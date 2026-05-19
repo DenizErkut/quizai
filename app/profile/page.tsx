@@ -4,32 +4,25 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 const GRADES = [
-  'ilkokul 1. sinif','ilkokul 2. sinif','ilkokul 3. sinif','ilkokul 4. sinif',
-  'ortaokul 5. sinif','ortaokul 6. sinif','ortaokul 7. sinif','ortaokul 8. sinif',
-  'lise 9. sinif','lise 10. sinif','lise 11. sinif','lise 12. sinif',
-  'universite 1. sinif','universite 2. sinif','universite 3. sinif','universite 4. sinif',
+  { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
+  { value: 'ilkokul 2. sinif', label: 'İlkokul 2. Sınıf' },
+  { value: 'ilkokul 3. sinif', label: 'İlkokul 3. Sınıf' },
+  { value: 'ilkokul 4. sinif', label: 'İlkokul 4. Sınıf' },
+  { value: 'ortaokul 5. sinif', label: 'Ortaokul 5. Sınıf' },
+  { value: 'ortaokul 6. sinif', label: 'Ortaokul 6. Sınıf' },
+  { value: 'ortaokul 7. sinif', label: 'Ortaokul 7. Sınıf' },
+  { value: 'ortaokul 8. sinif', label: 'Ortaokul 8. Sınıf' },
+  { value: 'lise 9. sinif', label: 'Lise 9. Sınıf' },
+  { value: 'lise 10. sinif', label: 'Lise 10. Sınıf' },
+  { value: 'lise 11. sinif', label: 'Lise 11. Sınıf' },
+  { value: 'lise 12. sinif', label: 'Lise 12. Sınıf' },
+  { value: 'universite 1. sinif', label: 'Üniversite 1. Sınıf' },
+  { value: 'universite 2. sinif', label: 'Üniversite 2. Sınıf' },
+  { value: 'universite 3. sinif', label: 'Üniversite 3. Sınıf' },
+  { value: 'universite 4. sinif', label: 'Üniversite 4. Sınıf' },
 ]
 
-const GRADE_LABELS: Record<string, string> = {
-  'ilkokul 1. sinif': 'İlkokul 1. Sınıf',
-  'ilkokul 2. sinif': 'İlkokul 2. Sınıf',
-  'ilkokul 3. sinif': 'İlkokul 3. Sınıf',
-  'ilkokul 4. sinif': 'İlkokul 4. Sınıf',
-  'ortaokul 5. sinif': 'Ortaokul 5. Sınıf',
-  'ortaokul 6. sinif': 'Ortaokul 6. Sınıf',
-  'ortaokul 7. sinif': 'Ortaokul 7. Sınıf',
-  'ortaokul 8. sinif': 'Ortaokul 8. Sınıf',
-  'lise 9. sinif': 'Lise 9. Sınıf',
-  'lise 10. sinif': 'Lise 10. Sınıf',
-  'lise 11. sinif': 'Lise 11. Sınıf',
-  'lise 12. sinif': 'Lise 12. Sınıf',
-  'universite 1. sinif': 'Üniversite 1. Sınıf',
-  'universite 2. sinif': 'Üniversite 2. Sınıf',
-  'universite 3. sinif': 'Üniversite 3. Sınıf',
-  'universite 4. sinif': 'Üniversite 4. Sınıf',
-}
-
-const LANGS = ['Türkçe','English','Deutsch','Français','Español']
+const LANGS = ['Türkçe', 'English', 'Deutsch', 'Français', 'Español']
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -53,19 +46,18 @@ export default function ProfilePage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    const profileData = {
-      name: (user.user_metadata?.name as string) || 'Kullanici',
-      age: parseInt(age),
-      gender: gender,
-      grade: grade,
-      school: school || null,
-      language: lang,
-    }
-
-    // Use raw query to avoid type conflicts
-    const { error: err } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: err } = await (supabase as any)
       .from('profiles')
-      .upsert({ id: user.id, ...profileData })
+      .upsert({
+        id: user.id,
+        name: (user.user_metadata?.name as string) || 'Kullanici',
+        age: parseInt(age),
+        gender: gender,
+        grade: grade,
+        school: school || null,
+        language: lang,
+      })
 
     setLoading(false)
     if (err) { setError(err.message); return }
@@ -73,7 +65,10 @@ export default function ProfilePage() {
   }
 
   return (
-    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
+    <main style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)',
+    }}>
       <div className="glow-blob" style={{ top: '-100px', right: '-100px' }} />
       <div style={{ width: '100%', maxWidth: '480px', position: 'relative', zIndex: 1 }}>
         <div className="anim-up" style={{ marginBottom: '1.5rem' }}>
@@ -106,7 +101,7 @@ export default function ProfilePage() {
           <select className="input" value={grade} onChange={e => setGrade(e.target.value)}>
             <option value="">Seç</option>
             {GRADES.map(g => (
-              <option key={g} value={g}>{GRADE_LABELS[g] || g}</option>
+              <option key={g.value} value={g.value}>{g.label}</option>
             ))}
           </select>
 

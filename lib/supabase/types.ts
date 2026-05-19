@@ -1,7 +1,3 @@
-// lib/supabase/types.ts
-// QuizAI — Supabase tablo tipleri
-// Bu dosyayı güncel tutmak için: npx supabase gen types typescript --linked > lib/supabase/types.ts
-
 export type Json =
   | string
   | number
@@ -18,7 +14,7 @@ export type Database = {
           id: string
           name: string
           age: number | null
-          gender: 'erkek' | 'kız' | 'belirtmek istemiyorum' | null
+          gender: string | null
           grade: string
           school: string | null
           language: string
@@ -29,7 +25,7 @@ export type Database = {
           id: string
           name: string
           age?: number | null
-          gender?: 'erkek' | 'kız' | 'belirtmek istemiyorum' | null
+          gender?: string | null
           grade: string
           school?: string | null
           language?: string
@@ -37,16 +33,16 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          id?: string
           name?: string
           age?: number | null
-          gender?: 'erkek' | 'kız' | 'belirtmek istemiyorum' | null
+          gender?: string | null
           grade?: string
           school?: string | null
           language?: string
           updated_at?: string
         }
       }
-
       quiz_sessions: {
         Row: {
           id: string
@@ -56,7 +52,7 @@ export type Database = {
           language: string
           question_count: number
           score: number
-          pct: number          // generated column
+          pct: number
           answers: QuizAnswer[]
           questions: QuizQuestion[]
           completed: boolean
@@ -81,17 +77,16 @@ export type Database = {
           completed?: boolean
         }
       }
-
       topic_suggestions: {
         Row: {
           id: number
-          level: 'ilkokul' | 'ortaokul' | 'lise' | 'üniversite'
+          level: string
           topic: string
           subject: string | null
           active: boolean
         }
         Insert: {
-          level: 'ilkokul' | 'ortaokul' | 'lise' | 'üniversite'
+          level: string
           topic: string
           subject?: string | null
           active?: boolean
@@ -101,7 +96,6 @@ export type Database = {
         }
       }
     }
-
     Views: {
       leaderboard: {
         Row: {
@@ -118,23 +112,19 @@ export type Database = {
   }
 }
 
-// ---------------------------------------------------------------
-// Domain tipleri
-// ---------------------------------------------------------------
 export interface QuizQuestion {
-  q: string        // soru metni
-  opts: string[]   // 4 şık
-  ans: number      // doğru şık index (0-3)
-  exp: string      // açıklama
+  q: string
+  opts: string[]
+  ans: number
+  exp: string
 }
 
 export interface QuizAnswer {
   questionIndex: number
-  userAns: number   // kullanıcının seçtiği index
+  userAns: number
   correct: boolean
 }
 
-// Supabase client için yardımcı tip
 export type Tables<T extends keyof Database['public']['Tables']> =
   Database['public']['Tables'][T]['Row']
 
