@@ -1,14 +1,14 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
-interface Question { q: string; opts: string[]; ans: number; exp: string }
-interface Profile {
-  name: string; grade: string; language: string;
-  plan: string; monthly_test_count: number
+interface Question {
+  q: string; opts: string[]; ans: number; exp: string
+  svg?: string | null; qtype?: 'text' | 'svg' | 'table'
 }
+interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number }
 
 const TOPIC_MAP: Record<string, { topic: string; subject: string }[]> = {
   ilkokul: [
@@ -48,7 +48,20 @@ const DIFFICULTIES = [
   { value: 'cok zor', label: 'Çok Zor', desc: 'Olimpiyat seviyesi', color: '#dc2626', bg: 'rgba(220,38,38,0.08)', border: 'rgba(220,38,38,0.3)' },
 ]
 
-// localStorage'dan güncel dili al — Navbar'dan değişince buraya yansır
+const FILE_TYPES = {
+  'application/pdf': { icon: '📄', label: 'PDF' },
+  'text/plain': { icon: '📝', label: 'TXT' },
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': { icon: '📃', label: 'DOCX' },
+  'application/msword': { icon: '📃', label: 'DOC' },
+  'image/jpeg': { icon: '🖼️', label: 'JPG' },
+  'image/png': { icon: '🖼️', label: 'PNG' },
+  'image/webp': { icon: '🖼️', label: 'WEBP' },
+  'audio/mpeg': { icon: '🎵', label: 'MP3' },
+  'audio/mp4': { icon: '🎵', label: 'M4A' },
+  'audio/wav': { icon: '🎵', label: 'WAV' },
+  'audio/ogg': { icon: '🎵', label: 'OGG' },
+} as Record<string, { icon: string; label: string }>
+
 function getActiveLang(profileLang?: string): string {
   if (typeof window === 'undefined') return profileLang || 'Türkçe'
   return localStorage.getItem('quizai_lang') || profileLang || 'Türkçe'
@@ -65,6 +78,16 @@ export default function QuizPage() {
   const [customTopic, setCustomTopic] = useState('')
   const [qCount, setQCount] = useState(10)
   const [difficulty, setDifficulty] = useState('normal')
+  const [includeVisuals, setIncludeVisuals] = useState(true)
+
+  // Dosya
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const [fileContent, setFileContent] = useState<string>('')
+  const [fileType, setFileType] = useState<string>('')
+  const [fileLoading, setFileLoading] = useState(false)
+  const [fileError, setFileError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const [questions, setQuestions] = useState<Question[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [current, setCurrent] = useState(0)
@@ -78,42 +101,74 @@ export default function QuizPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return null }
     const { data } = await supabase
-      .from('profiles')
-      .select('name,grade,language,plan,monthly_test_count')
+      .from('profiles').select('name,grade,language,plan,monthly_test_count')
       .eq('id', user.id).single()
     if (!data) { router.push('/profile'); return null }
-    // localStorage daha güncel — Navbar anında yazar
     const lang = getActiveLang(data.language)
     setProfile({ ...data, language: lang })
     setCurrentLang(lang)
     return { ...data, language: lang }
   }, [])
 
-  // İlk yükleme
   useEffect(() => { fetchProfile() }, [])
 
-  // localStorage değişimini izle (storage event — aynı sekme için polling)
   useEffect(() => {
-    function syncLang() {
+    const interval = setInterval(() => {
       const lang = getActiveLang(profile?.language)
-      if (lang !== currentLang) {
-        setCurrentLang(lang)
-        setProfile(prev => prev ? { ...prev, language: lang } : prev)
-      }
-    }
-    // storage event sadece diğer sekmelerden gelir, aynı sekme için interval kullan
-    const interval = setInterval(syncLang, 500)
-    window.addEventListener('storage', syncLang)
-    return () => {
-      clearInterval(interval)
-      window.removeEventListener('storage', syncLang)
-    }
+      if (lang !== currentLang) { setCurrentLang(lang); setProfile(prev => prev ? { ...prev, language: lang } : prev) }
+    }, 500)
+    return () => clearInterval(interval)
   }, [currentLang, profile?.language])
 
-  // Screen değişince yenile
-  useEffect(() => {
-    if (screen === 'topic') fetchProfile()
-  }, [screen])
+  useEffect(() => { if (screen === 'topic') fetchProfile() }, [screen])
+
+  // Dosya yükleme
+  async function handleFileUpload(file: File) {
+    setFileError('')
+    setFileLoading(true)
+    setUploadedFile(file)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await fetch('/api/extract-file', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+        body: formData,
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+
+      setFileContent(data.content)
+      setFileType(data.type)
+      // Dosya adını konu olarak öner
+      if (!customTopic) {
+        const name = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ')
+        setCustomTopic(name)
+      }
+    } catch (e: any) {
+      setFileError(e.message || 'Dosya yüklenemedi.')
+      setUploadedFile(null)
+    } finally {
+      setFileLoading(false)
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    const file = e.dataTransfer.files[0]
+    if (file) handleFileUpload(file)
+  }
+
+  function removeFile() {
+    setUploadedFile(null)
+    setFileContent('')
+    setFileType('')
+    setFileError('')
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
 
   function getLevel(grade: string) {
     return grade.startsWith('ilk') ? 'ilkokul'
@@ -127,7 +182,6 @@ export default function QuizPage() {
     if (!topic) { setTopicErr('Bir konu seç veya yaz.'); return }
     setTopicErr('')
 
-    // En güncel dili al
     const lang = getActiveLang(profile?.language)
     setCurrentLang(lang)
 
@@ -137,21 +191,26 @@ export default function QuizPage() {
 
     setScreen('loading')
     const msgs = [
-      'Profilin analiz ediliyor...',
+      fileContent ? 'Dosya içeriği analiz ediliyor...' : 'Profilin analiz ediliyor...',
       'Müfredat kontrol ediliyor...',
       `${difficulty.toUpperCase()} zorlukta sorular oluşturuluyor...`,
-      'Şıklar karıştırılıyor...',
+      includeVisuals ? 'Görsel içerikler hazırlanıyor...' : 'Şıklar karıştırılıyor...',
       'Son kontroller...',
     ]
     let mi = 0
-    const iv = setInterval(() => { mi = (mi + 1) % msgs.length; setLoadMsg(msgs[mi]) }, 900)
+    const iv = setInterval(() => { mi = (mi + 1) % msgs.length; setLoadMsg(msgs[mi]) }, 1000)
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/generate-quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ topic, questionCount: qCount, difficulty, language: lang }),
+        body: JSON.stringify({
+          topic, questionCount: qCount, difficulty, language: lang,
+          fileContent: fileContent || undefined,
+          fileType: fileType || undefined,
+          includeVisuals,
+        }),
       })
       const data = await res.json()
       clearInterval(iv)
@@ -203,7 +262,7 @@ export default function QuizPage() {
         <div style={{ fontSize: '48px', marginBottom: '1rem' }}>📚</div>
         <h2 className="serif" style={{ fontSize: '26px', marginBottom: '0.75rem' }}>Bu ayki test hakkın doldu</h2>
         <p style={{ color: 'var(--text2)', fontSize: '14px', marginBottom: '1.5rem', lineHeight: 1.7 }}>
-          Ücretsiz planda ayda 10 test hakkın var. Sınırsız test için Premium'a geç.
+          Ücretsiz planda ayda 10 test hakkın var.
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <Link href="/pricing" className="btn btn-primary btn-lg" style={{ justifyContent: 'center' }}>Premium'a geç →</Link>
@@ -216,26 +275,18 @@ export default function QuizPage() {
   // ── TOPIC ──
   if (screen === 'topic') return (
     <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
-      <div style={{ maxWidth: '620px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+
         {profile && (
           <div className="anim-up" style={{ marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: 42, height: 42, borderRadius: '50%',
-              background: 'var(--accent-bg)', border: '1.5px solid var(--accent)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--accent)', fontWeight: 600, fontSize: '15px',
-            }}>
+            <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--accent-bg)', border: '1.5px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontWeight: 600, fontSize: '15px' }}>
               {profile.name.slice(0, 2).toUpperCase()}
             </div>
             <div>
               <div style={{ fontWeight: 500 }}>Merhaba, {profile.name.split(' ')[0]}</div>
               <div style={{ fontSize: '12px', color: 'var(--text2)' }}>
                 {profile.grade} · {currentLang}
-                {testsLeft !== null && (
-                  <span style={{ marginLeft: '8px', color: testsLeft <= 2 ? 'var(--red)' : 'var(--text3)' }}>
-                    · {testsLeft} test kaldı
-                  </span>
-                )}
+                {testsLeft !== null && <span style={{ marginLeft: '8px', color: testsLeft <= 2 ? 'var(--red)' : 'var(--text3)' }}>· {testsLeft} test kaldı</span>}
               </div>
             </div>
           </div>
@@ -244,14 +295,11 @@ export default function QuizPage() {
         <div className="card anim-up-1">
           <h2 className="serif" style={{ fontSize: '24px', marginBottom: '0.25rem' }}>Hangi konuyu test edelim?</h2>
           <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1.5rem' }}>
-            Hazır konulardan birini seç ya da kendi konunu yaz.
-            {currentLang !== 'Türkçe' && (
-              <span style={{ color: 'var(--accent)', marginLeft: '6px' }}>
-                · Sorular {currentLang} dilinde gelecek
-              </span>
-            )}
+            Hazır konulardan seç, kendi konunu yaz veya dosya yükle.
+            {currentLang !== 'Türkçe' && <span style={{ color: 'var(--accent)', marginLeft: '6px' }}>· Sorular {currentLang} dilinde gelecek</span>}
           </p>
 
+          {/* Önerilen konular */}
           <label className="field-label">Önerilen konular</label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px', marginBottom: '1rem' }}>
             {suggestions.map(s => (
@@ -263,6 +311,7 @@ export default function QuizPage() {
             ))}
           </div>
 
+          {/* Konu yazma */}
           <label className="field-label">Veya kendi konunu yaz</label>
           <textarea className="input" rows={2}
             placeholder="Örn: Güneş sistemi, Osmanlı kuruluşu, Fotosentez..."
@@ -271,6 +320,71 @@ export default function QuizPage() {
             style={{ resize: 'none' }}
           />
 
+          {/* Dosya yükleme */}
+          <label className="field-label" style={{ marginTop: '16px' }}>Dosyadan soru üret</label>
+          {!uploadedFile ? (
+            <div
+              onDrop={handleDrop}
+              onDragOver={e => e.preventDefault()}
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                marginTop: '6px', padding: '20px', borderRadius: '10px',
+                border: '2px dashed var(--border)', background: 'var(--bg2)',
+                textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-bg)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg2)' }}
+            >
+              <div style={{ fontSize: '24px', marginBottom: '6px' }}>📎</div>
+              <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>
+                Dosya sürükle veya tıkla
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>
+                PDF · TXT · DOCX · JPG · PNG · MP3 · M4A · WAV
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.txt,.docx,.doc,.jpg,.jpeg,.png,.webp,.mp3,.m4a,.wav,.ogg"
+                style={{ display: 'none' }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }}
+              />
+            </div>
+          ) : (
+            <div style={{
+              marginTop: '6px', padding: '12px 14px', borderRadius: '10px',
+              border: '1.5px solid var(--accent)', background: 'var(--accent-bg)',
+              display: 'flex', alignItems: 'center', gap: '10px',
+            }}>
+              {fileLoading ? (
+                <>
+                  <div className="spinner" style={{ width: 20, height: 20, flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 500 }}>{uploadedFile.name}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text2)' }}>İşleniyor...</div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span style={{ fontSize: '22px', flexShrink: 0 }}>
+                    {FILE_TYPES[uploadedFile.type]?.icon || '📄'}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {uploadedFile.name}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--green)' }}>
+                      ✓ {fileContent.split(' ').length} kelime okundu · Sorular bu içerikten üretilecek
+                    </div>
+                  </div>
+                  <button onClick={removeFile} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: '16px', flexShrink: 0 }}>✕</button>
+                </>
+              )}
+            </div>
+          )}
+          {fileError && <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--red)' }}>{fileError}</div>}
+
+          {/* Zorluk */}
           <label className="field-label" style={{ marginTop: '16px' }}>Zorluk seviyesi</label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginTop: '6px' }}>
             {DIFFICULTIES.map(d => (
@@ -289,16 +403,37 @@ export default function QuizPage() {
             ))}
           </div>
 
-          <label className="field-label" style={{ marginTop: '16px' }}>Soru sayısı</label>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
-            {[5, 10, 15, ...(profile?.plan === 'premium' ? [20] : [])].map(n => (
-              <button key={n} className={`btn btn-sm ${qCount === n ? 'btn-primary' : ''}`}
-                onClick={() => setQCount(n)}>
-                {n} soru
+          {/* Soru sayısı + görsel toggle */}
+          <div style={{ display: 'flex', gap: '12px', marginTop: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1 }}>
+              <label className="field-label">Soru sayısı</label>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                {[5, 10, 15, ...(profile?.plan === 'premium' ? [20] : [])].map(n => (
+                  <button key={n} className={`btn btn-sm ${qCount === n ? 'btn-primary' : ''}`} onClick={() => setQCount(n)}>
+                    {n} soru
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="field-label">Görsel sorular</label>
+              <button
+                onClick={() => setIncludeVisuals(v => !v)}
+                style={{
+                  marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '8px 14px', borderRadius: '8px', cursor: 'pointer',
+                  border: `1.5px solid ${includeVisuals ? 'var(--accent)' : 'var(--border)'}`,
+                  background: includeVisuals ? 'var(--accent-bg)' : 'var(--bg2)',
+                  color: includeVisuals ? 'var(--accent)' : 'var(--text2)',
+                  fontSize: '13px', fontWeight: includeVisuals ? 600 : 400, transition: 'all 0.15s',
+                }}>
+                <span>{includeVisuals ? '📊' : '📝'}</span>
+                {includeVisuals ? 'Grafik & SVG açık' : 'Sadece metin'}
               </button>
-            ))}
+            </div>
           </div>
 
+          {/* Özet */}
           <div style={{
             marginTop: '1rem', padding: '12px 14px', borderRadius: '10px',
             background: 'var(--bg2)', border: '1px solid var(--border)',
@@ -307,13 +442,15 @@ export default function QuizPage() {
             <span>📝 {qCount} soru</span>
             <span style={{ color: activeDiff.color }}>⚡ {activeDiff.label}</span>
             <span>🌐 {currentLang}</span>
+            {fileContent && <span style={{ color: 'var(--green)' }}>📎 Dosyadan</span>}
+            {includeVisuals && <span style={{ color: 'var(--accent)' }}>📊 Görsel</span>}
           </div>
 
           {topicErr && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{topicErr}</div>}
 
-          <button className="btn btn-primary btn-lg" onClick={startQuiz}
+          <button className="btn btn-primary btn-lg" onClick={startQuiz} disabled={fileLoading}
             style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem' }}>
-            Test oluştur ⚡
+            {fileLoading ? 'Dosya işleniyor...' : 'Test oluştur ⚡'}
           </button>
         </div>
       </div>
@@ -336,19 +473,16 @@ export default function QuizPage() {
     const q = questions[current]
     const progPct = Math.round((current / questions.length) * 100)
     const diff = DIFFICULTIES.find(d => d.value === difficulty)!
+    const isSvgQ = q.qtype === 'svg' && q.svg
+
     return (
       <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
-        <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '640px', margin: '0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
             <span className="serif" style={{ fontSize: '18px' }}>Quiz<span style={{ color: 'var(--accent)' }}>AI</span></span>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <span style={{
-                fontSize: '12px', padding: '3px 8px', borderRadius: '99px',
-                background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600,
-              }}>{diff.label}</span>
-              <span style={{ fontSize: '13px', color: 'var(--text2)' }}>
-                {answers.filter(a => a.correct).length}/{current} doğru
-              </span>
+              <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '99px', background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600 }}>{diff.label}</span>
+              <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{answers.filter(a => a.correct).length}/{current} doğru</span>
             </div>
           </div>
           <div className="progress-bar" style={{ marginBottom: '1.5rem' }}>
@@ -356,12 +490,28 @@ export default function QuizPage() {
           </div>
 
           <div className="card anim-up">
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <span style={{ fontSize: '12px', color: 'var(--text3)', fontWeight: 500 }}>
-                Soru {current + 1} / {questions.length}
-              </span>
-              <span style={{ fontSize: '11px', color: 'var(--text3)' }}>🌐 {currentLang}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text3)', fontWeight: 500 }}>Soru {current + 1} / {questions.length}</span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {isSvgQ && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid rgba(91,76,245,0.2)' }}>📊 Görsel soru</span>}
+                <span style={{ fontSize: '11px', color: 'var(--text3)' }}>🌐 {currentLang}</span>
+              </div>
             </div>
+
+            {/* SVG görsel */}
+            {isSvgQ && (
+              <div style={{
+                marginBottom: '1rem', padding: '1rem', borderRadius: '10px',
+                background: 'var(--bg2)', border: '1px solid var(--border)',
+                overflow: 'hidden',
+              }}>
+                <div
+                  dangerouslySetInnerHTML={{ __html: q.svg! }}
+                  style={{ width: '100%', maxWidth: '100%' }}
+                />
+              </div>
+            )}
+
             <p style={{ fontSize: '17px', fontWeight: 500, lineHeight: 1.55, marginBottom: '1.5rem' }}>{q.q}</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -373,15 +523,8 @@ export default function QuizPage() {
                 }
                 return (
                   <button key={i} onClick={() => choose(i)} disabled={chosen !== null}
-                    style={{
-                      textAlign: 'left', padding: '12px 15px', borderRadius: '10px',
-                      border: `1.5px solid ${border}`, background: bg, color,
-                      font: '14px/1.45 "DM Sans", sans-serif',
-                      cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s',
-                    }}>
-                    <span style={{ fontWeight: 600, marginRight: '8px', opacity: 0.5 }}>
-                      {String.fromCharCode(65 + i)}.
-                    </span>
+                    style={{ textAlign: 'left', padding: '12px 15px', borderRadius: '10px', border: `1.5px solid ${border}`, background: bg, color, font: '14px/1.45 "DM Sans", sans-serif', cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s' }}>
+                    <span style={{ fontWeight: 600, marginRight: '8px', opacity: 0.5 }}>{String.fromCharCode(65 + i)}.</span>
                     {opt}
                   </button>
                 )
@@ -390,18 +533,13 @@ export default function QuizPage() {
 
             {chosen !== null && (
               <>
-                <div style={{
-                  marginTop: '1rem', padding: '12px 14px', borderRadius: '10px',
-                  background: 'var(--bg2)', borderLeft: '3px solid var(--accent)',
-                  fontSize: '13px', color: 'var(--text2)', lineHeight: 1.65,
-                }}>
+                <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', borderLeft: '3px solid var(--accent)', fontSize: '13px', color: 'var(--text2)', lineHeight: 1.65 }}>
                   <strong style={{ color: chosen === q.ans ? 'var(--green)' : 'var(--red)' }}>
                     {chosen === q.ans ? 'Doğru! ' : 'Yanlış. '}
                   </strong>
                   {q.exp}
                 </div>
-                <button className="btn btn-primary" onClick={next}
-                  style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}>
+                <button className="btn btn-primary" onClick={next} style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}>
                   {current + 1 < questions.length ? 'Sonraki soru →' : 'Sonuçları gör →'}
                 </button>
               </>
@@ -428,10 +566,8 @@ export default function QuizPage() {
           <div className="card anim-up" style={{ marginBottom: '1rem' }}>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem', flexWrap: 'wrap' }}>
               <div className="badge badge-purple">Test tamamlandı</div>
-              <span style={{
-                fontSize: '11px', padding: '3px 10px', borderRadius: '99px',
-                background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600,
-              }}>{diff.label}</span>
+              <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '99px', background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600 }}>{diff.label}</span>
+              {fileContent && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '99px', background: 'var(--green-bg)', color: 'var(--green)', border: '1px solid rgba(22,163,74,0.2)', fontWeight: 600 }}>📎 Dosyadan</span>}
             </div>
             <div style={{ textAlign: 'center', padding: '1rem 0' }}>
               <div className="serif" style={{ fontSize: '64px', lineHeight: 1 }}>
@@ -449,16 +585,19 @@ export default function QuizPage() {
           </div>
 
           <div className="card anim-up-1">
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Cevap özeti
-            </div>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cevap özeti</div>
             {questions.map((q, i) => (
               <div key={i} style={{ padding: '12px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: '13px', fontWeight: 700, color: answers[i]?.correct ? 'var(--green)' : 'var(--red)', flexShrink: 0 }}>
                     {answers[i]?.correct ? '✓' : '✗'}
                   </span>
-                  <div>
+                  <div style={{ flex: 1 }}>
+                    {q.qtype === 'svg' && q.svg && (
+                      <div style={{ marginBottom: '6px', padding: '8px', background: 'var(--bg2)', borderRadius: '8px', fontSize: '11px', color: 'var(--text3)' }}>
+                        📊 Görsel soru
+                      </div>
+                    )}
                     <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '3px' }}>{q.q}</div>
                     <div style={{ fontSize: '12px', color: 'var(--text2)' }}>
                       Doğru: {String.fromCharCode(65 + q.ans)}. {q.opts[q.ans]}

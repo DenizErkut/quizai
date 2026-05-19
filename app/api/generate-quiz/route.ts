@@ -8,9 +8,19 @@ interface ProfileParams {
   name: string; age: number; gender: string; grade: string
   gradeLevel: string; language: string; topic: string
   questionCount: number; difficulty: string
+  fileContent?: string; fileType?: string
+  includeVisuals?: boolean
 }
 
-interface Question { q: string; opts: string[]; ans: number; exp: string }
+interface Question {
+  q: string
+  opts: string[]
+  ans: number
+  exp: string
+  svg?: string        // opsiyonel SVG — görsel sorular için
+  table?: string[][]  // opsiyonel tablo verisi
+  qtype?: 'text' | 'svg' | 'table'
+}
 
 const CURRICULUM_SCOPE: Record<string, string> = {
   'ilkokul 1. sinif': 'Sayilari okuma/yazma (1-20), basit toplama cikarma (10a kadar), sekil tanima.',
@@ -28,17 +38,16 @@ const CURRICULUM_SCOPE: Record<string, string> = {
 }
 
 const DIFFICULTY_HINTS: Record<string, string> = {
-  'kolay': 'KOLAY: Temel tanım ve kavram soruları. Doğrudan hatırlama. Günlük hayattan çok basit örnekler. Şıklar arasındaki fark çok belirgin olsun.',
-  'normal': 'NORMAL: Müfredat seviyesinde standart sorular. Kavramların uygulaması. Şıklar makul düzeyde yakın.',
-  'zor': 'ZOR: Analiz ve sentez gerektiren sorular. Birden fazla adım. Şıklar birbirine yakın ve yanıltıcı olabilir.',
-  'cok zor': 'COK ZOR: Olimpiyat/sınav seviyesi. Derin analiz ve yaratıcı düşünme. Şıklar çok yakın ve detaylı. Zekice tuzaklar içerebilir.',
+  kolay: 'KOLAY: Temel tanim ve kavram sorulari. Dogrudan hatirlama. Siklar cok belirgin farkli.',
+  normal: 'NORMAL: Mufredat seviyesinde standart sorular. Kavramin uygulamasi.',
+  zor: 'ZOR: Analiz ve sentez gerektiren. Birden fazla adim. Siklar birbirine yakin.',
+  'cok zor': 'COK ZOR: Olimpiyat seviyesi. Derin analiz, yaratici dusunme. Zekice tuzaklar iceriyor.',
 }
 
 function getCurriculumNote(grade: string): string {
   const normalized = grade.toLowerCase().trim()
     .replace(/\u0131/g, 'i').replace(/\u015f/g, 's').replace(/\u011f/g, 'g')
     .replace(/\u00fc/g, 'u').replace(/\u00f6/g, 'o').replace(/\u00e7/g, 'c')
-
   for (const [k, v] of Object.entries(CURRICULUM_SCOPE)) {
     const kn = k.replace(/\u0131/g, 'i').replace(/\u015f/g, 's').replace(/\u011f/g, 'g')
       .replace(/\u00fc/g, 'u').replace(/\u00f6/g, 'o').replace(/\u00e7/g, 'c')
@@ -52,6 +61,26 @@ function buildPrompt(p: ProfileParams): string {
   const difficultyHint = DIFFICULTY_HINTS[p.difficulty] || DIFFICULTY_HINTS['normal']
   const answerPattern = Array.from({ length: p.questionCount }, (_, i) => i % 4).join(', ')
 
+  const fileSection = p.fileContent ? `
+DOSYA ICERIGI (bu icerikten sorular uret):
+---
+${p.fileContent.slice(0, 6000)}
+---
+Not: Sorulari bu dosya iceriginden uret. Konu olarak "${p.topic}" kullan.
+` : ''
+
+  const visualSection = p.includeVisuals ? `
+GORSEL SORU TALIMATI:
+Sorularin yaklasik %30-40'i gorsel ierikli olabilir. Gorsel soru olusturmak istediginde:
+- "qtype": "svg" yaz
+- "svg" alanina gecerli bir SVG kodu yaz (viewBox="0 0 400 250", width/height olmadan)
+- SVG icinde: cizgi grafigi, sutun grafigi, pasta grafik, geometrik sekil, koordinat sistemi
+- SVG renkleri: #5b4cf5 (ana), #16a34a (yesil), #dc2626 (kirmizi), #d97706 (turuncu), #64748b (gri)
+- SVG font: font-family="sans-serif" kullan
+- Soru metni SVG'ye referans vermeli: "Asagidaki grafige gore..." veya "Sekilye bakildiginda..."
+Gorsel olmayan sorular icin "qtype": "text" yaz, "svg" alani olmayacak.
+` : ''
+
   return `Sen Turkiye MEB mufredatina hakim deneyimli bir egitim uzmanisın.
 
 Ogrenci profili:
@@ -61,35 +90,34 @@ Ogrenci profili:
 - Cinsiyet: ${p.gender}
 - Test konusu: ${p.topic}
 - Yanitlama dili: ${p.language}
-- Zorluk seviyesi: ${p.difficulty.toUpperCase()}
-
-ZORLUK TALIMATI:
-${difficultyHint}
-
+- Zorluk: ${p.difficulty.toUpperCase()}
+${fileSection}
 MEB MUFREDAT SINIRI:
-${curriculumNote ? `${p.grade} icin kapsam: ${curriculumNote}` : `${p.grade} seviyesine uygun konularla sinirli tut.`}
-Ust siniflara ait kavram veya kisaltma KULLANMA.
+${curriculumNote ? `${p.grade} icin kapsam: ${curriculumNote}` : `${p.grade} seviyesine uygun tut.`}
 
-Gorev: "${p.topic}" konusunda ${p.questionCount} adet coktan secmeli soru hazirla.
-Sorularin zorluk seviyesi MUTLAKA ${p.difficulty.toUpperCase()} olmali.
+ZORLUK: ${difficultyHint}
+${visualSection}
+Gorev: ${p.questionCount} adet coktan secmeli soru hazirla.
 
 CEVAP DAGILIMI:
 - "ans" degerlerini sirasıyla ata: ${answerPattern}
-- ASLA tum sorularin ans=0 yapma.
+- ASLA hepsini ans=0 yapma.
 
 Kurallar:
 - Her soruda tam olarak 4 sik (opts 4 elemanli).
 - Aciklama 1-2 cumle, ogretici, ${p.language} dilinde.
 - Sorular birbirini tekrar etmemeli.
 
-SADECE JSON formatinda yanit ver:
+SADECE asagidaki JSON formatinda yanit ver, baska hicbir sey yazma:
 {
   "questions": [
     {
-      "q": "Soru?",
+      "qtype": "text",
+      "q": "Soru metni?",
       "opts": ["A", "B", "C", "D"],
       "ans": 0,
-      "exp": "Aciklama."
+      "exp": "Aciklama.",
+      "svg": null
     }
   ]
 }`
@@ -102,7 +130,6 @@ export async function POST(req: NextRequest) {
   }
   const token = authHeader.slice(7)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -121,6 +148,9 @@ export async function POST(req: NextRequest) {
   const questionCount: number = Math.min(body.questionCount ?? 10, 20)
   const difficulty: string = body.difficulty || 'normal'
   const language: string = body.language || profile.language
+  const fileContent: string | undefined = body.fileContent
+  const fileType: string | undefined = body.fileType
+  const includeVisuals: boolean = body.includeVisuals ?? true
 
   if (!topic) return NextResponse.json({ error: 'Konu belirtilmedi.' }, { status: 400 })
 
@@ -129,22 +159,33 @@ export async function POST(req: NextRequest) {
     : profile.grade.startsWith('lise') ? 'lise'
     : 'universite'
 
-  const prompt = buildPrompt({ name: profile.name, age: profile.age, gender: profile.gender, grade: profile.grade, gradeLevel, language, topic, questionCount, difficulty })
+  const prompt = buildPrompt({
+    name: profile.name, age: profile.age, gender: profile.gender,
+    grade: profile.grade, gradeLevel, language, topic, questionCount,
+    difficulty, fileContent, fileType, includeVisuals,
+  })
 
   let questions: Question[]
   try {
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
+      max_tokens: 6000,
       messages: [{ role: 'user', content: prompt }],
     })
-    const raw = (message.content[0] as { text: string }).text.replace(/```json|```/g, '').trim()
+    const raw = (message.content[0] as { text: string }).text
+      .replace(/```json|```/g, '').trim()
     questions = JSON.parse(raw).questions
 
+    // Şıkları karıştır — doğru cevap indexini güncelle
     questions = questions.map((q: Question) => {
       const correctOpt = q.opts[q.ans]
       const shuffled = [...q.opts].sort(() => Math.random() - 0.5)
-      return { ...q, opts: shuffled, ans: shuffled.indexOf(correctOpt) }
+      return {
+        ...q,
+        opts: shuffled,
+        ans: shuffled.indexOf(correctOpt),
+        qtype: q.qtype || (q.svg ? 'svg' : 'text'),
+      }
     })
   } catch (e) {
     console.error('Claude API hatasi:', e)
@@ -153,10 +194,17 @@ export async function POST(req: NextRequest) {
 
   const { data: session } = await supabase
     .from('quiz_sessions')
-    .insert({ user_id: user.id, topic, grade: profile.grade, language, question_count: questionCount, questions, answers: [], completed: false })
+    .insert({
+      user_id: user.id, topic, grade: profile.grade, language,
+      question_count: questionCount, questions, answers: [], completed: false,
+    })
     .select('id').single()
 
-  return NextResponse.json({ sessionId: session?.id ?? null, questions, profile: { name: profile.name, grade: profile.grade, language } })
+  return NextResponse.json({
+    sessionId: session?.id ?? null,
+    questions,
+    profile: { name: profile.name, grade: profile.grade, language },
+  })
 }
 
 export async function PATCH(req: NextRequest) {
@@ -164,7 +212,6 @@ export async function PATCH(req: NextRequest) {
   if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   const token = authHeader.slice(7)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -175,8 +222,11 @@ export async function PATCH(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
   const { sessionId, answers, score } = await req.json()
-  const { error } = await supabase.from('quiz_sessions').update({ answers, score, completed: true }).eq('id', sessionId).eq('user_id', user.id)
-  if (error) return NextResponse.json({ error: 'Kayit basarisiz.' }, { status: 500 })
+  const { error } = await supabase
+    .from('quiz_sessions')
+    .update({ answers, score, completed: true })
+    .eq('id', sessionId).eq('user_id', user.id)
 
+  if (error) return NextResponse.json({ error: 'Kayit basarisiz.' }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
