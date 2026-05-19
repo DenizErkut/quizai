@@ -6,10 +6,129 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 })
 
+interface ProfileParams {
+  name: string
+  age: number
+  gender: string
+  grade: string
+  gradeLevel: string
+  language: string
+  topic: string
+  questionCount: number
+}
+
+interface Question {
+  q: string
+  opts: string[]
+  ans: number
+  exp: string
+}
+
+const CURRICULUM_SCOPE: Record<string, string> = {
+  'ilkokul 1. sinif': 'Sayilari okuma/yazma (1-20), basit toplama cikarma (10a kadar), sekil tanima, gunluk hayat kelimeleri.',
+  'ilkokul 2. sinif': 'Toplama cikarma (100e kadar), saat okuma (tam ve yarim), uzunluk olcme, hece ve kelime.',
+  'ilkokul 3. sinif': 'Carpma islemi (2,3,4,5 ile), bolme kavrami, kesir kavrami (1/2, 1/4), cevre ve alan kavrami.',
+  'ilkokul 4. sinif': 'Carpim tablosu (1-9), dort islem, ondalik gosterim (baslangic), kesirler, veri okuma.',
+  'ortaokul 5. sinif': 'Dogal sayilar, tam sayilara giris, kesirler ve ondalik sayilar, yuzde kavrami (basit), alan ve cevre hesabi, veri analizi.',
+  'ortaokul 6. sinif': 'Tam sayilar ve islemler, kesirler (dort islem), oran ve orani (giris), temel geometri (acilar, cokgenler), veri analizi. OBEB ve OKEK bu sinifta mufredatta YOKTUR.',
+  'ortaokul 7. sinif': 'Tam sayilar (dort islem), rasyonel sayilar, oran-orani, yuzde hesabi, denklemler (basit), veri analizi, cember ve daire.',
+  'ortaokul 8. sinif': 'Carpanlara ayirma, denklem sistemleri (giris), ucgenler (benzerlik), Pisagor teoremi, olasilik, istatistik.',
+  'lise 9. sinif': 'Kumeler, sayi sistemleri, mutlak deger, denklem ve esitsizlikler, fonksiyon kavrami, trigonometri (giris), analitik geometri.',
+  'lise 10. sinif': 'Polinomlar, ikinci derece denklemler, logaritma, trigonometri, dortgenler, olasilik.',
+  'lise 11. sinif': 'Turev, integral (giris), karmasik sayilar, istatistik, ucgenlerde alan, koniler ve kureler.',
+  'lise 12. sinif': 'Integral uygulamalari, dizi ve seriler, olasilik (ileri), analitik geometri (konikler).',
+}
+
+function getCurriculumNote(grade: string): string {
+  const key = grade.toLowerCase().trim()
+  // Try exact match first
+  if (CURRICULUM_SCOPE[key]) return CURRICULUM_SCOPE[key]
+  // Try normalized (remove accent chars)
+  const normalized = key
+    .replace(/\u0131/g, 'i')
+    .replace(/\u015f/g, 's')
+    .replace(/\u011f/g, 'g')
+    .replace(/\u00fc/g, 'u')
+    .replace(/\u00f6/g, 'o')
+    .replace(/\u00e7/g, 'c')
+    .replace(/\u00e2/g, 'a')
+  for (const k of Object.keys(CURRICULUM_SCOPE)) {
+    const kn = k
+      .replace(/\u0131/g, 'i')
+      .replace(/\u015f/g, 's')
+      .replace(/\u011f/g, 'g')
+      .replace(/\u00fc/g, 'u')
+      .replace(/\u00f6/g, 'o')
+      .replace(/\u00e7/g, 'c')
+      .replace(/\u00e2/g, 'a')
+    if (kn === normalized) return CURRICULUM_SCOPE[k]
+  }
+  return ''
+}
+
+function buildPrompt(p: ProfileParams): string {
+  const difficultyHint: Record<string, string> = {
+    ilkokul: 'Cok basit ve somut cumleler, gunluk hayattan ornekler. Soyut kavramlardan kacin.',
+    ortaokul: 'Orta zorluk, kavram odakli. Formul gerektiren sorularda basit sayilar kullan.',
+    lise: 'Analitik dusunme gerektiren, formul ve ilke uygulamasi icerebilir.',
+    universite: 'Akademik ve teknik terimler kullanilabilir, derinlikli ve uygulamali sorular.',
+  }
+
+  const curriculumNote = getCurriculumNote(p.grade)
+
+  const answerPattern = Array.from(
+    { length: p.questionCount },
+    (_, i) => i % 4
+  ).join(', ')
+
+  return `Sen Turkiye MEB mufredatina hakim deneyimli bir egitim uzmanisın.
+
+Ogrenci profili:
+- Ad: ${p.name}
+- Sinif: ${p.grade}
+- Yas: ${p.age}
+- Cinsiyet: ${p.gender}
+- Test konusu: ${p.topic}
+- Yanitlama dili: ${p.language}
+
+MEB MUFREDAT SINIRI:
+${curriculumNote ? `${p.grade} icin kapsam: ${curriculumNote}` : `${p.grade} seviyesine uygun konularla sinirli tut.`}
+Ust siniflara ait kavram, formul veya kisaltma KULLANMA.
+Ogrencinin yasina (${p.age}) uygun bir dil kullan.
+
+Zorluk: ${difficultyHint[p.gradeLevel] ?? ''}
+
+Gorev: "${p.topic}" konusunda ${p.questionCount} adet coktan secmeli soru hazirla.
+
+CEVAP DAGILIMI KURALI:
+- "ans" degerlerini sirasıyla su sekilde ata: ${answerPattern}
+- Yani 1. soru ans=0, 2. soru ans=1, 3. soru ans=2, 4. soru ans=3, 5. soru ans=0 ...
+- Dogru cevabi o indexe yerlestir; diger siklara makul ama yanlis secenekler koy.
+- ASLA tum sorularin ans degerini 0 yapma.
+
+Diger kurallar:
+- Her soruda tam olarak 4 sik (opts dizisi 4 elemanli).
+- Siklar net ayrimli ama yakin zorlukta olmali.
+- Aciklama 1-2 cumle, ogretici ve sade, ${p.language} dilinde yaz.
+- Sorular birbirini tekrar etmemeli.
+
+SADECE asagidaki JSON formatinda yanit ver, baska hicbir sey yazma:
+{
+  "questions": [
+    {
+      "q": "Soru metni?",
+      "opts": ["Sik A", "Sik B", "Sik C", "Sik D"],
+      "ans": 0,
+      "exp": "Aciklama."
+    }
+  ]
+}`
+}
+
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Yetkisiz erişim.' }, { status: 401 })
+    return NextResponse.json({ error: 'Yetkisiz erisim.' }, { status: 401 })
   }
   const token = authHeader.slice(7)
 
@@ -21,7 +140,7 @@ export async function POST(req: NextRequest) {
 
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
   if (authErr || !user) {
-    return NextResponse.json({ error: 'Oturum geçersiz.' }, { status: 401 })
+    return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 })
   }
 
   const { data: profile, error: profileErr } = await supabase
@@ -31,7 +150,7 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (profileErr || !profile) {
-    return NextResponse.json({ error: 'Profil bulunamadı.' }, { status: 404 })
+    return NextResponse.json({ error: 'Profil bulunamadi.' }, { status: 404 })
   }
 
   const body = await req.json()
@@ -45,7 +164,7 @@ export async function POST(req: NextRequest) {
   const gradeLevel = profile.grade.startsWith('ilk') ? 'ilkokul'
     : profile.grade.startsWith('orta') ? 'ortaokul'
     : profile.grade.startsWith('lise') ? 'lise'
-    : 'üniversite'
+    : 'universite'
 
   const prompt = buildPrompt({
     name: profile.name,
@@ -72,7 +191,6 @@ export async function POST(req: NextRequest) {
     const parsed = JSON.parse(raw)
     questions = parsed.questions
 
-    // Şıkları karıştır — doğru cevap index'ini güncelle
     questions = questions.map((q: Question) => {
       const correctOpt = q.opts[q.ans]
       const shuffled = [...q.opts].sort(() => Math.random() - 0.5)
@@ -83,8 +201,8 @@ export async function POST(req: NextRequest) {
       }
     })
   } catch (e) {
-    console.error('Claude API hatası:', e)
-    return NextResponse.json({ error: 'Sorular üretilemedi.' }, { status: 500 })
+    console.error('Claude API hatasi:', e)
+    return NextResponse.json({ error: 'Sorular uretilemedi.' }, { status: 500 })
   }
 
   const { data: session } = await supabase
@@ -138,107 +256,8 @@ export async function PATCH(req: NextRequest) {
     .eq('user_id', user.id)
 
   if (error) {
-    return NextResponse.json({ error: 'Kayıt başarısız.' }, { status: 500 })
+    return NextResponse.json({ error: 'Kayit basarisiz.' }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true })
-}
-
-interface ProfileParams {
-  name: string
-  age: number
-  gender: string
-  grade: string
-  gradeLevel: string
-  language: string
-  topic: string
-  questionCount: number
-}
-
-interface Question {
-  q: string
-  opts: string[]
-  ans: number
-  exp: string
-}
-
-// Türkiye MEB müfredatına göre sınıf bazlı kapsam tanımları
-const CURRICULUM_SCOPE: Record<string, string> = {
-  'ilkokul 1. sınıf': 'Sayıları okuma/yazma (1-20), basit toplama çıkarma (10'a kadar), şekil tanıma, günlük hayat kelimeleri.',
-  'ilkokul 2. sınıf': 'Toplama çıkarma (100'e kadar), saat okuma (tam ve yarım), uzunluk ölçme, hece ve kelime.',
-  'ilkokul 3. sınıf': 'Çarpma işlemi (2,3,4,5 ile), bölme kavramı, kesir kavramı (1/2, 1/4), çevre ve alan kavramı.',
-  'ilkokul 4. sınıf': 'Çarpım tablosu (1-9), dört işlem, ondalık gösterim (başlangıç), kesirler, veri okuma.',
-  'ortaokul 5. sınıf': 'Doğal sayılar, tam sayılara giriş, kesirler ve ondalık sayılar, yüzde kavramı (basit), alan ve çevre hesabı, veri analizi.',
-  'ortaokul 6. sınıf': 'Tam sayılar ve işlemler, kesirler (dört işlem), oran ve orantı (giriş), temel geometri (açılar, çokgenler), veri analizi. NOT: OBEB ve OKEK 6. sınıfta müfredatta YOKTUR, kullanma.',
-  'ortaokul 7. sınıf': 'Tam sayılar (dört işlem), rasyonel sayılar, oran-orantı, yüzde hesabı, denklemler (basit), veri analizi, çember ve daire (alan-çevre).',
-  'ortaokul 8. sınıf': 'Çarpanlara ayırma, denklem sistemleri (giriş), üçgenler (benzerlik), Pisagor teoremi, olasılık, istatistik.',
-  'lise 9. sınıf': 'Kümeler, sayı sistemleri, mutlak değer, denklem ve eşitsizlikler, fonksiyon kavramı, trigonometri (giriş), analitik geometri (nokta ve doğru).',
-  'lise 10. sınıf': 'Polinomlar, ikinci derece denklemler, logaritma, trigonometri, dörtgenler, olasılık.',
-  'lise 11. sınıf': 'Türev, integral (giriş), karmaşık sayılar, istatistik, üçgenlerde alan, koniler ve küreler.',
-  'lise 12. sınıf': 'İntegral uygulamaları, dizi ve seriler, olasılık (ileri), analitik geometri (konikler).',
-}
-
-function getCurriculumNote(grade: string): string {
-  const key = grade.toLowerCase().trim()
-  return CURRICULUM_SCOPE[key] ?? ''
-}
-
-function buildPrompt(p: ProfileParams): string {
-  const difficultyHint: Record<string, string> = {
-    ilkokul:    'Çok basit ve somut cümleler, günlük hayattan örnekler. Soyut kavramlardan kaçın.',
-    ortaokul:   'Orta zorluk, kavram odaklı. Formül gerektiren sorularda basit sayılar kullan.',
-    lise:       'Analitik düşünme gerektiren, formül ve ilke uygulaması içerebilir.',
-    üniversite: 'Akademik ve teknik terimler kullanılabilir, derinlikli ve uygulamalı sorular.',
-  }
-
-  const curriculumNote = getCurriculumNote(p.grade)
-
-  const answerPattern = Array.from(
-    { length: p.questionCount },
-    (_, i) => i % 4
-  ).join(', ')
-
-  return `Sen Türkiye MEB müfredatına hâkim deneyimli bir eğitim uzmanısın.
-
-Öğrenci profili:
-- Ad: ${p.name}
-- Sınıf: ${p.grade}
-- Yaş: ${p.age} yaşında
-- Cinsiyet: ${p.gender}
-- Test konusu: ${p.topic}
-- Yanıt dili: ${p.language}
-
-MEB MÜFREDAт SINIRI — ÇOK ÖNEMLİ:
-${curriculumNote ? `${p.grade} için MEB müfredatı kapsamı: ${curriculumNote}` : `${p.grade} seviyesine uygun, bu sınıfta öğretilen konularla sınırlı tut.`}
-
-Bu sınıfın MÜFREDATINDAKİ konuları sor. Üst sınıflara ait kavram, formül veya kısaltma KULLANMA.
-Öğrencinin yaşına (${p.age}) ve bilgi birikimine uygun bir dil kullan.
-
-Zorluk: ${difficultyHint[p.gradeLevel] ?? ''}
-
-Görev: "${p.topic}" konusunda ${p.questionCount} adet çoktan seçmeli soru hazırla.
-
-KRİTİK KURAL — CEVAP DAĞILIMI:
-- "ans" değerlerini sırayla şöyle ata: ${answerPattern}
-- Yani 1. soru ans=0, 2. soru ans=1, 3. soru ans=2, 4. soru ans=3, 5. soru ans=0 ...
-- Doğru cevabı o index'e yerleştir; diğer şıklara makul ama yanlış seçenekler koy.
-- ASLA tüm soruların ans değerini 0 yapma.
-
-Diğer kurallar:
-- Her soruda tam olarak 4 şık (opts dizisi 4 elemanlı).
-- Şıklar net ayrımlı ama yakın zorlukta olmalı.
-- Açıklama 1-2 cümle, öğretici ve sade, ${p.language} dilinde.
-- Sorular birbirini tekrar etmemeli.
-
-SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir şey yazma:
-{
-  "questions": [
-    {
-      "q": "Soru metni?",
-      "opts": ["Şık A", "Şık B", "Şık C", "Şık D"],
-      "ans": 0,
-      "exp": "Açıklama."
-    }
-  ]
-}`
 }
