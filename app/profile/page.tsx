@@ -42,22 +42,19 @@ export default function ProfilePage() {
     setError('')
     setLoading(true)
 
-    const supabase = createClient()
+    const supabase = createClient() as any
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: err } = await (supabase as any)
-      .from('profiles')
-      .upsert({
-        id: user.id,
-        name: (user.user_metadata?.name as string) || 'Kullanici',
-        age: parseInt(age),
-        gender: gender,
-        grade: grade,
-        school: school || null,
-        language: lang,
-      })
+    const { error: err } = await supabase.from('profiles').upsert({
+      id: user.id,
+      name: (user.user_metadata?.name as string) || user.email?.split('@')[0] || 'Kullanici',
+      age: parseInt(age),
+      gender,
+      grade,
+      school: school || null,
+      language: lang,
+    })
 
     setLoading(false)
     if (err) { setError(err.message); return }
@@ -69,8 +66,7 @@ export default function ProfilePage() {
       minHeight: '100vh', display: 'flex', alignItems: 'center',
       justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)',
     }}>
-      <div className="glow-blob" style={{ top: '-100px', right: '-100px' }} />
-      <div style={{ width: '100%', maxWidth: '480px', position: 'relative', zIndex: 1 }}>
+      <div style={{ width: '100%', maxWidth: '480px' }}>
         <div className="anim-up" style={{ marginBottom: '1.5rem' }}>
           <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>Adım 2 / 2</div>
           <h1 className="serif" style={{ fontSize: '30px', lineHeight: 1.2 }}>Profilini kur</h1>
@@ -91,7 +87,8 @@ export default function ProfilePage() {
               <select className="input" value={gender} onChange={e => setGender(e.target.value)}>
                 <option value="">Seç</option>
                 <option value="erkek">Erkek</option>
-                <option value="kiz">Kız</option>
+                <option value="kadin">Kadın</option>
+                <option value="diger">Diğer</option>
                 <option value="belirtmek istemiyorum">Belirtmek istemiyorum</option>
               </select>
             </div>
@@ -100,9 +97,7 @@ export default function ProfilePage() {
           <label className="field-label">Sınıf / eğitim seviyesi</label>
           <select className="input" value={grade} onChange={e => setGrade(e.target.value)}>
             <option value="">Seç</option>
-            {GRADES.map(g => (
-              <option key={g.value} value={g.value}>{g.label}</option>
-            ))}
+            {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
           </select>
 
           <label className="field-label">Okul (isteğe bağlı)</label>
