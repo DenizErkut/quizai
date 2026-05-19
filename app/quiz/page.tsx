@@ -5,7 +5,10 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 interface Question { q: string; opts: string[]; ans: number; exp: string }
-interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number }
+interface Profile {
+  name: string; grade: string; language: string;
+  plan: string; monthly_test_count: number
+}
 
 const TOPIC_MAP: Record<string, { topic: string; subject: string }[]> = {
   ilkokul: [
@@ -18,12 +21,12 @@ const TOPIC_MAP: Record<string, { topic: string; subject: string }[]> = {
   ortaokul: [
     { topic: 'Ondalik sayilar', subject: 'Matematik' },
     { topic: 'Hucre ve organeller', subject: 'Fen' },
-    { topic: 'Osmanli Imparatorlugu kuruluu', subject: 'Tarih' },
-    { topic: 'Denklemler ve esitsizlikler', subject: 'Matematik' },
-    { topic: 'Tam sayilar ve islemler', subject: 'Matematik' },
+    { topic: 'Osmanli tarihi', subject: 'Tarih' },
+    { topic: 'Denklemler', subject: 'Matematik' },
+    { topic: 'Tam sayilar', subject: 'Matematik' },
   ],
   lise: [
-    { topic: 'Turev ve integral temelleri', subject: 'Matematik' },
+    { topic: 'Turev temelleri', subject: 'Matematik' },
     { topic: 'Organik kimya', subject: 'Kimya' },
     { topic: 'Ataturk ilkeleri', subject: 'Tarih' },
     { topic: 'Logaritma', subject: 'Matematik' },
@@ -31,12 +34,56 @@ const TOPIC_MAP: Record<string, { topic: string; subject: string }[]> = {
   ],
   universite: [
     { topic: 'Ucagin kisimlar', subject: 'Havacilik' },
-    { topic: 'Termodinamik yasalari', subject: 'Fizik' },
+    { topic: 'Termodinamik', subject: 'Fizik' },
     { topic: 'Diferansiyel denklemler', subject: 'Matematik' },
-    { topic: 'Makroekonomi temelleri', subject: 'Iktisat' },
-    { topic: 'Veri yapilari ve algoritmalar', subject: 'Bilisim' },
+    { topic: 'Makroekonomi', subject: 'Iktisat' },
+    { topic: 'Veri yapilari', subject: 'Bilisim' },
   ],
 }
+
+const LANGS = [
+  { code: 'Türkçe', flag: '🇹🇷' },
+  { code: 'English', flag: '🇬🇧' },
+  { code: 'Deutsch', flag: '🇩🇪' },
+  { code: 'Français', flag: '🇫🇷' },
+  { code: 'Español', flag: '🇪🇸' },
+  { code: 'العربية', flag: '🇸🇦' },
+]
+
+const DIFFICULTIES = [
+  {
+    value: 'kolay',
+    label: 'Kolay',
+    desc: 'Temel kavramlar',
+    color: '#16a34a',
+    bg: 'rgba(22,163,74,0.08)',
+    border: 'rgba(22,163,74,0.3)',
+  },
+  {
+    value: 'normal',
+    label: 'Normal',
+    desc: 'Müfredat seviyesi',
+    color: '#2563eb',
+    bg: 'rgba(37,99,235,0.08)',
+    border: 'rgba(37,99,235,0.3)',
+  },
+  {
+    value: 'zor',
+    label: 'Zor',
+    desc: 'Analiz gerektiren',
+    color: '#d97706',
+    bg: 'rgba(217,119,6,0.08)',
+    border: 'rgba(217,119,6,0.3)',
+  },
+  {
+    value: 'cok zor',
+    label: 'Çok Zor',
+    desc: 'Olimpiyat seviyesi',
+    color: '#dc2626',
+    bg: 'rgba(220,38,38,0.08)',
+    border: 'rgba(220,38,38,0.3)',
+  },
+]
 
 type Screen = 'topic' | 'loading' | 'quiz' | 'result' | 'limit'
 
@@ -47,6 +94,9 @@ export default function QuizPage() {
   const [selectedTopic, setSelectedTopic] = useState('')
   const [customTopic, setCustomTopic] = useState('')
   const [qCount, setQCount] = useState(10)
+  const [difficulty, setDifficulty] = useState('normal')
+  const [activeLang, setActiveLang] = useState('Türkçe')
+  const [showLangPicker, setShowLangPicker] = useState(false)
   const [questions, setQuestions] = useState<Question[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [current, setCurrent] = useState(0)
@@ -66,9 +116,17 @@ export default function QuizPage() {
         .eq('id', user.id).single()
       if (!data) { router.push('/profile'); return }
       setProfile(data)
+      setActiveLang(data.language || 'Türkçe')
     }
     load()
   }, [])
+
+  async function saveLang(lang: string) {
+    setActiveLang(lang)
+    setShowLangPicker(false)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) await supabase.from('profiles').update({ language: lang }).eq('id', user.id)
+  }
 
   function getLevel(grade: string) {
     return grade.startsWith('ilk') ? 'ilkokul'
@@ -82,14 +140,18 @@ export default function QuizPage() {
     if (!topic) { setTopicErr('Bir konu seç veya yaz.'); return }
     setTopicErr('')
 
-    // Freemium limit kontrolu
     if (profile?.plan === 'free' && (profile?.monthly_test_count || 0) >= 10) {
-      setScreen('limit')
-      return
+      setScreen('limit'); return
     }
 
     setScreen('loading')
-    const msgs = ['Profilin analiz ediliyor...', 'Mufredat kontrol ediliyor...', 'Sorular olusturuluyor...', 'Zorluk ayarlaniyor...', 'Son kontroller...']
+    const msgs = [
+      'Profilin analiz ediliyor...',
+      'Müfredat kontrol ediliyor...',
+      `${difficulty.toUpperCase()} zorlukta sorular oluşturuluyor...`,
+      'Şıklar karıştırılıyor...',
+      'Son kontroller...',
+    ]
     let mi = 0
     const iv = setInterval(() => { mi = (mi + 1) % msgs.length; setLoadMsg(msgs[mi]) }, 900)
 
@@ -98,22 +160,19 @@ export default function QuizPage() {
       const res = await fetch('/api/generate-quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ topic, questionCount: qCount }),
+        body: JSON.stringify({ topic, questionCount: qCount, difficulty, language: activeLang }),
       })
       const data = await res.json()
       clearInterval(iv)
       if (!res.ok) throw new Error(data.error)
-
-      // Profil sayacini guncelle
       setProfile(prev => prev ? { ...prev, monthly_test_count: (prev.monthly_test_count || 0) + 1 } : prev)
-
       setQuestions(data.questions)
       setSessionId(data.sessionId)
       setCurrent(0); setAnswers([]); setChosen(null)
       setScreen('quiz')
     } catch {
       clearInterval(iv)
-      setLoadMsg('Hata olustu, tekrar deneyin.')
+      setLoadMsg('Hata oluştu, tekrar deneyin.')
       setTimeout(() => setScreen('topic'), 2000)
     }
   }
@@ -121,8 +180,7 @@ export default function QuizPage() {
   function choose(idx: number) {
     if (chosen !== null) return
     setChosen(idx)
-    const correct = idx === questions[current].ans
-    setAnswers(prev => [...prev, { userAns: idx, correct }])
+    setAnswers(prev => [...prev, { userAns: idx, correct: idx === questions[current].ans }])
   }
 
   async function next() {
@@ -145,8 +203,10 @@ export default function QuizPage() {
   const level = profile ? getLevel(profile.grade) : 'ortaokul'
   const suggestions = TOPIC_MAP[level] || TOPIC_MAP['ortaokul']
   const testsLeft = profile?.plan === 'free' ? 10 - (profile?.monthly_test_count || 0) : null
+  const activeDiff = DIFFICULTIES.find(d => d.value === difficulty)!
+  const activeLangObj = LANGS.find(l => l.code === activeLang) || LANGS[0]
 
-  // ── LIMIT SCREEN ──
+  // ── LIMIT ──
   if (screen === 'limit') return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
       <div style={{ maxWidth: '440px', textAlign: 'center' }}>
@@ -156,70 +216,90 @@ export default function QuizPage() {
           Ücretsiz planda ayda 10 test hakkın var. Sınırsız test için Premium'a geç veya arkadaşlarını davet ederek ücretsiz premium kazan.
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <Link href="/pricing" className="btn btn-primary btn-lg" style={{ justifyContent: 'center' }}>
-            Premium'a geç →
-          </Link>
-          <Link href="/pricing#referral" className="btn btn-lg" style={{ justifyContent: 'center' }}>
-            Arkadaşlarını davet et (ücretsiz premium)
-          </Link>
+          <Link href="/pricing" className="btn btn-primary btn-lg" style={{ justifyContent: 'center' }}>Premium'a geç →</Link>
+          <Link href="/pricing" className="btn btn-lg" style={{ justifyContent: 'center' }}>Arkadaşını davet et (ücretsiz premium)</Link>
         </div>
-        <p style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '1rem' }}>
-          Ay başında test hakkın sıfırlanır.
-        </p>
       </div>
     </main>
   )
 
-  // ── TOPIC SCREEN ──
+  // ── TOPIC ──
   if (screen === 'topic') return (
     <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '620px', margin: '0 auto' }}>
+
+        {/* Nav */}
         <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
           <span className="serif" style={{ fontSize: '20px' }}>Quiz<span style={{ color: 'var(--accent)' }}>AI</span></span>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
             {testsLeft !== null && (
               <span style={{
                 fontSize: '12px', padding: '4px 10px', borderRadius: '99px',
                 background: testsLeft <= 2 ? 'var(--red-bg)' : 'var(--bg2)',
                 color: testsLeft <= 2 ? 'var(--red)' : 'var(--text2)',
                 border: `1px solid ${testsLeft <= 2 ? 'rgba(220,38,38,0.2)' : 'var(--border)'}`,
-              }}>
-                {testsLeft} test kaldı
-              </span>
+              }}>{testsLeft} test kaldı</span>
             )}
-            <Link href="/pricing" className="btn btn-sm" style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}>
-              {profile?.plan === 'premium' ? '★ Premium' : 'Yükselt'}
-            </Link>
+            {/* Dil secici */}
+            <div style={{ position: 'relative' }}>
+              <button
+                className="btn btn-sm"
+                onClick={() => setShowLangPicker(v => !v)}
+                style={{ gap: '5px' }}
+              >
+                {activeLangObj.flag} {activeLang}
+              </button>
+              {showLangPicker && (
+                <div style={{
+                  position: 'absolute', top: '110%', right: 0, zIndex: 100,
+                  background: 'var(--bg)', border: '1.5px solid var(--border)',
+                  borderRadius: '12px', padding: '6px', minWidth: '160px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                }}>
+                  {LANGS.map(l => (
+                    <button key={l.code} onClick={() => saveLang(l.code)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        width: '100%', padding: '8px 10px', borderRadius: '8px',
+                        border: 'none', background: activeLang === l.code ? 'var(--accent-bg)' : 'transparent',
+                        color: activeLang === l.code ? 'var(--accent)' : 'var(--text)',
+                        fontSize: '13px', cursor: 'pointer', fontWeight: activeLang === l.code ? 600 : 400,
+                      }}>
+                      {l.flag} {l.code}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <Link href="/profile/edit" className="btn btn-ghost btn-sm">Profil</Link>
             <Link href="/dashboard" className="btn btn-ghost btn-sm">Dashboard</Link>
             <button className="btn btn-ghost btn-sm" onClick={async () => { await supabase.auth.signOut(); router.push('/') }}>Çıkış</button>
           </div>
         </nav>
 
+        {/* Kullanici */}
         {profile && (
-          <div className="anim-up" style={{ marginBottom: '1.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                width: 42, height: 42, borderRadius: '50%',
-                background: 'var(--accent-bg)', border: '1.5px solid var(--accent)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--accent)', fontWeight: 600, fontSize: '15px',
-              }}>
-                {profile.name.slice(0, 2).toUpperCase()}
-              </div>
-              <div>
-                <div style={{ fontWeight: 500 }}>Merhaba, {profile.name.split(' ')[0]}</div>
-                <div style={{ fontSize: '12px', color: 'var(--text2)' }}>{profile.grade} · {profile.language}</div>
-              </div>
+          <div className="anim-up" style={{ marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: 42, height: 42, borderRadius: '50%',
+              background: 'var(--accent-bg)', border: '1.5px solid var(--accent)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--accent)', fontWeight: 600, fontSize: '15px',
+            }}>
+              {profile.name.slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <div style={{ fontWeight: 500 }}>Merhaba, {profile.name.split(' ')[0]}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text2)' }}>{profile.grade} · {activeLang}</div>
             </div>
           </div>
         )}
 
         <div className="card anim-up-1">
           <h2 className="serif" style={{ fontSize: '24px', marginBottom: '0.25rem' }}>Hangi konuyu test edelim?</h2>
-          <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1.5rem' }}>
-            Hazır konulardan birini seç ya da kendi konunu yaz.
-          </p>
+          <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1.5rem' }}>Hazır konulardan birini seç ya da kendi konunu yaz.</p>
 
+          {/* Konu onerileri */}
           <label className="field-label">Önerilen konular</label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px', marginBottom: '1rem' }}>
             {suggestions.map(s => (
@@ -239,9 +319,28 @@ export default function QuizPage() {
             style={{ resize: 'none' }}
           />
 
+          {/* Zorluk seviyesi */}
+          <label className="field-label" style={{ marginTop: '16px' }}>Zorluk seviyesi</label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginTop: '6px' }}>
+            {DIFFICULTIES.map(d => (
+              <button key={d.value} onClick={() => setDifficulty(d.value)}
+                style={{
+                  padding: '10px 8px', borderRadius: '10px', border: `1.5px solid ${difficulty === d.value ? d.border : 'var(--border)'}`,
+                  background: difficulty === d.value ? d.bg : 'var(--bg2)',
+                  color: difficulty === d.value ? d.color : 'var(--text2)',
+                  fontSize: '13px', fontWeight: difficulty === d.value ? 600 : 400,
+                  cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center',
+                }}>
+                <div style={{ fontWeight: 600, marginBottom: '2px' }}>{d.label}</div>
+                <div style={{ fontSize: '11px', opacity: 0.75 }}>{d.desc}</div>
+              </button>
+            ))}
+          </div>
+
+          {/* Soru sayisi */}
           <label className="field-label" style={{ marginTop: '16px' }}>Soru sayısı</label>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-            {[5, 10, ...(profile?.plan === 'premium' ? [15, 20] : [15])].map(n => (
+          <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+            {[5, 10, 15, ...(profile?.plan === 'premium' ? [20] : [])].map(n => (
               <button key={n} className={`btn btn-sm ${qCount === n ? 'btn-primary' : ''}`}
                 onClick={() => setQCount(n)}>
                 {n} soru
@@ -249,10 +348,21 @@ export default function QuizPage() {
             ))}
           </div>
 
+          {/* Ozet */}
+          <div style={{
+            marginTop: '1rem', padding: '12px 14px', borderRadius: '10px',
+            background: 'var(--bg2)', border: '1px solid var(--border)',
+            fontSize: '13px', color: 'var(--text2)', display: 'flex', gap: '16px', flexWrap: 'wrap',
+          }}>
+            <span>📝 {qCount} soru</span>
+            <span style={{ color: activeDiff.color }}>⚡ {activeDiff.label}</span>
+            <span>{activeLangObj.flag} {activeLang}</span>
+          </div>
+
           {topicErr && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{topicErr}</div>}
 
           <button className="btn btn-primary btn-lg" onClick={startQuiz}
-            style={{ width: '100%', justifyContent: 'center', marginTop: '1.5rem' }}>
+            style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem' }}>
             Test oluştur ⚡
           </button>
         </div>
@@ -266,7 +376,7 @@ export default function QuizPage() {
       <div style={{ textAlign: 'center' }}>
         <div className="spinner" style={{ margin: '0 auto 1.25rem' }} />
         <div style={{ fontWeight: 500, marginBottom: '0.4rem' }}>Sorular hazırlanıyor...</div>
-        <div style={{ color: 'var(--text2)', fontSize: '13px' }}>{loadMsg}</div>
+        <div style={{ fontSize: '13px', color: 'var(--text2)' }}>{loadMsg}</div>
       </div>
     </main>
   )
@@ -275,22 +385,29 @@ export default function QuizPage() {
   if (screen === 'quiz' && questions.length > 0) {
     const q = questions[current]
     const progPct = Math.round((current / questions.length) * 100)
+    const diff = DIFFICULTIES.find(d => d.value === difficulty)!
     return (
       <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
             <span className="serif" style={{ fontSize: '18px' }}>Quiz<span style={{ color: 'var(--accent)' }}>AI</span></span>
-            <span style={{ fontSize: '13px', color: 'var(--text2)' }}>
-              {answers.filter(a => a.correct).length} / {current} doğru
-            </span>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '99px', background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600 }}>
+                {diff.label}
+              </span>
+              <span style={{ fontSize: '13px', color: 'var(--text2)' }}>
+                {answers.filter(a => a.correct).length}/{current} doğru
+              </span>
+            </div>
           </div>
           <div className="progress-bar" style={{ marginBottom: '1.5rem' }}>
             <div className="progress-fill" style={{ width: `${progPct}%` }} />
           </div>
 
           <div className="card anim-up">
-            <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '0.5rem', fontWeight: 500 }}>
-              Soru {current + 1} / {questions.length}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text3)', fontWeight: 500 }}>Soru {current + 1} / {questions.length}</span>
+              <span style={{ fontSize: '11px', color: 'var(--text3)' }}>{activeLangObj.flag} {activeLang}</span>
             </div>
             <p style={{ fontSize: '17px', fontWeight: 500, lineHeight: 1.55, marginBottom: '1.5rem' }}>{q.q}</p>
 
@@ -348,14 +465,20 @@ export default function QuizPage() {
     const finalPct = Math.round((finalScore / questions.length) * 100)
     const msg = finalPct === 100 ? 'Mükemmel! Tüm sorular doğru.' :
       finalPct >= 80 ? 'Çok iyi! Konuya hakimsin.' :
-      finalPct >= 60 ? 'Fena değil, biraz daha pratik yaparsan harika olur.' :
+      finalPct >= 60 ? 'Fena değil, pratik yaparsan harika olur.' :
       'Tekrar çalışmak isteyebilirsin.'
+    const diff = DIFFICULTIES.find(d => d.value === difficulty)!
 
     return (
       <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
           <div className="card anim-up" style={{ marginBottom: '1rem' }}>
-            <div className="badge badge-purple" style={{ marginBottom: '1rem' }}>Test tamamlandı</div>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem', flexWrap: 'wrap' }}>
+              <div className="badge badge-purple">Test tamamlandı</div>
+              <div style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '99px', background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600 }}>
+                {diff.label}
+              </div>
+            </div>
             <div style={{ textAlign: 'center', padding: '1rem 0' }}>
               <div className="serif" style={{ fontSize: '64px', lineHeight: 1 }}>
                 {finalScore}<span style={{ fontSize: '32px', color: 'var(--text2)' }}>/{questions.length}</span>
@@ -377,7 +500,7 @@ export default function QuizPage() {
             {questions.map((q, i) => (
               <div key={i} style={{ padding: '12px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: answers[i]?.correct ? 'var(--green)' : 'var(--red)', flexShrink: 0 }}>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: answers[i]?.correct ? 'var(--green)' : 'var(--red)', flexShrink: 0 }}>
                     {answers[i]?.correct ? '✓' : '✗'}
                   </span>
                   <div>
