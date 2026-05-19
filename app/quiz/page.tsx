@@ -48,11 +48,18 @@ const DIFFICULTIES = [
   { value: 'cok zor', label: 'Çok Zor', desc: 'Olimpiyat seviyesi', color: '#dc2626', bg: 'rgba(220,38,38,0.08)', border: 'rgba(220,38,38,0.3)' },
 ]
 
+// localStorage'dan güncel dili al — Navbar'dan değişince buraya yansır
+function getActiveLang(profileLang?: string): string {
+  if (typeof window === 'undefined') return profileLang || 'Türkçe'
+  return localStorage.getItem('quizai_lang') || profileLang || 'Türkçe'
+}
+
 type Screen = 'topic' | 'loading' | 'quiz' | 'result' | 'limit'
 
 export default function QuizPage() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [currentLang, setCurrentLang] = useState('Türkçe')
   const [screen, setScreen] = useState<Screen>('topic')
   const [selectedTopic, setSelectedTopic] = useState('')
   const [customTopic, setCustomTopic] = useState('')
@@ -67,36 +74,43 @@ export default function QuizPage() {
   const [topicErr, setTopicErr] = useState('')
   const supabase = createClient() as any
 
-  // Profili Supabase'den çek — her çağrıda güncel veri gelir
   const fetchProfile = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+    if (!user) { router.push('/login'); return null }
     const { data } = await supabase
       .from('profiles')
       .select('name,grade,language,plan,monthly_test_count')
-      .eq('id', user.id)
-      .single()
-    if (!data) { router.push('/profile'); return }
-    setProfile(data)
-    return data
+      .eq('id', user.id).single()
+    if (!data) { router.push('/profile'); return null }
+    // localStorage daha güncel — Navbar anında yazar
+    const lang = getActiveLang(data.language)
+    setProfile({ ...data, language: lang })
+    setCurrentLang(lang)
+    return { ...data, language: lang }
   }, [])
 
   // İlk yükleme
   useEffect(() => { fetchProfile() }, [])
 
-  // Tab focus'a dönünce yenile (Navbar'dan dil değiştirince güncellenir)
+  // localStorage değişimini izle (storage event — aynı sekme için polling)
   useEffect(() => {
-    function onFocus() { fetchProfile() }
-    function onVisible() { if (document.visibilityState === 'visible') fetchProfile() }
-    window.addEventListener('focus', onFocus)
-    document.addEventListener('visibilitychange', onVisible)
-    return () => {
-      window.removeEventListener('focus', onFocus)
-      document.removeEventListener('visibilitychange', onVisible)
+    function syncLang() {
+      const lang = getActiveLang(profile?.language)
+      if (lang !== currentLang) {
+        setCurrentLang(lang)
+        setProfile(prev => prev ? { ...prev, language: lang } : prev)
+      }
     }
-  }, [fetchProfile])
+    // storage event sadece diğer sekmelerden gelir, aynı sekme için interval kullan
+    const interval = setInterval(syncLang, 500)
+    window.addEventListener('storage', syncLang)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('storage', syncLang)
+    }
+  }, [currentLang, profile?.language])
 
-  // Topic ekranına dönünce yenile
+  // Screen değişince yenile
   useEffect(() => {
     if (screen === 'topic') fetchProfile()
   }, [screen])
@@ -113,9 +127,9 @@ export default function QuizPage() {
     if (!topic) { setTopicErr('Bir konu seç veya yaz.'); return }
     setTopicErr('')
 
-    // Test başlamadan 1 kez daha güncel profili çek
-    const fresh = await fetchProfile()
-    const currentLang = (fresh as any)?.language || profile?.language || 'Türkçe'
+    // En güncel dili al
+    const lang = getActiveLang(profile?.language)
+    setCurrentLang(lang)
 
     if (profile?.plan === 'free' && (profile?.monthly_test_count || 0) >= 10) {
       setScreen('limit'); return
@@ -137,7 +151,7 @@ export default function QuizPage() {
       const res = await fetch('/api/generate-quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ topic, questionCount: qCount, difficulty, language: currentLang }),
+        body: JSON.stringify({ topic, questionCount: qCount, difficulty, language: lang }),
       })
       const data = await res.json()
       clearInterval(iv)
@@ -216,7 +230,7 @@ export default function QuizPage() {
             <div>
               <div style={{ fontWeight: 500 }}>Merhaba, {profile.name.split(' ')[0]}</div>
               <div style={{ fontSize: '12px', color: 'var(--text2)' }}>
-                {profile.grade} · {profile.language}
+                {profile.grade} · {currentLang}
                 {testsLeft !== null && (
                   <span style={{ marginLeft: '8px', color: testsLeft <= 2 ? 'var(--red)' : 'var(--text3)' }}>
                     · {testsLeft} test kaldı
@@ -231,9 +245,9 @@ export default function QuizPage() {
           <h2 className="serif" style={{ fontSize: '24px', marginBottom: '0.25rem' }}>Hangi konuyu test edelim?</h2>
           <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1.5rem' }}>
             Hazır konulardan birini seç ya da kendi konunu yaz.
-            {profile?.language && profile.language !== 'Türkçe' && (
+            {currentLang !== 'Türkçe' && (
               <span style={{ color: 'var(--accent)', marginLeft: '6px' }}>
-                · Sorular {profile.language} dilinde gelecek
+                · Sorular {currentLang} dilinde gelecek
               </span>
             )}
           </p>
@@ -292,7 +306,7 @@ export default function QuizPage() {
           }}>
             <span>📝 {qCount} soru</span>
             <span style={{ color: activeDiff.color }}>⚡ {activeDiff.label}</span>
-            <span>🌐 {profile?.language || 'Türkçe'}</span>
+            <span>🌐 {currentLang}</span>
           </div>
 
           {topicErr && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{topicErr}</div>}
@@ -346,7 +360,7 @@ export default function QuizPage() {
               <span style={{ fontSize: '12px', color: 'var(--text3)', fontWeight: 500 }}>
                 Soru {current + 1} / {questions.length}
               </span>
-              <span style={{ fontSize: '11px', color: 'var(--text3)' }}>🌐 {profile?.language}</span>
+              <span style={{ fontSize: '11px', color: 'var(--text3)' }}>🌐 {currentLang}</span>
             </div>
             <p style={{ fontSize: '17px', fontWeight: 500, lineHeight: 1.55, marginBottom: '1.5rem' }}>{q.q}</p>
 
@@ -365,7 +379,9 @@ export default function QuizPage() {
                       font: '14px/1.45 "DM Sans", sans-serif',
                       cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s',
                     }}>
-                    <span style={{ fontWeight: 600, marginRight: '8px', opacity: 0.5 }}>{String.fromCharCode(65 + i)}.</span>
+                    <span style={{ fontWeight: 600, marginRight: '8px', opacity: 0.5 }}>
+                      {String.fromCharCode(65 + i)}.
+                    </span>
                     {opt}
                   </button>
                 )
