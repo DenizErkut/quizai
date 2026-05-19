@@ -11,15 +11,21 @@ export default function RegisterPage() {
   const [pass, setPass] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [oauthLoading, setOauthLoading] = useState<string | null>(null)
+
+  const supabase = createClient()
+
+  // Referral kodu URL'den al
+  const ref = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('ref') || ''
+    : ''
 
   async function handleRegister() {
     if (!name.trim() || !email.trim() || pass.length < 6) {
       setError('Tüm alanları doldurun (şifre en az 6 karakter).')
       return
     }
-    setError('')
-    setLoading(true)
-    const supabase = createClient()
+    setError(''); setLoading(true)
     const { error: err } = await supabase.auth.signUp({
       email,
       password: pass,
@@ -27,17 +33,37 @@ export default function RegisterPage() {
     })
     setLoading(false)
     if (err) { setError(err.message); return }
+
+    // Referral varsa session'a kaydet
+    if (ref) sessionStorage.setItem('pending_ref', ref)
     router.push('/profile')
   }
 
+  async function handleOAuth(provider: 'google' | 'apple') {
+    setOauthLoading(provider)
+    await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback${ref ? `?ref=${ref}` : ''}`,
+      },
+    })
+  }
+
   return (
-    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
-      <div className="glow-blob" style={{ top: '-200px', left: '50%', transform: 'translateX(-50%)' }} />
-      <div style={{ width: '100%', maxWidth: '400px', position: 'relative', zIndex: 1 }}>
+    <main style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)',
+    }}>
+      <div style={{ width: '100%', maxWidth: '400px' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }} className="anim-up">
-          <Link href="/" className="serif" style={{ fontSize: '24px', textDecoration: 'none', color: 'var(--text)' }}>
+          <Link href="/" className="serif" style={{ fontSize: '26px', textDecoration: 'none', color: 'var(--text)' }}>
             Quiz<span style={{ color: 'var(--accent)' }}>AI</span>
           </Link>
+          {ref && (
+            <div className="badge badge-green" style={{ marginTop: '8px', display: 'block' }}>
+              Davet linki ile kayıt oluyorsun
+            </div>
+          )}
         </div>
 
         <div className="card anim-up-1">
@@ -46,20 +72,65 @@ export default function RegisterPage() {
             Sana özel testler seni bekliyor.
           </p>
 
+          {/* OAuth buttons */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '0.5rem' }}>
+            <button
+              className="btn"
+              onClick={() => handleOAuth('google')}
+              disabled={!!oauthLoading}
+              style={{ width: '100%', justifyContent: 'center', gap: '10px', fontWeight: 500 }}
+            >
+              {oauthLoading === 'google' ? (
+                <span className="spinner" style={{ width: 18, height: 18 }} />
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+              )}
+              Google ile kayıt ol
+            </button>
+
+            <button
+              className="btn"
+              onClick={() => handleOAuth('apple')}
+              disabled={!!oauthLoading}
+              style={{ width: '100%', justifyContent: 'center', gap: '10px', fontWeight: 500 }}
+            >
+              {oauthLoading === 'apple' ? (
+                <span className="spinner" style={{ width: 18, height: 18 }} />
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+                </svg>
+              )}
+              Apple ile kayıt ol
+            </button>
+          </div>
+
+          <div className="divider">veya e-posta ile</div>
+
           <label className="field-label">Ad soyad</label>
-          <input className="input" placeholder="Deniz Yılmaz" value={name} onChange={e => setName(e.target.value)} />
+          <input className="input" placeholder="Deniz Yılmaz"
+            value={name} onChange={e => setName(e.target.value)} />
 
           <label className="field-label">E-posta</label>
-          <input className="input" type="email" placeholder="ornek@mail.com" value={email} onChange={e => setEmail(e.target.value)} />
+          <input className="input" type="email" placeholder="ornek@mail.com"
+            value={email} onChange={e => setEmail(e.target.value)} />
 
           <label className="field-label">Şifre</label>
-          <input className="input" type="password" placeholder="En az 6 karakter" value={pass} onChange={e => setPass(e.target.value)}
+          <input className="input" type="password" placeholder="En az 6 karakter"
+            value={pass} onChange={e => setPass(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleRegister()} />
 
           {error && (
-            <div style={{ marginTop: '12px', padding: '10px 12px', background: 'var(--red-bg)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)' }}>
-              {error}
-            </div>
+            <div style={{
+              marginTop: '12px', padding: '10px 12px',
+              background: 'var(--red-bg)', border: '1px solid rgba(220,38,38,0.2)',
+              borderRadius: '9px', fontSize: '13px', color: 'var(--red)',
+            }}>{error}</div>
           )}
 
           <button className="btn btn-primary" onClick={handleRegister} disabled={loading}
@@ -68,11 +139,16 @@ export default function RegisterPage() {
           </button>
 
           <div className="divider">veya</div>
-
           <Link href="/login" className="btn" style={{ width: '100%', justifyContent: 'center' }}>
             Zaten hesabım var
           </Link>
         </div>
+
+        <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text3)', marginTop: '1rem' }}>
+          Kayıt olarak{' '}
+          <Link href="/terms" style={{ color: 'var(--text2)' }}>Kullanım Şartları</Link>
+          {'\'nı kabul etmiş olursun.'}
+        </p>
       </div>
     </main>
   )
