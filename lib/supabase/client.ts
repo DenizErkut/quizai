@@ -1,6 +1,3 @@
-// lib/supabase/client.ts
-// Singleton Supabase client — tüm client component'larında kullan
-
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from './types'
 
@@ -11,22 +8,10 @@ export function createClient() {
   )
 }
 
-// ---------------------------------------------------------------
-// lib/supabase/hooks.ts
-// Kullanışlı React hook'ları
-// ---------------------------------------------------------------
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyClient = any
 
-// useProfile — mevcut kullanıcının profilini çeker
-//
-// import { useProfile } from '@/lib/supabase/hooks'
-//
-// export default function Page() {
-//   const { profile, loading } = useProfile()
-//   if (loading) return <Spinner />
-//   return <div>Merhaba {profile?.name}</div>
-// }
-
-export async function getProfile(supabase: ReturnType<typeof createClient>) {
+export async function getProfile(supabase: AnyClient) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
   const { data } = await supabase
@@ -37,14 +22,11 @@ export async function getProfile(supabase: ReturnType<typeof createClient>) {
   return data
 }
 
-export async function getTopicSuggestions(
-  supabase: ReturnType<typeof createClient>,
-  grade: string
-) {
+export async function getTopicSuggestions(supabase: AnyClient, grade: string) {
   const level = grade.startsWith('ilk') ? 'ilkokul'
     : grade.startsWith('orta') ? 'ortaokul'
     : grade.startsWith('lise') ? 'lise'
-    : 'üniversite'
+    : 'universite'
 
   const { data } = await supabase
     .from('topic_suggestions')
@@ -55,10 +37,7 @@ export async function getTopicSuggestions(
   return data ?? []
 }
 
-export async function getUserSessions(
-  supabase: ReturnType<typeof createClient>,
-  limit = 10
-) {
+export async function getUserSessions(supabase: AnyClient, limit = 10) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
   const { data } = await supabase
@@ -72,7 +51,7 @@ export async function getUserSessions(
 }
 
 export async function saveQuizResult(
-  supabase: ReturnType<typeof createClient>,
+  supabase: AnyClient,
   sessionId: string,
   answers: { questionIndex: number; userAns: number; correct: boolean }[],
   score: number
