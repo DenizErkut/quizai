@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -67,35 +67,38 @@ export default function QuizPage() {
   const [topicErr, setTopicErr] = useState('')
   const supabase = createClient() as any
 
-  // Her sayfa ziyaretinde güncel profili çek
-  useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-      const { data } = await supabase
-        .from('profiles')
-        .select('name,grade,language,plan,monthly_test_count')
-        .eq('id', user.id).single()
-      if (!data) { router.push('/profile'); return }
-      setProfile(data)
-    }
-    load()
+  // Profili Supabase'den çek — her çağrıda güncel veri gelir
+  const fetchProfile = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/login'); return }
+    const { data } = await supabase
+      .from('profiles')
+      .select('name,grade,language,plan,monthly_test_count')
+      .eq('id', user.id)
+      .single()
+    if (!data) { router.push('/profile'); return }
+    setProfile(data)
+    return data
   }, [])
 
-  // Topic ekranına dönünce de profili yenile (dil değişmiş olabilir)
+  // İlk yükleme
+  useEffect(() => { fetchProfile() }, [])
+
+  // Tab focus'a dönünce yenile (Navbar'dan dil değiştirince güncellenir)
   useEffect(() => {
-    if (screen === 'topic') {
-      async function refresh() {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-        const { data } = await supabase
-          .from('profiles')
-          .select('name,grade,language,plan,monthly_test_count')
-          .eq('id', user.id).single()
-        if (data) setProfile(data)
-      }
-      refresh()
+    function onFocus() { fetchProfile() }
+    function onVisible() { if (document.visibilityState === 'visible') fetchProfile() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
     }
+  }, [fetchProfile])
+
+  // Topic ekranına dönünce yenile
+  useEffect(() => {
+    if (screen === 'topic') fetchProfile()
   }, [screen])
 
   function getLevel(grade: string) {
@@ -110,24 +113,15 @@ export default function QuizPage() {
     if (!topic) { setTopicErr('Bir konu seç veya yaz.'); return }
     setTopicErr('')
 
+    // Test başlamadan 1 kez daha güncel profili çek
+    const fresh = await fetchProfile()
+    const currentLang = (fresh as any)?.language || profile?.language || 'Türkçe'
+
     if (profile?.plan === 'free' && (profile?.monthly_test_count || 0) >= 10) {
       setScreen('limit'); return
     }
 
     setScreen('loading')
-
-    // Test başlamadan önce güncel dili Supabase'den çek
-    let currentLang = profile?.language || 'Türkçe'
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: fresh } = await supabase
-        .from('profiles')
-        .select('language')
-        .eq('id', user.id)
-        .single()
-      if (fresh?.language) currentLang = fresh.language
-    }
-
     const msgs = [
       'Profilin analiz ediliyor...',
       'Müfredat kontrol ediliyor...',
@@ -148,7 +142,7 @@ export default function QuizPage() {
       const data = await res.json()
       clearInterval(iv)
       if (!res.ok) throw new Error(data.error)
-      setProfile(prev => prev ? { ...prev, monthly_test_count: (prev.monthly_test_count || 0) + 1, language: currentLang } : prev)
+      setProfile(prev => prev ? { ...prev, monthly_test_count: (prev.monthly_test_count || 0) + 1 } : prev)
       setQuestions(data.questions)
       setSessionId(data.sessionId)
       setCurrent(0); setAnswers([]); setChosen(null)
@@ -195,7 +189,7 @@ export default function QuizPage() {
         <div style={{ fontSize: '48px', marginBottom: '1rem' }}>📚</div>
         <h2 className="serif" style={{ fontSize: '26px', marginBottom: '0.75rem' }}>Bu ayki test hakkın doldu</h2>
         <p style={{ color: 'var(--text2)', fontSize: '14px', marginBottom: '1.5rem', lineHeight: 1.7 }}>
-          Ücretsiz planda ayda 10 test hakkın var. Sınırsız test için Premium'a geç veya arkadaşlarını davet ederek ücretsiz premium kazan.
+          Ücretsiz planda ayda 10 test hakkın var. Sınırsız test için Premium'a geç.
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <Link href="/pricing" className="btn btn-primary btn-lg" style={{ justifyContent: 'center' }}>Premium'a geç →</Link>
@@ -209,8 +203,6 @@ export default function QuizPage() {
   if (screen === 'topic') return (
     <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
       <div style={{ maxWidth: '620px', margin: '0 auto' }}>
-
-        {/* Kullanıcı karşılama */}
         {profile && (
           <div className="anim-up" style={{ marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
@@ -265,7 +257,6 @@ export default function QuizPage() {
             style={{ resize: 'none' }}
           />
 
-          {/* Zorluk */}
           <label className="field-label" style={{ marginTop: '16px' }}>Zorluk seviyesi</label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginTop: '6px' }}>
             {DIFFICULTIES.map(d => (
@@ -284,7 +275,6 @@ export default function QuizPage() {
             ))}
           </div>
 
-          {/* Soru sayısı */}
           <label className="field-label" style={{ marginTop: '16px' }}>Soru sayısı</label>
           <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
             {[5, 10, 15, ...(profile?.plan === 'premium' ? [20] : [])].map(n => (
@@ -295,7 +285,6 @@ export default function QuizPage() {
             ))}
           </div>
 
-          {/* Özet */}
           <div style={{
             marginTop: '1rem', padding: '12px 14px', borderRadius: '10px',
             background: 'var(--bg2)', border: '1px solid var(--border)',
@@ -341,8 +330,7 @@ export default function QuizPage() {
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               <span style={{
                 fontSize: '12px', padding: '3px 8px', borderRadius: '99px',
-                background: diff.bg, color: diff.color,
-                border: `1px solid ${diff.border}`, fontWeight: 600,
+                background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600,
               }}>{diff.label}</span>
               <span style={{ fontSize: '13px', color: 'var(--text2)' }}>
                 {answers.filter(a => a.correct).length}/{current} doğru
@@ -358,17 +346,13 @@ export default function QuizPage() {
               <span style={{ fontSize: '12px', color: 'var(--text3)', fontWeight: 500 }}>
                 Soru {current + 1} / {questions.length}
               </span>
-              <span style={{ fontSize: '11px', color: 'var(--text3)' }}>
-                🌐 {profile?.language}
-              </span>
+              <span style={{ fontSize: '11px', color: 'var(--text3)' }}>🌐 {profile?.language}</span>
             </div>
             <p style={{ fontSize: '17px', fontWeight: 500, lineHeight: 1.55, marginBottom: '1.5rem' }}>{q.q}</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {q.opts.map((opt, i) => {
-                let bg = 'var(--bg2)'
-                let border = 'var(--border)'
-                let color = 'var(--text)'
+                let bg = 'var(--bg2)', border = 'var(--border)', color = 'var(--text)'
                 if (chosen !== null) {
                   if (i === q.ans) { bg = 'var(--green-bg)'; border = 'rgba(22,163,74,0.35)'; color = 'var(--green)' }
                   else if (i === chosen) { bg = 'var(--red-bg)'; border = 'rgba(220,38,38,0.35)'; color = 'var(--red)' }
@@ -381,9 +365,7 @@ export default function QuizPage() {
                       font: '14px/1.45 "DM Sans", sans-serif',
                       cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s',
                     }}>
-                    <span style={{ fontWeight: 600, marginRight: '8px', opacity: 0.5 }}>
-                      {String.fromCharCode(65 + i)}.
-                    </span>
+                    <span style={{ fontWeight: 600, marginRight: '8px', opacity: 0.5 }}>{String.fromCharCode(65 + i)}.</span>
                     {opt}
                   </button>
                 )
@@ -432,28 +414,21 @@ export default function QuizPage() {
               <div className="badge badge-purple">Test tamamlandı</div>
               <span style={{
                 fontSize: '11px', padding: '3px 10px', borderRadius: '99px',
-                background: diff.bg, color: diff.color,
-                border: `1px solid ${diff.border}`, fontWeight: 600,
+                background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600,
               }}>{diff.label}</span>
             </div>
             <div style={{ textAlign: 'center', padding: '1rem 0' }}>
               <div className="serif" style={{ fontSize: '64px', lineHeight: 1 }}>
                 {finalScore}<span style={{ fontSize: '32px', color: 'var(--text2)' }}>/{questions.length}</span>
               </div>
-              <div style={{ fontSize: '28px', color: finalPct >= 60 ? 'var(--green)' : 'var(--red)', fontWeight: 600, marginTop: '4px' }}>
-                %{finalPct}
-              </div>
+              <div style={{ fontSize: '28px', color: finalPct >= 60 ? 'var(--green)' : 'var(--red)', fontWeight: 600, marginTop: '4px' }}>%{finalPct}</div>
               <div style={{ color: 'var(--text2)', fontSize: '14px', marginTop: '0.75rem' }}>{msg}</div>
             </div>
             <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
               <button className="btn btn-primary"
                 onClick={() => { setScreen('topic'); setSelectedTopic(''); setCustomTopic('') }}
-                style={{ flex: 1, justifyContent: 'center' }}>
-                Yeni test
-              </button>
-              <Link href="/dashboard" className="btn" style={{ flex: 1, justifyContent: 'center' }}>
-                Dashboard
-              </Link>
+                style={{ flex: 1, justifyContent: 'center' }}>Yeni test</button>
+              <Link href="/dashboard" className="btn" style={{ flex: 1, justifyContent: 'center' }}>Dashboard</Link>
             </div>
           </div>
 
