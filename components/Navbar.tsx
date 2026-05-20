@@ -38,7 +38,6 @@ export default function Navbar() {
         .select('name, plan, monthly_test_count, language, referral_code')
         .eq('id', user.id).single()
       if (data) {
-        // localStorage'daki dil daha güncel olabilir
         const stored = localStorage.getItem('quizai_lang')
         if (stored) data.language = stored
         setProfile(data)
@@ -50,11 +49,8 @@ export default function Navbar() {
   async function saveLang(lang: string) {
     setShowLang(false)
     if (!profile) return
-    // Önce localStorage'a yaz — anında ve senkron
     localStorage.setItem('quizai_lang', lang)
-    // State'i güncelle
     setProfile(prev => prev ? { ...prev, language: lang } : prev)
-    // Supabase'e async yaz
     const { data: { user } } = await supabase.auth.getUser()
     if (user) await supabase.from('profiles').update({ language: lang }).eq('id', user.id)
   }
@@ -70,7 +66,8 @@ export default function Navbar() {
   const testsLeft = profile.plan === 'free' ? 10 - (profile.monthly_test_count || 0) : null
   const activeLang = LANGS.find(l => l.code === profile.language) || LANGS[0]
 
-  if (pathname === '/login' || pathname === '/register' || pathname === '/profile') return null
+  const HIDDEN_PATHS = ['/login', '/register', '/profile']
+  if (HIDDEN_PATHS.includes(pathname)) return null
 
   return (
     <>
@@ -87,6 +84,8 @@ export default function Navbar() {
         </Link>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+
+          {/* Test hakkı */}
           {testsLeft !== null && (
             <Link href="/pricing" style={{ textDecoration: 'none' }}>
               <span style={{
@@ -101,6 +100,7 @@ export default function Navbar() {
             </Link>
           )}
 
+          {/* Premium badge */}
           {profile.plan === 'premium' && (
             <Link href="/pricing" style={{ textDecoration: 'none' }}>
               <span style={{
@@ -159,28 +159,38 @@ export default function Navbar() {
               }}>
               {profile.name.slice(0, 2).toUpperCase()}
             </button>
+
             {showMenu && (
               <>
                 <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setShowMenu(false)} />
                 <div style={{
                   position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 99,
                   background: 'var(--bg)', border: '1.5px solid var(--border)',
-                  borderRadius: '12px', padding: '6px', minWidth: '200px',
+                  borderRadius: '12px', padding: '6px', minWidth: '210px',
                   boxShadow: '0 8px 32px rgba(0,0,0,0.10)',
                 }}>
+                  {/* Kullanıcı bilgisi */}
                   <div style={{ padding: '10px 12px 8px', borderBottom: '1px solid var(--border)', marginBottom: '6px' }}>
                     <div style={{ fontWeight: 600, fontSize: '13px' }}>{profile.name}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
-                      {profile.plan === 'premium' ? '★ Premium' : 'Ücretsiz plan'}
+                      {profile.plan === 'premium' ? '★ Premium üye' : 'Ücretsiz plan'}
                     </div>
+                    {profile.referral_code && (
+                      <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '3px', fontFamily: 'monospace', letterSpacing: '0.05em' }}>
+                        Kod: {profile.referral_code}
+                      </div>
+                    )}
                   </div>
+
                   {[
                     { label: '⚡ Yeni test', href: '/quiz' },
                     { label: '📊 Dashboard', href: '/dashboard' },
                     { label: '✏️ Profil düzenle', href: '/profile/edit' },
-                    { label: '💎 Planlar', href: '/pricing' },
+                    { label: '💎 Planlar & ödeme', href: '/pricing' },
+                    { label: '🎁 Davet et & kazan', href: '/referral' },
                   ].map(item => (
-                    <Link key={item.href} href={item.href} onClick={() => setShowMenu(false)}
+                    <Link key={item.href} href={item.href}
+                      onClick={() => setShowMenu(false)}
                       style={{
                         display: 'block', padding: '8px 12px', borderRadius: '8px',
                         fontSize: '13px', color: 'var(--text)', textDecoration: 'none',
@@ -189,13 +199,14 @@ export default function Navbar() {
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >{item.label}</Link>
                   ))}
+
                   <div style={{ borderTop: '1px solid var(--border)', marginTop: '6px', paddingTop: '6px' }}>
                     <button onClick={handleSignOut}
                       style={{
                         display: 'block', width: '100%', textAlign: 'left',
-                        padding: '8px 12px', borderRadius: '8px', fontSize: '13px',
-                        color: 'var(--red)', background: 'none', border: 'none',
-                        cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                        padding: '8px 12px', borderRadius: '8px',
+                        fontSize: '13px', color: 'var(--red)', background: 'none',
+                        border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)',
                       }}
                       onMouseEnter={e => (e.currentTarget.style.background = 'var(--red-bg)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
