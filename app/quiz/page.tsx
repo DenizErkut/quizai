@@ -122,23 +122,62 @@ export default function QuizPage() {
   useEffect(() => { if (screen === 'topic') fetchProfile() }, [screen])
 
   async function handleFileUpload(file: File) {
-    setFileError(''); setFileLoading(true); setUploadedFile(file)
+    setFileError('')
+
+    // Client-side boyut kontrolü — 10MB
+    const MAX_MB = 10
+    const MAX_BYTES = MAX_MB * 1024 * 1024
+    if (file.size > MAX_BYTES) {
+      setFileError(`Dosya çok büyük: ${(file.size / 1024 / 1024).toFixed(1)}MB. Maksimum ${MAX_MB}MB yükleyebilirsin.`)
+      return
+    }
+
+    setFileLoading(true)
+    setUploadedFile(file)
+
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const fd = new FormData(); fd.append('file', file)
+      const fd = new FormData()
+      fd.append('file', file)
+
       const res = await fetch('/api/extract-file', {
         method: 'POST',
         headers: { Authorization: `Bearer ${session?.access_token}` },
         body: fd,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      setFileContent(data.content); setFileType(data.type)
-      if (!customTopic) setCustomTopic(file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' '))
+
+      // Önce text oku — JSON olmayan hataları yakala
+      const text = await res.text()
+      let data: any
+      try {
+        data = JSON.parse(text)
+      } catch {
+        if (text.includes('413') || text.includes('Entity Too Large') || text.includes('Request En')) {
+          setFileError(`Dosya sunucuya ulaşamadı. ${MAX_MB}MB altında bir dosya dene.`)
+        } else {
+          setFileError('Dosya işlenemedi. Lütfen tekrar dene.')
+        }
+        setUploadedFile(null)
+        return
+      }
+
+      if (!res.ok) {
+        setFileError(data.error || 'Dosya yüklenemedi.')
+        setUploadedFile(null)
+        return
+      }
+
+      setFileContent(data.content)
+      setFileType(data.type)
+      if (!customTopic) {
+        setCustomTopic(file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' '))
+      }
     } catch (e: any) {
       setFileError(e.message || 'Dosya yüklenemedi.')
       setUploadedFile(null)
-    } finally { setFileLoading(false) }
+    } finally {
+      setFileLoading(false)
+    }
   }
 
   function removeFile() {
@@ -329,30 +368,60 @@ export default function QuizPage() {
               onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFileUpload(f) }}
               onDragOver={e => e.preventDefault()}
               onClick={() => fileInputRef.current?.click()}
-              style={{ marginTop: '6px', padding: '20px', borderRadius: '10px', border: '2px dashed var(--border)', background: 'var(--bg2)', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-bg)' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg2)' }}>
-              <div style={{ fontSize: '24px', marginBottom: '6px' }}>📎</div>
-              <div style={{ fontSize: '13px', fontWeight: 500 }}>Dosya sürükle veya tıkla</div>
-              <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>PDF · TXT · DOCX · JPG · PNG · MP3 · M4A · WAV</div>
+              style={{ marginTop: '6px', padding: '20px', borderRadius: '10px', border: `2px dashed ${fileError ? 'rgba(220,38,38,0.4)' : 'var(--border)'}`, background: fileError ? 'var(--red-bg)' : 'var(--bg2)', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
+              onMouseEnter={e => { if (!fileError) { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-bg)' } }}
+              onMouseLeave={e => { if (!fileError) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg2)' } }}>
+              <div style={{ fontSize: '24px', marginBottom: '6px' }}>{fileError ? '⚠️' : '📎'}</div>
+              <div style={{ fontSize: '13px', fontWeight: 500, color: fileError ? 'var(--red)' : 'var(--text)' }}>
+                {fileError ? 'Tekrar dene' : 'Dosya sürükle veya tıkla'}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>
+                PDF · TXT · DOCX · JPG · PNG · MP3 · M4A · WAV
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
+                Maksimum 10MB
+              </div>
               <input ref={fileInputRef} type="file" accept=".pdf,.txt,.docx,.doc,.jpg,.jpeg,.png,.webp,.mp3,.m4a,.wav,.ogg" style={{ display: 'none' }}
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }} />
             </div>
           ) : (
             <div style={{ marginTop: '6px', padding: '12px 14px', borderRadius: '10px', border: '1.5px solid var(--accent)', background: 'var(--accent-bg)', display: 'flex', alignItems: 'center', gap: '10px' }}>
               {fileLoading ? (
-                <><div className="spinner" style={{ width: 20, height: 20, flexShrink: 0 }} /><div style={{ fontSize: '13px', fontWeight: 500 }}>{uploadedFile.name}<br /><span style={{ fontSize: '11px', color: 'var(--text2)' }}>İşleniyor...</span></div></>
+                <>
+                  <div className="spinner" style={{ width: 20, height: 20, flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 500 }}>{uploadedFile.name}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text2)' }}>
+                      İşleniyor... ({(uploadedFile.size / 1024 / 1024).toFixed(1)}MB)
+                    </div>
+                  </div>
+                </>
               ) : (
-                <><span style={{ fontSize: '22px', flexShrink: 0 }}>{FILE_TYPES[uploadedFile.type]?.icon || '📄'}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{uploadedFile.name}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--green)' }}>✓ {fileContent.split(' ').length} kelime · Bu içerikten soru üretilecek</div>
-                </div>
-                <button onClick={removeFile} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: '16px' }}>✕</button></>
+                <>
+                  <span style={{ fontSize: '22px', flexShrink: 0 }}>{FILE_TYPES[uploadedFile.type]?.icon || '📄'}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {uploadedFile.name}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--green)' }}>
+                      ✓ {fileContent.split(' ').length} kelime okundu · {(uploadedFile.size / 1024).toFixed(0)}KB
+                    </div>
+                  </div>
+                  <button onClick={removeFile} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: '16px' }}>✕</button>
+                </>
               )}
             </div>
           )}
-          {fileError && <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--red)' }}>{fileError}</div>}
+          {fileError && (
+            <div style={{
+              marginTop: '8px', padding: '10px 12px', borderRadius: '8px',
+              background: 'var(--red-bg)', border: '1px solid rgba(220,38,38,0.2)',
+              fontSize: '12px', color: 'var(--red)', display: 'flex', gap: '6px', alignItems: 'flex-start',
+            }}>
+              <span style={{ flexShrink: 0 }}>⚠️</span>
+              <span>{fileError}</span>
+            </div>
+          )}
 
           {/* Zorluk */}
           <label className="field-label" style={{ marginTop: '16px' }}>Zorluk seviyesi</label>
