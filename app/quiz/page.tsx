@@ -1,8 +1,9 @@
 'use client'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import FileUploader, { type UploadedFile } from '@/components/FileUploader'
 
 interface Question {
   q: string; opts: string[]; ans: number; exp: string
@@ -48,17 +49,6 @@ const DIFFICULTIES = [
   { value: 'cok zor', label: 'Çok Zor', desc: 'Olimpiyat seviyesi', color: '#dc2626', bg: 'rgba(220,38,38,0.08)', border: 'rgba(220,38,38,0.3)' },
 ]
 
-const FILE_TYPES: Record<string, { icon: string; label: string }> = {
-  'application/pdf': { icon: '📄', label: 'PDF' },
-  'text/plain': { icon: '📝', label: 'TXT' },
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': { icon: '📃', label: 'DOCX' },
-  'image/jpeg': { icon: '🖼️', label: 'JPG' },
-  'image/png': { icon: '🖼️', label: 'PNG' },
-  'audio/mpeg': { icon: '🎵', label: 'MP3' },
-  'audio/mp4': { icon: '🎵', label: 'M4A' },
-  'audio/wav': { icon: '🎵', label: 'WAV' },
-}
-
 function getActiveLang(profileLang?: string): string {
   if (typeof window === 'undefined') return profileLang || 'Türkçe'
   return localStorage.getItem('quizai_lang') || profileLang || 'Türkçe'
@@ -76,13 +66,7 @@ export default function QuizPage() {
   const [qCount, setQCount] = useState(10)
   const [difficulty, setDifficulty] = useState('normal')
   const [includeVisuals, setIncludeVisuals] = useState(true)
-
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
-  const [fileContent, setFileContent] = useState('')
-  const [fileType, setFileType] = useState('')
-  const [fileLoading, setFileLoading] = useState(false)
-  const [fileError, setFileError] = useState('')
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
 
   const [questions, setQuestions] = useState<Question[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -191,6 +175,10 @@ export default function QuizPage() {
       : grade.startsWith('lise') ? 'lise' : 'universite'
   }
 
+  // Tüm yüklü dosyaların içeriğini birleştir
+  const combinedContent = uploadedFiles.map(f => `[${f.name}]\n${f.content}`).join('\n\n---\n\n')
+  const hasFiles = uploadedFiles.length > 0
+
   async function startQuiz() {
     const topic = customTopic.trim() || selectedTopic
     if (!topic) { setTopicErr('Bir konu seç veya yaz.'); return }
@@ -200,7 +188,7 @@ export default function QuizPage() {
     setScreen('loading')
 
     const msgs = [
-      fileContent ? 'Dosya içeriği analiz ediliyor...' : 'Profilin analiz ediliyor...',
+      hasFiles ? `${uploadedFiles.length} dosya analiz ediliyor...` : 'Profilin analiz ediliyor...',
       'Müfredat kontrol ediliyor...',
       `${difficulty.toUpperCase()} zorlukta sorular oluşturuluyor...`,
       includeVisuals ? 'Görsel içerikler hazırlanıyor...' : 'Şıklar karıştırılıyor...',
@@ -214,12 +202,16 @@ export default function QuizPage() {
       const res = await fetch('/api/generate-quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ topic, questionCount: qCount, difficulty, language: lang, fileContent: fileContent || undefined, fileType: fileType || undefined, includeVisuals }),
+        body: JSON.stringify({
+          topic, questionCount: qCount, difficulty, language: lang,
+          fileContent: combinedContent || undefined,
+          fileType: uploadedFiles[0]?.fileType || undefined,
+          includeVisuals,
+        }),
       })
       const data = await res.json()
       clearInterval(iv)
 
-      // Server-side limit kontrolü — 429
       if (res.status === 429 && data.error === 'limit_reached') {
         setScreen('limit')
         return
@@ -227,7 +219,6 @@ export default function QuizPage() {
 
       if (!res.ok) throw new Error(data.error)
 
-      // Profili yenile (server sayacı artırdı)
       fetchProfile()
       setQuestions(data.questions)
       setSessionId(data.sessionId)
@@ -363,63 +354,10 @@ export default function QuizPage() {
 
           {/* Dosya yükleme */}
           <label className="field-label" style={{ marginTop: '16px' }}>Dosyadan soru üret</label>
-          {!uploadedFile ? (
-            <div
-              onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFileUpload(f) }}
-              onDragOver={e => e.preventDefault()}
-              onClick={() => fileInputRef.current?.click()}
-              style={{ marginTop: '6px', padding: '20px', borderRadius: '10px', border: `2px dashed ${fileError ? 'rgba(220,38,38,0.4)' : 'var(--border)'}`, background: fileError ? 'var(--red-bg)' : 'var(--bg2)', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
-              onMouseEnter={e => { if (!fileError) { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-bg)' } }}
-              onMouseLeave={e => { if (!fileError) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg2)' } }}>
-              <div style={{ fontSize: '24px', marginBottom: '6px' }}>{fileError ? '⚠️' : '📎'}</div>
-              <div style={{ fontSize: '13px', fontWeight: 500, color: fileError ? 'var(--red)' : 'var(--text)' }}>
-                {fileError ? 'Tekrar dene' : 'Dosya sürükle veya tıkla'}
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>
-                PDF · TXT · DOCX · JPG · PNG · MP3 · M4A · WAV
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
-                Maksimum 10MB
-              </div>
-              <input ref={fileInputRef} type="file" accept=".pdf,.txt,.docx,.doc,.jpg,.jpeg,.png,.webp,.mp3,.m4a,.wav,.ogg" style={{ display: 'none' }}
-                onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }} />
-            </div>
-          ) : (
-            <div style={{ marginTop: '6px', padding: '12px 14px', borderRadius: '10px', border: '1.5px solid var(--accent)', background: 'var(--accent-bg)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              {fileLoading ? (
-                <>
-                  <div className="spinner" style={{ width: 20, height: 20, flexShrink: 0 }} />
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: 500 }}>{uploadedFile.name}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text2)' }}>
-                      İşleniyor... ({(uploadedFile.size / 1024 / 1024).toFixed(1)}MB)
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <span style={{ fontSize: '22px', flexShrink: 0 }}>{FILE_TYPES[uploadedFile.type]?.icon || '📄'}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {uploadedFile.name}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--green)' }}>
-                      ✓ {fileContent.split(' ').length} kelime okundu · {(uploadedFile.size / 1024).toFixed(0)}KB
-                    </div>
-                  </div>
-                  <button onClick={removeFile} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: '16px' }}>✕</button>
-                </>
-              )}
-            </div>
-          )}
-          {fileError && (
-            <div style={{
-              marginTop: '8px', padding: '10px 12px', borderRadius: '8px',
-              background: 'var(--red-bg)', border: '1px solid rgba(220,38,38,0.2)',
-              fontSize: '12px', color: 'var(--red)', display: 'flex', gap: '6px', alignItems: 'flex-start',
-            }}>
-              <span style={{ flexShrink: 0 }}>⚠️</span>
-              <span>{fileError}</span>
+          <FileUploader onFilesChange={setUploadedFiles} maxFiles={5} maxMB={20} />
+          {hasFiles && (
+            <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--green)' }}>
+              ✓ {uploadedFiles.length} dosya hazır · {uploadedFiles.reduce((s, f) => s + f.content.split(' ').length, 0)} kelime · Sorular bu içeriklerden üretilecek
             </div>
           )}
 
@@ -459,7 +397,7 @@ export default function QuizPage() {
             <span>📝 {qCount} soru</span>
             <span style={{ color: activeDiff.color }}>⚡ {activeDiff.label}</span>
             <span>🌐 {currentLang}</span>
-            {fileContent && <span style={{ color: 'var(--green)' }}>📎 Dosyadan</span>}
+            {hasFiles && <span style={{ color: 'var(--green)' }}>📎 {uploadedFiles.length} dosya</span>}
             {includeVisuals && <span style={{ color: 'var(--accent)' }}>📊 Görsel</span>}
           </div>
 
@@ -567,7 +505,7 @@ export default function QuizPage() {
             <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem', flexWrap: 'wrap' }}>
               <div className="badge badge-purple">Test tamamlandı</div>
               <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '99px', background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600 }}>{diff.label}</span>
-              {fileContent && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '99px', background: 'var(--green-bg)', color: 'var(--green)', border: '1px solid rgba(22,163,74,0.2)', fontWeight: 600 }}>📎 Dosyadan</span>}
+              {hasFiles && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '99px', background: 'var(--green-bg)', color: 'var(--green)', border: '1px solid rgba(22,163,74,0.2)', fontWeight: 600 }}>📎 {uploadedFiles.length} dosya</span>}
             </div>
             <div style={{ textAlign: 'center', padding: '1rem 0' }}>
               <div className="serif" style={{ fontSize: '64px', lineHeight: 1 }}>{finalScore}<span style={{ fontSize: '32px', color: 'var(--text2)' }}>/{questions.length}</span></div>
