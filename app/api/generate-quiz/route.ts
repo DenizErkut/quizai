@@ -59,7 +59,6 @@ function getCurriculumNote(grade: string): string {
 function buildPrompt(p: ProfileParams): string {
   const curriculum = getCurriculumNote(p.grade)
   const diffHint = DIFFICULTY_HINTS[p.difficulty] || DIFFICULTY_HINTS.normal
-  const ansPattern = Array.from({length: p.questionCount}, (_,i) => i % 4).join(', ')
 
   const fileSec = p.fileContent ? `
 DOSYA ICERIGI (bu icerikten soru uret):
@@ -75,7 +74,7 @@ GORSEL SORU: Sorularin ~30%'i gorsel olabilir. Gorsel sorular icin:
 - Soru SVG'ye referans vermeli: "Asagidaki grafige gore..."
 Gorsel olmayan: "qtype":"text", "svg":null` : `Tum sorular metin tabanli. "qtype":"text", "svg":null`
 
-  return `Sen MEB mufredatina hakim egitim uzmanisın.
+  return `Sen MEB mufredatina hakim egitim uzmanisın. DOGRU CEVAPLARI URET.
 
 Profil: ${p.name}, ${p.grade}, ${p.age} yas, ${p.gender}
 Konu: ${p.topic} | Dil: ${p.language} | Zorluk: ${p.difficulty.toUpperCase()}
@@ -84,11 +83,19 @@ Mufredat: ${curriculum || p.grade + ' seviyesine uygun'}
 ${diffHint}
 ${visualSec}
 
-${p.questionCount} adet soru uret. "ans" sirasi: ${ansPattern}
+${p.questionCount} adet soru uret.
+
+KRITIK KURALLAR:
+1. "ans" her zaman opts dizisindeki GERCEKTEN DOGRU cevabın index'i olmalidir (0, 1, 2 veya 3).
+2. Matematiksel hesaplama gerektiren sorularda ONCE hesapla, sonra cevabi yaz.
+3. "exp" aciklamasi neden dogru oldugunu aciklayan TUTARLI bir metin olmalidir.
+4. opts[ans] == dogru cevap. Bunu her soru icin kontrol et.
+5. Hic "ans" degerini ezberden yazma — her soru icin ayri dusun.
+
 4 sik, aciklama ${p.language} dilinde, tekrar yok.
 
 SADECE JSON:
-{"questions":[{"qtype":"text","q":"?","opts":["A","B","C","D"],"ans":0,"exp":"...","svg":null}]}`
+{"questions":[{"qtype":"text","q":"?","opts":["yanlis1","yanlis2","DOGRU","yanlis3"],"ans":2,"exp":"Aciklama.","svg":null}]}`
 }
 
 // ── Aylik sayaci sifirla ve limit kontrol et ──
@@ -207,9 +214,18 @@ export async function POST(req: NextRequest) {
     questions = JSON.parse(raw).questions
 
     questions = questions.map((q: Question) => {
+      if (!q.opts || q.opts.length !== 4 || q.ans < 0 || q.ans > 3) return q
       const correctOpt = q.opts[q.ans]
-      const shuffled = [...q.opts].sort(() => Math.random() - 0.5)
-      return { ...q, opts: shuffled, ans: shuffled.indexOf(correctOpt), qtype: q.qtype || 'text' }
+      // Fisher-Yates shuffle
+      const shuffled = [...q.opts]
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+      }
+      const newAns = shuffled.indexOf(correctOpt)
+      // Güvenlik: correctOpt bulunamadıysa shuffle yapma
+      if (newAns === -1) return { ...q, qtype: q.qtype || 'text' }
+      return { ...q, opts: shuffled, ans: newAns, qtype: q.qtype || 'text' }
     })
   } catch (e) {
     // Limit artırıldı ama soru üretilemedi — geri al

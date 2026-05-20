@@ -116,7 +116,7 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
     const openaiKey = process.env.OPENAI_API_KEY
     if (!openaiKey) throw new Error('Ses desteği aktif değil.')
     const whisperForm = new FormData()
-    whisperForm.append('file', new Blob([buffer]), filename)
+    whisperForm.append('file', new Blob([new Uint8Array(buffer)]), filename)
     whisperForm.append('model', 'whisper-1')
     const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
