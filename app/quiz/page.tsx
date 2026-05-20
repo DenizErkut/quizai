@@ -339,9 +339,9 @@ export default function QuizPage() {
 
           {topicErr && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{topicErr}</div>}
 
-          <button className="btn btn-primary btn-lg" onClick={startQuiz} disabled={fileLoading || testsLeft === 0}
+          <button className="btn btn-primary btn-lg" onClick={startQuiz} disabled={testsLeft === 0}
             style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', opacity: testsLeft === 0 ? 0.5 : 1 }}>
-            {testsLeft === 0 ? 'Test hakkın doldu — Yükselt' : fileLoading ? 'Dosya işleniyor...' : 'Test oluştur ⚡'}
+            {testsLeft === 0 ? 'Test hakkın doldu — Yükselt' : 'Test oluştur ⚡'}
           </button>
 
           {testsLeft === 0 && (
