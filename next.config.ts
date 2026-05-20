@@ -1,7 +1,22 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  /* config options here */
-};
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
+  },
+  // API route body limit
+  async headers() {
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+        ],
+      },
+    ]
+  },
+}
 
-export default nextConfig;
+export default nextConfig
