@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import FileUploader, { type UploadedFile } from '@/components/FileUploader'
+import QuizResult from '@/components/QuizResult'
 
 interface Question {
   q: string; opts: string[]; ans: number; exp: string
@@ -75,6 +76,7 @@ export default function QuizPage() {
   const [chosen, setChosen] = useState<number | null>(null)
   const [loadMsg, setLoadMsg] = useState('Profilin analiz ediliyor...')
   const [topicErr, setTopicErr] = useState('')
+  const [youtubeLinks, setYoutubeLinks] = useState<Record<string, string>>({})
   const supabase = createClient() as any
 
   const fetchProfile = useCallback(async () => {
@@ -176,14 +178,25 @@ export default function QuizPage() {
   async function next() {
     if (current + 1 >= questions.length) {
       const score = answers.filter(a => a.correct).length
+      const { data: { session } } = await supabase.auth.getSession()
       if (sessionId) {
-        const { data: { session } } = await supabase.auth.getSession()
         await fetch('/api/generate-quiz', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
           body: JSON.stringify({ sessionId, answers, score }),
         })
       }
+      // YouTube linkleri çek
+      const topic = customTopic.trim() || selectedTopic
+      try {
+        const ytRes = await fetch('/api/youtube-links', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ topics: [topic] }),
+        })
+        const ytData = await ytRes.json()
+        if (ytData.links) setYoutubeLinks(ytData.links)
+      } catch { /* YouTube linki olmasa da devam et */ }
       setScreen('result')
     } else { setCurrent(c => c + 1); setChosen(null) }
   }
@@ -430,43 +443,19 @@ export default function QuizPage() {
 
   // ── RESULT ──
   if (screen === 'result') {
-    const finalScore = answers.filter(a => a.correct).length
-    const finalPct = Math.round((finalScore / questions.length) * 100)
-    const msg = finalPct === 100 ? 'Mükemmel! Tüm sorular doğru.' : finalPct >= 80 ? 'Çok iyi! Konuya hakimsin.' : finalPct >= 60 ? 'Fena değil, pratik yaparsan harika olur.' : 'Tekrar çalışmak isteyebilirsin.'
-    const diff = DIFFICULTIES.find(d => d.value === difficulty)!
+    const topic = customTopic.trim() || selectedTopic
     return (
       <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-          <div className="card anim-up" style={{ marginBottom: '1rem' }}>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem', flexWrap: 'wrap' }}>
-              <div className="badge badge-purple">Test tamamlandı</div>
-              <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '99px', background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600 }}>{diff.label}</span>
-              {hasFiles && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '99px', background: 'var(--green-bg)', color: 'var(--green)', border: '1px solid rgba(22,163,74,0.2)', fontWeight: 600 }}>📎 {uploadedFiles.length} dosya</span>}
-            </div>
-            <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-              <div className="serif" style={{ fontSize: '64px', lineHeight: 1 }}>{finalScore}<span style={{ fontSize: '32px', color: 'var(--text2)' }}>/{questions.length}</span></div>
-              <div style={{ fontSize: '28px', color: finalPct >= 60 ? 'var(--green)' : 'var(--red)', fontWeight: 600, marginTop: '4px' }}>%{finalPct}</div>
-              <div style={{ color: 'var(--text2)', fontSize: '14px', marginTop: '0.75rem' }}>{msg}</div>
-            </div>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
-              <button className="btn btn-primary" onClick={() => { setScreen('topic'); setSelectedTopic(''); setCustomTopic('') }} style={{ flex: 1, justifyContent: 'center' }}>Yeni test</button>
-              <Link href="/dashboard" className="btn" style={{ flex: 1, justifyContent: 'center' }}>Dashboard</Link>
-            </div>
-          </div>
-          <div className="card anim-up-1">
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cevap özeti</div>
-            {questions.map((q, i) => (
-              <div key={i} style={{ padding: '12px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: answers[i]?.correct ? 'var(--green)' : 'var(--red)', flexShrink: 0 }}>{answers[i]?.correct ? '✓' : '✗'}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '3px' }}>{q.q}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text2)' }}>Doğru: {String.fromCharCode(65 + q.ans)}. {q.opts[q.ans]}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <QuizResult
+            questions={questions}
+            answers={answers}
+            topic={topic}
+            difficulty={difficulty}
+            language={currentLang}
+            youtubeLinks={youtubeLinks}
+            onNewTest={() => { setScreen('topic'); setSelectedTopic(''); setCustomTopic('') }}
+          />
         </div>
       </main>
     )
