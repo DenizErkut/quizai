@@ -1,0 +1,143 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import crypto from 'crypto'
+
+const IYZICO_API_KEY = process.env.IYZICO_API_KEY!
+const IYZICO_SECRET_KEY = process.env.IYZICO_SECRET_KEY!
+const IYZICO_BASE_URL = process.env.IYZICO_BASE_URL!
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://quizai-coral.vercel.app'
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+// iyzico HMAC-SHA256 imzası
+function generateAuthHeader(body: string): string {
+  const randomKey = Math.random().toString(36).substring(2)
+  const toSign = IYZICO_API_KEY + randomKey + IYZICO_SECRET_KEY + body
+  const hash = crypto.createHmac('sha256', IYZICO_SECRET_KEY)
+    .update(toSign).digest('base64')
+  const authString = `apiKey:${IYZICO_API_KEY}&randomKey:${randomKey}&signature:${hash}`
+  return 'IYZWSv2 ' + Buffer.from(authString).toString('base64')
+}
+
+const PLANS = {
+  monthly: { price: '79.0', name: 'QuizAI Premium - Aylık', months: 1 },
+  yearly:  { price: '599.0', name: 'QuizAI Premium - Yıllık', months: 12 },
+}
+
+export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  }
+  const token = authHeader.slice(7)
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { headers: { Authorization: `Bearer ${token}` } } }
+  ) as any
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Oturum geçersiz.' }, { status: 401 })
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('name, grade')
+    .eq('id', user.id)
+    .single()
+
+  const body = await req.json()
+  const planType = body.plan as 'monthly' | 'yearly'
+  const plan = PLANS[planType]
+  if (!plan) return NextResponse.json({ error: 'Geçersiz plan.' }, { status: 400 })
+
+  const conversationId = `${user.id}_${planType}_${Date.now()}`
+  const nameParts = (profile?.name || 'Kullanici').split(' ')
+  const firstName = nameParts[0] || 'Kullanici'
+  const lastName = nameParts.slice(1).join(' ') || 'Kullanici'
+
+  const requestBody = {
+    locale: 'tr',
+    conversationId,
+    price: plan.price,
+    paidPrice: plan.price,
+    currency: 'TRY',
+    basketId: conversationId,
+    paymentGroup: 'SUBSCRIPTION',
+    callbackUrl: `${APP_URL}/api/iyzico/callback`,
+    enabledInstallments: [1, 2, 3, 6, 9, 12],
+    buyer: {
+      id: user.id,
+      name: firstName,
+      surname: lastName,
+      gsmNumber: '+905000000000',
+      email: user.email,
+      identityNumber: '74300864791',
+      registrationAddress: 'Türkiye',
+      ip: req.headers.get('x-forwarded-for') || '127.0.0.1',
+      city: 'Istanbul',
+      country: 'Turkey',
+    },
+    shippingAddress: {
+      contactName: profile?.name || 'Kullanici',
+      city: 'Istanbul',
+      country: 'Turkey',
+      address: 'Türkiye',
+    },
+    billingAddress: {
+      contactName: profile?.name || 'Kullanici',
+      city: 'Istanbul',
+      country: 'Turkey',
+      address: 'Türkiye',
+    },
+    basketItems: [
+      {
+        id: `quizai_${planType}`,
+        name: plan.name,
+        category1: 'Dijital Ürün',
+        itemType: 'VIRTUAL',
+        price: plan.price,
+      },
+    ],
+  }
+
+  const bodyStr = JSON.stringify(requestBody)
+
+  try {
+    const response = await fetch(`${IYZICO_BASE_URL}/payment/iyzipos/checkoutform/initialize/auth/ecom`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: generateAuthHeader(bodyStr),
+      },
+      body: bodyStr,
+    })
+
+    const data = await response.json()
+
+    if (data.status !== 'success') {
+      console.error('iyzico error:', data)
+      return NextResponse.json({ error: data.errorMessage || 'Ödeme başlatılamadı.' }, { status: 400 })
+    }
+
+    // conversationId'yi Supabase'e kaydet (webhook'ta kullanılacak)
+    await supabaseAdmin.from('subscriptions').insert({
+      user_id: user.id,
+      plan: planType,
+      status: 'pending',
+      stripe_subscription_id: conversationId, // iyzico conversationId
+    })
+
+    return NextResponse.json({
+      checkoutFormContent: data.checkoutFormContent,
+      token: data.token,
+      conversationId,
+    })
+  } catch (e) {
+    console.error('iyzico fetch error:', e)
+    return NextResponse.json({ error: 'Ödeme servisi hatası.' }, { status: 500 })
+  }
+}
