@@ -199,7 +199,7 @@ function CheckoutContent() {
             )}
 
             <button className="btn btn-primary btn-lg" onClick={startPayment} disabled={loading}
-              style={{ width: '100%', justifyContent: 'center' }} className="anim-up-3">
+              style={{ width: "100%", justifyContent: "center" }}>
               {loading
                 ? <><span className="spinner" style={{ width: 18, height: 18 }} /> Yükleniyor...</>
                 : `₺${PLANS[selectedPlan].price} — Ödemeye geç →`}
