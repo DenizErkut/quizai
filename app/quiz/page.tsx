@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 
 interface Question {
   q: string; opts: string[]; ans: number; exp: string
-  svg?: string | null; qtype?: 'text' | 'svg' | 'table'
+  svg?: string | null; qtype?: 'text' | 'svg'
 }
 interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number }
 
@@ -48,19 +48,16 @@ const DIFFICULTIES = [
   { value: 'cok zor', label: 'Çok Zor', desc: 'Olimpiyat seviyesi', color: '#dc2626', bg: 'rgba(220,38,38,0.08)', border: 'rgba(220,38,38,0.3)' },
 ]
 
-const FILE_TYPES = {
+const FILE_TYPES: Record<string, { icon: string; label: string }> = {
   'application/pdf': { icon: '📄', label: 'PDF' },
   'text/plain': { icon: '📝', label: 'TXT' },
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': { icon: '📃', label: 'DOCX' },
-  'application/msword': { icon: '📃', label: 'DOC' },
   'image/jpeg': { icon: '🖼️', label: 'JPG' },
   'image/png': { icon: '🖼️', label: 'PNG' },
-  'image/webp': { icon: '🖼️', label: 'WEBP' },
   'audio/mpeg': { icon: '🎵', label: 'MP3' },
   'audio/mp4': { icon: '🎵', label: 'M4A' },
   'audio/wav': { icon: '🎵', label: 'WAV' },
-  'audio/ogg': { icon: '🎵', label: 'OGG' },
-} as Record<string, { icon: string; label: string }>
+}
 
 function getActiveLang(profileLang?: string): string {
   if (typeof window === 'undefined') return profileLang || 'Türkçe'
@@ -80,10 +77,9 @@ export default function QuizPage() {
   const [difficulty, setDifficulty] = useState('normal')
   const [includeVisuals, setIncludeVisuals] = useState(true)
 
-  // Dosya
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
-  const [fileContent, setFileContent] = useState<string>('')
-  const [fileType, setFileType] = useState<string>('')
+  const [fileContent, setFileContent] = useState('')
+  const [fileType, setFileType] = useState('')
   const [fileLoading, setFileLoading] = useState(false)
   const [fileError, setFileError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -113,83 +109,57 @@ export default function QuizPage() {
   useEffect(() => { fetchProfile() }, [])
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    const iv = setInterval(() => {
       const lang = getActiveLang(profile?.language)
-      if (lang !== currentLang) { setCurrentLang(lang); setProfile(prev => prev ? { ...prev, language: lang } : prev) }
+      if (lang !== currentLang) {
+        setCurrentLang(lang)
+        setProfile(prev => prev ? { ...prev, language: lang } : prev)
+      }
     }, 500)
-    return () => clearInterval(interval)
+    return () => clearInterval(iv)
   }, [currentLang, profile?.language])
 
   useEffect(() => { if (screen === 'topic') fetchProfile() }, [screen])
 
-  // Dosya yükleme
   async function handleFileUpload(file: File) {
-    setFileError('')
-    setFileLoading(true)
-    setUploadedFile(file)
-
+    setFileError(''); setFileLoading(true); setUploadedFile(file)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const formData = new FormData()
-      formData.append('file', file)
-
+      const fd = new FormData(); fd.append('file', file)
       const res = await fetch('/api/extract-file', {
         method: 'POST',
         headers: { Authorization: `Bearer ${session?.access_token}` },
-        body: formData,
+        body: fd,
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-
-      setFileContent(data.content)
-      setFileType(data.type)
-      // Dosya adını konu olarak öner
-      if (!customTopic) {
-        const name = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ')
-        setCustomTopic(name)
-      }
+      setFileContent(data.content); setFileType(data.type)
+      if (!customTopic) setCustomTopic(file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' '))
     } catch (e: any) {
       setFileError(e.message || 'Dosya yüklenemedi.')
       setUploadedFile(null)
-    } finally {
-      setFileLoading(false)
-    }
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault()
-    const file = e.dataTransfer.files[0]
-    if (file) handleFileUpload(file)
+    } finally { setFileLoading(false) }
   }
 
   function removeFile() {
-    setUploadedFile(null)
-    setFileContent('')
-    setFileType('')
-    setFileError('')
+    setUploadedFile(null); setFileContent(''); setFileType(''); setFileError('')
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   function getLevel(grade: string) {
     return grade.startsWith('ilk') ? 'ilkokul'
       : grade.startsWith('orta') ? 'ortaokul'
-      : grade.startsWith('lise') ? 'lise'
-      : 'universite'
+      : grade.startsWith('lise') ? 'lise' : 'universite'
   }
 
   async function startQuiz() {
     const topic = customTopic.trim() || selectedTopic
     if (!topic) { setTopicErr('Bir konu seç veya yaz.'); return }
     setTopicErr('')
-
     const lang = getActiveLang(profile?.language)
     setCurrentLang(lang)
-
-    if (profile?.plan === 'free' && (profile?.monthly_test_count || 0) >= 10) {
-      setScreen('limit'); return
-    }
-
     setScreen('loading')
+
     const msgs = [
       fileContent ? 'Dosya içeriği analiz ediliyor...' : 'Profilin analiz ediliyor...',
       'Müfredat kontrol ediliyor...',
@@ -205,17 +175,21 @@ export default function QuizPage() {
       const res = await fetch('/api/generate-quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({
-          topic, questionCount: qCount, difficulty, language: lang,
-          fileContent: fileContent || undefined,
-          fileType: fileType || undefined,
-          includeVisuals,
-        }),
+        body: JSON.stringify({ topic, questionCount: qCount, difficulty, language: lang, fileContent: fileContent || undefined, fileType: fileType || undefined, includeVisuals }),
       })
       const data = await res.json()
       clearInterval(iv)
+
+      // Server-side limit kontrolü — 429
+      if (res.status === 429 && data.error === 'limit_reached') {
+        setScreen('limit')
+        return
+      }
+
       if (!res.ok) throw new Error(data.error)
-      setProfile(prev => prev ? { ...prev, monthly_test_count: (prev.monthly_test_count || 0) + 1 } : prev)
+
+      // Profili yenile (server sayacı artırdı)
+      fetchProfile()
       setQuestions(data.questions)
       setSessionId(data.sessionId)
       setCurrent(0); setAnswers([]); setChosen(null)
@@ -245,29 +219,38 @@ export default function QuizPage() {
         })
       }
       setScreen('result')
-    } else {
-      setCurrent(c => c + 1); setChosen(null)
-    }
+    } else { setCurrent(c => c + 1); setChosen(null) }
   }
 
   const level = profile ? getLevel(profile.grade) : 'ortaokul'
-  const suggestions = TOPIC_MAP[level] || TOPIC_MAP['ortaokul']
-  const testsLeft = profile?.plan === 'free' ? 10 - (profile?.monthly_test_count || 0) : null
+  const suggestions = TOPIC_MAP[level] || TOPIC_MAP.ortaokul
+  const testsLeft = profile?.plan === 'free' ? Math.max(0, 10 - (profile?.monthly_test_count || 0)) : null
   const activeDiff = DIFFICULTIES.find(d => d.value === difficulty)!
 
   // ── LIMIT ──
   if (screen === 'limit') return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
-      <div style={{ maxWidth: '440px', textAlign: 'center' }}>
-        <div style={{ fontSize: '48px', marginBottom: '1rem' }}>📚</div>
-        <h2 className="serif" style={{ fontSize: '26px', marginBottom: '0.75rem' }}>Bu ayki test hakkın doldu</h2>
-        <p style={{ color: 'var(--text2)', fontSize: '14px', marginBottom: '1.5rem', lineHeight: 1.7 }}>
-          Ücretsiz planda ayda 10 test hakkın var.
+      <div style={{ maxWidth: '460px', textAlign: 'center' }} className="anim-up">
+        <div style={{ fontSize: '56px', marginBottom: '1.25rem' }}>📚</div>
+        <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>Bu ayki test hakkın doldu</h2>
+        <p style={{ color: 'var(--text2)', fontSize: '15px', marginBottom: '2rem', lineHeight: 1.7 }}>
+          Ücretsiz planda ayda <strong>10 test</strong> hakkın var.<br />
+          Sınırsız test için Premium'a geç veya <strong>10 arkadaşını davet ederek</strong> 1 yıl ücretsiz premium kazan.
         </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <Link href="/pricing" className="btn btn-primary btn-lg" style={{ justifyContent: 'center' }}>Premium'a geç →</Link>
-          <Link href="/pricing" className="btn btn-lg" style={{ justifyContent: 'center' }}>Arkadaşını davet et</Link>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '320px', margin: '0 auto' }}>
+          <Link href="/pricing" className="btn btn-primary btn-lg" style={{ justifyContent: 'center' }}>
+            💎 Premium'a geç
+          </Link>
+          <Link href="/pricing#referral" className="btn btn-lg" style={{ justifyContent: 'center' }}>
+            🎁 Arkadaşını davet et (ücretsiz)
+          </Link>
+          <button className="btn btn-ghost btn-sm" onClick={() => setScreen('topic')}>
+            ← Geri dön
+          </button>
         </div>
+        <p style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '1.5rem' }}>
+          Ay başında (her ayın 1'i) test hakkın otomatik sıfırlanır.
+        </p>
       </div>
     </main>
   )
@@ -284,11 +267,34 @@ export default function QuizPage() {
             </div>
             <div>
               <div style={{ fontWeight: 500 }}>Merhaba, {profile.name.split(' ')[0]}</div>
-              <div style={{ fontSize: '12px', color: 'var(--text2)' }}>
-                {profile.grade} · {currentLang}
-                {testsLeft !== null && <span style={{ marginLeft: '8px', color: testsLeft <= 2 ? 'var(--red)' : 'var(--text3)' }}>· {testsLeft} test kaldı</span>}
+              <div style={{ fontSize: '12px', color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span>{profile.grade}</span>
+                <span>·</span>
+                <span>{currentLang}</span>
+                {testsLeft !== null && (
+                  <span style={{
+                    padding: '1px 8px', borderRadius: '99px', fontSize: '11px',
+                    background: testsLeft === 0 ? 'var(--red-bg)' : testsLeft <= 2 ? 'rgba(217,119,6,0.1)' : 'var(--bg3)',
+                    color: testsLeft === 0 ? 'var(--red)' : testsLeft <= 2 ? 'var(--amber)' : 'var(--text3)',
+                    border: `1px solid ${testsLeft === 0 ? 'rgba(220,38,38,0.2)' : testsLeft <= 2 ? 'rgba(217,119,6,0.2)' : 'var(--border)'}`,
+                    fontWeight: 600,
+                  }}>
+                    {testsLeft === 0 ? '⚠ Hak kalmadı' : `${testsLeft} test kaldı`}
+                  </span>
+                )}
+                {profile.plan === 'premium' && (
+                  <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '11px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid rgba(91,76,245,0.2)', fontWeight: 600 }}>★ Premium</span>
+                )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Limit uyarısı */}
+        {testsLeft !== null && testsLeft <= 3 && testsLeft > 0 && (
+          <div className="anim-up" style={{ marginBottom: '1rem', padding: '12px 16px', borderRadius: '10px', background: 'rgba(217,119,6,0.07)', border: '1px solid rgba(217,119,6,0.25)', fontSize: '13px', color: '#92400e', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>⚠ Bu ay {testsLeft} test hakkın kaldı.</span>
+            <Link href="/pricing" style={{ color: 'var(--accent)', fontWeight: 600, fontSize: '12px', textDecoration: 'none' }}>Yükselt →</Link>
           </div>
         )}
 
@@ -296,10 +302,9 @@ export default function QuizPage() {
           <h2 className="serif" style={{ fontSize: '24px', marginBottom: '0.25rem' }}>Hangi konuyu test edelim?</h2>
           <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1.5rem' }}>
             Hazır konulardan seç, kendi konunu yaz veya dosya yükle.
-            {currentLang !== 'Türkçe' && <span style={{ color: 'var(--accent)', marginLeft: '6px' }}>· Sorular {currentLang} dilinde gelecek</span>}
+            {currentLang !== 'Türkçe' && <span style={{ color: 'var(--accent)', marginLeft: '6px' }}>· Sorular {currentLang} dilinde</span>}
           </p>
 
-          {/* Önerilen konular */}
           <label className="field-label">Önerilen konular</label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px', marginBottom: '1rem' }}>
             {suggestions.map(s => (
@@ -311,74 +316,39 @@ export default function QuizPage() {
             ))}
           </div>
 
-          {/* Konu yazma */}
           <label className="field-label">Veya kendi konunu yaz</label>
           <textarea className="input" rows={2}
             placeholder="Örn: Güneş sistemi, Osmanlı kuruluşu, Fotosentez..."
-            value={customTopic}
-            onChange={e => { setCustomTopic(e.target.value); setSelectedTopic('') }}
-            style={{ resize: 'none' }}
-          />
+            value={customTopic} onChange={e => { setCustomTopic(e.target.value); setSelectedTopic('') }}
+            style={{ resize: 'none' }} />
 
           {/* Dosya yükleme */}
           <label className="field-label" style={{ marginTop: '16px' }}>Dosyadan soru üret</label>
           {!uploadedFile ? (
             <div
-              onDrop={handleDrop}
+              onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFileUpload(f) }}
               onDragOver={e => e.preventDefault()}
               onClick={() => fileInputRef.current?.click()}
-              style={{
-                marginTop: '6px', padding: '20px', borderRadius: '10px',
-                border: '2px dashed var(--border)', background: 'var(--bg2)',
-                textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s',
-              }}
+              style={{ marginTop: '6px', padding: '20px', borderRadius: '10px', border: '2px dashed var(--border)', background: 'var(--bg2)', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-bg)' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg2)' }}
-            >
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg2)' }}>
               <div style={{ fontSize: '24px', marginBottom: '6px' }}>📎</div>
-              <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>
-                Dosya sürükle veya tıkla
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>
-                PDF · TXT · DOCX · JPG · PNG · MP3 · M4A · WAV
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.txt,.docx,.doc,.jpg,.jpeg,.png,.webp,.mp3,.m4a,.wav,.ogg"
-                style={{ display: 'none' }}
-                onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }}
-              />
+              <div style={{ fontSize: '13px', fontWeight: 500 }}>Dosya sürükle veya tıkla</div>
+              <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>PDF · TXT · DOCX · JPG · PNG · MP3 · M4A · WAV</div>
+              <input ref={fileInputRef} type="file" accept=".pdf,.txt,.docx,.doc,.jpg,.jpeg,.png,.webp,.mp3,.m4a,.wav,.ogg" style={{ display: 'none' }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }} />
             </div>
           ) : (
-            <div style={{
-              marginTop: '6px', padding: '12px 14px', borderRadius: '10px',
-              border: '1.5px solid var(--accent)', background: 'var(--accent-bg)',
-              display: 'flex', alignItems: 'center', gap: '10px',
-            }}>
+            <div style={{ marginTop: '6px', padding: '12px 14px', borderRadius: '10px', border: '1.5px solid var(--accent)', background: 'var(--accent-bg)', display: 'flex', alignItems: 'center', gap: '10px' }}>
               {fileLoading ? (
-                <>
-                  <div className="spinner" style={{ width: 20, height: 20, flexShrink: 0 }} />
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: 500 }}>{uploadedFile.name}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text2)' }}>İşleniyor...</div>
-                  </div>
-                </>
+                <><div className="spinner" style={{ width: 20, height: 20, flexShrink: 0 }} /><div style={{ fontSize: '13px', fontWeight: 500 }}>{uploadedFile.name}<br /><span style={{ fontSize: '11px', color: 'var(--text2)' }}>İşleniyor...</span></div></>
               ) : (
-                <>
-                  <span style={{ fontSize: '22px', flexShrink: 0 }}>
-                    {FILE_TYPES[uploadedFile.type]?.icon || '📄'}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {uploadedFile.name}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--green)' }}>
-                      ✓ {fileContent.split(' ').length} kelime okundu · Sorular bu içerikten üretilecek
-                    </div>
-                  </div>
-                  <button onClick={removeFile} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: '16px', flexShrink: 0 }}>✕</button>
-                </>
+                <><span style={{ fontSize: '22px', flexShrink: 0 }}>{FILE_TYPES[uploadedFile.type]?.icon || '📄'}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{uploadedFile.name}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--green)' }}>✓ {fileContent.split(' ').length} kelime · Bu içerikten soru üretilecek</div>
+                </div>
+                <button onClick={removeFile} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: '16px' }}>✕</button></>
               )}
             </div>
           )}
@@ -389,56 +359,34 @@ export default function QuizPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginTop: '6px' }}>
             {DIFFICULTIES.map(d => (
               <button key={d.value} onClick={() => setDifficulty(d.value)}
-                style={{
-                  padding: '10px 8px', borderRadius: '10px',
-                  border: `1.5px solid ${difficulty === d.value ? d.border : 'var(--border)'}`,
-                  background: difficulty === d.value ? d.bg : 'var(--bg2)',
-                  color: difficulty === d.value ? d.color : 'var(--text2)',
-                  fontSize: '13px', fontWeight: difficulty === d.value ? 600 : 400,
-                  cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center',
-                }}>
+                style={{ padding: '10px 8px', borderRadius: '10px', border: `1.5px solid ${difficulty === d.value ? d.border : 'var(--border)'}`, background: difficulty === d.value ? d.bg : 'var(--bg2)', color: difficulty === d.value ? d.color : 'var(--text2)', fontSize: '13px', fontWeight: difficulty === d.value ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center' }}>
                 <div style={{ fontWeight: 600, marginBottom: '2px' }}>{d.label}</div>
                 <div style={{ fontSize: '11px', opacity: 0.75 }}>{d.desc}</div>
               </button>
             ))}
           </div>
 
-          {/* Soru sayısı + görsel toggle */}
+          {/* Soru sayısı + görsel */}
           <div style={{ display: 'flex', gap: '12px', marginTop: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div style={{ flex: 1 }}>
               <label className="field-label">Soru sayısı</label>
               <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
                 {[5, 10, 15, ...(profile?.plan === 'premium' ? [20] : [])].map(n => (
-                  <button key={n} className={`btn btn-sm ${qCount === n ? 'btn-primary' : ''}`} onClick={() => setQCount(n)}>
-                    {n} soru
-                  </button>
+                  <button key={n} className={`btn btn-sm ${qCount === n ? 'btn-primary' : ''}`} onClick={() => setQCount(n)}>{n} soru</button>
                 ))}
               </div>
             </div>
             <div>
               <label className="field-label">Görsel sorular</label>
-              <button
-                onClick={() => setIncludeVisuals(v => !v)}
-                style={{
-                  marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px',
-                  padding: '8px 14px', borderRadius: '8px', cursor: 'pointer',
-                  border: `1.5px solid ${includeVisuals ? 'var(--accent)' : 'var(--border)'}`,
-                  background: includeVisuals ? 'var(--accent-bg)' : 'var(--bg2)',
-                  color: includeVisuals ? 'var(--accent)' : 'var(--text2)',
-                  fontSize: '13px', fontWeight: includeVisuals ? 600 : 400, transition: 'all 0.15s',
-                }}>
-                <span>{includeVisuals ? '📊' : '📝'}</span>
-                {includeVisuals ? 'Grafik & SVG açık' : 'Sadece metin'}
+              <button onClick={() => setIncludeVisuals(v => !v)}
+                style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', border: `1.5px solid ${includeVisuals ? 'var(--accent)' : 'var(--border)'}`, background: includeVisuals ? 'var(--accent-bg)' : 'var(--bg2)', color: includeVisuals ? 'var(--accent)' : 'var(--text2)', fontSize: '13px', fontWeight: includeVisuals ? 600 : 400, transition: 'all 0.15s' }}>
+                {includeVisuals ? '📊 Grafik & SVG açık' : '📝 Sadece metin'}
               </button>
             </div>
           </div>
 
           {/* Özet */}
-          <div style={{
-            marginTop: '1rem', padding: '12px 14px', borderRadius: '10px',
-            background: 'var(--bg2)', border: '1px solid var(--border)',
-            fontSize: '13px', color: 'var(--text2)', display: 'flex', gap: '16px', flexWrap: 'wrap',
-          }}>
+          <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '13px', color: 'var(--text2)', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             <span>📝 {qCount} soru</span>
             <span style={{ color: activeDiff.color }}>⚡ {activeDiff.label}</span>
             <span>🌐 {currentLang}</span>
@@ -448,10 +396,16 @@ export default function QuizPage() {
 
           {topicErr && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{topicErr}</div>}
 
-          <button className="btn btn-primary btn-lg" onClick={startQuiz} disabled={fileLoading}
-            style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem' }}>
-            {fileLoading ? 'Dosya işleniyor...' : 'Test oluştur ⚡'}
+          <button className="btn btn-primary btn-lg" onClick={startQuiz} disabled={fileLoading || testsLeft === 0}
+            style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', opacity: testsLeft === 0 ? 0.5 : 1 }}>
+            {testsLeft === 0 ? 'Test hakkın doldu — Yükselt' : fileLoading ? 'Dosya işleniyor...' : 'Test oluştur ⚡'}
           </button>
+
+          {testsLeft === 0 && (
+            <Link href="/pricing" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }}>
+              💎 Premium'a geç
+            </Link>
+          )}
         </div>
       </div>
     </main>
@@ -473,14 +427,12 @@ export default function QuizPage() {
     const q = questions[current]
     const progPct = Math.round((current / questions.length) * 100)
     const diff = DIFFICULTIES.find(d => d.value === difficulty)!
-    const isSvgQ = q.qtype === 'svg' && q.svg
-
     return (
       <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
         <div style={{ maxWidth: '640px', margin: '0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
             <span className="serif" style={{ fontSize: '18px' }}>Quiz<span style={{ color: 'var(--accent)' }}>AI</span></span>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '99px', background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600 }}>{diff.label}</span>
               <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{answers.filter(a => a.correct).length}/{current} doğru</span>
             </div>
@@ -488,32 +440,20 @@ export default function QuizPage() {
           <div className="progress-bar" style={{ marginBottom: '1.5rem' }}>
             <div className="progress-fill" style={{ width: `${progPct}%` }} />
           </div>
-
           <div className="card anim-up">
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
               <span style={{ fontSize: '12px', color: 'var(--text3)', fontWeight: 500 }}>Soru {current + 1} / {questions.length}</span>
               <div style={{ display: 'flex', gap: '8px' }}>
-                {isSvgQ && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid rgba(91,76,245,0.2)' }}>📊 Görsel soru</span>}
+                {q.qtype === 'svg' && q.svg && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid rgba(91,76,245,0.2)' }}>📊 Görsel</span>}
                 <span style={{ fontSize: '11px', color: 'var(--text3)' }}>🌐 {currentLang}</span>
               </div>
             </div>
-
-            {/* SVG görsel */}
-            {isSvgQ && (
-              <div style={{
-                marginBottom: '1rem', padding: '1rem', borderRadius: '10px',
-                background: 'var(--bg2)', border: '1px solid var(--border)',
-                overflow: 'hidden',
-              }}>
-                <div
-                  dangerouslySetInnerHTML={{ __html: q.svg! }}
-                  style={{ width: '100%', maxWidth: '100%' }}
-                />
+            {q.qtype === 'svg' && q.svg && (
+              <div style={{ marginBottom: '1rem', padding: '1rem', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                <div dangerouslySetInnerHTML={{ __html: q.svg }} style={{ width: '100%' }} />
               </div>
             )}
-
             <p style={{ fontSize: '17px', fontWeight: 500, lineHeight: 1.55, marginBottom: '1.5rem' }}>{q.q}</p>
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {q.opts.map((opt, i) => {
                 let bg = 'var(--bg2)', border = 'var(--border)', color = 'var(--text)'
@@ -523,21 +463,16 @@ export default function QuizPage() {
                 }
                 return (
                   <button key={i} onClick={() => choose(i)} disabled={chosen !== null}
-                    style={{ textAlign: 'left', padding: '12px 15px', borderRadius: '10px', border: `1.5px solid ${border}`, background: bg, color, font: '14px/1.45 "DM Sans", sans-serif', cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s' }}>
-                    <span style={{ fontWeight: 600, marginRight: '8px', opacity: 0.5 }}>{String.fromCharCode(65 + i)}.</span>
-                    {opt}
+                    style={{ textAlign: 'left', padding: '12px 15px', borderRadius: '10px', border: `1.5px solid ${border}`, background: bg, color, font: '14px/1.45 "DM Sans",sans-serif', cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s' }}>
+                    <span style={{ fontWeight: 600, marginRight: '8px', opacity: 0.5 }}>{String.fromCharCode(65 + i)}.</span>{opt}
                   </button>
                 )
               })}
             </div>
-
             {chosen !== null && (
               <>
                 <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', borderLeft: '3px solid var(--accent)', fontSize: '13px', color: 'var(--text2)', lineHeight: 1.65 }}>
-                  <strong style={{ color: chosen === q.ans ? 'var(--green)' : 'var(--red)' }}>
-                    {chosen === q.ans ? 'Doğru! ' : 'Yanlış. '}
-                  </strong>
-                  {q.exp}
+                  <strong style={{ color: chosen === q.ans ? 'var(--green)' : 'var(--red)' }}>{chosen === q.ans ? 'Doğru! ' : 'Yanlış. '}</strong>{q.exp}
                 </div>
                 <button className="btn btn-primary" onClick={next} style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}>
                   {current + 1 < questions.length ? 'Sonraki soru →' : 'Sonuçları gör →'}
@@ -554,12 +489,8 @@ export default function QuizPage() {
   if (screen === 'result') {
     const finalScore = answers.filter(a => a.correct).length
     const finalPct = Math.round((finalScore / questions.length) * 100)
-    const msg = finalPct === 100 ? 'Mükemmel! Tüm sorular doğru.' :
-      finalPct >= 80 ? 'Çok iyi! Konuya hakimsin.' :
-      finalPct >= 60 ? 'Fena değil, pratik yaparsan harika olur.' :
-      'Tekrar çalışmak isteyebilirsin.'
+    const msg = finalPct === 100 ? 'Mükemmel! Tüm sorular doğru.' : finalPct >= 80 ? 'Çok iyi! Konuya hakimsin.' : finalPct >= 60 ? 'Fena değil, pratik yaparsan harika olur.' : 'Tekrar çalışmak isteyebilirsin.'
     const diff = DIFFICULTIES.find(d => d.value === difficulty)!
-
     return (
       <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
@@ -570,38 +501,24 @@ export default function QuizPage() {
               {fileContent && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '99px', background: 'var(--green-bg)', color: 'var(--green)', border: '1px solid rgba(22,163,74,0.2)', fontWeight: 600 }}>📎 Dosyadan</span>}
             </div>
             <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-              <div className="serif" style={{ fontSize: '64px', lineHeight: 1 }}>
-                {finalScore}<span style={{ fontSize: '32px', color: 'var(--text2)' }}>/{questions.length}</span>
-              </div>
+              <div className="serif" style={{ fontSize: '64px', lineHeight: 1 }}>{finalScore}<span style={{ fontSize: '32px', color: 'var(--text2)' }}>/{questions.length}</span></div>
               <div style={{ fontSize: '28px', color: finalPct >= 60 ? 'var(--green)' : 'var(--red)', fontWeight: 600, marginTop: '4px' }}>%{finalPct}</div>
               <div style={{ color: 'var(--text2)', fontSize: '14px', marginTop: '0.75rem' }}>{msg}</div>
             </div>
             <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
-              <button className="btn btn-primary"
-                onClick={() => { setScreen('topic'); setSelectedTopic(''); setCustomTopic('') }}
-                style={{ flex: 1, justifyContent: 'center' }}>Yeni test</button>
+              <button className="btn btn-primary" onClick={() => { setScreen('topic'); setSelectedTopic(''); setCustomTopic('') }} style={{ flex: 1, justifyContent: 'center' }}>Yeni test</button>
               <Link href="/dashboard" className="btn" style={{ flex: 1, justifyContent: 'center' }}>Dashboard</Link>
             </div>
           </div>
-
           <div className="card anim-up-1">
             <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cevap özeti</div>
             {questions.map((q, i) => (
               <div key={i} style={{ padding: '12px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: answers[i]?.correct ? 'var(--green)' : 'var(--red)', flexShrink: 0 }}>
-                    {answers[i]?.correct ? '✓' : '✗'}
-                  </span>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: answers[i]?.correct ? 'var(--green)' : 'var(--red)', flexShrink: 0 }}>{answers[i]?.correct ? '✓' : '✗'}</span>
                   <div style={{ flex: 1 }}>
-                    {q.qtype === 'svg' && q.svg && (
-                      <div style={{ marginBottom: '6px', padding: '8px', background: 'var(--bg2)', borderRadius: '8px', fontSize: '11px', color: 'var(--text3)' }}>
-                        📊 Görsel soru
-                      </div>
-                    )}
                     <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '3px' }}>{q.q}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text2)' }}>
-                      Doğru: {String.fromCharCode(65 + q.ans)}. {q.opts[q.ans]}
-                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text2)' }}>Doğru: {String.fromCharCode(65 + q.ans)}. {q.opts[q.ans]}</div>
                   </div>
                 </div>
               </div>
@@ -611,6 +528,5 @@ export default function QuizPage() {
       </main>
     )
   }
-
   return null
 }

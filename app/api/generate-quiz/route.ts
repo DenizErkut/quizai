@@ -4,6 +4,12 @@ import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
+// Service role key — RLS bypass, limit kontrolü için
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
 interface ProfileParams {
   name: string; age: number; gender: string; grade: string
   gradeLevel: string; language: string; topic: string
@@ -13,120 +19,132 @@ interface ProfileParams {
 }
 
 interface Question {
-  q: string
-  opts: string[]
-  ans: number
-  exp: string
-  svg?: string        // opsiyonel SVG — görsel sorular için
-  table?: string[][]  // opsiyonel tablo verisi
-  qtype?: 'text' | 'svg' | 'table'
+  q: string; opts: string[]; ans: number; exp: string
+  svg?: string | null; qtype?: 'text' | 'svg'
 }
 
 const CURRICULUM_SCOPE: Record<string, string> = {
-  'ilkokul 1. sinif': 'Sayilari okuma/yazma (1-20), basit toplama cikarma (10a kadar), sekil tanima.',
-  'ilkokul 2. sinif': 'Toplama cikarma (100e kadar), saat okuma (tam ve yarim), uzunluk olcme.',
-  'ilkokul 3. sinif': 'Carpma islemi (2,3,4,5 ile), bolme kavrami, kesir kavrami (1/2, 1/4).',
-  'ilkokul 4. sinif': 'Carpim tablosu (1-9), dort islem, ondalik gosterim (baslangic), kesirler.',
-  'ortaokul 5. sinif': 'Dogal sayilar, tam sayilara giris, kesirler ve ondalik sayilar, yuzde kavrami (basit).',
-  'ortaokul 6. sinif': 'Tam sayilar ve islemler, kesirler (dort islem), oran ve orani (giris), temel geometri. OBEB ve OKEK bu sinifta YOKTUR.',
-  'ortaokul 7. sinif': 'Tam sayilar (dort islem), rasyonel sayilar, oran-orani, yuzde hesabi, denklemler (basit).',
-  'ortaokul 8. sinif': 'Carpanlara ayirma, denklem sistemleri (giris), ucgenler, Pisagor teoremi, olasilik.',
-  'lise 9. sinif': 'Kumeler, sayi sistemleri, mutlak deger, denklem ve esitsizlikler, fonksiyon kavrami.',
-  'lise 10. sinif': 'Polinomlar, ikinci derece denklemler, logaritma, trigonometri, dortgenler.',
-  'lise 11. sinif': 'Turev, integral (giris), karmasik sayilar, istatistik.',
-  'lise 12. sinif': 'Integral uygulamalari, dizi ve seriler, olasilik (ileri).',
+  'ilkokul 1. sinif': 'Sayilari okuma/yazma (1-20), basit toplama cikarma (10a kadar).',
+  'ilkokul 2. sinif': 'Toplama cikarma (100e kadar), saat okuma, uzunluk olcme.',
+  'ilkokul 3. sinif': 'Carpma (2-5 ile), bolme, kesir (1/2, 1/4).',
+  'ilkokul 4. sinif': 'Carpim tablosu (1-9), dort islem, ondalik, kesirler.',
+  'ortaokul 5. sinif': 'Dogal sayilar, tam sayilara giris, kesirler, yuzde (basit).',
+  'ortaokul 6. sinif': 'Tam sayilar, kesirler (dort islem), oran-orani (giris), geometri. OBEB/OKEK YOKTUR.',
+  'ortaokul 7. sinif': 'Rasyonel sayilar, oran-orani, yuzde, denklemler (basit).',
+  'ortaokul 8. sinif': 'Carpanlara ayirma, denklem sistemleri, Pisagor, olasilik.',
+  'lise 9. sinif': 'Kumeler, mutlak deger, fonksiyon, trigonometri (giris).',
+  'lise 10. sinif': 'Polinomlar, ikinci derece, logaritma, trigonometri.',
+  'lise 11. sinif': 'Turev, integral (giris), istatistik.',
+  'lise 12. sinif': 'Integral uygulamalari, seriler, olasilik (ileri).',
 }
 
 const DIFFICULTY_HINTS: Record<string, string> = {
-  kolay: 'KOLAY: Temel tanim ve kavram sorulari. Dogrudan hatirlama. Siklar cok belirgin farkli.',
-  normal: 'NORMAL: Mufredat seviyesinde standart sorular. Kavramin uygulamasi.',
-  zor: 'ZOR: Analiz ve sentez gerektiren. Birden fazla adim. Siklar birbirine yakin.',
-  'cok zor': 'COK ZOR: Olimpiyat seviyesi. Derin analiz, yaratici dusunme. Zekice tuzaklar iceriyor.',
+  kolay: 'KOLAY: Temel tanim sorulari. Siklar cok belirgin farkli.',
+  normal: 'NORMAL: Mufredat seviyesi. Kavramin uygulamasi.',
+  zor: 'ZOR: Analiz gerektiren. Siklar birbirine yakin.',
+  'cok zor': 'COK ZOR: Olimpiyat seviyesi. Zekice tuzaklar.',
 }
 
 function getCurriculumNote(grade: string): string {
-  const normalized = grade.toLowerCase().trim()
-    .replace(/\u0131/g, 'i').replace(/\u015f/g, 's').replace(/\u011f/g, 'g')
-    .replace(/\u00fc/g, 'u').replace(/\u00f6/g, 'o').replace(/\u00e7/g, 'c')
-  for (const [k, v] of Object.entries(CURRICULUM_SCOPE)) {
-    const kn = k.replace(/\u0131/g, 'i').replace(/\u015f/g, 's').replace(/\u011f/g, 'g')
-      .replace(/\u00fc/g, 'u').replace(/\u00f6/g, 'o').replace(/\u00e7/g, 'c')
-    if (kn === normalized) return v
+  const n = (s: string) => s.toLowerCase()
+    .replace(/\u0131/g,'i').replace(/\u015f/g,'s').replace(/\u011f/g,'g')
+    .replace(/\u00fc/g,'u').replace(/\u00f6/g,'o').replace(/\u00e7/g,'c')
+  const ng = n(grade.trim())
+  for (const [k,v] of Object.entries(CURRICULUM_SCOPE)) {
+    if (n(k) === ng) return v
   }
   return ''
 }
 
 function buildPrompt(p: ProfileParams): string {
-  const curriculumNote = getCurriculumNote(p.grade)
-  const difficultyHint = DIFFICULTY_HINTS[p.difficulty] || DIFFICULTY_HINTS['normal']
-  const answerPattern = Array.from({ length: p.questionCount }, (_, i) => i % 4).join(', ')
+  const curriculum = getCurriculumNote(p.grade)
+  const diffHint = DIFFICULTY_HINTS[p.difficulty] || DIFFICULTY_HINTS.normal
+  const ansPattern = Array.from({length: p.questionCount}, (_,i) => i % 4).join(', ')
 
-  const fileSection = p.fileContent ? `
-DOSYA ICERIGI (bu icerikten sorular uret):
+  const fileSec = p.fileContent ? `
+DOSYA ICERIGI (bu icerikten soru uret):
 ---
 ${p.fileContent.slice(0, 6000)}
----
-Not: Sorulari bu dosya iceriginden uret. Konu olarak "${p.topic}" kullan.
-` : ''
+---` : ''
 
-  const visualSection = p.includeVisuals ? `
-GORSEL SORU TALIMATI:
-Sorularin yaklasik %30-40'i gorsel ierikli olabilir. Gorsel soru olusturmak istediginde:
-- "qtype": "svg" yaz
-- "svg" alanina gecerli bir SVG kodu yaz (viewBox="0 0 400 250", width/height olmadan)
-- SVG icinde: cizgi grafigi, sutun grafigi, pasta grafik, geometrik sekil, koordinat sistemi
-- SVG renkleri: #5b4cf5 (ana), #16a34a (yesil), #dc2626 (kirmizi), #d97706 (turuncu), #64748b (gri)
-- SVG font: font-family="sans-serif" kullan
-- Soru metni SVG'ye referans vermeli: "Asagidaki grafige gore..." veya "Sekilye bakildiginda..."
-Gorsel olmayan sorular icin "qtype": "text" yaz, "svg" alani olmayacak.
-` : ''
+  const visualSec = p.includeVisuals ? `
+GORSEL SORU: Sorularin ~30%'i gorsel olabilir. Gorsel sorular icin:
+- "qtype":"svg", "svg" alanina gecerli SVG kodu (viewBox="0 0 400 250")
+- SVG renkleri: #5b4cf5 #16a34a #dc2626 #d97706 #64748b
+- font-family="sans-serif"
+- Soru SVG'ye referans vermeli: "Asagidaki grafige gore..."
+Gorsel olmayan: "qtype":"text", "svg":null` : `Tum sorular metin tabanli. "qtype":"text", "svg":null`
 
-  return `Sen Turkiye MEB mufredatina hakim deneyimli bir egitim uzmanisın.
+  return `Sen MEB mufredatina hakim egitim uzmanisın.
 
-Ogrenci profili:
-- Ad: ${p.name}
-- Sinif: ${p.grade}
-- Yas: ${p.age}
-- Cinsiyet: ${p.gender}
-- Test konusu: ${p.topic}
-- Yanitlama dili: ${p.language}
-- Zorluk: ${p.difficulty.toUpperCase()}
-${fileSection}
-MEB MUFREDAT SINIRI:
-${curriculumNote ? `${p.grade} icin kapsam: ${curriculumNote}` : `${p.grade} seviyesine uygun tut.`}
+Profil: ${p.name}, ${p.grade}, ${p.age} yas, ${p.gender}
+Konu: ${p.topic} | Dil: ${p.language} | Zorluk: ${p.difficulty.toUpperCase()}
+${fileSec}
+Mufredat: ${curriculum || p.grade + ' seviyesine uygun'}
+${diffHint}
+${visualSec}
 
-ZORLUK: ${difficultyHint}
-${visualSection}
-Gorev: ${p.questionCount} adet coktan secmeli soru hazirla.
+${p.questionCount} adet soru uret. "ans" sirasi: ${ansPattern}
+4 sik, aciklama ${p.language} dilinde, tekrar yok.
 
-CEVAP DAGILIMI:
-- "ans" degerlerini sirasıyla ata: ${answerPattern}
-- ASLA hepsini ans=0 yapma.
+SADECE JSON:
+{"questions":[{"qtype":"text","q":"?","opts":["A","B","C","D"],"ans":0,"exp":"...","svg":null}]}`
+}
 
-Kurallar:
-- Her soruda tam olarak 4 sik (opts 4 elemanli).
-- Aciklama 1-2 cumle, ogretici, ${p.language} dilinde.
-- Sorular birbirini tekrar etmemeli.
+// ── Aylik sayaci sifirla ve limit kontrol et ──
+async function checkAndIncrementLimit(userId: string): Promise<{ allowed: boolean; reason?: string }> {
+  // Profili cek
+  const { data: profile, error } = await supabaseAdmin
+    .from('profiles')
+    .select('plan, plan_expires_at, monthly_test_count, monthly_reset_at')
+    .eq('id', userId)
+    .single()
 
-SADECE asagidaki JSON formatinda yanit ver, baska hicbir sey yazma:
-{
-  "questions": [
-    {
-      "qtype": "text",
-      "q": "Soru metni?",
-      "opts": ["A", "B", "C", "D"],
-      "ans": 0,
-      "exp": "Aciklama.",
-      "svg": null
-    }
-  ]
-}`
+  if (error || !profile) return { allowed: false, reason: 'profile_not_found' }
+
+  // Premium suresi dolmussa free'ye dusur
+  if (profile.plan === 'premium' && profile.plan_expires_at && new Date(profile.plan_expires_at) < new Date()) {
+    await supabaseAdmin.from('profiles').update({ plan: 'free' }).eq('id', userId)
+    profile.plan = 'free'
+  }
+
+  // Premium — sinirsiz
+  if (profile.plan === 'premium') {
+    await supabaseAdmin.from('profiles')
+      .update({ monthly_test_count: (profile.monthly_test_count || 0) + 1 })
+      .eq('id', userId)
+    return { allowed: true }
+  }
+
+  // Aylik reset kontrolu
+  const resetAt = profile.monthly_reset_at ? new Date(profile.monthly_reset_at) : new Date(0)
+  const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0)
+  
+  if (resetAt < monthStart) {
+    // Yeni ay — sayaci sifirla
+    await supabaseAdmin.from('profiles')
+      .update({ monthly_test_count: 1, monthly_reset_at: monthStart.toISOString() })
+      .eq('id', userId)
+    return { allowed: true }
+  }
+
+  // Free plan limit: 10
+  const count = profile.monthly_test_count || 0
+  if (count >= 10) {
+    return { allowed: false, reason: 'limit_reached' }
+  }
+
+  // Sayaci artir
+  await supabaseAdmin.from('profiles')
+    .update({ monthly_test_count: count + 1 })
+    .eq('id', userId)
+  return { allowed: true }
 }
 
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Yetkisiz erisim.' }, { status: 401 })
+    return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   }
   const token = authHeader.slice(7)
 
@@ -138,6 +156,18 @@ export async function POST(req: NextRequest) {
 
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
   if (authErr || !user) return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 })
+
+  // ── SERVER-SIDE LİMİT KONTROLÜ ──
+  const limitCheck = await checkAndIncrementLimit(user.id)
+  if (!limitCheck.allowed) {
+    if (limitCheck.reason === 'limit_reached') {
+      return NextResponse.json({
+        error: 'limit_reached',
+        message: 'Bu ayki 10 test hakkını kullandın. Premium\'a geç veya ay başını bekle.',
+      }, { status: 429 })
+    }
+    return NextResponse.json({ error: 'Test başlatılamadı.' }, { status: 400 })
+  }
 
   const { data: profile, error: profileErr } = await supabase
     .from('profiles').select('name, age, gender, grade, language').eq('id', user.id).single()
@@ -176,28 +206,23 @@ export async function POST(req: NextRequest) {
       .replace(/```json|```/g, '').trim()
     questions = JSON.parse(raw).questions
 
-    // Şıkları karıştır — doğru cevap indexini güncelle
     questions = questions.map((q: Question) => {
       const correctOpt = q.opts[q.ans]
       const shuffled = [...q.opts].sort(() => Math.random() - 0.5)
-      return {
-        ...q,
-        opts: shuffled,
-        ans: shuffled.indexOf(correctOpt),
-        qtype: q.qtype || (q.svg ? 'svg' : 'text'),
-      }
+      return { ...q, opts: shuffled, ans: shuffled.indexOf(correctOpt), qtype: q.qtype || 'text' }
     })
   } catch (e) {
-    console.error('Claude API hatasi:', e)
+    // Limit artırıldı ama soru üretilemedi — geri al
+    await supabaseAdmin.from('profiles')
+      .update({ monthly_test_count: (await supabaseAdmin.from('profiles').select('monthly_test_count').eq('id', user.id).single()).data?.monthly_test_count - 1 })
+      .eq('id', user.id)
+    console.error('Claude API:', e)
     return NextResponse.json({ error: 'Sorular uretilemedi.' }, { status: 500 })
   }
 
   const { data: session } = await supabase
     .from('quiz_sessions')
-    .insert({
-      user_id: user.id, topic, grade: profile.grade, language,
-      question_count: questionCount, questions, answers: [], completed: false,
-    })
+    .insert({ user_id: user.id, topic, grade: profile.grade, language, question_count: questionCount, questions, answers: [], completed: false })
     .select('id').single()
 
   return NextResponse.json({
@@ -222,8 +247,7 @@ export async function PATCH(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
   const { sessionId, answers, score } = await req.json()
-  const { error } = await supabase
-    .from('quiz_sessions')
+  const { error } = await supabase.from('quiz_sessions')
     .update({ answers, score, completed: true })
     .eq('id', sessionId).eq('user_id', user.id)
 
