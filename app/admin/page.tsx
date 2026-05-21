@@ -55,11 +55,12 @@ export default function AdminPage() {
 
   async function fetchData() {
     setLoading(true)
-    // Kullanıcıları çek
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('id, name, grade, plan, plan_expires_at, monthly_test_count, is_admin, created_at')
-      .order('created_at', { ascending: false })
+    // Kullanıcıları service role API üzerinden çek
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/admin/users', {
+      headers: { Authorization: `Bearer ${session?.access_token}` }
+    })
+    const profileData = res.ok ? await res.json() : []
 
     // Her kullanıcının session istatistiklerini çek
     const { data: sessionData } = await supabase
