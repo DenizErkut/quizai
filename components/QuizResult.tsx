@@ -7,6 +7,13 @@ interface Question {
   svg?: string | null; qtype?: 'text' | 'svg'
 }
 
+interface YouTubeLink {
+  url: string
+  title: string
+  channel: string
+  thumbnail: string
+}
+
 interface Props {
   questions: Question[]
   answers: { userAns: number; correct: boolean }[]
@@ -14,7 +21,7 @@ interface Props {
   difficulty: string
   language: string
   onNewTest: () => void
-  youtubeLinks?: Record<string, string>
+  youtubeLinks?: Record<string, YouTubeLink | string>
 }
 
 const DIFFICULTIES: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -178,15 +185,32 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
                 <div style={{ fontSize: '12px', color: 'var(--text2)', lineHeight: 1.6, marginBottom: '8px' }}>
                   💡 {q.exp}
                 </div>
-                {ytLink && (
-                  <a href={ytLink} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '5px 10px', borderRadius: '6px', background: '#ff0000', color: '#fff', textDecoration: 'none', fontWeight: 500 }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-2.75 12.21 12.21 0 0 0-7.64 0A4.83 4.83 0 0 1 4.41 6.69C3.28 8.38 3 10.44 3 12s.28 3.62 1.41 5.31a4.83 4.83 0 0 1 3.77 2.75 12.21 12.21 0 0 0 7.64 0 4.83 4.83 0 0 1 3.77-2.75C20.72 15.62 21 13.56 21 12s-.28-3.62-1.41-5.31zM10 15.5v-7l6 3.5-6 3.5z"/>
-                    </svg>
-                    YouTube'da izle — {topic}
-                  </a>
-                )}
+                {ytLink && (() => {
+                  const yt = typeof ytLink === 'string' ? { url: ytLink, title: topic, channel: '', thumbnail: '' } : ytLink
+                  return (
+                    <div style={{ marginTop: '10px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '6px', fontWeight: 500 }}>
+                        📺 Önerilen kaynak
+                      </div>
+                      <a href={yt.url} target="_blank" rel="noopener noreferrer"
+                        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '8px', background: '#ff0000', textDecoration: 'none', color: '#fff' }}>
+                        {yt.thumbnail && (
+                          <img src={yt.thumbnail} alt="" style={{ width: 48, height: 36, objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} />
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '12px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
+                            ▶ {yt.title || `${topic} — Konu Anlatımı`}
+                          </div>
+                          {yt.channel && (
+                            <div style={{ fontSize: '11px', opacity: 0.85, marginTop: '2px' }}>
+                              {yt.channel}
+                            </div>
+                          )}
+                        </div>
+                      </a>
+                    </div>
+                  )
+                })()}
               </div>
             )
           })}

@@ -76,7 +76,7 @@ export default function QuizPage() {
   const [chosen, setChosen] = useState<number | null>(null)
   const [loadMsg, setLoadMsg] = useState('Profilin analiz ediliyor...')
   const [topicErr, setTopicErr] = useState('')
-  const [youtubeLinks, setYoutubeLinks] = useState<Record<string, string>>({})
+  const [youtubeLinks, setYoutubeLinks] = useState<Record<string, any>>({})
   const supabase = createClient() as any
 
   const fetchProfile = useCallback(async () => {
