@@ -4,26 +4,21 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 interface User {
-  id: string
-  name: string
-  email?: string
-  grade: string
-  plan: string
-  plan_expires_at: string | null
-  monthly_test_count: number
-  is_admin: boolean
-  created_at: string
-  total_sessions?: number
-  avg_pct?: number
+  id: string; name: string; grade: string; plan: string
+  plan_expires_at: string | null; monthly_test_count: number
+  is_admin: boolean; created_at: string; total_sessions?: number; avg_pct?: number
 }
 
 interface Stats {
-  total_users: number
-  premium_users: number
-  free_users: number
-  total_sessions: number
-  sessions_today: number
-  avg_score: number
+  total_users: number; premium_users: number; free_users: number
+  total_sessions: number; sessions_today: number; avg_score: number
+}
+
+interface ErrorReport {
+  id: string; user_id: string; question_text: string
+  correct_answer: string; user_answer: string; topic: string
+  reported_at: string; status: string; admin_note: string | null
+  profiles?: { name: string }
 }
 
 export default function AdminPage() {
@@ -31,10 +26,13 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [users, setUsers] = useState<User[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
+  const [errorReports, setErrorReports] = useState<ErrorReport[]>([])
+  const [pendingCount, setPendingCount] = useState(0)
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors'>('users')
+  const [adminNote, setAdminNote] = useState<Record<string, string>>({})
   const supabase = createClient() as any
 
   useEffect(() => {
@@ -100,7 +98,22 @@ export default function AdminPage() {
         ? Math.round(sessionData.reduce((s: number, x: any) => s + (x.pct || 0), 0) / sessionData.length)
         : 0,
     })
+
+    // Hata bildirimleri
+    const { data: reports } = await supabase
+      .from('error_reports')
+      .select('*, profiles(name)')
+      .order('reported_at', { ascending: false })
+    setErrorReports(reports || [])
+    setPendingCount((reports || []).filter((r: ErrorReport) => r.status === 'pending').length)
+
     setLoading(false)
+  }
+
+  async function updateReportStatus(id: string, status: string, note?: string) {
+    await supabase.from('error_reports').update({ status, admin_note: note || null }).eq('id', id)
+    setErrorReports(prev => prev.map(r => r.id === id ? { ...r, status, admin_note: note || null } : r))
+    if (status !== 'pending') setPendingCount(prev => Math.max(0, prev - 1))
   }
 
   async function updatePlan(userId: string, plan: 'free' | 'premium', months?: number) {
@@ -178,10 +191,15 @@ export default function AdminPage() {
 
         {/* Tab */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem' }}>
-          {(['users', 'stats'] as const).map(t => (
-            <button key={t} className={`btn btn-sm ${tab === t ? 'btn-primary' : ''}`}
-              onClick={() => setTab(t)}>
-              {t === 'users' ? '👥 Kullanıcılar' : '📊 İstatistikler'}
+          {([
+            { key: 'users', label: '👥 Kullanıcılar' },
+            { key: 'stats', label: '📊 İstatistikler' },
+            { key: 'errors', label: `⚠️ Hata Bildirimleri${pendingCount > 0 ? ` (${pendingCount})` : ''}` },
+          ] as const).map(t => (
+            <button key={t.key} className={`btn btn-sm ${tab === t.key ? 'btn-primary' : ''}`}
+              onClick={() => setTab(t.key)}
+              style={tab !== t.key && t.key === 'errors' && pendingCount > 0 ? { borderColor: 'var(--red)', color: 'var(--red)' } : {}}>
+              {t.label}
             </button>
           ))}
         </div>
@@ -351,6 +369,82 @@ export default function AdminPage() {
                 </table>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Error reports tab */}
+        {tab === 'errors' && (
+          <div className="anim-up">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{ fontSize: '13px', color: 'var(--text2)' }}>
+                {pendingCount > 0
+                  ? <span style={{ color: 'var(--red)', fontWeight: 600 }}>⚠ {pendingCount} bekleyen bildirim</span>
+                  : '✓ Tüm bildirimler işlendi'}
+              </div>
+              <button className="btn btn-sm" onClick={fetchData}>↺ Yenile</button>
+            </div>
+
+            {errorReports.length === 0 ? (
+              <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text2)' }}>
+                Henüz hata bildirimi yok.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {errorReports.map(r => (
+                  <div key={r.id} className="card" style={{
+                    borderLeft: `3px solid ${r.status === 'pending' ? 'var(--red)' : r.status === 'confirmed' ? 'var(--amber)' : 'var(--green)'}`,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                      <div>
+                        <span style={{
+                          fontSize: '11px', padding: '2px 8px', borderRadius: '99px', fontWeight: 600, marginRight: '8px',
+                          background: r.status === 'pending' ? 'var(--red-bg)' : r.status === 'confirmed' ? 'rgba(217,119,6,0.1)' : 'var(--green-bg)',
+                          color: r.status === 'pending' ? 'var(--red)' : r.status === 'confirmed' ? 'var(--amber)' : 'var(--green)',
+                        }}>
+                          {r.status === 'pending' ? 'Bekliyor' : r.status === 'confirmed' ? 'Onaylandı' : 'Reddedildi'}
+                        </span>
+                        <span style={{ fontSize: '12px', color: 'var(--text3)' }}>
+                          {(r as any).profiles?.name || 'Kullanıcı'} · {r.topic} · {new Date(r.reported_at).toLocaleDateString('tr-TR')}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>
+                      {r.question_text}
+                    </div>
+                    <div style={{ fontSize: '12px', marginBottom: '8px', display: 'flex', gap: '16px' }}>
+                      <span><span style={{ color: 'var(--red)' }}>✗ Kullanıcı:</span> {r.user_answer}</span>
+                      <span><span style={{ color: 'var(--green)' }}>✓ Kayıtlı doğru:</span> {r.correct_answer}</span>
+                    </div>
+
+                    {r.admin_note && (
+                      <div style={{ fontSize: '12px', color: 'var(--text2)', padding: '8px', background: 'var(--bg2)', borderRadius: '6px', marginBottom: '8px' }}>
+                        Not: {r.admin_note}
+                      </div>
+                    )}
+
+                    {r.status === 'pending' && (
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <input
+                          placeholder="Admin notu (opsiyonel)"
+                          value={adminNote[r.id] || ''}
+                          onChange={e => setAdminNote(prev => ({ ...prev, [r.id]: e.target.value }))}
+                          style={{ flex: 1, fontSize: '12px', padding: '5px 8px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-sans)', minWidth: '150px' }}
+                        />
+                        <button onClick={() => updateReportStatus(r.id, 'confirmed', adminNote[r.id])}
+                          style={{ fontSize: '11px', padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(217,119,6,0.3)', background: 'rgba(217,119,6,0.1)', color: 'var(--amber)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          ✓ Hata onaylandı
+                        </button>
+                        <button onClick={() => updateReportStatus(r.id, 'rejected', adminNote[r.id])}
+                          style={{ fontSize: '11px', padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(22,163,74,0.3)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          ✗ Ret (soru doğru)
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
