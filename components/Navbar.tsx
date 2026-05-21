@@ -81,7 +81,7 @@ export default function Navbar() {
         padding: '0 1.5rem', zIndex: 1000,
       }}>
         <Link href="/quiz" style={{ textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '48px', width: 'auto' }} />
+          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '56px', width: 'auto' }} />
         </Link>
 
         {/* Nav linkleri — desktop */}

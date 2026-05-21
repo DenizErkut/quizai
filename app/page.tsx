@@ -20,19 +20,19 @@ export default function LandingPage() {
     <main style={{ position: 'relative', minHeight: '100vh' }}>
       <div className="glow-blob" style={{ top: '-100px', left: '50%', transform: 'translateX(-50%)' }} />
 
-      {/* Nav */}
+      {/* Nav — global Navbar zaten var, bu sadece logo gösterir giriş yapmamış kullanıcılar için */}
       <nav style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '1.25rem 2rem', borderBottom: '1px solid var(--border)',
-        position: 'sticky', top: 0, background: 'rgba(14,14,16,0.85)',
+        padding: '1rem 2rem', borderBottom: '1px solid var(--border)',
+        position: 'sticky', top: 0, background: 'rgba(255,255,255,0.92)',
         backdropFilter: 'blur(12px)', zIndex: 100,
       }}>
-        <span className="serif" style={{ fontSize: '22px', letterSpacing: '-0.01em' }}>
-          Quiz<span style={{ color: 'var(--accent)' }}>AI</span>
-        </span>
+        <Link href="/" style={{ textDecoration: 'none', display: 'inline-block' }}>
+          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '52px', width: 'auto' }} />
+        </Link>
         <div style={{ display: 'flex', gap: '10px' }}>
           <Link href="/login" className="btn btn-ghost btn-sm">Giriş yap</Link>
-          <Link href="/register" className="btn btn-primary btn-sm">Başla</Link>
+          <Link href="/register" className="btn btn-primary btn-sm">Ücretsiz başla</Link>
         </div>
       </nav>
 
