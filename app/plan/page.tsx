@@ -82,6 +82,92 @@ export default function PlanPage() {
     ? Math.round(stats.sessions.reduce((s: number, x: any) => s + x.pct, 0) / stats.sessions.length)
     : 0
 
+  async function exportPDF() {
+    if (!plan || !profile) return
+    const { default: jsPDF } = await import('jspdf')
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+    doc.setFont('helvetica')
+
+    const margin = 20
+    const pageW = 210
+    const contentW = pageW - margin * 2
+    let y = margin
+
+    function clean(text: string): string {
+      return text
+        .replace(/ğ/g,'g').replace(/Ğ/g,'G').replace(/ü/g,'u').replace(/Ü/g,'U')
+        .replace(/ş/g,'s').replace(/Ş/g,'S').replace(/ı/g,'i').replace(/İ/g,'I')
+        .replace(/ö/g,'o').replace(/Ö/g,'O').replace(/ç/g,'c').replace(/Ç/g,'C')
+    }
+
+    function addText(text: string, size: number, bold = false, color: [number,number,number] = [0,0,0], indent = 0) {
+      doc.setFontSize(size); doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setTextColor(...color)
+      const lines = doc.splitTextToSize(clean(text), contentW - indent)
+      const lh = size * 0.4
+      if (y + lines.length * lh > 280) { doc.addPage(); y = margin }
+      doc.text(lines, margin + indent, y)
+      y += lines.length * lh + 2
+    }
+
+    // Header
+    doc.setFillColor(91, 76, 245)
+    doc.rect(0, 0, pageW, 36, 'F')
+    const logoB64 = await fetch('/pratium-logo.png').then(r => r.blob()).then(b => new Promise<string>(res => { const fr = new FileReader(); fr.onload = () => res((fr.result as string).split(',')[1]); fr.readAsDataURL(b) }))
+    doc.addImage('data:image/png;base64,' + logoB64, 'PNG', margin, 4, 30, 30)
+    doc.setFontSize(11); doc.setFont('helvetica','normal'); doc.setTextColor(255,255,255)
+    doc.text(clean(`${profile.name} - Gelisim Plani`), margin + 34, 16)
+    doc.text(new Date().toLocaleDateString('tr-TR'), pageW - margin, 16, { align: 'right' })
+    doc.text(clean(`${profile.grade} | Ort. %${avgPct}`), margin + 34, 24)
+    y = 46
+
+    // Özet
+    doc.setFillColor(245, 244, 255)
+    doc.roundedRect(margin, y, contentW, 4, 1, 1, 'F')
+    y += 6
+    addText('Genel Degerlendirme', 12, true, [91, 76, 245])
+    addText(plan.summary, 10, false, [40,40,40])
+    y += 4
+
+    // Haftalar
+    plan.weeks?.forEach((week) => {
+      if (y > 240) { doc.addPage(); y = margin }
+      doc.setFillColor(91, 76, 245)
+      doc.roundedRect(margin, y, contentW, 8, 2, 2, 'F')
+      doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255)
+      doc.text(clean(`Hafta ${week.week}: ${week.goal}`), margin + 4, y + 5.5)
+      doc.text(`${week.daily_minutes} dk/gun`, pageW - margin - 2, y + 5.5, { align: 'right' })
+      y += 12
+
+      // Konular
+      doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(91, 76, 245)
+      doc.text(clean('Konular: ' + (week.topics || []).join(', ')), margin + 2, y)
+      y += 6
+
+      // Odak
+      doc.setFontSize(9); doc.setTextColor(80,80,80)
+      const focusLines = doc.splitTextToSize(clean('• ' + week.focus), contentW - 4)
+      doc.text(focusLines, margin + 2, y)
+      y += focusLines.length * 4 + 6
+
+      doc.setDrawColor(220, 220, 220)
+      doc.line(margin, y, pageW - margin, y)
+      y += 4
+    })
+
+    // Motivasyon
+    if (plan.motivation) {
+      y += 4
+      doc.setFillColor(245, 244, 255)
+      doc.roundedRect(margin, y, contentW, 12, 2, 2, 'F')
+      doc.setFontSize(10); doc.setFont('helvetica','italic'); doc.setTextColor(91, 76, 245)
+      const motLines = doc.splitTextToSize(clean('"' + plan.motivation + '"'), contentW - 8)
+      doc.text(motLines, margin + 4, y + 5)
+      y += 16
+    }
+
+    doc.save(clean(`Pratium_Gelisim_Plani_${profile.name}_${new Date().toISOString().split('T')[0]}.pdf`))
+  }
+
   if (loading) return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
       <div className="spinner" />
@@ -200,10 +286,20 @@ export default function PlanPage() {
               </div>
             )}
 
-            <button className="btn btn-sm" onClick={generatePlan} disabled={generating}
-              style={{ marginTop: '1rem', width: '100%', justifyContent: 'center' }}>
-              {generating ? 'Yenileniyor...' : '↺ Planı yenile'}
-            </button>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '1rem' }}>
+              <button className="btn btn-sm" onClick={generatePlan} disabled={generating}
+                style={{ flex: 1, justifyContent: 'center' }}>
+                {generating ? 'Yenileniyor...' : '↺ Planı yenile'}
+              </button>
+              <button className="btn btn-sm" onClick={exportPDF} disabled={generating}
+                style={{ flex: 1, justifyContent: 'center', color: 'var(--accent)', borderColor: 'rgba(91,76,245,0.3)' }}>
+                📄 PDF indir
+              </button>
+              <button className="btn btn-sm" onClick={() => window.print()}
+                style={{ justifyContent: 'center', color: 'var(--text2)' }}>
+                🖨️
+              </button>
+            </div>
           </div>
         )}
       </div>
