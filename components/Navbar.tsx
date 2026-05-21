@@ -50,10 +50,18 @@ export default function Navbar() {
   }
 
   async function handleSignOut() {
+    setShowMenu(false)
+    setShowLang(false)
     localStorage.removeItem('pratium_lang')
     await supabase.auth.signOut()
     router.push('/')
   }
+
+  // pathname değişince menüleri kapat
+  useEffect(() => {
+    setShowMenu(false)
+    setShowLang(false)
+  }, [pathname])
 
   if (!profile) return null
 
@@ -73,7 +81,7 @@ export default function Navbar() {
         padding: '0 1.5rem', zIndex: 1000,
       }}>
         <Link href="/quiz" style={{ textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '36px', width: 'auto' }} />
+          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '48px', width: 'auto' }} />
         </Link>
 
         {/* Nav linkleri — desktop */}
