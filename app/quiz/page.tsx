@@ -83,9 +83,9 @@ export default function QuizPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return null }
     const { data } = await supabase
-      .from('profiles').select('name,grade,language,plan,monthly_test_count')
+      .from('profiles').select('name,grade,language,plan,monthly_test_count,age')
       .eq('id', user.id).single()
-    if (!data) { router.push('/profile'); return null }
+    if (!data || !data.grade || !data.age || !data.name) { router.push('/profile'); return null }
     const lang = getActiveLang(data.language)
     setProfile({ ...data, language: lang })
     setCurrentLang(lang)
