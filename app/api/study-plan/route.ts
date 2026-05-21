@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
 
+export const maxDuration = 60
+export const runtime = 'nodejs'
+
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
 export async function POST(req: NextRequest) {
@@ -27,28 +30,15 @@ export async function POST(req: NextRequest) {
     max_tokens: 1500,
     messages: [{
       role: 'user',
-      content: `Sen bir eğitim koçusun. ${profile?.name} için 4 haftalık kişisel çalışma planı oluştur.
-
+      content: `Sen bir egitim kocusun. ${profile?.name} icin 4 haftalik kisisel calisma plani olustur.
 Profil: ${profile?.grade}
-Ortalama başarı: %${avgPct}
+Ortalama basari: %${avgPct}
 Toplam test: ${totalTests}
-Zayıf konular: ${weakTopics || 'Henüz belirlenmedi'}
-Dil: ${profile?.language || 'Türkçe'}
+Zayif konular: ${weakTopics || 'Henuz belirlenmedi'}
+Dil: ${profile?.language || 'Turkce'}
 
-SADECE JSON döndür:
-{
-  "summary": "2-3 cümle genel değerlendirme",
-  "weeks": [
-    {
-      "week": 1,
-      "goal": "Hafta hedefi",
-      "topics": ["konu1", "konu2"],
-      "daily_minutes": 20,
-      "focus": "Bu hafta özellikle dikkat edilecek nokta"
-    }
-  ],
-  "motivation": "Kısa motivasyon cümlesi"
-}`,
+SADECE JSON don:
+{"summary":"2-3 cumle","weeks":[{"week":1,"goal":"hedef","topics":["konu1"],"daily_minutes":20,"focus":"odak"}],"motivation":"motivasyon"}`,
     }],
   }) as any
 
@@ -57,6 +47,6 @@ SADECE JSON döndür:
     const plan = JSON.parse(raw)
     return NextResponse.json({ plan })
   } catch {
-    return NextResponse.json({ error: 'Plan oluşturulamadı.' }, { status: 500 })
+    return NextResponse.json({ error: 'Plan olusturulamadi.' }, { status: 500 })
   }
 }

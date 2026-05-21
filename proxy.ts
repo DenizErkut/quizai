@@ -13,14 +13,14 @@ export async function proxy(req: NextRequest) {
     {
       cookies: {
         getAll() { return req.cookies.getAll() },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+        setAll(cookiesToSet: any[]) {
+          cookiesToSet.forEach(({ name, value, options }: any) =>
             res.cookies.set(name, value, options)
           )
         },
       },
     }
-  )
+  ) as any
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.redirect(new URL('/login', req.url))
@@ -31,7 +31,7 @@ export async function proxy(req: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  if (!profile?.is_admin) return NextResponse.redirect(new URL('/', req.url))
+  if (!profile?.is_admin) return NextResponse.redirect(new URL('/quiz', req.url))
 
   return res
 }

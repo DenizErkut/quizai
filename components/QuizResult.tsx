@@ -107,13 +107,10 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
       addText(q.q, 10, false, [20, 20, 20])
       y += 2
 
-      // Şıklar
+      // Şıklar — sadece harf ve metin, doğru cevap işaretlenmez
       const letters = ['A', 'B', 'C', 'D']
       q.opts.forEach((opt, oi) => {
-        const isCorrect = oi === q.ans
-        const color: [number, number, number] = isCorrect ? [22, 163, 74] : [80, 80, 80]
-        const prefix = isCorrect ? `${letters[oi]}. ✓ ` : `${letters[oi]}. `
-        addText(`${prefix}${opt}`, 9, isCorrect, color, 4)
+        addText(`${letters[oi]}. ${opt}`, 9, false, [60, 60, 60], 4)
       })
 
       y += 4
