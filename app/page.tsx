@@ -69,8 +69,8 @@ export default function LandingPage() {
           letterSpacing: '-0.02em', marginBottom: '1.25rem',
           maxWidth: '800px', margin: '0 auto 1.25rem',
         }}>
-          Sınıfına özel<br />
-          <em style={{ color: 'var(--accent2)', fontStyle: 'italic' }}>anlık testler</em>
+          Pratik yap,<br />
+          <em style={{ color: 'var(--accent2)', fontStyle: 'italic' }}>başarıya ulaş.</em>
         </h1>
         <p className="anim-up-2" style={{
           color: 'var(--text2)', fontSize: '17px', maxWidth: '520px',

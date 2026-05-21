@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 const GRADES = [
@@ -23,248 +22,163 @@ const GRADES = [
   { value: 'universite 4. sinif', label: 'Üniversite 4. Sınıf' },
 ]
 
-const LANGS = [
-  { code: 'Türkçe', label: 'Türkçe', flag: '🇹🇷' },
-  { code: 'English', label: 'English', flag: '🇬🇧' },
-  { code: 'Deutsch', label: 'Deutsch', flag: '🇩🇪' },
-  { code: 'Français', label: 'Français', flag: '🇫🇷' },
-  { code: 'Español', label: 'Español', flag: '🇪🇸' },
-  { code: 'العربية', label: 'العربية', flag: '🇸🇦' },
-]
-
-export default function ProfileEditPage() {
+export default function ProfileSetupPage() {
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [success, setSuccess] = useState(false)
-  const [error, setError] = useState('')
-
   const [name, setName] = useState('')
+  const [surname, setSurname] = useState('')
   const [age, setAge] = useState('')
-  const [gender, setGender] = useState('')
   const [grade, setGrade] = useState('')
-  const [school, setSchool] = useState('')
-  const [lang, setLang] = useState('Türkçe')
-  const [plan, setPlan] = useState('free')
-  const [referralCode, setReferralCode] = useState('')
-  const [copied, setCopied] = useState(false)
-  const [email, setEmail] = useState('')
-
+  const [phone, setPhone] = useState('')
+  const [instagram, setInstagram] = useState('')
+  const [tiktok, setTiktok] = useState('')
+  const [showOptional, setShowOptional] = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [step, setStep] = useState(1) // 1: ad/soyad, 2: sınıf/yaş
   const supabase = createClient() as any
 
   useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-      setEmail(user.email || '')
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-      if (data) {
-        setName(data.name || '')
-        setAge(data.age?.toString() || '')
-        setGender(data.gender || '')
-        setGrade(data.grade || '')
-        setSchool(data.school || '')
-        setLang(data.language || 'Türkçe')
-        setPlan(data.plan || 'free')
-        setReferralCode(data.referral_code || '')
+    // Kullanıcı yoksa login'e
+    supabase.auth.getUser().then(({ data: { user } }: any) => {
+      if (!user) router.push('/login')
+      // Google'dan gelen isim varsa doldur
+      if (user?.user_metadata?.full_name) {
+        const parts = user.user_metadata.full_name.split(' ')
+        setName(parts[0] || '')
+        setSurname(parts.slice(1).join(' ') || '')
+      } else if (user?.user_metadata?.name) {
+        const parts = user.user_metadata.name.split(' ')
+        setName(parts[0] || '')
+        setSurname(parts.slice(1).join(' ') || '')
       }
-      setLoading(false)
-    }
-    load()
+    })
   }, [])
 
   async function handleSave() {
-    if (!name.trim() || !grade) { setError('Ad ve sınıf zorunlu.'); return }
-    setError(''); setSaving(true)
+    if (!name.trim()) { setError('Ad zorunludur.'); return }
+    if (!surname.trim()) { setError('Soyad zorunludur.'); return }
+    if (!age || parseInt(age) < 5 || parseInt(age) > 35) { setError('Geçerli bir yaş girin (5-35).'); return }
+    if (!grade) { setError('Sınıf / eğitim seviyesi zorunludur.'); return }
+
+    setError(''); setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
 
     await supabase.from('profiles').upsert({
       id: user.id,
-      name: name.trim(),
-      age: age ? parseInt(age) : null,
-      gender: gender || null,
+      name: `${name.trim()} ${surname.trim()}`,
+      age: parseInt(age),
       grade,
-      school: school || null,
-      language: lang,
+      language: 'Türkçe',
+      phone: phone || null,
+      instagram: instagram || null,
+      tiktok: tiktok || null,
     })
 
-    setSaving(false)
-    setSuccess(true)
-    setTimeout(() => setSuccess(false), 2500)
+    setLoading(false)
+    router.push('/quiz')
   }
-
-  function copyReferral() {
-    const link = `${window.location.origin}/register?ref=${referralCode}`
-    navigator.clipboard.writeText(link)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  if (loading) return (
-    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
-      <div className="spinner" />
-    </main>
-  )
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', padding: '1.5rem' }}>
-      <div style={{ maxWidth: '560px', margin: '0 auto' }}>
+    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
+      <div style={{ width: '100%', maxWidth: '420px' }}>
 
-        {/* Nav */}
-        <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
-          <Link href="/" className="serif" style={{ fontSize: '20px', textDecoration: 'none', color: 'var(--text)' }}>
-            PRATIUM
-          </Link>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <Link href="/quiz" className="btn btn-ghost btn-sm">← Testler</Link>
-            <Link href="/dashboard" className="btn btn-ghost btn-sm">Dashboard</Link>
-          </div>
-        </nav>
-
-        <div className="anim-up" style={{ marginBottom: '1.5rem' }}>
-          <div className="badge badge-purple" style={{ marginBottom: '0.5rem' }}>Profil</div>
-          <h1 className="serif" style={{ fontSize: '28px' }}>Profil ayarları</h1>
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '64px' }} />
         </div>
 
-        {/* Kisisel bilgiler */}
-        <div className="card anim-up-1" style={{ marginBottom: '1rem' }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '1rem' }}>
-            Kişisel bilgiler
+        <div className="card anim-up">
+          {/* İlerleme */}
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '1.5rem' }}>
+            <div style={{ flex: 1, height: '4px', borderRadius: '99px', background: 'var(--accent)' }} />
+            <div style={{ flex: 1, height: '4px', borderRadius: '99px', background: step >= 2 ? 'var(--accent)' : 'var(--border)' }} />
           </div>
 
-          <label className="field-label">Ad soyad</label>
-          <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Adın Soyadın" />
-
-          <label className="field-label">E-posta</label>
-          <input className="input" value={email} disabled style={{ opacity: 0.5, cursor: 'not-allowed' }} />
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label className="field-label">Yaş</label>
-              <input className="input" type="number" min={5} max={30} placeholder="12"
-                value={age} onChange={e => setAge(e.target.value)} />
-            </div>
-            <div>
-              <label className="field-label">Cinsiyet</label>
-              <select className="input" value={gender} onChange={e => setGender(e.target.value)}>
-                <option value="">Seç</option>
-                <option value="erkek">Erkek</option>
-                <option value="kiz">Kız</option>
-                <option value="belirtmek istemiyorum">Belirtmek istemiyorum</option>
-              </select>
-            </div>
-          </div>
-
-          <label className="field-label">Sınıf / eğitim seviyesi</label>
-          <select className="input" value={grade} onChange={e => setGrade(e.target.value)}>
-            <option value="">Seç</option>
-            {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
-          </select>
-
-          <label className="field-label">Okul (isteğe bağlı)</label>
-          <input className="input" placeholder="İzmir Fen Lisesi"
-            value={school} onChange={e => setSchool(e.target.value)} />
-        </div>
-
-        {/* Dil secimi */}
-        <div className="card anim-up-2" style={{ marginBottom: '1rem' }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '1rem' }}>
-            Test dili
-          </div>
-          <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '1rem' }}>
-            Sorular ve açıklamalar seçtiğin dilde gelecek.
+          <h1 className="serif" style={{ fontSize: '20px', marginBottom: '4px' }}>
+            {step === 1 ? 'Merhaba! 👋' : 'Eğitim bilgilerin'}
+          </h1>
+          <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1.25rem' }}>
+            {step === 1
+              ? 'Sana nasıl hitap edelim?'
+              : 'Sorular sınıfına göre kişiselleştirilecek.'}
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-            {LANGS.map(l => (
-              <button
-                key={l.code}
-                onClick={() => setLang(l.code)}
-                style={{
-                  padding: '10px 12px',
-                  borderRadius: '10px',
-                  border: `1.5px solid ${lang === l.code ? 'var(--accent)' : 'var(--border)'}`,
-                  background: lang === l.code ? 'var(--accent-bg)' : 'var(--bg2)',
-                  color: lang === l.code ? 'var(--accent)' : 'var(--text)',
-                  fontSize: '13px',
-                  fontWeight: lang === l.code ? 600 : 400,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
-                <span>{l.flag}</span>
-                {l.label}
-              </button>
-            ))}
-          </div>
-        </div>
 
-        {/* Plan bilgisi */}
-        <div className="card anim-up-3" style={{ marginBottom: '1rem' }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '1rem' }}>
-            Üyelik
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontWeight: 500 }}>
-                {plan === 'premium' ? '★ Premium üye' : 'Ücretsiz plan'}
+          {step === 1 && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label className="field-label">Ad <span style={{ color: 'var(--red)' }}>*</span></label>
+                  <input className="input" placeholder="Deniz" value={name} onChange={e => setName(e.target.value)} autoFocus />
+                </div>
+                <div>
+                  <label className="field-label">Soyad <span style={{ color: 'var(--red)' }}>*</span></label>
+                  <input className="input" placeholder="Yılmaz" value={surname} onChange={e => setSurname(e.target.value)} />
+                </div>
               </div>
-              <div style={{ fontSize: '13px', color: 'var(--text2)', marginTop: '2px' }}>
-                {plan === 'free' ? 'Ayda 10 test · Sınırsız için yükselt' : 'Sınırsız test · Tüm özellikler aktif'}
-              </div>
-            </div>
-            <Link href="/pricing" className={`btn btn-sm ${plan === 'premium' ? '' : 'btn-primary'}`}>
-              {plan === 'premium' ? 'Planı gör' : 'Yükselt →'}
-            </Link>
-          </div>
-        </div>
 
-        {/* Referral */}
-        {referralCode && (
-          <div className="card anim-up-4" style={{ marginBottom: '1.5rem' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.75rem' }}>
-              Davet linkin
-            </div>
-            <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '0.75rem' }}>
-              10 kişiyi davet et → 1 yıl ücretsiz premium kazan.
-            </p>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                className="input"
-                readOnly
-                value={`${typeof window !== 'undefined' ? window.location.origin : ''}/register?ref=${referralCode}`}
-                style={{ fontSize: '12px' }}
-              />
-              <button className="btn btn-sm" onClick={copyReferral} style={{ flexShrink: 0 }}>
-                {copied ? '✓ Kopyalandı' : 'Kopyala'}
+              {error && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{error}</div>}
+
+              <button className="btn btn-primary" onClick={() => {
+                if (!name.trim() || !surname.trim()) { setError('Ad ve soyad zorunludur.'); return }
+                setError(''); setStep(2)
+              }} style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem' }}>
+                Devam et →
               </button>
-            </div>
-          </div>
-        )}
+            </>
+          )}
 
-        {/* Error / success */}
-        {error && (
-          <div style={{ padding: '10px 14px', background: 'var(--red-bg)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '10px', fontSize: '13px', color: 'var(--red)', marginBottom: '1rem' }}>
-            {error}
-          </div>
-        )}
-        {success && (
-          <div style={{ padding: '10px 14px', background: 'var(--green-bg)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: '10px', fontSize: '13px', color: 'var(--green)', marginBottom: '1rem' }}>
-            ✓ Profil kaydedildi!
-          </div>
-        )}
+          {step === 2 && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label className="field-label">Yaş <span style={{ color: 'var(--red)' }}>*</span></label>
+                  <input className="input" type="number" placeholder="16" min={5} max={35} value={age} onChange={e => setAge(e.target.value)} autoFocus />
+                </div>
+                <div>
+                  <label className="field-label">Sınıf <span style={{ color: 'var(--red)' }}>*</span></label>
+                  <select className="input" value={grade} onChange={e => setGrade(e.target.value)}>
+                    <option value="">Seç</option>
+                    {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+                  </select>
+                </div>
+              </div>
 
-        <button className="btn btn-primary btn-lg" onClick={handleSave} disabled={saving}
-          style={{ width: '100%', justifyContent: 'center' }}>
-          {saving ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Kaydet'}
-        </button>
+              {/* Opsiyonel */}
+              <button onClick={() => setShowOptional(v => !v)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--text2)', marginTop: '10px', padding: '4px 0', fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '11px' }}>{showOptional ? '▲' : '▼'}</span>
+                Telefon ve sosyal medya (opsiyonel)
+              </button>
+
+              {showOptional && (
+                <div style={{ marginTop: '8px', padding: '12px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+                  <label className="field-label">Telefon</label>
+                  <input className="input" type="tel" placeholder="+90 555 000 00 00" value={phone} onChange={e => setPhone(e.target.value)} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '4px' }}>
+                    <div>
+                      <label className="field-label">Instagram</label>
+                      <input className="input" placeholder="@kullanici" value={instagram} onChange={e => setInstagram(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="field-label">TikTok</label>
+                      <input className="input" placeholder="@kullanici" value={tiktok} onChange={e => setTiktok(e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {error && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{error}</div>}
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: '1.25rem' }}>
+                <button className="btn" onClick={() => setStep(1)} style={{ justifyContent: 'center' }}>← Geri</button>
+                <button className="btn btn-primary" onClick={handleSave} disabled={loading}
+                  style={{ flex: 1, justifyContent: 'center' }}>
+                  {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Başla ⚡'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </main>
   )

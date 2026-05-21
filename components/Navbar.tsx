@@ -100,21 +100,14 @@ export default function Navbar() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 1.25rem', zIndex: 1000,
       }}>
-        {/* Logo */}
-        <Link href="/quiz" style={{ textDecoration: 'none', flexShrink: 0 }}>
-          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '56px', width: 'auto' }} />
+        {/* Logo + Slogan */}
+        <Link href="/quiz" style={{ textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '64px', width: 'auto' }} />
+          <span style={{ fontSize: '13px', color: 'var(--text2)', fontWeight: 400, lineHeight: 1.4, maxWidth: '160px' }}
+            className="desktop-only">
+            Pratik yap,<br />netlerini artır.
+          </span>
         </Link>
-
-        {/* Desktop nav links — ortada */}
-        <div style={{ display: 'flex', gap: '2px', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}
-          className="desktop-nav">
-          {NAV_ITEMS.map(item => (
-            <Link key={item.href} href={item.href}
-              style={{ padding: '5px 10px', borderRadius: '8px', fontSize: '13px', textDecoration: 'none', color: pathname === item.href ? 'var(--accent)' : 'var(--text2)', background: pathname === item.href ? 'var(--accent-bg)' : 'transparent', fontWeight: pathname === item.href ? 600 : 400, whiteSpace: 'nowrap' }}>
-              {item.label}
-            </Link>
-          ))}
-        </div>
 
         {/* Sağ taraf */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
