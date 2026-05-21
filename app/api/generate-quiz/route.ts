@@ -250,6 +250,7 @@ export async function POST(req: NextRequest) {
 
 
 export async function PATCH(req: NextRequest) {
+  console.log('[PATCH] started')
   const authHeader = req.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   const token = authHeader.slice(7)
@@ -263,7 +264,9 @@ export async function PATCH(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
-  const { sessionId, answers, score } = await req.json()
+  const body = await req.json()
+  const { sessionId, answers, score } = body
+  console.log('[PATCH] body:', { sessionId, score, answersLen: answers?.length })
 
   // Session bilgisini cek (topic ve question_count lazim)
   const { data: sessionData } = await supabaseAdmin
