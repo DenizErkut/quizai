@@ -177,16 +177,21 @@ export default function QuizPage() {
 
   async function next() {
     if (current + 1 >= questions.length) {
-      const score = answers.filter(a => a.correct).length
+      // chosen henuz answers state'e yansimamis olabilir — son cevabi dahil et
+      const lastCorrect = chosen !== null && chosen === questions[current].ans
+      const finalAnswers = chosen !== null && answers.length < questions.length
+        ? [...answers, { userAns: chosen, correct: lastCorrect }]
+        : answers
+      const score = finalAnswers.filter(a => a.correct).length
       const { data: { session } } = await supabase.auth.getSession()
       if (sessionId) {
         await fetch('/api/generate-quiz', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-          body: JSON.stringify({ sessionId, answers, score }),
+          body: JSON.stringify({ sessionId, answers: finalAnswers, score }),
         })
       }
-      // YouTube linkleri çek
+      // YouTube linkleri cek
       const topic = customTopic.trim() || selectedTopic
       try {
         const ytRes = await fetch('/api/youtube-links', {
