@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
   let questions: Question[]
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5',
       max_tokens: 6000,
       messages: [{ role: 'user', content: prompt }],
     })
@@ -326,7 +326,7 @@ export async function PATCH(req: NextRequest) {
           const topicList = allTopics.map(t => `Hafta ${t.week}: "${t.topic}"`).join('\n')
 
           const matchMsg = await anthropic.messages.create({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-sonnet-4-5',
             max_tokens: 200,
             messages: [{
               role: 'user',
