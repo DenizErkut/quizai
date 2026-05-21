@@ -248,6 +248,7 @@ export async function POST(req: NextRequest) {
   })
 }
 
+
 export async function PATCH(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
@@ -263,10 +264,113 @@ export async function PATCH(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
   const { sessionId, answers, score } = await req.json()
+
+  // Session bilgisini cek (topic ve question_count lazim)
+  const { data: sessionData } = await supabaseAdmin
+    .from('quiz_sessions')
+    .select('topic, question_count')
+    .eq('id', sessionId)
+    .single()
+
+  const questionCount = sessionData?.question_count || 1
+  const pct = Math.round((score / questionCount) * 100)
+  const topic = sessionData?.topic || ''
+
+  // Session guncelle
   const { error } = await supabase.from('quiz_sessions')
-    .update({ answers, score, completed: true })
+    .update({ answers, score, pct, completed: true })
     .eq('id', sessionId).eq('user_id', user.id)
 
   if (error) return NextResponse.json({ error: 'Kayit basarisiz.' }, { status: 500 })
-  return NextResponse.json({ ok: true })
+
+  // Weak topics upsert
+  if (topic) {
+    const { data: existingWeak } = await supabaseAdmin
+      .from('weak_topics')
+      .select('id, wrong_count, total_count')
+      .eq('user_id', user.id)
+      .eq('topic', topic)
+      .single()
+
+    const wrong = questionCount - score
+    if (existingWeak) {
+      await supabaseAdmin.from('weak_topics').update({
+        wrong_count: existingWeak.wrong_count + wrong,
+        total_count: existingWeak.total_count + questionCount,
+      }).eq('id', existingWeak.id)
+    } else {
+      await supabaseAdmin.from('weak_topics').insert({
+        user_id: user.id, topic,
+        wrong_count: wrong, total_count: questionCount,
+      })
+    }
+  }
+
+  // Plan progress otomatik kontrol — sadece pct >= 60 ise
+  if (pct >= 60 && topic) {
+    try {
+      const { data: activePlan } = await supabaseAdmin
+        .from('study_plans')
+        .select('id, plan')
+        .eq('user_id', user.id)
+        .order('generated_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (activePlan?.plan?.weeks) {
+        const weeks = activePlan.plan.weeks as Array<{ week: number; topics?: string[] }>
+        const allTopics: { week: number; topic: string }[] = []
+        weeks.forEach(w => w.topics?.forEach(t => allTopics.push({ week: w.week, topic: t })))
+
+        if (allTopics.length > 0) {
+          const topicList = allTopics.map(t => `Hafta ${t.week}: "${t.topic}"`).join('\n')
+
+          const matchMsg = await anthropic.messages.create({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 200,
+            messages: [{
+              role: 'user',
+              content: `Kullanici "${topic}" konusunda test cozdu.\nAsagidaki plan konularindan hangisiyle esleşiyor? Ayni veya cok benzer konulari bul.\n\n${topicList}\n\nSadece eslesen konulari JSON olarak dondur: {"matches":[{"week":1,"topic":"konu adi"}]}\nEsleme yoksa: {"matches":[]}\nSadece JSON, baska hicbir sey yazma.`
+            }]
+          })
+
+          const rawMatch = (matchMsg.content[0] as { text: string }).text.replace(/```json|```/g, '').trim()
+          const { matches } = JSON.parse(rawMatch)
+
+          if (matches?.length > 0) {
+            for (const match of matches) {
+              const { data: existingProg } = await supabaseAdmin
+                .from('plan_progress')
+                .select('id, completed')
+                .eq('user_id', user.id)
+                .eq('plan_id', activePlan.id)
+                .eq('week_number', match.week)
+                .eq('topic', match.topic)
+                .single()
+
+              if (existingProg && !existingProg.completed) {
+                await supabaseAdmin.from('plan_progress').update({
+                  completed: true,
+                  completed_at: new Date().toISOString(),
+                }).eq('id', existingProg.id)
+              } else if (!existingProg) {
+                await supabaseAdmin.from('plan_progress').insert({
+                  user_id: user.id,
+                  plan_id: activePlan.id,
+                  week_number: match.week,
+                  topic: match.topic,
+                  completed: true,
+                  completed_at: new Date().toISOString(),
+                })
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Plan check error:', e)
+    }
+  }
+
+  return NextResponse.json({ ok: true, pct })
 }
