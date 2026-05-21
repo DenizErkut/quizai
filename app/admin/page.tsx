@@ -35,16 +35,19 @@ export default function AdminPage() {
   const [adminNote, setAdminNote] = useState<Record<string, string>>({})
   const supabase = createClient() as any
 
+  const [isAdmin, setIsAdmin] = useState(false)
+
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      // Admin kontrolü
       const { data: profile } = await supabase
         .from('profiles').select('is_admin').eq('id', user.id).single()
-      if (!profile?.is_admin) { router.push('/'); return }
 
+      if (!profile?.is_admin) { router.push('/quiz'); return }
+
+      setIsAdmin(true)
       await fetchData()
     }
     load()
@@ -167,7 +170,7 @@ export default function AdminPage() {
     return matchSearch && matchPlan
   })
 
-  if (loading) return (
+  if (loading || !isAdmin) return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
       <div className="spinner" />
     </main>
