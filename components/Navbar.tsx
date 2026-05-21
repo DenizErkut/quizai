@@ -67,7 +67,7 @@ export default function Navbar() {
 
   const testsLeft = profile.plan === 'free' ? 10 - (profile.monthly_test_count || 0) : null
   const activeLang = LANGS.find(l => l.code === profile.language) || LANGS[0]
-  const HIDDEN = ['/login', '/register', '/profile']
+  const HIDDEN = ['/login', '/register', '/profile', '/']
   if (HIDDEN.includes(pathname)) return null
 
   return (

@@ -1,5 +1,8 @@
 'use client'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 const features = [
   { icon: '⚡', title: 'Anlık soru üretimi', desc: 'Konunu yaz, 10 saniyede sınıfına özel sorular hazır.' },
@@ -16,11 +19,31 @@ const examples = [
 ]
 
 export default function LandingPage() {
+  const router = useRouter()
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [checking, setChecking] = useState(true)
+
+  useEffect(() => {
+    const supabase = createClient() as any
+    supabase.auth.getUser().then(({ data: { user } }: any) => {
+      if (user) {
+        // Giriş yapmış — direkt quiz'e yönlendir
+        router.replace('/quiz')
+      } else {
+        setIsLoggedIn(false)
+        setChecking(false)
+      }
+    })
+  }, [])
+
+  // Kontrol edilirken boş ekran göster
+  if (checking) return null
+
   return (
     <main style={{ position: 'relative', minHeight: '100vh' }}>
       <div className="glow-blob" style={{ top: '-100px', left: '50%', transform: 'translateX(-50%)' }} />
 
-      {/* Nav — global Navbar zaten var, bu sadece logo gösterir giriş yapmamış kullanıcılar için */}
+      {/* Nav — sadece giriş yapmamış kullanıcılar için */}
       <nav style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '1rem 2rem', borderBottom: '1px solid var(--border)',
