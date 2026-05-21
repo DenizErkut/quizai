@@ -268,23 +268,29 @@ export async function PATCH(req: NextRequest) {
   const { sessionId, answers, score } = body
   console.log('[PATCH] body:', { sessionId, score, answersLen: answers?.length })
 
-  // Session bilgisini cek (topic ve question_count lazim)
-  const { data: sessionData } = await supabaseAdmin
+  // Session guncelle — direkt, supabaseAdmin olmadan
+  console.log('[PATCH] updating session...')
+  const { error: updateErr } = await supabase.from('quiz_sessions')
+    .update({ answers, score, completed: true })
+    .eq('id', sessionId).eq('user_id', user.id)
+  console.log('[PATCH] update result:', updateErr)
+
+  if (updateErr) return NextResponse.json({ error: 'Kayit basarisiz.' }, { status: 500 })
+
+  // pct hesapla
+  console.log('[PATCH] fetching session data...')
+  const { data: sessionData, error: sessionErr } = await supabaseAdmin
     .from('quiz_sessions')
     .select('topic, question_count')
     .eq('id', sessionId)
     .single()
+  console.log('[PATCH] session data:', sessionData, sessionErr)
 
   const questionCount = sessionData?.question_count || 1
   const pct = Math.round((score / questionCount) * 100)
   const topic = sessionData?.topic || ''
 
-  // Session guncelle
-  const { error } = await supabase.from('quiz_sessions')
-    .update({ answers, score, pct, completed: true })
-    .eq('id', sessionId).eq('user_id', user.id)
-
-  if (error) return NextResponse.json({ error: 'Kayit basarisiz.' }, { status: 500 })
+  // (session already updated above)
 
   // Weak topics upsert
   if (topic) {
