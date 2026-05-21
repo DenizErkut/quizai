@@ -72,16 +72,16 @@ export default function Navbar() {
 
   return (
     <>
-      <div style={{ height: '56px' }} />
+      <div style={{ height: '72px' }} />
       <nav style={{
-        position: 'fixed', top: 0, left: 0, right: 0, height: '56px',
+        position: 'fixed', top: 0, left: 0, right: 0, height: '72px',
         background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)',
         borderBottom: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 1.5rem', zIndex: 1000,
       }}>
         <Link href="/quiz" style={{ textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '56px', width: 'auto' }} />
+          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '112px', width: 'auto' }} />
         </Link>
 
         {/* Nav linkleri — desktop */}
