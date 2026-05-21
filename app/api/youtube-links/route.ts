@@ -20,20 +20,13 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
-  // Kullanıcının sınıfını al — sınıfa göre arama terimini özelleştir
   const { data: profile } = await supabase
-    .from('profiles')
-    .select('grade')
-    .eq('id', user.id)
-    .single()
+    .from('profiles').select('grade').eq('id', user.id).single()
 
-  const { topics, wrongQuestions } = await req.json()
+  const { topics } = await req.json()
   const apiKey = process.env.YOUTUBE_API_KEY
 
-  const links: Record<string, { url: string; title: string; channel: string; thumbnail: string }> = {}
-
-  // Sınıf seviyesi etiketi
-  function gradeTag(grade: string): string {
+  function gradeLabel(grade: string): string {
     if (!grade) return 'konu anlatımı'
     if (grade.includes('ilkokul')) return 'ilkokul konu anlatımı'
     if (grade.includes('ortaokul')) return 'ortaokul konu anlatımı'
@@ -41,30 +34,24 @@ export async function POST(req: NextRequest) {
     return 'üniversite konu anlatımı'
   }
 
-  const gradeLabel = gradeTag(profile?.grade || '')
+  const grade = profile?.grade || ''
+  const gradeStr = gradeLabel(grade)
+  const links: Record<string, any> = {}
 
   for (const topic of (topics || []).slice(0, 5)) {
-    try {
-      // Arama stratejisi:
-      // 1. Önce konuya + sınıf seviyesine özel eğitim videosu ara
-      // 2. Türkçe, viewCount'a göre sırala
-      // 3. Shorts değil, uzun format tercih et (videoDuration=medium veya long)
-      
-      const searchQuery = `${topic} ${gradeLabel} öğretmen`
-      const encoded = encodeURIComponent(searchQuery)
-
-      if (!apiKey) {
-        // API key yoksa fallback — en azından iyi bir arama URL'i ver
-        links[topic] = {
-          url: `https://www.youtube.com/results?search_query=${encodeURIComponent(topic + ' ' + gradeLabel + ' öğretmen')}&sp=CAISAhAB`,
-          title: `${topic} — YouTube Arama`,
-          channel: 'YouTube',
-          thumbnail: '',
-        }
-        continue
+    if (!apiKey) {
+      links[topic] = {
+        url: `https://www.youtube.com/results?search_query=${encodeURIComponent(topic + ' ' + gradeStr)}`,
+        title: `${topic} — Arama`, channel: '', thumbnail: '',
       }
+      continue
+    }
 
-      // YouTube Data API v3 — viewCount sıralaması, Türkçe, orta/uzun video
+    // Çok spesifik arama — konunun tam adıyla
+    const searchQuery = `${topic} ${gradeStr} öğretmen ders`
+    const encoded = encodeURIComponent(searchQuery)
+
+    try {
       const res = await fetch(
         `https://www.googleapis.com/youtube/v3/search` +
         `?part=snippet` +
@@ -72,101 +59,74 @@ export async function POST(req: NextRequest) {
         `&type=video` +
         `&relevanceLanguage=tr` +
         `&regionCode=TR` +
-        `&videoDuration=medium` +        // 4-20 dakika arası (Shorts değil)
-        `&order=viewCount` +             // En çok izlenene göre
-        `&maxResults=5` +                // 5 aday al, en iyisini seç
-        `&safeSearch=strict` +           // Güvenli içerik
+        `&videoDuration=medium` +
+        `&order=relevance` +  // viewCount değil relevance — konuya daha yakın
+        `&maxResults=5` +
+        `&safeSearch=strict` +
         `&key=${apiKey}`
       )
 
-      if (!res.ok) {
-        console.error('YouTube API error:', res.status)
-        links[topic] = {
-          url: `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}`,
-          title: `${topic} Arama`,
-          channel: '',
-          thumbnail: '',
-        }
-        continue
-      }
-
+      if (!res.ok) throw new Error('YouTube API error')
       const data = await res.json()
       const items = data.items || []
 
       if (items.length === 0) {
-        // Sonuç yoksa daha geniş arama yap
+        // Fallback — daha basit arama
         const res2 = await fetch(
           `https://www.googleapis.com/youtube/v3/search` +
-          `?part=snippet` +
-          `&q=${encodeURIComponent(topic + ' konu anlatımı')}` +
-          `&type=video` +
-          `&relevanceLanguage=tr` +
-          `&order=viewCount` +
-          `&maxResults=3` +
-          `&safeSearch=strict` +
-          `&key=${apiKey}`
+          `?part=snippet&q=${encodeURIComponent(topic + ' konu anlatımı')}&type=video&relevanceLanguage=tr&maxResults=3&safeSearch=strict&key=${apiKey}`
         )
         const data2 = await res2.json()
         const items2 = data2.items || []
         if (items2.length > 0) {
-          const video = items2[0]
-          links[topic] = {
-            url: `https://www.youtube.com/watch?v=${video.id.videoId}`,
-            title: video.snippet.title,
-            channel: video.snippet.channelTitle,
-            thumbnail: video.snippet.thumbnails?.default?.url || '',
-          }
+          const v = items2[0]
+          links[topic] = { url: `https://www.youtube.com/watch?v=${v.id.videoId}`, title: v.snippet.title, channel: v.snippet.channelTitle, thumbnail: v.snippet.thumbnails?.default?.url || '' }
         } else {
-          links[topic] = {
-            url: `https://www.youtube.com/results?search_query=${encodeURIComponent(topic + ' konu anlatımı')}`,
-            title: `${topic} Arama`,
-            channel: '',
-            thumbnail: '',
-          }
+          links[topic] = { url: `https://www.youtube.com/results?search_query=${encodeURIComponent(topic + ' konu anlatımı')}`, title: '', channel: '', thumbnail: '' }
         }
         continue
       }
 
-      // En iyi videoyu seç:
-      // Öncelik: bilinen eğitim kanalları
-      const eduChannels = [
-        'Rehber Matematik', 'Feza Matematik', 'Tonguç Akademi',
-        'Hocalara Geldik', 'Birikim Yayınları', 'YKS Kampı',
-        'Engin Demirci', 'Özdebir', 'Matematik Delisi',
-        'Fen Bilimleri', 'Türkçe Dersi', 'Edebiyat',
-        'Konu Anlatımı', 'Öğretmen', 'Akademi', 'Eğitim'
-      ]
+      // Eğitim kanallarını ve konu başlığını içeren videoları önceliklendir
+      const eduKeywords = ['konu anlatım', 'öğretmen', 'ders', 'eğitim', 'matematik', 'fen', 'türkçe', 'fizik', 'kimya', 'biyoloji', 'tarih', 'coğrafya', 'akademi', 'sınıf']
+      const topicLower = topic.toLowerCase()
 
-      let bestVideo = items[0]
+      let best = items[0]
+      let bestScore = 0
+
       for (const item of items) {
-        const channelTitle = item.snippet.channelTitle || ''
-        const videoTitle = item.snippet.title || ''
-        const isEdu = eduChannels.some(ch =>
-          channelTitle.toLowerCase().includes(ch.toLowerCase()) ||
-          videoTitle.toLowerCase().includes('konu anlatım') ||
-          videoTitle.toLowerCase().includes('öğretmen') ||
-          videoTitle.toLowerCase().includes('ders')
-        )
-        if (isEdu) {
-          bestVideo = item
-          break
-        }
+        const title = (item.snippet.title || '').toLowerCase()
+        const channel = (item.snippet.channelTitle || '').toLowerCase()
+        let score = 0
+
+        // Konu başlığı videoda geçiyor mu?
+        const topicWords = topicLower.split(' ').filter((w: string) => w.length > 2)
+        topicWords.forEach((word: string) => {
+          if (title.includes(word)) score += 3
+        })
+
+        // Eğitim anahtar kelimeleri
+        eduKeywords.forEach(kw => {
+          if (title.includes(kw) || channel.includes(kw)) score += 1
+        })
+
+        // Shorts değilse bonus
+        if (!title.includes('#short') && !title.includes('shorts')) score += 2
+
+        if (score > bestScore) { bestScore = score; best = item }
       }
 
       links[topic] = {
-        url: `https://www.youtube.com/watch?v=${bestVideo.id.videoId}`,
-        title: bestVideo.snippet.title,
-        channel: bestVideo.snippet.channelTitle,
-        thumbnail: bestVideo.snippet.thumbnails?.default?.url || '',
+        url: `https://www.youtube.com/watch?v=${best.id.videoId}`,
+        title: best.snippet.title,
+        channel: best.snippet.channelTitle,
+        thumbnail: best.snippet.thumbnails?.default?.url || '',
       }
-
     } catch (e) {
-      console.error(`YouTube error for topic "${topic}":`, e)
+      console.error('YouTube error:', e)
       links[topic] = {
         url: `https://www.youtube.com/results?search_query=${encodeURIComponent(topic + ' konu anlatımı')}`,
-        title: `${topic} Arama`,
-        channel: '',
-        thumbnail: '',
+        title: '', channel: '', thumbnail: '',
       }
     }
   }
