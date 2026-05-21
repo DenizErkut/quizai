@@ -72,8 +72,8 @@ export default function Navbar() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 1.5rem', zIndex: 1000,
       }}>
-        <Link href="/quiz" style={{ fontSize: '18px', textDecoration: 'none', color: 'var(--text)', flexShrink: 0, fontFamily: 'var(--font-sans)', fontWeight: 700, letterSpacing: '0.05em' }}>
-          <span style={{ color: 'var(--accent)' }}>P</span>RATIUM
+        <Link href="/quiz" style={{ textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '36px', width: 'auto' }} />
         </Link>
 
         {/* Nav linkleri — desktop */}
