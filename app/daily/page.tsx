@@ -213,7 +213,7 @@ export default function DailyPage() {
       <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span className="serif" style={{ fontSize: '18px' }}>Quiz<span style={{ color: 'var(--accent)' }}>AI</span></span>
+            <span className="serif" style={{ fontSize: '18px' }}>PRATIUM</span>
             <span style={{ fontSize: '13px', color: 'var(--text2)' }}>🔥 {streak?.current_streak || 0} gün seri</span>
           </div>
           <div className="progress-bar" style={{ marginBottom: '1.5rem' }}>

@@ -90,7 +90,7 @@ function RegisterContent() {
 
         <div style={{ textAlign: 'center', marginBottom: '2rem' }} className="anim-up">
           <Link href="/" className="serif" style={{ fontSize: '26px', textDecoration: 'none', color: 'var(--text)' }}>
-            Quiz<span style={{ color: 'var(--accent)' }}>AI</span>
+            PRATIUM
           </Link>
         </div>
 

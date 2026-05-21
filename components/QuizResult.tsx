@@ -80,7 +80,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
     doc.setFontSize(18)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(255, 255, 255)
-    doc.text('QuizAI', margin, 16)
+    doc.text('Pratium', margin, 16)
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
     doc.text(cleanText(`Test: ${topic}`), margin, 22)
@@ -117,7 +117,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
       addLine()
     })
 
-    doc.save(`QuizAI_${cleanText(topic)}_${new Date().toISOString().split('T')[0]}.pdf`)
+    doc.save(`Pratium_${cleanText(topic)}_${new Date().toISOString().split('T')[0]}.pdf`)
   }
 
   return (

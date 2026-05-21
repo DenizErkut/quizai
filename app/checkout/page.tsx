@@ -133,7 +133,7 @@ function CheckoutContent() {
         {/* Nav */}
         <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2.5rem' }}>
           <Link href="/" className="serif" style={{ fontSize: '20px', textDecoration: 'none', color: 'var(--text)' }}>
-            Quiz<span style={{ color: 'var(--accent)' }}>AI</span>
+            PRATIUM
           </Link>
           <Link href="/pricing" className="btn btn-ghost btn-sm">← Planlara dön</Link>
         </nav>

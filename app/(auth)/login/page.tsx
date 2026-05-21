@@ -42,7 +42,7 @@ export default function LoginPage() {
       <div style={{ width: '100%', maxWidth: '400px' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }} className="anim-up">
           <Link href="/" className="serif" style={{ fontSize: '26px', textDecoration: 'none', color: 'var(--text)' }}>
-            Quiz<span style={{ color: 'var(--accent)' }}>AI</span>
+            PRATIUM
           </Link>
         </div>
 

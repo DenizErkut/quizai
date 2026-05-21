@@ -1,6 +1,7 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 const GRADES = [
@@ -22,64 +23,130 @@ const GRADES = [
   { value: 'universite 4. sinif', label: 'Üniversite 4. Sınıf' },
 ]
 
-const LANGS = ['Türkçe', 'English', 'Deutsch', 'Français', 'Español']
+const LANGS = [
+  { code: 'Türkçe', label: 'Türkçe', flag: '🇹🇷' },
+  { code: 'English', label: 'English', flag: '🇬🇧' },
+  { code: 'Deutsch', label: 'Deutsch', flag: '🇩🇪' },
+  { code: 'Français', label: 'Français', flag: '🇫🇷' },
+  { code: 'Español', label: 'Español', flag: '🇪🇸' },
+  { code: 'العربية', label: 'العربية', flag: '🇸🇦' },
+]
 
-export default function ProfilePage() {
+export default function ProfileEditPage() {
   const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [success, setSuccess] = useState(false)
+  const [error, setError] = useState('')
+
+  const [name, setName] = useState('')
   const [age, setAge] = useState('')
   const [gender, setGender] = useState('')
   const [grade, setGrade] = useState('')
   const [school, setSchool] = useState('')
   const [lang, setLang] = useState('Türkçe')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [plan, setPlan] = useState('free')
+  const [referralCode, setReferralCode] = useState('')
+  const [copied, setCopied] = useState(false)
+  const [email, setEmail] = useState('')
+
+  const supabase = createClient() as any
+
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+      setEmail(user.email || '')
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+      if (data) {
+        setName(data.name || '')
+        setAge(data.age?.toString() || '')
+        setGender(data.gender || '')
+        setGrade(data.grade || '')
+        setSchool(data.school || '')
+        setLang(data.language || 'Türkçe')
+        setPlan(data.plan || 'free')
+        setReferralCode(data.referral_code || '')
+      }
+      setLoading(false)
+    }
+    load()
+  }, [])
 
   async function handleSave() {
-    if (!age || !gender || !grade) {
-      setError('Yaş, cinsiyet ve sınıf zorunlu.')
-      return
-    }
-    setError('')
-    setLoading(true)
-
-    const supabase = createClient() as any
+    if (!name.trim() || !grade) { setError('Ad ve sınıf zorunlu.'); return }
+    setError(''); setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    const { error: err } = await supabase.from('profiles').upsert({
+    await supabase.from('profiles').upsert({
       id: user.id,
-      name: (user.user_metadata?.name as string) || user.email?.split('@')[0] || 'Kullanici',
-      age: parseInt(age),
-      gender,
+      name: name.trim(),
+      age: age ? parseInt(age) : null,
+      gender: gender || null,
       grade,
       school: school || null,
       language: lang,
     })
 
-    setLoading(false)
-    if (err) { setError(err.message); return }
-    router.push('/quiz')
+    setSaving(false)
+    setSuccess(true)
+    setTimeout(() => setSuccess(false), 2500)
   }
 
+  function copyReferral() {
+    const link = `${window.location.origin}/register?ref=${referralCode}`
+    navigator.clipboard.writeText(link)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  if (loading) return (
+    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+      <div className="spinner" />
+    </main>
+  )
+
   return (
-    <main style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center',
-      justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)',
-    }}>
-      <div style={{ width: '100%', maxWidth: '480px' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', padding: '1.5rem' }}>
+      <div style={{ maxWidth: '560px', margin: '0 auto' }}>
+
+        {/* Nav */}
+        <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
+          <Link href="/" className="serif" style={{ fontSize: '20px', textDecoration: 'none', color: 'var(--text)' }}>
+            PRATIUM
+          </Link>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Link href="/quiz" className="btn btn-ghost btn-sm">← Testler</Link>
+            <Link href="/dashboard" className="btn btn-ghost btn-sm">Dashboard</Link>
+          </div>
+        </nav>
+
         <div className="anim-up" style={{ marginBottom: '1.5rem' }}>
-          <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>Adım 2 / 2</div>
-          <h1 className="serif" style={{ fontSize: '30px', lineHeight: 1.2 }}>Profilini kur</h1>
-          <p style={{ color: 'var(--text2)', fontSize: '14px', marginTop: '0.5rem' }}>
-            Bu bilgiler sana tam uygun sorular oluşturmamızı sağlar.
-          </p>
+          <div className="badge badge-purple" style={{ marginBottom: '0.5rem' }}>Profil</div>
+          <h1 className="serif" style={{ fontSize: '28px' }}>Profil ayarları</h1>
         </div>
 
-        <div className="card anim-up-1">
+        {/* Kisisel bilgiler */}
+        <div className="card anim-up-1" style={{ marginBottom: '1rem' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '1rem' }}>
+            Kişisel bilgiler
+          </div>
+
+          <label className="field-label">Ad soyad</label>
+          <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Adın Soyadın" />
+
+          <label className="field-label">E-posta</label>
+          <input className="input" value={email} disabled style={{ opacity: 0.5, cursor: 'not-allowed' }} />
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
               <label className="field-label">Yaş</label>
-              <input className="input" type="number" placeholder="12" min={5} max={30}
+              <input className="input" type="number" min={5} max={30} placeholder="12"
                 value={age} onChange={e => setAge(e.target.value)} />
             </div>
             <div>
@@ -87,8 +154,7 @@ export default function ProfilePage() {
               <select className="input" value={gender} onChange={e => setGender(e.target.value)}>
                 <option value="">Seç</option>
                 <option value="erkek">Erkek</option>
-                <option value="kadin">Kadın</option>
-                <option value="diger">Diğer</option>
+                <option value="kiz">Kız</option>
                 <option value="belirtmek istemiyorum">Belirtmek istemiyorum</option>
               </select>
             </div>
@@ -103,34 +169,102 @@ export default function ProfilePage() {
           <label className="field-label">Okul (isteğe bağlı)</label>
           <input className="input" placeholder="İzmir Fen Lisesi"
             value={school} onChange={e => setSchool(e.target.value)} />
+        </div>
 
-          <label className="field-label">Dil tercihi</label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+        {/* Dil secimi */}
+        <div className="card anim-up-2" style={{ marginBottom: '1rem' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '1rem' }}>
+            Test dili
+          </div>
+          <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '1rem' }}>
+            Sorular ve açıklamalar seçtiğin dilde gelecek.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
             {LANGS.map(l => (
-              <button key={l} className={`tag ${lang === l ? 'active' : ''}`}
-                onClick={() => setLang(l)}>
-                {l}
+              <button
+                key={l.code}
+                onClick={() => setLang(l.code)}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  border: `1.5px solid ${lang === l.code ? 'var(--accent)' : 'var(--border)'}`,
+                  background: lang === l.code ? 'var(--accent-bg)' : 'var(--bg2)',
+                  color: lang === l.code ? 'var(--accent)' : 'var(--text)',
+                  fontSize: '13px',
+                  fontWeight: lang === l.code ? 600 : 400,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span>{l.flag}</span>
+                {l.label}
               </button>
             ))}
           </div>
-
-          {error && (
-            <div style={{
-              marginTop: '12px', padding: '10px 12px',
-              background: 'var(--red-bg)', border: '1px solid rgba(220,38,38,0.2)',
-              borderRadius: '9px', fontSize: '13px', color: 'var(--red)',
-            }}>
-              {error}
-            </div>
-          )}
-
-          <button className="btn btn-primary" onClick={handleSave} disabled={loading}
-            style={{ width: '100%', justifyContent: 'center', marginTop: '1.5rem' }}>
-            {loading
-              ? <span className="spinner" style={{ width: 18, height: 18 }} />
-              : 'Kaydet ve devam et →'}
-          </button>
         </div>
+
+        {/* Plan bilgisi */}
+        <div className="card anim-up-3" style={{ marginBottom: '1rem' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '1rem' }}>
+            Üyelik
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontWeight: 500 }}>
+                {plan === 'premium' ? '★ Premium üye' : 'Ücretsiz plan'}
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--text2)', marginTop: '2px' }}>
+                {plan === 'free' ? 'Ayda 10 test · Sınırsız için yükselt' : 'Sınırsız test · Tüm özellikler aktif'}
+              </div>
+            </div>
+            <Link href="/pricing" className={`btn btn-sm ${plan === 'premium' ? '' : 'btn-primary'}`}>
+              {plan === 'premium' ? 'Planı gör' : 'Yükselt →'}
+            </Link>
+          </div>
+        </div>
+
+        {/* Referral */}
+        {referralCode && (
+          <div className="card anim-up-4" style={{ marginBottom: '1.5rem' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.75rem' }}>
+              Davet linkin
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '0.75rem' }}>
+              10 kişiyi davet et → 1 yıl ücretsiz premium kazan.
+            </p>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                className="input"
+                readOnly
+                value={`${typeof window !== 'undefined' ? window.location.origin : ''}/register?ref=${referralCode}`}
+                style={{ fontSize: '12px' }}
+              />
+              <button className="btn btn-sm" onClick={copyReferral} style={{ flexShrink: 0 }}>
+                {copied ? '✓ Kopyalandı' : 'Kopyala'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Error / success */}
+        {error && (
+          <div style={{ padding: '10px 14px', background: 'var(--red-bg)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '10px', fontSize: '13px', color: 'var(--red)', marginBottom: '1rem' }}>
+            {error}
+          </div>
+        )}
+        {success && (
+          <div style={{ padding: '10px 14px', background: 'var(--green-bg)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: '10px', fontSize: '13px', color: 'var(--green)', marginBottom: '1rem' }}>
+            ✓ Profil kaydedildi!
+          </div>
+        )}
+
+        <button className="btn btn-primary btn-lg" onClick={handleSave} disabled={saving}
+          style={{ width: '100%', justifyContent: 'center' }}>
+          {saving ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Kaydet'}
+        </button>
       </div>
     </main>
   )

@@ -52,7 +52,7 @@ const DIFFICULTIES = [
 
 function getActiveLang(profileLang?: string): string {
   if (typeof window === 'undefined') return profileLang || 'Türkçe'
-  return localStorage.getItem('quizai_lang') || profileLang || 'Türkçe'
+  return localStorage.getItem('pratium_lang') || profileLang || 'Türkçe'
 }
 
 type Screen = 'topic' | 'loading' | 'quiz' | 'result' | 'limit'
@@ -387,7 +387,7 @@ export default function QuizPage() {
       <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
         <div style={{ maxWidth: '640px', margin: '0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <span className="serif" style={{ fontSize: '18px' }}>Quiz<span style={{ color: 'var(--accent)' }}>AI</span></span>
+            <span style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '0.05em' }}><span style={{ color: 'var(--accent)' }}>P</span>RATIUM</span>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '99px', background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600 }}>{diff.label}</span>
               <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{answers.filter(a => a.correct).length}/{current} doğru</span>

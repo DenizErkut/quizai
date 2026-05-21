@@ -63,13 +63,13 @@ export default function ReferralPage() {
 
   function shareWhatsApp() {
     const link = `${window.location.origin}/register?ref=${profile?.referral_code}`
-    const text = `QuizAI'yi denedin mi? Sınıfına ve konuna özel AI destekli testler! Davet linkimle ücretsiz kayıt ol: ${link}`
+    const text = `Pratium'yi denedin mi? Sınıfına ve konuna özel AI destekli testler! Davet linkimle ücretsiz kayıt ol: ${link}`
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
   }
 
   function shareTwitter() {
     const link = `${window.location.origin}/register?ref=${profile?.referral_code}`
-    const text = `AI destekli soru bankası @QuizAI ile öğrenmek çok kolay! Davet linkimle kayıt ol:`
+    const text = `AI destekli soru bankası @Pratium ile öğrenmek çok kolay! Davet linkimle kayıt ol:`
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`, '_blank')
   }
 

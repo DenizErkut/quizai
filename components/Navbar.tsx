@@ -31,7 +31,7 @@ export default function Navbar() {
         supabase.from('streaks').select('current_streak').eq('user_id', user.id).single(),
       ])
       if (p) {
-        const stored = localStorage.getItem('quizai_lang')
+        const stored = localStorage.getItem('pratium_lang')
         if (stored) p.language = stored
         setProfile(p)
       }
@@ -43,14 +43,14 @@ export default function Navbar() {
   async function saveLang(lang: string) {
     setShowLang(false)
     if (!profile) return
-    localStorage.setItem('quizai_lang', lang)
+    localStorage.setItem('pratium_lang', lang)
     setProfile((prev: any) => prev ? { ...prev, language: lang } : prev)
     const { data: { user } } = await supabase.auth.getUser()
     if (user) await supabase.from('profiles').update({ language: lang }).eq('id', user.id)
   }
 
   async function handleSignOut() {
-    localStorage.removeItem('quizai_lang')
+    localStorage.removeItem('pratium_lang')
     await supabase.auth.signOut()
     router.push('/')
   }
@@ -72,8 +72,8 @@ export default function Navbar() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 1.5rem', zIndex: 1000,
       }}>
-        <Link href="/quiz" className="serif" style={{ fontSize: '20px', textDecoration: 'none', color: 'var(--text)', flexShrink: 0 }}>
-          Quiz<span style={{ color: 'var(--accent)' }}>AI</span>
+        <Link href="/quiz" style={{ fontSize: '18px', textDecoration: 'none', color: 'var(--text)', flexShrink: 0, fontFamily: 'var(--font-sans)', fontWeight: 700, letterSpacing: '0.05em' }}>
+          <span style={{ color: 'var(--accent)' }}>P</span>RATIUM
         </Link>
 
         {/* Nav linkleri — desktop */}
