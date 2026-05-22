@@ -4,17 +4,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Cavolini&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
 
 :root {
-  --bg: #f8fffc;
-  --bg2: #f0fdf8;
-  --bg3: #dcfce7;
-  --border: rgba(29,158,117,0.12);
-  --border-hover: rgba(29,158,117,0.28);
+  --bg: #fffafa;
+  --bg2: #fff5f5;
+  --bg3: #ffe9e9;
+  --border: rgba(216,90,48,0.12);
+  --border-hover: rgba(216,90,48,0.28);
   --text: #1E1B3A;
   --text2: #6B7280;
   --text3: #aaa99e;
-  --accent: #1D9E75;
-  --accent2: #0F6E56;
-  --accent-bg: rgba(29,158,117,0.08);
+  --accent: #D85A30;
+  --accent2: #FF6B6B;
+  --accent-bg: rgba(216,90,48,0.08);
   --green: #16a34a;
   --green-bg: rgba(22,163,74,0.08);
   --red: #dc2626;
@@ -27,7 +27,7 @@
   --radius-lg: 18px;
 
   /* Gradient */
-  --grad-main: linear-gradient(135deg, #1D9E75 0%, #0F6E56 50%, #378ADD 100%);
+  --grad-main: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 50%, #EC4899 100%);
   --grad-streak: linear-gradient(135deg, #FF6B6B, #FF8E53);
   --grad-green: linear-gradient(135deg, #16A34A, #34D399);
 }
@@ -133,7 +133,7 @@ body {
   outline: none;
   transition: border-color 0.15s, background 0.15s;
 }
-.input:focus { border-color: var(--accent); background: var(--bg); box-shadow: 0 0 0 3px rgba(29,158,117,0.1); }
+.input:focus { border-color: var(--accent); background: var(--bg); box-shadow: 0 0 0 3px rgba(216,90,48,0.1); }
 .input::placeholder { color: var(--text3); }
 select.input { cursor: pointer; }
 
