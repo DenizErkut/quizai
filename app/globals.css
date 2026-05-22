@@ -1,14 +1,16 @@
 @import "tailwindcss/preflight";
 @import "tailwindcss/utilities";
 
+@import url('https://fonts.googleapis.com/css2?family=Cavolini&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+
 :root {
   --bg: #ffffff;
-  --bg2: #f8f7f4;
-  --bg3: #f0ede8;
-  --border: rgba(0,0,0,0.08);
-  --border-hover: rgba(0,0,0,0.18);
-  --text: #1a1a1a;
-  --text2: #555550;
+  --bg2: #f8f7ff;
+  --bg3: #ede9ff;
+  --border: rgba(91,76,245,0.1);
+  --border-hover: rgba(91,76,245,0.25);
+  --text: #1E1B3A;
+  --text2: #6B7280;
   --text3: #aaa99e;
   --accent: #5b4cf5;
   --accent2: #7b6ef8;
@@ -18,8 +20,16 @@
   --red: #dc2626;
   --red-bg: rgba(220,38,38,0.07);
   --amber: #d97706;
-  --radius: 10px;
-  --radius-lg: 16px;
+  --amber-bg: rgba(217,119,6,0.08);
+  --pink: #EC4899;
+  --pink-bg: rgba(236,72,153,0.08);
+  --radius: 12px;
+  --radius-lg: 18px;
+
+  /* Gradient */
+  --grad-main: linear-gradient(135deg, #5B4CF5 0%, #8B5CF6 50%, #EC4899 100%);
+  --grad-streak: linear-gradient(135deg, #FF6B6B, #FF8E53);
+  --grad-green: linear-gradient(135deg, #16A34A, #34D399);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,14 +38,15 @@ html { scroll-behavior: smooth; }
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: 15px;
   line-height: 1.6;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
 }
 
-.serif { font-family: 'DM Serif Display', serif; }
+/* Cavolini — başlıklar ve logo */
+.serif { font-family: 'Cavolini', cursive; }
 
 /* Cards */
 .card {
@@ -43,7 +54,7 @@ body {
   border: 1.5px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 1.75rem;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 12px rgba(91,76,245,0.06);
 }
 
 .card-sm {
@@ -51,6 +62,15 @@ body {
   border: 1.5px solid var(--border);
   border-radius: var(--radius);
   padding: 1rem 1.25rem;
+}
+
+/* Gradient card */
+.card-gradient {
+  background: var(--grad-main);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem;
+  color: #fff;
+  border: none;
 }
 
 /* Buttons */
@@ -64,9 +84,9 @@ body {
   border: 1.5px solid var(--border);
   background: var(--bg);
   color: var(--text);
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
   text-decoration: none;
@@ -82,6 +102,14 @@ body {
 }
 .btn-primary:hover { background: var(--accent2); border-color: var(--accent2); }
 
+.btn-gradient {
+  background: var(--grad-main);
+  border: none;
+  color: #fff;
+  font-weight: 700;
+}
+.btn-gradient:hover { opacity: 0.92; background: var(--grad-main); }
+
 .btn-ghost {
   background: transparent;
   border-color: transparent;
@@ -89,7 +117,7 @@ body {
 }
 .btn-ghost:hover { color: var(--text); background: var(--bg2); border-color: var(--border); }
 
-.btn-lg { padding: 13px 28px; font-size: 15px; border-radius: 12px; }
+.btn-lg { padding: 14px 32px; font-size: 15px; border-radius: 14px; font-weight: 700; }
 .btn-sm { padding: 7px 14px; font-size: 13px; border-radius: 8px; }
 
 /* Inputs */
@@ -100,19 +128,19 @@ body {
   border: 1.5px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: 14px;
   outline: none;
   transition: border-color 0.15s, background 0.15s;
 }
-.input:focus { border-color: var(--accent); background: var(--bg); }
+.input:focus { border-color: var(--accent); background: var(--bg); box-shadow: 0 0 0 3px rgba(91,76,245,0.1); }
 .input::placeholder { color: var(--text3); }
 select.input { cursor: pointer; }
 
 label.field-label {
   display: block;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text3);
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -120,33 +148,34 @@ label.field-label {
   margin-top: 16px;
 }
 
-/* Tags */
+/* Tags / Pills */
 .tag {
   display: inline-flex;
   align-items: center;
-  padding: 6px 14px;
+  padding: 6px 16px;
   border-radius: 99px;
   border: 1.5px solid var(--border);
   background: var(--bg2);
   color: var(--text2);
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
   user-select: none;
 }
-.tag:hover { border-color: var(--accent); color: var(--accent); }
-.tag.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); font-weight: 500; }
+.tag:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
+.tag.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); font-weight: 600; }
 
 /* Progress */
 .progress-bar {
-  height: 5px;
+  height: 6px;
   background: var(--bg3);
   border-radius: 99px;
   overflow: hidden;
 }
 .progress-fill {
   height: 100%;
-  background: var(--accent);
+  background: var(--grad-main);
   border-radius: 99px;
   transition: width 0.4s ease;
 }
@@ -155,16 +184,25 @@ label.field-label {
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 3px 10px;
+  padding: 4px 12px;
   border-radius: 99px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 .badge-purple { background: var(--accent-bg); color: var(--accent); }
 .badge-green  { background: var(--green-bg);  color: var(--green);  }
 .badge-red    { background: var(--red-bg);    color: var(--red);    }
+.badge-pink   { background: var(--pink-bg);   color: var(--pink);   }
+.badge-amber  { background: var(--amber-bg);  color: var(--amber);  }
+
+/* Feature cards - renkli */
+.card-purple { background: #EDE9FF; border: 1.5px solid rgba(91,76,245,0.15); border-radius: var(--radius-lg); }
+.card-pink   { background: #FFE9F5; border: 1.5px solid rgba(236,72,153,0.15); border-radius: var(--radius-lg); }
+.card-green  { background: #E8FFF0; border: 1.5px solid rgba(22,163,74,0.15); border-radius: var(--radius-lg); }
+.card-amber  { background: #FFF8E1; border: 1.5px solid rgba(217,119,6,0.15); border-radius: var(--radius-lg); }
+.card-streak { background: var(--grad-streak); border-radius: var(--radius-lg); border: none; }
 
 /* Divider */
 .divider {
@@ -188,12 +226,22 @@ label.field-label {
   to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
 
 .anim-up   { animation: fadeUp 0.35s ease both; }
 .anim-up-1 { animation: fadeUp 0.35s 0.05s ease both; }
 .anim-up-2 { animation: fadeUp 0.35s 0.10s ease both; }
 .anim-up-3 { animation: fadeUp 0.35s 0.15s ease both; }
 .anim-up-4 { animation: fadeUp 0.35s 0.20s ease both; }
+.anim-float { animation: float 3s ease-in-out infinite; }
+.anim-pulse { animation: pulse 2s ease-in-out infinite; }
 
 .spinner {
   width: 28px; height: 28px;
@@ -203,22 +251,24 @@ label.field-label {
   animation: spin 0.7s linear infinite;
 }
 
-/* Subtle top accent line on nav */
-.top-accent {
-  border-top: 3px solid var(--accent);
-}
-
 /* Scrollbar */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: var(--bg2); }
-::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 99px; }
+::-webkit-scrollbar-thumb { background: var(--accent-bg); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
-/* Glow blob — subtle on light theme */
-.glow-blob {
-  position: fixed;
-  width: 500px; height: 500px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(91,76,245,0.05) 0%, transparent 70%);
-  pointer-events: none;
-  z-index: 0;
+/* Selection */
+::selection { background: var(--accent-bg); color: var(--accent); }
+
+/* Gradient text */
+.text-gradient {
+  background: var(--grad-main);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
+
+/* Glow effects */
+.glow-purple { box-shadow: 0 4px 20px rgba(91,76,245,0.2); }
+.glow-pink { box-shadow: 0 4px 20px rgba(236,72,153,0.2); }
+.glow-green { box-shadow: 0 4px 20px rgba(22,163,74,0.2); }

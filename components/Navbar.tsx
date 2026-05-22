@@ -72,10 +72,10 @@ export default function Navbar() {
   const activeLang = LANGS.find(l => l.code === profile.language) || LANGS[0]
 
   const NAV_ITEMS = [
-    { href: '/daily', label: streak > 0 ? `🔥 ${streak}` : '📅 Günlük' },
-    { href: '/leaderboard', label: '🏆 Sıralama' },
-    { href: '/analysis', label: '📊 Analiz' },
-    { href: '/plan', label: '📋 Plan' },
+    { href: '/daily', label: streak > 0 ? `🔥 ${streak}` : '📅 Günlük', color: '#FF6B6B', bg: '#FFE9E9' },
+    { href: '/leaderboard', label: '🏆 Sıralama', color: '#D97706', bg: '#FFF8E1' },
+    { href: '/analysis', label: '📊 Analiz', color: '#5B4CF5', bg: '#EDE9FF' },
+    { href: '/plan', label: '📋 Plan', color: '#16A34A', bg: '#E8FFF0' },
   ]
 
   const MENU_ITEMS = [
@@ -97,17 +97,17 @@ export default function Navbar() {
       <div style={{ height: '72px' }} />
       <nav style={{
         position: 'fixed', top: 0, left: 0, right: 0, height: '72px',
-        background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid var(--border)',
+        background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(16px)',
+        borderBottom: '1.5px solid var(--border)',
+        boxShadow: '0 2px 20px rgba(91,76,245,0.06)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 1.25rem', zIndex: 1000,
       }}>
         {/* Logo + Slogan */}
-        <Link href="/quiz" style={{ textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '64px', width: 'auto' }} />
-          <span style={{ fontSize: '13px', color: 'var(--text2)', fontWeight: 400, lineHeight: 1.4, maxWidth: '160px' }}
-            className="desktop-only">
-            Pratik yap,<br />netlerini artır.
+        <Link href="/quiz" style={{ textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '52px', width: 'auto' }} />
+          <span className="serif desktop-only" style={{ fontSize: '22px', color: 'var(--accent)', letterSpacing: '-0.5px' }}>
+            prat<span style={{ color: 'var(--pink)' }}>ium</span>
           </span>
         </Link>
 
