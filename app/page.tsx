@@ -40,12 +40,12 @@ export default function LandingPage() {
   )
 
   return (
-    <main style={{ position: 'relative', minHeight: '100vh', background: '#faf9ff' }}>
+    <main style={{ position: 'relative', minHeight: '100vh', background: '#fffafa' }}>
 
       {/* Nav */}
       <nav style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '1rem 2rem', borderBottom: '1.5px solid rgba(79,70,229,0.12)',
+        padding: '1rem 2rem', borderBottom: '1.5px solid rgba(216,90,48,0.12)',
         position: 'sticky', top: 0, background: 'rgba(255,255,255,0.95)',
         backdropFilter: 'blur(16px)', zIndex: 100,
         boxShadow: '0 2px 20px rgba(91,76,245,0.06)',
@@ -60,7 +60,7 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero */}
-      <section style={{ textAlign: 'center', padding: '6rem 1.5rem 4rem', background: 'radial-gradient(ellipse at 20% 10%, rgba(99,102,241,0.12) 0%, transparent 60%), radial-gradient(ellipse at 80% 90%, rgba(167,139,250,0.10) 0%, transparent 60%)' }}>
+      <section style={{ textAlign: 'center', padding: '6rem 1.5rem 4rem', background: 'radial-gradient(ellipse at 0% 0%, rgba(255,107,107,0.10) 0%, transparent 55%), radial-gradient(ellipse at 100% 100%, rgba(236,72,153,0.08) 0%, transparent 55%)' }}>
         <div className="badge badge-purple anim-up" style={{ marginBottom: '1.5rem' }}>
           AI destekli soru bankası
         </div>
@@ -69,7 +69,7 @@ export default function LandingPage() {
           marginBottom: '1.25rem', maxWidth: '800px', margin: '0 auto 1.25rem',
         }}>
           Pratik yap,<br />
-          <span style={{ color: '#4F46E5', fontStyle: 'italic' }}>başarıya ulaş.</span>
+          <span style={{ color: '#D85A30', fontStyle: 'italic' }}>başarıya ulaş.</span>
         </h1>
         <p className="anim-up-2" style={{
           color: 'var(--text2)', fontSize: '17px', maxWidth: '520px',
@@ -141,7 +141,7 @@ export default function LandingPage() {
 
       {/* CTA */}
       <section style={{ textAlign: 'center', padding: '4rem 1.5rem 6rem' }}>
-        <div style={{ maxWidth: '480px', margin: '0 auto', background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #A78BFA 100%)', borderRadius: '24px', padding: '2.5rem 2rem' }}>
+        <div style={{ maxWidth: '480px', margin: '0 auto', background: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 50%, #EC4899 100%)', borderRadius: '24px', padding: '2.5rem 2rem' }}>
           <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem', color: '#fff' }}>
             Hemen dene
           </h2>
