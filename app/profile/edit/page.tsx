@@ -112,7 +112,7 @@ export default function ProfileEditPage() {
   )
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', padding: '1.5rem' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', padding: '1.5rem', paddingBottom: '5rem' }}>
       <div style={{ maxWidth: '560px', margin: '0 auto' }}>
 
         {/* Nav */}
