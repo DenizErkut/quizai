@@ -52,7 +52,7 @@ export default function LandingPage() {
         borderBottom: '1px solid rgba(255,255,255,0.08)',
       }}>
         <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '80px', width: 'auto' }} />
+          <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '72px', width: 'auto' }} />
         </Link>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <Link href="/login" style={{ color: 'rgba(255,255,255,0.7)', textDecoration: 'none', fontSize: '14px', fontWeight: 500, padding: '8px 16px' }}>
@@ -246,7 +246,7 @@ export default function LandingPage() {
         <div style={{ maxWidth: '960px', margin: '0 auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '2rem', marginBottom: '3rem' }}>
             <div>
-              <img src="/pratium-logo.png" alt="Pratium" style={{ height: '60px', marginBottom: '12px' }} />
+              <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '60px', marginBottom: '12px' }} />
               <p style={{ fontSize: '13px', lineHeight: 1.7, margin: 0 }}>Yapay zeka destekli kişiselleştirilmiş test platformu.</p>
               <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
                 {[
