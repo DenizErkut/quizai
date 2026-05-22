@@ -1,139 +1,469 @@
 'use client'
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import FileUploader, { type UploadedFile } from '@/components/FileUploader'
+import QuizResult from '@/components/QuizResult'
 
-const features = [
-  { icon: '⚡', title: 'Anlık soru üretimi', desc: 'Konunu yaz, 10 saniyede sınıfına özel sorular hazır.' },
-  { icon: '🎯', title: 'Sana özel zorluk', desc: 'AI sınıfını, yaşını ve geçmiş skorunu analiz eder.' },
-  { icon: '🌍', title: 'Çoklu dil', desc: 'Türkçe, İngilizce, Almanca ve daha fazlası.' },
-  { icon: '📊', title: 'İlerleme takibi', desc: 'Her testin skoru kaydedilir, zayıf konular analiz edilir.' },
+interface Question {
+  q: string; opts: string[]; ans: number; exp: string
+  svg?: string | null; qtype?: 'text' | 'svg'
+}
+interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number }
+
+const TOPIC_MAP: Record<string, { topic: string; subject: string }[]> = {
+  ilkokul: [
+    { topic: 'Toplama ve cikarma', subject: 'Matematik' },
+    { topic: 'Hayvanlar alemi', subject: 'Fen' },
+    { topic: 'Mevsimler ve iklim', subject: 'Fen' },
+    { topic: 'Turkiye haritasi', subject: 'Sosyal' },
+    { topic: 'Carpim tablosu', subject: 'Matematik' },
+  ],
+  ortaokul: [
+    { topic: 'Ondalik sayilar', subject: 'Matematik' },
+    { topic: 'Hucre ve organeller', subject: 'Fen' },
+    { topic: 'Osmanli tarihi', subject: 'Tarih' },
+    { topic: 'Denklemler', subject: 'Matematik' },
+    { topic: 'Tam sayilar', subject: 'Matematik' },
+  ],
+  lise: [
+    { topic: 'Turev temelleri', subject: 'Matematik' },
+    { topic: 'Organik kimya', subject: 'Kimya' },
+    { topic: 'Ataturk ilkeleri', subject: 'Tarih' },
+    { topic: 'Logaritma', subject: 'Matematik' },
+    { topic: 'Genetik ve DNA', subject: 'Biyoloji' },
+  ],
+  universite: [
+    { topic: 'Ucagin kisimlar', subject: 'Havacilik' },
+    { topic: 'Termodinamik', subject: 'Fizik' },
+    { topic: 'Diferansiyel denklemler', subject: 'Matematik' },
+    { topic: 'Makroekonomi', subject: 'Iktisat' },
+    { topic: 'Veri yapilari', subject: 'Bilisim' },
+  ],
+}
+
+const DIFFICULTIES = [
+  { value: 'kolay', label: 'Kolay', desc: 'Temel kavramlar', color: '#16a34a', bg: 'rgba(22,163,74,0.08)', border: 'rgba(22,163,74,0.3)' },
+  { value: 'normal', label: 'Normal', desc: 'Müfredat seviyesi', color: '#2563eb', bg: 'rgba(37,99,235,0.08)', border: 'rgba(37,99,235,0.3)' },
+  { value: 'zor', label: 'Zor', desc: 'Analiz gerektiren', color: '#d97706', bg: 'rgba(217,119,6,0.08)', border: 'rgba(217,119,6,0.3)' },
+  { value: 'cok zor', label: 'Çok Zor', desc: 'Olimpiyat seviyesi', color: '#dc2626', bg: 'rgba(220,38,38,0.08)', border: 'rgba(220,38,38,0.3)' },
 ]
 
-const examples = [
-  { grade: 'Üniversite 1. sınıf', topic: 'Uçağın kısımları', count: 10 },
-  { grade: 'Ortaokul 6. sınıf', topic: 'Asal sayılar ve OBEB', count: 10 },
-  { grade: 'Lise 11. sınıf', topic: 'Organik kimya', count: 15 },
-  { grade: 'İlkokul 4. sınıf', topic: 'Çarpım tablosu', count: 5 },
-]
+function getActiveLang(profileLang?: string): string {
+  if (typeof window === 'undefined') return profileLang || 'Türkçe'
+  return localStorage.getItem('pratium_lang') || profileLang || 'Türkçe'
+}
 
-export default function LandingPage() {
+type Screen = 'topic' | 'loading' | 'quiz' | 'result' | 'limit'
+
+export default function QuizPage() {
   const router = useRouter()
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [checking, setChecking] = useState(true)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [currentLang, setCurrentLang] = useState('Türkçe')
+  const [screen, setScreen] = useState<Screen>('topic')
+  const [selectedTopic, setSelectedTopic] = useState('')
+  const [customTopic, setCustomTopic] = useState('')
+  const [qCount, setQCount] = useState(10)
+  const [difficulty, setDifficulty] = useState('normal')
+  const [includeVisuals, setIncludeVisuals] = useState(true)
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
 
-  useEffect(() => {
-    const supabase = createClient() as any
-    supabase.auth.getUser().then(({ data: { user } }: any) => {
-      if (user) {
-        // Giriş yapmış — direkt quiz'e yönlendir
-        router.replace('/quiz')
-      } else {
-        setIsLoggedIn(false)
-        setChecking(false)
-      }
-    })
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [current, setCurrent] = useState(0)
+  const [answers, setAnswers] = useState<{ userAns: number; correct: boolean }[]>([])
+  const [chosen, setChosen] = useState<number | null>(null)
+  const [loadMsg, setLoadMsg] = useState('Profilin analiz ediliyor...')
+  const [topicErr, setTopicErr] = useState('')
+  const [youtubeLinks, setYoutubeLinks] = useState<Record<string, any>>({})
+  const supabase = createClient() as any
+
+  const fetchProfile = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/login'); return null }
+    const { data } = await supabase
+      .from('profiles').select('name,grade,language,plan,monthly_test_count,age')
+      .eq('id', user.id).single()
+    if (!data || !data.grade || !data.age || !data.name) { router.push('/profile'); return null }
+    const lang = getActiveLang(data.language)
+    setProfile({ ...data, language: lang })
+    setCurrentLang(lang)
+    return { ...data, language: lang }
   }, [])
 
-  // Kontrol edilirken boş ekran göster
-  if (checking) return null
+  useEffect(() => { fetchProfile() }, [])
 
-  return (
-    <main style={{ position: 'relative', minHeight: '100vh' }}>
-      <div className="glow-blob" style={{ top: '-100px', left: '50%', transform: 'translateX(-50%)' }} />
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const lang = getActiveLang(profile?.language)
+      if (lang !== currentLang) {
+        setCurrentLang(lang)
+        setProfile(prev => prev ? { ...prev, language: lang } : prev)
+      }
+    }, 500)
+    return () => clearInterval(iv)
+  }, [currentLang, profile?.language])
 
-      {/* Nav — sadece giriş yapmamış kullanıcılar için */}
-      <nav style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '1rem 2rem', borderBottom: '1px solid var(--border)',
-        position: 'sticky', top: 0, background: 'rgba(255,255,255,0.92)',
-        backdropFilter: 'blur(12px)', zIndex: 100,
-      }}>
-        <Link href="/" style={{ textDecoration: 'none', display: 'inline-block' }}>
-          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '52px', width: 'auto' }} />
-        </Link>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <Link href="/login" className="btn btn-ghost btn-sm">Giriş yap</Link>
-          <Link href="/register" className="btn btn-primary btn-sm">Ücretsiz başla</Link>
-        </div>
-      </nav>
+  useEffect(() => { if (screen === 'topic') fetchProfile() }, [screen])
 
-      {/* Hero */}
-      <section style={{ textAlign: 'center', padding: '6rem 1.5rem 4rem', position: 'relative', zIndex: 1 }}>
-        <div className="badge badge-purple anim-up" style={{ marginBottom: '1.5rem' }}>
-          AI destekli soru bankası
-        </div>
-        <h1 className="serif anim-up-1" style={{
-          fontSize: 'clamp(2.5rem, 6vw, 4.5rem)', lineHeight: 1.1,
-          letterSpacing: '-0.02em', marginBottom: '1.25rem',
-          maxWidth: '800px', margin: '0 auto 1.25rem',
-        }}>
-          Pratik yap,<br />
-          <em style={{ color: 'var(--accent2)', fontStyle: 'italic' }}>başarıya ulaş.</em>
-        </h1>
-        <p className="anim-up-2" style={{
-          color: 'var(--text2)', fontSize: '17px', maxWidth: '520px',
-          margin: '0 auto 2.5rem', lineHeight: 1.7,
-        }}>
-          Konunu yaz, sınıfını seç — Claude AI saniyeler içinde sana özel
-          çoktan seçmeli sorular üretsin.
+  function getLevel(grade: string) {
+    return grade.startsWith('ilk') ? 'ilkokul'
+      : grade.startsWith('orta') ? 'ortaokul'
+      : grade.startsWith('lise') ? 'lise' : 'universite'
+  }
+
+  // Tüm yüklü dosyaların içeriğini birleştir
+  const combinedContent = uploadedFiles.map(f => `[${f.name}]\n${f.content}`).join('\n\n---\n\n')
+  const hasFiles = uploadedFiles.length > 0
+
+  async function startQuiz() {
+    const topic = customTopic.trim() || selectedTopic
+    if (!topic) { setTopicErr('Bir konu seç veya yaz.'); return }
+    setTopicErr('')
+    const lang = getActiveLang(profile?.language)
+    setCurrentLang(lang)
+    setScreen('loading')
+
+    const msgs = [
+      hasFiles ? `${uploadedFiles.length} dosya analiz ediliyor...` : 'Profilin analiz ediliyor...',
+      'Müfredat kontrol ediliyor...',
+      `${difficulty.toUpperCase()} zorlukta sorular oluşturuluyor...`,
+      includeVisuals ? 'Görsel içerikler hazırlanıyor...' : 'Şıklar karıştırılıyor...',
+      'Son kontroller...',
+    ]
+    let mi = 0
+    const iv = setInterval(() => { mi = (mi + 1) % msgs.length; setLoadMsg(msgs[mi]) }, 1000)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/generate-quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          topic, questionCount: qCount, difficulty, language: lang,
+          fileContent: combinedContent || undefined,
+          fileType: uploadedFiles[0]?.fileType || undefined,
+          includeVisuals,
+        }),
+      })
+      const data = await res.json()
+      clearInterval(iv)
+
+      if (res.status === 429 && data.error === 'limit_reached') {
+        setScreen('limit')
+        return
+      }
+
+      if (!res.ok) throw new Error(data.error)
+
+      fetchProfile()
+      setQuestions(data.questions)
+      setSessionId(data.sessionId)
+      setCurrent(0); setAnswers([]); setChosen(null)
+      setScreen('quiz')
+    } catch {
+      clearInterval(iv)
+      setLoadMsg('Hata oluştu, tekrar deneyin.')
+      setTimeout(() => setScreen('topic'), 2000)
+    }
+  }
+
+  function choose(idx: number) {
+    if (chosen !== null) return
+    setChosen(idx)
+    setAnswers(prev => [...prev, { userAns: idx, correct: idx === questions[current].ans }])
+  }
+
+  async function next() {
+    if (current + 1 >= questions.length) {
+      // chosen henuz answers state'e yansimamis olabilir — son cevabi dahil et
+      const lastCorrect = chosen !== null && chosen === questions[current].ans
+      const finalAnswers = chosen !== null && answers.length < questions.length
+        ? [...answers, { userAns: chosen, correct: lastCorrect }]
+        : answers
+      const score = finalAnswers.filter(a => a.correct).length
+      const { data: { session } } = await supabase.auth.getSession()
+      if (sessionId) {
+        await fetch('/api/generate-quiz', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ sessionId, answers: finalAnswers, score }),
+        })
+      }
+      // YouTube linkleri cek
+      const topic = customTopic.trim() || selectedTopic
+      try {
+        const ytRes = await fetch('/api/youtube-links', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ topics: [topic] }),
+        })
+        const ytData = await ytRes.json()
+        if (ytData.links) setYoutubeLinks(ytData.links)
+      } catch { /* YouTube linki olmasa da devam et */ }
+      setScreen('result')
+    } else { setCurrent(c => c + 1); setChosen(null) }
+  }
+
+  const level = profile ? getLevel(profile.grade) : 'ortaokul'
+  const suggestions = TOPIC_MAP[level] || TOPIC_MAP.ortaokul
+  const testsLeft = profile?.plan === 'free' ? Math.max(0, 10 - (profile?.monthly_test_count || 0)) : null
+  const activeDiff = DIFFICULTIES.find(d => d.value === difficulty)!
+
+  // ── LIMIT ──
+  if (screen === 'limit') return (
+    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
+      <div style={{ maxWidth: '460px', textAlign: 'center' }} className="anim-up">
+        <div style={{ fontSize: '56px', marginBottom: '1.25rem' }}>📚</div>
+        <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>Bu ayki test hakkın doldu</h2>
+        <p style={{ color: 'var(--text2)', fontSize: '15px', marginBottom: '2rem', lineHeight: 1.7 }}>
+          Ücretsiz planda ayda <strong>10 test</strong> hakkın var.<br />
+          Sınırsız test için Premium'a geç veya <strong>10 arkadaşını davet ederek</strong> 1 yıl ücretsiz premium kazan.
         </p>
-        <div className="anim-up-3" style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Link href="/register" className="btn btn-primary btn-lg">
-            Ücretsiz başla →
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '320px', margin: '0 auto' }}>
+          <Link href="/pricing" className="btn btn-primary btn-lg" style={{ justifyContent: 'center' }}>
+            💎 Premium'a geç
           </Link>
-          <Link href="/login" className="btn btn-lg">
-            Giriş yap
+          <Link href="/pricing#referral" className="btn btn-lg" style={{ justifyContent: 'center' }}>
+            🎁 Arkadaşını davet et (ücretsiz)
           </Link>
+          <button className="btn btn-ghost btn-sm" onClick={() => setScreen('topic')}>
+            ← Geri dön
+          </button>
         </div>
-      </section>
-
-      {/* Example cards */}
-      <section style={{ padding: '2rem 1.5rem', maxWidth: '900px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
-        <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '12px', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '1.25rem' }}>
-          Örnek test senaryoları
+        <p style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '1.5rem' }}>
+          Ay başında (her ayın 1'i) test hakkın otomatik sıfırlanır.
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-          {examples.map((e, i) => (
-            <div key={i} className="card-sm anim-up" style={{ animationDelay: `${i * 0.05}s` }}>
-              <div style={{ fontSize: '11px', color: 'var(--accent2)', marginBottom: '6px', fontWeight: 600 }}>
-                {e.grade}
-              </div>
-              <div style={{ fontWeight: 500, marginBottom: '4px' }}>{e.topic}</div>
-              <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{e.count} soru · Türkçe</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Features */}
-      <section style={{ padding: '4rem 1.5rem', maxWidth: '900px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-          {features.map((f, i) => (
-            <div key={i} className="card anim-up" style={{ animationDelay: `${i * 0.06}s` }}>
-              <div style={{ fontSize: '28px', marginBottom: '12px' }}>{f.icon}</div>
-              <div style={{ fontWeight: 600, marginBottom: '6px' }}>{f.title}</div>
-              <div style={{ color: 'var(--text2)', fontSize: '13px', lineHeight: 1.6 }}>{f.desc}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section style={{ textAlign: 'center', padding: '4rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
-        <div className="card" style={{ maxWidth: '480px', margin: '0 auto' }}>
-          <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>
-            Hemen dene
-          </h2>
-          <p style={{ color: 'var(--text2)', marginBottom: '1.5rem', fontSize: '14px' }}>
-            Kayıt ol, profilini oluştur, ilk testini al.
-          </p>
-          <Link href="/register" className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center' }}>
-            Ücretsiz hesap oluştur
-          </Link>
-        </div>
-      </section>
+      </div>
     </main>
   )
+
+  // ── TOPIC ──
+  if (screen === 'topic') return (
+    <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
+      <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+
+        {profile && (
+          <div className="anim-up" style={{ marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--accent-bg)', border: '1.5px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontWeight: 600, fontSize: '15px' }}>
+              {profile.name.slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <div style={{ fontWeight: 500 }}>Merhaba, {profile.name.split(' ')[0]}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span>{profile.grade}</span>
+                <span>·</span>
+                <span>{currentLang}</span>
+                {testsLeft !== null && (
+                  <span style={{
+                    padding: '1px 8px', borderRadius: '99px', fontSize: '11px',
+                    background: testsLeft === 0 ? 'var(--red-bg)' : testsLeft <= 2 ? 'rgba(217,119,6,0.1)' : 'var(--bg3)',
+                    color: testsLeft === 0 ? 'var(--red)' : testsLeft <= 2 ? 'var(--amber)' : 'var(--text3)',
+                    border: `1px solid ${testsLeft === 0 ? 'rgba(220,38,38,0.2)' : testsLeft <= 2 ? 'rgba(217,119,6,0.2)' : 'var(--border)'}`,
+                    fontWeight: 600,
+                  }}>
+                    {testsLeft === 0 ? '⚠ Hak kalmadı' : `${testsLeft} test kaldı`}
+                  </span>
+                )}
+                {profile.plan === 'premium' && (
+                  <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '11px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid rgba(91,76,245,0.2)', fontWeight: 600 }}>★ Premium</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Limit uyarısı */}
+        {testsLeft !== null && testsLeft <= 3 && testsLeft > 0 && (
+          <div className="anim-up" style={{ marginBottom: '1rem', padding: '12px 16px', borderRadius: '10px', background: 'rgba(217,119,6,0.07)', border: '1px solid rgba(217,119,6,0.25)', fontSize: '13px', color: '#92400e', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>⚠ Bu ay {testsLeft} test hakkın kaldı.</span>
+            <Link href="/pricing" style={{ color: 'var(--accent)', fontWeight: 600, fontSize: '12px', textDecoration: 'none' }}>Yükselt →</Link>
+          </div>
+        )}
+
+        <div className="card anim-up-1">
+          <h2 className="serif" style={{ fontSize: '24px', marginBottom: '0.25rem' }}>Hangi konuyu test edelim?</h2>
+          <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1.5rem' }}>
+            Hazır konulardan seç, kendi konunu yaz veya dosya yükle.
+            {currentLang !== 'Türkçe' && <span style={{ color: 'var(--accent)', marginLeft: '6px' }}>· Sorular {currentLang} dilinde</span>}
+          </p>
+
+          <label className="field-label">Önerilen konular</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px', marginBottom: '1rem' }}>
+            {suggestions.map(s => (
+              <button key={s.topic} className={`tag ${selectedTopic === s.topic ? 'active' : ''}`}
+                onClick={() => { setSelectedTopic(s.topic); setCustomTopic('') }}>
+                <span style={{ fontSize: '10px', color: 'var(--text3)', marginRight: '4px' }}>{s.subject}</span>
+                {s.topic}
+              </button>
+            ))}
+          </div>
+
+          <label className="field-label">Veya kendi konunu yaz</label>
+          <textarea className="input" rows={2}
+            placeholder="Örn: Güneş sistemi, Osmanlı kuruluşu, Fotosentez..."
+            value={customTopic} onChange={e => { setCustomTopic(e.target.value); setSelectedTopic('') }}
+            style={{ resize: 'none' }} />
+
+          {/* Dosya yükleme */}
+          <label className="field-label" style={{ marginTop: '16px' }}>Dosyadan soru üret</label>
+          <FileUploader onFilesChange={setUploadedFiles} maxFiles={5} maxMB={20} />
+          {hasFiles && (
+            <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--green)' }}>
+              ✓ {uploadedFiles.length} dosya hazır · {uploadedFiles.reduce((s, f) => s + f.content.split(' ').length, 0)} kelime · Sorular bu içeriklerden üretilecek
+            </div>
+          )}
+
+          {/* Zorluk */}
+          <label className="field-label" style={{ marginTop: '16px' }}>Zorluk seviyesi</label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginTop: '6px' }}>
+            {DIFFICULTIES.map(d => (
+              <button key={d.value} onClick={() => setDifficulty(d.value)}
+                style={{ padding: '10px 8px', borderRadius: '10px', border: `1.5px solid ${difficulty === d.value ? d.border : 'var(--border)'}`, background: difficulty === d.value ? d.bg : 'var(--bg2)', color: difficulty === d.value ? d.color : 'var(--text2)', fontSize: '13px', fontWeight: difficulty === d.value ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center' }}>
+                <div style={{ fontWeight: 600, marginBottom: '2px' }}>{d.label}</div>
+                <div style={{ fontSize: '11px', opacity: 0.75 }}>{d.desc}</div>
+              </button>
+            ))}
+          </div>
+
+          {/* Soru sayısı + görsel */}
+          <div style={{ display: 'flex', gap: '12px', marginTop: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1 }}>
+              <label className="field-label">Soru sayısı</label>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                {[5, 10, 15, ...(profile?.plan === 'premium' ? [20] : [])].map(n => (
+                  <button key={n} className={`btn btn-sm ${qCount === n ? 'btn-primary' : ''}`} onClick={() => setQCount(n)}>{n} soru</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="field-label">Görsel sorular</label>
+              <button onClick={() => setIncludeVisuals(v => !v)}
+                style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', border: `1.5px solid ${includeVisuals ? 'var(--accent)' : 'var(--border)'}`, background: includeVisuals ? 'var(--accent-bg)' : 'var(--bg2)', color: includeVisuals ? 'var(--accent)' : 'var(--text2)', fontSize: '13px', fontWeight: includeVisuals ? 600 : 400, transition: 'all 0.15s' }}>
+                {includeVisuals ? '📊 Grafik & SVG açık' : '📝 Sadece metin'}
+              </button>
+            </div>
+          </div>
+
+          {/* Özet */}
+          <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '13px', color: 'var(--text2)', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            <span>📝 {qCount} soru</span>
+            <span style={{ color: activeDiff.color }}>⚡ {activeDiff.label}</span>
+            <span>🌐 {currentLang}</span>
+            {hasFiles && <span style={{ color: 'var(--green)' }}>📎 {uploadedFiles.length} dosya</span>}
+            {includeVisuals && <span style={{ color: 'var(--accent)' }}>📊 Görsel</span>}
+          </div>
+
+          {topicErr && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{topicErr}</div>}
+
+          <button className="btn btn-primary btn-lg" onClick={startQuiz} disabled={testsLeft === 0}
+            style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', opacity: testsLeft === 0 ? 0.5 : 1 }}>
+            {testsLeft === 0 ? 'Test hakkın doldu — Yükselt' : 'Test oluştur ⚡'}
+          </button>
+
+          {testsLeft === 0 && (
+            <Link href="/pricing" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }}>
+              💎 Premium'a geç
+            </Link>
+          )}
+        </div>
+      </div>
+    </main>
+  )
+
+  // ── LOADING ──
+  if (screen === 'loading') return (
+    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div className="spinner" style={{ margin: '0 auto 1.25rem' }} />
+        <div style={{ fontWeight: 500, marginBottom: '0.4rem' }}>Sorular hazırlanıyor...</div>
+        <div style={{ fontSize: '13px', color: 'var(--text2)' }}>{loadMsg}</div>
+      </div>
+    </main>
+  )
+
+  // ── QUIZ ──
+  if (screen === 'quiz' && questions.length > 0) {
+    const q = questions[current]
+    const progPct = Math.round((current / questions.length) * 100)
+    const diff = DIFFICULTIES.find(d => d.value === difficulty)!
+    return (
+      <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
+        <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+            <span style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '0.05em' }}><span style={{ color: 'var(--accent)' }}>P</span>RATIUM</span>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '99px', background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600 }}>{diff.label}</span>
+              <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{answers.filter(a => a.correct).length}/{current} doğru</span>
+            </div>
+          </div>
+          <div className="progress-bar" style={{ marginBottom: '1.5rem' }}>
+            <div className="progress-fill" style={{ width: `${progPct}%` }} />
+          </div>
+          <div className="card anim-up">
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text3)', fontWeight: 500 }}>Soru {current + 1} / {questions.length}</span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {q.qtype === 'svg' && q.svg && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid rgba(91,76,245,0.2)' }}>📊 Görsel</span>}
+                <span style={{ fontSize: '11px', color: 'var(--text3)' }}>🌐 {currentLang}</span>
+              </div>
+            </div>
+            {q.qtype === 'svg' && q.svg && (
+              <div style={{ marginBottom: '1rem', padding: '1rem', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                <div dangerouslySetInnerHTML={{ __html: q.svg }} style={{ width: '100%' }} />
+              </div>
+            )}
+            <p style={{ fontSize: '17px', fontWeight: 500, lineHeight: 1.55, marginBottom: '1.5rem' }}>{q.q}</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {q.opts.map((opt, i) => {
+                let bg = 'var(--bg2)', border = 'var(--border)', color = 'var(--text)'
+                if (chosen !== null) {
+                  if (i === q.ans) { bg = 'var(--green-bg)'; border = 'rgba(22,163,74,0.35)'; color = 'var(--green)' }
+                  else if (i === chosen) { bg = 'var(--red-bg)'; border = 'rgba(220,38,38,0.35)'; color = 'var(--red)' }
+                }
+                return (
+                  <button key={i} onClick={() => choose(i)} disabled={chosen !== null}
+                    style={{ textAlign: 'left', padding: '12px 15px', borderRadius: '10px', border: `1.5px solid ${border}`, background: bg, color, font: '14px/1.45 "DM Sans",sans-serif', cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s' }}>
+                    <span style={{ fontWeight: 600, marginRight: '8px', opacity: 0.5 }}>{String.fromCharCode(65 + i)}.</span>{opt}
+                  </button>
+                )
+              })}
+            </div>
+            {chosen !== null && (
+              <>
+                <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', borderLeft: '3px solid var(--accent)', fontSize: '13px', color: 'var(--text2)', lineHeight: 1.65 }}>
+                  <strong style={{ color: chosen === q.ans ? 'var(--green)' : 'var(--red)' }}>{chosen === q.ans ? 'Doğru! ' : 'Yanlış. '}</strong>{q.exp}
+                </div>
+                <button className="btn btn-primary" onClick={next} style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}>
+                  {current + 1 < questions.length ? 'Sonraki soru →' : 'Sonuçları gör →'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  // ── RESULT ──
+  if (screen === 'result') {
+    const topic = customTopic.trim() || selectedTopic
+    return (
+      <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
+        <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+          <QuizResult
+            questions={questions}
+            answers={answers}
+            topic={topic}
+            difficulty={difficulty}
+            language={currentLang}
+            youtubeLinks={youtubeLinks}
+            onNewTest={() => { setScreen('topic'); setSelectedTopic(''); setCustomTopic('') }}
+          />
+        </div>
+      </main>
+    )
+  }
+  return null
 }

@@ -272,3 +272,10 @@ label.field-label {
 .glow-purple { box-shadow: 0 4px 20px rgba(91,76,245,0.2); }
 .glow-pink { box-shadow: 0 4px 20px rgba(236,72,153,0.2); }
 .glow-green { box-shadow: 0 4px 20px rgba(22,163,74,0.2); }
+
+/* Mobil alt navbar için otomatik padding */
+@media (max-width: 768px) {
+  main {
+    padding-bottom: 80px !important;
+  }
+}
