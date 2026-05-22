@@ -97,15 +97,15 @@ export default function Navbar() {
       <div style={{ height: '72px' }} />
       <nav style={{
         position: 'fixed', top: 0, left: 0, right: 0, height: '72px',
-        background: 'rgba(15,10,30,0.97)', backdropFilter: 'blur(16px)',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        background: 'rgba(7,18,32,0.97)', backdropFilter: 'blur(16px)',
+        borderBottom: '1px solid rgba(0,149,200,0.2)',
         boxShadow: '0 2px 20px rgba(0,0,0,0.3)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 1.25rem', zIndex: 1000,
       }}>
         {/* Logo + Slogan */}
         <Link href="/quiz" style={{ textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '72px', width: 'auto' }} />
+          <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '70px', width: 'auto' }} />
           <span className="desktop-only" style={{ fontSize: '13px', color: 'rgba(255,255,255,0.45)', fontWeight: 500, lineHeight: 1.4 }}>
             Pratik yap,<br />netlerini artır.
           </span>
@@ -117,7 +117,7 @@ export default function Navbar() {
           {/* Test hakkı — sadece desktop */}
           {testsLeft !== null && (
             <Link href="/pricing" style={{ textDecoration: 'none' }} className="desktop-only">
-              <span style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '99px', background: testsLeft <= 2 ? 'rgba(255,107,107,0.15)' : 'rgba(255,255,255,0.08)', color: testsLeft <= 2 ? '#FF6B6B' : 'rgba(255,255,255,0.6)', border: `1px solid ${testsLeft <= 2 ? 'rgba(255,107,107,0.3)' : 'rgba(255,255,255,0.1)'}`, whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '99px', background: testsLeft <= 2 ? 'rgba(255,107,107,0.15)' : 'rgba(255,255,255,0.08)', color: testsLeft <= 2 ? '#FF6B6B' : 'rgba(255,255,255,0.6)', border: `1px solid ${testsLeft <= 2 ? 'rgba(255,107,107,0.3)' : 'rgba(0,149,200,0.2)'}`, whiteSpace: 'nowrap' }}>
                 {testsLeft} test kaldı
               </span>
             </Link>
@@ -125,7 +125,7 @@ export default function Navbar() {
 
           {profile.plan === 'premium' && (
             <Link href="/pricing" style={{ textDecoration: 'none' }} className="desktop-only">
-              <span style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '99px', background: 'rgba(255,107,107,0.15)', color: '#FF6B6B', border: '1px solid rgba(255,107,107,0.3)', fontWeight: 600 }}>★ Premium</span>
+              <span style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '99px', background: 'rgba(0,149,200,0.15)', color: '#0095C8', border: '1px solid rgba(0,149,200,0.3)', fontWeight: 600 }}>★ Premium</span>
             </Link>
           )}
 
@@ -139,10 +139,10 @@ export default function Navbar() {
             {showLang && (
               <>
                 <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setShowLang(false)} />
-                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 99, background: '#1A0F3C', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '6px', minWidth: '150px', boxShadow: '0 8px 40px rgba(0,0,0,0.4)' }}>
+                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 99, background: '#071220', border: '1px solid rgba(0,149,200,0.2)', borderRadius: '12px', padding: '6px', minWidth: '150px', boxShadow: '0 8px 40px rgba(0,0,0,0.4)' }}>
                   {LANGS.map(l => (
                     <button key={l.code} onClick={() => saveLang(l.code)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '7px 10px', borderRadius: '8px', border: 'none', fontFamily: 'var(--font-sans)', background: profile.language === l.code ? 'rgba(255,107,107,0.15)' : 'transparent', color: profile.language === l.code ? '#FF6B6B' : 'rgba(255,255,255,0.7)', fontSize: '13px', cursor: 'pointer', fontWeight: profile.language === l.code ? 600 : 400 }}>
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '7px 10px', borderRadius: '8px', border: 'none', fontFamily: 'var(--font-sans)', background: profile.language === l.code ? 'rgba(0,149,200,0.15)' : 'transparent', color: profile.language === l.code ? '#0095C8' : 'rgba(255,255,255,0.7)', fontSize: '13px', cursor: 'pointer', fontWeight: profile.language === l.code ? 600 : 400 }}>
                       {l.flag} {l.code}
                     </button>
                   ))}
@@ -154,13 +154,13 @@ export default function Navbar() {
           {/* Avatar menü */}
           <div style={{ position: 'relative' }}>
             <button onClick={() => { setShowMenu(v => !v); setShowLang(false); setShowMobileNav(false) }}
-              style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg, #FF6B6B, #EC4899)', border: 'none', color: '#fff', fontWeight: 700, fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg, #0095C8, #00ADDF)', border: 'none', color: '#fff', fontWeight: 700, fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               {profile.name?.slice(0, 2).toUpperCase()}
             </button>
             {showMenu && (
               <>
                 <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setShowMenu(false)} />
-                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 99, background: '#1A0F3C', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '6px', minWidth: '210px', boxShadow: '0 8px 40px rgba(0,0,0,0.4)' }}>
+                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 99, background: '#071220', border: '1px solid rgba(0,149,200,0.2)', borderRadius: '12px', padding: '6px', minWidth: '210px', boxShadow: '0 8px 40px rgba(0,0,0,0.4)' }}>
                   <div style={{ padding: '10px 12px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: '6px' }}>
                     <div style={{ fontWeight: 600, fontSize: '13px', color: '#fff' }}>{profile.name}</div>
                     <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
@@ -175,9 +175,9 @@ export default function Navbar() {
                   </div>
                   {MENU_ITEMS.map(item => (
                     <Link key={item.href} href={item.href} onClick={() => setShowMenu(false)}
-                      style={{ display: 'block', padding: '8px 12px', borderRadius: '8px', fontSize: '13px', color: 'rgba(255,255,255,0.8)', textDecoration: 'none', background: pathname === item.href ? 'rgba(255,107,107,0.15)' : 'transparent' }}
+                      style={{ display: 'block', padding: '8px 12px', borderRadius: '8px', fontSize: '13px', color: 'rgba(255,255,255,0.8)', textDecoration: 'none', background: pathname === item.href ? 'rgba(0,149,200,0.15)' : 'transparent' }}
                       onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = pathname === item.href ? 'rgba(255,107,107,0.15)' : 'transparent')}>
+                      onMouseLeave={e => (e.currentTarget.style.background = pathname === item.href ? 'rgba(0,149,200,0.15)' : 'transparent')}>
                       {item.label}
                     </Link>
                   ))}
@@ -199,8 +199,8 @@ export default function Navbar() {
       {/* Mobile bottom nav */}
       <div className="mobile-bottom-nav" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 999,
-        background: 'rgba(15,10,30,0.97)', backdropFilter: 'blur(16px)',
-        borderTop: '1px solid rgba(255,255,255,0.08)',
+        background: 'rgba(7,18,32,0.97)', backdropFilter: 'blur(16px)',
+        borderTop: '1px solid rgba(0,149,200,0.15)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-around',
         padding: '8px 0 max(8px, env(safe-area-inset-bottom))',
       }}>
@@ -212,9 +212,9 @@ export default function Navbar() {
           { href: '/plan', label: 'Plan', icon: '📋' },
         ].map(item => (
           <Link key={item.href} href={item.href}
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textDecoration: 'none', padding: '4px 8px', borderRadius: '8px', minWidth: '52px', background: pathname === item.href ? 'rgba(255,107,107,0.15)' : 'transparent' }}>
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textDecoration: 'none', padding: '4px 8px', borderRadius: '8px', minWidth: '52px', background: pathname === item.href ? 'rgba(0,149,200,0.15)' : 'transparent' }}>
             <span style={{ fontSize: '20px', lineHeight: 1 }}>{item.icon}</span>
-            <span style={{ fontSize: '10px', color: pathname === item.href ? '#FF6B6B' : 'rgba(255,255,255,0.4)', fontWeight: pathname === item.href ? 600 : 400 }}>
+            <span style={{ fontSize: '10px', color: pathname === item.href ? '#0095C8' : 'rgba(255,255,255,0.4)', fontWeight: pathname === item.href ? 600 : 400 }}>
               {item.label}
             </span>
           </Link>

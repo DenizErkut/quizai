@@ -1,53 +1,49 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 680 280" role="img">
   <title>Pratium Logo</title>
-  <desc>Pratium platformu koyu tema logo</desc>
+  <desc>Pratium platformu mavi arka planlı logo</desc>
   <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0F0A1E"/>
-      <stop offset="100%" style="stop-color:#1A0F3C"/>
-    </linearGradient>
-    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#FF6B6B"/>
-      <stop offset="50%" style="stop-color:#EC4899"/>
-      <stop offset="100%" style="stop-color:#8B5CF6"/>
-    </linearGradient>
-    <linearGradient id="iconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FF6B6B"/>
-      <stop offset="100%" style="stop-color:#EC4899"/>
-    </linearGradient>
-    <radialGradient id="blob1" cx="30%" cy="40%" r="50%">
-      <stop offset="0%" style="stop-color:#FF6B6B;stop-opacity:0.15"/>
-      <stop offset="100%" style="stop-color:#FF6B6B;stop-opacity:0"/>
+    <radialGradient id="bgGlow" cx="30%" cy="50%" r="60%">
+      <stop offset="0%" style="stop-color:#00ADDF;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#0083B0;stop-opacity:1"/>
     </radialGradient>
-    <radialGradient id="blob2" cx="70%" cy="60%" r="50%">
-      <stop offset="0%" style="stop-color:#8B5CF6;stop-opacity:0.12"/>
-      <stop offset="100%" style="stop-color:#8B5CF6;stop-opacity:0"/>
+    <radialGradient id="bgGlow2" cx="80%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#0095C8;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#007AAB;stop-opacity:1"/>
     </radialGradient>
-    <filter id="softglow">
-      <feGaussianBlur stdDeviation="3" result="blur"/>
+    <radialGradient id="blob1" cx="20%" cy="40%" r="50%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.12"/>
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0"/>
+    </radialGradient>
+    <radialGradient id="blob2" cx="80%" cy="60%" r="50%">
+      <stop offset="0%" style="stop-color:#005880;stop-opacity:0.25"/>
+      <stop offset="100%" style="stop-color:#005880;stop-opacity:0"/>
+    </radialGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-  <rect width="680" height="280" fill="url(#bgGrad)" rx="20"/>
-  <ellipse cx="160" cy="140" rx="180" ry="140" fill="url(#blob1)"/>
-  <ellipse cx="520" cy="140" rx="180" ry="140" fill="url(#blob2)"/>
-  <rect x="60" y="0" width="560" height="2" rx="1" fill="url(#textGrad)" opacity="0.4"/>
-  <circle cx="160" cy="140" r="68" fill="none" stroke="url(#textGrad)" stroke-width="1" opacity="0.3"/>
-  <circle cx="160" cy="140" r="50" fill="none" stroke="#FF6B6B" stroke-width="1.5" opacity="0.5"/>
-  <circle cx="160" cy="140" r="28" fill="url(#iconGrad)" filter="url(#softglow)"/>
-  <circle cx="160" cy="140" r="28" fill="none" stroke="#FF6B6B" stroke-width="0.5" opacity="0.5"/>
-  <text x="160" y="150" text-anchor="middle" font-family="'Cavolini', cursive" font-size="30" fill="white" font-weight="400">p</text>
-  <circle cx="160" cy="72" r="4" fill="#FF6B6B" opacity="0.8"/>
-  <circle cx="160" cy="208" r="4" fill="#8B5CF6" opacity="0.8"/>
-  <circle cx="92" cy="140" r="4" fill="#EC4899" opacity="0.8"/>
-  <circle cx="228" cy="140" r="4" fill="#FF6B6B" opacity="0.8"/>
-  <circle cx="112" cy="92" r="2.5" fill="#FF6B6B" opacity="0.5"/>
-  <circle cx="208" cy="92" r="2.5" fill="#EC4899" opacity="0.5"/>
-  <circle cx="112" cy="188" r="2.5" fill="#8B5CF6" opacity="0.5"/>
-  <circle cx="208" cy="188" r="2.5" fill="#FF6B6B" opacity="0.5"/>
-  <text x="270" y="125" font-family="'Cavolini', cursive" font-size="72" fill="url(#textGrad)" font-weight="400" opacity="0.95">pratium</text>
-  <text x="272" y="168" font-family="'Plus Jakarta Sans', sans-serif" font-size="15" fill="rgba(255,255,255,0.35)" font-weight="500" letter-spacing="3">PRATIK YAP, NETLERINI ARTIR</text>
-  <rect x="272" y="182" width="320" height="1" rx="0.5" fill="url(#textGrad)" opacity="0.25"/>
-  <text x="272" y="210" font-family="'Plus Jakarta Sans', sans-serif" font-size="13" fill="rgba(255,255,255,0.2)" font-weight="400">pratium.com</text>
-  <rect x="60" y="278" width="560" height="2" rx="1" fill="url(#textGrad)" opacity="0.4"/>
+  <rect width="680" height="280" fill="url(#bgGlow)" rx="20"/>
+  <rect width="680" height="280" fill="url(#bgGlow2)" rx="20" opacity="0.5"/>
+  <ellipse cx="150" cy="130" rx="200" ry="160" fill="url(#blob1)"/>
+  <ellipse cx="540" cy="160" rx="180" ry="140" fill="url(#blob2)"/>
+  <rect x="60" y="2" width="560" height="1.5" rx="1" fill="white" opacity="0.25"/>
+  <circle cx="155" cy="140" r="72" fill="none" stroke="white" stroke-width="1" opacity="0.15"/>
+  <circle cx="155" cy="140" r="54" fill="none" stroke="white" stroke-width="1.5" opacity="0.30"/>
+  <circle cx="155" cy="140" r="32" fill="white" opacity="0.95" filter="url(#glow)"/>
+  <circle cx="155" cy="140" r="32" fill="none" stroke="white" stroke-width="0.5" opacity="0.5"/>
+  <text x="155" y="153" text-anchor="middle" font-family="'Cavolini', cursive" font-size="34" fill="#0095C8" font-weight="400">p</text>
+  <circle cx="155" cy="68" r="5" fill="white" opacity="0.8"/>
+  <circle cx="155" cy="212" r="5" fill="white" opacity="0.6"/>
+  <circle cx="83" cy="140" r="5" fill="white" opacity="0.8"/>
+  <circle cx="227" cy="140" r="5" fill="white" opacity="0.6"/>
+  <circle cx="105" cy="90" r="3" fill="white" opacity="0.4"/>
+  <circle cx="205" cy="90" r="3" fill="white" opacity="0.4"/>
+  <circle cx="105" cy="190" r="3" fill="white" opacity="0.4"/>
+  <circle cx="205" cy="190" r="3" fill="white" opacity="0.4"/>
+  <text x="265" y="130" font-family="'Cavolini', cursive" font-size="74" fill="white" font-weight="400" opacity="0.97">pratium</text>
+  <text x="267" y="172" font-family="'Plus Jakarta Sans', sans-serif" font-size="14" fill="rgba(255,255,255,0.55)" font-weight="600" letter-spacing="3.5">PRATIK YAP, NETLERINI ARTIR</text>
+  <rect x="267" y="186" width="330" height="1" rx="0.5" fill="white" opacity="0.2"/>
+  <text x="267" y="213" font-family="'Plus Jakarta Sans', sans-serif" font-size="13" fill="rgba(255,255,255,0.35)" font-weight="400">pratium.com</text>
+  <rect x="60" y="276" width="560" height="1.5" rx="1" fill="white" opacity="0.25"/>
 </svg>

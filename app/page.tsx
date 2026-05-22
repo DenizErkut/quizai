@@ -6,10 +6,10 @@ import { createClient } from '@/lib/supabase/client'
 
 const features = [
   { icon: '⚡', title: 'Anlık soru üretimi', desc: 'Konunu yaz, 10 saniyede sınıfına özel sorular hazır.', color: '#FF6B6B', bg: 'rgba(255,107,107,0.12)' },
-  { icon: '🎯', title: 'Sana özel zorluk', desc: 'AI sınıfını, yaşını ve geçmiş skorunu analiz eder.', color: '#EC4899', bg: 'rgba(236,72,153,0.12)' },
+  { icon: '🎯', title: 'Sana özel zorluk', desc: 'AI sınıfını, yaşını ve geçmiş skorunu analiz eder.', color: '#EC4899', bg: 'rgba(0,173,223,0.10)' },
   { icon: '🌍', title: 'Çoklu dil desteği', desc: 'Türkçe, İngilizce, Almanca ve daha fazlası.', color: '#16A34A', bg: 'rgba(22,163,74,0.12)' },
   { icon: '📊', title: 'Gelişim takibi', desc: 'Her testin skoru kaydedilir, zayıf konular analiz edilir.', color: '#D97706', bg: 'rgba(217,119,6,0.12)' },
-  { icon: '📋', title: '4 Haftalık Plan', desc: 'AI test geçmişini analiz ederek kişisel plan hazırlar.', color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)' },
+  { icon: '📋', title: '4 Haftalık Plan', desc: 'AI test geçmişini analiz ederek kişisel plan hazırlar.', color: '#8B5CF6', bg: 'rgba(0,198,240,0.08)' },
   { icon: '🔥', title: 'Streak sistemi', desc: 'Günlük testlerle seriyi koru, liderboard\'da yüksel.', color: '#FF8E53', bg: 'rgba(255,142,83,0.12)' },
 ]
 
@@ -35,7 +35,7 @@ export default function LandingPage() {
   }, [])
 
   if (checking) return (
-    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0F0A1E' }}>
+    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#071220' }}>
       <div className="spinner" />
     </main>
   )
@@ -70,17 +70,17 @@ export default function LandingPage() {
 
       {/* ── HERO ── */}
       <section style={{
-        background: 'linear-gradient(180deg, #0F0A1E 0%, #1A0F3C 60%, #0F0A1E 100%)',
+        background: 'linear-gradient(180deg, #071220 0%, #0A1E2C 60%, #071220 100%)',
         padding: '6rem 1.5rem 5rem', textAlign: 'center', position: 'relative', overflow: 'hidden',
       }}>
         {/* Dekoratif blob'lar */}
-        <div style={{ position: 'absolute', top: '-100px', left: '50%', transform: 'translateX(-50%)', width: '600px', height: '600px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,107,107,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: '0', left: '10%', width: '300px', height: '300px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(236,72,153,0.12) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: '0', right: '10%', width: '300px', height: '300px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: '-100px', left: '50%', transform: 'translateX(-50%)', width: '600px', height: '600px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,149,200,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: '0', left: '10%', width: '300px', height: '300px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,173,223,0.10) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: '0', right: '10%', width: '300px', height: '300px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,198,240,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
         <div style={{ position: 'relative', zIndex: 1 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(255,107,107,0.15)', border: '1px solid rgba(255,107,107,0.3)', borderRadius: '99px', padding: '6px 16px', marginBottom: '2rem' }}>
-            <span style={{ fontSize: '12px', color: '#FF6B6B', fontWeight: 700, letterSpacing: '0.05em' }}>✨ AI DESTEKLİ SORU BANKASI</span>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(0,149,200,0.15)', border: '1px solid rgba(255,107,107,0.3)', borderRadius: '99px', padding: '6px 16px', marginBottom: '2rem' }}>
+            <span style={{ fontSize: '12px', color: '#00C6F0', fontWeight: 700, letterSpacing: '0.05em' }}>✨ AI DESTEKLİ SORU BANKASI</span>
           </div>
 
           <h1 className="serif" style={{
@@ -91,7 +91,7 @@ export default function LandingPage() {
           </h1>
           <h1 className="serif" style={{
             fontSize: 'clamp(2.8rem, 7vw, 5.5rem)', lineHeight: 1.1,
-            background: 'linear-gradient(135deg, #FF6B6B, #EC4899, #8B5CF6)',
+            background: 'linear-gradient(135deg, #0095C8, #00ADDF, #00C6F0)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             backgroundClip: 'text', marginBottom: '1.5rem',
           }}>
@@ -142,10 +142,10 @@ export default function LandingPage() {
       </section>
 
       {/* ── ÖZELLIKLER ── */}
-      <section style={{ padding: '5rem 1.5rem', background: '#fafafa' }}>
+      <section style={{ padding: '5rem 1.5rem', background: '#f0f9ff' }}>
         <div style={{ maxWidth: '960px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#FF6B6B', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '12px' }}>Neden Pratium?</div>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: '#0095C8', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '12px' }}>Neden Pratium?</div>
             <h2 className="serif" style={{ fontSize: 'clamp(1.8rem, 4vw, 3rem)', color: '#1E1B3A', margin: 0 }}>
               Her öğrenciye özel deneyim
             </h2>
@@ -170,9 +170,9 @@ export default function LandingPage() {
       </section>
 
       {/* ── NASIL ÇALIŞIR ── */}
-      <section style={{ padding: '5rem 1.5rem', background: '#0F0A1E' }}>
+      <section style={{ padding: '5rem 1.5rem', background: '#071220' }}>
         <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
-          <div style={{ fontSize: '12px', fontWeight: 700, color: '#FF6B6B', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '12px' }}>Nasıl çalışır?</div>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: '#0095C8', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '12px' }}>Nasıl çalışır?</div>
           <h2 className="serif" style={{ fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', color: '#fff', marginBottom: '3rem' }}>
             3 adımda başla
           </h2>
@@ -183,7 +183,7 @@ export default function LandingPage() {
               { n: '3', icon: '📈', title: 'Gelişimini takip et', desc: 'Analiz ve gelişim planınla ilerle' },
             ].map((s, i) => (
               <div key={i} style={{ textAlign: 'center' }}>
-                <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg, #FF6B6B, #EC4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', margin: '0 auto 16px', boxShadow: '0 8px 24px rgba(255,107,107,0.3)' }}>
+                <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#0095C8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', margin: '0 auto 16px', boxShadow: '0 8px 24px rgba(0,149,200,0.35)' }}>
                   {s.icon}
                 </div>
                 <div style={{ fontWeight: 700, fontSize: '16px', color: '#fff', marginBottom: '8px' }}>{s.title}</div>
@@ -198,7 +198,7 @@ export default function LandingPage() {
       <section style={{ padding: '5rem 1.5rem', background: '#fff' }}>
         <div style={{ maxWidth: '720px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#FF6B6B', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '12px' }}>SSS</div>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: '#0095C8', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '12px' }}>SSS</div>
             <h2 className="serif" style={{ fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', color: '#1E1B3A', margin: 0 }}>
               Sık sorulan sorular
             </h2>
@@ -208,9 +208,9 @@ export default function LandingPage() {
               <div key={i} style={{ borderRadius: '16px', border: `1.5px solid ${openFaq === i ? 'rgba(255,107,107,0.3)' : 'rgba(0,0,0,0.07)'}`, overflow: 'hidden', transition: 'border-color 0.2s' }}>
                 <button
                   onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem 1.5rem', background: openFaq === i ? 'rgba(255,107,107,0.04)' : '#fff', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-sans)' }}>
+                  style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem 1.5rem', background: openFaq === i ? 'rgba(0,149,200,0.04)' : '#fff', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-sans)' }}>
                   <span style={{ fontWeight: 600, fontSize: '15px', color: '#1E1B3A' }}>{faq.q}</span>
-                  <span style={{ fontSize: '20px', color: '#FF6B6B', flexShrink: 0, marginLeft: '12px', transform: openFaq === i ? 'rotate(45deg)' : 'none', transition: 'transform 0.2s' }}>+</span>
+                  <span style={{ fontSize: '20px', color: '#0095C8', flexShrink: 0, marginLeft: '12px', transform: openFaq === i ? 'rotate(45deg)' : 'none', transition: 'transform 0.2s' }}>+</span>
                 </button>
                 {openFaq === i && (
                   <div style={{ padding: '0 1.5rem 1.25rem', fontSize: '14px', color: '#6B7280', lineHeight: 1.8 }}>
@@ -224,7 +224,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── CTA ── */}
-      <section style={{ padding: '5rem 1.5rem', background: 'linear-gradient(135deg, #0F0A1E 0%, #1A0F3C 100%)', textAlign: 'center' }}>
+      <section style={{ padding: '5rem 1.5rem', background: 'linear-gradient(135deg, #071220 0%, #0A1E2C 100%)', textAlign: 'center' }}>
         <h2 className="serif" style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)', color: '#fff', marginBottom: '1rem' }}>
           Hemen dene, ücretsiz!
         </h2>
@@ -232,21 +232,21 @@ export default function LandingPage() {
           Kayıt ol, profilini oluştur, ilk testini al.
         </p>
         <Link href="/register" style={{
-          display: 'inline-block', background: 'linear-gradient(135deg, #FF6B6B, #EC4899)',
+          display: 'inline-block', background: '#0095C8',
           color: '#fff', textDecoration: 'none', fontSize: '16px', fontWeight: 700,
           padding: '16px 40px', borderRadius: '99px',
-          boxShadow: '0 8px 32px rgba(255,107,107,0.4)',
+          boxShadow: '0 8px 32px rgba(0,149,200,0.4)',
         }}>
           Ücretsiz hesap oluştur →
         </Link>
       </section>
 
       {/* ── FOOTER ── */}
-      <footer style={{ background: '#080512', padding: '3rem 2rem 2rem', color: 'rgba(255,255,255,0.5)' }}>
+      <footer style={{ background: '#040D18', padding: '3rem 2rem 2rem', color: 'rgba(255,255,255,0.5)' }}>
         <div style={{ maxWidth: '960px', margin: '0 auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '2rem', marginBottom: '3rem' }}>
             <div>
-              <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '60px', marginBottom: '12px' }} />
+              <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '56px', marginBottom: '12px' }} />
               <p style={{ fontSize: '13px', lineHeight: 1.7, margin: 0 }}>Yapay zeka destekli kişiselleştirilmiş test platformu.</p>
               <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
                 {[
@@ -261,7 +261,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: '#FF6B6B', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '16px' }}>Platform</div>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#0095C8', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '16px' }}>Platform</div>
               {['Quiz', 'Günlük test', 'Analiz', 'Gelişim planı', 'Sıralama'].map((l, i) => (
                 <div key={i} style={{ marginBottom: '10px' }}>
                   <Link href={`/${l.toLowerCase().replace(' ', '-')}`} style={{ color: 'rgba(255,255,255,0.5)', textDecoration: 'none', fontSize: '14px' }}>{l}</Link>
@@ -269,7 +269,7 @@ export default function LandingPage() {
               ))}
             </div>
             <div>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: '#FF6B6B', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '16px' }}>Hesap</div>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#0095C8', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '16px' }}>Hesap</div>
               {[['Kayıt ol', '/register'], ['Giriş yap', '/login'], ['Premium', '/pricing'], ['Davet et', '/referral']].map(([l, h], i) => (
                 <div key={i} style={{ marginBottom: '10px' }}>
                   <Link href={h} style={{ color: 'rgba(255,255,255,0.5)', textDecoration: 'none', fontSize: '14px' }}>{l}</Link>
@@ -277,7 +277,7 @@ export default function LandingPage() {
               ))}
             </div>
             <div>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: '#FF6B6B', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '16px' }}>Yasal</div>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#0095C8', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '16px' }}>Yasal</div>
               {[['Gizlilik Politikası', '/privacy'], ['Kullanım Şartları', '/terms'], ['KVKK', '/privacy']].map(([l, h], i) => (
                 <div key={i} style={{ marginBottom: '10px' }}>
                   <Link href={h} style={{ color: 'rgba(255,255,255,0.5)', textDecoration: 'none', fontSize: '14px' }}>{l}</Link>
