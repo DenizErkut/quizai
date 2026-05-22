@@ -213,7 +213,7 @@ export default function QuizPage() {
 
   // ── LIMIT ──
   if (screen === 'limit') return (
-    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
+    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', paddingBottom: '5rem', background: 'var(--bg)' }}>
       <div style={{ maxWidth: '460px', textAlign: 'center' }} className="anim-up">
         <div style={{ fontSize: '56px', marginBottom: '1.25rem' }}>📚</div>
         <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>Bu ayki test hakkın doldu</h2>
@@ -241,7 +241,7 @@ export default function QuizPage() {
 
   // ── TOPIC ──
   if (screen === 'topic') return (
-    <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
+    <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', background: 'var(--bg)' }}>
       <div style={{ maxWidth: '640px', margin: '0 auto' }}>
 
         {profile && (
@@ -389,7 +389,7 @@ export default function QuizPage() {
     const progPct = Math.round((current / questions.length) * 100)
     const diff = DIFFICULTIES.find(d => d.value === difficulty)!
     return (
-      <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
+      <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', background: 'var(--bg)' }}>
         <div style={{ maxWidth: '640px', margin: '0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
             <span style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '0.05em' }}><span style={{ color: 'var(--accent)' }}>P</span>RATIUM</span>
@@ -450,7 +450,7 @@ export default function QuizPage() {
   if (screen === 'result') {
     const topic = customTopic.trim() || selectedTopic
     return (
-      <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
+      <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', background: 'var(--bg)' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
           <QuizResult
             questions={questions}
