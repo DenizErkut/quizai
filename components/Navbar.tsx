@@ -106,8 +106,8 @@ export default function Navbar() {
         {/* Logo + Slogan */}
         <Link href="/quiz" style={{ textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img src="/pratium-logo.png" alt="Pratium" style={{ height: '52px', width: 'auto' }} />
-          <span className="serif desktop-only" style={{ fontSize: '22px', color: 'var(--accent)', letterSpacing: '-0.5px' }}>
-            prat<span style={{ color: 'var(--pink)' }}>ium</span>
+          <span className="desktop-only" style={{ fontSize: '13px', color: 'var(--text2)', fontWeight: 500, lineHeight: 1.4 }}>
+            Pratik yap,<br />netlerini artır.
           </span>
         </Link>
 
