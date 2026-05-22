@@ -59,7 +59,7 @@ export default function LandingPage() {
             Giriş yap
           </Link>
           <Link href="/register" style={{
-            background: 'linear-gradient(135deg, #FF6B6B, #EC4899)',
+            background: '#0095C8',
             color: '#fff', textDecoration: 'none', fontSize: '14px', fontWeight: 700,
             padding: '10px 22px', borderRadius: '99px', whiteSpace: 'nowrap',
           }}>
@@ -108,10 +108,10 @@ export default function LandingPage() {
 
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '4rem' }}>
             <Link href="/register" style={{
-              background: 'linear-gradient(135deg, #FF6B6B, #EC4899)',
+              background: '#0095C8',
               color: '#fff', textDecoration: 'none', fontSize: '16px', fontWeight: 700,
               padding: '14px 32px', borderRadius: '99px',
-              boxShadow: '0 8px 32px rgba(255,107,107,0.35)',
+              boxShadow: '0 8px 32px rgba(0,149,200,0.35)',
             }}>
               Ücretsiz başla →
             </Link>
