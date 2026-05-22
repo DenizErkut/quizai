@@ -88,6 +88,7 @@ export default function Navbar() {
     { label: '✏️ Profil düzenle', href: '/profile/edit' },
     { label: '💎 Planlar', href: '/pricing' },
     { label: '🎁 Davet et & kazan', href: '/referral' },
+    { label: '🔑 Şifremi değiştir', href: '/auth/reset-password' },
   ]
 
   return (
