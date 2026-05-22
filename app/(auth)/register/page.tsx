@@ -41,6 +41,7 @@ function RegisterContent() {
   const [instagram, setInstagram] = useState('')
   const [tiktok, setTiktok] = useState('')
   const [showOptional, setShowOptional] = useState(false)
+  const [kvkk, setKvkk] = useState(false)
 
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -62,6 +63,7 @@ function RegisterContent() {
     if (!grade) { setError('Sınıf / eğitim seviyesi zorunludur.'); return }
     if (!email.trim()) { setError('E-posta zorunludur.'); return }
     if (pass.length < 6) { setError('Şifre en az 6 karakter olmalıdır.'); return }
+    if (!kvkk) { setError('Devam etmek için Gizlilik Politikası ve KVKK metnini kabul etmelisiniz.'); return }
 
     setError(''); setLoading(true)
     const fullName = `${name.trim()} ${surname.trim()}`
@@ -207,8 +209,22 @@ function RegisterContent() {
             </div>
           )}
 
-          <button className="btn btn-primary" onClick={handleRegister} disabled={loading}
-            style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem' }}>
+          {/* KVKK Onay */}
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginTop: '1rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={kvkk}
+              onChange={e => setKvkk(e.target.checked)}
+              style={{ marginTop: '2px', accentColor: 'var(--accent)', width: '16px', height: '16px', flexShrink: 0, cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: '12px', color: 'var(--text2)', lineHeight: 1.6 }}>
+              <a href="/privacy" target="_blank" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>Gizlilik Politikası</a>'nı ve{' '}
+              <a href="/privacy" target="_blank" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>KVKK Aydınlatma Metni</a>'ni okudum, kişisel verilerimin işlenmesine açık rıza veriyorum.
+            </span>
+          </label>
+
+          <button className="btn btn-primary" onClick={handleRegister} disabled={loading || !kvkk}
+            style={{ width: '100%', justifyContent: 'center', marginTop: '0.75rem', opacity: kvkk ? 1 : 0.6 }}>
             {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Hesap oluştur →'}
           </button>
 
@@ -218,9 +234,7 @@ function RegisterContent() {
           </Link>
         </div>
 
-        <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text3)', marginTop: '1rem' }}>
-          Kayıt olarak Kullanım Şartları'nı kabul etmiş olursun.
-        </p>
+
       </div>
     </main>
   )
