@@ -86,6 +86,7 @@ export default function Navbar() {
     { label: '📋 Gelişim planı', href: '/plan' },
     { label: '🏆 Sıralama', href: '/leaderboard' },
     { label: '✏️ Profil düzenle', href: '/profile/edit' },
+    { label: '📝 Notlarım', href: '/notes' },
     { label: '💎 Planlar', href: '/pricing' },
     { label: '🎁 Davet et & kazan', href: '/referral' },
     { label: '🔑 Şifremi değiştir', href: '/auth/reset-password' },

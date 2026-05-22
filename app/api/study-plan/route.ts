@@ -25,6 +25,15 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { weakTopics, avgPct, totalTests } = body
 
+  // Kullanicinin notlarini cek
+  const { data: notesData } = await supabase
+    .from('user_notes')
+    .select('content')
+    .eq('user_id', user.id)
+    .order('updated_at', { ascending: false })
+    .limit(5)
+  const userNotes = notesData?.map((n: any) => n.content).join('\n---\n') || ''
+
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-5',
     max_tokens: 1500,
@@ -35,6 +44,7 @@ Profil: ${profile?.grade}
 Ortalama basari: %${avgPct}
 Toplam test: ${totalTests}
 Zayif konular: ${weakTopics || 'Henuz belirlenmedi'}
+Kullanicinin kendi notlari (MUTLAKA dikkate al): ${userNotes || 'Not girilmemis'}
 Dil: ${profile?.language || 'Turkce'}
 
 SADECE JSON don:
