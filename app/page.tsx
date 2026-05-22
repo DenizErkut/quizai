@@ -51,7 +51,7 @@ export default function LandingPage() {
         boxShadow: '0 2px 20px rgba(91,76,245,0.06)',
       }}>
         <Link href="/" style={{ textDecoration: 'none', display: 'inline-block' }}>
-          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '52px', width: 'auto' }} />
+          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '80px', width: 'auto' }} />
         </Link>
         <div style={{ display: 'flex', gap: '10px' }}>
           <Link href="/login" className="btn btn-ghost btn-sm">Giriş yap</Link>
