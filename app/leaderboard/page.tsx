@@ -13,13 +13,13 @@ interface Badge {
 }
 
 const BADGE_DEFS: Record<string, { icon: string; label: string; desc: string; color: string }> = {
-  first_test:      { icon: '⚡', label: 'İlk Test',       desc: 'İlk testini tamamladın',              color: '#0095C8' },
+  first_test:      { icon: '⚡', label: 'İlk Test',       desc: 'İlk testini tamamladın',              color: '#1ECFB8' },
   perfect_score:   { icon: '💯', label: 'Mükemmel',       desc: '100% başarı elde ettin',              color: '#F59E0B' },
   streak_3:        { icon: '🔥', label: '3 Günlük Seri',  desc: '3 gün üst üste test çözdün',          color: '#EF4444' },
   streak_7:        { icon: '🏆', label: 'Haftalık Seri',  desc: '7 gün üst üste test çözdün',          color: '#8B5CF6' },
   streak_30:       { icon: '👑', label: 'Aylık Seri',     desc: '30 gün üst üste test çözdün',         color: '#F59E0B' },
   tests_10:        { icon: '📚', label: '10 Test',        desc: '10 test tamamladın',                  color: '#16A34A' },
-  tests_50:        { icon: '🎓', label: '50 Test',        desc: '50 test tamamladın',                  color: '#0095C8' },
+  tests_50:        { icon: '🎓', label: '50 Test',        desc: '50 test tamamladın',                  color: '#1ECFB8' },
   tests_100:       { icon: '🌟', label: '100 Test',       desc: '100 test tamamladın',                 color: '#F59E0B' },
   high_score_80:   { icon: '🎯', label: 'Keskin Nişancı', desc: 'Ortalama %80+ başarı',                color: '#EC4899' },
   plan_complete:   { icon: '📋', label: 'Plancı',         desc: 'Gelişim planını tamamladın',          color: '#16A34A' },
@@ -139,7 +139,7 @@ export default function LeaderboardPage() {
 
             {/* Kendi sıran */}
             {myFiltered && (
-              <div className="card anim-up-1" style={{ marginBottom: '1rem', background: 'var(--accent-bg)', border: '1.5px solid rgba(0,149,200,0.25)' }}>
+              <div className="card anim-up-1" style={{ marginBottom: '1rem', background: 'var(--accent-bg)', border: '1.5px solid rgba(30,207,184,0.25)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--accent)', minWidth: '40px', textAlign: 'center' }}>
                     {medalEmoji(myFiltered.rank)}
@@ -179,11 +179,11 @@ export default function LeaderboardPage() {
                   <div key={e.id} style={{
                     padding: '16px 10px', borderRadius: '14px', textAlign: 'center',
                     background: i === 1 ? 'linear-gradient(135deg, #071220, #0A1E2C)' : 'var(--bg2)',
-                    border: `1.5px solid ${i === 1 ? 'rgba(0,149,200,0.4)' : 'var(--border)'}`,
+                    border: `1.5px solid ${i === 1 ? 'rgba(30,207,184,0.4)' : 'var(--border)'}`,
                   }}>
                     <div style={{ fontSize: i === 1 ? '38px' : '28px' }}>{i === 1 ? '🥇' : i === 0 ? '🥈' : '🥉'}</div>
                     <div style={{ fontSize: '13px', fontWeight: 600, marginTop: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: i === 1 ? '#fff' : 'var(--text)' }}>{e.name}</div>
-                    <div style={{ fontSize: '20px', fontWeight: 700, color: i === 1 ? '#0095C8' : 'var(--text)', marginTop: '4px' }}>{e.points}</div>
+                    <div style={{ fontSize: '20px', fontWeight: 700, color: i === 1 ? '#1ECFB8' : 'var(--text)', marginTop: '4px' }}>{e.points}</div>
                     <div style={{ fontSize: '10px', color: i === 1 ? 'rgba(255,255,255,0.5)' : 'var(--text3)' }}>puan</div>
                   </div>
                 ))}

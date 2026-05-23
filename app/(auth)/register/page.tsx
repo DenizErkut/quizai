@@ -118,7 +118,7 @@ function RegisterContent() {
 
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }} className="anim-up">
           <Link href="/" style={{ textDecoration: 'none', display: 'inline-block' }}>
-            <img src="/pratium-logo.png" alt="Pratium" style={{ height: '64px', width: 'auto' }} />
+            <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '64px', width: 'auto' }} />
           </Link>
         </div>
 

@@ -8,7 +8,7 @@ export default function TermsPage() {
 
         <div style={{ marginBottom: '2rem' }}>
           <Link href="/" style={{ textDecoration: 'none', display: 'inline-block', marginBottom: '1.5rem' }}>
-            <img src="/pratium-logo.png" alt="Pratium" style={{ height: '52px' }} />
+            <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '52px' }} />
           </Link>
           <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>Yasal</div>
           <h1 className="serif" style={{ fontSize: '28px', marginBottom: '0.5rem' }}>Kullanım Şartları</h1>

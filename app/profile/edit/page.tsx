@@ -117,8 +117,8 @@ export default function ProfileEditPage() {
 
         {/* Nav */}
         <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
-          <Link href="/" className="serif" style={{ fontSize: '20px', textDecoration: 'none', color: 'var(--text)' }}>
-            Quiz<span style={{ color: 'var(--accent)' }}>AI</span>
+          <Link href="/">
+            <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '36px' }} />
           </Link>
           <div style={{ display: 'flex', gap: '8px' }}>
             <Link href="/quiz" className="btn btn-ghost btn-sm">← Testler</Link>

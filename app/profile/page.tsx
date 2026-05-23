@@ -84,7 +84,7 @@ export default function ProfileSetupPage() {
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '64px' }} />
+          <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '64px' }} />
         </div>
 
         <div className="card anim-up">

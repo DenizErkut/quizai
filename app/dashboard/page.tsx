@@ -55,7 +55,7 @@ export default function DashboardPage() {
 
         {/* Nav */}
         <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
-          <span className="serif" style={{ fontSize: '20px' }}>Quiz<span style={{ color: 'var(--accent)' }}>AI</span></span>
+          <span className="serif" style={{ fontSize: '20px' }}>pratium</span>
           <div style={{ display: 'flex', gap: '8px' }}>
             <Link href="/quiz" className="btn btn-primary btn-sm">Yeni test ⚡</Link>
             <button className="btn btn-ghost btn-sm" onClick={async () => { await createClient().auth.signOut(); router.push('/') }}>Çıkış</button>

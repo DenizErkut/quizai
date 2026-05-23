@@ -52,7 +52,7 @@ export default function LoginPage() {
       <div style={{ width: '100%', maxWidth: '400px' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }} className="anim-up">
           <Link href="/" style={{ textDecoration: 'none', display: 'inline-block' }}>
-            <img src="/pratium-logo.png" alt="Pratium" style={{ height: '72px', width: 'auto' }} />
+            <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '72px', width: 'auto' }} />
           </Link>
         </div>
 

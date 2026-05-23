@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 400 80" role="img">
+  <title>Pratium Logo</title>
+  <desc>Pratium transparan logo</desc>
+  <defs>
+    <linearGradient id="iconG" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00C6F0"/>
+      <stop offset="100%" style="stop-color:#0095C8"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <circle cx="36" cy="40" r="28" fill="none" stroke="#0095C8" stroke-width="1.5" opacity="0.4"/>
+  <circle cx="36" cy="40" r="20" fill="none" stroke="#0095C8" stroke-width="1.2" opacity="0.6"/>
+  <circle cx="36" cy="40" r="12" fill="url(#iconG)" filter="url(#glow)" opacity="0.95"/>
+  <text x="36" y="46" text-anchor="middle" font-family="'Cavolini', cursive" font-size="14" fill="white" font-weight="400">p</text>
+  <circle cx="36" cy="12" r="3" fill="#0095C8" opacity="0.7"/>
+  <circle cx="36" cy="68" r="3" fill="#00C6F0" opacity="0.7"/>
+  <circle cx="8"  cy="40" r="3" fill="#0095C8" opacity="0.7"/>
+  <circle cx="64" cy="40" r="3" fill="#00C6F0" opacity="0.7"/>
+  <text x="82" y="50" font-family="'Cavolini', cursive" font-size="36" fill="white" font-weight="400">pratium</text>
+</svg>

@@ -166,7 +166,7 @@ export default function TeacherDashboard() {
               style={{ textDecoration: 'none' }}
             >
               <div className="card" style={{ cursor: 'pointer', transition: 'all 0.15s' }}
-                onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(0,149,200,0.4)')}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(30,207,184,0.4)')}
                 onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
               >
                 <div style={{ fontSize: '24px', marginBottom: '8px' }}>{item.icon}</div>

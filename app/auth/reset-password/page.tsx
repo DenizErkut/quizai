@@ -35,7 +35,7 @@ export default function ResetPasswordPage() {
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
       <div style={{ width: '100%', maxWidth: '400px' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <img src="/pratium-logo.png" alt="Pratium" style={{ height: '64px' }} />
+          <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '64px' }} />
         </div>
 
         <div className="card anim-up">

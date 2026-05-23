@@ -102,8 +102,8 @@ export default function TeacherStudentsPage() {
               style={{
                 padding: '7px 14px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer',
                 border: '1.5px solid', fontFamily: 'var(--font-sans)', fontWeight: 500,
-                background: selectedClass === c.id ? 'rgba(0,149,200,0.1)' : 'var(--bg2)',
-                borderColor: selectedClass === c.id ? 'rgba(0,149,200,0.4)' : 'var(--border)',
+                background: selectedClass === c.id ? 'rgba(30,207,184,0.1)' : 'var(--bg2)',
+                borderColor: selectedClass === c.id ? 'rgba(30,207,184,0.4)' : 'var(--border)',
                 color: selectedClass === c.id ? 'var(--accent)' : 'var(--text)',
               }}
             >
