@@ -101,7 +101,118 @@ export default function Navbar() {
 
   return (
     <>
-      <div style={{ height: '90px' }} />
+      <style>{`
+        .nav-spacer { height: 90px; }
+        @media (max-width: 768px) { .nav-spacer { height: 58px; } }
+      `}</style>
+      <div className="nav-spacer" />
+
+      {/* ── MOBILE TOP BAR ── */}
+      <div className="mobile-only" style={{
+        position: 'fixed', top: 0, left: 0, right: 0, height: '58px',
+        background: '#082465', zIndex: 1000,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 14px',
+        boxShadow: '0 2px 12px rgba(8,36,101,0.3)',
+      }}>
+        {/* Logo */}
+        <Link href="/quiz" style={{ flexShrink: 0 }}>
+          <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '36px', filter: 'brightness(0) invert(1)' }} />
+        </Link>
+
+        {/* Sağ: bildirim + dil + avatar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+
+          {/* Bildirim çanı */}
+          <a href="/notifications" onClick={() => setUnreadCount(0)} style={{
+            position: 'relative', width: 34, height: 34, borderRadius: '8px',
+            background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            textDecoration: 'none',
+          }}>
+            <span style={{ fontSize: '17px' }}>🔔</span>
+            {unreadCount > 0 && (
+              <span style={{
+                position: 'absolute', top: -4, right: -4,
+                width: 17, height: 17, borderRadius: '50%',
+                background: '#fdd31d', color: '#082465',
+                fontSize: '9px', fontWeight: 800,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: '2px solid #082465',
+              }}>
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </a>
+
+          {/* Dil seçici */}
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => { setShowLang(v => !v); setShowMenu(false) }}
+              style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '7px 9px', borderRadius: '8px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: '13px', fontFamily: 'inherit' }}>
+              <span>{activeLang.flag}</span>
+              <span style={{ fontSize: '9px', opacity: 0.6 }}>▾</span>
+            </button>
+            {showLang && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setShowLang(false)} />
+                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '6px', minWidth: '155px', boxShadow: '0 8px 32px rgba(8,36,101,0.2)' }}>
+                  {LANGS.map(l => (
+                    <button key={l.code} onClick={() => saveLang(l.code)} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', borderRadius: '8px', border: 'none', background: profile.language === l.code ? 'rgba(30,207,184,0.08)' : 'transparent', color: profile.language === l.code ? '#0a9e90' : '#3B566E', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: profile.language === l.code ? 600 : 400 }}>
+                      {l.flag} {l.code}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Avatar */}
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => { setShowMenu(v => !v); setShowLang(false) }}
+              style={{ width: 34, height: 34, borderRadius: '50%', background: '#fdd31d', border: 'none', color: '#082465', fontWeight: 800, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}>
+              {profile.name?.slice(0, 2).toUpperCase()}
+            </button>
+
+            {showMenu && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setShowMenu(false)} />
+                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '8px', minWidth: '210px', boxShadow: '0 8px 40px rgba(8,36,101,0.2)', maxHeight: '80vh', overflowY: 'auto' }}>
+                  {/* Profil özeti */}
+                  <div style={{ padding: '10px 14px', marginBottom: '6px', borderBottom: '1px solid #f0f4f8' }}>
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#082465' }}>{profile.name}</div>
+                    <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                      {profile.plan === 'premium'
+                        ? <span style={{ color: '#0a9e90', fontWeight: 600 }}>★ Premium</span>
+                        : 'Ücretsiz'}
+                      {streak > 0 && <span style={{ marginLeft: '6px' }}>🔥 {streak} gün</span>}
+                    </div>
+                    {testsLeft !== null && (
+                      <div style={{ fontSize: '11px', color: testsLeft <= 2 ? '#dc2626' : '#94a3b8', marginTop: '2px' }}>
+                        Bu ay {testsLeft} test hakkı kaldı
+                      </div>
+                    )}
+                  </div>
+                  {MENU_ITEMS.map(item => (
+                    <Link key={item.href} href={item.href} onClick={() => setShowMenu(false)} style={{
+                      display: 'block', padding: '8px 14px', borderRadius: '10px',
+                      fontSize: '13px', color: pathname === item.href ? '#0a9e90' : '#3B566E',
+                      background: pathname === item.href ? 'rgba(30,207,184,0.08)' : 'transparent',
+                      fontWeight: pathname === item.href ? 600 : 400,
+                    }}>
+                      {item.label}
+                    </Link>
+                  ))}
+                  <div style={{ borderTop: '1px solid #f0f4f8', marginTop: '6px', paddingTop: '6px' }}>
+                    <button onClick={handleSignOut} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px', borderRadius: '10px', fontSize: '13px', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>
+                      Çıkış yap
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* ── DESKTOP NAV ── */}
       <nav className="desktop-only" style={{
