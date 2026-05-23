@@ -50,7 +50,7 @@ export default function LandingPage() {
         background: '#082465',
         boxShadow: '0 2px 20px rgba(8,36,101,0.3)',
       }}>
-        <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 1.5rem', height: '68px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 1.5rem', height: '90px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link href="/">
             <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '40px', width: 'auto', filter: 'brightness(0) invert(1)' }} />
           </Link>
@@ -79,7 +79,7 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      <div style={{ height: '68px' }} />
+      <div style={{ height: '90px' }} />
 
       {/* ── HERO ── */}
       <section style={{
@@ -254,7 +254,7 @@ export default function LandingPage() {
       {/* ── FOOTER ── */}
       <footer style={{ background: '#082465', padding: '2rem 1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
         <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-          <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '36px', filter: 'brightness(0) invert(1)' }} />
+          <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '72px', filter: 'brightness(0) invert(1)' }} />
           <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
             {[{ href: '/privacy', label: 'Gizlilik' }, { href: '/terms', label: 'Kullanım Şartları' }, { href: '/pricing', label: 'Planlar' }].map(l => (
               <Link key={l.href} href={l.href} style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', transition: 'color 0.15s' }}

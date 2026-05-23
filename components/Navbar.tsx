@@ -91,11 +91,11 @@ export default function Navbar() {
 
   return (
     <>
-      <div style={{ height: '68px' }} />
+      <div style={{ height: '90px' }} />
 
       {/* ── DESKTOP NAV ── */}
       <nav className="desktop-only" style={{
-        position: 'fixed', top: 0, left: 0, right: 0, height: '68px',
+        position: 'fixed', top: 0, left: 0, right: 0, height: '90px',
         background: '#082465',
         boxShadow: '0 2px 16px rgba(8,36,101,0.3)',
         display: 'flex', alignItems: 'center', zIndex: 1000,
@@ -104,7 +104,7 @@ export default function Navbar() {
 
           {/* Logo */}
           <Link href="/quiz" style={{ flexShrink: 0 }}>
-            <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '38px', width: 'auto', filter: 'brightness(0) invert(1)' }} />
+            <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '76px', width: 'auto', filter: 'brightness(0) invert(1)' }} />
           </Link>
 
           {/* Nav linkleri */}
