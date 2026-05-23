@@ -1,10 +1,10 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
-export default function TeacherStudentsPage() {
+function TeacherStudentsContent() {
   const [teacher, setTeacher] = useState<any>(null)
   const [classrooms, setClassrooms] = useState<any[]>([])
   const [selectedClass, setSelectedClass] = useState<string | null>(null)
@@ -16,6 +16,7 @@ export default function TeacherStudentsPage() {
   const [addingStudent, setAddingStudent] = useState<string | null>(null)
   const [newClass, setNewClass] = useState({ name: '', grade: '', subject: '' })
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient() as any
 
   useEffect(() => { load() }, [])
@@ -31,9 +32,14 @@ export default function TeacherStudentsPage() {
       .order('created_at', { ascending: false })
     setClassrooms(cls ?? [])
     if (cls?.length) {
-      setSelectedClass(cls[0].id)
-      await loadStudents(cls[0].id)
-      await loadSuggestions(t, cls[0])
+      // URL'den gelen sınıf ID'si varsa onu seç
+      const urlClassId = searchParams.get('class')
+      const targetClass = urlClassId
+        ? cls.find((c: any) => c.id === urlClassId) || cls[0]
+        : cls[0]
+      setSelectedClass(targetClass.id)
+      await loadStudents(targetClass.id)
+      await loadSuggestions(t, targetClass)
     }
     setLoading(false)
   }
@@ -321,6 +327,10 @@ export default function TeacherStudentsPage() {
       </div>
     </main>
   )
+}
+
+export default function TeacherStudentsPage() {
+  return <Suspense fallback={<main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></main>}><TeacherStudentsContent /></Suspense>
 }
 
 const inputStyle: React.CSSProperties = {

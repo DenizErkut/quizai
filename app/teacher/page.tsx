@@ -177,7 +177,35 @@ export default function TeacherDashboard() {
           ))}
         </div>
 
-        {/* Son ödevler */}
+        {/* Sınıflarım — hızlı erişim */}
+        {classrooms.length > 0 && (
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
+              Sınıflarım
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {classrooms.map((c: any) => (
+                <a key={c.id} href={`/teacher/students?class=${c.id}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', textDecoration: 'none', transition: 'all 0.15s' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(8,36,101,0.3)'; e.currentTarget.style.background = 'rgba(8,36,101,0.04)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg2)' }}>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary)' }}>{c.name}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
+                      Davet kodu: <span style={{ fontWeight: 700, letterSpacing: '0.1em', color: 'var(--accent)' }}>{c.invite_code}</span>
+                      {' · '}{c.classroom_students?.[0]?.count || 0} öğrenci
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '12px', color: 'var(--text3)' }}>→</span>
+                </a>
+              ))}
+            </div>
+            <a href="/teacher/students" style={{ display: 'block', textAlign: 'center', marginTop: '10px', fontSize: '12px', color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>
+              Tüm sınıfları yönet →
+            </a>
+          </div>
+        )}
+
+        {/* Son ödevler */}}
         {assignments.length > 0 && (
           <div className="card">
             <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
