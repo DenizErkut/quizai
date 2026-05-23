@@ -14,6 +14,7 @@ function TeacherStudentsContent() {
   const [creating, setCreating] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [addingStudent, setAddingStudent] = useState<string | null>(null)
+  const [copiedCode, setCopiedCode] = useState(false)
   const [newClass, setNewClass] = useState({ name: '', grade: '', subject: '' })
   const router = useRouter()
   const searchParams = useSearchParams()

@@ -27,6 +27,7 @@ const MENU_ITEMS = [
   { label: '🎁 Davet et & kazan', href: '/referral' },
   { label: '🎓 Öğretmen paneli', href: '/teacher' },
   { label: '🔑 Şifremi değiştir', href: '/auth/reset-password' },
+  { label: '🏫 Sınıfa katıl', href: '/join' },
 ]
 
 export default function Navbar() {
