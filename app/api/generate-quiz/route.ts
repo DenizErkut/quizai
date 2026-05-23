@@ -8,117 +8,37 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-function getPromptForType(type: string, topic: string, grade: string, difficulty: string, language: string, count: number, fileContent?: string): string {
-  const langNote = `Tüm sorular ve açıklamalar ${language} dilinde olsun.`
-  const gradeNote = `Seviye: ${grade}. Zorluk: ${difficulty}.`
-  const topicNote = fileContent
-    ? `Konu: "${topic}". Aşağıdaki içerikten sorular üret:\n${fileContent.slice(0, 3000)}`
-    : `Konu: "${topic}".`
+function buildPrompt(type: string, topic: string, grade: string, difficulty: string, language: string, count: number, fileContent?: string): string {
+  const contentNote = fileContent
+    ? `Topic: "${topic}". Generate questions from this content:\n${fileContent.slice(0, 3000)}`
+    : `Topic: "${topic}".`
 
-  const base = `${topicNote}\n${gradeNote}\n${langNote}\nSoru sayısı: ${count}\n\n`
+  const base = `${contentNote}\nLevel: ${grade}. Difficulty: ${difficulty}. Language for all questions and explanations: ${language}. Question count: ${count}.\n\nReturn ONLY valid JSON, no markdown, no explanation.\n\n`
 
-  const formats: Record<string, string> = {
-    multiple_choice: `${base}Çoktan seçmeli sorular üret. Her soru için 4 şık (A/B/C/D), doğru cevap indexi ve açıklama olsun.
+  if (type === 'fill_blank') return base + `Generate fill-in-the-blank questions. Leave a critical word/concept as blank. Provide 4 options (one correct), write the correct answer in "blank" field too.
 
-JSON formatı (başka hiçbir şey yazma):
-{
-  "questions": [
-    {
-      "type": "multiple_choice",
-      "q": "Soru metni",
-      "opts": ["A şıkkı", "B şıkkı", "C şıkkı", "D şıkkı"],
-      "ans": 0,
-      "exp": "Açıklama"
-    }
-  ]
-}`,
+{"questions":[{"type":"fill_blank","q":"_____ is the powerhouse of the cell.","blank":"Mitochondria","opts":["Mitochondria","Ribosome","Nucleus","Lysosome"],"ans":0,"exp":"Mitochondria produces ATP through cellular respiration."}]}`
 
-    fill_blank: `${base}Boşluk doldurma soruları üret. Cümlede kritik bir kelime/kavram boşluk bırakılmış olsun. 4 şık ver (biri doğru), doğru cevabı "blank" alanına da yaz.
+  if (type === 'true_false') return base + `Generate true/false questions with reasoning. ans:0 means True, ans:1 means False. opts must always be ["True","False"] but translated to ${language}.
 
-JSON formatı (başka hiçbir şey yazma):
-{
-  "questions": [
-    {
-      "type": "fill_blank",
-      "q": "_____ hücrenin enerji merkezidir.",
-      "blank": "Mitokondri",
-      "opts": ["Mitokondri", "Ribozom", "Çekirdek", "Lizozom"],
-      "ans": 0,
-      "exp": "Mitokondri hücresel solunum yaparak ATP üretir."
-    }
-  ]
-}`,
+{"questions":[{"type":"true_false","q":"Photosynthesis only occurs during daytime.","opts":["True","False"],"ans":0,"exp":"Photosynthesis requires light energy so it occurs during daytime."}]}`
 
-    true_false: `${base}Doğru/Yanlış soruları üret. Her soru için bir ifade ver, doğruysa ans:0, yanlışsa ans:1. opts her zaman ["Doğru", "Yanlış"] olsun. Açıklamada neden doğru/yanlış olduğunu belirt.
+  if (type === 'matching') return base + `Generate matching questions. Each question has 4 concept-definition pairs in "pairs" array.
 
-JSON formatı (başka hiçbir şey yazma):
-{
-  "questions": [
-    {
-      "type": "true_false",
-      "q": "Fotosentez sadece gündüz gerçekleşir.",
-      "opts": ["Doğru", "Yanlış"],
-      "ans": 0,
-      "exp": "Fotosentez ışık enerjisi gerektirdiği için gündüz gerçekleşir."
-    }
-  ]
-}`,
+{"questions":[{"type":"matching","q":"Match cell organelles with their functions.","pairs":[{"left":"Mitochondria","right":"Energy production"},{"left":"Ribosome","right":"Protein synthesis"},{"left":"Nucleus","right":"DNA storage"},{"left":"Lysosome","right":"Digestion"}],"opts":["A","B","C","D"],"ans":0,"exp":"Each organelle has a critical role in the cell."}]}`
 
-    matching: `${base}Eşleştirme soruları üret. Her soru için 4 kavram-tanım çifti ver. Soru metninde ne eşleştirileceğini anlat.
+  if (type === 'ordering') return base + `Generate ordering/sequencing questions. Provide 4-5 items in random order in "items" array. "correctOrder" contains the indices of items in correct order.
 
-JSON formatı (başka hiçbir şey yazma):
-{
-  "questions": [
-    {
-      "type": "matching",
-      "q": "Hücre organellerini görevleriyle eşleştirin.",
-      "pairs": [
-        {"left": "Mitokondri", "right": "Enerji üretimi"},
-        {"left": "Ribozom", "right": "Protein sentezi"},
-        {"left": "Çekirdek", "right": "DNA depolama"},
-        {"left": "Lizozom", "right": "Sindirim"}
-      ],
-      "opts": ["Mitokondri", "Ribozom", "Çekirdek", "Lizozom"],
-      "ans": 0,
-      "exp": "Her organel hücrede kritik bir görev üstlenir."
-    }
-  ]
-}`,
+{"questions":[{"type":"ordering","q":"Order these events chronologically.","items":["Event B","Event A","Event D","Event C"],"correctOrder":[1,0,3,2],"opts":["1st","2nd","3rd","4th"],"ans":0,"exp":"The correct chronological order is A, B, C, D."}]}`
 
-    ordering: `${base}Sıralama soruları üret. Her soru için 4-5 öğe ver, doğru sırasını correctOrder dizisinde belirt. items karışık sırada olsun.
+  if (type === 'short_answer') return base + `Generate short answer questions. Write a model/example answer in opts[0]. ans:0. Student will write their own answer.
 
-JSON formatı (başka hiçbir şey yazma):
-{
-  "questions": [
-    {
-      "type": "ordering",
-      "q": "Osmanlı Devleti'nin kuruluşundan çöküşüne giden olayları kronolojik sıraya koyun.",
-      "items": ["Fatih İstanbul'u fethetti", "Osman Bey kurdu", "Tanzimat Fermanı", "Kurtuluş Savaşı"],
-      "correctOrder": [1, 0, 2, 3],
-      "opts": ["1. adım", "2. adım", "3. adım", "4. adım"],
-      "ans": 0,
-      "exp": "Osmanlı 1299'da kuruldu, 1453'te İstanbul fethedildi, 1839'da Tanzimat, 1923'te cumhuriyet kuruldu."
-    }
-  ]
-}`,
+{"questions":[{"type":"short_answer","q":"What is photosynthesis and where does it occur?","opts":["Photosynthesis is the process by which plants use sunlight to convert CO2 and water into glucose and oxygen. It occurs in chloroplasts."],"ans":0,"exp":"Equation: 6CO2 + 6H2O + light -> C6H12O6 + 6O2"}]}`
 
-    short_answer: `${base}Kısa cevap soruları üret. Her soru için örnek/model cevabı opts[0]'a yaz, ans:0 olsun. Öğrenci kendi cevabını yazacak.
+  // default: multiple_choice
+  return base + `Generate multiple choice questions with 4 options (A/B/C/D), correct answer index, and explanation.
 
-JSON formatı (başka hiçbir şey yazma):
-{
-  "questions": [
-    {
-      "type": "short_answer",
-      "q": "Fotosentez nedir? Hangi organelde gerçekleşir?",
-      "opts": ["Fotosentez; bitkinin güneş enerjisini kullanarak su ve karbondioksitten besin (glikoz) ve oksijen üretme sürecidir. Kloroplastta gerçekleşir."],
-      "ans": 0,
-      "exp": "Fotosentez denklemi: 6CO2 + 6H2O + ışık → C6H12O6 + 6O2"
-    }
-  ]
-}`
-  }
-
-  return formats[type] || formats['multiple_choice']
+{"questions":[{"type":"multiple_choice","q":"Question text here","opts":["Option A","Option B","Option C","Option D"],"ans":0,"exp":"Explanation here"}]}`
 }
 
 export async function POST(req: NextRequest) {
@@ -130,8 +50,11 @@ export async function POST(req: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase.from('profiles')
-      .select('plan, monthly_test_count, grade, language').eq('id', user.id).single()
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('plan, monthly_test_count, grade, language')
+      .eq('id', user.id)
+      .single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
     if (profile.plan === 'free' && (profile.monthly_test_count || 0) >= 10) {
@@ -140,20 +63,25 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const {
-      topic, questionCount = 10, difficulty = 'normal',
-      language, fileContent, fileType, includeVisuals = true,
-      questionType = 'multiple_choice', dailyChallenge = false
+      topic,
+      questionCount = 10,
+      difficulty = 'normal',
+      language,
+      fileContent,
+      includeVisuals = true,
+      questionType = 'multiple_choice',
+      dailyChallenge = false,
     } = body
 
-    const lang = language || profile.language || 'Türkçe'
+    const lang = language || profile.language || 'Turkce'
     const grade = profile.grade || 'ortaokul 6. sinif'
 
-    const prompt = getPromptForType(questionType, topic, grade, difficulty, lang, questionCount, fileContent)
+    const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, questionCount, fileContent)
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 4000,
-      messages: [{ role: 'user', content: prompt }]
+      messages: [{ role: 'user', content: prompt }],
     })
 
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
@@ -164,37 +92,40 @@ export async function POST(req: NextRequest) {
       parsed = JSON.parse(clean)
     } catch {
       const match = clean.match(/\{[\s\S]*\}/)
-      if (!match) throw new Error('Invalid JSON response')
+      if (!match) throw new Error('Invalid JSON')
       parsed = JSON.parse(match[0])
     }
 
     const questions = parsed.questions || []
 
-    // Test sayısını güncelle
     if (!dailyChallenge) {
-      await supabase.from('profiles').update({
-        monthly_test_count: (profile.monthly_test_count || 0) + 1
-      }).eq('id', user.id)
+      await supabase
+        .from('profiles')
+        .update({ monthly_test_count: (profile.monthly_test_count || 0) + 1 })
+        .eq('id', user.id)
     }
 
-    // Session kaydet
-    const { data: session } = await supabase.from('quiz_sessions').insert({
-      user_id: user.id,
-      topic,
-      grade: profile.grade,
-      language: lang,
-      question_count: questions.length,
-      questions,
-      answers: [],
-      score: 0,
-      pct: 0,
-      completed: false,
-      question_type: questionType,
-    }).select('id').single()
+    const { data: session } = await supabase
+      .from('quiz_sessions')
+      .insert({
+        user_id: user.id,
+        topic,
+        grade: profile.grade,
+        language: lang,
+        question_count: questions.length,
+        questions,
+        answers: [],
+        score: 0,
+        pct: 0,
+        completed: false,
+        question_type: questionType,
+      })
+      .select('id')
+      .single()
 
     return NextResponse.json({ questions, sessionId: session?.id })
   } catch (error) {
     console.error('Generate quiz error:', error)
-    return NextResponse.json({ error: 'Quiz üretilemedi' }, { status: 500 })
+    return NextResponse.json({ error: 'Quiz generation failed' }, { status: 500 })
   }
 }
