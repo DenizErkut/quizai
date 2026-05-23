@@ -209,14 +209,50 @@ export default function QuizPage() {
   const [orderItems, setOrderItems] = useState<string[]>([])
   const [fillInput, setFillInput] = useState('')
 
-  function submitShortAnswer() {
+  async function submitShortAnswer() {
     if (!fillInput.trim() && !shortInput.trim()) return
     const q = questions[current]
-    const userText = (fillInput || shortInput).trim().toLowerCase()
-    const correct = userText === (q.blank || '').toLowerCase() ||
-      (q.opts || []).some((o, i) => i === q.ans && o.toLowerCase() === userText)
-    setChosen(q.ans)
-    setAnswers(prev => [...prev, { userAns: q.ans, correct }])
+    const userText = (fillInput || shortInput).trim()
+    const correctAnswer = q.blank || q.opts?.[q.ans] || ''
+
+    // Hızlı local kontrol — tam eşleşme veya içerme
+    const userLower = userText.toLowerCase()
+    const correctLower = correctAnswer.toLowerCase()
+    let correct = false
+
+    if (
+      userLower === correctLower ||
+      correctLower.includes(userLower) ||
+      userLower.includes(correctLower) ||
+      // Her iki yönde kelime bazlı eşleşme
+      correctLower.split(/\s+/).some(word => word.length > 3 && userLower.includes(word)) ||
+      userLower.split(/\s+/).some(word => word.length > 3 && correctLower.includes(word))
+    ) {
+      correct = true
+    } else {
+      // AI ile semantik kontrol
+      try {
+        const res = await fetch('/api/check-answer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question: q.q,
+            correctAnswer,
+            userAnswer: userText,
+            language: currentLang,
+          }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          correct = data.correct === true
+        }
+      } catch {
+        // fallback: local kontrole güven
+      }
+    }
+
+    setChosen(correct ? q.ans : -1)
+    setAnswers(prev => [...prev, { userAns: correct ? q.ans : -1, correct }])
   }
 
   function submitMatching() {
