@@ -155,6 +155,7 @@ export default function QuizPage() {
           fileContent: combinedContent || undefined,
           fileType: uploadedFiles[0]?.fileType || undefined,
           includeVisuals,
+          questionType,
         }),
       })
       const data = await res.json()
