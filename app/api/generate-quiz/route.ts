@@ -24,9 +24,16 @@ IMPORTANT: For any calculation or factual claim, verify it is 100% correct befor
 
 {"questions":[{"type":"true_false","q":"Photosynthesis only occurs during daytime.","opts":["True","False"],"ans":0,"exp":"Photosynthesis requires light energy so it occurs during daytime."}]}`
 
-  if (type === 'matching') return base + `Generate matching questions. Each question has 4 concept-definition pairs in "pairs" array.
+  if (type === 'matching') return base + `Generate matching questions. Each question has exactly 4 concept-definition pairs in "pairs" array.
 
-{"questions":[{"type":"matching","q":"Match cell organelles with their functions.","pairs":[{"left":"Mitochondria","right":"Energy production"},{"left":"Ribosome","right":"Protein synthesis"},{"left":"Nucleus","right":"DNA storage"},{"left":"Lysosome","right":"Digestion"}],"opts":["A","B","C","D"],"ans":0,"exp":"Each organelle has a critical role in the cell."}]}`
+CRITICAL RULES for matching questions:
+- Every "right" value must be UNIQUE and DIFFERENT from each other
+- Never use repeated values like ["True","False","True","False"] - that is NOT a matching question
+- Each definition must be distinct and specific
+- Good example: match countries to capitals, elements to symbols, terms to definitions
+- Bad example: match statements to "True/False" (use true_false type instead)
+
+{"questions":[{"type":"matching","q":"Match cell organelles with their functions.","pairs":[{"left":"Mitochondria","right":"Energy production via ATP"},{"left":"Ribosome","right":"Protein synthesis from mRNA"},{"left":"Nucleus","right":"DNA storage and gene expression"},{"left":"Lysosome","right":"Cellular waste digestion"}],"opts":["A","B","C","D"],"ans":0,"exp":"Each organelle has a critical role in the cell."}]}`
 
   if (type === 'ordering') return base + `Generate ordering/sequencing questions. Provide 4-5 items in random order in "items" array. "correctOrder" contains the indices of items in correct order.
 

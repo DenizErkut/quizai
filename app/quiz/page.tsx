@@ -281,11 +281,31 @@ export default function QuizPage() {
   function submitMatching() {
     const q = questions[current]
     const pairs = q.pairs || []
+
+    // Check if right values are unique (proper matching) or repeated (D/Y style)
+    const rightValues = pairs.map((p: any) => p.right)
+    const uniqueRights = new Set(rightValues)
+    const isProperMatching = uniqueRights.size === pairs.length
+
     let correctCount = 0
-    pairs.forEach((_: any, i: number) => {
-      const userShuffledIdx = matchSelections[i]
-      if (userShuffledIdx !== undefined && shuffledIndexMap[userShuffledIdx] === i) correctCount++
-    })
+
+    if (isProperMatching) {
+      // Standard: shuffledIndexMap[userSelection] must equal original pair index
+      pairs.forEach((_: any, i: number) => {
+        const userShuffledIdx = matchSelections[i]
+        if (userShuffledIdx !== undefined && shuffledIndexMap[userShuffledIdx] === i) correctCount++
+      })
+    } else {
+      // Repeated values (e.g. True/False): match by text content directly
+      pairs.forEach((pair: any, i: number) => {
+        const userShuffledIdx = matchSelections[i]
+        if (userShuffledIdx !== undefined) {
+          const selectedText = shuffledPairs[userShuffledIdx]
+          if (selectedText === pair.right) correctCount++
+        }
+      })
+    }
+
     const correct = correctCount === pairs.length
     setChosen(correct ? q.ans : -1)
     setAnswers(prev => [...prev, { userAns: correct ? q.ans : -1, correct }])
