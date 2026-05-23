@@ -2,12 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 
-webpush.setVapidDetails(
-  'mailto:info@pratium.com',
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
-
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -15,6 +9,13 @@ const supabaseAdmin = createClient(
 
 // Push subscription kaydet
 export async function POST(req: NextRequest) {
+  // VAPID lazy init
+  webpush.setVapidDetails(
+    'mailto:info@pratium.com',
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+    process.env.VAPID_PRIVATE_KEY!
+  )
+
   const authHeader = req.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   const token = authHeader.slice(7)
@@ -70,6 +71,12 @@ export async function POST(req: NextRequest) {
 
 // Günlük hatırlatma gönder (cron job için)
 export async function GET(req: NextRequest) {
+  webpush.setVapidDetails(
+    'mailto:info@pratium.com',
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+    process.env.VAPID_PRIVATE_KEY!
+  )
+
   const authHeader = req.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
