@@ -14,6 +14,11 @@ interface Stats {
   total_sessions: number; sessions_today: number; avg_score: number
 }
 
+interface Teacher {
+  id: string; user_id: string; name: string; email: string
+  school: string | null; approved: boolean; created_at: string
+}
+
 interface ErrorReport {
   id: string; user_id: string; question_text: string
   correct_answer: string; user_answer: string; topic: string
@@ -31,8 +36,11 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers'>('users')
   const [adminNote, setAdminNote] = useState<Record<string, string>>({})
+  const [teachers, setTeachers] = useState<Teacher[]>([])
+  const [pendingTeachers, setPendingTeachers] = useState(0)
+  const [teacherUpdating, setTeacherUpdating] = useState<string | null>(null)
   const supabase = createClient() as any
 
   const [isAdmin, setIsAdmin] = useState(false)
@@ -110,6 +118,14 @@ export default function AdminPage() {
       .order('reported_at', { ascending: false })
     setErrorReports(reports || [])
     setPendingCount((reports || []).filter((r: ErrorReport) => r.status === 'pending').length)
+
+    // Öğretmen başvurularını çek
+    const { data: teacherData } = await supabase
+      .from('teachers')
+      .select('*')
+      .order('created_at', { ascending: false })
+    setTeachers(teacherData || [])
+    setPendingTeachers((teacherData || []).filter((t: Teacher) => !t.approved).length)
 
     setLoading(false)
   }
@@ -199,10 +215,15 @@ export default function AdminPage() {
             { key: 'users', label: '👥 Kullanıcılar' },
             { key: 'stats', label: '📊 İstatistikler' },
             { key: 'errors', label: `⚠️ Hata Bildirimleri${pendingCount > 0 ? ` (${pendingCount})` : ''}` },
+            { key: 'teachers', label: `🎓 Öğretmen Başvuruları${pendingTeachers > 0 ? ` (${pendingTeachers})` : ''}` },
           ] as const).map(t => (
             <button key={t.key} className={`btn btn-sm ${tab === t.key ? 'btn-primary' : ''}`}
               onClick={() => setTab(t.key)}
-              style={tab !== t.key && t.key === 'errors' && pendingCount > 0 ? { borderColor: 'var(--red)', color: 'var(--red)' } : {}}>
+              style={
+                tab !== t.key && t.key === 'errors' && pendingCount > 0 ? { borderColor: 'var(--red)', color: 'var(--red)' } :
+                tab !== t.key && t.key === 'teachers' && pendingTeachers > 0 ? { borderColor: '#fdd31d', color: '#082465' } :
+                {}
+              }>
               {t.label}
             </button>
           ))}
@@ -373,6 +394,71 @@ export default function AdminPage() {
                 </table>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Teachers tab */}
+        {tab === 'teachers' && (
+          <div className="card anim-up">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600 }}>
+                {pendingTeachers > 0
+                  ? <span style={{ color: '#d97706' }}>⏳ {pendingTeachers} bekleyen başvuru</span>
+                  : <span style={{ color: 'var(--green)' }}>✓ Bekleyen başvuru yok</span>}
+              </div>
+            </div>
+            {teachers.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text3)' }}>
+                Henüz öğretmen başvurusu yok.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {teachers.map(t => (
+                  <div key={t.id} style={{
+                    padding: '14px 16px', borderRadius: '12px', border: '1px solid var(--border)',
+                    borderLeft: `3px solid ${t.approved ? 'var(--green)' : '#fdd31d'}`,
+                    background: t.approved ? 'var(--green-bg)' : 'rgba(253,211,29,0.05)',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px',
+                  }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: t.approved ? 'var(--gradient)' : 'rgba(253,211,29,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: t.approved ? '#fff' : '#082465', flexShrink: 0 }}>
+                          {t.name.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '14px' }}>{t.name}</div>
+                          <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{t.email}</div>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text3)', marginLeft: '40px' }}>
+                        {t.school && <span>🏫 {t.school} · </span>}
+                        <span>📅 {new Date(t.created_at).toLocaleDateString('tr-TR')}</span>
+                        {' · '}
+                        <span style={{ fontWeight: 600, color: t.approved ? 'var(--green)' : '#d97706' }}>
+                          {t.approved ? '✓ Onaylandı' : '⏳ Bekliyor'}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {!t.approved && (
+                        <button
+                          onClick={() => approveTeacher(t.id)}
+                          disabled={teacherUpdating === t.id}
+                          style={{ padding: '7px 14px', borderRadius: '8px', border: 'none', background: 'var(--gradient)', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: teacherUpdating === t.id ? 0.6 : 1 }}>
+                          {teacherUpdating === t.id ? '...' : '✓ Onayla'}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => deleteTeacher(t.id)}
+                        disabled={teacherUpdating === t.id}
+                        style={{ padding: '7px 14px', borderRadius: '8px', border: '1px solid rgba(220,38,38,0.3)', background: 'var(--red-bg)', color: 'var(--red)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: teacherUpdating === t.id ? 0.6 : 1 }}>
+                        Sil
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
