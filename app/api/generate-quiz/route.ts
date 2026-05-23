@@ -104,7 +104,30 @@ export async function POST(req: NextRequest) {
       parsed = JSON.parse(match[0])
     }
 
-    const questions = parsed.questions || []
+    let questions = parsed.questions || []
+
+    // Math verification pipeline
+    const isMathTopic = /math|matematik|calcul|denklem|geometr|cebir|trigon|istatistik|olasil|fizik|kimya|physics|chemistry|algebra|equation|formula/i.test(topic)
+    const isMathType = questionType === 'multiple_choice'
+
+    if (isMathTopic && isMathType && questions.length > 0) {
+      try {
+        const verifyRes = await fetch(`${req.nextUrl.origin}/api/verify-math`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ questions, topic, grade, language: lang }),
+        })
+        if (verifyRes.ok) {
+          const verifyData = await verifyRes.json()
+          if (verifyData.questions?.length > 0) {
+            questions = verifyData.questions
+            console.log('Math verification stats:', verifyData.stats)
+          }
+        }
+      } catch (e) {
+        console.error('Math verification skipped:', e)
+      }
+    }
 
     if (!dailyChallenge) {
       await supabase
