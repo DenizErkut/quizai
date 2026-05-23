@@ -232,8 +232,8 @@ export default function Navbar() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
             {NAV_LINKS.map(item => (
               <Link key={item.href} href={item.href} style={{
-                padding: '7px 14px', borderRadius: '8px', fontSize: '13px',
-                fontWeight: 500, whiteSpace: 'nowrap', transition: 'all 0.15s',
+                padding: '8px 18px', borderRadius: '8px', fontSize: '15px',
+                fontWeight: 600, whiteSpace: 'nowrap', transition: 'all 0.15s',
                 color: pathname === item.href ? '#fdd31d' : 'rgba(255,255,255,0.7)',
                 background: pathname === item.href ? 'rgba(253,211,29,0.1)' : 'transparent',
                 borderBottom: pathname === item.href ? '2px solid #fdd31d' : '2px solid transparent',
