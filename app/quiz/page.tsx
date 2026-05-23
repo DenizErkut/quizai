@@ -169,6 +169,15 @@ export default function QuizPage() {
     }
   }
 
+  function retryWrong(wrongQuestions: Question[]) {
+    setQuestions(wrongQuestions)
+    setCurrent(0)
+    setAnswers([])
+    setChosen(null)
+    setSessionId(null)
+    setScreen('quiz')
+  }
+
   function choose(idx: number) {
     if (chosen !== null) return
     setChosen(idx)
@@ -460,6 +469,7 @@ export default function QuizPage() {
             language={currentLang}
             youtubeLinks={youtubeLinks}
             onNewTest={() => { setScreen('topic'); setSelectedTopic(''); setCustomTopic('') }}
+            onRetryWrong={retryWrong}
           />
         </div>
       </main>

@@ -19,6 +19,7 @@ interface Props {
   difficulty: string
   language: string
   onNewTest: () => void
+  onRetryWrong?: (wrongQuestions: Question[]) => void
   youtubeLinks?: Record<string, YouTubeLink | string>
 }
 
@@ -65,7 +66,7 @@ const SOCIAL_LINKS = [
   },
 ]
 
-export default function QuizResult({ questions, answers, topic, difficulty, language, onNewTest, youtubeLinks = {} }: Props) {
+export default function QuizResult({ questions, answers, topic, difficulty, language, onNewTest, onRetryWrong, youtubeLinks = {} }: Props) {
   const [reportedIdx, setReportedIdx] = useState<Set<number>>(new Set())
   const [reportingIdx, setReportingIdx] = useState<number | null>(null)
   const supabase = createClient() as any
@@ -73,11 +74,22 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
   const finalScore = answers.filter(a => a.correct).length
   const finalPct = Math.round((finalScore / questions.length) * 100)
   const diff = DIFFICULTIES[difficulty] || DIFFICULTIES.normal
+  const wrongQuestions = questions.filter((_, i) => !answers[i]?.correct)
 
   const msg = finalPct === 100 ? 'Mükemmel! Tüm sorular doğru.' :
     finalPct >= 80 ? 'Çok iyi! Konuya hakimsin.' :
     finalPct >= 60 ? 'Fena değil, pratik yaparsan harika olur.' :
     'Tekrar çalışmak isteyebilirsin.'
+
+  function shareResult() {
+    const text = `Pratium'da "${topic}" konusunda ${finalPct}% başarı elde ettim! 🎯 Sen de dene: https://pratium.com`
+    if (navigator.share) {
+      navigator.share({ title: 'Pratium Test Sonucu', text, url: 'https://pratium.com' }).catch(() => {})
+    } else {
+      navigator.clipboard.writeText(text)
+      alert('Sonuç panoya kopyalandı!')
+    }
+  }
 
   async function reportError(idx: number) {
     if (reportedIdx.has(idx)) return
@@ -185,10 +197,22 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
           <div style={{ color: 'var(--text2)', fontSize: '14px', marginTop: '0.75rem' }}>{msg}</div>
         </div>
         <div style={{ display: 'flex', gap: '8px', marginTop: '1.5rem', flexWrap: 'wrap' }}>
-          <button className="btn btn-primary" onClick={onNewTest} style={{ flex: 1, justifyContent: 'center' }}>Yeni test</button>
+          <button className="btn btn-primary" onClick={onNewTest} style={{ flex: 1, justifyContent: 'center' }}>⚡ Yeni test</button>
+          {wrongQuestions.length > 0 && onRetryWrong && (
+            <button className="btn" onClick={() => onRetryWrong(wrongQuestions)}
+              style={{ flex: 1, justifyContent: 'center', color: 'var(--red)', borderColor: 'rgba(220,38,38,0.3)', background: 'var(--red-bg)' }}>
+              🔁 Yanlışları tekrar çöz ({wrongQuestions.length})
+            </button>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+          <button className="btn" onClick={shareResult}
+            style={{ flex: 1, justifyContent: 'center', color: 'var(--accent)', borderColor: 'rgba(0,149,200,0.3)' }}>
+            🔗 Sonucu paylaş
+          </button>
           <Link href="/dashboard" className="btn" style={{ flex: 1, justifyContent: 'center' }}>Dashboard</Link>
-          <button className="btn" onClick={exportPDF} style={{ flex: 1, justifyContent: 'center', color: 'var(--accent)', borderColor: 'rgba(91,76,245,0.3)' }}>
-            📄 PDF indir
+          <button className="btn" onClick={exportPDF} style={{ justifyContent: 'center', color: 'var(--text2)' }}>
+            📄 PDF
           </button>
         </div>
       </div>
