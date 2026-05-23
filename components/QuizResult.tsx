@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import ChatAssistant from '@/components/ChatAssistant'
 
 interface Question {
   q: string; opts: string[]; ans: number; exp: string
@@ -311,6 +312,14 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
           </div>
         ))}
       </div>
+
+      {/* AI Sohbet Asistanı */}
+      <ChatAssistant
+        topic={topic}
+        language={language}
+        questions={questions}
+        answers={answers}
+      />
     </div>
   )
 }
