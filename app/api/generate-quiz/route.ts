@@ -13,9 +13,10 @@ function buildPrompt(type: string, topic: string, grade: string, difficulty: str
     ? `Topic: "${topic}". Generate questions from this content:\n${fileContent.slice(0, 3000)}`
     : `Topic: "${topic}".`
 
-  const base = `${contentNote}\nLevel: ${grade}. Difficulty: ${difficulty}. Language for all questions and explanations: ${language}. Question count: ${count}.\n\nReturn ONLY valid JSON, no markdown, no explanation.\n\n`
+  const base = `${contentNote}\nLevel: ${grade}. Difficulty: ${difficulty}. Language for all questions and explanations: ${language}. Question count: ${count}.\n\nCRITICAL ACCURACY RULES:\n1. For math: solve fully before writing, verify the answer is in opts at the correct index\n2. For science/history: only include facts you are certain about\n3. The "ans" index must point to the CORRECT answer in "opts"\n4. If you are unsure, use a simpler question\n\nReturn ONLY valid JSON, no markdown, no explanation.\n\n`
 
   if (type === 'fill_blank') return base + `Generate fill-in-the-blank questions. Leave a critical word/concept as blank. Provide 4 options (one correct), write the correct answer in "blank" field too.
+IMPORTANT: For any calculation or factual claim, verify it is 100% correct before including.
 
 {"questions":[{"type":"fill_blank","q":"_____ is the powerhouse of the cell.","blank":"Mitochondria","opts":["Mitochondria","Ribosome","Nucleus","Lysosome"],"ans":0,"exp":"Mitochondria produces ATP through cellular respiration."}]}`
 
@@ -38,7 +39,14 @@ function buildPrompt(type: string, topic: string, grade: string, difficulty: str
   // default: multiple_choice
   return base + `Generate multiple choice questions with 4 options (A/B/C/D), correct answer index, and explanation.
 
-{"questions":[{"type":"multiple_choice","q":"Question text here","opts":["Option A","Option B","Option C","Option D"],"ans":0,"exp":"Explanation here"}]}`
+CRITICAL FOR MATH/SCIENCE QUESTIONS:
+- Solve every calculation step by step BEFORE writing the question
+- Verify your answer is correct mathematically
+- Make sure the correct answer actually appears in the options at the index you specify in "ans"
+- Double-check: if ans=0, opts[0] must be the verified correct answer
+- Never include ambiguous or trick questions where multiple answers could be correct
+
+{"questions":[{"type":"multiple_choice","q":"Question text here","opts":["Option A","Option B","Option C","Option D"],"ans":0,"exp":"Step by step explanation"}]}`
 }
 
 export async function POST(req: NextRequest) {
