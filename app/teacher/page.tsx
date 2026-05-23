@@ -205,7 +205,7 @@ export default function TeacherDashboard() {
           </div>
         )}
 
-        {/* Son ödevler */}}
+        {/* Son ödevler */}
         {assignments.length > 0 && (
           <div className="card">
             <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
