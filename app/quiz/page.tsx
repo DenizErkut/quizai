@@ -209,25 +209,50 @@ export default function QuizPage() {
   const [orderItems, setOrderItems] = useState<string[]>([])
   const [fillInput, setFillInput] = useState('')
 
+  // Levenshtein distance — yazım hatası toleransı
+  function levenshtein(a: string, b: string): number {
+    const m = a.length, n = b.length
+    const dp: number[][] = Array.from({length: m+1}, (_, i) => [i, ...Array(n).fill(0)])
+    for (let j = 0; j <= n; j++) dp[0][j] = j
+    for (let i = 1; i <= m; i++)
+      for (let j = 1; j <= n; j++)
+        dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1])
+    return dp[m][n]
+  }
+
+  function isSimilarEnough(user: string, correct: string): boolean {
+    const u = user.toLowerCase().trim()
+    const c = correct.toLowerCase().trim()
+    if (!u || !c) return false
+    // Tam eşleşme
+    if (u === c) return true
+    // İçerme
+    if (c.includes(u) || u.includes(c)) return true
+    // Kelime bazlı — herhangi bir anahtar kelime eşleşirse
+    const cWords = c.split(/\s+/).filter(w => w.length > 3)
+    const uWords = u.split(/\s+/).filter(w => w.length > 3)
+    if (cWords.some(w => u.includes(w)) || uWords.some(w => c.includes(w))) return true
+    // Yazım hatası toleransı — kısa kelimelerde 1, uzunlarda 2 harf farkı kabul et
+    const maxDist = Math.max(1, Math.floor(Math.min(u.length, c.length) / 5))
+    if (levenshtein(u, c) <= maxDist) return true
+    // Her kelimeyi ayrı karşılaştır
+    for (const uw of uWords) {
+      for (const cw of cWords) {
+        const dist = levenshtein(uw, cw)
+        if (dist <= Math.max(1, Math.floor(Math.min(uw.length, cw.length) / 4))) return true
+      }
+    }
+    return false
+  }
+
   async function submitShortAnswer() {
     if (!fillInput.trim() && !shortInput.trim()) return
     const q = questions[current]
     const userText = (fillInput || shortInput).trim()
     const correctAnswer = q.blank || q.opts?.[q.ans] || ''
-
-    // Hızlı local kontrol — tam eşleşme veya içerme
-    const userLower = userText.toLowerCase()
-    const correctLower = correctAnswer.toLowerCase()
     let correct = false
 
-    if (
-      userLower === correctLower ||
-      correctLower.includes(userLower) ||
-      userLower.includes(correctLower) ||
-      // Her iki yönde kelime bazlı eşleşme
-      correctLower.split(/\s+/).some(word => word.length > 3 && userLower.includes(word)) ||
-      userLower.split(/\s+/).some(word => word.length > 3 && correctLower.includes(word))
-    ) {
+    if (isSimilarEnough(userText, correctAnswer)) {
       correct = true
     } else {
       // AI ile semantik kontrol
@@ -246,9 +271,7 @@ export default function QuizPage() {
           const data = await res.json()
           correct = data.correct === true
         }
-      } catch {
-        // fallback: local kontrole güven
-      }
+      } catch { /* fallback */ }
     }
 
     setChosen(correct ? q.ans : -1)
