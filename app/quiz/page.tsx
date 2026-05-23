@@ -6,9 +6,18 @@ import { createClient } from '@/lib/supabase/client'
 import FileUploader, { type UploadedFile } from '@/components/FileUploader'
 import QuizResult from '@/components/QuizResult'
 
+type QuestionType = 'multiple_choice' | 'fill_blank' | 'matching' | 'true_false' | 'ordering' | 'short_answer'
+
 interface Question {
   q: string; opts: string[]; ans: number; exp: string
   svg?: string | null; qtype?: 'text' | 'svg'
+  // Yeni soru tipleri
+  type?: QuestionType
+  blank?: string          // boşluk doldurma: doğru cevap
+  pairs?: {left:string; right:string}[]  // eşleştirme
+  items?: string[]        // sıralama: karışık liste
+  correctOrder?: number[] // sıralama: doğru sıra
+  statement?: boolean     // D/Y: doğru mu?
 }
 interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number }
 
@@ -67,6 +76,7 @@ export default function QuizPage() {
   const [qCount, setQCount] = useState(10)
   const [difficulty, setDifficulty] = useState('normal')
   const [includeVisuals, setIncludeVisuals] = useState(true)
+  const [questionType, setQuestionType] = useState<QuestionType>('multiple_choice')
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
 
   const [questions, setQuestions] = useState<Question[]>([])
@@ -181,8 +191,69 @@ export default function QuizPage() {
   function choose(idx: number) {
     if (chosen !== null) return
     setChosen(idx)
-    setAnswers(prev => [...prev, { userAns: idx, correct: idx === questions[current].ans }])
+    const q = questions[current]
+    let correct = false
+    if (q.type === 'true_false') {
+      correct = idx === q.ans
+    } else if (q.type === 'fill_blank' || q.type === 'short_answer') {
+      correct = idx === q.ans // AI puanladıysa ans=0 doğru demek
+    } else {
+      correct = idx === q.ans
+    }
+    setAnswers(prev => [...prev, { userAns: idx, correct }])
   }
+
+  const [shortInput, setShortInput] = useState('')
+  const [matchSelections, setMatchSelections] = useState<Record<number, number>>({})
+  const [orderItems, setOrderItems] = useState<string[]>([])
+  const [fillInput, setFillInput] = useState('')
+
+  function submitShortAnswer() {
+    if (!fillInput.trim() && !shortInput.trim()) return
+    const q = questions[current]
+    const userText = (fillInput || shortInput).trim().toLowerCase()
+    const correct = userText === (q.blank || '').toLowerCase() ||
+      (q.opts || []).some((o, i) => i === q.ans && o.toLowerCase() === userText)
+    setChosen(q.ans)
+    setAnswers(prev => [...prev, { userAns: q.ans, correct }])
+  }
+
+  function submitMatching() {
+    const q = questions[current]
+    const pairs = q.pairs || []
+    let correctCount = 0
+    pairs.forEach((_: any, i: number) => { if (matchSelections[i] === i) correctCount++ })
+    const correct = correctCount === pairs.length
+    setChosen(correct ? q.ans : -1)
+    setAnswers(prev => [...prev, { userAns: correct ? q.ans : -1, correct }])
+  }
+
+  function submitOrdering() {
+    const q = questions[current]
+    const items = q.items || []
+    const correct = orderItems.every((item, i) => item === items[q.correctOrder?.[i] ?? i])
+    setChosen(correct ? 0 : -1)
+    setAnswers(prev => [...prev, { userAns: correct ? 0 : -1, correct }])
+  }
+
+  function moveItem(from: number, to: number) {
+    setOrderItems(prev => {
+      const arr = [...prev]
+      const [item] = arr.splice(from, 1)
+      arr.splice(to, 0, item)
+      return arr
+    })
+  }
+
+  // Reset type-specific state on question change
+  useEffect(() => {
+    const q = questions[current]
+    if (!q) return
+    setFillInput('')
+    setShortInput('')
+    setMatchSelections({})
+    if (q.items) setOrderItems([...q.items].sort(() => Math.random() - 0.5))
+  }, [current, questions])
 
   async function next() {
     if (current + 1 >= questions.length) {
@@ -340,6 +411,33 @@ export default function QuizPage() {
             ))}
           </div>
 
+          {/* Soru tipi seçici */}
+          <div style={{ marginTop: '16px' }}>
+            <label className="field-label">Soru tipi</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '8px' }}>
+              {[
+                { value: 'multiple_choice', label: 'Çoktan Seçmeli', icon: '🔤', desc: 'A/B/C/D klasik' },
+                { value: 'fill_blank', label: 'Boşluk Doldurma', icon: '✏️', desc: 'Eksik kelimeyi bul' },
+                { value: 'true_false', label: 'Doğru / Yanlış', icon: '✓✗', desc: 'Gerekçeli D/Y' },
+                { value: 'matching', label: 'Eşleştirme', icon: '🔗', desc: 'Kavram – tanım' },
+                { value: 'ordering', label: 'Sıralama', icon: '📋', desc: 'Doğru sıraya koy' },
+                { value: 'short_answer', label: 'Kısa Cevap', icon: '💬', desc: 'AI puanlar' },
+              ].map(t => (
+                <button key={t.value} onClick={() => setQuestionType(t.value as QuestionType)}
+                  style={{
+                    padding: '10px 8px', borderRadius: '10px', cursor: 'pointer', textAlign: 'center',
+                    border: `1.5px solid ${questionType === t.value ? 'var(--accent)' : 'var(--border)'}`,
+                    background: questionType === t.value ? 'var(--accent-bg)' : 'var(--bg2)',
+                    transition: 'all 0.15s',
+                  }}>
+                  <div style={{ fontSize: '20px', marginBottom: '4px' }}>{t.icon}</div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: questionType === t.value ? 'var(--accent)' : 'var(--primary)', lineHeight: 1.3 }}>{t.label}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '2px' }}>{t.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Soru sayısı + görsel */}
           <div style={{ display: 'flex', gap: '12px', marginTop: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div style={{ flex: 1 }}>
@@ -362,6 +460,9 @@ export default function QuizPage() {
           {/* Özet */}
           <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '13px', color: 'var(--text2)', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             <span>📝 {qCount} soru</span>
+            <span style={{ color: 'var(--accent)' }}>{
+              {'multiple_choice':'🔤 Çoktan Seçmeli','fill_blank':'✏️ Boşluk Doldurma','true_false':'✓✗ D/Y','matching':'🔗 Eşleştirme','ordering':'📋 Sıralama','short_answer':'💬 Kısa Cevap'}[questionType]
+            }</span>
             <span style={{ color: activeDiff.color }}>⚡ {activeDiff.label}</span>
             <span>🌐 {currentLang}</span>
             {hasFiles && <span style={{ color: 'var(--green)' }}>📎 {uploadedFiles.length} dosya</span>}
@@ -432,22 +533,159 @@ export default function QuizPage() {
                 <div dangerouslySetInnerHTML={{ __html: q.svg }} style={{ width: '100%' }} />
               </div>
             )}
+            {/* Soru tipi badge */}
+            {q.type && q.type !== 'multiple_choice' && (
+              <div style={{ marginBottom: '8px' }}>
+                <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '99px', background: 'rgba(8,36,101,0.08)', color: 'var(--primary)', fontWeight: 700, border: '1px solid rgba(8,36,101,0.15)' }}>
+                  {{'fill_blank':'✏️ Boşluk Doldurma','true_false':'✓✗ Doğru / Yanlış','matching':'🔗 Eşleştirme','ordering':'📋 Sıralama','short_answer':'💬 Kısa Cevap'}[q.type]}
+                </span>
+              </div>
+            )}
+
             <p style={{ fontSize: '17px', fontWeight: 500, lineHeight: 1.55, marginBottom: '1.5rem' }}>{q.q}</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {q.opts.map((opt, i) => {
-                let bg = 'var(--bg2)', border = 'var(--border)', color = 'var(--text)'
-                if (chosen !== null) {
-                  if (i === q.ans) { bg = 'var(--green-bg)'; border = 'rgba(22,163,74,0.35)'; color = 'var(--green)' }
-                  else if (i === chosen) { bg = 'var(--red-bg)'; border = 'rgba(220,38,38,0.35)'; color = 'var(--red)' }
-                }
-                return (
-                  <button key={i} onClick={() => choose(i)} disabled={chosen !== null}
-                    style={{ textAlign: 'left', padding: '12px 15px', borderRadius: '10px', border: `1.5px solid ${border}`, background: bg, color, font: '14px/1.45 "DM Sans",sans-serif', cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s' }}>
-                    <span style={{ fontWeight: 600, marginRight: '8px', opacity: 0.5 }}>{String.fromCharCode(65 + i)}.</span>{opt}
+
+            {/* ── ÇOKTAN SEÇMELİ (default) ── */}
+            {(!q.type || q.type === 'multiple_choice') && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {(q.opts || []).map((opt, i) => {
+                  let bg = 'var(--bg2)', border = 'var(--border)', color = 'var(--text)'
+                  if (chosen !== null) {
+                    if (i === q.ans) { bg = 'var(--green-bg)'; border = 'rgba(22,163,74,0.35)'; color = 'var(--green)' }
+                    else if (i === chosen) { bg = 'var(--red-bg)'; border = 'rgba(220,38,38,0.35)'; color = 'var(--red)' }
+                  }
+                  return (
+                    <button key={i} onClick={() => choose(i)} disabled={chosen !== null}
+                      style={{ textAlign: 'left', padding: '12px 15px', borderRadius: '10px', border: `1.5px solid ${border}`, background: bg, color, fontSize: '14px', lineHeight: 1.45, cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s', fontFamily: 'var(--font-sans)' }}>
+                      <span style={{ fontWeight: 700, marginRight: '8px', opacity: 0.5 }}>{String.fromCharCode(65 + i)}.</span>{opt}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* ── DOĞRU / YANLIŞ ── */}
+            {q.type === 'true_false' && (
+              <div style={{ display: 'flex', gap: '12px' }}>
+                {[{label: '✓ Doğru', val: 0, c: 'var(--green)', bg: 'var(--green-bg)'}, {label: '✗ Yanlış', val: 1, c: 'var(--red)', bg: 'var(--red-bg)'}].map(opt => {
+                  const isChosen = chosen === opt.val
+                  const isCorrect = opt.val === q.ans
+                  const showResult = chosen !== null
+                  return (
+                    <button key={opt.val} onClick={() => choose(opt.val)} disabled={chosen !== null}
+                      style={{ flex: 1, padding: '18px', borderRadius: '12px', fontSize: '18px', fontWeight: 700,
+                        border: `2px solid ${showResult && isCorrect ? 'rgba(22,163,74,0.5)' : showResult && isChosen && !isCorrect ? 'rgba(220,38,38,0.5)' : 'var(--border)'}`,
+                        background: showResult && isCorrect ? 'var(--green-bg)' : showResult && isChosen && !isCorrect ? 'var(--red-bg)' : 'var(--bg2)',
+                        color: showResult && isCorrect ? 'var(--green)' : showResult && isChosen && !isCorrect ? 'var(--red)' : 'var(--text2)',
+                        cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s', fontFamily: 'var(--font-sans)' }}>
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* ── BOŞLUK DOLDURMA ── */}
+            {q.type === 'fill_blank' && (
+              <div>
+                <input value={fillInput} onChange={e => setFillInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && chosen === null && submitShortAnswer()}
+                  disabled={chosen !== null}
+                  placeholder="Cevabınızı yazın..."
+                  style={{ width: '100%', padding: '14px 16px', borderRadius: '10px', fontSize: '16px', fontFamily: 'var(--font-sans)', border: `2px solid ${chosen !== null ? (answers[answers.length-1]?.correct ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.4)') : 'var(--border)'}`, background: chosen !== null ? (answers[answers.length-1]?.correct ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', outline: 'none', boxSizing: 'border-box', color: 'var(--text)' }} />
+                {chosen === null && (
+                  <button className="btn btn-primary" onClick={submitShortAnswer} disabled={!fillInput.trim()}
+                    style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }}>
+                    Cevapla →
                   </button>
-                )
-              })}
-            </div>
+                )}
+                {chosen !== null && (
+                  <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: 600, color: answers[answers.length-1]?.correct ? 'var(--green)' : 'var(--red)' }}>
+                    {answers[answers.length-1]?.correct ? '✓ Doğru!' : `✗ Doğru cevap: "${q.blank || q.opts?.[q.ans]}"`}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── KISA CEVAP ── */}
+            {q.type === 'short_answer' && (
+              <div>
+                <textarea value={shortInput} onChange={e => setShortInput(e.target.value)}
+                  disabled={chosen !== null}
+                  placeholder="Cevabınızı buraya yazın..."
+                  rows={3}
+                  style={{ width: '100%', padding: '12px 16px', borderRadius: '10px', fontSize: '14px', fontFamily: 'var(--font-sans)', border: '2px solid var(--border)', background: 'var(--bg2)', outline: 'none', resize: 'vertical', boxSizing: 'border-box', color: 'var(--text)' }} />
+                {chosen === null && (
+                  <button className="btn btn-primary" onClick={submitShortAnswer} disabled={!shortInput.trim()}
+                    style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }}>
+                    Gönder →
+                  </button>
+                )}
+                {chosen !== null && (
+                  <div style={{ marginTop: '8px', padding: '10px 14px', borderRadius: '8px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '13px', color: 'var(--text3)' }}>
+                    <strong style={{ color: 'var(--primary)' }}>Örnek cevap:</strong> {q.opts?.[q.ans] || q.blank}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── EŞLEŞTİRME ── */}
+            {q.type === 'matching' && (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Kavram</div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tanım</div>
+                  {(q.pairs || []).map((pair: any, i: number) => (
+                    <>
+                      <div key={`l${i}`} style={{ padding: '10px 12px', borderRadius: '8px', background: 'rgba(8,36,101,0.06)', border: '1px solid rgba(8,36,101,0.1)', fontSize: '13px', fontWeight: 600, color: 'var(--primary)' }}>
+                        {pair.left}
+                      </div>
+                      <select key={`r${i}`} value={matchSelections[i] ?? ''} onChange={e => setMatchSelections(prev => ({ ...prev, [i]: Number(e.target.value) }))}
+                        disabled={chosen !== null}
+                        style={{ padding: '10px 12px', borderRadius: '8px', border: `1px solid ${chosen !== null ? (matchSelections[i] === i ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.4)') : 'var(--border)'}`, background: chosen !== null ? (matchSelections[i] === i ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', fontSize: '13px', color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>
+                        <option value="">Seç...</option>
+                        {(q.pairs || []).map((p: any, j: number) => (
+                          <option key={j} value={j}>{p.right}</option>
+                        ))}
+                      </select>
+                    </>
+                  ))}
+                </div>
+                {chosen === null && (
+                  <button className="btn btn-primary" onClick={submitMatching}
+                    disabled={Object.keys(matchSelections).length < (q.pairs || []).length}
+                    style={{ width: '100%', justifyContent: 'center' }}>
+                    Eşleştir →
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* ── SIRALAMA ── */}
+            {q.type === 'ordering' && (
+              <div>
+                <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px' }}>Öğeleri sürükleyerek doğru sıraya koy:</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {orderItems.map((item, i) => (
+                    <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 14px', borderRadius: '10px', border: `1.5px solid ${chosen !== null ? ((q.correctOrder || []).indexOf(q.items?.indexOf(item) ?? i) === i ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.3)') : 'var(--border)'}`, background: chosen !== null ? ((q.correctOrder || []).indexOf(q.items?.indexOf(item) ?? i) === i ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', fontSize: '13px', cursor: chosen !== null ? 'default' : 'grab' }}>
+                      <span style={{ fontWeight: 700, color: 'var(--text4)', fontSize: '12px', width: '20px' }}>{i + 1}.</span>
+                      <span style={{ flex: 1 }}>{item}</span>
+                      {chosen === null && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <button onClick={() => i > 0 && moveItem(i, i-1)} disabled={i === 0} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: '12px', padding: '0 4px', opacity: i === 0 ? 0.3 : 1 }}>▲</button>
+                          <button onClick={() => i < orderItems.length-1 && moveItem(i, i+1)} disabled={i === orderItems.length-1} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: '12px', padding: '0 4px', opacity: i === orderItems.length-1 ? 0.3 : 1 }}>▼</button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {chosen === null && (
+                  <button className="btn btn-primary" onClick={submitOrdering}
+                    style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
+                    Sıralamayı onayla →
+                  </button>
+                )}
+              </div>
+            )}
             {chosen !== null && (
               <>
                 <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', borderLeft: '3px solid var(--accent)', fontSize: '13px', color: 'var(--text2)', lineHeight: 1.65 }}>

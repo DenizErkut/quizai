@@ -1,423 +1,200 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@supabase/supabase-js'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
-
-// Service role key — RLS bypass, limit kontrolü için
-const supabaseAdmin = createClient(
+const anthropic = new Anthropic()
+const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-interface ProfileParams {
-  name: string; age: number; gender: string; grade: string
-  gradeLevel: string; language: string; topic: string
-  questionCount: number; difficulty: string
-  fileContent?: string; fileType?: string
-  includeVisuals?: boolean
-}
+function getPromptForType(type: string, topic: string, grade: string, difficulty: string, language: string, count: number, fileContent?: string): string {
+  const langNote = `Tüm sorular ve açıklamalar ${language} dilinde olsun.`
+  const gradeNote = `Seviye: ${grade}. Zorluk: ${difficulty}.`
+  const topicNote = fileContent
+    ? `Konu: "${topic}". Aşağıdaki içerikten sorular üret:\n${fileContent.slice(0, 3000)}`
+    : `Konu: "${topic}".`
 
-interface Question {
-  q: string; opts: string[]; ans: number; exp: string
-  svg?: string | null; qtype?: 'text' | 'svg'
-}
+  const base = `${topicNote}\n${gradeNote}\n${langNote}\nSoru sayısı: ${count}\n\n`
 
-const CURRICULUM_SCOPE: Record<string, string> = {
-  'ilkokul 1. sinif': 'Sayilari okuma/yazma (1-20), basit toplama cikarma (10a kadar).',
-  'ilkokul 2. sinif': 'Toplama cikarma (100e kadar), saat okuma, uzunluk olcme.',
-  'ilkokul 3. sinif': 'Carpma (2-5 ile), bolme, kesir (1/2, 1/4).',
-  'ilkokul 4. sinif': 'Carpim tablosu (1-9), dort islem, ondalik, kesirler.',
-  'ortaokul 5. sinif': 'Dogal sayilar, tam sayilara giris, kesirler, yuzde (basit).',
-  'ortaokul 6. sinif': 'Tam sayilar, kesirler (dort islem), oran-orani (giris), geometri. OBEB/OKEK YOKTUR.',
-  'ortaokul 7. sinif': 'Rasyonel sayilar, oran-orani, yuzde, denklemler (basit).',
-  'ortaokul 8. sinif': 'Carpanlara ayirma, denklem sistemleri, Pisagor, olasilik.',
-  'lise 9. sinif': 'Kumeler, mutlak deger, fonksiyon, trigonometri (giris).',
-  'lise 10. sinif': 'Polinomlar, ikinci derece, logaritma, trigonometri.',
-  'lise 11. sinif': 'Turev, integral (giris), istatistik.',
-  'lise 12. sinif': 'Integral uygulamalari, seriler, olasilik (ileri).',
-}
+  const formats: Record<string, string> = {
+    multiple_choice: `${base}Çoktan seçmeli sorular üret. Her soru için 4 şık (A/B/C/D), doğru cevap indexi ve açıklama olsun.
 
-const DIFFICULTY_HINTS: Record<string, string> = {
-  kolay: 'KOLAY: Temel tanim sorulari. Siklar cok belirgin farkli.',
-  normal: 'NORMAL: Mufredat seviyesi. Kavramin uygulamasi.',
-  zor: 'ZOR: Analiz gerektiren. Siklar birbirine yakin.',
-  'cok zor': 'COK ZOR: Olimpiyat seviyesi. Zekice tuzaklar.',
-}
+JSON formatı (başka hiçbir şey yazma):
+{
+  "questions": [
+    {
+      "type": "multiple_choice",
+      "q": "Soru metni",
+      "opts": ["A şıkkı", "B şıkkı", "C şıkkı", "D şıkkı"],
+      "ans": 0,
+      "exp": "Açıklama"
+    }
+  ]
+}`,
 
-function getCurriculumNote(grade: string): string {
-  const n = (s: string) => s.toLowerCase()
-    .replace(/\u0131/g,'i').replace(/\u015f/g,'s').replace(/\u011f/g,'g')
-    .replace(/\u00fc/g,'u').replace(/\u00f6/g,'o').replace(/\u00e7/g,'c')
-  const ng = n(grade.trim())
-  for (const [k,v] of Object.entries(CURRICULUM_SCOPE)) {
-    if (n(k) === ng) return v
-  }
-  return ''
-}
+    fill_blank: `${base}Boşluk doldurma soruları üret. Cümlede kritik bir kelime/kavram boşluk bırakılmış olsun. 4 şık ver (biri doğru), doğru cevabı "blank" alanına da yaz.
 
-function buildPrompt(p: ProfileParams): string {
-  const curriculum = getCurriculumNote(p.grade)
-  const diffHint = DIFFICULTY_HINTS[p.difficulty] || DIFFICULTY_HINTS.normal
+JSON formatı (başka hiçbir şey yazma):
+{
+  "questions": [
+    {
+      "type": "fill_blank",
+      "q": "_____ hücrenin enerji merkezidir.",
+      "blank": "Mitokondri",
+      "opts": ["Mitokondri", "Ribozom", "Çekirdek", "Lizozom"],
+      "ans": 0,
+      "exp": "Mitokondri hücresel solunum yaparak ATP üretir."
+    }
+  ]
+}`,
 
-  const fileSec = p.fileContent ? `
-DOSYA ICERIGI (bu icerikten soru uret):
----
-${p.fileContent.slice(0, 6000)}
----` : ''
+    true_false: `${base}Doğru/Yanlış soruları üret. Her soru için bir ifade ver, doğruysa ans:0, yanlışsa ans:1. opts her zaman ["Doğru", "Yanlış"] olsun. Açıklamada neden doğru/yanlış olduğunu belirt.
 
-  const visualSec = p.includeVisuals ? `
-GORSEL SORU: Sorularin ~30%'i gorsel olabilir. Gorsel sorular icin:
-- "qtype":"svg", "svg" alanina gecerli SVG kodu (viewBox="0 0 400 250")
-- SVG renkleri: #5b4cf5 #16a34a #dc2626 #d97706 #64748b
-- font-family="sans-serif"
-- Soru SVG'ye referans vermeli: "Asagidaki grafige gore..."
-Gorsel olmayan: "qtype":"text", "svg":null` : `Tum sorular metin tabanli. "qtype":"text", "svg":null`
+JSON formatı (başka hiçbir şey yazma):
+{
+  "questions": [
+    {
+      "type": "true_false",
+      "q": "Fotosentez sadece gündüz gerçekleşir.",
+      "opts": ["Doğru", "Yanlış"],
+      "ans": 0,
+      "exp": "Fotosentez ışık enerjisi gerektirdiği için gündüz gerçekleşir."
+    }
+  ]
+}`,
 
-  return `Sen MEB mufredatina hakim egitim uzmanisın. DOGRU CEVAPLARI URET.
+    matching: `${base}Eşleştirme soruları üret. Her soru için 4 kavram-tanım çifti ver. Soru metninde ne eşleştirileceğini anlat.
 
-Profil: ${p.name}, ${p.grade}, ${p.age} yas, ${p.gender}
-Konu: ${p.topic} | Dil: ${p.language} | Zorluk: ${p.difficulty.toUpperCase()}
-${fileSec}
-Mufredat: ${curriculum || p.grade + ' seviyesine uygun'}
-${diffHint}
-${visualSec}
+JSON formatı (başka hiçbir şey yazma):
+{
+  "questions": [
+    {
+      "type": "matching",
+      "q": "Hücre organellerini görevleriyle eşleştirin.",
+      "pairs": [
+        {"left": "Mitokondri", "right": "Enerji üretimi"},
+        {"left": "Ribozom", "right": "Protein sentezi"},
+        {"left": "Çekirdek", "right": "DNA depolama"},
+        {"left": "Lizozom", "right": "Sindirim"}
+      ],
+      "opts": ["Mitokondri", "Ribozom", "Çekirdek", "Lizozom"],
+      "ans": 0,
+      "exp": "Her organel hücrede kritik bir görev üstlenir."
+    }
+  ]
+}`,
 
-${p.questionCount} adet soru uret.
+    ordering: `${base}Sıralama soruları üret. Her soru için 4-5 öğe ver, doğru sırasını correctOrder dizisinde belirt. items karışık sırada olsun.
 
-KRITIK KURALLAR:
-1. "ans" her zaman opts dizisindeki GERCEKTEN DOGRU cevabın index'i olmalidir (0, 1, 2 veya 3).
-2. Matematiksel hesaplama gerektiren sorularda ONCE hesapla, sonra cevabi yaz.
-3. "exp" aciklamasi neden dogru oldugunu aciklayan TUTARLI bir metin olmalidir.
-4. opts[ans] == dogru cevap. Bunu her soru icin kontrol et.
-5. Hic "ans" degerini ezberden yazma — her soru icin ayri dusun.
+JSON formatı (başka hiçbir şey yazma):
+{
+  "questions": [
+    {
+      "type": "ordering",
+      "q": "Osmanlı Devleti'nin kuruluşundan çöküşüne giden olayları kronolojik sıraya koyun.",
+      "items": ["Fatih İstanbul'u fethetti", "Osman Bey kurdu", "Tanzimat Fermanı", "Kurtuluş Savaşı"],
+      "correctOrder": [1, 0, 2, 3],
+      "opts": ["1. adım", "2. adım", "3. adım", "4. adım"],
+      "ans": 0,
+      "exp": "Osmanlı 1299'da kuruldu, 1453'te İstanbul fethedildi, 1839'da Tanzimat, 1923'te cumhuriyet kuruldu."
+    }
+  ]
+}`,
 
-4 sik, aciklama ${p.language} dilinde, tekrar yok.
+    short_answer: `${base}Kısa cevap soruları üret. Her soru için örnek/model cevabı opts[0]'a yaz, ans:0 olsun. Öğrenci kendi cevabını yazacak.
 
-SADECE JSON:
-{"questions":[{"qtype":"text","q":"?","opts":["yanlis1","yanlis2","DOGRU","yanlis3"],"ans":2,"exp":"Aciklama.","svg":null}]}`
-}
-
-// ── Aylik sayaci sifirla ve limit kontrol et ──
-async function checkAndIncrementLimit(userId: string): Promise<{ allowed: boolean; reason?: string }> {
-  // Profili cek
-  const { data: profile, error } = await supabaseAdmin
-    .from('profiles')
-    .select('plan, plan_expires_at, monthly_test_count, monthly_reset_at')
-    .eq('id', userId)
-    .single()
-
-  if (error || !profile) return { allowed: false, reason: 'profile_not_found' }
-
-  // Premium suresi dolmussa free'ye dusur
-  if (profile.plan === 'premium' && profile.plan_expires_at && new Date(profile.plan_expires_at) < new Date()) {
-    await supabaseAdmin.from('profiles').update({ plan: 'free' }).eq('id', userId)
-    profile.plan = 'free'
-  }
-
-  // Premium — sinirsiz
-  if (profile.plan === 'premium') {
-    await supabaseAdmin.from('profiles')
-      .update({ monthly_test_count: (profile.monthly_test_count || 0) + 1 })
-      .eq('id', userId)
-    return { allowed: true }
+JSON formatı (başka hiçbir şey yazma):
+{
+  "questions": [
+    {
+      "type": "short_answer",
+      "q": "Fotosentez nedir? Hangi organelde gerçekleşir?",
+      "opts": ["Fotosentez; bitkinin güneş enerjisini kullanarak su ve karbondioksitten besin (glikoz) ve oksijen üretme sürecidir. Kloroplastta gerçekleşir."],
+      "ans": 0,
+      "exp": "Fotosentez denklemi: 6CO2 + 6H2O + ışık → C6H12O6 + 6O2"
+    }
+  ]
+}`
   }
 
-  // Aylik reset kontrolu
-  const resetAt = profile.monthly_reset_at ? new Date(profile.monthly_reset_at) : new Date(0)
-  const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0)
-  
-  if (resetAt < monthStart) {
-    // Yeni ay — sayaci sifirla
-    await supabaseAdmin.from('profiles')
-      .update({ monthly_test_count: 1, monthly_reset_at: monthStart.toISOString() })
-      .eq('id', userId)
-    return { allowed: true }
-  }
-
-  // Free plan limit: 10
-  const count = profile.monthly_test_count || 0
-  if (count >= 10) {
-    return { allowed: false, reason: 'limit_reached' }
-  }
-
-  // Sayaci artir
-  await supabaseAdmin.from('profiles')
-    .update({ monthly_test_count: count + 1 })
-    .eq('id', userId)
-  return { allowed: true }
+  return formats[type] || formats['multiple_choice']
 }
 
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
-  }
-  const token = authHeader.slice(7)
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { global: { headers: { Authorization: `Bearer ${token}` } } }
-  ) as any
-
-  const { data: { user }, error: authErr } = await supabase.auth.getUser()
-  if (authErr || !user) return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 })
-
-  // ── SERVER-SIDE LİMİT KONTROLÜ ──
-  const limitCheck = await checkAndIncrementLimit(user.id)
-  if (!limitCheck.allowed) {
-    if (limitCheck.reason === 'limit_reached') {
-      return NextResponse.json({
-        error: 'limit_reached',
-        message: 'Bu ayki 10 test hakkını kullandın. Premium\'a geç veya ay başını bekle.',
-      }, { status: 429 })
-    }
-    return NextResponse.json({ error: 'Test başlatılamadı.' }, { status: 400 })
-  }
-
-  const { data: profile, error: profileErr } = await supabase
-    .from('profiles').select('name, age, gender, grade, language').eq('id', user.id).single()
-  if (profileErr || !profile) return NextResponse.json({ error: 'Profil bulunamadi.' }, { status: 404 })
-
-  const body = await req.json()
-  const topic: string = body.topic?.trim()
-  const questionCount: number = Math.min(body.questionCount ?? 10, 20)
-  const difficulty: string = body.difficulty || 'normal'
-  const language: string = body.language || profile.language
-  const fileContent: string | undefined = body.fileContent
-  const fileType: string | undefined = body.fileType
-  const includeVisuals: boolean = body.includeVisuals ?? true
-
-  if (!topic) return NextResponse.json({ error: 'Konu belirtilmedi.' }, { status: 400 })
-
-  const gradeLevel = profile.grade.startsWith('ilk') ? 'ilkokul'
-    : profile.grade.startsWith('orta') ? 'ortaokul'
-    : profile.grade.startsWith('lise') ? 'lise'
-    : 'universite'
-
-  const prompt = buildPrompt({
-    name: profile.name, age: profile.age, gender: profile.gender,
-    grade: profile.grade, gradeLevel, language, topic, questionCount,
-    difficulty, fileContent, fileType, includeVisuals,
-  })
-
-  let questions: Question[]
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 6000,
-      messages: [{ role: 'user', content: prompt }],
-    })
-    const raw = (message.content[0] as { text: string }).text
-      .replace(/```json|```/g, '').trim()
-    questions = JSON.parse(raw).questions
+    const authHeader = req.headers.get('Authorization')
+    const token = authHeader?.replace('Bearer ', '')
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    questions = questions.map((q: Question) => {
-      if (!q.opts || q.opts.length !== 4 || q.ans < 0 || q.ans > 3) return q
-      const correctOpt = q.opts[q.ans]
-      // Fisher-Yates shuffle
-      const shuffled = [...q.opts]
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-      }
-      const newAns = shuffled.indexOf(correctOpt)
-      // Güvenlik: correctOpt bulunamadıysa shuffle yapma
-      if (newAns === -1) return { ...q, qtype: q.qtype || 'text' }
-      return { ...q, opts: shuffled, ans: newAns, qtype: q.qtype || 'text' }
-    })
-  } catch (e) {
-    // Limit artırıldı ama soru üretilemedi — geri al
-    await supabaseAdmin.from('profiles')
-      .update({ monthly_test_count: (await supabaseAdmin.from('profiles').select('monthly_test_count').eq('id', user.id).single()).data?.monthly_test_count - 1 })
-      .eq('id', user.id)
-    console.error('Claude API:', e)
-    return NextResponse.json({ error: 'Sorular uretilemedi.' }, { status: 500 })
-  }
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: session } = await supabase
-    .from('quiz_sessions')
-    .insert({ user_id: user.id, topic, grade: profile.grade, language, question_count: questionCount, questions, answers: [], completed: false })
-    .select('id').single()
+    const { data: profile } = await supabase.from('profiles')
+      .select('plan, monthly_test_count, grade, language').eq('id', user.id).single()
+    if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
-  return NextResponse.json({
-    sessionId: session?.id ?? null,
-    questions,
-    profile: { name: profile.name, grade: profile.grade, language },
-  })
-}
-
-
-export async function PATCH(req: NextRequest) {
-  const authHeader = req.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
-  const token = authHeader.slice(7)
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { global: { headers: { Authorization: `Bearer ${token}` } } }
-  ) as any
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
-
-  const body = await req.json()
-  const { sessionId, answers, score } = body
-
-  // Session guncelle — direkt, supabaseAdmin olmadan
-  const { error: updateErr } = await supabase.from('quiz_sessions')
-    .update({ answers, score, completed: true })
-    .eq('id', sessionId).eq('user_id', user.id)
-
-  if (updateErr) return NextResponse.json({ error: 'Kayit basarisiz.' }, { status: 500 })
-
-  // pct hesapla
-  const { data: sessionData, error: sessionErr } = await supabaseAdmin
-    .from('quiz_sessions')
-    .select('topic, question_count')
-    .eq('id', sessionId)
-    .single()
-
-  const questionCount = sessionData?.question_count || 1
-  const pct = Math.round((score / questionCount) * 100)
-  const topic = sessionData?.topic || ''
-
-  // (session already updated above)
-
-  // Weak topics upsert
-  if (topic) {
-    const { data: existingWeak } = await supabaseAdmin
-      .from('weak_topics')
-      .select('id, wrong_count, total_count')
-      .eq('user_id', user.id)
-      .eq('topic', topic)
-      .single()
-
-    const wrong = questionCount - score
-    if (existingWeak) {
-      await supabaseAdmin.from('weak_topics').update({
-        wrong_count: existingWeak.wrong_count + wrong,
-        total_count: existingWeak.total_count + questionCount,
-      }).eq('id', existingWeak.id)
-    } else {
-      await supabaseAdmin.from('weak_topics').insert({
-        user_id: user.id, topic,
-        wrong_count: wrong, total_count: questionCount,
-      })
+    if (profile.plan === 'free' && (profile.monthly_test_count || 0) >= 10) {
+      return NextResponse.json({ error: 'limit_reached' }, { status: 429 })
     }
-  }
 
-  // Plan progress otomatik kontrol — sadece pct >= 60 ise
-  if (pct >= 60 && topic) {
+    const body = await req.json()
+    const {
+      topic, questionCount = 10, difficulty = 'normal',
+      language, fileContent, fileType, includeVisuals = true,
+      questionType = 'multiple_choice', dailyChallenge = false
+    } = body
+
+    const lang = language || profile.language || 'Türkçe'
+    const grade = profile.grade || 'ortaokul 6. sinif'
+
+    const prompt = getPromptForType(questionType, topic, grade, difficulty, lang, questionCount, fileContent)
+
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+
+    const text = response.content[0].type === 'text' ? response.content[0].text : ''
+    const clean = text.replace(/```json|```/g, '').trim()
+
+    let parsed: any
     try {
-      const { data: activePlan } = await supabaseAdmin
-        .from('study_plans')
-        .select('id, plan')
-        .eq('user_id', user.id)
-        .order('generated_at', { ascending: false })
-        .limit(1)
-        .single()
-
-      if (activePlan?.plan?.weeks) {
-        const weeks = activePlan.plan.weeks as Array<{ week: number; topics?: string[] }>
-        const allTopics: { week: number; topic: string }[] = []
-        weeks.forEach(w => w.topics?.forEach(t => allTopics.push({ week: w.week, topic: t })))
-
-        if (allTopics.length > 0) {
-          const topicList = allTopics.map(t => `Hafta ${t.week}: "${t.topic}"`).join('\n')
-
-          const matchMsg = await anthropic.messages.create({
-            model: 'claude-sonnet-4-5',
-            max_tokens: 200,
-            messages: [{
-              role: 'user',
-              content: `Kullanici "${topic}" konusunda test cozdu.\nAsagidaki plan konularindan hangisiyle esleşiyor? Ayni veya cok benzer konulari bul.\n\n${topicList}\n\nSadece eslesen konulari JSON olarak dondur: {"matches":[{"week":1,"topic":"konu adi"}]}\nEsleme yoksa: {"matches":[]}\nSadece JSON, baska hicbir sey yazma.`
-            }]
-          })
-
-          const rawMatch = (matchMsg.content[0] as { text: string }).text.replace(/```json|```/g, '').trim()
-          const { matches } = JSON.parse(rawMatch)
-
-          if (matches?.length > 0) {
-            for (const match of matches) {
-              const { data: existingProg } = await supabaseAdmin
-                .from('plan_progress')
-                .select('id, completed')
-                .eq('user_id', user.id)
-                .eq('plan_id', activePlan.id)
-                .eq('week_number', match.week)
-                .eq('topic', match.topic)
-                .single()
-
-              if (existingProg && !existingProg.completed) {
-                await supabaseAdmin.from('plan_progress').update({
-                  completed: true,
-                  completed_at: new Date().toISOString(),
-                }).eq('id', existingProg.id)
-              } else if (!existingProg) {
-                await supabaseAdmin.from('plan_progress').insert({
-                  user_id: user.id,
-                  plan_id: activePlan.id,
-                  week_number: match.week,
-                  topic: match.topic,
-                  completed: true,
-                  completed_at: new Date().toISOString(),
-                })
-              }
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Plan check error:', e)
+      parsed = JSON.parse(clean)
+    } catch {
+      const match = clean.match(/\{[\s\S]*\}/)
+      if (!match) throw new Error('Invalid JSON response')
+      parsed = JSON.parse(match[0])
     }
-  }
 
-  // ── Rozet kontrolü ──
-  try {
-    const { data: allSessions } = await supabaseAdmin
-      .from('quiz_sessions')
-      .select('pct, completed')
-      .eq('user_id', user.id)
-      .eq('completed', true)
+    const questions = parsed.questions || []
 
-    const { data: streakData } = await supabaseAdmin
-      .from('streaks')
-      .select('current_streak')
-      .eq('user_id', user.id)
-      .single()
-
-    const { data: existingBadges } = await supabaseAdmin
-      .from('badges')
-      .select('badge_key')
-      .eq('user_id', user.id)
-
-    const earned = new Set((existingBadges || []).map((b: any) => b.badge_key))
-    const totalTests = (allSessions || []).length
-    const avgPct = totalTests > 0 ? Math.round((allSessions || []).reduce((s: number, x: any) => s + x.pct, 0) / totalTests) : 0
-    const streak = streakData?.current_streak || 0
-    const toEarn: string[] = []
-
-    if (totalTests >= 1 && !earned.has('first_test')) toEarn.push('first_test')
-    if (pct === 100 && !earned.has('perfect_score')) toEarn.push('perfect_score')
-    if (totalTests >= 10 && !earned.has('tests_10')) toEarn.push('tests_10')
-    if (totalTests >= 50 && !earned.has('tests_50')) toEarn.push('tests_50')
-    if (totalTests >= 100 && !earned.has('tests_100')) toEarn.push('tests_100')
-    if (avgPct >= 80 && totalTests >= 10 && !earned.has('high_score_80')) toEarn.push('high_score_80')
-    if (streak >= 3 && !earned.has('streak_3')) toEarn.push('streak_3')
-    if (streak >= 7 && !earned.has('streak_7')) toEarn.push('streak_7')
-    if (streak >= 30 && !earned.has('streak_30')) toEarn.push('streak_30')
-
-    if (toEarn.length > 0) {
-      await supabaseAdmin.from('badges').insert(
-        toEarn.map(badge_key => ({ user_id: user.id, badge_key }))
-      )
+    // Test sayısını güncelle
+    if (!dailyChallenge) {
+      await supabase.from('profiles').update({
+        monthly_test_count: (profile.monthly_test_count || 0) + 1
+      }).eq('id', user.id)
     }
-  } catch (e) {
-    console.error('Badge check error:', e)
-  }
 
-  return NextResponse.json({ ok: true, pct })
+    // Session kaydet
+    const { data: session } = await supabase.from('quiz_sessions').insert({
+      user_id: user.id,
+      topic,
+      grade: profile.grade,
+      language: lang,
+      question_count: questions.length,
+      questions,
+      answers: [],
+      score: 0,
+      pct: 0,
+      completed: false,
+      question_type: questionType,
+    }).select('id').single()
+
+    return NextResponse.json({ questions, sessionId: session?.id })
+  } catch (error) {
+    console.error('Generate quiz error:', error)
+    return NextResponse.json({ error: 'Quiz üretilemedi' }, { status: 500 })
+  }
 }
