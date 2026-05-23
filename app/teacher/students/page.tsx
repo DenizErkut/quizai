@@ -95,7 +95,11 @@ export default function TeacherStudentsPage() {
       subject: newClass.subject.trim(),
     }).select().single()
     setCreating(false)
-    if (error || !data) { alert('Sınıf oluşturulamadı, tekrar dene.'); return }
+    if (error || !data) {
+      console.error('Classroom insert error:', error)
+      alert('Hata: ' + (error?.message || 'Bilinmeyen hata'))
+      return
+    }
     const updated = [data, ...classrooms]
     setClassrooms(updated)
     setSelectedClass(data.id)
