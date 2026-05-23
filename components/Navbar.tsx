@@ -87,6 +87,7 @@ export default function Navbar() {
     { label: '🏆 Sıralama', href: '/leaderboard' },
     { label: '✏️ Profil düzenle', href: '/profile/edit' },
     { label: '📝 Notlarım', href: '/notes' },
+    { label: '🗂️ Soru arşivi', href: '/archive' },
     { label: '💎 Planlar', href: '/pricing' },
     { label: '🎁 Davet et & kazan', href: '/referral' },
     { label: '🔑 Şifremi değiştir', href: '/auth/reset-password' },
@@ -209,7 +210,7 @@ export default function Navbar() {
           { href: '/daily', label: streak > 0 ? `${streak} gün` : 'Günlük', icon: streak > 0 ? '🔥' : '📅' },
           { href: '/leaderboard', label: 'Sıralama', icon: '🏆' },
           { href: '/analysis', label: 'Analiz', icon: '📊' },
-          { href: '/plan', label: 'Plan', icon: '📋' },
+          { href: '/archive', label: 'Arşiv', icon: '🗂️' },
         ].map(item => (
           <Link key={item.href} href={item.href}
             style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textDecoration: 'none', padding: '4px 8px', borderRadius: '8px', minWidth: '52px', background: pathname === item.href ? 'rgba(0,149,200,0.15)' : 'transparent' }}>
