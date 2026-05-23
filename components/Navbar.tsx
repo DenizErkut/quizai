@@ -37,6 +37,7 @@ export default function Navbar() {
   const [streak, setStreak] = useState(0)
   const [showLang, setShowLang] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
   const supabase = createClient() as any
 
   useEffect(() => {
@@ -53,6 +54,14 @@ export default function Navbar() {
         setProfile(p)
       }
       setStreak(s?.current_streak || 0)
+
+      // Okunmamış bildirim sayısı
+      const { count } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('read', false)
+      setUnreadCount(count || 0)
     }
     load()
   }, [pathname])
@@ -152,6 +161,30 @@ export default function Navbar() {
                 }}>★ Premium</span>
               </Link>
             )}
+
+            {/* Bildirim çanı */}
+            <a href="/notifications" onClick={() => setUnreadCount(0)} style={{
+              position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 36, height: 36, borderRadius: '8px',
+              background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
+              color: '#fff', textDecoration: 'none', transition: 'background 0.15s',
+            }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}>
+              <span style={{ fontSize: '18px', lineHeight: 1 }}>🔔</span>
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: -4, right: -4,
+                  width: 18, height: 18, borderRadius: '50%',
+                  background: '#fdd31d', color: '#082465',
+                  fontSize: '10px', fontWeight: 800,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: '2px solid #082465',
+                }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </a>
 
             {/* Dil seçici */}
             <div style={{ position: 'relative' }}>

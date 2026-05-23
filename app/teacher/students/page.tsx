@@ -46,12 +46,28 @@ function TeacherStudentsContent() {
   }
 
   async function loadStudents(classroomId: string) {
-    const { data } = await supabase
+    const { data: cs } = await supabase
       .from('classroom_students')
-      .select('student_id, joined_at, profiles(name, grade, school, monthly_test_count)')
+      .select('student_id, joined_at')
       .eq('classroom_id', classroomId)
-    setStudents(data ?? [])
-    return data ?? []
+
+    if (!cs?.length) { setStudents([]); return [] }
+
+    const ids = cs.map((c: any) => c.student_id)
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, name, grade, school, monthly_test_count')
+      .in('id', ids)
+
+    const profileMap: Record<string, any> = {}
+    profiles?.forEach((p: any) => { profileMap[p.id] = p })
+
+    const merged = cs.map((c: any) => ({
+      ...c,
+      profiles: profileMap[c.student_id] || null,
+    }))
+    setStudents(merged)
+    return merged
   }
 
   async function loadSuggestions(t: any, classroom: any) {
