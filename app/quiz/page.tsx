@@ -250,8 +250,12 @@ export default function QuizPage() {
 
   // ── TOPIC ──
   if (screen === 'topic') return (
-    <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', background: 'var(--bg)' }}>
-      <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+    <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', position: 'relative', overflow: 'hidden', background: 'linear-gradient(160deg, #f0f9ff 0%, #ffffff 40%, #f5f3ff 100%)' }}>
+      {/* Dekoratif arka plan elementleri */}
+      <div style={{ position: 'fixed', top: '-120px', right: '-80px', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,207,184,0.08) 0%, transparent 65%)', pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{ position: 'fixed', bottom: '60px', left: '-100px', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(91,127,238,0.07) 0%, transparent 65%)', pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{ position: 'fixed', top: '40%', left: '60%', width: '300px', height: '300px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,207,184,0.05) 0%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{ maxWidth: '640px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
 
         {profile && (
           <div className="anim-up" style={{ marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -378,16 +382,20 @@ export default function QuizPage() {
           )}
         </div>
       </div>
+      </div>
     </main>
   )
 
   // ── LOADING ──
   if (screen === 'loading') return (
-    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div className="spinner" style={{ margin: '0 auto 1.25rem' }} />
-        <div style={{ fontWeight: 500, marginBottom: '0.4rem' }}>Sorular hazırlanıyor...</div>
-        <div style={{ fontSize: '13px', color: 'var(--text2)' }}>{loadMsg}</div>
+    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg, #f0f9ff 0%, #ffffff 40%, #f5f3ff 100%)' }}>
+      <div style={{ position: 'fixed', top: '-120px', right: '-80px', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,207,184,0.08) 0%, transparent 65%)', pointerEvents: 'none' }} />
+      <div style={{ textAlign: 'center', position: 'relative', zIndex: 1 }}>
+        <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--gradient)', margin: '0 auto 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--shadow-accent)' }}>
+          <div className="spinner" style={{ width: 28, height: 28, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} />
+        </div>
+        <div style={{ fontWeight: 600, fontSize: '16px', marginBottom: '0.4rem' }}>Sorular hazırlanıyor...</div>
+        <div style={{ fontSize: '13px', color: 'var(--text3)' }}>{loadMsg}</div>
       </div>
     </main>
   )
@@ -398,10 +406,12 @@ export default function QuizPage() {
     const progPct = Math.round((current / questions.length) * 100)
     const diff = DIFFICULTIES.find(d => d.value === difficulty)!
     return (
-      <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', background: 'var(--bg)' }}>
-        <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+      <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', background: 'linear-gradient(160deg, #f0f9ff 0%, #ffffff 40%, #f5f3ff 100%)' }}>
+        <div style={{ position: 'fixed', top: '-120px', right: '-80px', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,207,184,0.07) 0%, transparent 65%)', pointerEvents: 'none', zIndex: 0 }} />
+        <div style={{ position: 'fixed', bottom: '60px', left: '-100px', width: '350px', height: '350px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(91,127,238,0.06) 0%, transparent 65%)', pointerEvents: 'none', zIndex: 0 }} />
+        <div style={{ maxWidth: '640px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <span style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '0.05em' }}><span style={{ color: 'var(--accent)' }}>P</span>RATIUM</span>
+            <img src='/pratium-logo-new.svg' alt='Pratium' style={{ height: '32px' }} />
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '99px', background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600 }}>{diff.label}</span>
               <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{answers.filter(a => a.correct).length}/{current} doğru</span>
@@ -459,7 +469,7 @@ export default function QuizPage() {
   if (screen === 'result') {
     const topic = customTopic.trim() || selectedTopic
     return (
-      <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', background: 'var(--bg)' }}>
+      <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', background: 'linear-gradient(160deg, #f0f9ff 0%, #ffffff 40%, #f5f3ff 100%)' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
           <QuizResult
             questions={questions}
