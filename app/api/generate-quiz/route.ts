@@ -375,5 +375,49 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
+  // ── Rozet kontrolü ──
+  try {
+    const { data: allSessions } = await supabaseAdmin
+      .from('quiz_sessions')
+      .select('pct, completed')
+      .eq('user_id', user.id)
+      .eq('completed', true)
+
+    const { data: streakData } = await supabaseAdmin
+      .from('streaks')
+      .select('current_streak')
+      .eq('user_id', user.id)
+      .single()
+
+    const { data: existingBadges } = await supabaseAdmin
+      .from('badges')
+      .select('badge_key')
+      .eq('user_id', user.id)
+
+    const earned = new Set((existingBadges || []).map((b: any) => b.badge_key))
+    const totalTests = (allSessions || []).length
+    const avgPct = totalTests > 0 ? Math.round((allSessions || []).reduce((s: number, x: any) => s + x.pct, 0) / totalTests) : 0
+    const streak = streakData?.current_streak || 0
+    const toEarn: string[] = []
+
+    if (totalTests >= 1 && !earned.has('first_test')) toEarn.push('first_test')
+    if (pct === 100 && !earned.has('perfect_score')) toEarn.push('perfect_score')
+    if (totalTests >= 10 && !earned.has('tests_10')) toEarn.push('tests_10')
+    if (totalTests >= 50 && !earned.has('tests_50')) toEarn.push('tests_50')
+    if (totalTests >= 100 && !earned.has('tests_100')) toEarn.push('tests_100')
+    if (avgPct >= 80 && totalTests >= 10 && !earned.has('high_score_80')) toEarn.push('high_score_80')
+    if (streak >= 3 && !earned.has('streak_3')) toEarn.push('streak_3')
+    if (streak >= 7 && !earned.has('streak_7')) toEarn.push('streak_7')
+    if (streak >= 30 && !earned.has('streak_30')) toEarn.push('streak_30')
+
+    if (toEarn.length > 0) {
+      await supabaseAdmin.from('badges').insert(
+        toEarn.map(badge_key => ({ user_id: user.id, badge_key }))
+      )
+    }
+  } catch (e) {
+    console.error('Badge check error:', e)
+  }
+
   return NextResponse.json({ ok: true, pct })
 }
