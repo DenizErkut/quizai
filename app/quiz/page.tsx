@@ -259,7 +259,10 @@ export default function QuizPage() {
     const q = questions[current]
     const pairs = q.pairs || []
     let correctCount = 0
-    pairs.forEach((_: any, i: number) => { if (matchSelections[i] === i) correctCount++ })
+    pairs.forEach((_: any, i: number) => {
+      const userShuffledIdx = matchSelections[i]
+      if (userShuffledIdx !== undefined && shuffledIndexMap[userShuffledIdx] === i) correctCount++
+    })
     const correct = correctCount === pairs.length
     setChosen(correct ? q.ans : -1)
     setAnswers(prev => [...prev, { userAns: correct ? q.ans : -1, correct }])
@@ -282,6 +285,8 @@ export default function QuizPage() {
     })
   }
 
+  const [shuffledPairs, setShuffledPairs] = useState<string[]>([])
+
   // Reset type-specific state on question change
   useEffect(() => {
     const q = questions[current]
@@ -290,7 +295,17 @@ export default function QuizPage() {
     setShortInput('')
     setMatchSelections({})
     if (q.items) setOrderItems([...q.items].sort(() => Math.random() - 0.5))
+    // Eşleştirme: sağ tarafı karıştır, orijinal index'i sakla
+    if (q.pairs) {
+      const rights = q.pairs.map((p: any, i: number) => ({ text: p.right, originalIndex: i }))
+      const shuffled = [...rights].sort(() => Math.random() - 0.5)
+      setShuffledPairs(shuffled.map((s: any) => s.text))
+      // shuffledIndexMap: karışık pozisyon → orijinal index
+      setShuffledIndexMap(shuffled.map((s: any) => s.originalIndex))
+    }
   }, [current, questions])
+
+  const [shuffledIndexMap, setShuffledIndexMap] = useState<number[]>([])
 
   async function next() {
     if (current + 1 >= questions.length) {
@@ -669,23 +684,32 @@ export default function QuizPage() {
             {q.type === 'matching' && (
               <div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Kavram</div>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tanım</div>
-                  {(q.pairs || []).map((pair: any, i: number) => (
-                    <>
-                      <div key={`l${i}`} style={{ padding: '10px 12px', borderRadius: '8px', background: 'rgba(8,36,101,0.06)', border: '1px solid rgba(8,36,101,0.1)', fontSize: '13px', fontWeight: 600, color: 'var(--primary)' }}>
-                        {pair.left}
-                      </div>
-                      <select key={`r${i}`} value={matchSelections[i] ?? ''} onChange={e => setMatchSelections(prev => ({ ...prev, [i]: Number(e.target.value) }))}
-                        disabled={chosen !== null}
-                        style={{ padding: '10px 12px', borderRadius: '8px', border: `1px solid ${chosen !== null ? (matchSelections[i] === i ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.4)') : 'var(--border)'}`, background: chosen !== null ? (matchSelections[i] === i ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', fontSize: '13px', color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>
-                        <option value="">Seç...</option>
-                        {(q.pairs || []).map((p: any, j: number) => (
-                          <option key={j} value={j}>{p.right}</option>
-                        ))}
-                      </select>
-                    </>
-                  ))}
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', paddingBottom: '4px' }}>Kavram</div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', paddingBottom: '4px' }}>Tanım</div>
+                  {(q.pairs || []).map((pair: any, i: number) => {
+                    // matchSelections[i] = kullanıcının seçtiği shuffledPairs index'i
+                    // Doğru cevap: shuffledIndexMap[seçilen] === i (orijinal index eşleşmeli)
+                    const userShuffledIdx = matchSelections[i]
+                    const isAnswered = chosen !== null && userShuffledIdx !== undefined
+                    const isCorrect = isAnswered && shuffledIndexMap[userShuffledIdx] === i
+                    return (
+                      <>
+                        <div key={`l${i}`} style={{ padding: '10px 12px', borderRadius: '8px', background: 'rgba(8,36,101,0.06)', border: '1px solid rgba(8,36,101,0.1)', fontSize: '13px', fontWeight: 600, color: 'var(--primary)' }}>
+                          {pair.left}
+                        </div>
+                        <select key={`r${i}`}
+                          value={userShuffledIdx ?? ''}
+                          onChange={e => setMatchSelections(prev => ({ ...prev, [i]: Number(e.target.value) }))}
+                          disabled={chosen !== null}
+                          style={{ padding: '10px 12px', borderRadius: '8px', border: `1px solid ${isAnswered ? (isCorrect ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.4)') : 'var(--border)'}`, background: isAnswered ? (isCorrect ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', fontSize: '13px', color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>
+                          <option value="">Seç...</option>
+                          {shuffledPairs.map((right: string, j: number) => (
+                            <option key={j} value={j}>{right}</option>
+                          ))}
+                        </select>
+                      </>
+                    )
+                  })}
                 </div>
                 {chosen === null && (
                   <button className="btn btn-primary" onClick={submitMatching}
@@ -693,6 +717,14 @@ export default function QuizPage() {
                     style={{ width: '100%', justifyContent: 'center' }}>
                     Eşleştir →
                   </button>
+                )}
+                {chosen !== null && (
+                  <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '8px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '12px', color: 'var(--text3)' }}>
+                    <strong style={{ color: 'var(--primary)' }}>Doğru eşleşmeler:</strong>
+                    {(q.pairs || []).map((p: any, i: number) => (
+                      <div key={i} style={{ marginTop: '4px' }}>{p.left} → {p.right}</div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
