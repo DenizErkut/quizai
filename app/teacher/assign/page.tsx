@@ -17,6 +17,8 @@ export default function TeacherAssignPage() {
   const [assignments, setAssignments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [assignFile, setAssignFile] = useState<File | null>(null)
+  const [assignFileContent, setAssignFileContent] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({
     classroom_id: '',
@@ -109,6 +111,30 @@ export default function TeacherAssignPage() {
                 onChange={e => setForm(p => ({ ...p, title: e.target.value }))} style={inputStyle} />
               <input placeholder="Konu (AI buna göre soru üretir)" value={form.topic}
                 onChange={e => setForm(p => ({ ...p, topic: e.target.value }))} style={inputStyle} />
+              <div style={{ marginTop: '6px' }}>
+                <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>
+                  Veya dosyadan soru üret (PDF, DOCX, JPG, PNG)
+                </label>
+                <input type="file" accept=".pdf,.docx,.jpg,.jpeg,.png,.txt"
+                  onChange={async e => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    setAssignFile(file)
+                    // Read file content for text files
+                    if (file.type.includes('text') || file.name.endsWith('.txt')) {
+                      const text = await file.text()
+                      setAssignFileContent(text.slice(0, 3000))
+                      if (!form.topic) setForm(p => ({ ...p, topic: file.name.replace(/\.[^.]+$/, '') }))
+                    } else {
+                      setAssignFileContent('')
+                      if (!form.topic) setForm(p => ({ ...p, topic: file.name.replace(/\.[^.]+$/, '') }))
+                    }
+                  }}
+                  style={{ fontSize: '12px', color: 'var(--text)', width: '100%' }} />
+                {assignFile && (
+                  <p style={{ fontSize: '11px', color: 'var(--green)', marginTop: '4px' }}>✓ {assignFile.name}</p>
+                )}
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <select value={form.grade} onChange={e => setForm(p => ({ ...p, grade: e.target.value }))} style={inputStyle}>
                   <option value="">Sınıf seviyesi</option>

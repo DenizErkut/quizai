@@ -398,7 +398,7 @@ export default function PlanPage() {
             </h3>
             <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1.5rem', lineHeight: 1.7 }}>
               {stats?.sessions?.length < 3
-                ? 'Kişisel plan için en az 3 test çözmen gerekiyor. Şu an: ' + stats.sessions.length
+                ? 'Kişisel plan için en az 10 test çözmen gerekiyor. Şu an: ' + stats.sessions.length
                 : 'AI, test geçmişini analiz ederek 4 haftalık özel plan hazırlayacak.'}
             </p>
             <button className="btn btn-primary btn-lg" onClick={generatePlan}

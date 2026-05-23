@@ -12,6 +12,8 @@ export default function TeacherDashboard() {
   const [loading, setLoading] = useState(true)
   const [applying, setApplying] = useState(false)
   const [applyForm, setApplyForm] = useState({ name: '', school: '' })
+  const [applyDoc, setApplyDoc] = useState<File | null>(null)
+  const [applyDocUrl, setApplyDocUrl] = useState('')
   const router = useRouter()
   const supabase = createClient() as any
 
@@ -59,11 +61,26 @@ export default function TeacherDashboard() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user || !applyForm.name.trim()) return
     setApplying(true)
+
+    let docUrl = ''
+    if (applyDoc) {
+      const ext = applyDoc.name.split('.').pop()
+      const path = `teacher-docs/${user.id}-${Date.now()}.${ext}`
+      const { data: uploadData } = await supabase.storage
+        .from('teacher-documents')
+        .upload(path, applyDoc, { upsert: true })
+      if (uploadData) {
+        const { data: urlData } = supabase.storage.from('teacher-documents').getPublicUrl(path)
+        docUrl = urlData.publicUrl
+      }
+    }
+
     await supabase.from('teachers').insert({
       user_id: user.id,
       name: applyForm.name.trim(),
       email: user.email,
       school: applyForm.school.trim(),
+      document_url: docUrl || null,
       approved: false,
     })
     setApplying(false)
@@ -94,15 +111,34 @@ export default function TeacherDashboard() {
               style={inputStyle}
             />
             <input
-              placeholder="Okul adı (isteğe bağlı)"
+              placeholder="Görev yaptığınız okul"
               value={applyForm.school}
               onChange={e => setApplyForm(p => ({ ...p, school: e.target.value }))}
               style={inputStyle}
             />
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text3)', display: 'block', marginBottom: '6px' }}>
+                Öğretmenliği ispatlayan belge <span style={{ color: 'var(--red)' }}>*</span>
+              </label>
+              <p style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>
+                Diploma, atama kararnamesi veya okul müdürü onaylı belge (PDF, JPG, PNG)
+              </p>
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={e => setApplyDoc(e.target.files?.[0] || null)}
+                style={{ fontSize: '13px', color: 'var(--text)', width: '100%' }}
+              />
+              {applyDoc && (
+                <p style={{ fontSize: '12px', color: 'var(--green)', marginTop: '6px' }}>
+                  ✓ {applyDoc.name} seçildi
+                </p>
+              )}
+            </div>
             <button
               className="btn btn-primary"
               onClick={applyAsTeacher}
-              disabled={applying || !applyForm.name.trim()}
+              disabled={applying || !applyForm.name.trim() || !applyForm.school.trim() || !applyDoc}
               style={{ justifyContent: 'center', opacity: applying ? 0.6 : 1 }}
             >
               {applying ? 'Gönderiliyor...' : 'Başvur'}

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import Navbar from '@/components/Navbar'
+import AIChatBot from '@/components/AIChatBot'
 
 export const metadata: Metadata = {
   title: 'Pratium — Öğren. Test Et. Geliş.',
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <Navbar />
         {children}
+        <AIChatBot />
       </body>
     </html>
   )

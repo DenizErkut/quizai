@@ -538,7 +538,7 @@ export default function QuizPage() {
             <div style={{ flex: 1 }}>
               <label className="field-label">Soru sayısı</label>
               <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                {[5, 10, 15, ...(profile?.plan === 'premium' ? [20] : [])].map(n => (
+                {(profile?.plan === 'free' ? [5] : [5, 10, 15, 20]).map(n => (
                   <button key={n} className={`btn btn-sm ${qCount === n ? 'btn-primary' : ''}`} onClick={() => setQCount(n)}>{n} soru</button>
                 ))}
               </div>
@@ -783,8 +783,8 @@ export default function QuizPage() {
                       <span style={{ flex: 1 }}>{item}</span>
                       {chosen === null && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <button onClick={() => i > 0 && moveItem(i, i-1)} disabled={i === 0} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: '12px', padding: '0 4px', opacity: i === 0 ? 0.3 : 1 }}>▲</button>
-                          <button onClick={() => i < orderItems.length-1 && moveItem(i, i+1)} disabled={i === orderItems.length-1} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: '12px', padding: '0 4px', opacity: i === orderItems.length-1 ? 0.3 : 1 }}>▼</button>
+                          <button onClick={() => i > 0 && moveItem(i, i-1)} disabled={i === 0} style={{ background: 'rgba(8,36,101,0.08)', border: '1px solid rgba(8,36,101,0.15)', borderRadius: '6px', cursor: 'pointer', color: '#082465', fontSize: '20px', padding: '4px 10px', opacity: i === 0 ? 0.3 : 1, lineHeight: 1 }}>▲</button>
+                          <button onClick={() => i < orderItems.length-1 && moveItem(i, i+1)} disabled={i === orderItems.length-1} style={{ background: 'rgba(8,36,101,0.08)', border: '1px solid rgba(8,36,101,0.15)', borderRadius: '6px', cursor: 'pointer', color: '#082465', fontSize: '20px', padding: '4px 10px', opacity: i === orderItems.length-1 ? 0.3 : 1, lineHeight: 1 }}>▼</button>
                         </div>
                       )}
                     </div>
