@@ -187,6 +187,24 @@ export default function AdminPage() {
     return matchSearch && matchPlan
   })
 
+  async function approveTeacher(teacherId: string) {
+    setTeacherUpdating(teacherId)
+    await supabase.from('teachers').update({ approved: true }).eq('id', teacherId)
+    setTeachers(prev => prev.map(t => t.id === teacherId ? { ...t, approved: true } : t))
+    setPendingTeachers(prev => Math.max(0, prev - 1))
+    setTeacherUpdating(null)
+  }
+
+  async function deleteTeacher(teacherId: string) {
+    if (!confirm('Bu başvuruyu silmek istediğine emin misin?')) return
+    setTeacherUpdating(teacherId)
+    const target = teachers.find(t => t.id === teacherId)
+    await supabase.from('teachers').delete().eq('id', teacherId)
+    setTeachers(prev => prev.filter(t => t.id !== teacherId))
+    if (target && !target.approved) setPendingTeachers(prev => Math.max(0, prev - 1))
+    setTeacherUpdating(null)
+  }
+
   if (loading || !isAdmin) return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
       <div className="spinner" />
