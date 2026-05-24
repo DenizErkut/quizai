@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
           user_id: userId, topic: session.topic, subject: 'Genel',
           wrong_count: wrongCount, total_count: answers?.length || 0,
           last_seen_at: new Date().toISOString(),
-        }).catch(() => {})
+        })
       }
     }
 
