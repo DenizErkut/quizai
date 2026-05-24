@@ -117,6 +117,9 @@ export default function StudentAssignmentsPage() {
                         <span>🏫 {a.classrooms?.name}</span>
                         <span>❓ {a.question_count} soru</span>
                         <span>⚡ {a.difficulty}</span>
+                        {a.question_type && a.question_type !== 'multiple_choice' && (
+                          <span>🔤 {{'fill_blank':'Boşluk Doldurma','true_false':'D/Y','matching':'Eşleştirme','ordering':'Sıralama','short_answer':'Kısa Cevap','mixed':'Karma'}[a.question_type] || a.question_type}</span>
+                        )}
                         {a.due_date && (
                           <span style={{ color: isOverdue(a.due_date) ? 'var(--red)' : 'var(--text3)', fontWeight: isOverdue(a.due_date) ? 700 : 400 }}>
                             🕐 {new Date(a.due_date).toLocaleDateString('tr-TR')}{isOverdue(a.due_date) ? ' ⚠️ Süresi doldu' : '\'e kadar'}
@@ -126,7 +129,7 @@ export default function StudentAssignmentsPage() {
                     </div>
                   </div>
                   <Link
-                    href={`/quiz?assignment=${a.id}&topic=${encodeURIComponent(a.topic)}&count=${a.question_count}&difficulty=${a.difficulty}`}
+                    href={`/quiz?assignment=${a.id}&topic=${encodeURIComponent(a.topic)}&count=${a.question_count}&difficulty=${a.difficulty}&type=${a.question_type || 'multiple_choice'}`}
                     className="btn btn-primary"
                     style={{ width: '100%', justifyContent: 'center', display: 'flex' }}>
                     ⚡ Ödevi Çöz

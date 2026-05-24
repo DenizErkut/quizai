@@ -1,6 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import FileUploader, { type UploadedFile } from '@/components/FileUploader'
@@ -66,7 +66,7 @@ function getActiveLang(profileLang?: string): string {
 
 type Screen = 'topic' | 'loading' | 'quiz' | 'result' | 'limit'
 
-export default function QuizPage() {
+function QuizPageContent() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [currentLang, setCurrentLang] = useState('Türkçe')
@@ -365,6 +365,22 @@ export default function QuizPage() {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
           body: JSON.stringify({ sessionId, answers: finalAnswers, score }),
         })
+      }
+
+      // Save assignment completion if this was an assignment
+      if (assignmentId) {
+        const pct = questions.length > 0 ? Math.round((score / questions.length) * 100) : 0
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          await supabase.from('assignment_completions').upsert({
+            assignment_id: assignmentId,
+            student_id: user.id,
+            session_id: sessionId,
+            score,
+            pct,
+            completed_at: new Date().toISOString(),
+          }, { onConflict: 'assignment_id,student_id' })
+        }
       }
       // YouTube linkleri cek
       const topic = customTopic.trim() || selectedTopic
@@ -835,4 +851,12 @@ export default function QuizPage() {
     )
   }
   return null
+}
+
+export default function QuizPage() {
+  return (
+    <Suspense fallback={<main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></main>}>
+      <QuizPageContent />
+    </Suspense>
+  )
 }
