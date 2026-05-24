@@ -28,6 +28,8 @@ export default function TeacherAssignPage() {
     difficulty: 'normal',
     question_count: 10,
     due_date: '',
+    question_type: 'multiple_choice',
+    source_type: 'generate', // 'generate' | 'from_file' | 'similar'
   })
   const router = useRouter()
   const supabase = createClient() as any
@@ -157,6 +159,54 @@ export default function TeacherAssignPage() {
                     onChange={e => setForm(p => ({ ...p, due_date: e.target.value }))} style={inputStyle} />
                 </div>
               </div>
+              {/* Soru tipi */}
+              <div style={{ marginTop: '6px' }}>
+                <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>Soru tipi</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                  {[
+                    { value: 'multiple_choice', label: '🔤 Çoktan Seçmeli' },
+                    { value: 'fill_blank', label: '✏️ Boşluk Doldurma' },
+                    { value: 'true_false', label: '✓✗ D/Y' },
+                    { value: 'matching', label: '🔗 Eşleştirme' },
+                    { value: 'ordering', label: '📋 Sıralama' },
+                    { value: 'short_answer', label: '💬 Kısa Cevap' },
+                    { value: 'mixed', label: '🎲 Karma (Tüm tipler)' },
+                  ].map(t => (
+                    <button key={t.value} onClick={() => setForm(p => ({ ...p, question_type: t.value }))}
+                      style={{ padding: '6px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', fontFamily: 'var(--font-sans)', textAlign: 'center',
+                        background: form.question_type === t.value ? 'rgba(8,36,101,0.08)' : 'var(--bg2)',
+                        borderColor: form.question_type === t.value ? 'rgba(8,36,101,0.3)' : 'var(--border)',
+                        color: form.question_type === t.value ? 'var(--primary)' : 'var(--text3)',
+                      }}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Dosya kaynağı seçimi */}
+              {assignFile && (
+                <div style={{ marginTop: '6px' }}>
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>Dosyadan soru üretme yöntemi</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {[
+                      { value: 'from_file', label: '📄 Dosyadaki Soruları Kullan' },
+                      { value: 'similar', label: '🔀 Benzer Sorular Üret' },
+                      { value: 'generate', label: '✨ Konuya Göre Üret' },
+                    ].map(s => (
+                      <button key={s.value} onClick={() => setForm(p => ({ ...p, source_type: s.value }))}
+                        style={{ flex: 1, padding: '7px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', fontFamily: 'var(--font-sans)', textAlign: 'center',
+                          background: form.source_type === s.value ? 'rgba(8,36,101,0.08)' : 'var(--bg2)',
+                          borderColor: form.source_type === s.value ? 'rgba(8,36,101,0.3)' : 'var(--border)',
+                          color: form.source_type === s.value ? 'var(--primary)' : 'var(--text3)',
+                        }}>
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                 <button className="btn btn-primary" onClick={createAssignment}
                   disabled={saving || !form.title.trim() || !form.topic.trim()}

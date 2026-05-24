@@ -23,6 +23,8 @@ const MENU_ITEMS = [
   { label: '✏️ Profil düzenle', href: '/profile/edit' },
   { label: '📝 Notlarım', href: '/notes' },
   { label: '🗂️ Soru arşivi', href: '/archive' },
+  { label: '📝 Ödevlerim', href: '/assignments' },
+  { label: '🏫 Sınıfım', href: '/join' },
   { label: '💎 Planlar', href: '/pricing' },
   { label: '🎁 Davet et & kazan', href: '/referral' },
   { label: '🎓 Öğretmen paneli', href: '/teacher' },

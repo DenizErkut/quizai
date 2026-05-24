@@ -167,3 +167,119 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Quiz generation failed' }, { status: 500 })
   }
 }
+
+// PATCH: Save quiz results and mark as completed
+export async function PATCH(req: NextRequest) {
+  try {
+    const authHeader = req.headers.get('Authorization')
+    const token = authHeader?.replace('Bearer ', '')
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { data: { user } } = await supabase.auth.getUser(token)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { sessionId, answers, score } = await req.json()
+    if (!sessionId) return NextResponse.json({ error: 'No sessionId' }, { status: 400 })
+
+    // Get session to calculate pct
+    const { data: session } = await supabase
+      .from('quiz_sessions')
+      .select('question_count, topic, user_id')
+      .eq('id', sessionId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+
+    const pct = session.question_count > 0
+      ? Math.round((score / session.question_count) * 100)
+      : 0
+
+    // Mark session as completed
+    await supabase
+      .from('quiz_sessions')
+      .update({ answers, score, pct, completed: true })
+      .eq('id', sessionId)
+      .eq('user_id', user.id)
+
+    // Update streak
+    const today = new Date().toISOString().split('T')[0]
+    const { data: streak } = await supabase
+      .from('streaks')
+      .select('*')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!streak) {
+      await supabase.from('streaks').insert({
+        user_id: user.id,
+        current_streak: 1,
+        longest_streak: 1,
+        total_points: 10,
+        last_activity_date: today,
+      })
+    } else {
+      const lastDate = streak.last_activity_date
+      const yesterday = new Date()
+      yesterday.setDate(yesterday.getDate() - 1)
+      const yesterdayStr = yesterday.toISOString().split('T')[0]
+
+      if (lastDate === today) {
+        // Already did today, just add points
+        await supabase.from('streaks')
+          .update({ total_points: (streak.total_points || 0) + 5 })
+          .eq('user_id', user.id)
+      } else if (lastDate === yesterdayStr) {
+        // Consecutive day
+        const newStreak = (streak.current_streak || 0) + 1
+        await supabase.from('streaks').update({
+          current_streak: newStreak,
+          longest_streak: Math.max(newStreak, streak.longest_streak || 0),
+          total_points: (streak.total_points || 0) + 10,
+          last_activity_date: today,
+        }).eq('user_id', user.id)
+      } else {
+        // Streak broken
+        await supabase.from('streaks').update({
+          current_streak: 1,
+          total_points: (streak.total_points || 0) + 10,
+          last_activity_date: today,
+        }).eq('user_id', user.id)
+      }
+    }
+
+    // Update weak topics
+    // (simplified - track per topic wrong answers)
+    const wrongAnswers = (answers || []).filter((a: any) => !a.correct)
+    if (wrongAnswers.length > 0 && session.topic) {
+      const { data: existing } = await supabase
+        .from('weak_topics')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('topic', session.topic)
+        .single()
+
+      if (existing) {
+        await supabase.from('weak_topics').update({
+          wrong_count: (existing.wrong_count || 0) + wrongAnswers.length,
+          total_count: (existing.total_count || 0) + (answers?.length || 0),
+          last_seen_at: new Date().toISOString(),
+        }).eq('id', existing.id)
+      } else {
+        await supabase.from('weak_topics').insert({
+          user_id: user.id,
+          topic: session.topic,
+          subject: 'Genel',
+          wrong_count: wrongAnswers.length,
+          total_count: answers?.length || 0,
+          last_seen_at: new Date().toISOString(),
+        })
+      }
+    }
+
+    return NextResponse.json({ success: true, pct })
+  } catch (error) {
+    console.error('Save quiz error:', error)
+    return NextResponse.json({ error: 'Save failed' }, { status: 500 })
+  }
+}
