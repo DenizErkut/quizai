@@ -77,6 +77,7 @@ function QuizPageContent() {
   const [difficulty, setDifficulty] = useState('normal')
   const [includeVisuals, setIncludeVisuals] = useState(true)
   const [questionType, setQuestionType] = useState<QuestionType>('multiple_choice')
+  const [assignmentId, setAssignmentId] = useState<string | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
 
   const [questions, setQuestions] = useState<Question[]>([])
