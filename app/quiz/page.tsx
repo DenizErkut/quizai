@@ -430,13 +430,22 @@ function QuizPageContent() {
         : answers
       const score = finalAnswers.filter(a => a.correct).length
       const { data: { session } } = await supabase.auth.getSession()
-      if (sessionId) {
-        const { data: { user: u } } = await supabase.auth.getUser()
-        await fetch('/api/save-quiz', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId, answers: finalAnswers, score, userId: u?.id }),
-        })
+      if (sessionId && session?.user?.id) {
+        try {
+          const saveRes = await fetch('/api/save-quiz', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId, answers: finalAnswers, score, userId: session.user.id }),
+          })
+          if (!saveRes.ok) {
+            const err = await saveRes.json().catch(() => ({}))
+            console.error('[save-quiz] failed:', saveRes.status, err)
+          }
+        } catch (e) {
+          console.error('[save-quiz] fetch error:', e)
+        }
+      } else {
+        console.warn('[save-quiz] skipped — sessionId:', sessionId, 'userId:', session?.user?.id)
       }
 
       // Save assignment completion if this was an assignment
