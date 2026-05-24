@@ -431,10 +431,11 @@ function QuizPageContent() {
       const score = finalAnswers.filter(a => a.correct).length
       const { data: { session } } = await supabase.auth.getSession()
       if (sessionId) {
-        await fetch('/api/generate-quiz', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-          body: JSON.stringify({ sessionId, answers: finalAnswers, score }),
+        const { data: { user: u } } = await supabase.auth.getUser()
+        await fetch('/api/save-quiz', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId, answers: finalAnswers, score, userId: u?.id }),
         })
       }
 

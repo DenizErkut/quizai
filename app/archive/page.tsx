@@ -19,7 +19,7 @@ export default function ArchivePage() {
         .from('quiz_sessions')
         .select('id, topic, grade, language, question_count, score, pct, completed, created_at')
         .eq('user_id', user.id)
-        .eq('completed', true)
+        .not('topic', 'is', null)
         .order('created_at', { ascending: false })
 
       setSessions(data ?? [])
