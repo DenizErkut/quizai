@@ -45,14 +45,18 @@ export default function TeacherPerformancePage() {
 
     const studentIds = students.map((s: any) => s.student_id)
 
-    // Get profiles separately
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, name, grade, monthly_test_count')
-      .in('id', studentIds)
-
+    // Fetch profiles individually to bypass RLS edge cases
     const profileMap: Record<string, any> = {}
-    profiles?.forEach((p: any) => { profileMap[p.id] = p })
+    await Promise.all(
+      studentIds.map(async (id: string) => {
+        const { data: p } = await supabase
+          .from('profiles')
+          .select('id, name, grade, monthly_test_count')
+          .eq('id', id)
+          .maybeSingle()
+        if (p) profileMap[id] = p
+      })
+    )
 
     // Quiz sessions
     const { data: sessions } = await supabase

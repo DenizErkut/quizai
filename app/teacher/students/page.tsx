@@ -46,21 +46,26 @@ function TeacherStudentsContent() {
   }
 
   async function loadStudents(classroomId: string) {
-    const { data: cs } = await supabase
+    // Use nested select — let Supabase handle the join with service role
+    const { data: cs, error: csErr } = await supabase
       .from('classroom_students')
       .select('student_id, joined_at')
       .eq('classroom_id', classroomId)
 
     if (!cs?.length) { setStudents([]); return [] }
 
-    const ids = cs.map((c: any) => c.student_id)
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, name, grade, school, monthly_test_count')
-      .in('id', ids)
-
+    // Fetch profiles one by one to bypass any RLS edge cases
     const profileMap: Record<string, any> = {}
-    profiles?.forEach((p: any) => { profileMap[p.id] = p })
+    await Promise.all(
+      cs.map(async (c: any) => {
+        const { data: p } = await supabase
+          .from('profiles')
+          .select('id, name, grade, school, monthly_test_count')
+          .eq('id', c.student_id)
+          .maybeSingle()
+        if (p) profileMap[c.student_id] = p
+      })
+    )
 
     const merged = cs.map((c: any) => ({
       ...c,
