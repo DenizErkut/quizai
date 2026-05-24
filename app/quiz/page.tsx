@@ -85,6 +85,7 @@ function QuizPageContent() {
   const [current, setCurrent] = useState(0)
   const [answers, setAnswers] = useState<{ userAns: number; correct: boolean }[]>([])
   const [chosen, setChosen] = useState<number | null>(null)
+  const searchParams = useSearchParams()
   const [loadMsg, setLoadMsg] = useState('Profilin analiz ediliyor...')
   const [topicErr, setTopicErr] = useState('')
   const [youtubeLinks, setYoutubeLinks] = useState<Record<string, any>>({})
@@ -104,6 +105,75 @@ function QuizPageContent() {
   }, [])
 
   useEffect(() => { fetchProfile() }, [])
+
+  // Auto-start from assignment URL params
+  useEffect(() => {
+    const asgId = searchParams.get('assignment')
+    const asgTopic = searchParams.get('topic')
+    const asgCount = searchParams.get('count')
+    const asgDiff = searchParams.get('difficulty')
+    const asgType = searchParams.get('type')
+
+    if (asgId && asgTopic) {
+      setAssignmentId(asgId)
+      setCustomTopic(decodeURIComponent(asgTopic))
+      if (asgCount) setQCount(parseInt(asgCount))
+      if (asgDiff) setDifficulty(asgDiff)
+      if (asgType) setQuestionType(asgType as QuestionType)
+    }
+  }, [searchParams])
+
+  // Auto-trigger quiz start when assignment params + profile ready
+  useEffect(() => {
+    const asgId = searchParams.get('assignment')
+    const asgTopic = searchParams.get('topic')
+    const asgCount = searchParams.get('count')
+    const asgDiff = searchParams.get('difficulty')
+    const asgType = searchParams.get('type')
+
+    if (asgId && asgTopic && profile && screen === 'topic') {
+      const topicDecoded = decodeURIComponent(asgTopic)
+      const count = asgCount ? parseInt(asgCount) : 5
+      const diff = asgDiff || 'normal'
+      const qtype = (asgType || 'multiple_choice') as QuestionType
+
+      setAssignmentId(asgId)
+      setCustomTopic(topicDecoded)
+      setQCount(count)
+      setDifficulty(diff)
+      setQuestionType(qtype)
+
+      // Use timeout to let React flush state updates, then manually start
+      const timer = setTimeout(async () => {
+        const lang = getActiveLang(profile?.language)
+        setCurrentLang(lang)
+        setScreen('loading')
+
+        const { data: { session } } = await supabase.auth.getSession()
+        const res = await fetch('/api/generate-quiz', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+          body: JSON.stringify({
+            topic: topicDecoded,
+            questionCount: count,
+            difficulty: diff,
+            language: lang,
+            questionType: qtype,
+          }),
+        })
+        const data = await res.json()
+        if (res.status === 429 && data.error === 'limit_reached') { setScreen('limit'); return }
+        if (!data.questions?.length) { setScreen('topic'); return }
+        setQuestions(data.questions)
+        setSessionId(data.sessionId)
+        setCurrent(0)
+        setAnswers([])
+        setChosen(null)
+        setScreen('quiz')
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [profile])
 
   useEffect(() => {
     const iv = setInterval(() => {
