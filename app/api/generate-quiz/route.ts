@@ -8,35 +8,51 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// Türkiye MEB müfredatı konu listesi (geniş tutuluyor)
+// Türkçe karakterleri normalize et
+function normalizeTR(s: string): string {
+  return s.toLowerCase()
+    .replace(/ğ/g,'g').replace(/ü/g,'u').replace(/ş/g,'s')
+    .replace(/ı/g,'i').replace(/ö/g,'o').replace(/ç/g,'c')
+}
+
+// Türkiye MEB müfredatı konu listesi
 const CURRICULUM_KEYWORDS = [
   // Matematik
-  'matematik','sayı','işlem','toplama','çıkarma','çarpma','bölme','kesir','ondalık',
-  'denklem','oran','yüzde','geometri','alan','hacim','çevre','açı','üçgen','dörtgen',
-  'çember','daire','istatistik','olasılık','cebir','fonksiyon','türev','integral',
-  'logaritma','trigonometri','vektör','matris','kombinasyon','permütasyon',
-  // Fen/Fizik/Kimya/Biyoloji
-  'hücre','organlar','fotosentez','solunum','bitki','hayvan','madde','enerji',
-  'kuvvet','hareket','ışık','ses','elektrik','mıknatıs','atom','element','bileşik',
-  'asit','baz','reaksiyon','dna','gen','evrim','ekosistem','çevre','fizik','kimya',
-  'biyoloji','fen','termodinamik','mekanik',
-  // Tarih/Sosyal
-  'tarih','osmanlı','cumhuriyet','atatürk','türkiye','anadolu','uygarlık','kültür',
-  'coğrafya','harita','iklim','nüfus','ekonomi','siyasi','devlet','demokrasi',
-  // Dil/Edebiyat
-  'türkçe','dil','cümle','paragraf','yazım','noktalama','edebi','şiir','roman',
-  'kelime','anlam','ses','hece','sözcük','metin','hikaye',
-  // Havacılık/Mesleki
-  'uçak','motor','yakıt','pist','kokpit','kanat','iniş','kalkış','navigasyon',
-  'meteoroloji','meteorolojik',
-  // Genel akademik
-  'müfredat','ders','okul','sınav','öğrenme','bilgi','kavram','konu','test'
+  'matematik','sayi','sayilar','islem','toplama','cikarma','carpma','bolme','kesir','ondalik',
+  'denklem','oran','yuzde','geometri','alan','hacim','cevre','aci','ucgen','dortgen',
+  'cember','daire','istatistik','olasilik','cebir','fonksiyon','turev','integral',
+  'logaritma','trigonometri','vektor','matris','kombinasyon','permutasyon',
+  'tam sayi','dogal sayi','rasyonel','carpanlar','katlar','asal','oruntu',
+  // Fen / Biyoloji
+  'hucre','organeller','organell','organel','fotosent','solunum','bitki','hayvan',
+  'madde','enerji','kuvvet','hareket','isik','ses','elektrik','miknatis',
+  'atom','element','bilesi','asit','baz','reaksiyon','dna','gen','evrim',
+  'ekosistem','cevre','fizik','kimya','biyoloji','fen','termodinamik','mekanik',
+  'mitokondri','ribozom','cekirdek','lizozom','kloroplast','vakuol','zar',
+  'doku','organ','sistem','sindirim','dolasim','solunum sistemi','bosaltim',
+  'iskelet','kas','sinir','ureme','kalitim','kromozom','mutasyon',
+  'fotosentez','klorofil','madde dongusu','besin zinciri','populasyon',
+  // Tarih / Sosyal
+  'tarih','osmanli','cumhuriyet','ataturk','turkiye','anadolu','uygarlik','kultur',
+  'cografya','harita','iklim','nufus','ekonomi','siyasi','devlet','demokrasi',
+  'inkilap','savas','anlasma','imparatorluk','medeniyet','koy','sehir','bolge',
+  // Dil / Edebiyat
+  'turkce','dil','cumle','paragraf','yazim','noktalama','edeb','siir','roman',
+  'kelime','anlam','ses','hece','sozcuk','metin','hikaye','masal','destan',
+  // Havacılık / Mesleki
+  'ucak','motor','yakit','pist','kokpit','kanat','inis','kalkis','navigasyon',
+  'meteoroloji','havacilik','pervane','irtifa','radar','basinc',
+  // İngilizce konu adları (dosya yüklemelerinde gelebilir)
+  'cell','organelle','photosynthesis','respiration','atom','molecule','force',
+  'energy','history','geography','math','algebra','geometry','biology','chemistry','physics',
+  // Genel
+  'mufredat','ders','okul','sinav','ogrenme','bilgi','kavram','konu','test','sinif'
 ]
 
 function isInCurriculum(topic: string, plan: string): boolean {
-  if (plan === 'unlimited') return true // unlimited her konuya erişebilir
-  const lower = topic.toLowerCase()
-  return CURRICULUM_KEYWORDS.some(kw => lower.includes(kw))
+  if (plan === 'unlimited') return true
+  const norm = normalizeTR(topic)
+  return CURRICULUM_KEYWORDS.some(kw => norm.includes(kw))
 }
 
 function buildPrompt(type: string, topic: string, grade: string, difficulty: string, language: string, count: number, fileContent?: string): string {
