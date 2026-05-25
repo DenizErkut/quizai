@@ -299,6 +299,8 @@ function QuizPageContent() {
   const [matchSelections, setMatchSelections] = useState<Record<number, number>>({})
   const [orderItems, setOrderItems] = useState<string[]>([])
   const [fillInput, setFillInput] = useState('')
+  const [mTFAnswers, setMTFAnswers] = useState<Record<number, boolean | null>>({})
+  const [tInputs, setTInputs] = useState<string[]>([])
 
   // Levenshtein distance — yazım hatası toleransı
   function levenshtein(a: string, b: string): number {
@@ -428,13 +430,15 @@ function QuizPageContent() {
     setFillInput('')
     setShortInput('')
     setMatchSelections({})
+    setMTFAnswers({})
+    setTInputs(Array(
+      q.tableData?.rows?.reduce((s: number, r: any) => s + (r.blanks?.length || 0), 0) || 0
+    ).fill(''))
     if (q.items) setOrderItems([...q.items].sort(() => Math.random() - 0.5))
-    // Eşleştirme: sağ tarafı karıştır, orijinal index'i sakla
     if (q.pairs) {
       const rights = q.pairs.map((p: any, i: number) => ({ text: p.right, originalIndex: i }))
       const shuffled = [...rights].sort(() => Math.random() - 0.5)
       setShuffledPairs(shuffled.map((s: any) => s.text))
-      // shuffledIndexMap: karışık pozisyon → orijinal index
       setShuffledIndexMap(shuffled.map((s: any) => s.originalIndex))
     }
   }, [current, questions])
@@ -1000,59 +1004,53 @@ function QuizPageContent() {
             )}
 
             {/* ── ÇOKLU D/Y (Maarif Modeli) ── */}
-            {q.type === 'multi_true_false' && (() => {
-              const stmts = q.statements || []
-              const [mAnswers, setMAnswers] = useState<Record<number, boolean | null>>({})
-              const allAnswered = stmts.every((_: any, i: number) => mAnswers[i] !== undefined && mAnswers[i] !== null)
-              function submitMTF() {
-                const correct = stmts.every((s: any, i: number) => mAnswers[i] === s.correct)
-                setChosen(correct ? 0 : -1)
-                setAnswers(prev => [...prev, { userAns: correct ? 0 : -1, correct }])
-              }
-              return (
-                <div>
-                  <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px' }}>Her ifade için Doğru veya Yanlış'ı seç:</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {stmts.map((s: any, i: number) => {
-                      const userAns = mAnswers[i]
-                      const isAnswered = chosen !== null
-                      const isCorrect = s.correct === true
-                      return (
-                        <div key={i} style={{ padding: '12px 14px', borderRadius: '10px', border: `1.5px solid ${isAnswered ? (userAns === s.correct ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.3)') : 'var(--border)'}`, background: isAnswered ? (userAns === s.correct ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)' }}>
-                          <div style={{ fontSize: '13px', marginBottom: '8px' }}>{i + 1}. {s.text}</div>
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            {[true, false].map(val => (
-                              <button key={String(val)} onClick={() => { if (chosen !== null) return; setMAnswers(prev => ({ ...prev, [i]: val })) }}
-                                disabled={chosen !== null}
-                                style={{ padding: '6px 16px', borderRadius: '8px', border: `1.5px solid ${mAnswers[i] === val ? (val ? 'rgba(22,163,74,0.6)' : 'rgba(220,38,38,0.6)') : 'var(--border)'}`, background: mAnswers[i] === val ? (val ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', fontWeight: 600, fontSize: '12px', cursor: chosen !== null ? 'default' : 'pointer', color: mAnswers[i] === val ? (val ? 'var(--green)' : 'var(--red)') : 'var(--text2)' }}>
-                                {val ? '✓ Doğru' : '✗ Yanlış'}
-                              </button>
-                            ))}
-                            {isAnswered && <span style={{ fontSize: '12px', fontWeight: 600, color: isCorrect ? 'var(--green)' : 'var(--red)', alignSelf: 'center', marginLeft: '4px' }}>{userAns === s.correct ? '✓' : `✗ (${isCorrect ? 'Doğru' : 'Yanlış'})`}</span>}
-                          </div>
+            {q.type === 'multi_true_false' && (
+              <div>
+                <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px' }}>Her ifade için Doğru veya Yanlış'ı seç:</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {(q.statements || []).map((s: any, i: number) => {
+                    const isAnswered = chosen !== null
+                    const isCorrect = s.correct === true
+                    return (
+                      <div key={i} style={{ padding: '12px 14px', borderRadius: '10px', border: `1.5px solid ${isAnswered ? (mTFAnswers[i] === s.correct ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.3)') : 'var(--border)'}`, background: isAnswered ? (mTFAnswers[i] === s.correct ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)' }}>
+                        <div style={{ fontSize: '13px', marginBottom: '8px' }}>{i + 1}. {s.text}</div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          {[true, false].map(val => (
+                            <button key={String(val)} onClick={() => { if (chosen !== null) return; setMTFAnswers(prev => ({ ...prev, [i]: val })) }}
+                              disabled={chosen !== null}
+                              style={{ padding: '6px 16px', borderRadius: '8px', border: `1.5px solid ${mTFAnswers[i] === val ? (val ? 'rgba(22,163,74,0.6)' : 'rgba(220,38,38,0.6)') : 'var(--border)'}`, background: mTFAnswers[i] === val ? (val ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', fontWeight: 600, fontSize: '12px', cursor: chosen !== null ? 'default' : 'pointer', color: mTFAnswers[i] === val ? (val ? 'var(--green)' : 'var(--red)') : 'var(--text2)' }}>
+                              {val ? '✓ Doğru' : '✗ Yanlış'}
+                            </button>
+                          ))}
+                          {isAnswered && <span style={{ fontSize: '12px', fontWeight: 600, color: mTFAnswers[i] === s.correct ? 'var(--green)' : 'var(--red)', marginLeft: '4px' }}>{mTFAnswers[i] === s.correct ? '✓' : `✗ (${isCorrect ? 'Doğru' : 'Yanlış'})`}</span>}
                         </div>
-                      )
-                    })}
-                  </div>
-                  {chosen === null && (
-                    <button className="btn btn-primary" onClick={submitMTF} disabled={!allAnswered}
-                      style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
-                      Cevapları onayla →
-                    </button>
-                  )}
+                      </div>
+                    )
+                  })}
                 </div>
-              )
-            })()}
+                {chosen === null && (
+                  <button className="btn btn-primary"
+                    onClick={() => {
+                      const stmts = q.statements || []
+                      const correct = stmts.every((s: any, i: number) => mTFAnswers[i] === s.correct)
+                      setChosen(correct ? 0 : -1)
+                      setAnswers(prev => [...prev, { userAns: correct ? 0 : -1, correct }])
+                    }}
+                    disabled={(q.statements || []).some((_: any, i: number) => mTFAnswers[i] === undefined || mTFAnswers[i] === null)}
+                    style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
+                    Cevapları onayla →
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* ── TABLO DOLDURMA (Maarif Modeli) ── */}
             {q.type === 'table_fill' && (() => {
               const td = q.tableData
-              const answers2 = q.tableAnswers || []
-              const blankCount = td?.rows?.reduce((s: number, r: any) => s + (r.blanks?.length || 0), 0) || 0
-              const [tInputs, setTInputs] = useState<string[]>(Array(blankCount).fill(''))
+              const tableAnswers = q.tableAnswers || []
               let blankIdx = 0
               function submitTable() {
-                const correct = answers2.every((ans: string, i: number) => (tInputs[i] || '').toLowerCase().trim() === ans.toLowerCase().trim())
+                const correct = tableAnswers.every((ans: string, i: number) => (tInputs[i] || '').toLowerCase().trim() === ans.toLowerCase().trim())
                 setChosen(correct ? 0 : -1)
                 setAnswers(prev => [...prev, { userAns: correct ? 0 : -1, correct }])
               }
@@ -1075,15 +1073,15 @@ function QuizPageContent() {
                               const isBlank = row.blanks?.includes(ci)
                               if (isBlank) {
                                 const idx = blankIdx++
-                                const isCorrectAns = chosen !== null && (tInputs[idx] || '').toLowerCase().trim() === (answers2[idx] || '').toLowerCase().trim()
+                                const isCorrectAns = chosen !== null && (tInputs[idx] || '').toLowerCase().trim() === (tableAnswers[idx] || '').toLowerCase().trim()
                                 return (
                                   <td key={ci} style={{ padding: '6px 8px', border: '1px solid var(--border)', background: chosen !== null ? (isCorrectAns ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)' }}>
                                     {chosen !== null ? (
                                       <span style={{ fontWeight: 600, color: isCorrectAns ? 'var(--green)' : 'var(--red)' }}>
-                                        {tInputs[idx] || '—'} {!isCorrectAns && <span style={{ fontSize: '11px' }}>→ {answers2[idx]}</span>}
+                                        {tInputs[idx] || '—'} {!isCorrectAns && <span style={{ fontSize: '11px' }}>→ {tableAnswers[idx]}</span>}
                                       </span>
                                     ) : (
-                                      <input value={tInputs[idx]} onChange={e => { const n = [...tInputs]; n[idx] = e.target.value; setTInputs(n) }}
+                                      <input value={tInputs[idx] || ''} onChange={e => { const n = [...tInputs]; n[idx] = e.target.value; setTInputs(n) }}
                                         style={{ width: '100%', padding: '4px 8px', border: '1.5px solid var(--accent)', borderRadius: '6px', fontSize: '13px', fontFamily: 'var(--font-sans)', background: 'var(--bg)', color: 'var(--text)', outline: 'none', boxSizing: 'border-box' }} />
                                     )}
                                   </td>
@@ -1097,7 +1095,7 @@ function QuizPageContent() {
                     </table>
                   </div>
                   {chosen === null && (
-                    <button className="btn btn-primary" onClick={submitTable} disabled={tInputs.some(t => !t.trim())}
+                    <button className="btn btn-primary" onClick={submitTable} disabled={tInputs.some(t => !t?.trim())}
                       style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
                       Tabloyu onayla →
                     </button>
