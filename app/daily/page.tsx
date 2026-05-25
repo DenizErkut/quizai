@@ -28,24 +28,36 @@ export default function DailyPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
+    const today = new Date().toISOString().split('T')[0]
+
     const [{ data: p }, { data: s }, { data: c }] = await Promise.all([
       supabase.from('profiles').select('name,grade,language,plan').eq('id', user.id).single(),
       supabase.from('streaks').select('*').eq('user_id', user.id).single(),
-      supabase.from('daily_challenges').select('*').eq('date', new Date().toISOString().split('T')[0]).single(),
+      supabase.from('daily_challenges').select('*').eq('date', today).single(),
     ])
 
     setProfile(p)
     setStreak(s)
 
-    // Bugün zaten test yapılmış mı?
-    if (s?.last_activity_date === new Date().toISOString().split('T')[0]) {
+    // Bugün günlük testten kayıt var mı? (quiz_sessions üzerinden kontrol)
+    const { data: todaySessions } = await supabase
+      .from('quiz_sessions')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('completed', true)
+      .gte('created_at', today + 'T00:00:00')
+      .lte('created_at', today + 'T23:59:59')
+      .eq('topic', c?.topic || '')
+      .limit(1)
+
+    // Streak last_activity_date de kontrol et (iki yöntemden biri yeterliyse done say)
+    if (s?.last_activity_date === today || (todaySessions && todaySessions.length > 0)) {
       setAlreadyDone(true)
     }
 
     if (c) {
       setChallenge(c)
     } else {
-      // Günlük challenge yok — oluştur
       await generateDailyChallenge(p, user)
     }
     setLoading(false)
@@ -89,13 +101,46 @@ export default function DailyPage() {
     if (current + 1 >= challenge.questions.length) {
       const score = answers.filter(a => a.correct).length
       const { data: { user } } = await supabase.auth.getUser()
-      // Quiz session kaydet
+      const today = new Date().toISOString().split('T')[0]
+
+      // Quiz session kaydet — completed:true olsun ki arşivde görünsün
       await supabase.from('quiz_sessions').insert({
-        user_id: user.id, topic: challenge.topic, grade: profile?.grade,
-        language: profile?.language, question_count: 5,
-        questions: challenge.questions, answers, score,
-        pct: Math.round(score / 5 * 100), completed: true,
+        user_id: user.id,
+        topic: challenge.topic,
+        grade: profile?.grade,
+        language: profile?.language,
+        question_count: challenge.questions.length,
+        questions: challenge.questions,
+        answers,
+        score,
+        pct: Math.round(score / challenge.questions.length * 100),
+        completed: true,
+        question_type: 'multiple_choice',
       })
+
+      // Streak güncelle
+      const { data: streakData } = await supabase
+        .from('streaks').select('*').eq('user_id', user.id).single()
+
+      if (!streakData) {
+        await supabase.from('streaks').insert({
+          user_id: user.id, current_streak: 1, longest_streak: 1,
+          total_points: 10, last_activity_date: today,
+        })
+      } else if (streakData.last_activity_date !== today) {
+        const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1)
+        const yStr = yesterday.toISOString().split('T')[0]
+        const ns = streakData.last_activity_date === yStr ? (streakData.current_streak || 0) + 1 : 1
+        await supabase.from('streaks').update({
+          current_streak: ns,
+          longest_streak: Math.max(ns, streakData.longest_streak || 0),
+          total_points: (streakData.total_points || 0) + 10,
+          last_activity_date: today,
+        }).eq('user_id', user.id)
+        setStreak(prev => prev ? { ...prev, current_streak: ns, last_activity_date: today } : prev)
+      }
+
+      setAlreadyDone(true)
       setScreen('done')
     } else {
       setCurrent(c => c + 1); setChosen(null)

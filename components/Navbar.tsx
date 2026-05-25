@@ -20,16 +20,15 @@ const MENU_ITEMS = [
   { label: '📈 Analiz', href: '/analysis' },
   { label: '📋 Gelişim planı', href: '/plan' },
   { label: '🏆 Sıralama', href: '/leaderboard' },
+  { label: '🏫 Sınıflarım', href: '/classes' },
   { label: '✏️ Profil düzenle', href: '/profile/edit' },
   { label: '📝 Notlarım', href: '/notes' },
   { label: '🗂️ Soru arşivi', href: '/archive' },
   { label: '📝 Ödevlerim', href: '/assignments' },
-  { label: '🏫 Sınıfım', href: '/join' },
   { label: '💎 Planlar', href: '/pricing' },
   { label: '🎁 Davet et & kazan', href: '/referral' },
   { label: '🎓 Öğretmen paneli', href: '/teacher' },
   { label: '🔑 Şifremi değiştir', href: '/auth/reset-password' },
-  { label: '🏫 Sınıfa katıl', href: '/join' },
 ]
 
 export default function Navbar() {
@@ -99,6 +98,7 @@ export default function Navbar() {
     { href: '/leaderboard', label: '🏆 Sıralama' },
     { href: '/analysis', label: '📊 Analiz' },
     { href: '/archive', label: '🗂️ Arşiv' },
+    { href: '/classes', label: '🏫 Sınıflarım' },
   ]
 
   return (
@@ -119,7 +119,7 @@ export default function Navbar() {
       }}>
         {/* Logo */}
         <Link href="/quiz" style={{ flexShrink: 0 }}>
-          <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '36px', filter: 'brightness(0) invert(1)' }} />
+          <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '28px', filter: 'brightness(0) invert(1)' }} />
         </Link>
 
         {/* Sağ: bildirim + dil + avatar */}
@@ -388,7 +388,7 @@ export default function Navbar() {
           { href: '/quiz', label: 'Test', icon: '⚡' },
           { href: '/daily', label: streak > 0 ? `${streak} gün` : 'Günlük', icon: streak > 0 ? '🔥' : '📅' },
           { href: '/leaderboard', label: 'Sıralama', icon: '🏆' },
-          { href: '/analysis', label: 'Analiz', icon: '📊' },
+          { href: '/classes', label: 'Sınıflarım', icon: '🏫' },
           { href: '/archive', label: 'Arşiv', icon: '🗂️' },
         ].map(item => (
           <Link key={item.href} href={item.href} style={{
