@@ -142,19 +142,46 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
       doc.setDrawColor(220, 220, 220); doc.line(margin, y, pageW - margin, y); y += 5
     }
 
-    // Logo fetch
+    // Logo — SVG'yi canvas üzerinden PNG'ye çevir
     try {
-      const logoRes = await fetch('/pratium-logo.png')
-      const logoBlob = await logoRes.blob()
-      const logoB64 = await new Promise<string>(res => {
-        const fr = new FileReader(); fr.onload = () => res((fr.result as string).split(',')[1]); fr.readAsDataURL(logoBlob)
+      const svgStr = `<svg width="620" height="190" viewBox="0 0 620 190" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="pGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#14D8A6"/>
+    </linearGradient>
+  </defs>
+  <path d="M55 20V165" stroke="#0F172A" stroke-width="18" stroke-linecap="round"/>
+  <path d="M55 25H105 C140 25 155 45 155 72 C155 100 140 120 105 120H55" stroke="url(#pGrad)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="120" cy="52" r="7" fill="#14D8A6"/>
+  <text x="205" y="98" font-size="76" font-family="Arial" font-weight="700" fill="#0F172A">pratium</text>
+  <text x="208" y="140" font-size="22" font-family="Arial" fill="#64748B">Yeni nesil ogrenci platformu</text>
+</svg>`
+      const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' })
+      const svgUrl = URL.createObjectURL(svgBlob)
+      const logoB64 = await new Promise<string>((resolve, reject) => {
+        const img = new Image()
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          canvas.width = 620; canvas.height = 190
+          const ctx = canvas.getContext('2d')!
+          ctx.fillStyle = '#ffffff'
+          ctx.fillRect(0, 0, 620, 190)
+          ctx.drawImage(img, 0, 0)
+          URL.revokeObjectURL(svgUrl)
+          resolve(canvas.toDataURL('image/png').split(',')[1])
+        }
+        img.onerror = reject
+        img.src = svgUrl
       })
-      doc.setFillColor(91, 76, 245); doc.rect(0, 0, pageW, 36, 'F')
-      doc.addImage('data:image/png;base64,' + logoB64, 'PNG', margin, 4, 30, 30)
+      // Header bar
+      doc.setFillColor(15, 23, 42)  // #0F172A
+      doc.rect(0, 0, pageW, 38, 'F')
+      doc.addImage('data:image/png;base64,' + logoB64, 'PNG', margin, 4, 44, 14)
       doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.setTextColor(255,255,255)
-      doc.text(cleanText(`Test: ${topic}`), margin + 34, 16)
+      doc.text(cleanText(`Test: ${topic}`), margin + 48, 16)
       doc.text(new Date().toLocaleDateString('tr-TR'), pageW - margin, 16, { align: 'right' })
-      y = 46
+      y = 48
     } catch {
       y = margin
     }
