@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
     const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, safeQCount, fileContent)
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5',
       max_tokens: 4000,
       messages: [{ role: 'user', content: prompt }],
     })

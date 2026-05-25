@@ -447,29 +447,34 @@ function QuizPageContent() {
 
   async function next() {
     if (current + 1 >= questions.length) {
-      // chosen henuz answers state'e yansimamis olabilir — son cevabi dahil et
       const lastCorrect = chosen !== null && chosen === questions[current].ans
       const finalAnswers = chosen !== null && answers.length < questions.length
         ? [...answers, { userAns: chosen, correct: lastCorrect }]
         : answers
       const score = finalAnswers.filter(a => a.correct).length
+
+      // getUser() ile userId al — getSession().user güvenilmez
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
       const { data: { session } } = await supabase.auth.getSession()
-      if (sessionId && session?.user?.id) {
+
+      if (sessionId && currentUser?.id) {
         try {
           const saveRes = await fetch('/api/save-quiz', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId, answers: finalAnswers, score, userId: session.user.id }),
+            body: JSON.stringify({ sessionId, answers: finalAnswers, score, userId: currentUser.id }),
           })
           if (!saveRes.ok) {
             const err = await saveRes.json().catch(() => ({}))
             console.error('[save-quiz] failed:', saveRes.status, err)
+          } else {
+            console.log('[save-quiz] success')
           }
         } catch (e) {
           console.error('[save-quiz] fetch error:', e)
         }
       } else {
-        console.warn('[save-quiz] skipped — sessionId:', sessionId, 'userId:', session?.user?.id)
+        console.warn('[save-quiz] skipped — sessionId:', sessionId, 'userId:', currentUser?.id)
       }
 
       // Save assignment completion if this was an assignment

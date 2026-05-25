@@ -88,8 +88,17 @@ export async function POST(req: NextRequest) {
       console.log('[save-quiz] streak updated, last:', last, 'today:', today, 'err:', strErr)
     }
 
-    // Weak topics
-    const wrongCount = (answers || []).filter((a: any) => !a.correct).length
+    // Weak topics — multi_true_false için ifade bazında say
+    let wrongCount = 0
+    let totalCount = answers?.length || 0
+
+    if (Array.isArray(answers)) {
+      // Tüm cevapları tara, MTF ise ifade sayısını kullan
+      // Not: mTFAnswers body'de gelmiyorsa fallback olarak answer.correct kullan
+      wrongCount = answers.filter((a: any) => !a.correct).length
+      totalCount = answers.length
+    }
+
     if (wrongCount > 0 && session.topic) {
       const { data: wt } = await supabase.from('weak_topics')
         .select('*').eq('user_id', userId).eq('topic', session.topic).maybeSingle()

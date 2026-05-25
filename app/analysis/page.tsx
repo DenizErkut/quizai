@@ -159,9 +159,33 @@ export default function AnalysisPage() {
           </div>
 
           {sessions.map((s, i) => {
-            const wrongAnswers = (s.answers || [])
-              .map((a: any, qi: number) => ({ ...a, q: s.questions?.[qi] }))
-              .filter((a: any) => !a.correct && a.q)
+            // multi_true_false sorularını ifade bazında aç
+            const wrongAnswers: any[] = []
+            ;(s.answers || []).forEach((a: any, qi: number) => {
+              const q = s.questions?.[qi]
+              if (!q) return
+              if (q.type === 'multi_true_false' && q.statements?.length) {
+                // Her ifadeyi ayrı "yanlış" olarak göster
+                q.statements.forEach((stmt: any, si: number) => {
+                  const userAns = a.mTFAnswers?.[si]
+                  const isCorrect = userAns === stmt.correct
+                  if (!isCorrect) {
+                    wrongAnswers.push({
+                      correct: false,
+                      q: {
+                        q: `[Çoklu D/Y] ${stmt.text}`,
+                        exp: q.exp || '',
+                        opts: ['Doğru', 'Yanlış'],
+                        ans: stmt.correct ? 0 : 1,
+                        type: 'multi_true_false_item',
+                      },
+                    })
+                  }
+                })
+              } else if (!a.correct && q) {
+                wrongAnswers.push({ ...a, q })
+              }
+            })
 
             if (wrongAnswers.length === 0) return null
             const isExpanded = expandedSession === s.id
