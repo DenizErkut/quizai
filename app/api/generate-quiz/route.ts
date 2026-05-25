@@ -258,7 +258,7 @@ export async function POST(req: NextRequest) {
         .eq('id', user.id)
     }
 
-    const { data: session } = await supabase
+    const { data: sessionRow, error: sessionInsertErr } = await supabase
       .from('quiz_sessions')
       .insert({
         user_id: user.id,
@@ -274,9 +274,10 @@ export async function POST(req: NextRequest) {
         question_type: questionType,
       })
       .select('id')
-      .single()
+      .maybeSingle()
 
-    return NextResponse.json({ questions, sessionId: session?.id })
+    console.log('[generate-quiz] session insert:', sessionRow?.id, 'err:', sessionInsertErr)
+    return NextResponse.json({ questions, sessionId: sessionRow?.id })
   } catch (error) {
     console.error('Generate quiz error:', error)
     return NextResponse.json({ error: 'Quiz generation failed' }, { status: 500 })

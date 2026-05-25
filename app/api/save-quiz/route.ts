@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       .from('quiz_sessions')
       .select('question_count, topic, user_id')
       .eq('id', sessionId)
-      .single()
+      .maybeSingle()
 
     console.log('[save-quiz] session:', session, 'err:', sessionErr)
 
