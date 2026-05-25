@@ -43,43 +43,49 @@ export async function POST(req: NextRequest) {
 
     console.log('[save-quiz] update err:', updateErr)
 
-    // Update streak
+    // Update streak — upsert ile (satır yoksa insert, varsa update)
     const today = new Date().toISOString().split('T')[0]
     const { data: streak } = await supabase
       .from('streaks').select('*').eq('user_id', userId).maybeSingle()
 
     if (!streak) {
-      await supabase.from('streaks').insert({
+      // İlk kez — oluştur
+      const { error: insErr } = await supabase.from('streaks').insert({
         user_id: userId, current_streak: 1, longest_streak: 1,
         total_points: 10, last_activity_date: today,
       })
-      console.log('[save-quiz] streak created')
+      console.log('[save-quiz] streak created, err:', insErr)
     } else {
       const yesterday = new Date()
       yesterday.setDate(yesterday.getDate() - 1)
       const yStr = yesterday.toISOString().split('T')[0]
       const last = streak.last_activity_date
 
+      let updateData: any = {}
+
       if (last === today) {
-        await supabase.from('streaks')
-          .update({ total_points: (streak.total_points || 0) + 5 })
-          .eq('user_id', userId)
+        // Bugün zaten yapıldı — sadece puan ekle
+        updateData = { total_points: (streak.total_points || 0) + 5 }
       } else if (last === yStr) {
+        // Dün de yapıldı — seri devam
         const ns = (streak.current_streak || 0) + 1
-        await supabase.from('streaks').update({
+        updateData = {
           current_streak: ns,
           longest_streak: Math.max(ns, streak.longest_streak || 0),
           total_points: (streak.total_points || 0) + 10,
           last_activity_date: today,
-        }).eq('user_id', userId)
+        }
       } else {
-        await supabase.from('streaks').update({
+        // Seri koptu — sıfırla
+        updateData = {
           current_streak: 1,
           total_points: (streak.total_points || 0) + 10,
           last_activity_date: today,
-        }).eq('user_id', userId)
+        }
       }
-      console.log('[save-quiz] streak updated, last:', last, 'today:', today)
+
+      const { error: strErr } = await supabase.from('streaks').update(updateData).eq('user_id', userId)
+      console.log('[save-quiz] streak updated, last:', last, 'today:', today, 'err:', strErr)
     }
 
     // Weak topics

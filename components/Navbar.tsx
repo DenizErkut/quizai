@@ -266,12 +266,14 @@ export default function Navbar() {
               </Link>
             )}
 
-            {profile.plan === 'premium' && (
-              <Link href="/pricing">
+            {(profile.plan === 'premium' || profile.plan === 'unlimited') && (
+              <Link href="/pricing" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
                 <span style={{
                   fontSize: '12px', padding: '5px 12px', borderRadius: '999px',
-                  background: '#fdd31d', color: '#082465', fontWeight: 700,
-                }}>★ Premium</span>
+                  background: profile.plan === 'unlimited' ? '#0d9488' : '#fdd31d',
+                  color: profile.plan === 'unlimited' ? '#fff' : '#082465',
+                  fontWeight: 700, whiteSpace: 'nowrap',
+                }}>{profile.plan === 'unlimited' ? '⭐ Unlimited' : '★ Premium'}</span>
               </Link>
             )}
 

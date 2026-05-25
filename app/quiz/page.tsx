@@ -1049,10 +1049,22 @@ function QuizPageContent() {
               const td = q.tableData
               const tableAnswers = q.tableAnswers || []
               let blankIdx = 0
+              function tableCellCorrect(userInput: string, correctAns: string): boolean {
+                const u = userInput.toLowerCase().trim()
+                const c = correctAns.toLowerCase().trim()
+                if (!u) return false
+                if (u === c) return true
+                // İçerme kontrolü — "enerji" yazdıysa "enerji üretimi" doğru sayılsın
+                if (c.includes(u) || u.includes(c)) return true
+                // Kelime bazlı — en az bir önemli kelime eşleşirse
+                const cWords = c.split(/\s+/).filter(w => w.length > 2)
+                const uWords = u.split(/\s+/).filter(w => w.length > 2)
+                return cWords.some(cw => uWords.some(uw => cw === uw || cw.startsWith(uw) || uw.startsWith(cw)))
+              }
               function submitTable() {
-                const correct = tableAnswers.every((ans: string, i: number) => (tInputs[i] || '').toLowerCase().trim() === ans.toLowerCase().trim())
-                setChosen(correct ? 0 : -1)
-                setAnswers(prev => [...prev, { userAns: correct ? 0 : -1, correct }])
+                const allCorrect = tableAnswers.every((ans: string, i: number) => tableCellCorrect(tInputs[i] || '', ans))
+                setChosen(allCorrect ? 0 : -1)
+                setAnswers(prev => [...prev, { userAns: allCorrect ? 0 : -1, correct: allCorrect }])
               }
               return (
                 <div>
@@ -1073,7 +1085,7 @@ function QuizPageContent() {
                               const isBlank = row.blanks?.includes(ci)
                               if (isBlank) {
                                 const idx = blankIdx++
-                                const isCorrectAns = chosen !== null && (tInputs[idx] || '').toLowerCase().trim() === (tableAnswers[idx] || '').toLowerCase().trim()
+                                const isCorrectAns = chosen !== null && tableCellCorrect(tInputs[idx] || '', tableAnswers[idx] || '')
                                 return (
                                   <td key={ci} style={{ padding: '6px 8px', border: '1px solid var(--border)', background: chosen !== null ? (isCorrectAns ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)' }}>
                                     {chosen !== null ? (
