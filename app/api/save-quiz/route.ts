@@ -43,48 +43,43 @@ export async function POST(req: NextRequest) {
 
     console.log('[save-quiz] update err:', updateErr)
 
-    // Update streak — upsert ile (satır yoksa insert, varsa update)
+    // Streak — upsert ile güncelle (insert veya update, tek seferde)
     const today = new Date().toISOString().split('T')[0]
-    const { data: streak } = await supabase
+    const { data: existingStreak } = await supabase
       .from('streaks').select('*').eq('user_id', userId).maybeSingle()
 
-    if (!streak) {
-      // İlk kez — oluştur
-      const { error: insErr } = await supabase.from('streaks').insert({
+    if (!existingStreak) {
+      await supabase.from('streaks').upsert({
         user_id: userId, current_streak: 1, longest_streak: 1,
         total_points: 10, last_activity_date: today,
-      })
-      console.log('[save-quiz] streak created, err:', insErr)
+      }, { onConflict: 'user_id' })
+      console.log('[save-quiz] streak upserted (new)')
     } else {
       const yesterday = new Date()
       yesterday.setDate(yesterday.getDate() - 1)
       const yStr = yesterday.toISOString().split('T')[0]
-      const last = streak.last_activity_date
+      const last = existingStreak.last_activity_date
 
       let updateData: any = {}
-
       if (last === today) {
-        // Bugün zaten yapıldı — sadece puan ekle
-        updateData = { total_points: (streak.total_points || 0) + 5 }
+        updateData = { total_points: (existingStreak.total_points || 0) + 5 }
       } else if (last === yStr) {
-        // Dün de yapıldı — seri devam
-        const ns = (streak.current_streak || 0) + 1
+        const ns = (existingStreak.current_streak || 0) + 1
         updateData = {
           current_streak: ns,
-          longest_streak: Math.max(ns, streak.longest_streak || 0),
-          total_points: (streak.total_points || 0) + 10,
+          longest_streak: Math.max(ns, existingStreak.longest_streak || 0),
+          total_points: (existingStreak.total_points || 0) + 10,
           last_activity_date: today,
         }
       } else {
-        // Seri koptu — sıfırla
         updateData = {
           current_streak: 1,
-          total_points: (streak.total_points || 0) + 10,
+          total_points: (existingStreak.total_points || 0) + 10,
           last_activity_date: today,
         }
       }
-
-      const { error: strErr } = await supabase.from('streaks').update(updateData).eq('user_id', userId)
+      const { error: strErr } = await supabase.from('streaks')
+        .update(updateData).eq('user_id', userId)
       console.log('[save-quiz] streak updated, last:', last, 'today:', today, 'err:', strErr)
     }
 
