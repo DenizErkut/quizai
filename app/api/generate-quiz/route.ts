@@ -8,6 +8,37 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// Türkiye MEB müfredatı konu listesi (geniş tutuluyor)
+const CURRICULUM_KEYWORDS = [
+  // Matematik
+  'matematik','sayı','işlem','toplama','çıkarma','çarpma','bölme','kesir','ondalık',
+  'denklem','oran','yüzde','geometri','alan','hacim','çevre','açı','üçgen','dörtgen',
+  'çember','daire','istatistik','olasılık','cebir','fonksiyon','türev','integral',
+  'logaritma','trigonometri','vektör','matris','kombinasyon','permütasyon',
+  // Fen/Fizik/Kimya/Biyoloji
+  'hücre','organlar','fotosentez','solunum','bitki','hayvan','madde','enerji',
+  'kuvvet','hareket','ışık','ses','elektrik','mıknatıs','atom','element','bileşik',
+  'asit','baz','reaksiyon','dna','gen','evrim','ekosistem','çevre','fizik','kimya',
+  'biyoloji','fen','termodinamik','mekanik',
+  // Tarih/Sosyal
+  'tarih','osmanlı','cumhuriyet','atatürk','türkiye','anadolu','uygarlık','kültür',
+  'coğrafya','harita','iklim','nüfus','ekonomi','siyasi','devlet','demokrasi',
+  // Dil/Edebiyat
+  'türkçe','dil','cümle','paragraf','yazım','noktalama','edebi','şiir','roman',
+  'kelime','anlam','ses','hece','sözcük','metin','hikaye',
+  // Havacılık/Mesleki
+  'uçak','motor','yakıt','pist','kokpit','kanat','iniş','kalkış','navigasyon',
+  'meteoroloji','meteorolojik',
+  // Genel akademik
+  'müfredat','ders','okul','sınav','öğrenme','bilgi','kavram','konu','test'
+]
+
+function isInCurriculum(topic: string, plan: string): boolean {
+  if (plan === 'unlimited') return true // unlimited her konuya erişebilir
+  const lower = topic.toLowerCase()
+  return CURRICULUM_KEYWORDS.some(kw => lower.includes(kw))
+}
+
 function buildPrompt(type: string, topic: string, grade: string, difficulty: string, language: string, count: number, fileContent?: string): string {
   const contentNote = fileContent
     ? `Topic: "${topic}". Generate questions from this content:\n${fileContent.slice(0, 3000)}`
@@ -23,6 +54,20 @@ IMPORTANT: For any calculation or factual claim, verify it is 100% correct befor
   if (type === 'true_false') return base + `Generate true/false questions with reasoning. ans:0 means True, ans:1 means False. opts must always be ["True","False"] but translated to ${language}.
 
 {"questions":[{"type":"true_false","q":"Photosynthesis only occurs during daytime.","opts":["True","False"],"ans":0,"exp":"Photosynthesis requires light energy so it occurs during daytime."}]}`
+
+  if (type === 'multi_true_false') return base + `Generate Maarif Model multi-statement true/false questions. Each question has 4-5 statements. The student must judge each statement as true or false.
+
+{"questions":[{"type":"multi_true_false","q":"Aşağıdaki ifadeleri Doğru (D) ya da Yanlış (Y) olarak değerlendirin.","statements":[{"text":"Mitokondri hücrenin enerji merkezidir.","correct":true},{"text":"Ribozom DNA saklar.","correct":false},{"text":"Çekirdek hücre bölünmesini kontrol eder.","correct":true},{"text":"Lizozom protein sentezi yapar.","correct":false}],"opts":["D","Y"],"ans":0,"exp":"Her ifade için açıklama: Mitokondri ATP üretir, ribozom protein sentezler, çekirdek genetik bilgiyi taşır, lizozom artıkları sindirir."}]}`
+
+  if (type === 'table_fill') return base + `Generate Maarif Model table-fill questions. The student fills in blank cells. tableAnswers contains correct answers in order of blanks.
+
+RULES:
+- headers: column headers
+- rows: each row has cells (array of strings) and blanks (array of column indices that are blank)
+- For blank cells, put "___" as the cell value
+- tableAnswers: correct answers in order of appearance (left-to-right, top-to-bottom)
+
+{"questions":[{"type":"table_fill","q":"Aşağıdaki tabloyu tamamlayın.","tableData":{"headers":["Organel","Görevi","Bulunduğu Yer"],"rows":[{"cells":["Mitokondri","___","Hücre sitoplazması"],"blanks":[1]},{"cells":["Ribozom","Protein sentezi","___"],"blanks":[2]},{"cells":["___","DNA saklar","Hücre çekirdeği"],"blanks":[0]}]},"tableAnswers":["Enerji (ATP) üretimi","Sitoplazma ve ER","Çekirdek"],"opts":["A","B","C"],"ans":0,"exp":"Her organelin görevi farklıdır: mitokondri enerji, ribozom protein, çekirdek genetik bilgi üretir."}]}`
 
   if (type === 'matching') return base + `Generate matching questions. Each question has exactly 4 concept-definition pairs in "pairs" array.
 
@@ -67,12 +112,24 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('plan, monthly_test_count, grade, language')
+      .select('plan, monthly_test_count, daily_test_count, daily_test_date, grade, language')
       .eq('id', user.id)
       .single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
-    if (profile.plan === 'free' && (profile.monthly_test_count || 0) >= 10) {
+    const plan = profile.plan || 'free'
+    const today = new Date().toISOString().split('T')[0]
+
+    // Günlük limit kontrolü
+    const DAILY_LIMIT: Record<string, number> = { free: 10, premium: 25, unlimited: 99999 }
+    const dailyLimit = DAILY_LIMIT[plan] ?? 10
+    const dailyCount = profile.daily_test_date === today ? (profile.daily_test_count || 0) : 0
+    if (dailyCount >= dailyLimit) {
+      return NextResponse.json({ error: 'daily_limit_reached' }, { status: 429 })
+    }
+
+    // Aylık limit (free)
+    if (plan === 'free' && (profile.monthly_test_count || 0) >= 10) {
       return NextResponse.json({ error: 'limit_reached' }, { status: 429 })
     }
 
@@ -88,10 +145,20 @@ export async function POST(req: NextRequest) {
       dailyChallenge = false,
     } = body
 
+    // Soru sayısı limiti
+    const MAX_QCOUNT: Record<string, number> = { free: 5, premium: 20, unlimited: 20 }
+    const maxQ = MAX_QCOUNT[plan] ?? 5
+    const safeQCount = Math.min(questionCount, maxQ)
+
+    // Müfredat kontrolü (free + premium için)
+    if (!fileContent && !isInCurriculum(topic, plan)) {
+      return NextResponse.json({ error: 'out_of_curriculum' }, { status: 403 })
+    }
+
     const lang = language || profile.language || 'Turkce'
     const grade = profile.grade || 'ortaokul 6. sinif'
 
-    const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, questionCount, fileContent)
+    const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, safeQCount, fileContent)
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
@@ -137,9 +204,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!dailyChallenge) {
+      // Aylık sayaç
       await supabase
         .from('profiles')
-        .update({ monthly_test_count: (profile.monthly_test_count || 0) + 1 })
+        .update({
+          monthly_test_count: (profile.monthly_test_count || 0) + 1,
+          daily_test_count: dailyCount + 1,
+          daily_test_date: today,
+        })
         .eq('id', user.id)
     }
 
@@ -181,7 +253,6 @@ export async function PATCH(req: NextRequest) {
     const { sessionId, answers, score } = await req.json()
     if (!sessionId) return NextResponse.json({ error: 'No sessionId' }, { status: 400 })
 
-    // Get session to calculate pct
     const { data: session } = await supabase
       .from('quiz_sessions')
       .select('question_count, topic, user_id')
@@ -192,88 +263,40 @@ export async function PATCH(req: NextRequest) {
     if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
 
     const pct = session.question_count > 0
-      ? Math.round((score / session.question_count) * 100)
-      : 0
+      ? Math.round((score / session.question_count) * 100) : 0
 
-    // Mark session as completed
     await supabase
       .from('quiz_sessions')
       .update({ answers, score, pct, completed: true })
       .eq('id', sessionId)
       .eq('user_id', user.id)
 
-    // Update streak
     const today = new Date().toISOString().split('T')[0]
-    const { data: streak } = await supabase
-      .from('streaks')
-      .select('*')
-      .eq('user_id', user.id)
-      .single()
+    const { data: streak } = await supabase.from('streaks').select('*').eq('user_id', user.id).single()
 
     if (!streak) {
-      await supabase.from('streaks').insert({
-        user_id: user.id,
-        current_streak: 1,
-        longest_streak: 1,
-        total_points: 10,
-        last_activity_date: today,
-      })
+      await supabase.from('streaks').insert({ user_id: user.id, current_streak: 1, longest_streak: 1, total_points: 10, last_activity_date: today })
     } else {
       const lastDate = streak.last_activity_date
-      const yesterday = new Date()
-      yesterday.setDate(yesterday.getDate() - 1)
-      const yesterdayStr = yesterday.toISOString().split('T')[0]
-
+      const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1)
+      const yStr = yesterday.toISOString().split('T')[0]
       if (lastDate === today) {
-        // Already did today, just add points
-        await supabase.from('streaks')
-          .update({ total_points: (streak.total_points || 0) + 5 })
-          .eq('user_id', user.id)
-      } else if (lastDate === yesterdayStr) {
-        // Consecutive day
-        const newStreak = (streak.current_streak || 0) + 1
-        await supabase.from('streaks').update({
-          current_streak: newStreak,
-          longest_streak: Math.max(newStreak, streak.longest_streak || 0),
-          total_points: (streak.total_points || 0) + 10,
-          last_activity_date: today,
-        }).eq('user_id', user.id)
+        await supabase.from('streaks').update({ total_points: (streak.total_points || 0) + 5 }).eq('user_id', user.id)
+      } else if (lastDate === yStr) {
+        const ns = (streak.current_streak || 0) + 1
+        await supabase.from('streaks').update({ current_streak: ns, longest_streak: Math.max(ns, streak.longest_streak || 0), total_points: (streak.total_points || 0) + 10, last_activity_date: today }).eq('user_id', user.id)
       } else {
-        // Streak broken
-        await supabase.from('streaks').update({
-          current_streak: 1,
-          total_points: (streak.total_points || 0) + 10,
-          last_activity_date: today,
-        }).eq('user_id', user.id)
+        await supabase.from('streaks').update({ current_streak: 1, total_points: (streak.total_points || 0) + 10, last_activity_date: today }).eq('user_id', user.id)
       }
     }
 
-    // Update weak topics
-    // (simplified - track per topic wrong answers)
     const wrongAnswers = (answers || []).filter((a: any) => !a.correct)
     if (wrongAnswers.length > 0 && session.topic) {
-      const { data: existing } = await supabase
-        .from('weak_topics')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('topic', session.topic)
-        .single()
-
+      const { data: existing } = await supabase.from('weak_topics').select('*').eq('user_id', user.id).eq('topic', session.topic).single()
       if (existing) {
-        await supabase.from('weak_topics').update({
-          wrong_count: (existing.wrong_count || 0) + wrongAnswers.length,
-          total_count: (existing.total_count || 0) + (answers?.length || 0),
-          last_seen_at: new Date().toISOString(),
-        }).eq('id', existing.id)
+        await supabase.from('weak_topics').update({ wrong_count: (existing.wrong_count || 0) + wrongAnswers.length, total_count: (existing.total_count || 0) + (answers?.length || 0), last_seen_at: new Date().toISOString() }).eq('id', existing.id)
       } else {
-        await supabase.from('weak_topics').insert({
-          user_id: user.id,
-          topic: session.topic,
-          subject: 'Genel',
-          wrong_count: wrongAnswers.length,
-          total_count: answers?.length || 0,
-          last_seen_at: new Date().toISOString(),
-        })
+        await supabase.from('weak_topics').insert({ user_id: user.id, topic: session.topic, subject: 'Genel', wrong_count: wrongAnswers.length, total_count: answers?.length || 0, last_seen_at: new Date().toISOString() })
       }
     }
 

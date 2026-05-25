@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import FileUploader, { type UploadedFile } from '@/components/FileUploader'
 import QuizResult from '@/components/QuizResult'
 
-type QuestionType = 'multiple_choice' | 'fill_blank' | 'matching' | 'true_false' | 'ordering' | 'short_answer'
+type QuestionType = 'multiple_choice' | 'fill_blank' | 'matching' | 'true_false' | 'ordering' | 'short_answer' | 'multi_true_false' | 'table_fill'
 
 interface Question {
   q: string; opts: string[]; ans: number; exp: string
@@ -18,8 +18,11 @@ interface Question {
   items?: string[]        // sıralama: karışık liste
   correctOrder?: number[] // sıralama: doğru sıra
   statement?: boolean     // D/Y: doğru mu?
+  statements?: {text: string; correct: boolean}[]  // çoklu D/Y (Maarif)
+  tableData?: {headers: string[]; rows: {cells: string[]; blanks: number[]}[]} // tablo (Maarif)
+  tableAnswers?: string[] // tablo: doğru cevaplar sırayla
 }
-interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number }
+interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number; daily_test_count?: number; daily_test_date?: string }
 
 const TOPIC_MAP: Record<string, { topic: string; subject: string }[]> = {
   ilkokul: [
@@ -89,13 +92,18 @@ function QuizPageContent() {
   const [loadMsg, setLoadMsg] = useState('Profilin analiz ediliyor...')
   const [topicErr, setTopicErr] = useState('')
   const [youtubeLinks, setYoutubeLinks] = useState<Record<string, any>>({})
+  const [showPaywall, setShowPaywall] = useState<'qcount' | 'daily' | 'topic' | null>(null)
   const supabase = createClient() as any
+
+  // Plan limitleri
+  const PLAN_DAILY_LIMIT: Record<string, number> = { free: 10, premium: 25, unlimited: 9999 }
+  const PLAN_MAX_QCOUNT: Record<string, number> = { free: 5, premium: 20, unlimited: 20 }
 
   const fetchProfile = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return null }
     const { data } = await supabase
-      .from('profiles').select('name,grade,language,plan,monthly_test_count,age')
+      .from('profiles').select('name,grade,language,plan,monthly_test_count,daily_test_count,daily_test_date,age')
       .eq('id', user.id).single()
     if (!data || !data.grade || !data.age || !data.name) { router.push('/profile'); return null }
     const lang = getActiveLang(data.language)
@@ -234,6 +242,18 @@ function QuizPageContent() {
 
       if (res.status === 429 && data.error === 'limit_reached') {
         setScreen('limit')
+        return
+      }
+
+      if (res.status === 429 && data.error === 'daily_limit_reached') {
+        setScreen('topic')
+        setShowPaywall('daily')
+        return
+      }
+
+      if (res.status === 403 && data.error === 'out_of_curriculum') {
+        setScreen('topic')
+        setShowPaywall('topic')
         return
       }
 
@@ -480,8 +500,58 @@ function QuizPageContent() {
 
   const level = profile ? getLevel(profile.grade) : 'ortaokul'
   const suggestions = TOPIC_MAP[level] || TOPIC_MAP.ortaokul
+  const plan = profile?.plan || 'free'
+  const dailyLimit = PLAN_DAILY_LIMIT[plan] ?? 10
+  const maxQCount = PLAN_MAX_QCOUNT[plan] ?? 5
+  const today = new Date().toISOString().split('T')[0]
+  const dailyUsed = profile?.daily_test_date === today ? (profile?.daily_test_count || 0) : 0
+  const dailyLeft = plan === 'unlimited' ? null : Math.max(0, dailyLimit - dailyUsed)
   const testsLeft = profile?.plan === 'free' ? Math.max(0, 10 - (profile?.monthly_test_count || 0)) : null
   const activeDiff = DIFFICULTIES.find(d => d.value === difficulty)!
+
+  // ── PAYWALL MODAL ──
+  const PaywallModal = ({ reason }: { reason: 'qcount' | 'daily' | 'topic' }) => (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+      <div className="card anim-up" style={{ maxWidth: '460px', width: '100%', position: 'relative' }}>
+        <button onClick={() => setShowPaywall(null)} style={{ position: 'absolute', top: '12px', right: '12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--text3)' }}>✕</button>
+        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+          <div style={{ fontSize: '48px', marginBottom: '0.75rem' }}>
+            {reason === 'qcount' ? '🎯' : reason === 'daily' ? '⏰' : '🔒'}
+          </div>
+          <h3 className="serif" style={{ fontSize: '22px', marginBottom: '0.5rem' }}>
+            {reason === 'qcount' ? 'Daha fazla soru için Premium' :
+             reason === 'daily' ? 'Günlük test limitin doldu' :
+             'Bu konu müfredat dışı'}
+          </h3>
+          <p style={{ color: 'var(--text2)', fontSize: '13px', lineHeight: 1.7 }}>
+            {reason === 'qcount' ? 'Ücretsiz planda en fazla 5 soru oluşturabilirsin. Premium veya Unlimited üyelikle 20 soruya kadar test oluştur.' :
+             reason === 'daily' ? `Bugün ${dailyLimit} test hakkını kullandın. Yarın yenilenir ya da Unlimited'a geç.` :
+             'Bu konu Türkiye Millî Eğitim müfredatında bulunmuyor. Unlimited planda müfredat dışı konularda da test oluşturabilirsin.'}
+          </p>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {[
+            { plan: 'Freemium', price: 'Ücretsiz', features: ['5 soru/test', 'Günde 10 test', 'Sadece müfredat konuları'], color: '#64748b', highlight: false },
+            { plan: 'Premium', price: '600₺/yıl', features: ['20 soru/test', 'Günde 25 test', 'Tüm konular', 'Koç desteği yok'], color: '#2563eb', highlight: false },
+            { plan: 'Unlimited', price: '6.000₺/yıl', features: ['20 soru/test', 'Sınırsız test', 'Müfredat dışı konular', '12× koça danışma'], color: 'var(--accent)', highlight: true },
+          ].map(p => (
+            <div key={p.plan} style={{ padding: '14px 16px', borderRadius: '12px', border: `2px solid ${p.highlight ? p.color : 'var(--border)'}`, background: p.highlight ? 'var(--accent-bg)' : 'var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+              <div>
+                <div style={{ fontWeight: 700, color: p.color, fontSize: '14px' }}>{p.plan} {p.highlight && '⭐'}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{p.features.join(' · ')}</div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: '14px', color: p.color }}>{p.price}</div>
+                {p.plan !== 'Freemium' && (
+                  <a href="/pricing" style={{ fontSize: '11px', color: p.color, textDecoration: 'none', fontWeight: 600 }}>Satın al →</a>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
 
   // ── LIMIT ──
   if (screen === 'limit') return (
@@ -514,6 +584,7 @@ function QuizPageContent() {
   // ── TOPIC ──
   if (screen === 'topic') return (
     <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', position: 'relative', overflow: 'hidden', background: 'linear-gradient(160deg, #f0f9ff 0%, #ffffff 40%, #fff8e8 100%)' }}>
+      {showPaywall && <PaywallModal reason={showPaywall} />}
       {/* Dekoratif arka plan elementleri */}
       <div style={{ position: 'fixed', top: '-120px', right: '-80px', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,207,184,0.08) 0%, transparent 65%)', pointerEvents: 'none', zIndex: 0 }} />
       <div style={{ position: 'fixed', bottom: '60px', left: '-100px', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(8,36,101,0.06) 0%, transparent 65%)', pointerEvents: 'none', zIndex: 0 }} />
@@ -542,8 +613,16 @@ function QuizPageContent() {
                     {testsLeft === 0 ? '⚠ Hak kalmadı' : `${testsLeft} test kaldı`}
                   </span>
                 )}
+                {dailyLeft !== null && dailyLeft <= 5 && (
+                  <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '11px', background: dailyLeft === 0 ? 'var(--red-bg)' : 'rgba(217,119,6,0.1)', color: dailyLeft === 0 ? 'var(--red)' : '#92400e', border: `1px solid ${dailyLeft === 0 ? 'rgba(220,38,38,0.2)' : 'rgba(217,119,6,0.2)'}`, fontWeight: 600 }}>
+                    {dailyLeft === 0 ? '⏰ Günlük limit doldu' : `Bugün ${dailyLeft} test kaldı`}
+                  </span>
+                )}
                 {profile.plan === 'premium' && (
                   <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '11px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid rgba(91,76,245,0.2)', fontWeight: 600 }}>★ Premium</span>
+                )}
+                {profile.plan === 'unlimited' && (
+                  <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '11px', background: 'rgba(30,207,184,0.1)', color: '#0d9488', border: '1px solid rgba(30,207,184,0.3)', fontWeight: 600 }}>⭐ Unlimited</span>
                 )}
               </div>
             </div>
@@ -606,22 +685,28 @@ function QuizPageContent() {
           {/* Soru tipi seçici */}
           <div style={{ marginTop: '16px' }}>
             <label className="field-label">Soru tipi</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '8px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '6px', fontWeight: 500 }}>
+              📌 Maarif Modeli tipleri işaretli olanlardır
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '4px' }}>
               {[
-                { value: 'multiple_choice', label: 'Çoktan Seçmeli', icon: '🔤', desc: 'A/B/C/D klasik' },
-                { value: 'fill_blank', label: 'Boşluk Doldurma', icon: '✏️', desc: 'Eksik kelimeyi bul' },
-                { value: 'true_false', label: 'Doğru / Yanlış', icon: '✓✗', desc: 'Gerekçeli D/Y' },
-                { value: 'matching', label: 'Eşleştirme', icon: '🔗', desc: 'Kavram – tanım' },
-                { value: 'ordering', label: 'Sıralama', icon: '📋', desc: 'Doğru sıraya koy' },
-                { value: 'short_answer', label: 'Kısa Cevap', icon: '💬', desc: 'AI puanlar' },
+                { value: 'multiple_choice', label: 'Çoktan Seçmeli', icon: '🔤', desc: 'A/B/C/D klasik', maarif: true },
+                { value: 'fill_blank', label: 'Boşluk Doldurma', icon: '✏️', desc: 'Eksik kelimeyi bul', maarif: true },
+                { value: 'true_false', label: 'Doğru / Yanlış', icon: '✓✗', desc: 'Gerekçeli D/Y', maarif: true },
+                { value: 'multi_true_false', label: 'Çoklu D/Y', icon: '📋✓✗', desc: 'Maarif Modeli', maarif: true },
+                { value: 'table_fill', label: 'Tablo Doldurma', icon: '🗂️', desc: 'Maarif Modeli', maarif: true },
+                { value: 'matching', label: 'Eşleştirme', icon: '🔗', desc: 'Kavram – tanım', maarif: true },
+                { value: 'ordering', label: 'Sıralama', icon: '📋', desc: 'Doğru sıraya koy', maarif: true },
+                { value: 'short_answer', label: 'Kısa Cevap', icon: '💬', desc: 'AI puanlar', maarif: false },
               ].map(t => (
                 <button key={t.value} onClick={() => setQuestionType(t.value as QuestionType)}
                   style={{
                     padding: '10px 8px', borderRadius: '10px', cursor: 'pointer', textAlign: 'center',
-                    border: `1.5px solid ${questionType === t.value ? 'var(--accent)' : 'var(--border)'}`,
-                    background: questionType === t.value ? 'var(--accent-bg)' : 'var(--bg2)',
-                    transition: 'all 0.15s',
+                    border: `1.5px solid ${questionType === t.value ? 'var(--accent)' : t.maarif ? 'rgba(91,76,245,0.2)' : 'var(--border)'}`,
+                    background: questionType === t.value ? 'var(--accent-bg)' : t.maarif ? 'rgba(91,76,245,0.03)' : 'var(--bg2)',
+                    transition: 'all 0.15s', position: 'relative',
                   }}>
+                  {t.maarif && <span style={{ position: 'absolute', top: '4px', right: '5px', fontSize: '8px', color: 'var(--accent)', fontWeight: 700 }}>MM</span>}
                   <div style={{ fontSize: '20px', marginBottom: '4px' }}>{t.icon}</div>
                   <div style={{ fontSize: '11px', fontWeight: 700, color: questionType === t.value ? 'var(--accent)' : 'var(--primary)', lineHeight: 1.3 }}>{t.label}</div>
                   <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '2px' }}>{t.desc}</div>
@@ -634,11 +719,25 @@ function QuizPageContent() {
           <div style={{ display: 'flex', gap: '12px', marginTop: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div style={{ flex: 1 }}>
               <label className="field-label">Soru sayısı</label>
-              <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                {(profile?.plan === 'free' ? [5] : [5, 10, 15, 20]).map(n => (
-                  <button key={n} className={`btn btn-sm ${qCount === n ? 'btn-primary' : ''}`} onClick={() => setQCount(n)}>{n} soru</button>
-                ))}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+                {[5, 10, 15, 20].map(n => {
+                  const locked = n > maxQCount
+                  const active = qCount === n
+                  return (
+                    <button key={n}
+                      className={`btn btn-sm ${active && !locked ? 'btn-primary' : ''}`}
+                      onClick={() => {
+                        if (locked) { setShowPaywall('qcount'); return }
+                        setQCount(n)
+                      }}
+                      style={{ position: 'relative', opacity: locked ? 0.7 : 1, border: locked ? '1.5px solid rgba(217,119,6,0.4)' : undefined, color: locked ? '#92400e' : undefined }}>
+                      {n} soru
+                      {locked && <span style={{ fontSize: '10px', marginLeft: '3px' }}>🔒</span>}
+                    </button>
+                  )
+                })}
               </div>
+              {plan === 'free' && <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Freemium'da max 5 soru · <a href="/pricing" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Premium'a geç</a></div>}
             </div>
             <div>
               <label className="field-label">Görsel sorular</label>
@@ -663,15 +762,19 @@ function QuizPageContent() {
 
           {topicErr && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{topicErr}</div>}
 
-          <button className="btn btn-primary btn-lg" onClick={startQuiz} disabled={testsLeft === 0}
-            style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', opacity: testsLeft === 0 ? 0.5 : 1 }}>
-            {testsLeft === 0 ? 'Test hakkın doldu — Yükselt' : 'Test oluştur ⚡'}
+          <button className="btn btn-primary btn-lg" onClick={() => {
+            if (dailyLeft === 0) { setShowPaywall('daily'); return }
+            if (testsLeft === 0) { setScreen('limit'); return }
+            startQuiz()
+          }}
+            style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', opacity: (testsLeft === 0 || dailyLeft === 0) ? 0.5 : 1 }}>
+            {testsLeft === 0 ? 'Test hakkın doldu — Yükselt' : dailyLeft === 0 ? 'Günlük limit doldu ⏰' : 'Test oluştur ⚡'}
           </button>
 
-          {testsLeft === 0 && (
-            <Link href="/pricing" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }}>
-              💎 Premium'a geç
-            </Link>
+          {(testsLeft === 0 || dailyLeft === 0) && (
+            <a href="/pricing" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '8px', display: 'flex', textDecoration: 'none' }}>
+              💎 Planları gör
+            </a>
           )}
         </div>
       </div>
@@ -729,7 +832,7 @@ function QuizPageContent() {
             {q.type && q.type !== 'multiple_choice' && (
               <div style={{ marginBottom: '8px' }}>
                 <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '99px', background: 'rgba(8,36,101,0.08)', color: 'var(--primary)', fontWeight: 700, border: '1px solid rgba(8,36,101,0.15)' }}>
-                  {{'fill_blank':'✏️ Boşluk Doldurma','true_false':'✓✗ Doğru / Yanlış','matching':'🔗 Eşleştirme','ordering':'📋 Sıralama','short_answer':'💬 Kısa Cevap'}[q.type]}
+                  {({'fill_blank':'✏️ Boşluk Doldurma','true_false':'✓✗ Doğru / Yanlış','matching':'🔗 Eşleştirme','ordering':'📋 Sıralama','short_answer':'💬 Kısa Cevap','multi_true_false':'📋✓✗ Çoklu D/Y — Maarif','table_fill':'🗂️ Tablo Doldurma — Maarif'} as Record<string,string>)[q.type]}
                 </span>
               </div>
             )}
@@ -895,6 +998,114 @@ function QuizPageContent() {
                 )}
               </div>
             )}
+
+            {/* ── ÇOKLU D/Y (Maarif Modeli) ── */}
+            {q.type === 'multi_true_false' && (() => {
+              const stmts = q.statements || []
+              const [mAnswers, setMAnswers] = useState<Record<number, boolean | null>>({})
+              const allAnswered = stmts.every((_: any, i: number) => mAnswers[i] !== undefined && mAnswers[i] !== null)
+              function submitMTF() {
+                const correct = stmts.every((s: any, i: number) => mAnswers[i] === s.correct)
+                setChosen(correct ? 0 : -1)
+                setAnswers(prev => [...prev, { userAns: correct ? 0 : -1, correct }])
+              }
+              return (
+                <div>
+                  <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px' }}>Her ifade için Doğru veya Yanlış'ı seç:</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {stmts.map((s: any, i: number) => {
+                      const userAns = mAnswers[i]
+                      const isAnswered = chosen !== null
+                      const isCorrect = s.correct === true
+                      return (
+                        <div key={i} style={{ padding: '12px 14px', borderRadius: '10px', border: `1.5px solid ${isAnswered ? (userAns === s.correct ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.3)') : 'var(--border)'}`, background: isAnswered ? (userAns === s.correct ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)' }}>
+                          <div style={{ fontSize: '13px', marginBottom: '8px' }}>{i + 1}. {s.text}</div>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            {[true, false].map(val => (
+                              <button key={String(val)} onClick={() => { if (chosen !== null) return; setMAnswers(prev => ({ ...prev, [i]: val })) }}
+                                disabled={chosen !== null}
+                                style={{ padding: '6px 16px', borderRadius: '8px', border: `1.5px solid ${mAnswers[i] === val ? (val ? 'rgba(22,163,74,0.6)' : 'rgba(220,38,38,0.6)') : 'var(--border)'}`, background: mAnswers[i] === val ? (val ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', fontWeight: 600, fontSize: '12px', cursor: chosen !== null ? 'default' : 'pointer', color: mAnswers[i] === val ? (val ? 'var(--green)' : 'var(--red)') : 'var(--text2)' }}>
+                                {val ? '✓ Doğru' : '✗ Yanlış'}
+                              </button>
+                            ))}
+                            {isAnswered && <span style={{ fontSize: '12px', fontWeight: 600, color: isCorrect ? 'var(--green)' : 'var(--red)', alignSelf: 'center', marginLeft: '4px' }}>{userAns === s.correct ? '✓' : `✗ (${isCorrect ? 'Doğru' : 'Yanlış'})`}</span>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {chosen === null && (
+                    <button className="btn btn-primary" onClick={submitMTF} disabled={!allAnswered}
+                      style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
+                      Cevapları onayla →
+                    </button>
+                  )}
+                </div>
+              )
+            })()}
+
+            {/* ── TABLO DOLDURMA (Maarif Modeli) ── */}
+            {q.type === 'table_fill' && (() => {
+              const td = q.tableData
+              const answers2 = q.tableAnswers || []
+              const blankCount = td?.rows?.reduce((s: number, r: any) => s + (r.blanks?.length || 0), 0) || 0
+              const [tInputs, setTInputs] = useState<string[]>(Array(blankCount).fill(''))
+              let blankIdx = 0
+              function submitTable() {
+                const correct = answers2.every((ans: string, i: number) => (tInputs[i] || '').toLowerCase().trim() === ans.toLowerCase().trim())
+                setChosen(correct ? 0 : -1)
+                setAnswers(prev => [...prev, { userAns: correct ? 0 : -1, correct }])
+              }
+              return (
+                <div>
+                  <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px' }}>Boş hücreleri doldurun:</p>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                      <thead>
+                        <tr>
+                          {td?.headers?.map((h: string, i: number) => (
+                            <th key={i} style={{ padding: '8px 12px', background: 'rgba(8,36,101,0.08)', border: '1px solid var(--border)', fontWeight: 700, color: 'var(--primary)', textAlign: 'left' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {td?.rows?.map((row: any, ri: number) => (
+                          <tr key={ri}>
+                            {row.cells.map((cell: string, ci: number) => {
+                              const isBlank = row.blanks?.includes(ci)
+                              if (isBlank) {
+                                const idx = blankIdx++
+                                const isCorrectAns = chosen !== null && (tInputs[idx] || '').toLowerCase().trim() === (answers2[idx] || '').toLowerCase().trim()
+                                return (
+                                  <td key={ci} style={{ padding: '6px 8px', border: '1px solid var(--border)', background: chosen !== null ? (isCorrectAns ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)' }}>
+                                    {chosen !== null ? (
+                                      <span style={{ fontWeight: 600, color: isCorrectAns ? 'var(--green)' : 'var(--red)' }}>
+                                        {tInputs[idx] || '—'} {!isCorrectAns && <span style={{ fontSize: '11px' }}>→ {answers2[idx]}</span>}
+                                      </span>
+                                    ) : (
+                                      <input value={tInputs[idx]} onChange={e => { const n = [...tInputs]; n[idx] = e.target.value; setTInputs(n) }}
+                                        style={{ width: '100%', padding: '4px 8px', border: '1.5px solid var(--accent)', borderRadius: '6px', fontSize: '13px', fontFamily: 'var(--font-sans)', background: 'var(--bg)', color: 'var(--text)', outline: 'none', boxSizing: 'border-box' }} />
+                                    )}
+                                  </td>
+                                )
+                              }
+                              return <td key={ci} style={{ padding: '8px 12px', border: '1px solid var(--border)', background: 'var(--bg2)' }}>{cell}</td>
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {chosen === null && (
+                    <button className="btn btn-primary" onClick={submitTable} disabled={tInputs.some(t => !t.trim())}
+                      style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
+                      Tabloyu onayla →
+                    </button>
+                  )}
+                </div>
+              )
+            })()}
+
             {chosen !== null && (
               <>
                 <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', borderLeft: '3px solid var(--accent)', fontSize: '13px', color: 'var(--text2)', lineHeight: 1.65 }}>
