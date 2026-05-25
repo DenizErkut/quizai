@@ -174,7 +174,34 @@ export async function POST(req: NextRequest) {
     const lang = language || profile.language || 'Turkce'
     const grade = profile.grade || 'ortaokul 6. sinif'
 
-    const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, safeQCount, fileContent)
+    // Daha önce sorulmuş soruları çek — tekrar önleme
+    let previousQuestionsNote = ''
+    try {
+      const { data: recentSessions } = await supabase
+        .from('quiz_sessions')
+        .select('questions')
+        .eq('user_id', user.id)
+        .eq('topic', topic)
+        .eq('completed', true)
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      if (recentSessions?.length) {
+        const prevQTexts: string[] = []
+        recentSessions.forEach((s: any) => {
+          (s.questions || []).forEach((q: any) => {
+            if (q.q && prevQTexts.length < 30) prevQTexts.push(q.q.slice(0, 80))
+          })
+        })
+        if (prevQTexts.length > 0) {
+          previousQuestionsNote = `\n\nIMPORTANT - DO NOT REPEAT these previously asked questions (paraphrase or use completely different angles):\n${prevQTexts.map((q, i) => `${i + 1}. ${q}`).join('\n')}`
+        }
+      }
+    } catch (e) {
+      console.error('Previous questions fetch error:', e)
+    }
+
+    const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, safeQCount, fileContent) + previousQuestionsNote
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5',
