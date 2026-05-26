@@ -66,47 +66,53 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
   }
 
   if (ext === 'pdf') {
-    // Sayfa sayısını PDF header'dan kontrol et
-    const pdfText = buffer.toString('binary')
-    const pageMatches = pdfText.match(/\/Type\s*\/Page[^s]/g)
-    const estimatedPages = pageMatches ? pageMatches.length : 0
-
-    if (estimatedPages > 95) {
-      return {
-        error: 'pdf_too_long',
-        content: '',
-        type: 'pdf',
-        filename,
-        message: `Bu PDF yaklaşık ${estimatedPages} sayfa içeriyor. Anthropic API maksimum 100 sayfa destekliyor. Lütfen ilk 80-90 sayfayı ayrı bir PDF olarak kaydet veya metni kopyalayıp yapıştır.`,
-      }
-    }
-
-    const base64 = buffer.toString('base64')
+    // PDF metin extraction — pdf-parse ile direkt metin çıkar, Anthropic'e gönderme
     try {
-      const message = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 2000,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } } as any,
-            { type: 'text', text: 'Bu PDF dosyasının tüm metin içeriğini çıkar. Sadece metni döndür. Maksimum 8000 kelime.' },
-          ],
-        }],
-      }) as any
-      return { content: message.content[0].text, type: 'pdf', filename }
-    } catch (pdfErr: any) {
-      // Anthropic'ten 100 sayfa hatası gelirse güzel mesaj ver
-      if (pdfErr?.message?.includes('100 PDF pages') || pdfErr?.status === 400) {
+      const pdfParse = (await import('pdf-parse')).default
+      const data = await pdfParse(buffer, { max: 80 }) // max 80 sayfa
+      const text = data.text?.trim()
+
+      if (!text || text.length < 50) {
+        // Taranmış/görsel PDF — Anthropic ile dene ama max 30 sayfa sınırla
+        const pageCount = data.numpages || 0
+        if (pageCount > 30) {
+          return {
+            error: 'pdf_too_long',
+            content: '',
+            type: 'pdf',
+            filename,
+            message: `Bu PDF taranmış görsel içeriyor ve ${pageCount} sayfa. Maksimum 30 sayfa destekleniyor. Lütfen daha kısa bir bölüm yükleyin.`,
+          }
+        }
+        const base64 = buffer.toString('base64')
+        const message = await anthropic.messages.create({
+          model: 'claude-sonnet-4-5',
+          max_tokens: 2000,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } } as any,
+              { type: 'text', text: 'Bu PDF dosyasının tüm metin içeriğini çıkar. Sadece metni döndür. Maksimum 5000 kelime.' },
+            ],
+          }],
+        }) as any
+        return { content: message.content[0].text, type: 'pdf', filename }
+      }
+
+      // Başarılı text extraction — Anthropic'e gerek yok
+      const trimmed = text.slice(0, 20000)
+      return { content: trimmed, type: 'pdf', filename }
+    } catch (parseErr: any) {
+      if (parseErr?.message?.includes('100 PDF pages') || parseErr?.status === 400) {
         return {
           error: 'pdf_too_long',
           content: '',
           type: 'pdf',
           filename,
-          message: 'Bu PDF 100 sayfadan fazla içeriyor. Lütfen daha kısa bir bölüm yükleyin veya metni kopyalayıp yapıştırın.',
+          message: 'Bu PDF 100 sayfadan fazla içeriyor. Lütfen daha kısa bir bölüm yükleyin.',
         }
       }
-      throw pdfErr
+      throw parseErr
     }
   }
 
