@@ -30,10 +30,21 @@ export default function DailyPage() {
 
     const today = new Date().toISOString().split('T')[0]
 
-    const [{ data: p }, { data: s }, { data: c }] = await Promise.all([
-      supabase.from('profiles').select('name,grade,language,plan').eq('id', user.id).single(),
-      supabase.from('streaks').select('*').eq('user_id', user.id).single(),
-      supabase.from('daily_challenges').select('*').eq('date', today).single(),
+    // Önce profili çek — grade'e göre challenge seçeceğiz
+    const { data: p } = await supabase.from('profiles').select('name,grade,language,plan').eq('id', user.id).maybeSingle()
+
+    const gradeGroup = !p?.grade ? 'ortaokul'
+      : p.grade.includes('ilkokul') ? 'ilkokul'
+      : p.grade.includes('lise') ? 'lise'
+      : (p.grade.includes('universite') || p.grade.includes('üniversite')) ? 'universite'
+      : 'ortaokul'
+
+    const [{ data: s }, { data: c }] = await Promise.all([
+      supabase.from('streaks').select('*').eq('user_id', user.id).maybeSingle(),
+      supabase.from('daily_challenges').select('*')
+        .eq('date', today)
+        .eq('grade_level', gradeGroup)
+        .maybeSingle(),
     ])
 
     setProfile(p)
@@ -66,10 +77,21 @@ export default function DailyPage() {
   async function generateDailyChallenge(p: any, user: any) {
     setGenerating(true)
     const { data: { session } } = await supabase.auth.getSession()
-    const topics = [
-      'Türkiye coğrafyası', 'Osmanlı tarihi', 'Hücre biyolojisi', 'Denklemler',
-      'Fotosentez', 'Atatürk ilkeleri', 'Doğal sayılar', 'Ekosistem',
-    ]
+
+    const gradeGroup = !p?.grade ? 'ortaokul'
+      : p.grade.includes('ilkokul') ? 'ilkokul'
+      : p.grade.includes('lise') ? 'lise'
+      : (p.grade.includes('universite') || p.grade.includes('üniversite')) ? 'universite'
+      : 'ortaokul'
+
+    const TOPICS: Record<string, string[]> = {
+      ilkokul: ['Toplama ve çıkarma', 'Hayvanlar', 'Mevsimler', 'Vücudumuz', 'Türkiye haritası', 'Çarpım tablosu', 'Sağlıklı beslenme'],
+      ortaokul: ['Türkiye coğrafyası', 'Osmanlı tarihi', 'Hücre biyolojisi', 'Denklemler', 'Fotosentez', 'Atatürk ilkeleri', 'Doğal sayılar'],
+      lise: ['Türev ve integral', 'Osmanlı çöküşü', 'Genetik', 'Organik kimya', 'Elektromanyetizma', 'Edebiyat akımları', 'Trigonometri'],
+      universite: ['Diferansiyel denklemler', 'Makroekonomi', 'Termodinamik', 'Hukuk felsefesi', 'Veri yapıları', 'İstatistik', 'Moleküler biyoloji'],
+    }
+
+    const topics = TOPICS[gradeGroup] || TOPICS.ortaokul
     const topic = topics[new Date().getDay() % topics.length]
 
     const res = await fetch('/api/generate-quiz', {
@@ -79,9 +101,12 @@ export default function DailyPage() {
     })
     const data = await res.json()
     if (data.questions) {
+      const today = new Date().toISOString().split('T')[0]
       const { data: newChallenge } = await supabase.from('daily_challenges').insert({
-        date: new Date().toISOString().split('T')[0],
-        topic, subject: 'Genel', grade_level: 'ortaokul',
+        date: today,
+        topic,
+        subject: 'Genel',
+        grade_level: gradeGroup,
         questions: data.questions,
       }).select().single()
       setChallenge(newChallenge)
