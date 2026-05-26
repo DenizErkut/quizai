@@ -207,7 +207,7 @@ function QuizPageContent() {
   const hasFiles = uploadedFiles.length > 0
 
   async function startQuiz() {
-    const topic = customTopic.trim() || selectedTopic
+    const topic = customTopic.trim() || selectedTopic || (hasFiles ? uploadedFiles.map(f => f.name.replace(/\.[^.]+$/, '')).join(', ') : '')
     if (!topic) { setTopicErr('Bir konu seç veya yaz.'); return }
     setTopicErr('')
     const lang = getActiveLang(profile?.language)
@@ -777,7 +777,7 @@ function QuizPageContent() {
             {includeVisuals && <span style={{ color: 'var(--accent)' }}>📊 Görsel</span>}
           </div>
 
-          {topicErr && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{topicErr}</div>}
+          {topicErr && !hasFiles && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{topicErr}</div>}
 
           <button className="btn btn-primary btn-lg" onClick={() => {
             if (dailyLeft === 0) { setShowPaywall('daily'); return }
