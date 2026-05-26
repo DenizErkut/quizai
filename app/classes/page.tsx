@@ -1,16 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-
-interface ClassMember {
-  id: string
-  user_id: string
-  role: 'teacher' | 'student'
-  joined_at: string
-  profiles: { name: string; grade: string; plan: string }
-}
 
 interface ClassRoom {
   id: string
@@ -20,7 +11,9 @@ interface ClassRoom {
   invite_code: string
   created_at: string
   teacher_id: string
-  class_members: ClassMember[]
+  teacher_name?: string
+  student_count?: number
+  students?: { id: string; name: string; grade: string; plan: string; joined_at: string }[]
 }
 
 const SUBJECT_COLORS: Record<string, { bg: string; color: string; border: string }> = {
@@ -34,6 +27,11 @@ const SUBJECT_COLORS: Record<string, { bg: string; color: string; border: string
   'Kimya':     { bg: 'rgba(20,184,166,0.08)', color: '#0d9488', border: 'rgba(20,184,166,0.2)' },
   'Biyoloji':  { bg: 'rgba(22,163,74,0.08)',  color: '#16a34a', border: 'rgba(22,163,74,0.2)' },
   'Genel':     { bg: 'rgba(100,116,139,0.08)', color: '#475569', border: 'rgba(100,116,139,0.2)' },
+}
+
+const SUBJECT_EMOJI: Record<string, string> = {
+  'Matematik':'🔢','Türkçe':'📖','Fen':'🔬','Tarih':'🏛️',
+  'Coğrafya':'🌍','İngilizce':'🇬🇧','Fizik':'⚛️','Kimya':'🧪','Biyoloji':'🧬'
 }
 
 function subjectStyle(subject: string) {
@@ -60,28 +58,49 @@ export default function ClassesPage() {
     if (!user) { router.push('/login'); return }
     setMyUserId(user.id)
 
-    // Kullanıcının dahil olduğu sınıfları çek
+    // classroom_students üzerinden katıldığım sınıfları bul
     const { data: memberships } = await supabase
-      .from('class_members')
-      .select('class_id')
-      .eq('user_id', user.id)
+      .from('classroom_students')
+      .select('classroom_id, joined_at')
+      .eq('student_id', user.id)
 
     if (!memberships?.length) { setLoading(false); return }
 
-    const classIds = memberships.map((m: any) => m.class_id)
+    const classIds = memberships.map((m: any) => m.classroom_id)
+
+    // classrooms tablosundan sınıf bilgilerini çek
     const { data: classData } = await supabase
-      .from('classes')
-      .select(`
-        id, name, subject, description, invite_code, created_at, teacher_id,
-        class_members (
-          id, user_id, role, joined_at,
-          profiles ( name, grade, plan )
-        )
-      `)
+      .from('classrooms')
+      .select('*')
       .in('id', classIds)
       .order('created_at', { ascending: false })
 
-    setClasses(classData || [])
+    if (!classData?.length) { setLoading(false); return }
+
+    // Her sınıf için öğrenci listesini ve öğretmen adını çek
+    const enriched = await Promise.all(classData.map(async (cls: any) => {
+      const [{ data: students }, { data: teacher }] = await Promise.all([
+        supabase.from('classroom_students')
+          .select('student_id, joined_at, profiles(name, grade, plan)')
+          .eq('classroom_id', cls.id),
+        supabase.from('profiles').select('name').eq('id', cls.teacher_id).single(),
+      ])
+
+      return {
+        ...cls,
+        teacher_name: teacher?.name || '—',
+        student_count: students?.length || 0,
+        students: (students || []).map((s: any) => ({
+          id: s.student_id,
+          name: s.profiles?.name || 'İsimsiz',
+          grade: s.profiles?.grade || '—',
+          plan: s.profiles?.plan || 'free',
+          joined_at: s.joined_at,
+        })),
+      }
+    }))
+
+    setClasses(enriched)
     setLoading(false)
   }
 
@@ -93,12 +112,11 @@ export default function ClassesPage() {
     const { data: { user } } = await supabase.auth.getUser()
     const code = joinCode.trim().toUpperCase()
 
-    // Sınıfı bul
     const { data: cls } = await supabase
-      .from('classes')
+      .from('classrooms')
       .select('id, name, subject')
       .eq('invite_code', code)
-      .single()
+      .maybeSingle()
 
     if (!cls) {
       setJoinError('Geçersiz kod. Öğretmeninden doğru kodu iste.')
@@ -106,13 +124,12 @@ export default function ClassesPage() {
       return
     }
 
-    // Zaten üye mi?
     const { data: existing } = await supabase
-      .from('class_members')
-      .select('id')
-      .eq('class_id', cls.id)
-      .eq('user_id', user.id)
-      .single()
+      .from('classroom_students')
+      .select('classroom_id')
+      .eq('classroom_id', cls.id)
+      .eq('student_id', user.id)
+      .maybeSingle()
 
     if (existing) {
       setJoinError('Bu sınıfa zaten kayıtlısın.')
@@ -120,11 +137,9 @@ export default function ClassesPage() {
       return
     }
 
-    // Üye ol
-    const { error } = await supabase.from('class_members').insert({
-      class_id: cls.id,
-      user_id: user.id,
-      role: 'student',
+    const { error } = await supabase.from('classroom_students').insert({
+      classroom_id: cls.id,
+      student_id: user.id,
     })
 
     if (error) {
@@ -145,11 +160,8 @@ export default function ClassesPage() {
 
   // ── SINIF DETAY ──
   if (selectedClass) {
-    const myMembership = selectedClass.class_members.find(m => m.user_id === myUserId)
-    const isTeacher = myMembership?.role === 'teacher'
-    const students = selectedClass.class_members.filter(m => m.role === 'student')
-    const teacher = selectedClass.class_members.find(m => m.role === 'teacher')
     const sStyle = subjectStyle(selectedClass.subject)
+    const students = selectedClass.students || []
 
     return (
       <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'linear-gradient(160deg, #f0f9ff 0%, #ffffff 40%, #fff8e8 100%)' }}>
@@ -159,31 +171,25 @@ export default function ClassesPage() {
             ← Sınıflarıma dön
           </button>
 
-          {/* Sınıf başlığı */}
           <div className="card anim-up" style={{ marginBottom: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
               <div>
                 <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '99px', background: sStyle.bg, color: sStyle.color, border: `1px solid ${sStyle.border}`, fontWeight: 700, marginBottom: '8px', display: 'inline-block' }}>
-                  {selectedClass.subject}
+                  {selectedClass.subject || 'Genel'}
                 </span>
                 <h2 className="serif" style={{ fontSize: '24px', marginBottom: '4px' }}>{selectedClass.name}</h2>
                 {selectedClass.description && (
                   <p style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}>{selectedClass.description}</p>
                 )}
                 <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '6px' }}>
-                  👨‍🏫 Öğretmen: <strong>{teacher?.profiles?.name || '—'}</strong>
+                  👨‍🏫 Öğretmen: <strong>{selectedClass.teacher_name}</strong>
                   <span style={{ margin: '0 8px' }}>·</span>
                   {students.length} öğrenci
-                  <span style={{ margin: '0 8px' }}>·</span>
-                  {new Date(selectedClass.created_at).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
                 </div>
               </div>
-              <div style={{ fontSize: '40px' }}>
-                {{'Matematik':'🔢','Türkçe':'📖','Fen':'🔬','Tarih':'🏛️','Coğrafya':'🌍','İngilizce':'🇬🇧','Fizik':'⚛️','Kimya':'🧪','Biyoloji':'🧬'}[selectedClass.subject] || '📚'}
-              </div>
+              <div style={{ fontSize: '40px' }}>{SUBJECT_EMOJI[selectedClass.subject] || '📚'}</div>
             </div>
 
-            {/* Test paylaşımı tercihi */}
             <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
               <div>
                 <div style={{ fontSize: '13px', fontWeight: 500 }}>Test sonuçlarımı sınıfla paylaş</div>
@@ -196,29 +202,29 @@ export default function ClassesPage() {
             </div>
           </div>
 
-          {/* Üyeler */}
           <div className="card anim-up-1">
             <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '1rem' }}>
               Sınıf üyeleri · {students.length} öğrenci
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-              {students.map((m, i) => (
-                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: m.user_id === myUserId ? 'var(--accent)' : 'rgba(8,36,101,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '13px', color: m.user_id === myUserId ? '#fff' : 'var(--primary)', flexShrink: 0 }}>
-                    {m.profiles?.name?.slice(0, 2).toUpperCase() || '??'}
+              {students.map((s, i) => (
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: s.id === myUserId ? 'var(--accent)' : 'rgba(8,36,101,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '13px', color: s.id === myUserId ? '#fff' : 'var(--primary)', flexShrink: 0 }}>
+                    {s.name.slice(0, 2).toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: m.user_id === myUserId ? 700 : 500, fontSize: '14px' }}>
-                      {m.profiles?.name || 'İsimsiz'}
-                      {m.user_id === myUserId && <span style={{ marginLeft: '6px', fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>(Sen)</span>}
+                    <div style={{ fontWeight: s.id === myUserId ? 700 : 500, fontSize: '14px' }}>
+                      {s.name}
+                      {s.id === myUserId && <span style={{ marginLeft: '6px', fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>(Sen)</span>}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '1px' }}>
-                      {m.profiles?.grade || '—'}
-                      {m.profiles?.plan === 'premium' && <span style={{ marginLeft: '6px', color: 'var(--accent)' }}>★ Premium</span>}
+                      {s.grade}
+                      {s.plan === 'premium' && <span style={{ marginLeft: '6px', color: 'var(--accent)' }}>★ Premium</span>}
+                      {s.plan === 'unlimited' && <span style={{ marginLeft: '6px', color: '#0d9488' }}>⭐ Unlimited</span>}
                     </div>
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text3)', flexShrink: 0 }}>
-                    {new Date(m.joined_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                    {new Date(s.joined_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
                   </div>
                 </div>
               ))}
@@ -227,17 +233,6 @@ export default function ClassesPage() {
                   Henüz öğrenci yok.
                 </div>
               )}
-            </div>
-          </div>
-
-          {/* Ödevler (varsa) */}
-          <div className="card anim-up-2" style={{ marginTop: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ödevler</div>
-              <Link href="/assignments" style={{ fontSize: '12px', color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>Tümünü gör →</Link>
-            </div>
-            <div style={{ fontSize: '13px', color: 'var(--text3)', textAlign: 'center', padding: '1rem' }}>
-              Bu sınıfa ait ödevler ödevlerim sayfasında görünür.
             </div>
           </div>
         </div>
@@ -254,33 +249,25 @@ export default function ClassesPage() {
           <div>
             <div className="badge badge-purple" style={{ marginBottom: '0.5rem' }}>Sınıflarım</div>
             <h1 className="serif" style={{ fontSize: '28px', marginBottom: '4px' }}>Sınıflarım</h1>
-            <p style={{ color: 'var(--text2)', fontSize: '13px' }}>
-              Dahil olduğun sınıflar ve arkadaşların
-            </p>
+            <p style={{ color: 'var(--text2)', fontSize: '13px' }}>Dahil olduğun sınıflar ve arkadaşların</p>
           </div>
-          <button onClick={() => setShowJoin(v => !v)}
-            className="btn btn-primary"
-            style={{ flexShrink: 0 }}>
+          <button onClick={() => setShowJoin(v => !v)} className="btn btn-primary" style={{ flexShrink: 0 }}>
             + Sınıfa katıl
           </button>
         </div>
 
-        {/* Sınıfa katılma */}
         {showJoin && (
           <div className="card anim-up" style={{ marginBottom: '1rem', border: '2px solid var(--accent)' }}>
             <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '0.75rem' }}>🏫 Sınıfa katıl</div>
             <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '1rem', lineHeight: 1.6 }}>
-              Öğretmeninden aldığın davet kodunu gir. Her öğretmen her dersi için ayrı bir sınıf oluşturabilir — matematik, Türkçe, fen gibi.
+              Öğretmeninden aldığın davet kodunu gir. Her öğretmen her dersi için ayrı bir sınıf oluşturabilir.
             </p>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                className="input"
-                placeholder="Örn: MAT-5A2K"
+              <input className="input" placeholder="Örn: 8A002D"
                 value={joinCode}
                 onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinError('') }}
                 onKeyDown={e => e.key === 'Enter' && joinClass()}
-                style={{ flex: 1, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}
-              />
+                style={{ flex: 1, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }} />
               <button className="btn btn-primary" onClick={joinClass} disabled={joinLoading || !joinCode.trim()}>
                 {joinLoading ? '⏳' : 'Katıl'}
               </button>
@@ -289,13 +276,12 @@ export default function ClassesPage() {
           </div>
         )}
 
-        {/* Sınıf listesi */}
         {classes.length === 0 ? (
           <div className="card anim-up-1" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
             <div style={{ fontSize: '48px', marginBottom: '1rem' }}>🏫</div>
             <h3 className="serif" style={{ fontSize: '22px', marginBottom: '0.5rem' }}>Henüz bir sınıfa dahil değilsin</h3>
             <p style={{ color: 'var(--text2)', fontSize: '14px', lineHeight: 1.7, marginBottom: '1.5rem' }}>
-              Öğretmeninden davet kodu alarak matematik, Türkçe veya istediğin ders için sınıfa katılabilirsin. Birden fazla sınıfa aynı anda üye olabilirsin.
+              Öğretmeninden davet kodu alarak matematik, Türkçe veya istediğin ders için sınıfa katılabilirsin.
             </p>
             <button className="btn btn-primary" onClick={() => setShowJoin(true)} style={{ justifyContent: 'center' }}>
               + Sınıfa katıl
@@ -305,9 +291,6 @@ export default function ClassesPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {classes.map((cls, idx) => {
               const sStyle = subjectStyle(cls.subject)
-              const studentCount = cls.class_members.filter(m => m.role === 'student').length
-              const teacher = cls.class_members.find(m => m.role === 'teacher')
-              const emoji = {'Matematik':'🔢','Türkçe':'📖','Fen':'🔬','Tarih':'🏛️','Coğrafya':'🌍','İngilizce':'🇬🇧','Fizik':'⚛️','Kimya':'🧪','Biyoloji':'🧬'}[cls.subject] || '📚'
               return (
                 <div key={cls.id} className={`card anim-up-${idx + 1}`}
                   onClick={() => setSelectedClass(cls)}
@@ -316,22 +299,17 @@ export default function ClassesPage() {
                   onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
                     <div style={{ width: 52, height: 52, borderRadius: '14px', background: sStyle.bg, border: `1.5px solid ${sStyle.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>
-                      {emoji}
+                      {SUBJECT_EMOJI[cls.subject] || '📚'}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
                         <span style={{ fontWeight: 700, fontSize: '16px' }}>{cls.name}</span>
-                        <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: sStyle.bg, color: sStyle.color, border: `1px solid ${sStyle.border}`, fontWeight: 700 }}>
-                          {cls.subject}
-                        </span>
+                        {cls.subject && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: sStyle.bg, color: sStyle.color, border: `1px solid ${sStyle.border}`, fontWeight: 700 }}>{cls.subject}</span>}
                       </div>
-                      {cls.description && (
-                        <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cls.description}</div>
-                      )}
+                      {cls.description && <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cls.description}</div>}
                       <div style={{ fontSize: '12px', color: 'var(--text3)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                        <span>👨‍🏫 {teacher?.profiles?.name || '—'}</span>
-                        <span>👥 {studentCount} öğrenci</span>
-                        <span>📅 {new Date(cls.created_at).toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' })}</span>
+                        <span>👨‍🏫 {cls.teacher_name}</span>
+                        <span>👥 {cls.student_count} öğrenci</span>
                       </div>
                     </div>
                     <span style={{ fontSize: '18px', color: 'var(--text3)', alignSelf: 'center' }}>›</span>

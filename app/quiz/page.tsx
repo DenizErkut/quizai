@@ -257,7 +257,15 @@ function QuizPageContent() {
         return
       }
 
-      if (!res.ok) throw new Error(data.error)
+      if (!res.ok) {
+        if (data.error === 'pdf_too_long') {
+          clearInterval(iv)
+          setLoadMsg(data.message || 'PDF çok uzun. Lütfen daha kısa bir bölüm yükleyin.')
+          setTimeout(() => setScreen('topic'), 3000)
+          return
+        }
+        throw new Error(data.error)
+      }
 
       fetchProfile()
       setQuestions(data.questions)

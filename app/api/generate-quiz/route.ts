@@ -221,6 +221,14 @@ export async function POST(req: NextRequest) {
       parsed = JSON.parse(match[0])
     }
 
+    // PDF sayfa limiti kontrolü
+    if (parsed?.error?.includes?.('100 PDF pages') || parsed?.type === 'error') {
+      return NextResponse.json(
+        { error: 'pdf_too_long', message: 'Bu PDF 100 sayfadan fazla içeriyor. Lütfen daha kısa bir bölüm yükleyin veya metni kopyalayıp yapıştırın.' },
+        { status: 400 }
+      )
+    }
+
     let questions = parsed.questions || []
 
     // Math verification pipeline
