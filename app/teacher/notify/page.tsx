@@ -18,6 +18,7 @@ export default function TeacherNotifyPage() {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const [result, setResult] = useState<{ recipientCount: number; pushDelivered: number } | null>(null)
   const [history, setHistory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
@@ -35,7 +36,6 @@ export default function TeacherNotifyPage() {
     setClassrooms(cls ?? [])
     if (cls?.length) setSelectedClass(cls[0].id)
 
-    // Bildirim geçmişi (teacher_notifications tablosu — aşağıda SQL var)
     const { data: hist } = await supabase
       .from('teacher_notifications')
       .select('*, classrooms(name)')
@@ -49,52 +49,41 @@ export default function TeacherNotifyPage() {
   async function sendNotification() {
     if (!message.trim() || !selectedClass) return
     setSending(true)
+    setResult(null)
 
-    // Sınıftaki öğrencilerin push subscription'larını çek
-    const { data: students } = await supabase
-      .from('classroom_students')
-      .select('student_id')
-      .eq('classroom_id', selectedClass)
+    try {
+      // Token al
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Oturum bulunamadı')
 
-    const studentIds = (students ?? []).map((s: any) => s.student_id)
+      const res = await fetch('/api/teacher/notify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          classroom_id: selectedClass,
+          message: message.trim(),
+          title: '📢 Öğretmeninizden mesaj',
+        }),
+      })
 
-    const { data: subscriptions } = await supabase
-      .from('push_subscriptions')
-      .select('subscription')
-      .in('user_id', studentIds)
+      const json = await res.json()
 
-    // Push gönder
-    let successCount = 0
-    for (const sub of subscriptions ?? []) {
-      try {
-        const res = await fetch('/api/push', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            subscription: JSON.parse(sub.subscription),
-            title: '📢 Öğretmeninizden mesaj',
-            body: message.trim(),
-          }),
-        })
-        if (res.ok) successCount++
-      } catch {}
+      if (!res.ok) throw new Error(json.error ?? 'Gönderilemedi')
+
+      setResult({ recipientCount: json.recipientCount, pushDelivered: json.pushDelivered })
+      setMessage('')
+      setSent(true)
+      if (json.notifRecord) setHistory((prev: any[]) => [json.notifRecord, ...prev])
+      setTimeout(() => setSent(false), 4000)
+    } catch (err: any) {
+      alert('Hata: ' + (err.message ?? 'Bilinmeyen hata'))
+    } finally {
+      setSending(false)
     }
-
-    // Geçmişe kaydet
-    const classroom = classrooms.find(c => c.id === selectedClass)
-    const { data: notif } = await supabase.from('teacher_notifications').insert({
-      teacher_id: teacher.id,
-      classroom_id: selectedClass,
-      message: message.trim(),
-      recipient_count: studentIds.length,
-      delivered_count: successCount,
-    }).select('*, classrooms(name)').single()
-
-    setSending(false)
-    setSent(true)
-    setMessage('')
-    if (notif) setHistory(prev => [notif, ...prev])
-    setTimeout(() => setSent(false), 3000)
   }
 
   if (loading) return (
@@ -153,8 +142,20 @@ export default function TeacherNotifyPage() {
             disabled={sending || !message.trim() || !selectedClass}
             style={{ width: '100%', justifyContent: 'center', opacity: sending ? 0.6 : 1 }}
           >
-            {sent ? '✓ Gönderildi!' : sending ? 'Gönderiliyor...' : `🔔 ${classrooms.find(c=>c.id===selectedClass)?.name || ''} Sınıfına Gönder`}
+            {sent ? '✓ Gönderildi!' : sending ? 'Gönderiliyor...' : `🔔 ${classrooms.find(c => c.id === selectedClass)?.name || ''} Sınıfına Gönder`}
           </button>
+
+          {/* Sonuç özeti */}
+          {sent && result && (
+            <div style={{
+              marginTop: '10px', padding: '10px 14px', borderRadius: '10px',
+              background: 'rgba(30,207,184,0.08)', border: '1px solid rgba(30,207,184,0.2)',
+              fontSize: '12px', color: 'var(--text2)',
+            }}>
+              ✅ <strong>{result.recipientCount}</strong> öğrenciye uygulama bildirimi gönderildi
+              {result.pushDelivered > 0 && <> · <strong>{result.pushDelivered}</strong> push bildirimi iletildi</>}
+            </div>
+          )}
         </div>
 
         {/* Geçmiş */}
