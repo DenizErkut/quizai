@@ -490,12 +490,27 @@ function QuizPageContent() {
         const pct = questions.length > 0 ? Math.round((score / questions.length) * 100) : 0
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
+          // Cevapları öğretmen analizi için zenginleştir (soru metni + doğru cevap dahil)
+          const enrichedAnswers = finalAnswers.map((a, i) => {
+            const q = questions[i]
+            if (!q) return a
+            const correctAnswerText = q.opts?.[q.ans] ?? q.blank ?? ''
+            const studentAnswerText = a.userAns !== -1 ? (q.opts?.[a.userAns] ?? '') : '(Boş)'
+            return {
+              correct: a.correct,
+              question: q.q,
+              student_answer: studentAnswerText,
+              correct_answer: correctAnswerText,
+              explanation: q.exp ?? '',
+            }
+          })
           await supabase.from('assignment_completions').upsert({
             assignment_id: assignmentId,
             student_id: user.id,
             session_id: sessionId,
             score,
             pct,
+            answers: enrichedAnswers,
             completed_at: new Date().toISOString(),
           }, { onConflict: 'assignment_id,student_id' })
         }
