@@ -45,8 +45,10 @@ const CURRICULUM_KEYWORDS = [
   // İngilizce konu adları (dosya yüklemelerinde gelebilir)
   'cell','organelle','photosynthesis','respiration','atom','molecule','force',
   'energy','history','geography','math','algebra','geometry','biology','chemistry','physics',
-  // Genel
-  'mufredat','ders','okul','sinav','ogrenme','bilgi','kavram','konu','test','sinif'
+  // Sınav & genel akademik (bunlar her zaman müfredatla ilgili)
+  'lgs','yks','tyt','ayt','kpss','ales','dgs','ösym','sınav','hazırlık','hazirlık',
+  'hazirlık','deneme','kazanim','kazanım','ogrenme','öğrenme','okul','ders',
+  'test','soru','konu','mufredat','müfredat','sinif','sınıf',
 ]
 
 function isInCurriculum(topic: string, plan: string): boolean {
