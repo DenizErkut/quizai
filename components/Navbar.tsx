@@ -46,8 +46,8 @@ export default function Navbar() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const [{ data: p }, { data: s }] = await Promise.all([
-        supabase.from('profiles').select('name,plan,monthly_test_count,language,referral_code').eq('id', user.id).single(),
-        supabase.from('streaks').select('current_streak').eq('user_id', user.id).single(),
+        supabase.from('profiles').select('name,plan,monthly_test_count,language,referral_code').eq('id', user.id).maybeSingle(),
+        supabase.from('streaks').select('current_streak').eq('user_id', user.id).maybeSingle(),
       ])
       if (p) {
         const stored = localStorage.getItem('pratium_lang')
@@ -94,7 +94,7 @@ export default function Navbar() {
 
   const NAV_LINKS = [
     { href: '/quiz', label: '⚡ Test' },
-    { href: '/daily', label: streak > 0 ? `🔥 ${streak}` : '📅 Günlük' },
+    { href: '/daily', label: streak > 0 ? `🔥 ${streak} gün` : '📅 Günlük' },
     { href: '/leaderboard', label: '🏆 Sıralama' },
     { href: '/analysis', label: '📊 Analiz' },
     { href: '/archive', label: '🗂️ Arşiv' },
