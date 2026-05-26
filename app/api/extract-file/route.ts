@@ -67,83 +67,95 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
 
   if (ext === 'pdf') {
     try {
-      // PDF'den metin çıkar — stream objelerini parse et
-      const bufStr = buffer.toString('latin1')
-      
-      // PDF stream içeriğini çıkar
-      const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g
-      const textParts: string[] = []
-      
-      // BT...ET blokları arasındaki text operatörlerini çıkar
-      const btEtRegex = /BT([\s\S]*?)ET/g
-      let btMatch
-      while ((btMatch = btEtRegex.exec(bufStr)) !== null) {
-        const block = btMatch[1]
-        // Tj, TJ, ' operatörleri
-        const tjRegex = /\(((?:[^()\\]|\\.)*)\)\s*(?:Tj|'|")/g
-        const tjArrayRegex = /\[((?:[^\[\]])*)\]\s*TJ/g
-        
-        let m
-        while ((m = tjRegex.exec(block)) !== null) {
-          const decoded = m[1]
-            .replace(/\\n/g, '\n').replace(/\\r/g, '\r')
-            .replace(/\\t/g, '\t').replace(/\\\\/g, '\\')
-            .replace(/\\([0-7]{1,3})/g, (_: string, o: string) => String.fromCharCode(parseInt(o, 8)))
-            .replace(/\\(.)/g, '$1')
-          if (decoded.trim()) textParts.push(decoded)
-        }
-        
-        while ((m = tjArrayRegex.exec(block)) !== null) {
-          const inner = m[1]
-          const strRegex = /\(((?:[^()\\]|\\.)*)\)/g
-          let sm
-          while ((sm = strRegex.exec(inner)) !== null) {
-            const decoded = sm[1].replace(/\\(.)/g, '$1')
-            if (decoded.trim()) textParts.push(decoded)
-          }
+      // AŞAMA 1: pdf-parse ile metin çıkar (sayfa sınırı yok)
+      const pdfParse = (await import('pdf-parse')).default
+      let pdfData: any = null
+      let parsedText = ''
+
+      try {
+        pdfData = await pdfParse(buffer, { max: 0 }) // max:0 = tüm sayfalar
+        parsedText = (pdfData?.text || '').trim()
+      } catch (parseErr) {
+        console.warn('[extract-file] pdf-parse failed, falling back:', parseErr)
+      }
+
+      // Metin yeterliyse direkt döndür (100 sayfa sınırı YOK)
+      if (parsedText.length >= 200) {
+        const pageCount = pdfData?.numpages || 0
+        return {
+          content: parsedText.slice(0, 30000),
+          type: 'pdf',
+          filename,
+          pageCount,
+          note: pageCount > 0 ? `${pageCount} sayfa işlendi` : undefined,
         }
       }
-      
-      let text = textParts.join(' ').replace(/\s+/g, ' ').trim()
-      
-      // Metin yeterli değilse — Anthropic'e gönder (küçük dosyalar için)
-      if (text.length < 100) {
-        if (buffer.length > 5 * 1024 * 1024) {
-          return {
-            error: 'pdf_too_long',
-            content: '',
-            type: 'pdf',
-            filename,
-            message: 'Bu PDF taranmış görsel içeriyor ve 5MB\'den büyük. Lütfen metni kopyalayıp yapıştırın veya daha küçük bir bölüm yükleyin.',
-          }
-        }
+
+      // AŞAMA 2: Taranmış PDF — Anthropic API, 90 sayfa chunk ile
+      const totalPages = pdfData?.numpages || 0
+
+      // Küçük taranmış PDF: direkt gönder
+      if (buffer.length <= 15 * 1024 * 1024 && totalPages <= 90) {
         const base64 = buffer.toString('base64')
         const message = await anthropic.messages.create({
           model: 'claude-sonnet-4-5',
-          max_tokens: 2000,
+          max_tokens: 3000,
           messages: [{
             role: 'user',
             content: [
               { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } } as any,
-              { type: 'text', text: 'Bu PDF dosyasının tüm metin içeriğini çıkar. Sadece metni döndür. Maksimum 5000 kelime.' },
+              { type: 'text', text: 'Bu PDF dosyasinin tum metin icerigini cikar. Sadece metni dondur.' },
             ],
           }],
         }) as any
-        return { content: message.content[0].text, type: 'pdf', filename }
+        return { content: message.content[0].text, type: 'pdf', filename, pageCount: totalPages }
       }
-      
-      return { content: text.slice(0, 20000), type: 'pdf', filename }
-    } catch (pdfErr: any) {
-      if (pdfErr?.message?.includes('100 PDF pages') || pdfErr?.status === 400) {
+
+      // Büyük taranmış PDF: chunk'lara bölerek metin çek
+      const CHUNK_PAGES = 90
+      const pageTexts: string[] = []
+      const chunkCount = Math.ceil(Math.max(totalPages, 1) / CHUNK_PAGES)
+
+      for (let i = 0; i < chunkCount; i++) {
+        const endPage = Math.min((i + 1) * CHUNK_PAGES, totalPages)
+        try {
+          const chunkData = await pdfParse(buffer, { max: endPage })
+          const fullText = chunkData?.text || ''
+          const sliceStart = i === 0 ? 0 : Math.floor(fullText.length * (i / chunkCount))
+          const chunkText = fullText.slice(sliceStart).trim()
+          if (chunkText) pageTexts.push(chunkText)
+        } catch {}
+      }
+
+      const combinedText = pageTexts.join('\n\n').trim()
+      if (combinedText.length >= 100) {
         return {
-          error: 'pdf_too_long',
-          content: '',
+          content: combinedText.slice(0, 30000),
           type: 'pdf',
           filename,
-          message: 'Bu PDF çok uzun. Lütfen daha kısa bir bölüm yükleyin veya metni kopyalayıp yapıştırın.',
+          pageCount: totalPages,
+          note: `${totalPages} sayfa, ${chunkCount} bolumde islendi`,
         }
       }
-      throw pdfErr
+
+      // Tamamen görsel PDF
+      return {
+        error: 'pdf_image_only',
+        content: '',
+        type: 'pdf',
+        filename,
+        message: 'Bu PDF tamamen taranmis gorsel iceriyor. Lutfen metni kopyalayip yapistirin veya Word dosyasi olarak yukleyin.',
+      }
+
+    } catch (pdfErr: any) {
+      console.error('[extract-file] PDF error:', pdfErr)
+      return {
+        error: 'pdf_error',
+        content: '',
+        type: 'pdf',
+        filename,
+        message: 'PDF isle nemedi. Lutfen Word (.docx) veya metin (.txt) formatinda yukleyin.',
+      }
     }
   }
 
