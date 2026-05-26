@@ -68,7 +68,7 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
   if (ext === 'pdf') {
     // PDF metin extraction — pdf-parse ile direkt metin çıkar, Anthropic'e gönderme
     try {
-      const pdfParse = (await import('pdf-parse')).default
+      const { default: pdfParse } = await import('pdf-parse')
       const data = await pdfParse(buffer, { max: 80 }) // max 80 sayfa
       const text = data.text?.trim()
 
