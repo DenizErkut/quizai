@@ -66,22 +66,55 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
   }
 
   if (ext === 'pdf') {
-    // PDF metin extraction — pdf-parse ile direkt metin çıkar, Anthropic'e gönderme
     try {
-      const pdfParse = await import('pdf-parse').then(m => m.default ?? m)
-      const data = await pdfParse(buffer, { max: 80 }) // max 80 sayfa
-      const text = data.text?.trim()
-
-      if (!text || text.length < 50) {
-        // Taranmış/görsel PDF — Anthropic ile dene ama max 30 sayfa sınırla
-        const pageCount = data.numpages || 0
-        if (pageCount > 30) {
+      // PDF'den metin çıkar — stream objelerini parse et
+      const bufStr = buffer.toString('latin1')
+      
+      // PDF stream içeriğini çıkar
+      const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g
+      const textParts: string[] = []
+      
+      // BT...ET blokları arasındaki text operatörlerini çıkar
+      const btEtRegex = /BT([\s\S]*?)ET/g
+      let btMatch
+      while ((btMatch = btEtRegex.exec(bufStr)) !== null) {
+        const block = btMatch[1]
+        // Tj, TJ, ' operatörleri
+        const tjRegex = /\(((?:[^()\\]|\\.)*)\)\s*(?:Tj|'|")/g
+        const tjArrayRegex = /\[((?:[^\[\]])*)\]\s*TJ/g
+        
+        let m
+        while ((m = tjRegex.exec(block)) !== null) {
+          const decoded = m[1]
+            .replace(/\\n/g, '\n').replace(/\\r/g, '\r')
+            .replace(/\\t/g, '\t').replace(/\\\\/g, '\\')
+            .replace(/\\([0-7]{1,3})/g, (_: string, o: string) => String.fromCharCode(parseInt(o, 8)))
+            .replace(/\\(.)/g, '$1')
+          if (decoded.trim()) textParts.push(decoded)
+        }
+        
+        while ((m = tjArrayRegex.exec(block)) !== null) {
+          const inner = m[1]
+          const strRegex = /\(((?:[^()\\]|\\.)*)\)/g
+          let sm
+          while ((sm = strRegex.exec(inner)) !== null) {
+            const decoded = sm[1].replace(/\\(.)/g, '$1')
+            if (decoded.trim()) textParts.push(decoded)
+          }
+        }
+      }
+      
+      let text = textParts.join(' ').replace(/\s+/g, ' ').trim()
+      
+      // Metin yeterli değilse — Anthropic'e gönder (küçük dosyalar için)
+      if (text.length < 100) {
+        if (buffer.length > 5 * 1024 * 1024) {
           return {
             error: 'pdf_too_long',
             content: '',
             type: 'pdf',
             filename,
-            message: `Bu PDF taranmış görsel içeriyor ve ${pageCount} sayfa. Maksimum 30 sayfa destekleniyor. Lütfen daha kısa bir bölüm yükleyin.`,
+            message: 'Bu PDF taranmış görsel içeriyor ve 5MB\'den büyük. Lütfen metni kopyalayıp yapıştırın veya daha küçük bir bölüm yükleyin.',
           }
         }
         const base64 = buffer.toString('base64')
@@ -98,21 +131,19 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
         }) as any
         return { content: message.content[0].text, type: 'pdf', filename }
       }
-
-      // Başarılı text extraction — Anthropic'e gerek yok
-      const trimmed = text.slice(0, 20000)
-      return { content: trimmed, type: 'pdf', filename }
-    } catch (parseErr: any) {
-      if (parseErr?.message?.includes('100 PDF pages') || parseErr?.status === 400) {
+      
+      return { content: text.slice(0, 20000), type: 'pdf', filename }
+    } catch (pdfErr: any) {
+      if (pdfErr?.message?.includes('100 PDF pages') || pdfErr?.status === 400) {
         return {
           error: 'pdf_too_long',
           content: '',
           type: 'pdf',
           filename,
-          message: 'Bu PDF 100 sayfadan fazla içeriyor. Lütfen daha kısa bir bölüm yükleyin.',
+          message: 'Bu PDF çok uzun. Lütfen daha kısa bir bölüm yükleyin veya metni kopyalayıp yapıştırın.',
         }
       }
-      throw parseErr
+      throw pdfErr
     }
   }
 
