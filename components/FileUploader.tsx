@@ -91,12 +91,19 @@ export default function FileUploader({ onFilesChange, maxFiles = 5, maxMB = 20 }
           throw new Error('Sunucu hatası. Tekrar deneyin.')
         }
 
-        if (!res.ok) throw new Error(data.error || 'Yükleme hatası.')
+        if (!res.ok) {
+          const msg = data?.message || data?.error || 'Yükleme hatası.'
+          throw new Error(msg)
+        }
 
         if (data.status === 'chunk_received') {
           // Upload progress: 0-80
           updateFile(id, { progress: data.progress })
         } else if (data.status === 'complete') {
+          // Hata kontrolü — route başarıyla döndü ama içerik hatası var
+          if (data.error) {
+            throw new Error(data.message || data.error)
+          }
           // Claude işleme: 80-100
           updateFile(id, { progress: 95 })
           await new Promise(r => setTimeout(r, 300))
