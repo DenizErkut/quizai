@@ -112,7 +112,7 @@ CRITICAL RULES for matching questions:
 Rules per type:
 - multiple_choice: opts array with 4 choices, ans = correct index (0-3)
 - fill_blank: blank = correct word, opts = 4 choices including the correct one, ans = correct index
-- true_false: opts = ["Doğru","Yanlış"] (or in ${lang}), ans: 0=True 1=False  
+- true_false: opts = ["Doğru","Yanlış"] (or translated to the test language), ans: 0=True 1=False  
 - multi_true_false: statements array [{text, correct: bool}], 4-5 statements
 - matching: pairs array [{left, right}], exactly 4 pairs
 - ordering: items array (shuffled), correctOrder array (indices of correct order)
