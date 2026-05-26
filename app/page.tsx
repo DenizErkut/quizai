@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 
 const features = [
   { icon: '⚡', title: 'Anlık soru üretimi', desc: 'Konunu yaz, 10 saniyede sınıfına ve seviyene özel sorular hazır. Müfredat dışı konular da desteklenir.' },
-  { icon: '📝', title: '8 Farklı Soru Tipi', desc: 'Çoktan seçmeli, boşluk doldurma, doğru/yanlış, eşleştirme, sıralama, kısa cevap — ve Maarif Modeli'ne özel çoklu D/Y ile tablo doldurma.' },
+  { icon: '📝', title: '8 Farklı Soru Tipi', desc: 'Çoktan seçmeli, boşluk doldurma, doğru/yanlış, eşleştirme, sıralama, kısa cevap — ve Maarif Modeline özel çoklu D/Y ve tablo doldurma.' },
   { icon: '🏫', title: 'Sınıf & Öğretmen Sistemi', desc: 'Öğretmenler sınıf oluşturur, ödev atar, öğrenci performansını takip eder. AI her öğrenci için ayrı analiz hazırlar.' },
   { icon: '📊', title: 'Kişisel Analiz & Zayıf Konular', desc: 'Her test sonucu kaydedilir. 10 test sonrasında AI zayıf konularını tespit eder, detaylı rapor sunar.' },
   { icon: '📋', title: '4 Haftalık Gelişim Planı', desc: 'AI test geçmişini analiz ederek sana özel 4 haftalık çalışma planı hazırlar. Hedefini belirle, planı takip et.' },
@@ -14,13 +14,13 @@ const features = [
 ]
 
 const faqs = [
-  { q: 'Pratium'un ücretsiz planı neye kadar kullanılabilir?', a: 'Freemium planda günde 10 test, test başına 5 soru ve temel soru tipleri ücretsiz kullanılabilir. Müfredat dışı konular, Maarif Modeli soru tipleri ve dosya yükleme Premium plana dahildir.' },
-  { q: 'Maarif Modeli soru tipleri neler?', a: 'Pratium'da 8 farklı soru tipi var: Çoktan Seçmeli, Boşluk Doldurma, Doğru/Yanlış, Eşleştirme, Sıralama, Kısa Cevap ve Maarif Modeli'ne özel Çoklu D/Y (birden fazla ifadeyi değerlendirme) ile Tablo Doldurma. Freemium planda temel tipler, Premium ve üstünde tüm tipler açık.' },
+  { q: 'Pratium ucretsiz plan neye kadar kullanılabilir?', a: 'Freemium planda günde 10 test, test başına 5 soru ve temel soru tipleri ücretsiz kullanılabilir. Müfredat dışı konular, Maarif Modeli soru tipleri ve dosya yükleme Premium plana dahildir.' },
+  { q: 'Maarif Modeli soru tipleri neler?', a: 'Pratiumda 8 farklı soru tipi var: Çoktan Seçmeli, Boşluk Doldurma, Doğru/Yanlış, Eşleştirme, Sıralama, Kısa Cevap ve Maarif Modeline özel Çoklu D/Y (birden fazla ifadeyi değerlendirme) ile Tablo Doldurma. Freemium planda temel tipler, Premium ve üstünde tüm tipler açık.' },
   { q: 'Öğretmen paneli nasıl çalışır?', a: 'Öğretmenler başvuru yapıp onaylandıktan sonra sınıf oluşturabilir, öğrencilere davet kodu gönderebilir, ödev atayabilir ve her öğrencinin performansını takip edebilir. AI, yanlış cevaplar üzerinden öğrenci özelinde analiz hazırlar. Toplu bildirim gönderme özelliği de mevcut.' },
   { q: 'Sınıf sistemine nasıl katılabilirim?', a: 'Öğretmenin sana davet kodu verir. Uygulamada "Sınıflarım" bölümüne gidip kodu girerek katılabilirsin. Premium planda birden fazla sınıfa aynı anda üye olabilirsin.' },
   { q: 'PDF veya dosyadan soru üretebilir miyim?', a: 'Evet! PDF ve Word dosyası yükleyebilirsin. Yapay zeka o içerikten soru üretir. Bu özellik Premium ve Unlimited planlarda kullanılabilir.' },
   { q: 'Gelişim planı için kaç test çözmem gerekiyor?', a: 'En az 10 test çözdükten sonra yapay zeka test geçmişini analiz ederek 4 haftalık kişisel çalışma planı hazırlar. Daha fazla test çözdükçe plan daha isabetli olur.' },
-  { q: 'Premium ve Unlimited arasındaki fark nedir?', a: 'Premium'da günde 25 test, test başına 20 soru, tüm soru tipleri, PDF yükleme, sınıf sistemi ve öncelikli destek var (₺600/yıl). Unlimited'da ise sınırsız günlük test, tüm özellikler, gelişmiş analiz raporları ve yılda 12 birebir koç görüşmesi bulunuyor (₺6.000/yıl).' },
+  { q: 'Premium ve Unlimited arasındaki fark nedir?', a: 'Premiumda günde 25 test, test başına 20 soru, tüm soru tipleri, PDF yükleme, sınıf sistemi ve öncelikli destek var (₺600/yıl). Unlimitedda ise sınırsız günlük test, tüm özellikler, gelişmiş analiz raporları ve yılda 12 birebir koç görüşmesi bulunuyor (₺6.000/yıl).' },
   { q: 'Kaç dil destekleniyor?', a: 'Türkçe, İngilizce, Almanca, Fransızca, İspanyolca ve Arapça olmak üzere 6 dil destekleniyor. Test arayüzü seçtiğin dilde üretilir.' },
 ]
 
@@ -231,12 +231,12 @@ export default function LandingPage() {
               {
                 label: 'Premium', price: '₺600', sub: '/yıl', color: '#2563eb', badge: '🏆 En popüler',
                 features: ['Günde 25 test', 'Test başına 20 soru', 'Tüm konular (müfredat dışı dahil)', 'Tüm Maarif Modeli soru tipleri', 'PDF & dosyadan soru üret', 'Sınıf sistemi', 'Detaylı analiz & gelişim planı', 'Öncelikli destek'],
-                cta: 'Premium'a geç →', href: '/pricing', accent: true,
+                cta: 'Premiuma geç →', href: '/pricing', accent: true,
               },
               {
                 label: 'Unlimited', price: '₺6.000', sub: '/yıl', color: '#0d9488',
                 features: ['Sınırsız günlük test', 'Test başına 20 soru', 'Tüm özellikler kısıtsız', 'Gelişmiş analiz & raporlar', 'Sınırsız sınıf', '12× birebir koç görüşmesi', 'Öncelikli & telefon desteği'],
-                cta: 'Unlimited'a geç →', href: '/pricing', accent: false,
+                cta: 'Unlimiteda geç →', href: '/pricing', accent: false,
               },
             ].map((p, i) => (
               <div key={i} style={{ background: '#fff', borderRadius: '20px', padding: '2rem', border: p.accent ? '2px solid #2563eb' : '1px solid #e2e8f0', boxShadow: p.accent ? '0 8px 32px rgba(37,99,235,0.12)' : '0 2px 12px rgba(8,36,101,0.06)', display: 'flex', flexDirection: 'column', position: 'relative' }}>
