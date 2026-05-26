@@ -144,8 +144,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'daily_limit_reached' }, { status: 429 })
     }
 
-    // Aylık limit (free)
-    if (plan === 'free' && (profile.monthly_test_count || 0) >= 10) {
+    // Aylık limit kontrolü
+    const MONTHLY_LIMIT: Record<string, number> = { free: 10, premium: 200, unlimited: 99999 }
+    const monthlyLimit = MONTHLY_LIMIT[plan] ?? 10
+    if ((profile.monthly_test_count || 0) >= monthlyLimit) {
       return NextResponse.json({ error: 'limit_reached' }, { status: 429 })
     }
 
