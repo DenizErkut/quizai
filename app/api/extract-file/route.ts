@@ -66,19 +66,48 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
   }
 
   if (ext === 'pdf') {
+    // Sayfa sayısını PDF header'dan kontrol et
+    const pdfText = buffer.toString('binary')
+    const pageMatches = pdfText.match(/\/Type\s*\/Page[^s]/g)
+    const estimatedPages = pageMatches ? pageMatches.length : 0
+
+    if (estimatedPages > 95) {
+      return {
+        error: 'pdf_too_long',
+        content: '',
+        type: 'pdf',
+        filename,
+        message: `Bu PDF yaklaşık ${estimatedPages} sayfa içeriyor. Anthropic API maksimum 100 sayfa destekliyor. Lütfen ilk 80-90 sayfayı ayrı bir PDF olarak kaydet veya metni kopyalayıp yapıştır.`,
+      }
+    }
+
     const base64 = buffer.toString('base64')
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 2000,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } } as any,
-          { type: 'text', text: 'Bu PDF dosyasının tüm metin içeriğini çıkar. Sadece metni döndür. Maksimum 8000 kelime.' },
-        ],
-      }],
-    }) as any
-    return { content: message.content[0].text, type: 'pdf', filename }
+    try {
+      const message = await anthropic.messages.create({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 2000,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } } as any,
+            { type: 'text', text: 'Bu PDF dosyasının tüm metin içeriğini çıkar. Sadece metni döndür. Maksimum 8000 kelime.' },
+          ],
+        }],
+      }) as any
+      return { content: message.content[0].text, type: 'pdf', filename }
+    } catch (pdfErr: any) {
+      // Anthropic'ten 100 sayfa hatası gelirse güzel mesaj ver
+      if (pdfErr?.message?.includes('100 PDF pages') || pdfErr?.status === 400) {
+        return {
+          error: 'pdf_too_long',
+          content: '',
+          type: 'pdf',
+          filename,
+          message: 'Bu PDF 100 sayfadan fazla içeriyor. Lütfen daha kısa bir bölüm yükleyin veya metni kopyalayıp yapıştırın.',
+        }
+      }
+      throw pdfErr
+    }
   }
 
   if (ext === 'docx' || ext === 'doc') {
@@ -99,7 +128,7 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
     const base64 = buffer.toString('base64')
     const mediaType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg'
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5',
       max_tokens: 2000,
       messages: [{
         role: 'user',
