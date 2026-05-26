@@ -68,7 +68,7 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
   if (ext === 'pdf') {
     try {
       // AŞAMA 1: pdf-parse ile metin çıkar (sayfa sınırı yok)
-      const pdfParse = (await import('pdf-parse')).default
+      const { default: pdfParse } = await import('pdf-parse') as any
       let pdfData: any = null
       let parsedText = ''
 
