@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import FileUploader, { type UploadedFile } from '@/components/FileUploader'
 import QuizResult from '@/components/QuizResult'
 
-type QuestionType = 'multiple_choice' | 'fill_blank' | 'matching' | 'true_false' | 'ordering' | 'short_answer' | 'multi_true_false' | 'table_fill'
+type QuestionType = 'multiple_choice' | 'fill_blank' | 'matching' | 'true_false' | 'ordering' | 'short_answer' | 'multi_true_false' | 'table_fill' | 'mixed'
 
 interface Question {
   q: string; opts: string[]; ans: number; exp: string
@@ -730,6 +730,7 @@ function QuizPageContent() {
                 { value: 'matching', label: 'Eşleştirme', icon: '🔗', desc: 'Kavram – tanım', maarif: true },
                 { value: 'ordering', label: 'Sıralama', icon: '📋', desc: 'Doğru sıraya koy', maarif: true },
                 { value: 'short_answer', label: 'Kısa Cevap', icon: '💬', desc: 'AI puanlar', maarif: false },
+                { value: 'mixed', label: 'Karma Sorular', icon: '🎲', desc: 'Tüm tipler karışık', maarif: false },
               ].map(t => (
                 <button key={t.value} onClick={() => setQuestionType(t.value as QuestionType)}
                   style={{
@@ -784,7 +785,7 @@ function QuizPageContent() {
           <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '13px', color: 'var(--text2)', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             <span>📝 {qCount} soru</span>
             <span style={{ color: 'var(--accent)' }}>{
-              {'multiple_choice':'🔤 Çoktan Seçmeli','fill_blank':'✏️ Boşluk Doldurma','true_false':'✓✗ D/Y','matching':'🔗 Eşleştirme','ordering':'📋 Sıralama','short_answer':'💬 Kısa Cevap'}[questionType]
+              {'multiple_choice':'🔤 Çoktan Seçmeli','fill_blank':'✏️ Boşluk Doldurma','true_false':'✓✗ D/Y','multi_true_false':'📋✓✗ Çoklu D/Y','table_fill':'🗂️ Tablo','matching':'🔗 Eşleştirme','ordering':'📋 Sıralama','short_answer':'💬 Kısa Cevap','mixed':'🎲 Karma'}[questionType]
             }</span>
             <span style={{ color: activeDiff.color }}>⚡ {activeDiff.label}</span>
             <span>🌐 {currentLang}</span>

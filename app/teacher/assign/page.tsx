@@ -161,23 +161,27 @@ export default function TeacherAssignPage() {
               </div>
               {/* Soru tipi */}
               <div style={{ marginTop: '6px' }}>
-                <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>Soru tipi</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Soru tipi</label>
+                <div style={{ fontSize: '10px', color: '#5b4cf5', marginBottom: '6px', fontWeight: 600 }}>MM = Maarif Modeli soru tipi</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
                   {[
-                    { value: 'multiple_choice', label: '🔤 Çoktan Seçmeli' },
-                    { value: 'fill_blank', label: '✏️ Boşluk Doldurma' },
-                    { value: 'true_false', label: '✓✗ D/Y' },
-                    { value: 'matching', label: '🔗 Eşleştirme' },
-                    { value: 'ordering', label: '📋 Sıralama' },
-                    { value: 'short_answer', label: '💬 Kısa Cevap' },
-                    { value: 'mixed', label: '🎲 Karma (Tüm tipler)' },
+                    { value: 'multiple_choice', label: '🔤 Çoktan Seçmeli', maarif: false },
+                    { value: 'fill_blank', label: '✏️ Boşluk Doldurma', maarif: false },
+                    { value: 'true_false', label: '✓✗ D/Y', maarif: false },
+                    { value: 'multi_true_false', label: '📋✓✗ Çoklu D/Y', maarif: true },
+                    { value: 'table_fill', label: '🗂️ Tablo Doldurma', maarif: true },
+                    { value: 'matching', label: '🔗 Eşleştirme', maarif: false },
+                    { value: 'ordering', label: '📋 Sıralama', maarif: false },
+                    { value: 'short_answer', label: '💬 Kısa Cevap', maarif: false },
+                    { value: 'mixed', label: '🎲 Karma Sorular', maarif: false },
                   ].map(t => (
                     <button key={t.value} onClick={() => setForm(p => ({ ...p, question_type: t.value }))}
-                      style={{ padding: '6px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', fontFamily: 'var(--font-sans)', textAlign: 'center',
-                        background: form.question_type === t.value ? 'rgba(8,36,101,0.08)' : 'var(--bg2)',
-                        borderColor: form.question_type === t.value ? 'rgba(8,36,101,0.3)' : 'var(--border)',
+                      style={{ padding: '6px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', fontFamily: 'var(--font-sans)', textAlign: 'center', position: 'relative',
+                        background: form.question_type === t.value ? 'rgba(8,36,101,0.08)' : t.maarif ? 'rgba(91,76,245,0.03)' : 'var(--bg2)',
+                        borderColor: form.question_type === t.value ? 'rgba(8,36,101,0.3)' : t.maarif ? 'rgba(91,76,245,0.25)' : 'var(--border)',
                         color: form.question_type === t.value ? 'var(--primary)' : 'var(--text3)',
                       }}>
+                      {t.maarif && <span style={{ position: 'absolute', top: '2px', right: '4px', fontSize: '7px', color: '#5b4cf5', fontWeight: 800 }}>MM</span>}
                       {t.label}
                     </button>
                   ))}
@@ -241,6 +245,7 @@ export default function TeacherAssignPage() {
                         <span>🏫 {a.classrooms?.name}</span>
                         <span>❓ {a.question_count} soru</span>
                         <span>✅ {completions} tamamladı</span>
+                        <span>{({'multiple_choice':'🔤 Çoktan Seçmeli','fill_blank':'✏️ Boşluk Doldurma','true_false':'✓✗ D/Y','multi_true_false':'📋✓✗ Çoklu D/Y','table_fill':'🗂️ Tablo','matching':'🔗 Eşleştirme','ordering':'📋 Sıralama','short_answer':'💬 Kısa Cevap','mixed':'🎲 Karma'} as any)[a.question_type] || '🔤 Çoktan Seçmeli'}</span>
                         {a.due_date && (
                           <span style={{ color: isOverdue ? 'var(--red)' : 'var(--text3)' }}>
                             🕐 {new Date(a.due_date).toLocaleDateString('tr-TR')}{isOverdue ? ' (süresi doldu)' : ''}

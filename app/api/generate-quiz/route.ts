@@ -106,6 +106,27 @@ CRITICAL RULES for matching questions:
 
 {"questions":[{"type":"short_answer","q":"What is photosynthesis and where does it occur?","opts":["Photosynthesis is the process by which plants use sunlight to convert CO2 and water into glucose and oxygen. It occurs in chloroplasts."],"ans":0,"exp":"Equation: 6CO2 + 6H2O + light -> C6H12O6 + 6O2"}]}`
 
+  // mixed: tüm soru tipleri karışık
+  if (type === 'mixed') return base + `Generate a MIXED set of questions combining ALL question types below. Distribute evenly: multiple_choice, fill_blank, true_false, multi_true_false, matching, ordering. Each question must have a "type" field matching its format exactly.
+
+Rules per type:
+- multiple_choice: opts array with 4 choices, ans = correct index (0-3)
+- fill_blank: blank = correct word, opts = 4 choices including the correct one, ans = correct index
+- true_false: opts = ["Doğru","Yanlış"] (or in ${lang}), ans: 0=True 1=False  
+- multi_true_false: statements array [{text, correct: bool}], 4-5 statements
+- matching: pairs array [{left, right}], exactly 4 pairs
+- ordering: items array (shuffled), correctOrder array (indices of correct order)
+
+Return ALL as one JSON array mixing the types:
+{"questions":[
+  {"type":"multiple_choice","q":"...","opts":["A","B","C","D"],"ans":0,"exp":"..."},
+  {"type":"fill_blank","q":"___ is the powerhouse","blank":"Mitochondria","opts":["Mitochondria","Ribosome","Nucleus","Lysosome"],"ans":0,"exp":"..."},
+  {"type":"true_false","q":"...","opts":["Doğru","Yanlış"],"ans":0,"exp":"..."},
+  {"type":"multi_true_false","q":"...","statements":[{"text":"...","correct":true},{"text":"...","correct":false}],"opts":["D","Y"],"ans":0,"exp":"..."},
+  {"type":"matching","q":"...","pairs":[{"left":"...","right":"..."}],"opts":["A","B","C","D"],"ans":0,"exp":"..."},
+  {"type":"ordering","q":"...","items":["B","A","D","C"],"correctOrder":[1,0,3,2],"opts":["1.","2.","3.","4."],"ans":0,"exp":"..."}
+]}`
+
   // default: multiple_choice
   return base + `Generate multiple choice questions with 4 options (A/B/C/D), correct answer index, and explanation.
 
