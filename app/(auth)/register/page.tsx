@@ -41,6 +41,8 @@ function RegisterContent() {
   const [instagram, setInstagram] = useState('')
   const [tiktok, setTiktok] = useState('')
   const [showOptional, setShowOptional] = useState(false)
+  const [institutionCode, setInstitutionCode] = useState('')
+  const [institutionName, setInstitutionName] = useState('')
   const [kvkk, setKvkk] = useState(false)
 
   const [error, setError] = useState('')
@@ -88,6 +90,23 @@ function RegisterContent() {
         instagram: instagram || null,
         tiktok: tiktok || null,
       })
+
+      // Kurum kodu işle
+      if (institutionCode.trim()) {
+        const { data: inst } = await supabase
+          .from('institutions')
+          .select('id, name')
+          .eq('code', institutionCode.trim().toUpperCase())
+          .eq('active', true)
+          .maybeSingle()
+        if (inst) {
+          await supabase.from('institution_users').insert({
+            institution_id: inst.id,
+            user_id: data.user.id,
+            role: 'student',
+          })
+        }
+      }
 
       // Referral işle
       if (ref) {
@@ -178,6 +197,33 @@ function RegisterContent() {
 
           <label className="field-label">Şifre <span style={{ color: 'var(--red)' }}>*</span></label>
           <input className="input" type="password" placeholder="En az 6 karakter" value={pass} onChange={e => setPass(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleRegister()} />
+
+          {/* Kurum kodu (opsiyonel) */}
+          <div style={{ marginBottom: '1rem', padding: '12px 14px', borderRadius: '12px', background: 'rgba(217,119,6,0.04)', border: '1.5px solid rgba(217,119,6,0.15)' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#d97706', marginBottom: '6px' }}>🏛️ Kurum Kodu (Opsiyonel)</div>
+            <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px', lineHeight: 1.5 }}>
+              Okulunuz veya kurumunuz Pratium ile anlasmali ise size verilen kodu girin.
+            </div>
+            <input className="input" placeholder="8 haneli kurum kodu (ornek: ABC12345)"
+              value={institutionCode}
+              onChange={async e => {
+                const val = e.target.value.toUpperCase()
+                setInstitutionCode(val)
+                if (val.length === 8) {
+                  const { data: inst } = await supabase.from('institutions').select('name').eq('code', val).eq('active', true).maybeSingle()
+                  setInstitutionName(inst?.name || '')
+                } else {
+                  setInstitutionName('')
+                }
+              }}
+              style={{ marginBottom: institutionName ? '6px' : 0 }}
+            />
+            {institutionName && (
+              <div style={{ fontSize: '12px', color: 'var(--green)', fontWeight: 600 }}>
+                ✓ {institutionName} kurumuna baglanacaksiniz
+              </div>
+            )}
+          </div>
 
           {/* Opsiyonel alanlar */}
           <button onClick={() => setShowOptional(v => !v)}
