@@ -36,7 +36,13 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions'>('users')
+  // Kurum formu
+  const [instForm, setInstForm] = useState({ name: '', email: '', password: '', code: '', discount: '0' })
+  const [instSaving, setInstSaving] = useState(false)
+  const [instError, setInstError] = useState('')
+  const [instSuccess, setInstSuccess] = useState('')
+  const [institutions, setInstitutions] = useState<any[]>([])
   const [adminNote, setAdminNote] = useState<Record<string, string>>({})
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [pendingTeachers, setPendingTeachers] = useState(0)
@@ -60,6 +66,38 @@ export default function AdminPage() {
     }
     load()
   }, [])
+
+  async function generateInstCode() {
+    return Math.random().toString(36).substring(2, 6).toUpperCase() +
+           Math.random().toString(36).substring(2, 6).toUpperCase()
+  }
+
+  async function createInstitution() {
+    if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password || !instForm.code.trim()) {
+      setInstError('Kurum adı, mail, şifre ve kod zorunlu.')
+      return
+    }
+    setInstSaving(true); setInstError(''); setInstSuccess('')
+
+    // 1. Auth hesabı oluştur
+    const { data: authData, error: authErr } = await supabase.auth.admin
+      ? await fetch('/api/admin/create-institution', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          },
+          body: JSON.stringify(instForm),
+        }).then(r => r.json())
+      : { error: 'Admin API yok' }
+
+    if (authData?.error) { setInstError(authData.error); setInstSaving(false); return }
+
+    setInstSuccess(`Kurum "${instForm.name}" oluşturuldu! Kod: ${instForm.code}`)
+    setInstForm({ name: '', email: '', password: '', code: '', discount: '0' })
+    await fetchData()
+    setInstSaving(false)
+  }
 
   async function fetchData() {
     setLoading(true)
@@ -129,6 +167,13 @@ export default function AdminPage() {
     const teacherData = teachersJson.teachers || []
     setTeachers(teacherData)
     setPendingTeachers(teacherData.filter((t: Teacher) => !t.approved).length)
+
+    // Kurumları çek
+    const { data: instData } = await supabase
+      .from('institutions')
+      .select('*')
+      .order('created_at', { ascending: false })
+    setInstitutions(instData || [])
 
     setLoading(false)
   }
@@ -259,6 +304,7 @@ export default function AdminPage() {
             { key: 'stats', label: '📊 İstatistikler' },
             { key: 'errors', label: `⚠️ Hata Bildirimleri${pendingCount > 0 ? ` (${pendingCount})` : ''}` },
             { key: 'teachers', label: `🎓 Öğretmen Başvuruları${pendingTeachers > 0 ? ` (${pendingTeachers})` : ''}` },
+            { key: 'institutions', label: '🏛️ Kurumlar' },
           ] as const).map(t => (
             <button key={t.key} className={`btn btn-sm ${tab === t.key ? 'btn-primary' : ''}`}
               onClick={() => setTab(t.key)}
@@ -500,6 +546,92 @@ export default function AdminPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Institutions tab */}
+        {tab === 'institutions' && (
+          <div>
+            {/* Kurum oluştur formu */}
+            <div className="card" style={{ marginBottom: '1.5rem' }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>🏛️ Yeni Kurum Oluştur</div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Kurum Adı *</label>
+                  <input className="input" placeholder="ABC Koleji" value={instForm.name}
+                    onChange={e => setInstForm(p => ({ ...p, name: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Kurum Kodu * (8 hane)</label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input className="input" placeholder="ABC12345" value={instForm.code}
+                      onChange={e => setInstForm(p => ({ ...p, code: e.target.value.toUpperCase() }))}
+                      style={{ fontFamily: 'monospace', letterSpacing: '0.1em' }} />
+                    <button onClick={async () => {
+                      const code = (Math.random().toString(36).substring(2, 6) + Math.random().toString(36).substring(2, 6)).toUpperCase()
+                      setInstForm(p => ({ ...p, code }))
+                    }} className="btn btn-sm" title="Otomatik üret" style={{ flexShrink: 0 }}>🎲</button>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>E-posta Adresi *</label>
+                  <input className="input" type="email" placeholder="kurum@mail.com" value={instForm.email}
+                    onChange={e => setInstForm(p => ({ ...p, email: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Şifre *</label>
+                  <input className="input" type="password" placeholder="En az 8 karakter" value={instForm.password}
+                    onChange={e => setInstForm(p => ({ ...p, password: e.target.value }))} />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '12px', maxWidth: '200px' }}>
+                <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>İndirim Oranı (%)</label>
+                <input className="input" type="number" min={0} max={100} placeholder="0" value={instForm.discount}
+                  onChange={e => setInstForm(p => ({ ...p, discount: e.target.value }))} />
+              </div>
+
+              {instError && <div style={{ padding: '10px 12px', background: 'var(--red-bg)', borderRadius: '8px', fontSize: '13px', color: 'var(--red)', marginBottom: '10px' }}>{instError}</div>}
+              {instSuccess && <div style={{ padding: '10px 12px', background: 'var(--green-bg)', borderRadius: '8px', fontSize: '13px', color: 'var(--green)', marginBottom: '10px' }}>{instSuccess}</div>}
+
+              <button onClick={createInstitution} disabled={instSaving} className="btn btn-primary"
+                style={{ opacity: instSaving ? 0.6 : 1 }}>
+                {instSaving ? '⏳ Oluşturuluyor...' : '🏛️ Kurumu Oluştur'}
+              </button>
+            </div>
+
+            {/* Mevcut kurumlar */}
+            {institutions.length > 0 && (
+              <div className="card">
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>
+                  Mevcut Kurumlar ({institutions.length})
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                      {['Kurum', 'Kod', 'E-posta', 'İndirim', 'Tarih'].map(h => (
+                        <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontSize: '11px', color: 'var(--text3)', fontWeight: 700, textTransform: 'uppercase' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {institutions.map((inst: any, i: number) => (
+                      <tr key={inst.id} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg2)' }}>
+                        <td style={{ padding: '10px', fontWeight: 600 }}>{inst.name}</td>
+                        <td style={{ padding: '10px', fontFamily: 'monospace', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em' }}>{inst.code}</td>
+                        <td style={{ padding: '10px', color: 'var(--text3)' }}>{inst.admin_email || '—'}</td>
+                        <td style={{ padding: '10px' }}>{inst.discount_rate ? `%${inst.discount_rate}` : '—'}</td>
+                        <td style={{ padding: '10px', color: 'var(--text3)', fontSize: '11px' }}>{new Date(inst.created_at).toLocaleDateString('tr-TR')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
