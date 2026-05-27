@@ -43,6 +43,10 @@ export default function AdminPage() {
   const [instError, setInstError] = useState('')
   const [instSuccess, setInstSuccess] = useState('')
   const [institutions, setInstitutions] = useState<any[]>([])
+  const [editingInst, setEditingInst] = useState<any>(null)
+  const [editInstForm, setEditInstForm] = useState({ name: '', email: '', newPassword: '', discount: '0', active: true })
+  const [editInstSaving, setEditInstSaving] = useState(false)
+  const [instStudentCounts, setInstStudentCounts] = useState<Record<string, number>>({})
   const [adminNote, setAdminNote] = useState<Record<string, string>>({})
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [pendingTeachers, setPendingTeachers] = useState(0)
@@ -70,6 +74,32 @@ export default function AdminPage() {
   async function generateInstCode() {
     return Math.random().toString(36).substring(2, 6).toUpperCase() +
            Math.random().toString(36).substring(2, 6).toUpperCase()
+  }
+
+  async function updateInstitution() {
+    if (!editingInst) return
+    setEditInstSaving(true)
+    const { data: { session: s } } = await supabase.auth.getSession()
+    const res = await fetch('/api/admin/update-institution', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${s?.access_token}` },
+      body: JSON.stringify({ institution_id: editingInst.id, ...editInstForm }),
+    })
+    const json = await res.json()
+    if (json.error) { alert(json.error); setEditInstSaving(false); return }
+    setEditingInst(null)
+    await fetchData()
+    setEditInstSaving(false)
+  }
+
+  async function toggleInstitutionActive(inst: any) {
+    const { data: { session: s } } = await supabase.auth.getSession()
+    await fetch('/api/admin/update-institution', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${s?.access_token}` },
+      body: JSON.stringify({ institution_id: inst.id, name: inst.name, email: inst.admin_email, newPassword: '', discount: String(inst.discount_rate || 0), active: !inst.active }),
+    })
+    await fetchData()
   }
 
   async function createInstitution() {
@@ -168,12 +198,13 @@ export default function AdminPage() {
     setTeachers(teacherData)
     setPendingTeachers(teacherData.filter((t: Teacher) => !t.approved).length)
 
-    // Kurumları çek
-    const { data: instData } = await supabase
-      .from('institutions')
-      .select('*')
-      .order('created_at', { ascending: false })
-    setInstitutions(instData || [])
+    // Kurumları çek (service_role ile)
+    const instRes = await fetch('/api/admin/institutions', {
+      headers: { 'Authorization': `Bearer ${adminSession?.access_token}` }
+    })
+    const instJson = instRes.ok ? await instRes.json() : { institutions: [], counts: {} }
+    setInstitutions(instJson.institutions || [])
+    setInstStudentCounts(instJson.counts || {})
 
     setLoading(false)
   }
@@ -607,33 +638,84 @@ export default function AdminPage() {
             </div>
 
             {/* Mevcut kurumlar */}
-            {institutions.length > 0 && (
-              <div className="card">
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>
-                  Mevcut Kurumlar ({institutions.length})
+            {/* Düzenleme modalı */}
+            {editingInst && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                <div className="card" style={{ width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--primary)' }}>✏️ Kurumu Düzenle</div>
+                    <button onClick={() => setEditingInst(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: 'var(--text3)' }}>×</button>
+                  </div>
+
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Kurum Adı</label>
+                  <input className="input" value={editInstForm.name} onChange={e => setEditInstForm(p => ({ ...p, name: e.target.value }))} style={{ marginBottom: '10px' }} />
+
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>E-posta</label>
+                  <input className="input" type="email" value={editInstForm.email} onChange={e => setEditInstForm(p => ({ ...p, email: e.target.value }))} style={{ marginBottom: '10px' }} />
+
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Yeni Şifre (boş bırakırsan değişmez)</label>
+                  <input className="input" type="password" placeholder="Yeni şifre..." value={editInstForm.newPassword} onChange={e => setEditInstForm(p => ({ ...p, newPassword: e.target.value }))} style={{ marginBottom: '10px' }} />
+
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>İndirim Oranı (%)</label>
+                  <input className="input" type="number" min={0} max={100} value={editInstForm.discount} onChange={e => setEditInstForm(p => ({ ...p, discount: e.target.value }))} style={{ marginBottom: '10px' }} />
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={editInstForm.active} onChange={e => setEditInstForm(p => ({ ...p, active: e.target.checked }))} style={{ width: 16, height: 16, accentColor: 'var(--accent)' }} />
+                    <span style={{ fontSize: '13px', color: 'var(--text2)' }}>Kurum aktif</span>
+                  </label>
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={updateInstitution} disabled={editInstSaving} className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
+                      {editInstSaving ? '⏳ Kaydediliyor...' : '💾 Kaydet'}
+                    </button>
+                    <button onClick={() => setEditingInst(null)} className="btn" style={{ justifyContent: 'center' }}>İptal</button>
+                  </div>
                 </div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                      {['Kurum', 'Kod', 'E-posta', 'İndirim', 'Tarih'].map(h => (
-                        <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontSize: '11px', color: 'var(--text3)', fontWeight: 700, textTransform: 'uppercase' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {institutions.map((inst: any, i: number) => (
-                      <tr key={inst.id} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg2)' }}>
-                        <td style={{ padding: '10px', fontWeight: 600 }}>{inst.name}</td>
-                        <td style={{ padding: '10px', fontFamily: 'monospace', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em' }}>{inst.code}</td>
-                        <td style={{ padding: '10px', color: 'var(--text3)' }}>{inst.admin_email || '—'}</td>
-                        <td style={{ padding: '10px' }}>{inst.discount_rate ? `%${inst.discount_rate}` : '—'}</td>
-                        <td style={{ padding: '10px', color: 'var(--text3)', fontSize: '11px' }}>{new Date(inst.created_at).toLocaleDateString('tr-TR')}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
             )}
+
+            {/* Kurum listesi */}
+            <div className="card">
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>
+                Mevcut Kurumlar ({institutions.length})
+              </div>
+              {institutions.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text3)', fontSize: '13px' }}>Henüz kurum yok.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {institutions.map((inst: any) => (
+                    <div key={inst.id} style={{ padding: '14px 16px', borderRadius: '12px', border: `1.5px solid ${inst.active ? 'var(--border)' : 'rgba(220,38,38,0.2)'}`, background: inst.active ? 'var(--bg)' : 'var(--red-bg)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                            <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)' }}>{inst.name}</span>
+                            {!inst.active && <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--red)', background: 'var(--red-bg)', padding: '2px 8px', borderRadius: '999px' }}>PASİF</span>}
+                          </div>
+                          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '12px', color: 'var(--text3)' }}>
+                            <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em' }}>#{inst.code}</span>
+                            <span>📧 {inst.admin_email || '—'}</span>
+                            <span>👥 {instStudentCounts[inst.id] ?? 0} öğrenci</span>
+                            {inst.discount_rate > 0 && <span>🏷️ %{inst.discount_rate} indirim</span>}
+                            <span>📅 {new Date(inst.created_at).toLocaleDateString('tr-TR')}</span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                          <button onClick={() => {
+                            setEditingInst(inst)
+                            setEditInstForm({ name: inst.name, email: inst.admin_email || '', newPassword: '', discount: String(inst.discount_rate || 0), active: inst.active })
+                          }} className="btn btn-sm" style={{ fontSize: '11px' }}>✏️ Düzenle</button>
+                          <button onClick={() => toggleInstitutionActive(inst)}
+                            className="btn btn-sm"
+                            style={{ fontSize: '11px', color: inst.active ? 'var(--red)' : 'var(--green)', borderColor: inst.active ? 'rgba(220,38,38,0.3)' : 'rgba(22,163,74,0.3)', background: inst.active ? 'var(--red-bg)' : 'var(--green-bg)' }}>
+                            {inst.active ? '🔴 Pasif Yap' : '🟢 Aktif Yap'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
