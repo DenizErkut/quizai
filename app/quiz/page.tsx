@@ -266,10 +266,10 @@ function QuizPageContent() {
       }
 
       if (!res.ok) {
-        if (data.error === 'pdf_too_long') {
+        if (data.error === 'pdf_too_long' || data.error === 'pdf_image_only' || data.error === 'pdf_error') {
           clearInterval(iv)
-          setLoadMsg(data.message || 'PDF çok uzun. Lütfen daha kısa bir bölüm yükleyin.')
-          setTimeout(() => setScreen('topic'), 3000)
+          setLoadMsg('__PDF_ERROR__:' + (data.message || 'PDF işlenemedi.'))
+          setTimeout(() => setScreen('topic'), 8000)
           return
         }
         throw new Error(data.error)
@@ -831,7 +831,26 @@ function QuizPageContent() {
           <div className="spinner" style={{ width: 28, height: 28, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} />
         </div>
         <div style={{ fontWeight: 600, fontSize: '16px', marginBottom: '0.4rem' }}>Sorular hazırlanıyor...</div>
-        <div style={{ fontSize: '13px', color: 'var(--text3)' }}>{loadMsg}</div>
+        {loadMsg.startsWith('__PDF_ERROR__:') ? (
+          <div style={{ marginTop: '1rem', background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '12px', padding: '16px', textAlign: 'left', maxWidth: '320px' }}>
+            <div style={{ fontWeight: 700, color: 'var(--red)', marginBottom: '8px', fontSize: '13px' }}>⚠️ PDF Yüklenemedi</div>
+            <div style={{ color: 'var(--text2)', fontSize: '12px', lineHeight: 1.6, marginBottom: '10px' }}>
+              {loadMsg.replace('__PDF_ERROR__:', '')}
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.7, marginBottom: '12px' }}>
+              <strong style={{ color: 'var(--text2)' }}>Çözüm önerileri:</strong><br/>
+              • PDF'i Word dosyasına çevir, tekrar yükle<br/>
+              • Büyük PDF'i 50 sayfalık parçalara böl<br/>
+              • Metni kopyalayıp konu kutusuna yapıştır
+            </div>
+            <a href="https://bigconvert.11zon.com/" target="_blank" rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 16px', borderRadius: '8px', background: '#082465', color: '#fff', fontSize: '12px', fontWeight: 700, textDecoration: 'none' }}>
+              🔄 Ücretsiz PDF Dönüştür / Küçült →
+            </a>
+          </div>
+        ) : (
+          <div style={{ fontSize: '13px', color: 'var(--text3)' }}>{loadMsg}</div>
+        )}
       </div>
     </main>
   )

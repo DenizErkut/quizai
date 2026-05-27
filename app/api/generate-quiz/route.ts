@@ -257,15 +257,13 @@ export async function POST(req: NextRequest) {
     let questions = parsed.questions || []
 
     // Math verification pipeline
-    const isMathTopic = /math|matematik|calcul|denklem|geometr|cebir|trigon|istatistik|olasil|fizik|kimya|physics|chemistry|algebra|equation|formula/i.test(topic)
-    const isMathType = questionType === 'multiple_choice'
-
-    if (isMathTopic && isMathType && questions.length > 0) {
+    // AI soru doğrulama — tüm tipler için (verify-math'ın genişletilmiş versiyonu)
+    if (questions.length > 0) {
       try {
-        const verifyRes = await fetch(`${req.nextUrl.origin}/api/verify-math`, {
+        const verifyRes = await fetch(`${req.nextUrl.origin}/api/verify-questions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ questions, topic, grade, language: lang }),
+          body: JSON.stringify({ questions, topic, grade, language: lang, questionType }),
         })
         if (verifyRes.ok) {
           const verifyData = await verifyRes.json()
@@ -273,8 +271,8 @@ export async function POST(req: NextRequest) {
             questions = verifyData.questions
           }
         }
-      } catch (e) {
-        console.error('Math verification skipped:', e)
+      } catch {
+        // Doğrulama başarısız → orijinal soruları kullan
       }
     }
 
