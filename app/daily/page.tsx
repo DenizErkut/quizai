@@ -94,10 +94,14 @@ export default function DailyPage() {
     const topics = TOPICS[gradeGroup] || TOPICS.ortaokul
     const topic = topics[new Date().getDay() % topics.length]
 
+    // Günün gününe göre soru tipi rotate (Pzt=çoktan seçmeli, Sal=boşluk, Çar=D/Y ...)
+    const DAILY_TYPES = ['multiple_choice', 'fill_blank', 'true_false', 'matching', 'ordering', 'multiple_choice', 'mixed']
+    const dailyQuestionType = DAILY_TYPES[new Date().getDay()]
+
     const res = await fetch('/api/generate-quiz', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ topic, questionCount: 5, difficulty: 'normal', language: p?.language || 'Türkçe', dailyChallenge: true }),
+      body: JSON.stringify({ topic, questionCount: 5, difficulty: 'normal', language: p?.language || 'Türkçe', dailyChallenge: true, questionType: dailyQuestionType }),
     })
     const data = await res.json()
     if (data.questions) {
@@ -108,6 +112,7 @@ export default function DailyPage() {
         subject: 'Genel',
         grade_level: gradeGroup,
         questions: data.questions,
+        question_type: dailyQuestionType || 'multiple_choice',
       }).select().single()
       setChallenge(newChallenge)
     }
@@ -140,7 +145,7 @@ export default function DailyPage() {
         score,
         pct: Math.round(score / challenge.questions.length * 100),
         completed: true,
-        question_type: 'multiple_choice',
+        question_type: dailyQuestionType || 'multiple_choice',
       })
 
       // Streak güncelle
