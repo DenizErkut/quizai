@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -302,105 +302,93 @@ export default function DailyPage() {
             </div>
             <p style={{ fontSize: '17px', fontWeight: 500, lineHeight: 1.55, marginBottom: '1.5rem' }}>{q.q}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {/* Eşleştirme sorusu */}
-              {q.type === 'matching' && q.pairs ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {q.pairs.map((pair: any, i: number) => {
-                    const sel = (chosen as any)?.[i]
-                    const rightOptions = q.pairs.map((p: any) => p.right)
-                    return (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ flex: 1, padding: '10px 13px', borderRadius: '9px', background: 'var(--bg2)', border: '1.5px solid var(--border)', fontSize: '13px', fontWeight: 600 }}>
-                          {pair.left}
-                        </div>
-                        <span style={{ color: 'var(--text4)' }}>→</span>
-                        <select
-                          disabled={chosen !== null}
-                          value={sel ?? ''}
-                          onChange={e => {
-                            if (chosen !== null) return
-                            const prev = (chosen as any) || {}
-                            const next = { ...prev, [i]: e.target.value }
-                            if (Object.keys(next).length === q.pairs.length) {
-                              const allCorrect = q.pairs.every((p: any, idx: number) => next[idx] === p.right)
-                              choose(allCorrect ? q.ans : -1)
-                            } else {
-                              setChosen(next as any)
-                            }
-                          }}
-                          style={{ flex: 1, padding: '10px 13px', borderRadius: '9px', border: `1.5px solid ${chosen !== null ? (sel === pair.right ? 'rgba(22,163,74,0.35)' : 'rgba(220,38,38,0.35)') : 'var(--border)'}`, background: chosen !== null ? (sel === pair.right ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', fontSize: '13px', color: 'var(--text)', outline: 'none' }}>
-                          <option value="">Seç...</option>
-                          {rightOptions.map((r: string, j: number) => <option key={j} value={r}>{r}</option>)}
-                        </select>
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : q.type === 'ordering' && q.items ? (
-                /* Sıralama sorusu */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {(q.items as string[]).map((item: string, i: number) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '12px', color: 'var(--text4)', width: '20px' }}>{i + 1}.</span>
-                      <div style={{ flex: 1, padding: '10px 13px', borderRadius: '9px', background: 'var(--bg2)', border: '1.5px solid var(--border)', fontSize: '13px' }}>{item}</div>
-                    </div>
-                  ))}
-                  {chosen === null && (
-                    <button onClick={() => choose(q.ans)} className="btn btn-primary" style={{ marginTop: '8px', justifyContent: 'center', fontSize: '13px' }}>
-                      Sıralamayı Onayla
-                    </button>
-                  )}
-                </div>
-              ) : q.type === 'fill_blank' ? (
-                /* Boşluk doldurma */
-                <div>
-                  {(q.opts || []).map((opt: string, i: number) => {
-                    let bg = 'var(--bg2)', border = 'var(--border)', color = 'var(--text)'
-                    if (chosen !== null) {
-                      if (i === q.ans) { bg = 'var(--green-bg)'; border = 'rgba(22,163,74,0.35)'; color = 'var(--green)' }
-                      else if (i === chosen) { bg = 'var(--red-bg)'; border = 'rgba(220,38,38,0.35)'; color = 'var(--red)' }
-                    }
-                    return (
-                      <button key={i} onClick={() => choose(i)} disabled={chosen !== null}
-                        style={{ textAlign: 'left', padding: '12px 15px', borderRadius: '10px', border: `1.5px solid ${border}`, background: bg, color, fontSize: '14px', cursor: chosen !== null ? 'default' : 'pointer', width: '100%', marginBottom: '8px', transition: 'all 0.15s' }}>
-                        <span style={{ fontWeight: 600, marginRight: '8px', opacity: 0.5 }}>{String.fromCharCode(65 + i)}.</span>{opt}
-                      </button>
-                    )
-                  })}
-                </div>
-              ) : q.type === 'true_false' || q.type === 'multi_true_false' ? (
-                /* Doğru/Yanlış */
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  {['Doğru', 'Yanlış'].map((label, i) => {
-                    let bg = 'var(--bg2)', border = 'var(--border)', color = 'var(--text)'
-                    if (chosen !== null) {
-                      if (i === q.ans) { bg = 'var(--green-bg)'; border = 'rgba(22,163,74,0.35)'; color = 'var(--green)' }
-                      else if (i === chosen) { bg = 'var(--red-bg)'; border = 'rgba(220,38,38,0.35)'; color = 'var(--red)' }
-                    }
-                    return (
-                      <button key={i} onClick={() => choose(i)} disabled={chosen !== null}
-                        style={{ flex: 1, padding: '16px', borderRadius: '12px', border: `2px solid ${border}`, background: bg, color, fontSize: '15px', fontWeight: 700, cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s' }}>
-                        {i === 0 ? '✓ ' : '✗ '}{label}
-                      </button>
-                    )
-                  })}
-                </div>
-              ) : (
-                /* Varsayılan: çoktan seçmeli */
-                (q.opts || []).map((opt: string, i: number) => {
-                  let bg = 'var(--bg2)', border = 'var(--border)', color = 'var(--text)'
-                  if (chosen !== null) {
-                    if (i === q.ans) { bg = 'var(--green-bg)'; border = 'rgba(22,163,74,0.35)'; color = 'var(--green)' }
-                    else if (i === chosen) { bg = 'var(--red-bg)'; border = 'rgba(220,38,38,0.35)'; color = 'var(--red)' }
-                  }
+              {((): React.ReactNode => {
+                const qq = q as any
+                if (qq.type === 'matching' && qq.pairs) {
                   return (
-                    <button key={i} onClick={() => choose(i)} disabled={chosen !== null}
-                      style={{ textAlign: 'left', padding: '12px 15px', borderRadius: '10px', border: `1.5px solid ${border}`, background: bg, color, fontSize: '14px', cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s' }}>
-                      <span style={{ fontWeight: 600, marginRight: '8px', opacity: 0.5 }}>{String.fromCharCode(65 + i)}.</span>{opt}
-                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {qq.pairs.map((pair: any, i: number) => {
+                        const sel = (chosen as any)?.[i]
+                        const rightOptions = qq.pairs.map((p: any) => p.right)
+                        return (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ flex: 1, padding: '10px 13px', borderRadius: '9px', background: 'var(--bg2)', border: '1.5px solid var(--border)', fontSize: '13px', fontWeight: 600 }}>{pair.left}</div>
+                            <span style={{ color: 'var(--text4)' }}>→</span>
+                            <select disabled={chosen !== null} value={sel ?? ''}
+                              onChange={e => {
+                                if (chosen !== null) return
+                                const prev: any = (typeof chosen === 'object' && chosen !== null) ? chosen : {}
+                                const next = { ...prev, [i]: e.target.value }
+                                if (Object.keys(next).length === qq.pairs.length) {
+                                  const allCorrect = qq.pairs.every((p: any, idx: number) => next[idx] === p.right)
+                                  choose(allCorrect ? qq.ans : -1)
+                                } else { setChosen(next as any) }
+                              }}
+                              style={{ flex: 1, padding: '10px 13px', borderRadius: '9px', border: `1.5px solid ${chosen !== null ? (sel === pair.right ? 'rgba(22,163,74,0.35)' : 'rgba(220,38,38,0.35)') : 'var(--border)'}`, background: chosen !== null ? (sel === pair.right ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', fontSize: '13px', color: 'var(--text)', outline: 'none' }}>
+                              <option value="">Seç...</option>
+                              {rightOptions.map((r: string, j: number) => <option key={j} value={r}>{r}</option>)}
+                            </select>
+                          </div>
+                        )
+                      })}
+                    </div>
                   )
-                })
-              )}
+                }
+                if (qq.type === 'ordering' && qq.items) {
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {(qq.items as string[]).map((item: string, i: number) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '12px', color: 'var(--text4)', width: '20px' }}>{i + 1}.</span>
+                          <div style={{ flex: 1, padding: '10px 13px', borderRadius: '9px', background: 'var(--bg2)', border: '1.5px solid var(--border)', fontSize: '13px' }}>{item}</div>
+                        </div>
+                      ))}
+                      {chosen === null && (
+                        <button onClick={() => choose(qq.ans)} className="btn btn-primary" style={{ marginTop: '8px', justifyContent: 'center', fontSize: '13px' }}>
+                          Sıralamayı Onayla
+                        </button>
+                      )}
+                    </div>
+                  )
+                }
+                if (qq.type === 'true_false' || qq.type === 'multi_true_false') {
+                  return (
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      {['Doğru', 'Yanlış'].map((lbl, i) => {
+                        let bg = 'var(--bg2)', border = 'var(--border)', color = 'var(--text)'
+                        if (chosen !== null) {
+                          if (i === qq.ans) { bg = 'var(--green-bg)'; border = 'rgba(22,163,74,0.35)'; color = 'var(--green)' }
+                          else if (i === chosen) { bg = 'var(--red-bg)'; border = 'rgba(220,38,38,0.35)'; color = 'var(--red)' }
+                        }
+                        return (
+                          <button key={i} onClick={() => choose(i)} disabled={chosen !== null}
+                            style={{ flex: 1, padding: '16px', borderRadius: '12px', border: `2px solid ${border}`, background: bg, color, fontSize: '15px', fontWeight: 700, cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s' }}>
+                            {i === 0 ? '✓ ' : '✗ '}{lbl}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )
+                }
+                // Varsayılan: çoktan seçmeli / boşluk doldurma
+                return (
+                  <>
+                    {(qq.opts || []).map((opt: string, i: number) => {
+                      let bg = 'var(--bg2)', border = 'var(--border)', color = 'var(--text)'
+                      if (chosen !== null) {
+                        if (i === qq.ans) { bg = 'var(--green-bg)'; border = 'rgba(22,163,74,0.35)'; color = 'var(--green)' }
+                        else if (i === chosen) { bg = 'var(--red-bg)'; border = 'rgba(220,38,38,0.35)'; color = 'var(--red)' }
+                      }
+                      return (
+                        <button key={i} onClick={() => choose(i)} disabled={chosen !== null}
+                          style={{ textAlign: 'left', padding: '12px 15px', borderRadius: '10px', border: `1.5px solid ${border}`, background: bg, color, fontSize: '14px', cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s', width: '100%' }}>
+                          <span style={{ fontWeight: 600, marginRight: '8px', opacity: 0.5 }}>{String.fromCharCode(65 + i)}.</span>{opt}
+                        </button>
+                      )
+                    })}
+                  </>
+                )
+              })()}
             </div>
             {chosen !== null && (
               <>
