@@ -48,12 +48,17 @@ export default function Navbar() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const [{ data: p }, { data: s }] = await Promise.all([
-        supabase.from('profiles').select('name,plan,monthly_test_count,language,referral_code,avatar_url').eq('id', user.id).maybeSingle(),
+        supabase.from('profiles').select('name,plan,monthly_test_count,language,referral_code,avatar_url,role').eq('id', user.id).maybeSingle(),
         supabase.from('streaks').select('current_streak').eq('user_id', user.id).maybeSingle(),
       ])
       if (p) {
         const stored = localStorage.getItem('pratium_lang')
         if (stored) p.language = stored
+        // Onaylı öğretmen mi kontrol et
+        if (p.role === 'teacher') {
+          const { data: tData } = await supabase.from('teachers').select('approved').eq('user_id', user.id).maybeSingle()
+          p.teacher_approved = tData?.approved || false
+        }
         setProfile(p)
       }
       setStreak(s?.current_streak || 0)
@@ -110,7 +115,17 @@ export default function Navbar() {
   const testsLeft = profile.plan === 'free' ? 10 - (profile.monthly_test_count || 0) : null
   const activeLang = LANGS.find(l => l.code === profile.language) || LANGS[0]
 
-  const NAV_LINKS = [
+  const isApprovedTeacher = profile?.role === 'teacher' && profile?.teacher_approved
+  const isParent = profile?.role === 'parent'
+
+  const NAV_LINKS = isApprovedTeacher ? [
+    { href: '/teacher',             label: '🏫 Panel' },
+    { href: '/teacher/assign',      label: '📝 Ödev Ata' },
+    { href: '/teacher/performance', label: '📊 Performans' },
+    { href: '/teacher/notify',      label: '🔔 Bildirim' },
+  ] : isParent ? [
+    { href: '/parent', label: '👨‍👩‍👧 Veli Paneli' },
+  ] : [
     { href: '/quiz', label: '⚡ Test' },
     { href: '/daily', label: streak > 0 ? `🔥 ${streak} gün` : '📅 Günlük' },
     { href: '/leaderboard', label: '🏆 Sıralama' },

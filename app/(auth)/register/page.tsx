@@ -23,49 +23,98 @@ const GRADES = [
   { value: 'universite 4. sinif', label: 'Üniversite 4. Sınıf' },
 ]
 
+const ROLES = [
+  {
+    key: 'student',
+    icon: '⚡',
+    title: 'Öğrenci',
+    desc: 'Test çöz, gelişimini takip et',
+    color: '#082465',
+    bg: 'rgba(8,36,101,0.06)',
+    border: 'rgba(8,36,101,0.2)',
+  },
+  {
+    key: 'teacher',
+    icon: '🎓',
+    title: 'Öğretmen',
+    desc: 'Sınıf yönet, ödev ata, analiz yap',
+    color: '#7c3aed',
+    bg: 'rgba(124,58,237,0.06)',
+    border: 'rgba(124,58,237,0.25)',
+  },
+  {
+    key: 'parent',
+    icon: '👨‍👩‍👧',
+    title: 'Veli',
+    desc: 'Çocuğunun performansını takip et',
+    color: '#1ECFB8',
+    bg: 'rgba(30,207,184,0.06)',
+    border: 'rgba(30,207,184,0.3)',
+  },
+]
+
 function RegisterContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const ref = searchParams.get('ref') || ''
-
-  // Zorunlu
-  const [name, setName] = useState('')
-  const [surname, setSurname] = useState('')
-  const [age, setAge] = useState('')
-  const [grade, setGrade] = useState('')
-  const [email, setEmail] = useState('')
-  const [pass, setPass] = useState('')
-
-  // Opsiyonel
-  const [phone, setPhone] = useState('')
-  const [instagram, setInstagram] = useState('')
-  const [tiktok, setTiktok] = useState('')
-  const [showOptional, setShowOptional] = useState(false)
-  const [institutionCode, setInstitutionCode] = useState('')
-  const [institutionName, setInstitutionName] = useState('')
-  const [kvkk, setKvkk] = useState(false)
-
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [oauthLoading, setOauthLoading] = useState<string | null>(null)
-  const [referrerName, setReferrerName] = useState('')
-
   const supabase = createClient() as any
 
+  // Adım yönetimi
+  const [step, setStep] = useState<'role' | 'info' | 'teacher_info'>('role')
+  const [selectedRole, setSelectedRole] = useState<'student' | 'teacher' | 'parent' | null>(null)
+
+  // Ortak alanlar
+  const [name, setName] = useState('')
+  const [surname, setSurname] = useState('')
+  const [email, setEmail] = useState('')
+  const [pass, setPass] = useState('')
+  const [kvkk, setKvkk] = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [oauthLoading, setOauthLoading] = useState(false)
+
+  // Öğrenci alanları
+  const [age, setAge] = useState('')
+  const [grade, setGrade] = useState('')
+  const [institutionCode, setInstitutionCode] = useState('')
+  const [institutionName, setInstitutionName] = useState('')
+
+  // Öğretmen alanları
+  const [school, setSchool] = useState('')
+  const [subject, setSubject] = useState('')
+  const [phone, setPhone] = useState('')
+  const [doc, setDoc] = useState<File | null>(null)
+
+  // Referral
+  const [referrerName, setReferrerName] = useState('')
   useEffect(() => {
     if (!ref) return
     supabase.from('profiles').select('name').eq('referral_code', ref.toUpperCase()).single()
       .then(({ data }: any) => { if (data) setReferrerName(data.name.split(' ')[0]) })
   }, [ref])
 
+  async function handleOAuth() {
+    if (!selectedRole) return
+    setOauthLoading(true)
+    localStorage.setItem('pending_role', selectedRole)
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth/callback?role=${selectedRole}${ref ? `&ref=${ref}` : ''}` },
+    })
+  }
+
   async function handleRegister() {
     if (!name.trim()) { setError('Ad zorunludur.'); return }
     if (!surname.trim()) { setError('Soyad zorunludur.'); return }
-    if (!age || parseInt(age) < 5 || parseInt(age) > 35) { setError('Geçerli bir yaş girin (5-35).'); return }
-    if (!grade) { setError('Sınıf / eğitim seviyesi zorunludur.'); return }
     if (!email.trim()) { setError('E-posta zorunludur.'); return }
     if (pass.length < 6) { setError('Şifre en az 6 karakter olmalıdır.'); return }
-    if (!kvkk) { setError('Devam etmek için Gizlilik Politikası ve KVKK metnini kabul etmelisiniz.'); return }
+    if (!kvkk) { setError('Gizlilik Politikasi ve KVKK metnini kabul etmelisiniz.'); return }
+
+    // Öğrenci için ek kontrol
+    if (selectedRole === 'student') {
+      if (!age || parseInt(age) < 5 || parseInt(age) > 35) { setError('Gecerli bir yas girin (5-35).'); return }
+      if (!grade) { setError('Sinif / egitim seviyesi zorunludur.'); return }
+    }
 
     setError(''); setLoading(true)
     const fullName = `${name.trim()} ${surname.trim()}`
@@ -79,213 +128,323 @@ function RegisterContent() {
     if (err) { setError(err.message); setLoading(false); return }
 
     if (data.user) {
-      // Profili güncelle
-      await supabase.from('profiles').upsert({
-        id: data.user.id,
-        name: fullName,
-        age: parseInt(age),
-        grade,
-        language: 'Türkçe',
-        phone: phone || null,
-        instagram: instagram || null,
-        tiktok: tiktok || null,
-      })
+      if (selectedRole === 'student') {
+        // Öğrenci profili
+        await supabase.from('profiles').upsert({
+          id: data.user.id,
+          name: fullName,
+          age: parseInt(age),
+          grade,
+          language: 'Türkçe',
+          role: 'student',
+        })
 
-      // Kurum kodu işle
-      if (institutionCode.trim()) {
-        const { data: inst } = await supabase
-          .from('institutions')
-          .select('id, name')
-          .eq('code', institutionCode.trim().toUpperCase())
-          .eq('active', true)
-          .maybeSingle()
-        if (inst) {
-          await supabase.from('institution_users').insert({
-            institution_id: inst.id,
-            user_id: data.user.id,
-            role: 'student',
-          })
+        // Kurum kodu
+        if (institutionCode.trim()) {
+          const { data: inst } = await supabase.from('institutions')
+            .select('id').eq('code', institutionCode.trim().toUpperCase()).eq('active', true).maybeSingle()
+          if (inst) {
+            await supabase.from('institution_users').insert({ institution_id: inst.id, user_id: data.user.id, role: 'student' })
+          }
         }
+
+        // Referral
+        if (ref) {
+          const { data: referrer } = await supabase.from('profiles').select('id').eq('referral_code', ref.toUpperCase()).single()
+          if (referrer && referrer.id !== data.user.id) {
+            await new Promise(r => setTimeout(r, 800))
+            await supabase.from('referrals').insert({ referrer_id: referrer.id, referred_id: data.user.id })
+          }
+        }
+
+        setLoading(false)
+        router.push('/quiz')
+
+      } else if (selectedRole === 'parent') {
+        // Veli profili
+        await supabase.from('profiles').upsert({
+          id: data.user.id,
+          name: fullName,
+          language: 'Türkçe',
+          role: 'parent',
+        })
+        setLoading(false)
+        router.push('/parent')
+
+      } else if (selectedRole === 'teacher') {
+        // Öğretmen: profil + başvuru
+        await supabase.from('profiles').upsert({
+          id: data.user.id,
+          name: fullName,
+          language: 'Türkçe',
+          role: 'teacher',
+        })
+        setStep('teacher_info')
+        setLoading(false)
       }
+    }
+  }
 
-      // Referral işle
-      if (ref) {
-        const { data: referrer } = await supabase
-          .from('profiles').select('id').eq('referral_code', ref.toUpperCase()).single()
-        if (referrer && referrer.id !== data.user.id) {
-          await new Promise(r => setTimeout(r, 800))
-          await supabase.from('referrals').insert({ referrer_id: referrer.id, referred_id: data.user.id })
-        }
+  async function handleTeacherApply() {
+    if (!school.trim()) { setError('Okul/Kurum zorunlu.'); return }
+    setError(''); setLoading(true)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setError('Oturum bulunamadi.'); setLoading(false); return }
+
+    let docUrl = ''
+    if (doc) {
+      const ext = doc.name.split('.').pop()
+      const path = `teacher-docs/${user.id}-${Date.now()}.${ext}`
+      const { data: uploadData } = await supabase.storage.from('teacher-documents').upload(path, doc, { upsert: true })
+      if (uploadData) {
+        const { data: urlData } = supabase.storage.from('teacher-documents').getPublicUrl(path)
+        docUrl = urlData.publicUrl
       }
     }
 
+    await supabase.from('teachers').insert({
+      user_id: user.id,
+      name: `${name.trim()} ${surname.trim()}`,
+      email: user.email,
+      school: school.trim(),
+      subject: subject.trim(),
+      phone: phone.trim() || null,
+      document_url: docUrl || null,
+      approved: false,
+    })
+
     setLoading(false)
-    router.push('/quiz')
+    // Öğretmen onay bekliyor — quiz'e git ama panel kısıtlı
+    router.push('/teacher')
   }
 
-  async function handleOAuth(provider: 'google' | 'apple') {
-    setOauthLoading(provider)
-    await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback${ref ? `?ref=${ref}` : ''}` },
-    })
+  // ── ADIM 1: Rol Seçimi ──
+  if (step === 'role') {
+    return (
+      <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
+        <div style={{ width: '100%', maxWidth: '440px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }} className="anim-up">
+            <Link href="/" style={{ textDecoration: 'none', display: 'inline-block' }}>
+              <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '64px', width: 'auto' }} />
+            </Link>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)', marginTop: '12px' }}>
+              Hesap oluştur
+            </h1>
+            <p style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '4px' }}>
+              Kimsin? Sana uygun deneyim hazırlayalım.
+            </p>
+          </div>
+
+          {referrerName && (
+            <div style={{ marginBottom: '1rem', padding: '10px 14px', background: 'var(--accent-bg)', borderRadius: '10px', fontSize: '13px', color: 'var(--accent)', textAlign: 'center', fontWeight: 600 }}>
+              🎁 {referrerName} seni davet etti!
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.5rem' }} className="anim-up-1">
+            {ROLES.map(role => (
+              <button key={role.key} onClick={() => { setSelectedRole(role.key as any); setStep('info') }}
+                style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 20px', borderRadius: '16px', border: `1.5px solid ${role.border}`, background: role.bg, cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s', textAlign: 'left' }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)' }}
+                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}>
+                <div style={{ width: 48, height: 48, borderRadius: '14px', background: role.bg, border: `1.5px solid ${role.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>
+                  {role.icon}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: '15px', color: role.color }}>{role.title}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>{role.desc}</div>
+                </div>
+                <span style={{ color: role.color, fontSize: '20px', opacity: 0.5 }}>›</span>
+              </button>
+            ))}
+          </div>
+
+          <div style={{ textAlign: 'center', fontSize: '13px', color: 'var(--text3)' }} className="anim-up-2">
+            Zaten hesabın var mı?{' '}
+            <Link href="/login" style={{ color: 'var(--accent)', fontWeight: 600 }}>Giriş yap</Link>
+          </div>
+        </div>
+      </main>
+    )
   }
+
+  // ── ADIM 2: Öğretmen başvuru bilgileri (kayıt sonrası) ──
+  if (step === 'teacher_info') {
+    return (
+      <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
+        <div style={{ width: '100%', maxWidth: '440px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }} className="anim-up">
+            <div style={{ fontSize: '40px', marginBottom: '8px' }}>🎓</div>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>Öğretmen Bilgileri</h1>
+            <p style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '4px' }}>Admin onayından sonra panele erişebilirsiniz</p>
+          </div>
+
+          <div className="card anim-up-1">
+            <label className="field-label">Okul / Kurum *</label>
+            <input className="input" placeholder="Ankara Anadolu Lisesi"
+              value={school} onChange={e => setSchool(e.target.value)} />
+
+            <label className="field-label">Branş</label>
+            <input className="input" placeholder="Matematik, Fizik..."
+              value={subject} onChange={e => setSubject(e.target.value)} />
+
+            <label className="field-label">Telefon (Opsiyonel)</label>
+            <input className="input" type="tel" placeholder="05xx xxx xx xx"
+              value={phone} onChange={e => setPhone(e.target.value)} />
+
+            <label className="field-label">Belge Yükle (Opsiyonel)</label>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '9px 16px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', fontSize: '13px', cursor: 'pointer', color: 'var(--text2)', fontFamily: 'var(--font-sans)', marginBottom: '4px' }}>
+              📎 {doc ? doc.name : 'Belge seç (PDF, JPG)'}
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: 'none' }}
+                onChange={e => setDoc(e.target.files?.[0] || null)} />
+            </label>
+            <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '1rem' }}>Öğretmenlik belgesi, diploma vb.</div>
+
+            {error && <div style={{ padding: '10px 12px', background: 'var(--red-bg)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)', marginBottom: '10px' }}>{error}</div>}
+
+            <button className="btn btn-primary" onClick={handleTeacherApply} disabled={loading}
+              style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}>
+              {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Başvuruyu Gönder →'}
+            </button>
+
+            <button onClick={() => router.push('/teacher')} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--text3)', marginTop: '8px', fontFamily: 'var(--font-sans)', textAlign: 'center' }}>
+              Daha sonra tamamla →
+            </button>
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  // ── ADIM 2: Kayıt Formu (Öğrenci / Veli / Öğretmen) ──
+  const roleInfo = ROLES.find(r => r.key === selectedRole)!
 
   return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
       <div style={{ width: '100%', maxWidth: '440px' }}>
 
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }} className="anim-up">
-          <Link href="/" style={{ textDecoration: 'none', display: 'inline-block' }}>
-            <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '64px', width: 'auto' }} />
-          </Link>
+          <button onClick={() => setStep('role')} style={{ fontSize: '13px', color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', display: 'block', margin: '0 auto 12px' }}>← Geri</button>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', borderRadius: '999px', background: roleInfo.bg, border: `1px solid ${roleInfo.border}`, fontSize: '13px', fontWeight: 700, color: roleInfo.color, marginBottom: '8px' }}>
+            {roleInfo.icon} {roleInfo.title} Kaydı
+          </div>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>Hesap Oluştur</h1>
         </div>
 
-        {ref && (
-          <div className="anim-up" style={{ marginBottom: '1rem', padding: '12px 16px', borderRadius: '12px', background: 'var(--green-bg)', border: '1px solid rgba(22,163,74,0.25)', textAlign: 'center' }}>
-            <div style={{ fontSize: '18px', marginBottom: '4px' }}>🎁</div>
-            <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--green)' }}>
-              {referrerName ? `${referrerName} seni davet etti!` : 'Davet linki ile kayıt oluyorsun'}
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--text2)', marginTop: '2px' }}>Kayıt olunca arkadaşın ödül kazanır.</div>
-          </div>
-        )}
-
         <div className="card anim-up-1">
-          <h1 className="serif" style={{ fontSize: '22px', marginBottom: '0.25rem' }}>Hesap oluştur</h1>
-          <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1.25rem' }}>Sana özel testler seni bekliyor.</p>
-
-          {/* Google OAuth */}
-          <button className="btn" onClick={() => handleOAuth('google')} disabled={!!oauthLoading}
-            style={{ width: '100%', justifyContent: 'center', gap: '10px', fontWeight: 500, marginBottom: '12px' }}>
-            {oauthLoading === 'google'
-              ? <span className="spinner" style={{ width: 18, height: 18 }} />
-              : <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>}
-            Google ile hızlı kayıt
+          {/* Google ile kayıt */}
+          <button className="btn" onClick={handleOAuth} disabled={oauthLoading}
+            style={{ width: '100%', justifyContent: 'center', gap: '10px', fontWeight: 500, marginBottom: '0.5rem' }}>
+            {oauthLoading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : (
+              <svg width="18" height="18" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+            )}
+            Google ile kayıt ol
           </button>
+          <div className="divider">veya e-posta ile</div>
 
-          <div className="divider">veya bilgileri doldur</div>
-
-          {/* Zorunlu alanlar */}
+          {/* Ad / Soyad */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <div>
-              <label className="field-label">Ad <span style={{ color: 'var(--red)' }}>*</span></label>
-              <input className="input" placeholder="Deniz" value={name} onChange={e => setName(e.target.value)} />
+              <label className="field-label">Ad *</label>
+              <input className="input" placeholder="Ahmet" value={name} onChange={e => setName(e.target.value)} />
             </div>
             <div>
-              <label className="field-label">Soyad <span style={{ color: 'var(--red)' }}>*</span></label>
-              <input className="input" placeholder="Yılmaz" value={surname} onChange={e => setSurname(e.target.value)} />
+              <label className="field-label">Soyad *</label>
+              <input className="input" placeholder="Yilmaz" value={surname} onChange={e => setSurname(e.target.value)} />
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '4px' }}>
-            <div>
-              <label className="field-label">Yaş <span style={{ color: 'var(--red)' }}>*</span></label>
-              <input className="input" type="number" placeholder="16" min={5} max={35} value={age} onChange={e => setAge(e.target.value)} />
-            </div>
-            <div>
-              <label className="field-label">Sınıf <span style={{ color: 'var(--red)' }}>*</span></label>
-              <select className="input" value={grade} onChange={e => setGrade(e.target.value)}>
-                <option value="">Seç</option>
-                {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <label className="field-label" style={{ marginTop: '4px' }}>E-posta <span style={{ color: 'var(--red)' }}>*</span></label>
-          <input className="input" type="email" placeholder="ornek@mail.com" value={email} onChange={e => setEmail(e.target.value)} />
-
-          <label className="field-label">Şifre <span style={{ color: 'var(--red)' }}>*</span></label>
-          <input className="input" type="password" placeholder="En az 6 karakter" value={pass} onChange={e => setPass(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleRegister()} />
-
-          {/* Kurum kodu (opsiyonel) */}
-          <div style={{ marginBottom: '1rem', padding: '12px 14px', borderRadius: '12px', background: 'rgba(217,119,6,0.04)', border: '1.5px solid rgba(217,119,6,0.15)' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#d97706', marginBottom: '6px' }}>🏛️ Kurum Kodu (Opsiyonel)</div>
-            <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px', lineHeight: 1.5 }}>
-              Okulunuz veya kurumunuz Pratium ile anlasmali ise size verilen kodu girin.
-            </div>
-            <input className="input" placeholder="8 haneli kurum kodu (ornek: ABC12345)"
-              value={institutionCode}
-              onChange={async e => {
-                const val = e.target.value.toUpperCase()
-                setInstitutionCode(val)
-                if (val.length === 8) {
-                  const { data: inst } = await supabase.from('institutions').select('name').eq('code', val).eq('active', true).maybeSingle()
-                  setInstitutionName(inst?.name || '')
-                } else {
-                  setInstitutionName('')
-                }
-              }}
-              style={{ marginBottom: institutionName ? '6px' : 0 }}
-            />
-            {institutionName && (
-              <div style={{ fontSize: '12px', color: 'var(--green)', fontWeight: 600 }}>
-                ✓ {institutionName} kurumuna baglanacaksiniz
+          {/* Öğrenci özel alanlar */}
+          {selectedRole === 'student' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div>
+                <label className="field-label">Yaş *</label>
+                <input className="input" type="number" placeholder="16" value={age} onChange={e => setAge(e.target.value)} />
               </div>
-            )}
-          </div>
-
-          {/* Opsiyonel alanlar */}
-          <button onClick={() => setShowOptional(v => !v)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--text2)', marginTop: '10px', padding: '4px 0', fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '11px' }}>{showOptional ? '▲' : '▼'}</span>
-            Opsiyonel bilgiler (telefon, sosyal medya)
-          </button>
-
-          {showOptional && (
-            <div style={{ marginTop: '8px', padding: '12px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
-              <label className="field-label">Telefon</label>
-              <input className="input" type="tel" placeholder="+90 555 000 00 00" value={phone} onChange={e => setPhone(e.target.value)} />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '4px' }}>
-                <div>
-                  <label className="field-label">Instagram</label>
-                  <input className="input" placeholder="@kullanici" value={instagram} onChange={e => setInstagram(e.target.value)} />
-                </div>
-                <div>
-                  <label className="field-label">TikTok</label>
-                  <input className="input" placeholder="@kullanici" value={tiktok} onChange={e => setTiktok(e.target.value)} />
-                </div>
+              <div>
+                <label className="field-label">Sınıf *</label>
+                <select className="input" value={grade} onChange={e => setGrade(e.target.value)}
+                  style={{ cursor: 'pointer' }}>
+                  <option value="">Seç...</option>
+                  {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+                </select>
               </div>
             </div>
           )}
 
+          <label className="field-label">E-posta *</label>
+          <input className="input" type="email" placeholder="ornek@mail.com"
+            value={email} onChange={e => setEmail(e.target.value)} />
+
+          <label className="field-label">Şifre *</label>
+          <input className="input" type="password" placeholder="En az 6 karakter"
+            value={pass} onChange={e => setPass(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleRegister()} />
+
+          {/* Kurum kodu - sadece öğrenci */}
+          {selectedRole === 'student' && (
+            <div style={{ marginBottom: '0.75rem', padding: '12px 14px', borderRadius: '12px', background: 'rgba(217,119,6,0.04)', border: '1.5px solid rgba(217,119,6,0.15)' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: '#d97706', marginBottom: '6px' }}>🏛️ Kurum Kodu (Opsiyonel)</div>
+              <input className="input" placeholder="8 haneli kurum kodu"
+                value={institutionCode}
+                onChange={async e => {
+                  const val = e.target.value.toUpperCase()
+                  setInstitutionCode(val)
+                  if (val.length === 8) {
+                    const { data: inst } = await supabase.from('institutions').select('name').eq('code', val).eq('active', true).maybeSingle()
+                    setInstitutionName(inst?.name || '')
+                  } else setInstitutionName('')
+                }}
+              />
+              {institutionName && <div style={{ fontSize: '12px', color: 'var(--green)', fontWeight: 600, marginTop: '4px' }}>✓ {institutionName} kurumuna baglaniyor</div>}
+            </div>
+          )}
+
+          {/* KVKK */}
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', marginBottom: '1rem' }}>
+            <input type="checkbox" checked={kvkk} onChange={e => setKvkk(e.target.checked)}
+              style={{ marginTop: '2px', flexShrink: 0, width: 16, height: 16, accentColor: 'var(--accent)' }} />
+            <span style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.5 }}>
+              <Link href="/privacy" style={{ color: 'var(--accent)', fontWeight: 600 }}>Gizlilik Politikasi</Link> ve{' '}
+              <Link href="/terms" style={{ color: 'var(--accent)', fontWeight: 600 }}>KVKK Metni</Link>'ni okudum, kabul ediyorum.
+            </span>
+          </label>
+
           {error && (
-            <div style={{ marginTop: '10px', padding: '10px 12px', background: 'var(--red-bg)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)' }}>
+            <div style={{ marginBottom: '12px', padding: '10px 12px', background: 'var(--red-bg)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)', lineHeight: 1.5 }}>
               {error}
             </div>
           )}
 
-          {/* KVKK Onay */}
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginTop: '1rem', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={kvkk}
-              onChange={e => setKvkk(e.target.checked)}
-              style={{ marginTop: '2px', accentColor: 'var(--accent)', width: '16px', height: '16px', flexShrink: 0, cursor: 'pointer' }}
-            />
-            <span style={{ fontSize: '12px', color: 'var(--text2)', lineHeight: 1.6 }}>
-              <a href="/privacy" target="_blank" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>Gizlilik Politikası</a>'nı ve{' '}
-              <a href="/privacy" target="_blank" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>KVKK Aydınlatma Metni</a>'ni okudum, kişisel verilerimin işlenmesine açık rıza veriyorum.
-            </span>
-          </label>
-
           <button className="btn btn-primary" onClick={handleRegister} disabled={loading || !kvkk}
-            style={{ width: '100%', justifyContent: 'center', marginTop: '0.75rem', opacity: kvkk ? 1 : 0.6 }}>
-            {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Hesap oluştur →'}
+            style={{ width: '100%', justifyContent: 'center', background: selectedRole === 'teacher' ? 'linear-gradient(135deg, #7c3aed, #5b21b6)' : selectedRole === 'parent' ? 'linear-gradient(135deg, #1ECFB8, #0a9e90)' : undefined }}>
+            {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : (
+              selectedRole === 'teacher' ? 'Hesap Oluştur → Başvuruya Devam Et' :
+              selectedRole === 'parent' ? 'Veli Hesabı Oluştur →' :
+              'Öğrenci Hesabı Oluştur →'
+            )}
           </button>
 
-          <div className="divider">veya</div>
-          <Link href={`/login${ref ? `?ref=${ref}` : ''}`} className="btn" style={{ width: '100%', justifyContent: 'center' }}>
-            Zaten hesabım var
-          </Link>
+          <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '13px', color: 'var(--text3)' }}>
+            Zaten hesabın var mı?{' '}
+            <Link href="/login" style={{ color: 'var(--accent)', fontWeight: 600 }}>Giriş yap</Link>
+          </div>
         </div>
-
-
       </div>
     </main>
   )
 }
 
 export default function RegisterPage() {
-  return <Suspense fallback={<div />}><RegisterContent /></Suspense>
+  return (
+    <Suspense fallback={<main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></main>}>
+      <RegisterContent />
+    </Suspense>
+  )
 }
