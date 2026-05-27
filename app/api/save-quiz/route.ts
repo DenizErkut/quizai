@@ -47,7 +47,6 @@ export async function POST(req: NextRequest) {
         user_id: userId, current_streak: 1, longest_streak: 1,
         total_points: 10, last_activity_date: today,
       }, { onConflict: 'user_id' })
-')
     } else {
       const yesterday = new Date()
       yesterday.setDate(yesterday.getDate() - 1)
