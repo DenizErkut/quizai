@@ -40,6 +40,7 @@ export default function Navbar() {
   const [showLang, setShowLang] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [isDark, setIsDark] = useState(false)
   const supabase = createClient() as any
 
   useEffect(() => {
@@ -69,6 +70,22 @@ export default function Navbar() {
   }, [pathname])
 
   useEffect(() => { setShowMenu(false); setShowLang(false) }, [pathname])
+
+  useEffect(() => {
+    // Dark mode başlangıç durumu
+    const stored = localStorage.getItem('pratium-theme')
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    const dark = stored === 'dark' || (!stored && prefersDark)
+    setIsDark(dark)
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
+  }, [])
+
+  function toggleDark() {
+    const next = !isDark
+    setIsDark(next)
+    document.documentElement.setAttribute('data-theme', next ? 'dark' : 'light')
+    localStorage.setItem('pratium-theme', next ? 'dark' : 'light')
+  }
 
   async function saveLang(lang: string) {
     setShowLang(false)
@@ -127,6 +144,15 @@ export default function Navbar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
 
           {/* Bildirim çanı */}
+          {/* Dark mode toggle */}
+          <button onClick={toggleDark}
+            title={isDark ? 'Aydınlık mod' : 'Karanlık mod'}
+            style={{ width: 38, height: 38, borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '16px', flexShrink: 0, transition: 'all 0.2s' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}>
+            {isDark ? '☀️' : '🌙'}
+          </button>
+
           <a href="/notifications" onClick={() => setUnreadCount(0)} style={{
             position: 'relative', width: 34, height: 34, borderRadius: '8px',
             background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)',
@@ -279,7 +305,16 @@ export default function Navbar() {
             )}
 
             {/* Bildirim çanı */}
-            <a href="/notifications" onClick={() => setUnreadCount(0)} style={{
+            {/* Dark mode toggle */}
+          <button onClick={toggleDark}
+            title={isDark ? 'Aydınlık mod' : 'Karanlık mod'}
+            style={{ width: 38, height: 38, borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '16px', flexShrink: 0, transition: 'all 0.2s' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}>
+            {isDark ? '☀️' : '🌙'}
+          </button>
+
+          <a href="/notifications" onClick={() => setUnreadCount(0)} style={{
               position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: 36, height: 36, borderRadius: '8px',
               background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',

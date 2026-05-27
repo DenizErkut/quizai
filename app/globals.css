@@ -54,6 +54,42 @@
   --radius-pill:   999px;
 }
 
+/* ─── Dark Mode ─── */
+[data-theme="dark"] {
+  --primary:       #e2e8f0;
+  --accent:        #1ECFB8;
+  --accent-2:      #fdd31d;
+  --accent-bg:     rgba(30,207,184,0.12);
+  --accent-2-bg:   rgba(253,211,29,0.10);
+  --primary-bg:    rgba(226,232,240,0.08);
+
+  --bg:            #0f1623;
+  --bg2:           #161e2e;
+  --bg3:           #1a2540;
+  --bg-colored:    #1a2540;
+  --bg-yellow:     #1f1a0a;
+
+  --text:          #e2e8f0;
+  --text2:         #94a3b8;
+  --text3:         #64748b;
+  --text4:         #475569;
+
+  --border:        #1e2d45;
+  --border2:       #243352;
+
+  --green:         #4ade80;
+  --green-bg:      rgba(74,222,128,0.08);
+  --red:           #f87171;
+  --red-bg:        rgba(248,113,113,0.08);
+  --amber:         #fbbf24;
+  --amber-bg:      rgba(251,191,36,0.08);
+
+  --shadow-sm:     0 1px 4px rgba(0,0,0,0.3);
+  --shadow:        0 4px 24px rgba(0,0,0,0.4);
+  --shadow-lg:     0 8px 48px rgba(0,0,0,0.5);
+  --shadow-accent: 0 8px 32px rgba(30,207,184,0.15);
+}
+
 /* ─── Reset ─── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body {
