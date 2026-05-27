@@ -84,7 +84,7 @@ export default function ProfileEditPage() {
 
   async function uploadAvatar(file: File) {
     if (!file || file.size > 2 * 1024 * 1024) {
-      alert('Dosya 2MB'den küçük olmalı.')
+      alert('Dosya 2MB den kucuk olmali.')
       return
     }
     setAvatarUploading(true)
