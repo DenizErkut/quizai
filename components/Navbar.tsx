@@ -28,6 +28,7 @@ const MENU_ITEMS = [
   { label: '💎 Planlar', href: '/pricing' },
   { label: '🎁 Davet et & kazan', href: '/referral' },
   { label: '🎓 Öğretmen paneli', href: '/teacher' },
+  { label: '👨‍👩‍👧 Veli paneli', href: '/parent' },
   { label: '🔑 Şifremi değiştir', href: '/auth/reset-password' },
 ]
 

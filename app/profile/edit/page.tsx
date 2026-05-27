@@ -47,6 +47,7 @@ export default function ProfileEditPage() {
   const [lang, setLang] = useState('Türkçe')
   const [plan, setPlan] = useState('free')
   const [referralCode, setReferralCode] = useState('')
+  const [parentCode, setParentCode] = useState('')
   const [copied, setCopied] = useState(false)
   const [email, setEmail] = useState('')
 
@@ -71,6 +72,7 @@ export default function ProfileEditPage() {
         setLang(data.language || 'Türkçe')
         setPlan(data.plan || 'free')
         setReferralCode(data.referral_code || '')
+        setParentCode(data.parent_code || '')
       }
       setLoading(false)
     }
@@ -225,6 +227,27 @@ export default function ProfileEditPage() {
             </Link>
           </div>
         </div>
+
+        {/* Veli bağlantısı */}
+        {parentCode && (
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>
+              👨‍👩‍👧 Veli Bağlantısı
+            </div>
+            <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px', lineHeight: 1.6 }}>
+              Velinize bu kodu verin — Veli Panelinden performansınızı takip edebilirler.
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', background: 'var(--bg2)', border: '1.5px solid var(--border)', fontSize: '16px', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--primary)', fontFamily: 'monospace' }}>
+                {parentCode}
+              </div>
+              <button onClick={() => navigator.clipboard.writeText(parentCode)}
+                style={{ padding: '10px 14px', borderRadius: '10px', background: '#082465', color: '#fff', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                Kopyala
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Referral */}
         {referralCode && (
