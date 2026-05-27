@@ -121,6 +121,7 @@ function QuizPageContent() {
     const asgCount = searchParams.get('count')
     const asgDiff = searchParams.get('difficulty')
     const asgType = searchParams.get('type')
+    const retrySession = searchParams.get('retry_session')
 
     if (asgId && asgTopic) {
       setAssignmentId(asgId)
@@ -128,6 +129,13 @@ function QuizPageContent() {
       if (asgCount) setQCount(parseInt(asgCount))
       if (asgDiff) setDifficulty(asgDiff)
       if (asgType) setQuestionType(asgType as QuestionType)
+    }
+
+    // Arşivden "Yanlışlarımı tekrar çöz" — topic + count otomatik doldur
+    if (retrySession && asgTopic) {
+      setCustomTopic(decodeURIComponent(asgTopic))
+      if (asgCount) setQCount(parseInt(asgCount))
+      if (asgDiff) setDifficulty(asgDiff)
     }
   }, [searchParams])
 

@@ -11,6 +11,7 @@ export default function SessionDetailPage() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const router = useRouter()
+  let wrongQuestions: any[] = []
   const supabase = createClient() as any
 
   useEffect(() => {
@@ -37,6 +38,21 @@ export default function SessionDetailPage() {
     }
     load()
   }, [id])
+
+  // Yanlış soruları quiz'e gönder
+  async function retryWrong() {
+    if (!session || wrongQuestions.length === 0) return
+    // Quiz sayfasına retry parametresiyle yönlendir
+    const params = new URLSearchParams({
+      topic: session.topic,
+      grade: session.grade || '',
+      count: String(wrongQuestions.length),
+      difficulty: session.difficulty || 'normal',
+      lang: session.language || 'Türkçe',
+      retry_session: session.id,
+    })
+    router.push(`/quiz?${params.toString()}`)
+  }
 
   if (loading) return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
@@ -99,6 +115,9 @@ export default function SessionDetailPage() {
           </div>
         </div>
 
+        {/* Yanlış soruları hesapla */}
+        {(() => { wrongQuestions = questions.filter((_, i) => !getCorrect(i)); return null })()}
+
         {questions.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div>
@@ -155,13 +174,32 @@ export default function SessionDetailPage() {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '10px', marginTop: '2rem' }}>
-          <Link href="/quiz" className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
-            ⚡ Yeni Test
+        {/* Tekrar çalış butonları */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '2rem' }}>
+          {/* Aynı konudan yeni test */}
+          <Link
+            href={`/quiz?topic=${encodeURIComponent(session.topic)}&grade=${session.grade}&count=${session.question_count}&difficulty=${session.difficulty || 'normal'}&lang=${session.language || 'Türkçe'}`}
+            className="btn btn-primary" style={{ justifyContent: 'center' }}>
+            🔄 Bu Konudan Tekrar Çöz
           </Link>
-          <Link href="/archive" className="btn" style={{ flex: 1, justifyContent: 'center' }}>
-            ← Arşive dön
-          </Link>
+
+          {/* Sadece yanlışları tekrar çöz */}
+          {wrongQuestions.length > 0 && (
+            <button
+              onClick={retryWrong}
+              className="btn" style={{ justifyContent: 'center', borderColor: 'var(--red)', color: 'var(--red)' }}>
+              ❌ Sadece Yanlışlarımı Tekrar Çöz ({wrongQuestions.length} soru)
+            </button>
+          )}
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <Link href="/quiz" className="btn" style={{ flex: 1, justifyContent: 'center' }}>
+              ⚡ Yeni Test
+            </Link>
+            <Link href="/archive" className="btn" style={{ flex: 1, justifyContent: 'center' }}>
+              ← Arşive dön
+            </Link>
+          </div>
         </div>
       </div>
     </main>
