@@ -120,12 +120,15 @@ export default function AdminPage() {
     setPendingCount((reports || []).filter((r: ErrorReport) => r.status === 'pending').length)
 
     // Öğretmen başvurularını çek
-    const { data: teacherData } = await supabase
-      .from('teachers')
-      .select('*')
-      .order('created_at', { ascending: false })
-    setTeachers(teacherData || [])
-    setPendingTeachers((teacherData || []).filter((t: Teacher) => !t.approved).length)
+    // service_role ile tüm öğretmenleri çek (RLS bypass)
+    const { data: { session } } = await supabase.auth.getSession()
+    const teachersRes = await fetch('/api/admin/teachers', {
+      headers: { 'Authorization': `Bearer ${session?.access_token}` }
+    })
+    const teachersJson = await teachersRes.json()
+    const teacherData = teachersJson.teachers || []
+    setTeachers(teacherData)
+    setPendingTeachers(teacherData.filter((t: Teacher) => !t.approved).length)
 
     setLoading(false)
   }
