@@ -189,19 +189,41 @@ export default function AdminPage() {
 
   async function approveTeacher(teacherId: string) {
     setTeacherUpdating(teacherId)
-    await supabase.from('teachers').update({ approved: true }).eq('id', teacherId)
-    setTeachers(prev => prev.map(t => t.id === teacherId ? { ...t, approved: true } : t))
-    setPendingTeachers(prev => Math.max(0, prev - 1))
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin/approve-teacher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ teacher_id: teacherId, action: 'approve' }),
+      })
+      if (res.ok) {
+        setTeachers(prev => prev.map(t => t.id === teacherId ? { ...t, approved: true } : t))
+        setPendingTeachers(prev => Math.max(0, prev - 1))
+      }
+    } catch (e) {
+      alert('Hata oluştu')
+    }
     setTeacherUpdating(null)
   }
 
   async function deleteTeacher(teacherId: string) {
-    if (!confirm('Bu başvuruyu silmek istediğine emin misin?')) return
+    if (!confirm('Bu başvuruyu reddetmek istediğine emin misin? Öğretmene bildirim emaili gönderilecek.')) return
     setTeacherUpdating(teacherId)
-    const target = teachers.find(t => t.id === teacherId)
-    await supabase.from('teachers').delete().eq('id', teacherId)
-    setTeachers(prev => prev.filter(t => t.id !== teacherId))
-    if (target && !target.approved) setPendingTeachers(prev => Math.max(0, prev - 1))
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin/approve-teacher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ teacher_id: teacherId, action: 'reject' }),
+      })
+      if (res.ok) {
+        const target = teachers.find(t => t.id === teacherId)
+        setTeachers(prev => prev.filter(t => t.id !== teacherId))
+        if (target && !target.approved) setPendingTeachers(prev => Math.max(0, prev - 1))
+      }
+    } catch (e) {
+      alert('Hata oluştu')
+    }
     setTeacherUpdating(null)
   }
 
