@@ -48,7 +48,7 @@ export default function Navbar() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const [{ data: p }, { data: s }] = await Promise.all([
-        supabase.from('profiles').select('name,plan,monthly_test_count,language,referral_code').eq('id', user.id).maybeSingle(),
+        supabase.from('profiles').select('name,plan,monthly_test_count,language,referral_code,avatar_url').eq('id', user.id).maybeSingle(),
         supabase.from('streaks').select('current_streak').eq('user_id', user.id).maybeSingle(),
       ])
       if (p) {
@@ -198,8 +198,12 @@ export default function Navbar() {
           {/* Avatar */}
           <div style={{ position: 'relative' }}>
             <button onClick={() => { setShowMenu(v => !v); setShowLang(false) }}
-              style={{ width: 34, height: 34, borderRadius: '50%', background: '#fdd31d', border: 'none', color: '#082465', fontWeight: 800, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}>
-              {profile.name?.slice(0, 2).toUpperCase()}
+              style={{ width: 34, height: 34, borderRadius: '50%', background: '#fdd31d', border: 'none', color: '#082465', fontWeight: 800, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit', overflow: 'hidden', padding: 0 }}>
+              {profile.avatar_url ? (
+                <img src={profile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                profile.name?.slice(0, 2).toUpperCase()
+              )}
             </button>
 
             {showMenu && (

@@ -48,6 +48,8 @@ export default function ProfileEditPage() {
   const [plan, setPlan] = useState('free')
   const [referralCode, setReferralCode] = useState('')
   const [parentCode, setParentCode] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState('')
+  const [avatarUploading, setAvatarUploading] = useState(false)
   const [copied, setCopied] = useState(false)
   const [email, setEmail] = useState('')
 
@@ -73,11 +75,35 @@ export default function ProfileEditPage() {
         setPlan(data.plan || 'free')
         setReferralCode(data.referral_code || '')
         setParentCode(data.parent_code || '')
+        setAvatarUrl(data.avatar_url || '')
       }
       setLoading(false)
     }
     load()
   }, [])
+
+  async function uploadAvatar(file: File) {
+    if (!file || file.size > 2 * 1024 * 1024) {
+      alert('Dosya 2MB'den küçük olmalı.')
+      return
+    }
+    setAvatarUploading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const ext = file.name.split('.').pop()
+    const path = `${user.id}/avatar.${ext}`
+
+    const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
+    if (error) { alert('Yükleme hatası: ' + error.message); setAvatarUploading(false); return }
+
+    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
+    const url = publicUrl + '?t=' + Date.now() // cache bust
+
+    await supabase.from('profiles').update({ avatar_url: url }).eq('id', user.id)
+    setAvatarUrl(url)
+    setAvatarUploading(false)
+  }
 
   async function handleSave() {
     if (!name.trim() || !grade) { setError('Ad ve sınıf zorunlu.'); return }
@@ -137,6 +163,47 @@ export default function ProfileEditPage() {
         <div className="card anim-up-1" style={{ marginBottom: '1rem' }}>
           <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '1rem' }}>
             Kişisel bilgiler
+          </div>
+
+          {/* Avatar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '1.5rem', paddingBottom: '1.5rem', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Avatar"
+                  style={{ width: 76, height: 76, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--border)' }} />
+              ) : (
+                <div style={{ width: 76, height: 76, borderRadius: '50%', background: 'linear-gradient(135deg, #082465, #1ECFB8)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '26px', border: '3px solid var(--border)' }}>
+                  {name?.slice(0, 2).toUpperCase() || '?'}
+                </div>
+              )}
+              {avatarUploading && (
+                <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div className="spinner" style={{ width: 20, height: 20 }} />
+                </div>
+              )}
+            </div>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary)', marginBottom: '4px' }}>Profil Fotoğrafı</div>
+              <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>JPG, PNG · Maks. 2MB</div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '8px', background: 'var(--bg2)', border: '1.5px solid var(--border)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', color: 'var(--text2)' }}>
+                  📷 {avatarUrl ? 'Değiştir' : 'Yükle'}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadAvatar(f) }} />
+                </label>
+                {avatarUrl && (
+                  <button onClick={async () => {
+                    const { data: { user } } = await supabase.auth.getUser()
+                    if (!user) return
+                    await supabase.storage.from('avatars').remove([`${user.id}/avatar.jpg`, `${user.id}/avatar.png`, `${user.id}/avatar.webp`])
+                    await supabase.from('profiles').update({ avatar_url: null }).eq('id', user.id)
+                    setAvatarUrl('')
+                  }} style={{ fontSize: '12px', color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 500 }}>
+                    Kaldır
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           <label className="field-label">Ad soyad</label>
