@@ -70,9 +70,20 @@ function RegisterTeacherContent() {
     if (!school.trim()) { setError('Okul/Kurum zorunlu.'); return }
     setError(''); setLoading(true)
 
-    const { data: { user } } = await supabase.auth.getUser()
-    const uid = user?.id || userId
-    if (!uid) { setError('Oturum bulunamadi.'); setLoading(false); return }
+    // userId state'inden, yoksa session'dan, yoksa getUser'dan al
+    let uid = userId
+    let userEmail = email
+    if (!uid) {
+      const { data: sessionData } = await supabase.auth.getSession()
+      uid = sessionData?.session?.user?.id || ''
+      userEmail = sessionData?.session?.user?.email || email
+    }
+    if (!uid) {
+      const { data: { user } } = await supabase.auth.getUser()
+      uid = user?.id || ''
+      userEmail = user?.email || email
+    }
+    if (!uid) { setError('Oturum bulunamadi. Lutfen once hesap olusturun.'); setLoading(false); return }
 
     let docUrl = ''
     if (doc) {
@@ -88,7 +99,7 @@ function RegisterTeacherContent() {
     const { error: insertErr } = await supabase.from('teachers').insert({
       user_id: uid,
       name: name.trim(),
-      email: user?.email || email,
+      email: userEmail,
       school: school.trim(),
       subject: subject.trim(),
       phone: phone.trim() || null,
