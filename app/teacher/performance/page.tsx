@@ -26,6 +26,7 @@ export default function TeacherPerformancePage() {
   // Seçili ödev detayı (assignment view'da expand)
   const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null)
   const [rankTab, setRankTab] = useState<'general' | 'assignments' | 'streak'>('general')
+  const [pdfLoading, setPdfLoading] = useState(false)
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null) // assignment içinde öğrenci detayı
   const router = useRouter()
   const supabase = createClient() as any
@@ -139,6 +140,181 @@ export default function TeacherPerformancePage() {
     setStatsLoading(false)
   }
 
+  async function exportPDF() {
+    if (!selectedClass || studentStats.length === 0) return
+    setPdfLoading(true)
+    try {
+      const { jsPDF } = await import('jspdf')
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const pageW = 210
+      const margin = 15
+      const contentW = pageW - margin * 2
+      let y = 20
+
+      const classroom = classrooms.find(c => c.id === selectedClass)
+      const now = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
+
+      // Başlık
+      doc.setFillColor(8, 36, 101)
+      doc.rect(0, 0, pageW, 32, 'F')
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(18)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Pratium - Sinif Performans Raporu', margin, 14)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`${classroom?.name || 'Sinif'} | ${now}`, margin, 24)
+      y = 42
+
+      // Özet istatistikler
+      doc.setTextColor(8, 36, 101)
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Genel Ozet', margin, y)
+      y += 8
+
+      const totalStudents = studentStats.length
+      const activeStudents = studentStats.filter(s => s.totalTests > 0).length
+      const avgPctAll = studentStats.filter(s => s.avgPct !== null).length > 0
+        ? Math.round(studentStats.filter(s => s.avgPct !== null).reduce((a, s) => a + (s.avgPct || 0), 0) / studentStats.filter(s => s.avgPct !== null).length)
+        : 0
+
+      const summaryData = [
+        ['Toplam Ogrenci', String(totalStudents)],
+        ['Aktif Ogrenci (test cozdu)', String(activeStudents)],
+        ['Sinif Ortalamasi', avgPctAll ? `%${avgPctAll}` : '-'],
+        ['Toplam Odev', String(assignments.length)],
+      ]
+
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(50, 50, 50)
+      summaryData.forEach(([label, value]) => {
+        doc.setFillColor(248, 250, 252)
+        doc.rect(margin, y - 4, contentW, 8, 'F')
+        doc.setTextColor(80, 80, 80)
+        doc.text(label, margin + 3, y + 1)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(8, 36, 101)
+        doc.text(value, margin + contentW - 3, y + 1, { align: 'right' })
+        doc.setFont('helvetica', 'normal')
+        y += 9
+      })
+      y += 8
+
+      // Öğrenci tablosu
+      doc.setTextColor(8, 36, 101)
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Ogrenci Detaylari', margin, y)
+      y += 8
+
+      // Tablo başlığı
+      doc.setFillColor(8, 36, 101)
+      doc.rect(margin, y - 4, contentW, 8, 'F')
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(9)
+      doc.text('Ad', margin + 3, y + 1)
+      doc.text('Test', margin + 70, y + 1)
+      doc.text('Ortalama', margin + 95, y + 1)
+      doc.text('Odev', margin + 125, y + 1)
+      doc.text('Odev Ort.', margin + 148, y + 1)
+      y += 10
+
+      // Öğrenci satırları
+      studentStats
+        .sort((a, b) => (b.avgPct ?? -1) - (a.avgPct ?? -1))
+        .forEach((s, idx) => {
+          if (y > 270) {
+            doc.addPage()
+            y = 20
+          }
+          const rowBg = idx % 2 === 0 ? [248, 250, 252] : [255, 255, 255]
+          doc.setFillColor(...(rowBg as [number, number, number]))
+          doc.rect(margin, y - 4, contentW, 8, 'F')
+          doc.setTextColor(50, 50, 50)
+          doc.setFont('helvetica', 'normal')
+          doc.setFontSize(9)
+
+          const name = s.name.length > 22 ? s.name.slice(0, 22) + '...' : s.name
+          doc.text(name, margin + 3, y + 1)
+          doc.text(String(s.totalTests), margin + 70, y + 1)
+
+          // Ortalama rengi
+          if (s.avgPct !== null) {
+            const pctColor = s.avgPct >= 70 ? [22, 163, 74] : s.avgPct >= 50 ? [245, 158, 11] : [220, 38, 38]
+            doc.setTextColor(...(pctColor as [number, number, number]))
+            doc.setFont('helvetica', 'bold')
+            doc.text(`%${s.avgPct}`, margin + 95, y + 1)
+            doc.setFont('helvetica', 'normal')
+            doc.setTextColor(50, 50, 50)
+          } else {
+            doc.text('-', margin + 95, y + 1)
+          }
+
+          doc.text(String(s.assignmentsDone), margin + 125, y + 1)
+          if (s.assignmentAvg !== null) {
+            const aColor = s.assignmentAvg >= 70 ? [22, 163, 74] : s.assignmentAvg >= 50 ? [245, 158, 11] : [220, 38, 38]
+            doc.setTextColor(...(aColor as [number, number, number]))
+            doc.setFont('helvetica', 'bold')
+            doc.text(`%${s.assignmentAvg}`, margin + 148, y + 1)
+            doc.setFont('helvetica', 'normal')
+            doc.setTextColor(50, 50, 50)
+          } else {
+            doc.text('-', margin + 148, y + 1)
+          }
+          y += 9
+        })
+
+      // Ödev özeti sayfası
+      if (assignments.length > 0) {
+        doc.addPage()
+        y = 20
+        doc.setTextColor(8, 36, 101)
+        doc.setFontSize(14)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Odev Ozeti', margin, y)
+        y += 10
+
+        assignments.forEach(a => {
+          if (y > 260) { doc.addPage(); y = 20 }
+          doc.setFillColor(240, 249, 255)
+          doc.rect(margin, y - 4, contentW, 10, 'F')
+          doc.setTextColor(8, 36, 101)
+          doc.setFontSize(10)
+          doc.setFont('helvetica', 'bold')
+          const title = a.title.length > 35 ? a.title.slice(0, 35) + '...' : a.title
+          doc.text(title, margin + 3, y + 2)
+          doc.setFont('helvetica', 'normal')
+          doc.setTextColor(80, 80, 80)
+          doc.text(`${a.completedCount}/${a.totalStudents} tamamladi`, margin + contentW - 3, y + 2, { align: 'right' })
+          y += 12
+
+          doc.setFontSize(9)
+          doc.setTextColor(100, 100, 100)
+          doc.text(`Konu: ${a.topic} | Zorluk: ${a.difficulty} | ${a.question_count} soru${a.avgScore !== null ? ` | Sinif ort: %${a.avgScore}` : ''}`, margin + 3, y)
+          y += 8
+        })
+      }
+
+      // Footer
+      const pageCount = doc.getNumberOfPages()
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i)
+        doc.setFontSize(8)
+        doc.setTextColor(150, 150, 150)
+        doc.text(`Pratium | pratium.com | Sayfa ${i}/${pageCount}`, pageW / 2, 290, { align: 'center' })
+      }
+
+      const fileName = `pratium-rapor-${classroom?.name?.replace(/\s/g, '-') || 'sinif'}-${new Date().toISOString().split('T')[0]}.pdf`
+      doc.save(fileName)
+    } catch (e) {
+      console.error('PDF export error:', e)
+      alert('PDF olusturulamadi, lutfen tekrar deneyin.')
+    }
+    setPdfLoading(false)
+  }
+
   async function selectClass(cls: any) {
     setSelectedClass(cls.id)
     setView('overview')
@@ -211,9 +387,15 @@ export default function TeacherPerformancePage() {
       <div style={{ maxWidth: '900px', margin: '0 auto' }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.5rem' }}>
-          <Link href="/teacher" style={{ color: 'var(--text3)', fontSize: '13px', textDecoration: 'none' }}>← Panel</Link>
-          <h1 style={{ fontSize: '20px', fontWeight: 700 }}>📊 Performans</h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Link href="/teacher" style={{ color: 'var(--text3)', fontSize: '13px', textDecoration: 'none' }}>← Panel</Link>
+            <h1 style={{ fontSize: '20px', fontWeight: 700 }}>📊 Performans</h1>
+          </div>
+          <button onClick={exportPDF} disabled={pdfLoading || statsLoading || studentStats.length === 0}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '10px', background: pdfLoading ? 'var(--bg2)' : '#082465', color: pdfLoading ? 'var(--text3)' : '#fff', border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', opacity: (pdfLoading || studentStats.length === 0) ? 0.6 : 1, transition: 'all 0.15s' }}>
+            {pdfLoading ? '⏳ Hazırlanıyor...' : '📄 PDF Rapor İndir'}
+          </button>
         </div>
 
         {/* Sınıf sekmeleri */}
