@@ -40,8 +40,9 @@ const CURRICULUM_KEYWORDS = [
   'turkce','dil','cumle','paragraf','yazim','noktalama','edeb','siir','roman',
   'kelime','anlam','ses','hece','sozcuk','metin','hikaye','masal','destan',
   // Havacılık / Mesleki
-  'ucak','motor','yakit','pist','kokpit','kanat','inis','kalkis','navigasyon',
-  'meteoroloji','havacilik','pervane','irtifa','radar','basinc',
+  'ucak','ucagin','kanat','govde','motor','yakit','pist','kokpit','inis','kalkis','navigasyon',
+  'meteoroloji','havacilik','pervane','irtifa','radar','basinc','flap','aileron','rudder',
+  'hidrolik','pnomatik','aviyonik','yer etkisi','kaldirma kuvveti','suruklenme','itki',
   // İngilizce konu adları (dosya yüklemelerinde gelebilir)
   'cell','organelle','photosynthesis','respiration','atom','molecule','force',
   'energy','history','geography','math','algebra','geometry','biology','chemistry','physics',
@@ -52,9 +53,11 @@ const CURRICULUM_KEYWORDS = [
 ]
 
 function isInCurriculum(topic: string, plan: string): boolean {
-  if (plan === 'unlimited') return true
+  // Premium ve Unlimited her konuya erişebilir
+  if (plan === 'premium' || plan === 'unlimited') return true
   const norm = normalizeTR(topic)
-  return CURRICULUM_KEYWORDS.some(kw => norm.includes(kw))
+  // Kelime köküyle eşleştir (ucagin → ucak gibi)
+  return CURRICULUM_KEYWORDS.some(kw => norm.includes(kw) || kw.includes(norm.split(' ')[0]))
 }
 
 function buildPrompt(type: string, topic: string, grade: string, difficulty: string, language: string, count: number, fileContent?: string): string {
