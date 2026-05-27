@@ -20,6 +20,7 @@ export default function DailyPage() {
   const [answers, setAnswers] = useState<{ userAns: number; correct: boolean }[]>([])
   const [chosen, setChosen] = useState<number | null>(null)
   const [alreadyDone, setAlreadyDone] = useState(false)
+  const [dailyQuestionType, setDailyQuestionType] = useState('multiple_choice')
   const supabase = createClient() as any
 
   useEffect(() => { loadData() }, [])
@@ -97,6 +98,7 @@ export default function DailyPage() {
     // Günün gününe göre soru tipi rotate (Pzt=çoktan seçmeli, Sal=boşluk, Çar=D/Y ...)
     const DAILY_TYPES = ['multiple_choice', 'fill_blank', 'true_false', 'matching', 'ordering', 'multiple_choice', 'mixed']
     const dailyQuestionType = DAILY_TYPES[new Date().getDay()]
+    setDailyQuestionType(dailyQuestionType)
 
     const res = await fetch('/api/generate-quiz', {
       method: 'POST',
