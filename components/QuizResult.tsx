@@ -82,14 +82,136 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
     finalPct >= 60 ? 'Fena değil, pratik yaparsan harika olur.' :
     'Tekrar çalışmak isteyebilirsin.'
 
-  function shareResult() {
-    const text = `Pratium'da "${topic}" konusunda ${finalPct}% başarı elde ettim! 🎯 Sen de dene: https://pratium.com`
-    if (navigator.share) {
-      navigator.share({ title: 'Pratium Test Sonucu', text, url: 'https://pratium.com' }).catch(() => {})
-    } else {
-      navigator.clipboard.writeText(text)
-      alert('Sonuç panoya kopyalandı!')
+  const [sharing, setSharing] = useState(false)
+
+  async function generateShareCard(): Promise<Blob | null> {
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = 1080
+      canvas.height = 1080
+      const ctx = canvas.getContext('2d')!
+
+      // Arka plan gradient
+      const grad = ctx.createLinearGradient(0, 0, 1080, 1080)
+      grad.addColorStop(0, '#082465')
+      grad.addColorStop(1, '#0d3d8c')
+      ctx.fillStyle = grad
+      ctx.fillRect(0, 0, 1080, 1080)
+
+      // Pratium logo metni
+      ctx.fillStyle = '#1ECFB8'
+      ctx.font = 'bold 52px Arial'
+      ctx.fillText('pratium', 80, 100)
+      ctx.fillStyle = 'rgba(255,255,255,0.4)'
+      ctx.font = '24px Arial'
+      ctx.fillText('Ogren. Test Et. Gelis.', 80, 138)
+
+      // Dekoratif daire
+      ctx.beginPath()
+      ctx.arc(1080, 0, 350, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(30,207,184,0.08)'
+      ctx.fill()
+      ctx.beginPath()
+      ctx.arc(0, 1080, 280, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(30,207,184,0.06)'
+      ctx.fill()
+
+      // Skor büyük
+      const scoreColor = finalPct >= 80 ? '#1ECFB8' : finalPct >= 60 ? '#FDD31D' : '#ef4444'
+      ctx.fillStyle = scoreColor
+      ctx.font = 'bold 260px Arial'
+      ctx.textAlign = 'center'
+      ctx.fillText(`%${finalPct}`, 540, 560)
+
+      // Skor alt yazı
+      ctx.fillStyle = 'rgba(255,255,255,0.7)'
+      ctx.font = '36px Arial'
+      ctx.fillText(`${finalScore} / ${questions.length} soru dogru`, 540, 630)
+
+      // Konu
+      ctx.fillStyle = '#ffffff'
+      ctx.font = 'bold 48px Arial'
+      const topicText = topic.length > 28 ? topic.slice(0, 28) + '...' : topic
+      ctx.fillText(topicText, 540, 730)
+
+      // Mesaj
+      const msg = finalPct === 100 ? 'Mukemmel!' : finalPct >= 80 ? 'Harika!' : finalPct >= 60 ? 'Iyi is!' : 'Devam et!'
+      ctx.fillStyle = scoreColor
+      ctx.font = 'bold 56px Arial'
+      ctx.fillText(msg, 540, 820)
+
+      // Alt çizgi
+      ctx.strokeStyle = 'rgba(30,207,184,0.4)'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.moveTo(80, 900)
+      ctx.lineTo(1000, 900)
+      ctx.stroke()
+
+      // Davet metni
+      ctx.fillStyle = 'rgba(255,255,255,0.6)'
+      ctx.font = '30px Arial'
+      ctx.fillText('Sen de dene → pratium.com', 540, 960)
+
+      ctx.textAlign = 'left'
+
+      return new Promise(resolve => {
+        canvas.toBlob(blob => resolve(blob), 'image/png', 0.95)
+      })
+    } catch {
+      return null
     }
+  }
+
+  async function shareResult() {
+    setSharing(true)
+    const text = `Pratium'da "${topic}" konusunda %${finalPct} başarı elde ettim! 🎯 Sen de dene: https://pratium.com`
+
+    try {
+      const blob = await generateShareCard()
+
+      // Web Share API ile görsel paylaş (mobil destekler)
+      if (blob && navigator.share && navigator.canShare?.({ files: [new File([blob], 'pratium-skor.png', { type: 'image/png' })] })) {
+        await navigator.share({
+          title: 'Pratium Test Sonucu',
+          text,
+          files: [new File([blob], 'pratium-skor.png', { type: 'image/png' })],
+        })
+      } else if (blob) {
+        // Mobil desteklemiyorsa → görseli indir + metni kopyala
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `pratium-skor-${topic.slice(0, 15)}.png`
+        a.click()
+        URL.revokeObjectURL(url)
+        await navigator.clipboard.writeText(text).catch(() => {})
+        alert('Kart indirildi! Metni panoya kopyaladık, görselle birlikte paylaşabilirsin.')
+      } else {
+        // Canvas başarısız → sadece metin
+        if (navigator.share) {
+          await navigator.share({ title: 'Pratium Test Sonucu', text, url: 'https://pratium.com' })
+        } else {
+          await navigator.clipboard.writeText(text)
+          alert('Sonuç panoya kopyalandı!')
+        }
+      }
+    } catch {
+      // Kullanıcı iptal etti
+    }
+    setSharing(false)
+  }
+
+  // WhatsApp paylaş
+  function shareWhatsApp() {
+    const text = encodeURIComponent(`Pratium'da "${topic}" konusunda %${finalPct} başarı elde ettim! 🎯 Sen de dene: https://pratium.com`)
+    window.open(`https://wa.me/?text=${text}`, '_blank')
+  }
+
+  // Twitter/X paylaş
+  function shareTwitter() {
+    const text = encodeURIComponent(`Pratium'da "${topic}" konusunda %${finalPct} aldım! 🎯 #Pratium #Eğitim`)
+    window.open(`https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent('https://pratium.com')}`, '_blank')
   }
 
   async function reportError(idx: number) {
@@ -234,9 +356,13 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
           )}
         </div>
         <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-          <button className="btn" onClick={shareResult}
-            style={{ flex: 1, justifyContent: 'center', color: 'var(--accent)', borderColor: 'rgba(0,149,200,0.3)' }}>
-            🔗 Sonucu paylaş
+          <button className="btn" onClick={shareResult} disabled={sharing}
+            style={{ flex: 1, justifyContent: 'center', color: 'var(--accent)', borderColor: 'rgba(0,149,200,0.3)', opacity: sharing ? 0.6 : 1 }}>
+            {sharing ? '⏳ Hazırlanıyor...' : '🖼️ Kart Paylaş'}
+          </button>
+          <button className="btn" onClick={shareWhatsApp}
+            style={{ justifyContent: 'center', color: '#25D366', borderColor: 'rgba(37,211,102,0.3)', background: 'rgba(37,211,102,0.06)' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
           </button>
           <Link href="/dashboard" className="btn" style={{ flex: 1, justifyContent: 'center' }}>Dashboard</Link>
           <button className="btn" onClick={exportPDF} style={{ justifyContent: 'center', color: 'var(--text2)' }}>
