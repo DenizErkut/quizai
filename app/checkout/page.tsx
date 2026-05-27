@@ -9,7 +9,9 @@ const PLANS = {
     name: 'Aylık Premium',
     price: '79',
     period: 'ay',
-    features: ['Sınırsız test', '20 soru/test', '5 dil', 'Dosya yükleme', 'Görsel sorular', 'Öncelikli destek'],
+    badge: '',
+    color: '#2563eb',
+    features: ['Günde 25 test', '20 soru/test', 'Tüm soru tipleri', 'Dosya yükleme', '6 dil', 'Öncelikli destek'],
   },
   yearly: {
     name: 'Yıllık Premium',
@@ -17,14 +19,24 @@ const PLANS = {
     originalPrice: '948',
     period: 'yıl',
     saving: '%37 tasarruf',
-    features: ['Sınırsız test', '20 soru/test', '5 dil', 'Dosya yükleme', 'Görsel sorular', 'Öncelikli destek', '4 ay bedava'],
+    badge: '🏆 En popüler',
+    color: '#2563eb',
+    features: ['Günde 25 test', '20 soru/test', 'Tüm soru tipleri', 'Dosya yükleme', '6 dil', 'Öncelikli destek', '4 ay bedava'],
+  },
+  unlimited: {
+    name: 'Yıllık Unlimited',
+    price: '6.000',
+    period: 'yıl',
+    badge: '👑 Tüm özellikler',
+    color: '#0d9488',
+    features: ['Sınırsız günlük test', '20 soru/test', 'Tüm soru tipleri', 'Gelişmiş analiz', 'Sınırsız sınıf', '12× birebir koç', 'Telefon desteği'],
   },
 }
 
 function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly')
+  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly' | 'unlimited'>('yearly')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [formHtml, setFormHtml] = useState('')
@@ -37,8 +49,8 @@ function CheckoutContent() {
   useEffect(() => {
     // URL'den plan al
     const planParam = searchParams.get('plan')
-    if (planParam === 'monthly' || planParam === 'yearly') {
-      setSelectedPlan(planParam)
+    if (planParam === 'monthly' || planParam === 'yearly' || planParam === 'unlimited') {
+      setSelectedPlan(planParam as any)
     }
   }, [])
 

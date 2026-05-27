@@ -5,7 +5,7 @@ import crypto from 'crypto'
 const IYZICO_API_KEY = process.env.IYZICO_API_KEY!
 const IYZICO_SECRET_KEY = process.env.IYZICO_SECRET_KEY!
 const IYZICO_BASE_URL = process.env.IYZICO_BASE_URL!
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://quizai-coral.vercel.app'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://pratium.com'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,9 +21,10 @@ function generateAuthHeader(body: string): string {
   return 'IYZWSv2 ' + Buffer.from(authString).toString('base64')
 }
 
-const PLAN_MONTHS: Record<string, number> = {
-  monthly: 1,
-  yearly: 12,
+const PLAN_META: Record<string, { months: number; plan: string }> = {
+  monthly:   { months: 1,  plan: 'premium'   },
+  yearly:    { months: 12, plan: 'premium'   },
+  unlimited: { months: 12, plan: 'unlimited' },
 }
 
 export async function POST(req: NextRequest) {
@@ -61,18 +62,29 @@ export async function POST(req: NextRequest) {
     const conversationId = result.conversationId as string
     const parts = conversationId.split('_')
     const userId = parts[0]
-    const planType = parts[1] as 'monthly' | 'yearly'
-    const months = PLAN_MONTHS[planType] || 1
+    const planType = parts[1] as 'monthly' | 'yearly' | 'unlimited'
+    const meta = PLAN_META[planType] || { months: 1, plan: 'premium' }
 
-    // Premium aktive et
+    // Plan aktive et (premium veya unlimited)
     const expiresAt = new Date()
-    expiresAt.setMonth(expiresAt.getMonth() + months)
+    expiresAt.setMonth(expiresAt.getMonth() + meta.months)
 
     await supabaseAdmin.from('profiles').update({
-      plan: 'premium',
+      plan: meta.plan,
       plan_expires_at: expiresAt.toISOString(),
       monthly_test_count: 0,
+      daily_test_count: 0,
     }).eq('id', userId)
+
+    // Aktivasyon bildirimi gönder
+    await supabaseAdmin.from('notifications').insert({
+      user_id: userId,
+      type: 'system',
+      title: meta.plan === 'unlimited' ? '👑 Unlimited aktif!' : '⭐ Premium aktif!',
+      body: `${meta.plan === 'unlimited' ? 'Unlimited' : 'Premium'} planın başarıyla aktive edildi. İyi çalışmalar!`,
+      read: false,
+      data: { href: '/pricing' },
+    })
 
     // Subscription güncelle
     await supabaseAdmin.from('subscriptions').update({

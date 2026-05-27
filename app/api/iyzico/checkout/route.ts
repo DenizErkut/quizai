@@ -5,7 +5,7 @@ import crypto from 'crypto'
 const IYZICO_API_KEY = process.env.IYZICO_API_KEY!
 const IYZICO_SECRET_KEY = process.env.IYZICO_SECRET_KEY!
 const IYZICO_BASE_URL = process.env.IYZICO_BASE_URL!
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://quizai-coral.vercel.app'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://pratium.com'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,8 +23,9 @@ function generateAuthHeader(body: string): string {
 }
 
 const PLANS = {
-  monthly: { price: '79.0', name: 'QuizAI Premium - Aylık', months: 1 },
-  yearly:  { price: '599.0', name: 'QuizAI Premium - Yıllık', months: 12 },
+  monthly:   { price: '79.0',    name: 'Pratium Premium - Aylık',    months: 1,  plan: 'premium'   },
+  yearly:    { price: '599.0',   name: 'Pratium Premium - Yıllık',   months: 12, plan: 'premium'   },
+  unlimited: { price: '6000.0',  name: 'Pratium Unlimited - Yıllık', months: 12, plan: 'unlimited' },
 }
 
 export async function POST(req: NextRequest) {
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
     .single()
 
   const body = await req.json()
-  const planType = body.plan as 'monthly' | 'yearly'
+  const planType = body.plan as 'monthly' | 'yearly' | 'unlimited'
   const plan = PLANS[planType]
   if (!plan) return NextResponse.json({ error: 'Geçersiz plan.' }, { status: 400 })
 
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest) {
     },
     basketItems: [
       {
-        id: `quizai_${planType}`,
+        id: `pratium_${planType}`,
         name: plan.name,
         category1: 'Dijital Ürün',
         itemType: 'VIRTUAL',
