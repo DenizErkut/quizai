@@ -4,7 +4,6 @@ import { createClient } from '@supabase/supabase-js'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-.slice(0, 200))
 
     const { sessionId, answers, score, userId } = body
 
@@ -32,12 +31,12 @@ export async function POST(req: NextRequest) {
       ? Math.round((score / session.question_count) * 100) : 0
 
     // Mark completed
-    const { error: updateErr } = await supabase
+    await supabase
       .from('quiz_sessions')
       .update({ answers, score, pct, completed: true })
       .eq('id', sessionId)
 
-    // Streak — upsert ile güncelle (insert veya update, tek seferde)
+    // Streak güncelle
     const today = new Date().toISOString().split('T')[0]
     const { data: existingStreak } = await supabase
       .from('streaks').select('*').eq('user_id', userId).maybeSingle()
@@ -71,19 +70,16 @@ export async function POST(req: NextRequest) {
           last_activity_date: today,
         }
       }
-      const { error: strErr } = await supabase.from('streaks')
+      await supabase.from('streaks')
         .update(updateData).eq('user_id', userId)
     }
 
-    // Weak topics — multi_true_false için ifade bazında say
+    // Weak topics
     let wrongCount = 0
-    let totalCount = answers?.length || 0
+    const totalCount = answers?.length || 0
 
     if (Array.isArray(answers)) {
-      // Tüm cevapları tara, MTF ise ifade sayısını kullan
-      // Not: mTFAnswers body'de gelmiyorsa fallback olarak answer.correct kullan
       wrongCount = answers.filter((a: any) => !a.correct).length
-      totalCount = answers.length
     }
 
     if (wrongCount > 0 && session.topic) {
@@ -103,6 +99,7 @@ export async function POST(req: NextRequest) {
         })
       }
     }
+
     return NextResponse.json({ success: true, pct })
   } catch (error: any) {
     console.error('[save-quiz] ERROR:', error?.message)
