@@ -229,7 +229,22 @@ export async function POST(req: NextRequest) {
       console.error('Previous questions fetch error:', e)
     }
 
-    const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, safeQCount, fileContent) + previousQuestionsNote
+    // Karne notlarından zayıf dersleri çek
+    let gradeContext = ''
+    try {
+      const { data: gradeNotes } = await supabase
+        .from('grade_notes')
+        .select('subject, term1_avg, term2_avg')
+        .eq('user_id', user.id)
+      const weakSubjects = (gradeNotes ?? [])
+        .filter((g: any) => (g.term1_avg ?? 100) < 70 || (g.term2_avg ?? 100) < 70)
+        .map((g: any) => g.subject)
+      if (weakSubjects.length > 0) {
+        gradeContext = `\n\nNOTE: This student has low grades in: ${weakSubjects.join(', ')}. If this topic relates to these subjects, focus on fundamental concepts they might be missing.`
+      }
+    } catch { /* grade_notes tablosu yoksa atla */ }
+
+    const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, safeQCount, (fileContent || '') + gradeContext) + previousQuestionsNote
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5',
