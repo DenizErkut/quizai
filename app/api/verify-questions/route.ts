@@ -92,6 +92,11 @@ export async function POST(req: NextRequest) {
     const { questions, topic, grade, language, questionType } = await req.json()
     if (!questions?.length) return NextResponse.json({ questions: [] })
 
+    // mixed tipte her sorunun kendi type'ı var — ikinci AI doğrulama gerekmiyor
+    if (questionType === 'mixed') {
+      return NextResponse.json({ questions, stats: { original: questions.length, verified: questions.length, rejected: 0, replacements: 0, final: questions.length } })
+    }
+
     const lang = language || 'Türkçe'
     const verified: any[] = []
     const rejected: number[] = []
@@ -153,10 +158,11 @@ export async function POST(req: NextRequest) {
         const replaceType = questionType || 'multiple_choice'
         const replacePrompt = `Generate ${rejected.length} verified ${replaceType} questions about "${topic}" for "${grade}" level in ${lang}.
 
-CRITICAL: Double-check every answer before including it. Only include questions you are 100% certain about.
+CRITICAL: Double-check every answer. Only include questions you are 100% certain about.
+Each question MUST have "type":"${replaceType}" field.
 
 Return ONLY valid JSON:
-{"questions":[{"type":"${replaceType}","q":"...","opts":["A","B","C","D"],"ans":0,"exp":"..."}]}`
+{"questions":[{"type":"${replaceType}","q":"...","opts":["A","B","C","D"],"ans":0,"exp":"step by step solution"}]}`
 
         const replaceRes = await anthropic.messages.create({
           model: 'claude-sonnet-4-20250514',
