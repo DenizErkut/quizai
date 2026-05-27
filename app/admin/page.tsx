@@ -121,9 +121,9 @@ export default function AdminPage() {
 
     // Öğretmen başvurularını çek
     // service_role ile tüm öğretmenleri çek (RLS bypass)
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { session: adminSession } } = await supabase.auth.getSession()
     const teachersRes = await fetch('/api/admin/teachers', {
-      headers: { 'Authorization': `Bearer ${session?.access_token}` }
+      headers: { 'Authorization': `Bearer ${adminSession?.access_token}` }
     })
     const teachersJson = await teachersRes.json()
     const teacherData = teachersJson.teachers || []
