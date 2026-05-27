@@ -1,12 +1,29 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams, Suspense } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export default function RegisterTeacherPage() {
+function RegisterTeacherContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient() as any
+
+  useEffect(() => {
+    // OAuth redirect sonrası session kontrol et
+    async function checkSession() {
+      const stepParam = searchParams.get('step')
+      if (stepParam === 'info') {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          // Profil adını otomatik doldur
+          setName(user.user_metadata?.name || user.user_metadata?.full_name || '')
+          setStep('info')
+        }
+      }
+    }
+    checkSession()
+  }, [])
 
   // Hesap bilgileri
   const [email, setEmail] = useState('')
@@ -213,5 +230,13 @@ export default function RegisterTeacherPage() {
         )}
       </div>
     </main>
+  )
+}
+
+export default function RegisterTeacherPage() {
+  return (
+    <Suspense fallback={<main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></main>}>
+      <RegisterTeacherContent />
+    </Suspense>
   )
 }
