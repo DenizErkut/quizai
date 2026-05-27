@@ -19,6 +19,8 @@ export default function TeacherAssignPage() {
   const [saving, setSaving] = useState(false)
   const [assignFile, setAssignFile] = useState<File | null>(null)
   const [assignFileContent, setAssignFileContent] = useState('')
+  const [fileError, setFileError] = useState('')
+  const [fileLoading, setFileLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({
     classroom_id: '',
@@ -56,14 +58,45 @@ export default function TeacherAssignPage() {
     setLoading(false)
   }
 
+  async function extractFileContent(file: File) {
+    setFileLoading(true)
+    setFileError('')
+    const formData = new FormData()
+    formData.append('file', file)
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/extract-file', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      body: formData,
+    })
+    const data = await res.json()
+    setFileLoading(false)
+
+    if (data.error) {
+      setFileError(data.error)
+      return ''
+    }
+    return data.content || ''
+  }
+
   async function createAssignment() {
     if (!form.classroom_id || !form.title.trim() || !form.topic.trim()) return
     setSaving(true)
+
+    // PDF/dosya içeriği varsa konuya ekle
+    let finalTopic = form.topic.trim()
+    if (assignFile && !assignFileContent) {
+      const extracted = await extractFileContent(assignFile)
+      if (extracted) finalTopic = extracted.slice(0, 3000)
+    } else if (assignFileContent) {
+      finalTopic = assignFileContent.slice(0, 3000)
+    }
+
     const { data } = await supabase.from('assignments').insert({
       classroom_id: form.classroom_id,
       teacher_id: teacher.id,
       title: form.title.trim(),
-      topic: form.topic.trim(),
+      topic: finalTopic,
       grade: form.grade,
       difficulty: form.difficulty,
       question_count: form.question_count,
@@ -122,19 +155,36 @@ export default function TeacherAssignPage() {
                     const file = e.target.files?.[0]
                     if (!file) return
                     setAssignFile(file)
-                    // Read file content for text files
+                    setFileError('')
+                    if (!form.topic) setForm(p => ({ ...p, topic: file.name.replace(/\.[^.]+$/, '') }))
                     if (file.type.includes('text') || file.name.endsWith('.txt')) {
                       const text = await file.text()
                       setAssignFileContent(text.slice(0, 3000))
-                      if (!form.topic) setForm(p => ({ ...p, topic: file.name.replace(/\.[^.]+$/, '') }))
                     } else {
                       setAssignFileContent('')
-                      if (!form.topic) setForm(p => ({ ...p, topic: file.name.replace(/\.[^.]+$/, '') }))
                     }
                   }}
                   style={{ fontSize: '12px', color: 'var(--text)', width: '100%' }} />
-                {assignFile && (
+                {fileLoading && (
+                  <p style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>⏳ Dosya okunuyor...</p>
+                )}
+                {assignFile && !fileLoading && !fileError && (
                   <p style={{ fontSize: '11px', color: 'var(--green)', marginTop: '4px' }}>✓ {assignFile.name}</p>
+                )}
+                {fileError && (
+                  <div style={{ marginTop: '8px', background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '10px', padding: '12px' }}>
+                    <div style={{ fontWeight: 700, color: 'var(--red)', fontSize: '12px', marginBottom: '6px' }}>⚠️ PDF Yüklenemedi</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.6, marginBottom: '8px' }}>
+                      Çözüm önerileri:<br/>
+                      • PDF'i Word'e çevir → tekrar yükle<br/>
+                      • Büyük PDF'i 50 sayfalık parçalara böl<br/>
+                      • Metni kopyalayıp Konu alanına yapıştır
+                    </div>
+                    <a href="https://bigconvert.11zon.com/" target="_blank" rel="noopener noreferrer"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 12px', borderRadius: '7px', background: '#082465', color: '#fff', fontSize: '11px', fontWeight: 700, textDecoration: 'none' }}>
+                      🔄 Ücretsiz PDF Dönüştür / Küçült →
+                    </a>
+                  </div>
                 )}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
