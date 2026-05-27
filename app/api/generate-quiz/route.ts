@@ -271,7 +271,6 @@ export async function POST(req: NextRequest) {
           const verifyData = await verifyRes.json()
           if (verifyData.questions?.length > 0) {
             questions = verifyData.questions
-            console.log('Math verification stats:', verifyData.stats)
           }
         }
       } catch (e) {
@@ -302,14 +301,11 @@ export async function POST(req: NextRequest) {
         questions,
         answers: [],
         score: 0,
-        pct: 0,
         completed: false,
         question_type: questionType,
       })
       .select('id')
       .maybeSingle()
-
-    console.log('[generate-quiz] session insert:', sessionRow?.id, 'err:', sessionInsertErr)
     return NextResponse.json({ questions, sessionId: sessionRow?.id })
   } catch (error) {
     console.error('Generate quiz error:', error)
