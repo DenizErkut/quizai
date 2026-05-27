@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
-interface Question { q: string; opts: string[]; ans: number; exp: string }
+interface Question { q: string; opts?: string[]; ans: number; exp?: string; type?: string; pairs?: {left: string; right: string}[]; items?: string[]; blank?: string; statements?: {text: string; correct: boolean}[] }
 interface Streak { current_streak: number; longest_streak: number; total_points: number; last_activity_date: string | null }
 interface Challenge { id: string; date: string; topic: string; subject: string; questions: Question[] }
 
