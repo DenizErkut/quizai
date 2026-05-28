@@ -110,6 +110,7 @@ export default function Navbar() {
 
   if (!profile) return null
   if (pathname?.startsWith('/institution')) return null
+  if (pathname?.startsWith('/teacher')) return null
   const HIDDEN = ['/login', '/register', '/profile', '/']
   if (HIDDEN.includes(pathname)) return null
 
