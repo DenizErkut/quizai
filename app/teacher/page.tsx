@@ -10,8 +10,13 @@ export default function TeacherDashboard() {
   const [assignments, setAssignments] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'students' | 'assign' | 'performance'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'students' | 'assign' | 'performance' | 'notify'>('dashboard')
   const [selectedClass, setSelectedClass] = useState<string>('all')
+  const [notifyClass, setNotifyClass] = useState<string>('')
+  const [notifyMsg, setNotifyMsg] = useState('')
+  const [notifySending, setNotifySending] = useState(false)
+  const [notifyResult, setNotifyResult] = useState('')
+  const [notifyHistory, setNotifyHistory] = useState<any[]>([])
   const router = useRouter()
   const supabase = createClient() as any
 
@@ -84,6 +89,18 @@ export default function TeacherDashboard() {
       }))
       setStudents(studentData)
     }
+    // Bildirim geçmişi
+    if (t?.id) {
+      const { data: hist } = await supabase
+        .from('teacher_notifications')
+        .select('*, classrooms(name)')
+        .eq('teacher_id', t.id)
+        .order('created_at', { ascending: false })
+        .limit(10)
+      setNotifyHistory(hist ?? [])
+      if (cls?.length) setNotifyClass(cls[0]?.id || '')
+    }
+
     setLoading(false)
   }
 
@@ -154,6 +171,7 @@ export default function TeacherDashboard() {
             { key: 'students', label: '👥 Öğrenciler' },
             { key: 'assign', label: '📝 Ödev Ata' },
             { key: 'performance', label: '📈 Analiz' },
+            { key: 'notify', label: '🔔 Bildirim' },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key as any)}
               style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
@@ -407,6 +425,91 @@ export default function TeacherDashboard() {
                 Gelişmiş Performans Raporu →
               </Link>
             </div>
+          </div>
+        )}
+
+        {/* BİLDİRİM */}
+        {activeTab === 'notify' && (
+          <div>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1.5rem' }}>🔔 Bildirim Gönder</h2>
+
+            <div className="card" style={{ marginBottom: '1rem' }}>
+              {/* Hızlı şablonlar */}
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Hızlı Şablonlar</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '1rem' }}>
+                {[
+                  { label: '📢 Yeni ödev', text: 'Yeni bir ödeviniz var! Pratium'a girerek kontrol edin.' },
+                  { label: '🔥 Streak hatırlatıcı', text: 'Bugün test çözmeyi unutma! Streakini koru 🔥' },
+                  { label: '📊 Sınav yaklaşıyor', text: 'Sınav tarihine az kaldı. Pratium'da pratik yapmaya devam et!' },
+                  { label: '🏆 Tebrik', text: 'Bu haftaki performansın harika! Gurur duyduk.' },
+                ].map((t, i) => (
+                  <button key={i} onClick={() => setNotifyMsg(t.text)}
+                    style={{ padding: '6px 12px', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text2)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 500 }}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Sınıf seç */}
+              <label style={{ fontSize: '12px', color: 'var(--text3)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>Sınıf</label>
+              <select value={notifyClass} onChange={e => setNotifyClass(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', outline: 'none', marginBottom: '12px' }}>
+                <option value="">Tüm sınıflarım</option>
+                {classrooms.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+
+              {/* Mesaj */}
+              <label style={{ fontSize: '12px', color: 'var(--text3)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>Mesaj</label>
+              <textarea value={notifyMsg} onChange={e => setNotifyMsg(e.target.value)}
+                placeholder="Öğrencilerinize göndermek istediğiniz mesajı yazın..."
+                rows={4}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', outline: 'none', resize: 'vertical', lineHeight: 1.6, boxSizing: 'border-box', marginBottom: '12px' }} />
+
+              {notifyResult && (
+                <div style={{ padding: '10px 14px', borderRadius: '10px', background: notifyResult.startsWith('✅') ? 'var(--green-bg)' : 'var(--red-bg)', fontSize: '13px', color: notifyResult.startsWith('✅') ? 'var(--green)' : 'var(--red)', marginBottom: '12px' }}>
+                  {notifyResult}
+                </div>
+              )}
+
+              <button disabled={!notifyMsg.trim() || notifySending} onClick={async () => {
+                setNotifySending(true); setNotifyResult('')
+                try {
+                  const { data: { session: ns } } = await supabase.auth.getSession()
+                  const res = await fetch('/api/teacher/notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ns?.access_token}` },
+                    body: JSON.stringify({ classroom_id: notifyClass || null, message: notifyMsg }),
+                  })
+                  const data = await res.json()
+                  if (data.error) { setNotifyResult(`❌ ${data.error}`); return }
+                  setNotifyResult(`✅ ${data.recipientCount ?? 0} öğrenciye bildirim gönderildi!`)
+                  setNotifyMsg('')
+                  // Geçmişi yenile
+                  const { data: hist } = await supabase.from('teacher_notifications').select('*, classrooms(name)').eq('teacher_id', teacher?.id).order('created_at', { ascending: false }).limit(10)
+                  setNotifyHistory(hist ?? [])
+                } catch { setNotifyResult('❌ Bir hata oluştu.') }
+                setNotifySending(false)
+              }} className="btn btn-primary" style={{ justifyContent: 'center', opacity: (!notifyMsg.trim() || notifySending) ? 0.5 : 1 }}>
+                {notifySending ? '⏳ Gönderiliyor...' : '🔔 Bildirimi Gönder'}
+              </button>
+            </div>
+
+            {/* Geçmiş */}
+            {notifyHistory.length > 0 && (
+              <div className="card">
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>📋 Geçmiş Bildirimler</div>
+                {notifyHistory.map((n: any) => (
+                  <div key={n.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.5 }}>{n.message}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text4)', marginTop: '4px', display: 'flex', gap: '8px' }}>
+                      <span>{n.classrooms?.name || 'Tüm sınıflar'}</span>
+                      <span>·</span>
+                      <span>{new Date(n.created_at).toLocaleDateString('tr-TR')}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
