@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
     if (action === 'to-word') {
       // PDF → Word: pdf-parse ile text çek, docx ile Word yap
-      const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default
+      const pdfParse = (await import('pdf-parse')).default
       const data = await pdfParse(buffer)
 
       if (!data.text?.trim()) {
@@ -96,10 +96,6 @@ export async function POST(req: NextRequest) {
 
     } else if (action === 'compress') {
       // PDF Küçültme: pypdf ile optimize et
-      const { PdfReader, PdfWriter } = await import('pypdf').catch(() => null) ?? {}
-
-      // Node.js'de pypdf yok — sharp ile görsel PDF'leri sıkıştır
-      // Text-based PDF'ler için: gereksiz objeleri kaldır
       const { PDFDocument } = await import('pdf-lib')
 
       const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true })
