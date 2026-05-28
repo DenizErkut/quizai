@@ -25,17 +25,16 @@ export default function InstitutionLoginPage() {
     const { data, error: err } = await supabase.auth.signInWithPassword({ email, password: pass })
     if (err) { setError('E-posta veya sifre hatali.'); setLoading(false); return }
 
-    // Kurum admin mi?
-    const { data: instUser } = await supabase
-      .from('institution_users')
-      .select('institution_id, role, institutions(name)')
-      .eq('user_id', data.user.id)
-      .eq('role', 'admin')
-      .maybeSingle()
+    // Kurum admin mi? — API üzerinden kontrol et (RLS bypass)
+    const { data: { session: instSession } } = await supabase.auth.getSession()
+    const checkRes = await fetch('/api/institution/check-admin', {
+      headers: { 'Authorization': `Bearer ${instSession?.access_token}` }
+    })
+    const checkJson = await checkRes.json()
 
     setLoading(false)
 
-    if (!instUser) {
+    if (!checkJson.isAdmin) {
       await supabase.auth.signOut()
       setError('Bu hesap herhangi bir kurumun yonetici hesabi degil. Kurum girisi icin admin yetkisi gereklidir.')
       return
