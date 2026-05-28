@@ -463,8 +463,13 @@ function QuizPageContent() {
 
   async function next() {
     if (current + 1 >= questions.length) {
-      const lastCorrect = chosen !== null && chosen === questions[current].ans
-      const finalAnswers = chosen !== null && answers.length < questions.length
+      // Son sorunun correct değerini answers array'inden al
+      // answers state async — son eklenen correct field'ını kullan
+      const alreadyAdded = answers.length >= questions.length
+      const lastCorrect = alreadyAdded
+        ? (answers[answers.length - 1]?.correct ?? false)
+        : chosen !== null && chosen === questions[current].ans
+      const finalAnswers = !alreadyAdded && chosen !== null
         ? [...answers, { userAns: chosen, correct: lastCorrect }]
         : answers
       const score = finalAnswers.filter(a => a.correct).length
