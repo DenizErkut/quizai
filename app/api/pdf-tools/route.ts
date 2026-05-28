@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       const docBuffer = await Packer.toBuffer(doc)
       const fileName = file.name.replace('.pdf', '') + '.docx'
 
-      return new NextResponse(docBuffer, {
+      return new NextResponse(new Uint8Array(docBuffer), {
         status: 200,
         headers: {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
 
       const fileName = file.name.replace('.pdf', '') + '-kucuk.pdf'
 
-      return new NextResponse(compressedBytes, {
+      return new NextResponse(new Uint8Array(compressedBytes), {
         status: 200,
         headers: {
           'Content-Type': 'application/pdf',
