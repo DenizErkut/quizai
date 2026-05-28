@@ -389,7 +389,14 @@ export default function ProfileEditPage() {
                   const { data: { user: u } } = await supabase.auth.getUser()
                   const { data: inst } = await supabase.from('institutions').select('id, name').eq('code', instCode).eq('active', true).maybeSingle()
                   if (!inst) { setInstMsg('Geçersiz kurum kodu.'); setInstSaving(false); return }
-                  await supabase.from('institution_users').upsert({ institution_id: inst.id, user_id: u.id, role: 'student' }, { onConflict: 'institution_id,user_id' })
+                  const { error: joinErr } = await supabase
+                    .from('institution_users')
+                    .insert({ institution_id: inst.id, user_id: u.id, role: 'student' })
+                  if (joinErr) {
+                    setInstMsg(`Hata: ${joinErr.message}`)
+                    setInstSaving(false)
+                    return
+                  }
                   setInstName(inst.name)
                   setInstJoined(new Date().toISOString())
                   setInstMsg('✅ Kuruma başarıyla kaydoldunuz!')
