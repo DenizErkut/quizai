@@ -30,8 +30,9 @@ export async function POST(req: NextRequest) {
 
     if (action === 'to-word') {
       // PDF → Word: pdf-parse ile text çek, docx ile Word yap
-      const pdfParse = (await import('pdf-parse')).default
-      const data = await pdfParse(buffer)
+      const pdfParseModule = await import('pdf-parse')
+      const pdfParse = pdfParseModule.default || pdfParseModule
+      const data = await (pdfParse as any)(buffer)
 
       if (!data.text?.trim()) {
         return NextResponse.json({ error: 'pdf_image_only', message: 'Bu PDF taranmış görsel içeriyor, metin çıkarılamadı.' }, { status: 400 })
