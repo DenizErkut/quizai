@@ -49,6 +49,11 @@ export default function ProfileEditPage() {
   const [referralCode, setReferralCode] = useState('')
   const [parentCode, setParentCode] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
+  const [instCode, setInstCode] = useState('')
+  const [instName, setInstName] = useState('')
+  const [instJoined, setInstJoined] = useState('')
+  const [instSaving, setInstSaving] = useState(false)
+  const [instMsg, setInstMsg] = useState('')
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [copied, setCopied] = useState(false)
   const [email, setEmail] = useState('')
@@ -75,6 +80,19 @@ export default function ProfileEditPage() {
         setPlan(data.plan || 'free')
         setReferralCode(data.referral_code || '')
         setParentCode(data.parent_code || '')
+
+        // Mevcut kurum bağlantısı
+        const { data: instUser } = await supabase
+          .from('institution_users')
+          .select('joined_at, institutions(name, code)')
+          .eq('user_id', user.id)
+          .eq('role', 'student')
+          .maybeSingle()
+        if (instUser) {
+          setInstJoined(instUser.joined_at)
+          setInstName((instUser.institutions as any)?.name || '')
+          setInstCode((instUser.institutions as any)?.code || '')
+        }
         setAvatarUrl(data.avatar_url || '')
       }
       setLoading(false)
@@ -317,6 +335,75 @@ export default function ProfileEditPage() {
         )}
 
         {/* Referral */}
+        {/* Kurum Kodu */}
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>
+            🏛️ Kurum Bağlantısı
+          </div>
+          {instName ? (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                <div style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', background: 'var(--bg2)', border: '1.5px solid var(--border)' }}>
+                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)' }}>{instName}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
+                    Kod: <strong style={{ fontFamily: 'monospace', color: 'var(--accent)' }}>{instCode}</strong>
+                    {instJoined && ` · Katılım: ${new Date(instJoined).toLocaleDateString('tr-TR')}`}
+                  </div>
+                </div>
+                <button onClick={async () => {
+                  if (!confirm('Kurumdan ayrılmak istediğinize emin misiniz?')) return
+                  const { data: { user: u } } = await supabase.auth.getUser()
+                  const { data: inst } = await supabase.from('institutions').select('id').eq('code', instCode).maybeSingle()
+                  if (inst) await supabase.from('institution_users').delete().eq('user_id', u.id).eq('institution_id', inst.id)
+                  setInstName(''); setInstCode(''); setInstJoined('')
+                }} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(220,38,38,0.2)', background: 'var(--red-bg)', color: 'var(--red)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>
+                  Ayrıl
+                </button>
+              </div>
+              <p style={{ fontSize: '12px', color: 'var(--green)', margin: 0 }}>✅ Bu kuruma kayıtlısınız.</p>
+            </div>
+          ) : (
+            <div>
+              <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px', lineHeight: 1.6 }}>
+                Okulunuz veya kurumunuz Pratium ile anlaşmalıysa size verilen kodu girin.
+              </p>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  className="input"
+                  placeholder="8 haneli kurum kodu"
+                  value={instCode}
+                  style={{ flex: 1, fontFamily: 'monospace', letterSpacing: '0.08em', textTransform: 'uppercase' }}
+                  onChange={async e => {
+                    const val = e.target.value.toUpperCase()
+                    setInstCode(val)
+                    setInstMsg('')
+                    if (val.length === 8) {
+                      const { data: inst } = await supabase.from('institutions').select('name').eq('code', val).eq('active', true).maybeSingle()
+                      setInstName(inst?.name ? `✓ ${inst.name}` : '')
+                      if (!inst) setInstMsg('Kurum bulunamadı.')
+                    }
+                  }}
+                />
+                <button disabled={instSaving || instCode.length !== 8} onClick={async () => {
+                  setInstSaving(true); setInstMsg('')
+                  const { data: { user: u } } = await supabase.auth.getUser()
+                  const { data: inst } = await supabase.from('institutions').select('id, name').eq('code', instCode).eq('active', true).maybeSingle()
+                  if (!inst) { setInstMsg('Geçersiz kurum kodu.'); setInstSaving(false); return }
+                  await supabase.from('institution_users').upsert({ institution_id: inst.id, user_id: u.id, role: 'student' }, { onConflict: 'institution_id,user_id' })
+                  setInstName(inst.name)
+                  setInstJoined(new Date().toISOString())
+                  setInstMsg('✅ Kuruma başarıyla kaydoldunuz!')
+                  setInstSaving(false)
+                }} style={{ padding: '10px 16px', borderRadius: '10px', background: '#082465', color: '#fff', border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', opacity: instSaving || instCode.length !== 8 ? 0.5 : 1 }}>
+                  {instSaving ? '...' : 'Katıl'}
+                </button>
+              </div>
+              {instName && !instMsg && <div style={{ fontSize: '12px', color: 'var(--green)', marginTop: '6px' }}>{instName}</div>}
+              {instMsg && <div style={{ fontSize: '12px', color: instMsg.startsWith('✅') ? 'var(--green)' : 'var(--red)', marginTop: '6px' }}>{instMsg}</div>}
+            </div>
+          )}
+        </div>
+
         {referralCode && (
           <div className="card anim-up-4" style={{ marginBottom: '1.5rem' }}>
             <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.75rem' }}>
