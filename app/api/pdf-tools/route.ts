@@ -33,22 +33,21 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(bytes)
 
     if (action === 'to-word') {
-      // PDF → Word: pdf-parse/lib ile text çek (Vercel uyumlu), docx ile Word yap
-      // NOT: `import('pdf-parse')` Vercel'de test dosyası arayıp crash eder.
-      // Doğru yol: pdf-parse/lib/pdf-parse.js direkt import
-      const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default
-      const data = await pdfParse(buffer, { max: 0 })
+      // pdf-parse v2: artık class tabanlı API — PDFParse instance oluştur, getText() çağır
+      const { PDFParse } = await import('pdf-parse')
+      const parser = new PDFParse({ data: buffer })
+      const result = await parser.getText({})
 
-      console.log(`[pdf-tools] extracted text length: ${data.text?.length || 0}`)
+      const text = result.text || ''
+      console.log(`[pdf-tools] extracted text length: ${text.length}`)
 
-      if (!data.text?.trim()) {
+      if (!text.trim()) {
         return NextResponse.json({ error: 'pdf_image_only', message: 'Bu PDF taranmış görsel içeriyor, metin çıkarılamadı.' }, { status: 400 })
       }
 
       const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import('docx')
 
-      // Metni paragraflara böl
-      const lines = data.text.split('\n').filter((l: string) => l.trim())
+      const lines = text.split('\n').filter((l: string) => l.trim())
       const children: any[] = []
 
       // Başlık
@@ -68,7 +67,6 @@ export async function POST(req: NextRequest) {
         }
         prevWasEmpty = false
 
-        // Başlık olabilecek kısa satırlar (tamamen büyük harf, 3-80 karakter)
         const isHeading = trimmed.length < 80 && trimmed === trimmed.toUpperCase() && trimmed.length > 3
         if (isHeading) {
           children.push(new Paragraph({
@@ -91,6 +89,9 @@ export async function POST(req: NextRequest) {
       const fileName = file.name.replace('.pdf', '') + '.docx'
 
       console.log(`[pdf-tools] docx created: ${docBuffer.length} bytes`)
+
+      // Parser'ı temizle
+      await parser.destroy()
 
       return new NextResponse(new Uint8Array(docBuffer), {
         status: 200,
