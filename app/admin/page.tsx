@@ -202,9 +202,16 @@ export default function AdminPage() {
     const instRes = await fetch('/api/admin/institutions', {
       headers: { 'Authorization': `Bearer ${adminSession?.access_token}` }
     })
-    const instJson = instRes.ok ? await instRes.json() : { institutions: [], counts: {} }
-    setInstitutions(instJson.institutions || [])
-    setInstStudentCounts(instJson.counts || {})
+    if (instRes.ok) {
+      const instJson = await instRes.json()
+      setInstitutions(instJson.institutions || [])
+      setInstStudentCounts(instJson.counts || {})
+    } else {
+      // Fallback: direkt supabase'den çek
+      const { data: instDirect } = await supabase
+        .from('institutions').select('*').order('created_at', { ascending: false })
+      setInstitutions(instDirect || [])
+    }
 
     setLoading(false)
   }
