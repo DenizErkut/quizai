@@ -23,9 +23,7 @@ export async function POST(req: NextRequest) {
 
   const { data: profile } = await supabaseAdmin
     .from('profiles').select('is_admin').eq('id', user.id).single()
-  if (!profile?.is_admin) {
-    return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
-  }
+  if (!profile?.is_admin) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
 
   const body = await req.json()
   const { name, email, password, code, discount } = body
@@ -44,7 +42,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Bu kurum kodu zaten kullanımda.' }, { status: 400 })
   }
 
-  // 1. Kurum tablosuna ekle (önce, sonra user oluştur)
+  // 1. Auth kullanıcısı oluştur — Supabase Admin API
+  const adminApiUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users`
+  const createUserRes = await fetch(adminApiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
+    },
+    body: JSON.stringify({
+      email: email.trim(),
+      password,
+      email_confirm: true,
+      user_metadata: { name: name.trim(), role: 'institution_admin' },
+    }),
+  })
+
+  const createUserData = await createUserRes.json()
+  const newUserId = createUserData?.id
+
+  if (!newUserId) {
+    return NextResponse.json({
+      error: `Kullanici olusturulamadi: ${createUserData?.msg || createUserData?.message || JSON.stringify(createUserData)}`
+    }, { status: 400 })
+  }
+
+  // 2. Kurum tablosuna ekle
   const { data: inst, error: instErr } = await supabaseAdmin
     .from('institutions')
     .insert({
@@ -58,35 +82,8 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (instErr) {
-    return NextResponse.json({ error: `Kurum kaydı hatası: ${instErr.message}` }, { status: 500 })
+    return NextResponse.json({ error: `Kurum kaydi hatası: ${instErr.message}` }, { status: 500 })
   }
-
-  // 2. Auth kullanıcısı oluştur — service_role ile signUp (email confirm atla)
-  const signUpRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/signup`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
-    },
-    body: JSON.stringify({
-      email: email.trim(),
-      password,
-      data: { name: name.trim(), role: 'institution_admin' },
-    }),
-  })
-
-  const signUpData = await signUpRes.json()
-
-  if (!signUpData.id && !signUpData.user?.id) {
-    // Auth user oluşturulamadı ama kurum kaydedildi — kurumu sil
-    await supabaseAdmin.from('institutions').delete().eq('id', inst.id)
-    return NextResponse.json({
-      error: `Kullanici hesabi olusturulamadi: ${signUpData.msg || signUpData.error_description || JSON.stringify(signUpData)}`
-    }, { status: 400 })
-  }
-
-  const newUserId = signUpData.id || signUpData.user?.id
 
   // 3. Profil oluştur
   await supabaseAdmin.from('profiles').upsert({
@@ -97,15 +94,20 @@ export async function POST(req: NextRequest) {
   })
 
   // 4. institution_users'a admin olarak ekle
-  await supabaseAdmin.from('institution_users').insert({
+  const { error: iuErr } = await supabaseAdmin.from('institution_users').insert({
     institution_id: inst.id,
     user_id: newUserId,
     role: 'admin',
   })
 
+  if (iuErr) {
+    return NextResponse.json({ error: `Kullanici-kurum iliskisi kurulamadi: ${iuErr.message}` }, { status: 500 })
+  }
+
   return NextResponse.json({
     success: true,
     institution: inst,
+    user_id: newUserId,
     message: `"${name}" kurumu olusturuldu. Kod: ${code.toUpperCase()}`,
   })
 }
