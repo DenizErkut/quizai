@@ -9,7 +9,7 @@ export default function InstitutionPage() {
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [activeTab, setActiveTab] = useState<'list' | 'leaderboard'>('list')
+  const [activeTab, setActiveTab] = useState<'list' | 'leaderboard' | 'profile'>('list')
   const router = useRouter()
   const supabase = createClient() as any
 
@@ -73,25 +73,48 @@ export default function InstitutionPage() {
   )
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', padding: '1.5rem', paddingBottom: '5rem' }}>
-      <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      {/* Kurum Navbar — sadece bu sayfada */}
+      <nav style={{ background: '#082465', padding: '0 1.5rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '32px', filter: 'brightness(0) invert(1)' }} />
+          <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.2)' }} />
+          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 500 }}>🏛️ {institution?.name}</span>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {[
+            { key: 'list', label: '👥 Öğrenciler' },
+            { key: 'leaderboard', label: '🏆 Liderlik' },
+            { key: 'profile', label: '⚙️ Profil' },
+          ].map(t => (
+            <button key={t.key} onClick={() => setActiveTab(t.key as any)}
+              style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
+                background: activeTab === t.key ? 'rgba(255,255,255,0.15)' : 'transparent',
+                color: activeTab === t.key ? '#fff' : 'rgba(255,255,255,0.6)',
+              }}>
+              {t.label}
+            </button>
+          ))}
+          <button onClick={() => { supabase.auth.signOut(); router.push('/login') }}
+            style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', marginLeft: '8px' }}>
+            Çıkış
+          </button>
+        </div>
+      </nav>
+
+      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '1.5rem', paddingBottom: '5rem' }}>
 
         {/* Header */}
         <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>🏛️ Kurum Paneli</div>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 800, color: 'var(--primary)' }}>
-              {institution?.name}
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)' }}>
+              {activeTab === 'list' ? '👥 Öğrenci Listesi' : activeTab === 'leaderboard' ? '🏆 Liderlik Tablosu' : '⚙️ Kurum Profili'}
             </h1>
-            <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-              <span>Kod: <strong style={{ fontFamily: 'monospace', letterSpacing: '0.08em', color: 'var(--accent)' }}>{institution?.code}</strong></span>
+            <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px', display: 'flex', gap: '12px' }}>
+              <span>Kod: <strong style={{ fontFamily: 'monospace', color: 'var(--accent)' }}>{institution?.code}</strong></span>
               {institution?.discount_rate > 0 && <span>🏷️ %{institution.discount_rate} indirim</span>}
             </div>
           </div>
-          <button onClick={() => { supabase.auth.signOut(); router.push('/login') }}
-            style={{ padding: '8px 14px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text3)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-            Çıkış Yap
-          </button>
         </div>
 
         {/* Özet kartlar */}
@@ -114,22 +137,7 @@ export default function InstitutionPage() {
           </div>
         )}
 
-        {/* Sekmeler */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem' }}>
-          {[
-            { key: 'list', label: `👥 Öğrenci Listesi (${students.length})` },
-            { key: 'leaderboard', label: `🏆 Liderlik Tablosu` },
-          ].map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key as any)}
-              style={{ padding: '8px 16px', borderRadius: '999px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
-                background: activeTab === t.key ? '#082465' : 'var(--bg2)',
-                borderColor: activeTab === t.key ? '#082465' : 'var(--border)',
-                color: activeTab === t.key ? '#fff' : 'var(--text3)',
-              }}>
-              {t.label}
-            </button>
-          ))}
-        </div>
+
 
         {/* Arama */}
         <div style={{ marginBottom: '1rem' }}>
@@ -216,7 +224,49 @@ export default function InstitutionPage() {
           )
         )}
 
+        {/* Profil sekmesi */}
+        {activeTab === 'profile' && (
+          <div>
+            <div className="card" style={{ marginBottom: '1rem' }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>🏛️ Kurum Bilgileri</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
+                {[
+                  { label: 'Kurum Adı', value: institution?.name },
+                  { label: 'Kurum Kodu', value: institution?.code, mono: true },
+                  { label: 'E-posta', value: institution?.admin_email },
+                  { label: 'İndirim Oranı', value: institution?.discount_rate ? `%${institution.discount_rate}` : 'Yok' },
+                  { label: 'Durum', value: institution?.active ? '✅ Aktif' : '🔴 Pasif' },
+                  { label: 'Kayıt Tarihi', value: institution?.created_at ? new Date(institution.created_at).toLocaleDateString('tr-TR') : '—' },
+                ].map((item, i) => (
+                  <div key={i} style={{ padding: '10px 14px', background: 'var(--bg2)', borderRadius: '10px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '4px', fontWeight: 600 }}>{item.label}</div>
+                    <div style={{ fontWeight: 600, color: 'var(--primary)', fontFamily: (item as any).mono ? 'monospace' : undefined, letterSpacing: (item as any).mono ? '0.08em' : undefined }}>
+                      {item.value || '—'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="card">
+              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>📊 Genel Durum</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                {[
+                  { label: 'Toplam Öğrenci', value: stats?.total ?? 0 },
+                  { label: 'Aktif Öğrenci', value: stats?.active ?? 0 },
+                  { label: 'Genel Ortalama', value: stats?.overallAvg ? `%${stats.overallAvg}` : '—' },
+                ].map((s, i) => (
+                  <div key={i} style={{ textAlign: 'center', padding: '14px', background: 'var(--bg2)', borderRadius: '10px' }}>
+                    <div style={{ fontWeight: 800, fontSize: '22px', color: 'var(--primary)' }}>{s.value}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
-    </main>
+    </div>
   )
 }
