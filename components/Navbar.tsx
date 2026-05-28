@@ -24,6 +24,7 @@ const MENU_ITEMS = [
   { label: '✏️ Profil düzenle', href: '/profile/edit' },
   { label: '📝 Notlarım', href: '/notes' },
   { label: '🗂️ Soru arşivi', href: '/archive' },
+  { label: '🛠️ PDF Araçları', href: '/pdf-tools' },
   { label: '📝 Ödevlerim', href: '/assignments' },
   { label: '💎 Planlar', href: '/pricing' },
   { label: '🎁 Davet et & kazan', href: '/referral' },
@@ -137,6 +138,7 @@ export default function Navbar() {
     { href: '/leaderboard', label: '🏆 Sıralama' },
     { href: '/analysis', label: '📊 Analiz' },
     { href: '/archive', label: '🗂️ Arşiv' },
+    { href: '/pdf-tools', label: '🛠️ PDF' },
     { href: '/classes', label: '🏫 Sınıflarım' },
   ]
 
