@@ -117,8 +117,11 @@ export default function Navbar() {
 
   const isApprovedTeacher = profile?.role === 'teacher' && profile?.teacher_approved
   const isParent = profile?.role === 'parent'
+  const isInstitution = profile?.role === 'institution_admin'
 
-  const NAV_LINKS = isApprovedTeacher ? [
+  const NAV_LINKS = isInstitution ? [
+    { href: '/institution', label: '🏛️ Kurum Paneli' },
+  ] : isApprovedTeacher ? [
     { href: '/teacher',             label: '🏫 Panel' },
     { href: '/teacher/assign',      label: '📝 Ödev Ata' },
     { href: '/teacher/performance', label: '📊 Performans' },
