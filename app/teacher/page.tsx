@@ -438,9 +438,9 @@ export default function TeacherDashboard() {
               <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Hızlı Şablonlar</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '1rem' }}>
                 {[
-                  { label: '📢 Yeni ödev', text: 'Yeni bir ödeviniz var! Pratium'a girerek kontrol edin.' },
+                  { label: "📢 Yeni ödev", text: "Yeni bir ödeviniz var! Pratium'a girerek kontrol edin." },
                   { label: '🔥 Streak hatırlatıcı', text: 'Bugün test çözmeyi unutma! Streakini koru 🔥' },
-                  { label: '📊 Sınav yaklaşıyor', text: 'Sınav tarihine az kaldı. Pratium'da pratik yapmaya devam et!' },
+                  { label: "📊 Sınav yaklaşıyor", text: "Sınav tarihine az kaldi. Pratiumda pratik yapmaya devam et!" },
                   { label: '🏆 Tebrik', text: 'Bu haftaki performansın harika! Gurur duyduk.' },
                 ].map((t, i) => (
                   <button key={i} onClick={() => setNotifyMsg(t.text)}
