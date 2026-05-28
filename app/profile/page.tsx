@@ -28,6 +28,8 @@ export default function ProfileSetupPage() {
   const [surname, setSurname] = useState('')
   const [age, setAge] = useState('')
   const [grade, setGrade] = useState('')
+  const [institutionCode, setInstitutionCode] = useState('')
+  const [institutionName, setInstitutionName] = useState('')
   const [phone, setPhone] = useState('')
   const [instagram, setInstagram] = useState('')
   const [tiktok, setTiktok] = useState('')
@@ -73,6 +75,23 @@ export default function ProfileSetupPage() {
       instagram: instagram || null,
       tiktok: tiktok || null,
     })
+
+    // Kurum kodu işle
+    if (institutionCode.trim()) {
+      const { data: inst } = await supabase
+        .from('institutions')
+        .select('id, name')
+        .eq('code', institutionCode.trim().toUpperCase())
+        .eq('active', true)
+        .maybeSingle()
+      if (inst) {
+        await supabase.from('institution_users').upsert({
+          institution_id: inst.id,
+          user_id: user.id,
+          role: 'student',
+        }, { onConflict: 'institution_id,user_id' })
+      }
+    }
 
     setLoading(false)
     router.push('/quiz')
@@ -141,6 +160,30 @@ export default function ProfileSetupPage() {
                     {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
                   </select>
                 </div>
+              </div>
+
+              {/* Kurum kodu */}
+              <div style={{ marginTop: '10px', padding: '12px 14px', borderRadius: '12px', background: 'rgba(217,119,6,0.04)', border: '1.5px solid rgba(217,119,6,0.15)' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#d97706', marginBottom: '6px' }}>🏛️ Kurum Kodu (Opsiyonel)</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px', lineHeight: 1.5 }}>
+                  Okulunuz Pratium ile anlaşmalıysa size verilen kodu girin.
+                </div>
+                <input className="input" placeholder="8 haneli kurum kodu"
+                  value={institutionCode}
+                  onChange={async e => {
+                    const val = e.target.value.toUpperCase()
+                    setInstitutionCode(val)
+                    if (val.length === 8) {
+                      const { data: inst } = await supabase.from('institutions').select('name').eq('code', val).eq('active', true).maybeSingle()
+                      setInstitutionName(inst?.name || '')
+                    } else setInstitutionName('')
+                  }}
+                />
+                {institutionName && (
+                  <div style={{ fontSize: '12px', color: 'var(--green)', fontWeight: 600, marginTop: '4px' }}>
+                    ✓ {institutionName} kurumuna bağlanıyor
+                  </div>
+                )}
               </div>
 
               {/* Opsiyonel */}
