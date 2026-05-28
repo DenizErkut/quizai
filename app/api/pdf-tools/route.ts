@@ -129,7 +129,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Geçersiz işlem.' }, { status: 400 })
 
   } catch (error: any) {
-    console.error('[pdf-tools] error:', error?.message)
-    return NextResponse.json({ error: error?.message || 'İşlem başarısız.' }, { status: 500 })
+    console.error('[pdf-tools] error:', error?.message, error?.stack)
+    return NextResponse.json({ 
+      error: error?.message || 'İşlem başarısız.',
+      stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
+      detail: String(error)
+    }, { status: 500 })
   }
 }

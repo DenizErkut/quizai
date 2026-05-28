@@ -55,7 +55,7 @@ export default function PdfToolsPage() {
         if (err.error === 'pdf_image_only') {
           setResult({ success: false, message: 'Bu PDF taranmış görsel içeriyor — metin çıkarılamadı. Önce OCR işlemi yapmanız gerekiyor.' })
         } else {
-          setResult({ success: false, message: err.message || err.error || 'İşlem başarısız.' })
+          setResult({ success: false, message: `${err.message || err.error || 'İşlem başarısız.'} ${err.detail ? `(${err.detail})` : ''}` })
         }
         return
       }
