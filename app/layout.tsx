@@ -17,9 +17,26 @@ export const metadata: Metadata = {
     shortcut: '/favicon.ico',
   },
   openGraph: {
-    title: 'Pratium',
-    description: 'AI destekli kişisel test platformu',
-    images: ['/logo-512.png'],
+    title: 'Pratium — Öğren. Test Et. Geliş.',
+    description: 'Yapay zeka destekli soru üretimi, gerçek zamanlı analiz ve kişisel gelişim planı. İlkokuldan üniversiteye 6 dilde eğitim platformu.',
+    url: 'https://pratium.com',
+    siteName: 'Pratium',
+    images: [
+      {
+        url: 'https://pratium.com/pratium-logo.png',
+        width: 1254,
+        height: 1254,
+        alt: 'Pratium — AI Destekli Eğitim Platformu',
+      }
+    ],
+    locale: 'tr_TR',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Pratium — Öğren. Test Et. Geliş.',
+    description: 'AI destekli soru üretimi, gerçek zamanlı analiz. İlkokuldan üniversiteye 6 dilde eğitim platformu.',
+    images: ['https://pratium.com/pratium-logo.png'],
   },
 }
 
