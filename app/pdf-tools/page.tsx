@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 type Tool = 'to-word' | 'compress' | null
@@ -11,22 +12,79 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+// Hata kodlarına göre kullanıcı dostu mesaj
+function friendlyError(err: any): { title: string; detail: string; action?: { label: string; href: string } } {
+  const code = err?.error || ''
+  const msg = err?.message || err?.detail || ''
+
+  if (code === 'pdf_image_only') {
+    return {
+      title: 'Bu PDF metin içermiyor',
+      detail: 'Taranmış (görsel) PDF\'ler desteklenmez. Önce OCR işlemi yapman gerekiyor.',
+      action: { label: 'Ücretsiz OCR yap →', href: 'https://www.ilovepdf.com/ocr-pdf' },
+    }
+  }
+  if (msg.includes('too large') || msg.includes('Content Too Large') || msg.includes('413') || code === 'file_too_large') {
+    return {
+      title: 'Dosya çok büyük',
+      detail: 'Sunucu limiti 4MB. Daha büyük dosyaları ücretsiz araçlarla küçülttükten sonra tekrar dene.',
+      action: { label: 'Online PDF küçült →', href: 'https://bigconvert.11zon.com/' },
+    }
+  }
+  if (msg.includes('Yetkisiz') || msg.includes('401') || msg.includes('auth')) {
+    return {
+      title: 'Oturum süresi dolmuş',
+      detail: 'Sayfayı yenile ve tekrar giriş yap.',
+    }
+  }
+  if (msg.includes('formData') || msg.includes('body')) {
+    return {
+      title: 'Yükleme hatası',
+      detail: 'Dosya yüklenirken sorun oluştu. Farklı bir tarayıcı dene veya sayfayı yenile.',
+    }
+  }
+  return {
+    title: 'İşlem başarısız',
+    detail: msg || 'Beklenmedik bir hata oluştu. Lütfen tekrar dene.',
+    action: { label: 'Alternatif araç →', href: 'https://bigconvert.11zon.com/' },
+  }
+}
+
 export default function PdfToolsPage() {
+  const router = useRouter()
   const [selectedTool, setSelectedTool] = useState<Tool>(null)
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<{ success: boolean; message: string; reduction?: number; originalSize?: number; compressedSize?: number } | null>(null)
+  const [result, setResult] = useState<{
+    success: boolean
+    title?: string
+    message: string
+    reduction?: number
+    originalSize?: number
+    compressedSize?: number
+    downloadName?: string
+    action?: { label: string; href: string }
+  } | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const supabase = createClient() as any
 
   function handleFile(f: File) {
     if (!f.name.toLowerCase().endsWith('.pdf')) {
-      setResult({ success: false, message: 'Yalnızca PDF dosyaları kabul edilir.' })
+      setResult({
+        success: false,
+        title: 'Desteklenmeyen format',
+        message: 'Yalnızca PDF dosyaları kabul edilir. Dosya uzantısının .pdf olduğundan emin ol.',
+      })
       return
     }
     if (f.size > 4 * 1024 * 1024) {
-      setResult({ success: false, message: `Dosya çok büyük (${formatBytes(f.size)}). Sunucu limiti: maks. 4MB. Daha büyük dosyalar için bigconvert.11zon.com kullanabilirsin.` })
+      setResult({
+        success: false,
+        title: 'Dosya çok büyük',
+        message: `Yüklediğin dosya ${formatBytes(f.size)} — sunucu limiti 4MB.`,
+        action: { label: 'Önce buradan küçült →', href: 'https://bigconvert.11zon.com/' },
+      })
       return
     }
     setFile(f)
@@ -40,31 +98,37 @@ export default function PdfToolsPage() {
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        setResult({ success: false, title: 'Oturum süresi dolmuş', message: 'Sayfayı yenile ve tekrar giriş yap.' })
+        setLoading(false)
+        return
+      }
+
       const formData = new FormData()
       formData.append('file', file)
       formData.append('action', selectedTool)
 
       const res = await fetch('/api/pdf-tools', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
         body: formData,
       })
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        if (err.error === 'pdf_image_only') {
-          setResult({ success: false, message: 'Bu PDF taranmış görsel içeriyor — metin çıkarılamadı. Önce OCR işlemi yapmanız gerekiyor.' })
-        } else {
-          setResult({ success: false, message: `${err.message || err.error || 'İşlem başarısız.'} ${err.detail ? `(${err.detail})` : ''}` })
-        }
+        const friendly = friendlyError(err)
+        setResult({ success: false, title: friendly.title, message: friendly.detail, action: friendly.action })
+        setLoading(false)
         return
       }
 
-      // Dosyayı indir
       const blob = await res.blob()
       const contentDisposition = res.headers.get('Content-Disposition') || ''
       const fileNameMatch = contentDisposition.match(/filename="([^"]+)"/)
-      const downloadName = fileNameMatch ? decodeURIComponent(fileNameMatch[1]) : (selectedTool === 'to-word' ? file.name.replace('.pdf', '.docx') : file.name.replace('.pdf', '-kucuk.pdf'))
+      const downloadName = fileNameMatch
+        ? decodeURIComponent(fileNameMatch[1])
+        : (selectedTool === 'to-word' ? file.name.replace('.pdf', '.docx') : file.name.replace('.pdf', '-kucuk.pdf'))
 
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -79,15 +143,23 @@ export default function PdfToolsPage() {
 
       setResult({
         success: true,
+        downloadName,
         message: selectedTool === 'to-word'
-          ? `✅ "${downloadName}" başarıyla oluşturuldu ve indirildi!`
-          : `✅ PDF küçültüldü ve indirildi! ${reduction > 0 ? `%${reduction} daha küçük (${formatBytes(originalSize)} → ${formatBytes(compressedSize)})` : 'Dosya zaten optimize edilmiş.'}`,
+          ? `"${downloadName}" başarıyla oluşturuldu ve indirildi!`
+          : `PDF küçültüldü! ${reduction > 0 ? `%${reduction} daha küçük (${formatBytes(originalSize)} → ${formatBytes(compressedSize)})` : 'Dosya zaten optimize edilmiş.'}`,
         reduction,
         originalSize,
         compressedSize,
       })
     } catch (e: any) {
-      setResult({ success: false, message: e?.message || 'Bağlantı hatası.' })
+      const isNetwork = e?.message?.includes('fetch') || e?.message?.includes('network') || e?.name === 'TypeError'
+      setResult({
+        success: false,
+        title: isNetwork ? 'Bağlantı hatası' : 'Beklenmedik hata',
+        message: isNetwork
+          ? 'İnternet bağlantını kontrol et ve tekrar dene.'
+          : (e?.message || 'Beklenmedik bir hata oluştu.'),
+      })
     }
     setLoading(false)
   }
@@ -111,7 +183,7 @@ export default function PdfToolsPage() {
       color: '#16a34a',
       bg: 'rgba(22,163,74,0.06)',
       border: 'rgba(22,163,74,0.2)',
-      tips: ['Görsel ağırlıklı PDF\'lerde daha etkili', '4MB üstü dosyalar için bigconvert.11zon.com kullan', 'Kalite kaybı olmadan sıkıştırır'],
+      tips: ['Görsel ağırlıklı PDF\'lerde daha etkili', '4MB üstü için bigconvert.11zon.com kullan', 'Kalite kaybı olmadan sıkıştırır'],
     },
   ]
 
@@ -125,7 +197,7 @@ export default function PdfToolsPage() {
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 800, color: 'var(--primary)', marginBottom: '4px' }}>
             🛠️ PDF Araçları
           </h1>
-          <p style={{ fontSize: '13px', color: 'var(--text3)' }}>Ders notlarını dönüştür, büyük PDF\'leri küçült.</p>
+          <p style={{ fontSize: '13px', color: 'var(--text3)' }}>Ders notlarını dönüştür, büyük PDF'leri küçült. <strong>Maks. 4MB.</strong></p>
         </div>
 
         {/* Araç seçimi */}
@@ -152,7 +224,7 @@ export default function PdfToolsPage() {
               ))}
             </div>
 
-            {/* Dosya yükleme alanı */}
+            {/* Dosya yükleme */}
             <div
               onDragOver={e => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
@@ -181,7 +253,7 @@ export default function PdfToolsPage() {
               {loading ? (
                 <>
                   <span className="spinner" style={{ width: 18, height: 18, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} />
-                  İşleniyor...
+                  İşleniyor... (bu 10-30 saniye sürebilir)
                 </>
               ) : (
                 selectedTool === 'to-word' ? '📄 Word\'e Dönüştür & İndir' : '🗜️ PDF\'i Küçült & İndir'
@@ -191,23 +263,51 @@ export default function PdfToolsPage() {
             {/* Sonuç */}
             {result && (
               <div style={{ marginTop: '1rem', padding: '14px 16px', borderRadius: '12px', background: result.success ? 'var(--green-bg)' : 'var(--red-bg)', border: `1px solid ${result.success ? 'rgba(22,163,74,0.2)' : 'rgba(220,38,38,0.2)'}` }}>
-                <div style={{ fontSize: '13px', color: result.success ? 'var(--green)' : 'var(--red)', fontWeight: 600, lineHeight: 1.6 }}>
-                  {result.message}
-                </div>
-                {result.success && selectedTool === 'to-word' && (
-                  <div style={{ marginTop: '10px', padding: '10px 12px', borderRadius: '8px', background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.15)', fontSize: '12px', color: '#2563eb' }}>
-                    💡 <strong>Sonraki adım:</strong> İndirilen .docx dosyasını{' '}
-                    <Link href="/quiz" style={{ color: '#2563eb', fontWeight: 700 }}>Test sayfasında</Link>{' '}
-                    yükleyerek otomatik quiz oluşturabilirsin!
+
+                {/* Başlık */}
+                {result.title && (
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: result.success ? 'var(--green)' : 'var(--red)', marginBottom: '4px' }}>
+                    {result.success ? '✅' : '❌'} {result.title}
                   </div>
                 )}
-                {!result.success && (
-                  <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text3)', lineHeight: 1.6 }}>
-                    Sorun devam ediyorsa{' '}
-                    <a href="https://bigconvert.11zon.com/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', fontWeight: 600 }}>
-                      bigconvert.11zon.com
+
+                <div style={{ fontSize: '13px', color: result.success ? 'var(--green)' : 'var(--red)', lineHeight: 1.6 }}>
+                  {result.message}
+                </div>
+
+                {/* Başarı: Word'den quiz oluştur CTA */}
+                {result.success && selectedTool === 'to-word' && (
+                  <div style={{ marginTop: '12px', padding: '12px 14px', borderRadius: '10px', background: 'rgba(37,99,235,0.08)', border: '1px solid rgba(37,99,235,0.2)' }}>
+                    <div style={{ fontSize: '12px', color: '#1d4ed8', marginBottom: '8px' }}>
+                      💡 <strong>Sonraki adım:</strong> İndirilen dosyayı quiz oluşturmak için kullan
+                    </div>
+                    <Link href="/quiz"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', background: '#2563eb', color: '#fff', textDecoration: 'none', fontSize: '13px', fontWeight: 700 }}>
+                      ⚡ Quiz oluştur →
+                    </Link>
+                  </div>
+                )}
+
+                {/* Başarı: compress sonrası quiz yükle CTA */}
+                {result.success && selectedTool === 'compress' && (
+                  <div style={{ marginTop: '12px', padding: '12px 14px', borderRadius: '10px', background: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.2)' }}>
+                    <div style={{ fontSize: '12px', color: '#15803d', marginBottom: '8px' }}>
+                      💡 Küçültülen PDF'i quiz oluşturmak için doğrudan yükleyebilirsin
+                    </div>
+                    <Link href="/quiz"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', background: '#16a34a', color: '#fff', textDecoration: 'none', fontSize: '13px', fontWeight: 700 }}>
+                      ⚡ Quiz oluştur →
+                    </Link>
+                  </div>
+                )}
+
+                {/* Hata: yönlendirme butonu */}
+                {!result.success && result.action && (
+                  <div style={{ marginTop: '10px' }}>
+                    <a href={result.action.href} target="_blank" rel="noopener noreferrer"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '8px', background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.2)', color: 'var(--red)', textDecoration: 'none', fontSize: '12px', fontWeight: 600 }}>
+                      {result.action.label}
                     </a>
-                    'u deneyin.
                   </div>
                 )}
               </div>

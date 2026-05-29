@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
+    console.log(`[save-quiz] START sessionId=${body?.sessionId} userId=${body?.userId} score=${body?.score}`)
 
     const { sessionId, answers, score, userId } = body
 
@@ -100,6 +101,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    console.log(`[save-quiz] SUCCESS sessionId=${sessionId} pct=${pct}`)
     return NextResponse.json({ success: true, pct })
   } catch (error: any) {
     console.error('[save-quiz] ERROR:', error?.message)

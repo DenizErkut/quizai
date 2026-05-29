@@ -149,12 +149,18 @@ export default function AnalysisPage() {
           )}
 
           {weakTopics.length > 0 && (
-            <button className="btn btn-primary" onClick={generateAiAnalysis} disabled={loadingAi}
-              style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}>
-              {loadingAi
-                ? <><span className="spinner" style={{ width: 16, height: 16 }} /> AI analiz yapıyor...</>
-                : '🤖 AI ile detaylı analiz al'}
-            </button>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '1rem' }}>
+              <button className="btn btn-primary" onClick={generateAiAnalysis} disabled={loadingAi}
+                style={{ flex: 1, justifyContent: 'center' }}>
+                {loadingAi
+                  ? <><span className="spinner" style={{ width: 16, height: 16 }} /> AI analiz yapıyor...</>
+                  : '🤖 Detaylı analiz al'}
+              </button>
+              <button className="btn" onClick={() => router.push('/plan')}
+                style={{ flex: 1, justifyContent: 'center', borderColor: 'var(--accent)', color: 'var(--accent)' }}>
+                📋 4 Haftalık Plan
+              </button>
+            </div>
           )}
         </div>
 
