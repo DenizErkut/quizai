@@ -1,13 +1,70 @@
+// app/api/extract-file/route.ts
+// Güncellenmiş versiyon: Gemini Vision (görsel PDF) + Gemini Audio (ses) entegrasyonu
+
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 120
 export const dynamic = 'force-dynamic'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
-// In-memory chunk store (Vercel serverless — same instance)
+// Gemini API helper — fetch tabanlı (SDK gerektirmez)
+async function callGemini(model: string, parts: any[]): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY!
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts }],
+      generationConfig: { maxOutputTokens: 4000, temperature: 0.1 },
+    }),
+  })
+  if (!res.ok) {
+    const err = await res.json()
+    throw new Error(`Gemini API hatası: ${err?.error?.message || res.status}`)
+  }
+  const data = await res.json()
+  return data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+}
+
+// Görsel PDF → Gemini Vision
+async function extractWithGeminiVision(buffer: Buffer, filename: string): Promise<string> {
+  const base64 = buffer.toString('base64')
+  const text = await callGemini('gemini-1.5-flash', [
+    {
+      inlineData: {
+        mimeType: 'application/pdf',
+        data: base64,
+      }
+    },
+    {
+      text: 'Bu PDF dosyasının tüm metin içeriğini Türkçe olarak çıkar. Başlıkları, paragrafları ve listeleri koru. Sadece metni döndür, açıklama yapma.'
+    }
+  ])
+  return text.trim()
+}
+
+// Ses dosyası → Gemini Audio
+async function extractWithGeminiAudio(buffer: Buffer, mimeType: string, filename: string): Promise<string> {
+  const base64 = buffer.toString('base64')
+  const text = await callGemini('gemini-1.5-flash', [
+    {
+      inlineData: {
+        mimeType,
+        data: base64,
+      }
+    },
+    {
+      text: 'Bu ses dosyasını transkribe et. Konuşulan dili koru (Türkçe ise Türkçe yaz). Sadece transkripti döndür, açıklama yapma.'
+    }
+  ])
+  return text.trim()
+}
+
+// Chunk store
 const chunkStore = new Map<string, Buffer[]>()
 
 export async function POST(req: NextRequest) {
@@ -29,27 +86,23 @@ export async function POST(req: NextRequest) {
 
     const chunkBuffer = Buffer.from(await chunk.arrayBuffer())
 
-    // Chunk'ı store'a ekle
     if (!chunkStore.has(sessionId)) chunkStore.set(sessionId, [])
     const chunks = chunkStore.get(sessionId)!
     chunks[chunkIndex] = chunkBuffer
 
-    // Tüm chunk'lar gelmediyse sadece progress döndür
     const received = chunks.filter(Boolean).length
     if (received < totalChunks) {
       return NextResponse.json({
         status: 'chunk_received',
         received,
         total: totalChunks,
-        progress: Math.round((received / totalChunks) * 80), // 0-80 arası
+        progress: Math.round((received / totalChunks) * 80),
       })
     }
 
-    // Tüm chunk'lar tamam — birleştir
     const fullBuffer = Buffer.concat(chunks)
     chunkStore.delete(sessionId)
 
-    // Dosyayı işle
     const result = await processFile(fullBuffer, ext, filename)
     return NextResponse.json({ status: 'complete', progress: 100, ...result })
 
@@ -60,45 +113,62 @@ export async function POST(req: NextRequest) {
 }
 
 async function processFile(buffer: Buffer, ext: string, filename: string) {
+  // ── TXT ──
   if (ext === 'txt') {
     const content = buffer.toString('utf-8').slice(0, 15000)
     return { content, type: 'text', filename }
   }
 
+  // ── PDF ──
   if (ext === 'pdf') {
     try {
-      // AŞAMA 1: pdf-parse ile metin çıkar (sayfa sınırı yok)
       const { default: pdfParse } = await import('pdf-parse') as any
       let pdfData: any = null
       let parsedText = ''
 
       try {
-        pdfData = await pdfParse(buffer, { max: 0 }) // max:0 = tüm sayfalar
+        pdfData = await pdfParse(buffer, { max: 0 })
         parsedText = (pdfData?.text || '').trim()
       } catch (parseErr) {
-        console.warn('[extract-file] pdf-parse failed, falling back:', parseErr)
+        console.warn('[extract-file] pdf-parse failed:', parseErr)
       }
 
-      // Metin yeterliyse direkt döndür (100 sayfa sınırı YOK)
+      // Metin yeterliyse direkt döndür
       if (parsedText.length >= 200) {
-        const pageCount = pdfData?.numpages || 0
         return {
           content: parsedText.slice(0, 30000),
           type: 'pdf',
           filename,
-          pageCount,
-          note: pageCount > 0 ? `${pageCount} sayfa işlendi` : undefined,
+          pageCount: pdfData?.numpages || 0,
         }
       }
 
-      // AŞAMA 2: Taranmış PDF — Anthropic API, 90 sayfa chunk ile
-      const totalPages = pdfData?.numpages || 0
+      // Taranmış PDF → Gemini Vision'ı dene
+      if (process.env.GEMINI_API_KEY) {
+        try {
+          console.log('[extract-file] Taranmış PDF — Gemini Vision deneniyor...')
+          const geminiText = await extractWithGeminiVision(buffer, filename)
+          if (geminiText.length >= 100) {
+            return {
+              content: geminiText.slice(0, 30000),
+              type: 'pdf',
+              filename,
+              pageCount: pdfData?.numpages || 0,
+              note: '🤖 Gemini Vision ile taranmış PDF okundu',
+              engine: 'gemini-vision',
+            }
+          }
+        } catch (geminiErr) {
+          console.warn('[extract-file] Gemini Vision failed, falling back to Claude:', geminiErr)
+        }
+      }
 
-      // Küçük taranmış PDF: direkt gönder
+      // Gemini yoksa veya başarısız → Claude fallback
+      const totalPages = pdfData?.numpages || 0
       if (buffer.length <= 15 * 1024 * 1024 && totalPages <= 90) {
         const base64 = buffer.toString('base64')
         const message = await anthropic.messages.create({
-          model: 'claude-sonnet-4-5',
+          model: 'claude-sonnet-4-20250514',
           max_tokens: 3000,
           messages: [{
             role: 'user',
@@ -108,57 +178,23 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
             ],
           }],
         }) as any
-        return { content: message.content[0].text, type: 'pdf', filename, pageCount: totalPages }
+        return { content: message.content[0].text, type: 'pdf', filename, pageCount: totalPages, engine: 'claude' }
       }
 
-      // Büyük taranmış PDF: chunk'lara bölerek metin çek
-      const CHUNK_PAGES = 90
-      const pageTexts: string[] = []
-      const chunkCount = Math.ceil(Math.max(totalPages, 1) / CHUNK_PAGES)
-
-      for (let i = 0; i < chunkCount; i++) {
-        const endPage = Math.min((i + 1) * CHUNK_PAGES, totalPages)
-        try {
-          const chunkData = await pdfParse(buffer, { max: endPage })
-          const fullText = chunkData?.text || ''
-          const sliceStart = i === 0 ? 0 : Math.floor(fullText.length * (i / chunkCount))
-          const chunkText = fullText.slice(sliceStart).trim()
-          if (chunkText) pageTexts.push(chunkText)
-        } catch {}
-      }
-
-      const combinedText = pageTexts.join('\n\n').trim()
-      if (combinedText.length >= 100) {
-        return {
-          content: combinedText.slice(0, 30000),
-          type: 'pdf',
-          filename,
-          pageCount: totalPages,
-          note: `${totalPages} sayfa, ${chunkCount} bolumde islendi`,
-        }
-      }
-
-      // Tamamen görsel PDF
       return {
         error: 'pdf_image_only',
         content: '',
         type: 'pdf',
         filename,
-        message: 'Bu PDF tamamen taranmis gorsel iceriyor. Lutfen metni kopyalayip yapistirin veya Word dosyasi olarak yukleyin.',
+        message: 'Bu PDF tamamen taranmış görsel içeriyor ve metin çıkarılamadı.',
       }
 
     } catch (pdfErr: any) {
-      console.error('[extract-file] PDF error:', pdfErr)
-      return {
-        error: 'pdf_error',
-        content: '',
-        type: 'pdf',
-        filename,
-        message: 'PDF isle nemedi. Lutfen Word (.docx) veya metin (.txt) formatinda yukleyin.',
-      }
+      return { error: 'pdf_error', content: '', type: 'pdf', filename, message: 'PDF işlenemedi.' }
     }
   }
 
+  // ── DOCX ──
   if (ext === 'docx' || ext === 'doc') {
     const JSZip = (await import('jszip')).default
     const zip = await JSZip.loadAsync(buffer)
@@ -173,38 +209,73 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
     return { content, type: 'docx', filename }
   }
 
+  // ── GÖRSEL ──
   if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
     const base64 = buffer.toString('base64')
     const mediaType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg'
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 2000,
       messages: [{
         role: 'user',
         content: [
           { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-          { type: 'text', text: 'Bu görseli detaylıca açıkla. Grafik, tablo, diyagram, metin varsa hepsini say. Eğitim soruları üretmek için kullanılacak.' },
+          { type: 'text', text: 'Bu görseldeki tüm metni çıkar. Ders notu, soru veya içerik varsa olduğu gibi yaz.' },
         ],
       }],
     }) as any
     return { content: message.content[0].text, type: 'image', filename }
   }
 
-  if (['mp3', 'm4a', 'wav', 'ogg'].includes(ext)) {
-    const openaiKey = process.env.OPENAI_API_KEY
-    if (!openaiKey) throw new Error('Ses desteği aktif değil.')
-    const whisperForm = new FormData()
-    whisperForm.append('file', new Blob([new Uint8Array(buffer)]), filename)
-    whisperForm.append('model', 'whisper-1')
-    const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${openaiKey}` },
-      body: whisperForm,
-    })
-    if (!res.ok) throw new Error('Ses dosyası işlenemedi.')
-    const { text } = await res.json()
-    return { content: text, type: 'audio', filename }
+  // ── SES (MP3, M4A, WAV, OGG) — Gemini Audio ──
+  if (['mp3', 'm4a', 'wav', 'ogg', 'aac', 'flac', 'opus'].includes(ext)) {
+    if (!process.env.GEMINI_API_KEY) {
+      return {
+        error: 'gemini_required',
+        content: '',
+        type: 'audio',
+        filename,
+        message: 'Ses dosyası işleme için Gemini API anahtarı gerekli.',
+      }
+    }
+
+    try {
+      const mimeMap: Record<string, string> = {
+        mp3: 'audio/mpeg',
+        m4a: 'audio/mp4',
+        wav: 'audio/wav',
+        ogg: 'audio/ogg',
+        aac: 'audio/aac',
+        flac: 'audio/flac',
+        opus: 'audio/opus',
+      }
+      const mimeType = mimeMap[ext] || 'audio/mpeg'
+
+      console.log(`[extract-file] Ses dosyası — Gemini Audio ile transkribe ediliyor: ${filename}`)
+      const transcript = await extractWithGeminiAudio(buffer, mimeType, filename)
+
+      if (!transcript) {
+        return { error: 'audio_empty', content: '', type: 'audio', filename, message: 'Ses dosyasında konuşma bulunamadı.' }
+      }
+
+      return {
+        content: transcript.slice(0, 30000),
+        type: 'audio',
+        filename,
+        note: '🎤 Gemini Audio ile transkribe edildi',
+        engine: 'gemini-audio',
+      }
+    } catch (audioErr: any) {
+      console.error('[extract-file] Audio error:', audioErr)
+      return {
+        error: 'audio_error',
+        content: '',
+        type: 'audio',
+        filename,
+        message: `Ses dosyası işlenemedi: ${audioErr?.message || 'Bilinmeyen hata'}`,
+      }
+    }
   }
 
-  throw new Error(`Desteklenmeyen format: .${ext}`)
+  return { error: 'unsupported', content: '', type: 'unknown', filename, message: `Desteklenmeyen dosya türü: .${ext}` }
 }
