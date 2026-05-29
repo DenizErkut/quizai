@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -87,6 +87,8 @@ function QuizPageContent() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [current, setCurrent] = useState(0)
   const [answers, setAnswers] = useState<{ userAns: number; correct: boolean }[]>([])
+  // ✅ answersRef: save-quiz için her zaman güncel değeri tut (React state async sorununu çözer)
+  const answersRef = useRef<{ userAns: number; correct: boolean }[]>([])
   const [chosen, setChosen] = useState<number | null>(null)
   const searchParams = useSearchParams()
   const [loadMsg, setLoadMsg] = useState('Profilin analiz ediliyor...')
@@ -122,7 +124,6 @@ function QuizPageContent() {
     const asgDiff = searchParams.get('difficulty')
     const asgType = searchParams.get('type')
     const retrySession = searchParams.get('retry_session')
-    const source = searchParams.get('source')
 
     if (asgId && asgTopic) {
       setAssignmentId(asgId)
@@ -137,24 +138,6 @@ function QuizPageContent() {
       setCustomTopic(decodeURIComponent(asgTopic))
       if (asgCount) setQCount(parseInt(asgCount))
       if (asgDiff) setDifficulty(asgDiff)
-    }
-
-    // ✅ PDF araçlarından gelen dosyayı sessionStorage'dan oku
-    if (source === 'pdf-tools') {
-      try {
-        const raw = sessionStorage.getItem('pdf_tools_file')
-        if (raw) {
-          const meta = JSON.parse(raw)
-          // base64 → Uint8Array → File → FileUploader'a inject
-          const binary = atob(meta.base64)
-          const arr = new Uint8Array(binary.length)
-          for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i)
-          const file = new File([arr], meta.name, { type: meta.type })
-          // Geçici input ile FileUploader'ı tetikle
-          ;(window as any).__pdf_tools_pending_file = file
-          sessionStorage.removeItem('pdf_tools_file')
-        }
-      } catch(e) { console.warn('pdf-tools sessionStorage read failed', e) }
     }
   }, [searchParams])
 
@@ -327,7 +310,11 @@ function QuizPageContent() {
     } else {
       correct = idx === q.ans
     }
-    setAnswers(prev => [...prev, { userAns: idx, correct }])
+    setAnswers(prev => {
+      const next = [...prev, { userAns: idx, correct }]
+      answersRef.current = next
+      return next
+    })
   }
 
   const [shortInput, setShortInput] = useState('')
@@ -403,7 +390,11 @@ function QuizPageContent() {
     }
 
     setChosen(correct ? q.ans : -1)
-    setAnswers(prev => [...prev, { userAns: correct ? q.ans : -1, correct }])
+    setAnswers(prev => {
+      const next = [...prev, { userAns: correct ? q.ans : -1, correct }]
+      answersRef.current = next
+      return next
+    })
   }
 
   function submitMatching() {
@@ -436,7 +427,11 @@ function QuizPageContent() {
 
     const correct = correctCount === pairs.length
     setChosen(correct ? q.ans : -1)
-    setAnswers(prev => [...prev, { userAns: correct ? q.ans : -1, correct }])
+    setAnswers(prev => {
+      const next = [...prev, { userAns: correct ? q.ans : -1, correct }]
+      answersRef.current = next
+      return next
+    })
   }
 
   function submitOrdering() {
@@ -444,7 +439,11 @@ function QuizPageContent() {
     const items = q.items || []
     const correct = orderItems.every((item, i) => item === items[q.correctOrder?.[i] ?? i])
     setChosen(correct ? 0 : -1)
-    setAnswers(prev => [...prev, { userAns: correct ? 0 : -1, correct }])
+    setAnswers(prev => {
+      const next = [...prev, { userAns: correct ? 0 : -1, correct }]
+      answersRef.current = next
+      return next
+    })
   }
 
   function moveItem(from: number, to: number) {
@@ -484,14 +483,10 @@ function QuizPageContent() {
     if (current + 1 >= questions.length) {
       // Son sorunun correct değerini answers array'inden al
       // answers state async — son eklenen correct field'ını kullan
-      const alreadyAdded = answers.length >= questions.length
-      const lastCorrect = alreadyAdded
-        ? (answers[answers.length - 1]?.correct ?? false)
-        : chosen !== null && chosen === questions[current].ans
-      const finalAnswers = !alreadyAdded && chosen !== null
-        ? [...answers, { userAns: chosen, correct: lastCorrect }]
-        : answers
+      // ✅ answersRef: React state async sorunundan bağımsız, her zaman güncel
+      const finalAnswers = answersRef.current
       const score = finalAnswers.filter(a => a.correct).length
+      console.log('[quiz] finish: finalAnswers.length=', finalAnswers.length, 'score=', score, 'questions=', questions.length)
 
       // getUser() ile userId al — getSession().user güvenilmez
       const { data: { user: currentUser } } = await supabase.auth.getUser()
@@ -727,7 +722,7 @@ function QuizPageContent() {
 
           {/* Dosya yükleme */}
           <label className="field-label" style={{ marginTop: '16px' }}>Dosyadan soru üret</label>
-          <FileUploader onFilesChange={setUploadedFiles} maxFiles={5} maxMB={20} pendingFile={(window as any).__pdf_tools_pending_file} onPendingFileConsumed={() => { delete (window as any).__pdf_tools_pending_file }} />
+          <FileUploader onFilesChange={setUploadedFiles} maxFiles={5} maxMB={20} />
           {hasFiles && (
             <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--green)' }}>
               ✓ {uploadedFiles.length} dosya hazır · {uploadedFiles.reduce((s, f) => s + f.content.split(' ').length, 0)} kelime · Sorular bu içeriklerden üretilecek
@@ -1114,7 +1109,11 @@ function QuizPageContent() {
                       const stmts = q.statements || []
                       const correct = stmts.every((s: any, i: number) => mTFAnswers[i] === s.correct)
                       setChosen(correct ? 0 : -1)
-                      setAnswers(prev => [...prev, { userAns: correct ? 0 : -1, correct }])
+                      setAnswers(prev => {
+                        const next = [...prev, { userAns: correct ? 0 : -1, correct }]
+                        answersRef.current = next
+                        return next
+                      })
                     }}
                     disabled={(q.statements || []).some((_: any, i: number) => mTFAnswers[i] === undefined || mTFAnswers[i] === null)}
                     style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
