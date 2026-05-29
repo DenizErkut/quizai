@@ -25,8 +25,8 @@ export default function PdfToolsPage() {
       setResult({ success: false, message: 'Yalnızca PDF dosyaları kabul edilir.' })
       return
     }
-    if (f.size > 20 * 1024 * 1024) {
-      setResult({ success: false, message: `Dosya çok büyük (${formatBytes(f.size)}). Maks. 20MB.` })
+    if (f.size > 4 * 1024 * 1024) {
+      setResult({ success: false, message: `Dosya çok büyük (${formatBytes(f.size)}). Sunucu limiti: maks. 4MB. Daha büyük dosyalar için bigconvert.11zon.com kullanabilirsin.` })
       return
     }
     setFile(f)
@@ -111,7 +111,7 @@ export default function PdfToolsPage() {
       color: '#16a34a',
       bg: 'rgba(22,163,74,0.06)',
       border: 'rgba(22,163,74,0.2)',
-      tips: ['Görsel ağırlıklı PDF\'lerde daha etkili', '20MB üstü dosyalar için önerilir', 'Kalite kaybı olmadan sıkıştırır'],
+      tips: ['Görsel ağırlıklı PDF\'lerde daha etkili', '4MB üstü dosyalar için bigconvert.11zon.com kullan', 'Kalite kaybı olmadan sıkıştırır'],
     },
   ]
 
@@ -170,7 +170,7 @@ export default function PdfToolsPage() {
                 <div>
                   <div style={{ fontSize: '40px', marginBottom: '10px' }}>📁</div>
                   <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>PDF dosyasını sürükle veya tıkla</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text3)' }}>Maks. 20MB · Yalnızca .pdf</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)' }}>Maks. 4MB · Yalnızca .pdf</div>
                 </div>
               )}
             </div>
