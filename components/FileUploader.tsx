@@ -19,6 +19,8 @@ interface Props {
   onFilesChange: (files: UploadedFile[]) => void
   maxFiles?: number
   maxMB?: number
+  pendingFile?: File | null          // ✅ PDF araçlarından gelen dosya
+  onPendingFileConsumed?: () => void
 }
 
 const CHUNK_SIZE = 3 * 1024 * 1024 // 3MB per chunk
@@ -35,10 +37,19 @@ function formatSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)}MB`
 }
 
-export default function FileUploader({ onFilesChange, maxFiles = 5, maxMB = 20 }: Props) {
+export default function FileUploader({ onFilesChange, maxFiles = 5, maxMB = 20, pendingFile, onPendingFileConsumed }: Props) {
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // ✅ PDF araçlarından gelen dosyayı otomatik yükle
+  useEffect(() => {
+    if (pendingFile) {
+      uploadFile(pendingFile)
+      onPendingFileConsumed?.()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingFile])
   const supabase = createClient() as any
 
   const updateFile = useCallback((id: string, patch: Partial<UploadedFile>) => {

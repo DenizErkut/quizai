@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     const { messages, system } = await req.json()
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5',
       max_tokens: 512,
       system,
       messages: messages.map((m: any) => ({ role: m.role, content: m.content })),

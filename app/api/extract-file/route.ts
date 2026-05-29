@@ -168,7 +168,7 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
       if (buffer.length <= 15 * 1024 * 1024 && totalPages <= 90) {
         const base64 = buffer.toString('base64')
         const message = await anthropic.messages.create({
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-sonnet-4-5',
           max_tokens: 3000,
           messages: [{
             role: 'user',
@@ -214,7 +214,7 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
     const base64 = buffer.toString('base64')
     const mediaType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg'
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5',
       max_tokens: 2000,
       messages: [{
         role: 'user',

@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
 
         try {
           const res = await anthropic.messages.create({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-sonnet-4-5',
             max_tokens: 150,
             messages: [{ role: 'user', content: buildVerifyPrompt(q, lang) }],
           })
@@ -165,7 +165,7 @@ Return ONLY valid JSON:
 {"questions":[{"type":"${replaceType}","q":"...","opts":["A","B","C","D"],"ans":0,"exp":"step by step solution"}]}`
 
         const replaceRes = await anthropic.messages.create({
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-sonnet-4-5',
           max_tokens: 2000,
           messages: [{ role: 'user', content: replacePrompt }],
         })

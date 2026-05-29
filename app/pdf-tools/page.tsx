@@ -281,10 +281,28 @@ export default function PdfToolsPage() {
                     <div style={{ fontSize: '12px', color: '#1d4ed8', marginBottom: '8px' }}>
                       💡 <strong>Sonraki adım:</strong> İndirilen dosyayı quiz oluşturmak için kullan
                     </div>
-                    <Link href="/quiz"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', background: '#2563eb', color: '#fff', textDecoration: 'none', fontSize: '13px', fontWeight: 700 }}>
+                    <button
+                      onClick={() => {
+                        // Dosyayı base64 olarak sessionStorage'a kaydet
+                        if (file) {
+                          const reader = new FileReader()
+                          reader.onload = () => {
+                            const base64 = (reader.result as string).split(',')[1]
+                            sessionStorage.setItem('pdf_tools_file', JSON.stringify({
+                              base64,
+                              name: file.name.replace('.pdf', '.pdf'),
+                              type: file.type || 'application/pdf',
+                            }))
+                            router.push('/quiz?source=pdf-tools')
+                          }
+                          reader.readAsDataURL(file)
+                        } else {
+                          router.push('/quiz')
+                        }
+                      }}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', background: '#2563eb', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 700, fontFamily: 'var(--font-sans)' }}>
                       ⚡ Quiz oluştur →
-                    </Link>
+                    </button>
                   </div>
                 )}
 
@@ -294,10 +312,11 @@ export default function PdfToolsPage() {
                     <div style={{ fontSize: '12px', color: '#15803d', marginBottom: '8px' }}>
                       💡 Küçültülen PDF'i quiz oluşturmak için doğrudan yükleyebilirsin
                     </div>
-                    <Link href="/quiz"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', background: '#16a34a', color: '#fff', textDecoration: 'none', fontSize: '13px', fontWeight: 700 }}>
+                    <button
+                      onClick={() => router.push('/quiz')}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', background: '#16a34a', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 700, fontFamily: 'var(--font-sans)' }}>
                       ⚡ Quiz oluştur →
-                    </Link>
+                    </button>
                   </div>
                 )}
 

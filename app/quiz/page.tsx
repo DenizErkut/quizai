@@ -122,6 +122,7 @@ function QuizPageContent() {
     const asgDiff = searchParams.get('difficulty')
     const asgType = searchParams.get('type')
     const retrySession = searchParams.get('retry_session')
+    const source = searchParams.get('source')
 
     if (asgId && asgTopic) {
       setAssignmentId(asgId)
@@ -136,6 +137,24 @@ function QuizPageContent() {
       setCustomTopic(decodeURIComponent(asgTopic))
       if (asgCount) setQCount(parseInt(asgCount))
       if (asgDiff) setDifficulty(asgDiff)
+    }
+
+    // ✅ PDF araçlarından gelen dosyayı sessionStorage'dan oku
+    if (source === 'pdf-tools') {
+      try {
+        const raw = sessionStorage.getItem('pdf_tools_file')
+        if (raw) {
+          const meta = JSON.parse(raw)
+          // base64 → Uint8Array → File → FileUploader'a inject
+          const binary = atob(meta.base64)
+          const arr = new Uint8Array(binary.length)
+          for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i)
+          const file = new File([arr], meta.name, { type: meta.type })
+          // Geçici input ile FileUploader'ı tetikle
+          ;(window as any).__pdf_tools_pending_file = file
+          sessionStorage.removeItem('pdf_tools_file')
+        }
+      } catch(e) { console.warn('pdf-tools sessionStorage read failed', e) }
     }
   }, [searchParams])
 
@@ -708,7 +727,7 @@ function QuizPageContent() {
 
           {/* Dosya yükleme */}
           <label className="field-label" style={{ marginTop: '16px' }}>Dosyadan soru üret</label>
-          <FileUploader onFilesChange={setUploadedFiles} maxFiles={5} maxMB={20} />
+          <FileUploader onFilesChange={setUploadedFiles} maxFiles={5} maxMB={20} pendingFile={(window as any).__pdf_tools_pending_file} onPendingFileConsumed={() => { delete (window as any).__pdf_tools_pending_file }} />
           {hasFiles && (
             <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--green)' }}>
               ✓ {uploadedFiles.length} dosya hazır · {uploadedFiles.reduce((s, f) => s + f.content.split(' ').length, 0)} kelime · Sorular bu içeriklerden üretilecek

@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       if (hasMath) {
         try {
           const checkResponse = await anthropic.messages.create({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-sonnet-4-5',
             max_tokens: 200,
             messages: [{
               role: 'user',
@@ -116,7 +116,7 @@ Respond ONLY with JSON: {"correct": true} or {"correct": false, "actual_answer":
     if (needMore > 0) {
       try {
         const replaceResponse = await anthropic.messages.create({
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-sonnet-4-5',
           max_tokens: 2000,
           messages: [{
             role: 'user',

@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   if (!gradeNotes) return NextResponse.json({ error: 'Veri eksik.' }, { status: 400 })
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-5',
     max_tokens: 800,
     messages: [{
       role: 'user',
