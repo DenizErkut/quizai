@@ -36,7 +36,6 @@ export default function AnalysisPage() {
       setWeakTopics(wt || [])
       setSessions(s || [])
 
-      // YouTube linki oluştur (search URL)
       const links: Record<string, string> = {}
       for (const topic of (wt || []).slice(0, 5)) {
         links[topic.topic] = `https://www.youtube.com/results?search_query=${encodeURIComponent(topic.topic + ' konu anlatımı #shorts')}`
@@ -60,6 +59,12 @@ export default function AnalysisPage() {
     const data = await res.json()
     setAiPlan(data.analysis || '')
     setLoadingAi(false)
+  }
+
+  // ✅ YENİ: Zayıf konudan quiz oluştur
+  function startQuizFromTopic(topic: string) {
+    const params = new URLSearchParams({ topic, source: 'weak_topic' })
+    router.push(`/quiz?${params.toString()}`)
   }
 
   function accuracy(wrong: number, total: number) {
@@ -107,12 +112,25 @@ export default function AnalysisPage() {
                         {w.wrong_count} yanlış / {w.total_count} soru
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       <span style={{
                         fontSize: '12px', padding: '3px 8px', borderRadius: '99px', fontWeight: 600,
                         background: acc < 50 ? 'var(--red-bg)' : acc < 70 ? 'rgba(217,119,6,0.1)' : 'var(--green-bg)',
                         color: acc < 50 ? 'var(--red)' : acc < 70 ? '#d97706' : 'var(--green)',
                       }}>%{acc}</span>
+
+                      {/* ✅ YENİ: Quiz oluştur butonu */}
+                      <button
+                        onClick={() => startQuizFromTopic(w.topic)}
+                        style={{
+                          fontSize: '11px', padding: '4px 8px', borderRadius: '6px',
+                          background: 'var(--accent)', color: '#fff',
+                          border: 'none', cursor: 'pointer', fontWeight: 600,
+                          fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', gap: '3px',
+                        }}>
+                        ⚡ Quiz yap
+                      </button>
+
                       {ytLink && (
                         <a href={ytLink} target="_blank" rel="noopener noreferrer"
                           style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', background: '#ff0000', color: '#fff', textDecoration: 'none', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -159,13 +177,11 @@ export default function AnalysisPage() {
           </div>
 
           {sessions.map((s, i) => {
-            // multi_true_false sorularını ifade bazında aç
             const wrongAnswers: any[] = []
             ;(s.answers || []).forEach((a: any, qi: number) => {
               const q = s.questions?.[qi]
               if (!q) return
               if (q.type === 'multi_true_false' && q.statements?.length) {
-                // Her ifadeyi ayrı "yanlış" olarak göster
                 q.statements.forEach((stmt: any, si: number) => {
                   const userAns = a.mTFAnswers?.[si]
                   const isCorrect = userAns === stmt.correct

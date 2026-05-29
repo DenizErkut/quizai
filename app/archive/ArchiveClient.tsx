@@ -13,6 +13,8 @@ type Session = {
   completed: boolean
   created_at: string
   question_type?: string
+  questions?: any[]
+  answers?: any[]
 }
 
 const QUESTION_TYPE_LABELS: Record<string, string> = {
@@ -32,13 +34,11 @@ function pctColor(pct: number) {
   if (pct >= 55) return 'var(--amber, #f59e0b)'
   return 'var(--red)'
 }
-
 function pctBg(pct: number) {
   if (pct >= 80) return 'var(--green-bg)'
   if (pct >= 55) return 'var(--amber-bg)'
   return 'var(--red-bg)'
 }
-
 function dateGroup(iso: string): string {
   const d = new Date(iso)
   const now = new Date()
@@ -50,14 +50,127 @@ function dateGroup(iso: string): string {
   return d.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
 }
 
+// ✅ PDF Export fonksiyonu — jsPDF client-side
+async function exportQuizPDF(session: Session) {
+  const { jsPDF } = await import('jspdf')
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+  const pageW = 210
+  const margin = 18
+  const contentW = pageW - margin * 2
+  let y = 20
+
+  // Başlık
+  doc.setFillColor(8, 36, 101) // navy
+  doc.rect(0, 0, pageW, 28, 'F')
+  doc.setTextColor(253, 211, 29) // yellow
+  doc.setFontSize(16)
+  doc.setFont('helvetica', 'bold')
+  doc.text('pratium.com', margin, 12)
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'normal')
+  doc.text('AI Destekli Soru Platformu', margin, 20)
+  y = 40
+
+  // Test bilgisi
+  doc.setTextColor(8, 36, 101)
+  doc.setFontSize(16)
+  doc.setFont('helvetica', 'bold')
+  const titleLines = doc.splitTextToSize(session.topic, contentW)
+  doc.text(titleLines, margin, y)
+  y += titleLines.length * 7 + 4
+
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(100, 116, 139)
+  const meta = [
+    session.grade && `Sınıf: ${session.grade}`,
+    `${session.question_count} Soru`,
+    session.question_type && (QUESTION_TYPE_LABELS[session.question_type] || session.question_type),
+    new Date(session.created_at).toLocaleDateString('tr-TR'),
+  ].filter(Boolean).join('  ·  ')
+  doc.text(meta, margin, y)
+  y += 6
+
+  // Ad-soyad alanı
+  doc.setDrawColor(226, 232, 240)
+  doc.line(margin, y, pageW - margin, y)
+  y += 8
+  doc.setFontSize(9)
+  doc.setTextColor(100, 116, 139)
+  doc.text('Ad Soyad: ________________________________________    Tarih: ___________', margin, y)
+  y += 10
+
+  // Sorular
+  const questions: any[] = session.questions || []
+
+  questions.forEach((q: any, idx: number) => {
+    // Sayfa taşıyorsa yeni sayfa
+    if (y > 265) {
+      doc.addPage()
+      y = 20
+    }
+
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(15, 23, 42)
+    const qText = `${idx + 1}. ${q.q || q.question || ''}`
+    const qLines = doc.splitTextToSize(qText, contentW)
+    doc.text(qLines, margin, y)
+    y += qLines.length * 5.5 + 2
+
+    // Seçenekler
+    if (q.opts && Array.isArray(q.opts)) {
+      const letters = ['A', 'B', 'C', 'D', 'E']
+      q.opts.forEach((opt: string, oi: number) => {
+        if (y > 270) { doc.addPage(); y = 20 }
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(9)
+        doc.setTextColor(51, 65, 85)
+        const optText = `${letters[oi]}) ${opt}`
+        const optLines = doc.splitTextToSize(optText, contentW - 6)
+        doc.text(optLines, margin + 5, y)
+        y += optLines.length * 5 + 1
+      })
+      y += 2
+    } else if (q.type === 'true_false') {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(51, 65, 85)
+      doc.text('A) Doğru    B) Yanlış', margin + 5, y)
+      y += 7
+    } else if (q.type === 'fill_blank' || q.type === 'short_answer') {
+      doc.setDrawColor(200, 210, 220)
+      doc.line(margin + 5, y + 4, margin + contentW - 5, y + 4)
+      y += 10
+    }
+
+    y += 3
+  })
+
+  // Footer
+  const pageCount = doc.getNumberOfPages()
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i)
+    doc.setFontSize(8)
+    doc.setTextColor(148, 163, 184)
+    doc.text(`pratium.com  ·  ${i} / ${pageCount}`, pageW / 2, 293, { align: 'center' })
+  }
+
+  const fileName = `${session.topic.slice(0, 40).replace(/[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ\s]/g, '')}_quiz.pdf`
+  doc.save(fileName)
+}
+
 export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
   const [search, setSearch] = useState('')
   const [gradeFilter, setGradeFilter] = useState('all')
-  const [scoreFilter, setScoreFilter] = useState('all') // all | weak | mid | good
+  const [scoreFilter, setScoreFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
-  const [dateFilter, setDateFilter] = useState('all') // all | week | month
+  const [dateFilter, setDateFilter] = useState('all')
   const [sortBy, setSortBy] = useState<'date' | 'pct_asc' | 'pct_desc'>('date')
   const [showFilters, setShowFilters] = useState(false)
+  const [exportingId, setExportingId] = useState<string | null>(null) // ✅ YENİ
 
   const grades = useMemo(() => [...new Set(sessions.map(s => s.grade))].filter(Boolean).sort(), [sessions])
   const types = useMemo(() => [...new Set(sessions.map(s => s.question_type).filter(Boolean))], [sessions])
@@ -83,7 +196,6 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
       })
   }, [sessions, search, gradeFilter, typeFilter, scoreFilter, dateFilter, sortBy])
 
-  // İstatistikler
   const stats = useMemo(() => {
     if (!sessions.length) return null
     const avg = Math.round(sessions.reduce((a, s) => a + s.pct, 0) / sessions.length)
@@ -93,7 +205,6 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
     return { avg, best, worst, weakCount, total: sessions.length }
   }, [sessions])
 
-  // Tarih grupları
   const grouped = useMemo(() => {
     const groups: { label: string; items: Session[] }[] = []
     let currentLabel = ''
@@ -109,6 +220,21 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
   }, [filtered])
 
   const activeFilters = [gradeFilter, typeFilter, scoreFilter, dateFilter].filter(f => f !== 'all').length
+
+  // ✅ YENİ: PDF export handler
+  async function handleExport(e: React.MouseEvent, session: Session) {
+    e.preventDefault()
+    e.stopPropagation()
+    setExportingId(session.id)
+    try {
+      await exportQuizPDF(session)
+    } catch (err) {
+      console.error('PDF export error:', err)
+      alert('PDF oluşturulurken hata oluştu.')
+    } finally {
+      setExportingId(null)
+    }
+  }
 
   return (
     <div style={{ maxWidth: '720px', margin: '0 auto', padding: '1.5rem', paddingBottom: '5rem' }}>
@@ -158,61 +284,49 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
           </button>
         </div>
 
-        {/* Genişletilmiş filtreler */}
         {showFilters && (
           <div className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '8px' }}>
-            {/* Sıralama */}
             <div>
               <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Sıralama</label>
-              <select value={sortBy} onChange={e => setSortBy(e.target.value as any)}
-                style={selectStyle}>
+              <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} style={selectStyle}>
                 <option value="date">En yeni</option>
                 <option value="pct_desc">En yüksek puan</option>
                 <option value="pct_asc">En düşük puan</option>
               </select>
             </div>
-            {/* Sınıf */}
             <div>
               <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Sınıf</label>
-              <select value={gradeFilter} onChange={e => setGradeFilter(e.target.value)}
-                style={selectStyle}>
+              <select value={gradeFilter} onChange={e => setGradeFilter(e.target.value)} style={selectStyle}>
                 <option value="all">Tümü</option>
                 {grades.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
             </div>
-            {/* Skor */}
             <div>
               <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Puan Aralığı</label>
-              <select value={scoreFilter} onChange={e => setScoreFilter(e.target.value)}
-                style={selectStyle}>
+              <select value={scoreFilter} onChange={e => setScoreFilter(e.target.value)} style={selectStyle}>
                 <option value="all">Tümü</option>
                 <option value="good">İyi (%80+)</option>
                 <option value="mid">Orta (%55-79)</option>
                 <option value="weak">Zayıf (-%55)</option>
               </select>
             </div>
-            {/* Tarih */}
             <div>
               <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Tarih</label>
-              <select value={dateFilter} onChange={e => setDateFilter(e.target.value)}
-                style={selectStyle}>
+              <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} style={selectStyle}>
                 <option value="all">Tümü</option>
                 <option value="week">Bu hafta</option>
                 <option value="month">Bu ay</option>
               </select>
             </div>
-            {/* Soru tipi */}
             {types.length > 0 && (
               <div>
                 <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Soru Tipi</label>
-                <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
-                  style={selectStyle}>
+                <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={selectStyle}>
                   <option value="all">Tümü</option>
                   {types.map(t => <option key={t} value={t}>{QUESTION_TYPE_LABELS[t!] || t}</option>)}
                 </select>
               </div>
             )}
-            {/* Filtreleri temizle */}
             {activeFilters > 0 && (
               <div style={{ display: 'flex', alignItems: 'flex-end' }}>
                 <button onClick={() => { setGradeFilter('all'); setScoreFilter('all'); setTypeFilter('all'); setDateFilter('all'); setSortBy('date') }}
@@ -224,7 +338,6 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
           </div>
         )}
 
-        {/* Aktif filtre etiketleri */}
         {activeFilters > 0 && !showFilters && (
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             {gradeFilter !== 'all' && <FilterTag label={`Sınıf: ${gradeFilter}`} onRemove={() => setGradeFilter('all')} />}
@@ -248,7 +361,6 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
         <div>
           {grouped.map(group => (
             <div key={group.label} style={{ marginBottom: '1.5rem' }}>
-              {/* Grup başlığı */}
               <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span>{group.label}</span>
                 <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
@@ -257,36 +369,57 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {group.items.map(s => (
-                  <Link key={s.id} href={`/archive/${s.id}`}
-                    style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderRadius: '14px', border: '1px solid var(--border)', background: 'var(--bg)', textDecoration: 'none', transition: 'all 0.15s' }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(8,36,101,0.3)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = '' }}>
+                  <div key={s.id} style={{ position: 'relative' }}>
+                    <Link href={`/archive/${s.id}`}
+                      style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', paddingRight: s.questions?.length ? '52px' : '16px', borderRadius: '14px', border: '1px solid var(--border)', background: 'var(--bg)', textDecoration: 'none', transition: 'all 0.15s' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(8,36,101,0.3)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = '' }}>
 
-                    {/* Puan kartı */}
-                    <div style={{ width: 52, height: 52, borderRadius: '12px', background: pctBg(s.pct), display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <span style={{ fontWeight: 800, fontSize: '16px', color: pctColor(s.pct), lineHeight: 1 }}>%{s.pct}</span>
-                      <span style={{ fontSize: '10px', color: pctColor(s.pct), opacity: 0.7, marginTop: '2px' }}>{s.score}/{s.question_count}</span>
-                    </div>
-
-                    {/* İçerik */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {s.topic}
+                      <div style={{ width: 52, height: 52, borderRadius: '12px', background: pctBg(s.pct), display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span style={{ fontWeight: 800, fontSize: '16px', color: pctColor(s.pct), lineHeight: 1 }}>%{s.pct}</span>
+                        <span style={{ fontSize: '10px', color: pctColor(s.pct), opacity: 0.7, marginTop: '2px' }}>{s.score}/{s.question_count}</span>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '11px', color: 'var(--text3)' }}>
-                        {s.grade && <span>📚 {s.grade}</span>}
-                        <span>❓ {s.question_count} soru</span>
-                        {s.question_type && s.question_type !== 'multiple_choice' && (
-                          <span>{QUESTION_TYPE_LABELS[s.question_type] || s.question_type}</span>
-                        )}
-                      </div>
-                    </div>
 
-                    {/* Tarih */}
-                    <div style={{ fontSize: '11px', color: 'var(--text4)', flexShrink: 0, textAlign: 'right' }}>
-                      {new Date(s.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
-                    </div>
-                  </Link>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {s.topic}
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '11px', color: 'var(--text3)' }}>
+                          {s.grade && <span>📚 {s.grade}</span>}
+                          <span>❓ {s.question_count} soru</span>
+                          {s.question_type && s.question_type !== 'multiple_choice' && (
+                            <span>{QUESTION_TYPE_LABELS[s.question_type] || s.question_type}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ fontSize: '11px', color: 'var(--text4)', flexShrink: 0, textAlign: 'right' }}>
+                        {new Date(s.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                      </div>
+                    </Link>
+
+                    {/* ✅ YENİ: PDF export butonu — sadece sorular varsa göster */}
+                    {s.questions && s.questions.length > 0 && (
+                      <button
+                        onClick={(e) => handleExport(e, s)}
+                        disabled={exportingId === s.id}
+                        title="PDF olarak indir"
+                        style={{
+                          position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                          width: 32, height: 32, borderRadius: '8px',
+                          background: exportingId === s.id ? 'var(--bg2)' : 'rgba(8,36,101,0.06)',
+                          border: '1px solid var(--border)',
+                          color: 'var(--text3)', cursor: exportingId === s.id ? 'not-allowed' : 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '14px', transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={e => { if (exportingId !== s.id) { e.currentTarget.style.background = 'rgba(8,36,101,0.12)'; e.currentTarget.style.color = 'var(--primary)' } }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(8,36,101,0.06)'; e.currentTarget.style.color = 'var(--text3)' }}
+                      >
+                        {exportingId === s.id ? '⏳' : '⬇️'}
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>

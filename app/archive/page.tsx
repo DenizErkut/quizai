@@ -17,7 +17,8 @@ export default function ArchivePage() {
 
       const { data } = await supabase
         .from('quiz_sessions')
-        .select('id, topic, grade, language, question_count, score, pct, completed, created_at')
+        // ✅ questions ve answers eklendi — PDF export ve analiz için gerekli
+        .select('id, topic, grade, language, question_count, score, pct, completed, created_at, question_type, questions, answers')
         .eq('user_id', user.id)
         .not('topic', 'is', null)
         .order('created_at', { ascending: false })
