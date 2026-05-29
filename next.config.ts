@@ -7,13 +7,6 @@ const nextConfig: NextConfig = {
     },
   },
   serverExternalPackages: ['pdf-parse'],
-  // API route body limit için
-  api: {
-    bodyParser: {
-      sizeLimit: '25mb',
-    },
-    responseLimit: '25mb',
-  },
 }
 
 export default nextConfig
