@@ -3,11 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 export const maxDuration = 60
-
-// App Router route handler için body size limit kaldır
 export const dynamic = 'force-dynamic'
 
-// Next.js 15+ için route segment config ile body limit aşma
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization')
@@ -23,12 +20,10 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabaseUser.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
-    // FormData'yı manuel parse et — Next.js default body limit bypass
     let formData: FormData
     try {
       formData = await req.formData()
     } catch (e: any) {
-      console.error('[pdf-tools] formData parse error:', e?.message)
       return NextResponse.json({ error: 'Dosya çok büyük veya format hatalı.', detail: e?.message }, { status: 413 })
     }
 
@@ -44,10 +39,11 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(bytes)
 
     if (action === 'to-word') {
-      const { PDFParse } = await import('pdf-parse')
-      const parser = new PDFParse({ data: buffer })
-      const result = await parser.getText({})
-      const text = result.text || ''
+      // pdf-parse v1: fonksiyon tabanlı, Vercel uyumlu (DOMMatrix gerektirmez)
+      // serverExternalPackages: ['pdf-parse'] next.config.ts'de olmalı
+      const pdfParse = require('pdf-parse')
+      const data = await pdfParse(buffer)
+      const text: string = data.text || ''
 
       console.log(`[pdf-tools] extracted text length: ${text.length}`)
 
@@ -92,7 +88,6 @@ export async function POST(req: NextRequest) {
       const fileName = file.name.replace('.pdf', '') + '.docx'
 
       console.log(`[pdf-tools] docx created: ${docBuffer.length} bytes`)
-      await parser.destroy()
 
       return new NextResponse(new Uint8Array(docBuffer), {
         status: 200,
@@ -139,7 +134,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       error: error?.message || 'İşlem başarısız.',
       detail: String(error),
-      stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
     }, { status: 500 })
   }
 }
