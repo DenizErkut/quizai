@@ -39,15 +39,26 @@ function pctBg(pct: number) {
   if (pct >= 55) return 'var(--amber-bg)'
   return 'var(--red-bg)'
 }
-function dateGroup(iso: string): string {
+function toLocalDateStr(iso: string): string {
+  // Supabase UTC timestamp → yerel tarih string (YYYY-MM-DD)
   const d = new Date(iso)
+  return d.toLocaleDateString('sv-SE') // ISO format: YYYY-MM-DD, locale-independent
+}
+
+function dateGroup(iso: string): string {
+  const sessionDate = toLocalDateStr(iso)
   const now = new Date()
-  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000)
-  if (diffDays === 0) return 'Bugün'
-  if (diffDays === 1) return 'Dün'
-  if (diffDays <= 7) return 'Bu Hafta'
-  if (diffDays <= 30) return 'Bu Ay'
-  return d.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
+  const todayStr = now.toLocaleDateString('sv-SE')
+  const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1)
+  const yesterdayStr = yesterday.toLocaleDateString('sv-SE')
+  const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7)
+  const monthAgo = new Date(now); monthAgo.setDate(now.getDate() - 30)
+
+  if (sessionDate === todayStr) return 'Bugün'
+  if (sessionDate === yesterdayStr) return 'Dün'
+  if (new Date(iso) >= weekAgo) return 'Bu Hafta'
+  if (new Date(iso) >= monthAgo) return 'Bu Ay'
+  return new Date(iso).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
 }
 
 // ✅ PDF Export fonksiyonu — jsPDF client-side
@@ -394,7 +405,7 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
                       </div>
 
                       <div style={{ fontSize: '11px', color: 'var(--text4)', flexShrink: 0, textAlign: 'right' }}>
-                        {new Date(s.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                        {new Date(s.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', timeZone: 'Europe/Istanbul' })}
                       </div>
                     </Link>
 

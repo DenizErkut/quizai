@@ -186,6 +186,7 @@ function QuizPageContent() {
         setSessionId(data.sessionId)
         setCurrent(0)
         setAnswers([])
+        answersRef.current = []
         setChosen(null)
         setScreen('quiz')
       }, 300)
@@ -280,7 +281,7 @@ function QuizPageContent() {
       fetchProfile()
       setQuestions(data.questions)
       setSessionId(data.sessionId)
-      setCurrent(0); setAnswers([]); setChosen(null)
+      setCurrent(0); setAnswers([]); answersRef.current = []; setChosen(null)
       setScreen('quiz')
     } catch {
       clearInterval(iv)
@@ -293,6 +294,7 @@ function QuizPageContent() {
     setQuestions(wrongQuestions)
     setCurrent(0)
     setAnswers([])
+    answersRef.current = []
     setChosen(null)
     setSessionId(null)
     setScreen('quiz')
@@ -1143,7 +1145,11 @@ function QuizPageContent() {
               function submitTable() {
                 const allCorrect = tableAnswers.every((ans: string, i: number) => tableCellCorrect(tInputs[i] || '', ans))
                 setChosen(allCorrect ? 0 : -1)
-                setAnswers(prev => [...prev, { userAns: allCorrect ? 0 : -1, correct: allCorrect }])
+                setAnswers(prev => {
+                  const next = [...prev, { userAns: allCorrect ? 0 : -1, correct: allCorrect }]
+                  answersRef.current = next
+                  return next
+                })
               }
               return (
                 <div>
