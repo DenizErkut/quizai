@@ -19,12 +19,21 @@ export default function ArchivePage() {
         .from('quiz_sessions')
         .select('id, topic, grade, language, question_count, score, pct, completed, created_at, question_type, questions, answers')
         .eq('user_id', user.id)
-        .eq('completed', true)        // ✅ Sadece tamamlanmış testler
+        .eq('completed', true)
         .not('topic', 'is', null)
-        .gt('pct', -1)                // ✅ pct null olan kayıtları dışla
         .order('created_at', { ascending: false })
 
-      setSessions(data ?? [])
+      // ✅ Client-side: score > 0 VEYA soru sayısı 0 olan (tamamlanmış ama boş)
+      // kayıtları filtrele — bozuk %0 kayıtları gösterme
+      // NOT: Kasıtlı %0 alan testler de gösterilsin (tüm soruları yanlış yapmak mümkün)
+      // Sadece score=0 VE question_count>0 VE answers boş olan bozuk kayıtları gizle
+      const cleaned = (data ?? []).filter((s: any) => {
+        const hasAnswers = Array.isArray(s.answers) && s.answers.length > 0
+        const isGenuineZero = s.pct === 0 && !hasAnswers && s.question_count > 0
+        return !isGenuineZero
+      })
+
+      setSessions(cleaned)
       setLoading(false)
     }
     load()
