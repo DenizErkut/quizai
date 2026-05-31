@@ -11,13 +11,19 @@ interface Session {
 interface Profile { name: string; grade: string; language: string }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })
+  return new Date(iso).toLocaleDateString('tr-TR', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    timeZone: 'Europe/Istanbul'
+  })
 }
 
 export default function DashboardPage() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [sessions, setSessions] = useState<Session[]>([])
+  const [sessions, setSessions] = useState<Session[]>([])       // Son 20 — liste için
+  const [totalCount, setTotalCount] = useState(0)               // ✅ Gerçek toplam
+  const [totalCorrect, setTotalCorrect] = useState(0)           // ✅ Gerçek toplam doğru
+  const [totalQ, setTotalQ] = useState(0)                       // ✅ Gerçek toplam soru
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -25,21 +31,44 @@ export default function DashboardPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
-      const [{ data: p }, { data: s }] = await Promise.all([
+
+      const [{ data: p }, { data: s }, { count }, { data: allStats }] = await Promise.all([
         supabase.from('profiles').select('name,grade,language').eq('id', user.id).single(),
-        supabase.from('quiz_sessions').select('id,topic,grade,score,pct,question_count,created_at')
-          .eq('user_id', user.id).eq('completed', true).order('created_at', { ascending: false }).limit(20),
+        // Son 20 test — liste gösterimi için
+        supabase.from('quiz_sessions')
+          .select('id,topic,grade,score,pct,question_count,created_at')
+          .eq('user_id', user.id)
+          .eq('completed', true)
+          .order('created_at', { ascending: false })
+          .limit(20),
+        // ✅ Gerçek toplam tamamlanmış test sayısı
+        supabase.from('quiz_sessions')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('completed', true),
+        // ✅ Tüm testlerin score ve question_count toplamı
+        supabase.from('quiz_sessions')
+          .select('score,question_count')
+          .eq('user_id', user.id)
+          .eq('completed', true),
       ])
+
       setProfile(p)
       setSessions(s || [])
+      setTotalCount(count || 0)
+
+      // Gerçek toplam doğru ve soru sayısı
+      const allSessions = allStats || []
+      setTotalCorrect(allSessions.reduce((sum: number, x: any) => sum + (x.score || 0), 0))
+      setTotalQ(allSessions.reduce((sum: number, x: any) => sum + (x.question_count || 0), 0))
+
       setLoading(false)
     }
     load()
   }, [])
 
-  const avgPct = sessions.length > 0 ? Math.round(sessions.reduce((s, x) => s + x.pct, 0) / sessions.length) : 0
-  const totalQ = sessions.reduce((s, x) => s + x.question_count, 0)
-  const totalCorrect = sessions.reduce((s, x) => s + x.score, 0)
+  const avgPct = sessions.length > 0
+    ? Math.round(sessions.reduce((s, x) => s + x.pct, 0) / sessions.length) : 0
   const bestPct = sessions.length > 0 ? Math.max(...sessions.map(x => x.pct)) : 0
 
   if (loading) return (
@@ -53,16 +82,16 @@ export default function DashboardPage() {
       <div className="glow-blob" style={{ top: '-100px', left: '-100px' }} />
       <div style={{ maxWidth: '720px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
 
-        {/* Nav */}
         <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
           <span className="serif" style={{ fontSize: '20px' }}>pratium</span>
           <div style={{ display: 'flex', gap: '8px' }}>
             <Link href="/quiz" className="btn btn-primary btn-sm">Yeni test ⚡</Link>
-            <button className="btn btn-ghost btn-sm" onClick={async () => { await createClient().auth.signOut(); router.push('/') }}>Çıkış</button>
+            <button className="btn btn-ghost btn-sm" onClick={async () => {
+              await createClient().auth.signOut(); router.push('/')
+            }}>Çıkış</button>
           </div>
         </nav>
 
-        {/* Header */}
         <div className="anim-up" style={{ marginBottom: '1.75rem' }}>
           <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>Dashboard</div>
           <h1 className="serif" style={{ fontSize: '30px' }}>
@@ -73,16 +102,18 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Stats */}
+        {/* ✅ Stats — gerçek toplam sayılar */}
         <div className="anim-up-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '1.5rem' }}>
           {[
-            { label: 'Test sayısı', value: sessions.length, suffix: '' },
+            { label: 'Test sayısı', value: totalCount, suffix: '' },
             { label: 'Ortalama', value: avgPct, suffix: '%' },
             { label: 'En yüksek', value: bestPct, suffix: '%' },
             { label: 'Toplam soru', value: totalQ, suffix: '' },
           ].map((s, i) => (
             <div key={i} className="card-sm" style={{ textAlign: 'center' }}>
-              <div className="serif" style={{ fontSize: '28px', lineHeight: 1.1 }}>{s.value}<span style={{ fontSize: '14px', color: 'var(--text2)' }}>{s.suffix}</span></div>
+              <div className="serif" style={{ fontSize: '28px', lineHeight: 1.1 }}>
+                {s.value}<span style={{ fontSize: '14px', color: 'var(--text2)' }}>{s.suffix}</span>
+              </div>
               <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</div>
             </div>
           ))}
@@ -116,8 +147,15 @@ export default function DashboardPage() {
 
         {/* Sessions list */}
         <div className="card anim-up-3">
-          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
-            Geçmiş testler
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Geçmiş testler
+            </div>
+            {totalCount > 20 && (
+              <Link href="/archive" style={{ fontSize: '12px', color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>
+                Tümünü gör ({totalCount}) →
+              </Link>
+            )}
           </div>
           {sessions.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text3)' }}>
@@ -152,7 +190,6 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Stats summary */}
         {sessions.length > 0 && (
           <div className="card-sm anim-up-4" style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '13px', color: 'var(--text2)' }}>

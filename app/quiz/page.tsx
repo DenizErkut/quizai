@@ -890,7 +890,7 @@ function QuizPageContent() {
             <img src='/pratium-logo-new.svg' alt='Pratium' style={{ height: '32px' }} />
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '99px', background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600 }}>{diff.label}</span>
-              <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{answers.filter(a => a.correct).length}/{current} doğru</span>
+              <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{answers.filter(a => a.correct).length}/{answers.length || current} doğru</span>
             </div>
           </div>
           <div className="progress-bar" style={{ marginBottom: '1.5rem' }}>
