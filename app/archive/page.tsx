@@ -17,10 +17,11 @@ export default function ArchivePage() {
 
       const { data } = await supabase
         .from('quiz_sessions')
-        // ✅ questions ve answers eklendi — PDF export ve analiz için gerekli
         .select('id, topic, grade, language, question_count, score, pct, completed, created_at, question_type, questions, answers')
         .eq('user_id', user.id)
+        .eq('completed', true)        // ✅ Sadece tamamlanmış testler
         .not('topic', 'is', null)
+        .gt('pct', -1)                // ✅ pct null olan kayıtları dışla
         .order('created_at', { ascending: false })
 
       setSessions(data ?? [])
