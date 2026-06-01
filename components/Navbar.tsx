@@ -450,19 +450,19 @@ export default function Navbar() {
         padding: '8px 0 max(8px, env(safe-area-inset-bottom))',
       }}>
         {[
-          { href: '/quiz', label: 'Test', icon: '⚡' },
-          { href: '/daily', label: streak > 0 ? `${streak} gün` : 'Günlük', icon: streak > 0 ? '🔥' : '📅' },
-          { href: '/leaderboard', label: 'Sıralama', icon: '🏆' },
-          { href: '/classes', label: 'Sınıflarım', icon: '🏫' },
-          { href: '/archive', label: 'Arşiv', icon: '🗂️' },
+          { href: '/quiz',        label: 'Test',    icon: '⚡' },
+          { href: '/daily',       label: streak > 0 ? `${streak} gün` : 'Günlük', icon: streak > 0 ? '🔥' : '📅' },
+          { href: '/analysis',    label: 'Analiz',  icon: '📊' },
+          { href: '/archive',     label: 'Arşiv',   icon: '🗂️' },
+          { href: '/pdf-tools',   label: 'PDF',     icon: '🛠️' },
         ].map(item => (
           <Link key={item.href} href={item.href} style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
-            textDecoration: 'none', padding: '6px 10px', borderRadius: '10px', minWidth: '56px',
+            textDecoration: 'none', padding: '6px 8px', borderRadius: '10px', minWidth: '52px', flex: 1,
             background: pathname === item.href ? 'rgba(253,211,29,0.12)' : 'transparent',
           }}>
             <span style={{ fontSize: '20px', lineHeight: 1 }}>{item.icon}</span>
-            <span style={{ fontSize: '10px', fontWeight: pathname === item.href ? 700 : 400, color: pathname === item.href ? '#fdd31d' : 'rgba(255,255,255,0.5)' }}>
+            <span style={{ fontSize: '10px', fontWeight: pathname === item.href ? 700 : 400, color: pathname === item.href ? '#fdd31d' : 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
               {item.label}
             </span>
           </Link>

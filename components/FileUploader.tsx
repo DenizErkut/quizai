@@ -13,6 +13,7 @@ export interface UploadedFile {
   progress: number      // 0-100
   status: 'uploading' | 'done' | 'error'
   error?: string
+  note?: string
 }
 
 interface Props {
@@ -123,6 +124,7 @@ export default function FileUploader({ onFilesChange, maxFiles = 5, maxMB = 20, 
             status: 'done',
             content: data.content,
             fileType: data.type,
+            note: data.note || undefined,
           })
         }
       }
@@ -221,7 +223,9 @@ export default function FileUploader({ onFilesChange, maxFiles = 5, maxMB = 20, 
                   </div>
                   <div style={{ fontSize: '11px', marginTop: '2px', color: f.status === 'error' ? 'var(--red)' : f.status === 'done' ? 'var(--green)' : 'var(--accent)' }}>
                     {f.status === 'error' && (f.error || 'Hata')}
-                    {f.status === 'done' && `✓ ${f.content.split(' ').length} kelime · ${formatSize(f.size)}`}
+                    {f.status === 'done' && (
+                      <span>✓ {f.content.split(' ').length} kelime · {formatSize(f.size)}{f.note && <span style={{ marginLeft:'6px', color:'var(--accent)', fontSize:'10px' }}>{f.note}</span>}</span>
+                    )}
                     {f.status === 'uploading' && `${formatSize(f.size)} yükleniyor...`}
                   </div>
 
