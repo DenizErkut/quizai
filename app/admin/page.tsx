@@ -224,20 +224,31 @@ export default function AdminPage() {
 
   async function updatePlan(userId: string, plan: 'free' | 'premium', months?: number) {
     setUpdating(userId)
-    const expires = plan === 'premium' && months
-      ? new Date(Date.now() + months * 30 * 24 * 60 * 60 * 1000).toISOString()
-      : null
-
-    await supabase.from('profiles').update({
-      plan,
-      plan_expires_at: expires,
-      monthly_test_count: plan === 'free' ? 0 : undefined,
-    }).eq('id', userId)
-
-    setUsers(prev => prev.map(u => u.id === userId
-      ? { ...u, plan, plan_expires_at: expires }
-      : u))
-    setUpdating(null)
+    try {
+      // ✅ Service role ile güncelle — client-side RLS bypass için API route
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin/update-plan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ userId, plan, months }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(`Hata: ${data.error}`)
+        return
+      }
+      const expires = data.expires
+      setUsers(prev => prev.map(u => u.id === userId
+        ? { ...u, plan, plan_expires_at: expires }
+        : u))
+    } catch(e: any) {
+      alert(`Bağlantı hatası: ${e.message}`)
+    } finally {
+      setUpdating(null)
+    }
   }
 
   async function resetTestCount(userId: string) {
@@ -487,18 +498,44 @@ export default function AdminPage() {
                                 </button>
                                 <button
                                   disabled={updating === u.id}
+                                  onClick={() => updatePlan(u.id, 'premium', 3)}
+                                  style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(22,163,74,0.3)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                  +3 ay
+                                </button>
+                                <button
+                                  disabled={updating === u.id}
                                   onClick={() => updatePlan(u.id, 'premium', 12)}
                                   style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(22,163,74,0.3)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                                   +1 yıl
                                 </button>
                               </>
                             ) : (
-                              <button
-                                disabled={updating === u.id}
-                                onClick={() => updatePlan(u.id, 'free')}
-                                style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text2)', cursor: 'pointer' }}>
-                                Free'ye al
-                              </button>
+                              <>
+                                <button
+                                  disabled={updating === u.id}
+                                  onClick={() => updatePlan(u.id, 'premium', 1)}
+                                  style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(22,163,74,0.3)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                  +1 ay
+                                </button>
+                                <button
+                                  disabled={updating === u.id}
+                                  onClick={() => updatePlan(u.id, 'premium', 3)}
+                                  style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(22,163,74,0.3)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                  +3 ay
+                                </button>
+                                <button
+                                  disabled={updating === u.id}
+                                  onClick={() => updatePlan(u.id, 'premium', 12)}
+                                  style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(22,163,74,0.3)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                  +1 yıl
+                                </button>
+                                <button
+                                  disabled={updating === u.id}
+                                  onClick={() => updatePlan(u.id, 'free')}
+                                  style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text2)', cursor: 'pointer' }}>
+                                  Free'ye al
+                                </button>
+                              </>
                             )}
                             <button
                               disabled={updating === u.id}
