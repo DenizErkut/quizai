@@ -323,7 +323,8 @@ function QuizPageContent() {
   const [matchSelections, setMatchSelections] = useState<Record<number, number>>({})
   const [orderItems, setOrderItems] = useState<string[]>([])
   const [fillInput, setFillInput] = useState('')
-  const [checkingAnswer, setCheckingAnswer] = useState(false) // ✅ AI kontrol sırasında butonu kilitle
+  const [checkingAnswer, setCheckingAnswer] = useState(false)
+  const isSavingRef = useRef(false) // ✅ Çift save-quiz çağrısını önle // ✅ AI kontrol sırasında butonu kilitle
   const [mTFAnswers, setMTFAnswers] = useState<Record<number, boolean | null>>({})
   const [tInputs, setTInputs] = useState<string[]>([])
 
@@ -488,6 +489,9 @@ function QuizPageContent() {
 
   async function next() {
     if (current + 1 >= questions.length) {
+      // ✅ Çift tıklama / çift tetiklenme koruması
+      if (isSavingRef.current) return
+      isSavingRef.current = true
       // Son sorunun correct değerini answers array'inden al
       // answers state async — son eklenen correct field'ını kullan
       // ✅ answersRef: React state async sorunundan bağımsız, her zaman güncel
@@ -560,6 +564,7 @@ function QuizPageContent() {
         const ytData = await ytRes.json()
         if (ytData.links) setYoutubeLinks(ytData.links)
       } catch { /* YouTube linki olmasa da devam et */ }
+      isSavingRef.current = false
       setScreen('result')
     } else { setCurrent(c => c + 1); setChosen(null) }
   }
@@ -1211,8 +1216,8 @@ function QuizPageContent() {
                 <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', borderLeft: '3px solid var(--accent)', fontSize: '13px', color: 'var(--text2)', lineHeight: 1.65 }}>
                   <strong style={{ color: chosen === q.ans ? 'var(--green)' : 'var(--red)' }}>{chosen === q.ans ? 'Doğru! ' : 'Yanlış. '}</strong>{q.exp}
                 </div>
-                <button className="btn btn-primary" onClick={next} disabled={checkingAnswer} style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}>
-                  {current + 1 < questions.length ? 'Sonraki soru →' : 'Sonuçları gör →'}
+                <button className="btn btn-primary" onClick={next} disabled={checkingAnswer || isSavingRef.current} style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}>
+                  {current + 1 < questions.length ? 'Sonraki soru →' : (isSavingRef.current ? 'Kaydediliyor...' : 'Sonuçları gör →')}
                 </button>
               </>
             )}
