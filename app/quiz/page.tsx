@@ -188,6 +188,11 @@ function QuizPageContent() {
         setAnswers([])
         answersRef.current = []
         setChosen(null)
+        setFillInput('')
+        setShortInput('')
+        setMatchSelections({})
+        setOrderItems([])
+        isSavingRef.current = false
         setScreen('quiz')
       }, 300)
       return () => clearTimeout(timer)
