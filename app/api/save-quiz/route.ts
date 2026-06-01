@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     // Mark completed
     const { error: updateError, data: updateData } = await supabase
       .from('quiz_sessions')
-      .update({ answers, score, pct, completed: true })
+      .update({ answers, score, completed: true }) // pct: generated column, DB otomatik hesaplıyor
       .eq('id', sessionId)
       .select('id, pct, score, completed')
 
@@ -109,8 +109,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    console.log(`[save-quiz] SUCCESS sessionId=${sessionId} pct=${pct}`)
-    return NextResponse.json({ success: true, pct })
+    const dbPct = updateData?.[0]?.pct ?? pct
+    console.log(`[save-quiz] SUCCESS sessionId=${sessionId} pct=${dbPct}`)
+    return NextResponse.json({ success: true, pct: updateData?.[0]?.pct ?? pct })
   } catch (error: any) {
     console.error('[save-quiz] ERROR:', error?.message)
     return NextResponse.json({ error: error?.message || 'Save failed' }, { status: 500 })
