@@ -89,6 +89,7 @@ function QuizPageContent() {
   const [answers, setAnswers] = useState<{ userAns: number; correct: boolean }[]>([])
   // ✅ answersRef: save-quiz için her zaman güncel değeri tut (React state async sorununu çözer)
   const answersRef = useRef<{ userAns: number; correct: boolean }[]>([])
+  const isSavingRef = useRef(false) // ✅ Çift save-quiz çağrısını önle
   const [chosen, setChosen] = useState<number | null>(null)
   const searchParams = useSearchParams()
   const [loadMsg, setLoadMsg] = useState('Profilin analiz ediliyor...')
@@ -329,7 +330,6 @@ function QuizPageContent() {
   const [orderItems, setOrderItems] = useState<string[]>([])
   const [fillInput, setFillInput] = useState('')
   const [checkingAnswer, setCheckingAnswer] = useState(false)
-  const isSavingRef = useRef(false) // ✅ Çift save-quiz çağrısını önle // ✅ AI kontrol sırasında butonu kilitle
   const [mTFAnswers, setMTFAnswers] = useState<Record<number, boolean | null>>({})
   const [tInputs, setTInputs] = useState<string[]>([])
 
