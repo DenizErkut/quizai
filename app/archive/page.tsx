@@ -23,17 +23,9 @@ export default function ArchivePage() {
         .not('topic', 'is', null)
         .order('created_at', { ascending: false })
 
-      // ✅ Client-side: score > 0 VEYA soru sayısı 0 olan (tamamlanmış ama boş)
-      // kayıtları filtrele — bozuk %0 kayıtları gösterme
-      // NOT: Kasıtlı %0 alan testler de gösterilsin (tüm soruları yanlış yapmak mümkün)
-      // Sadece score=0 VE question_count>0 VE answers boş olan bozuk kayıtları gizle
-      const cleaned = (data ?? []).filter((s: any) => {
-        const hasAnswers = Array.isArray(s.answers) && s.answers.length > 0
-        const isGenuineZero = s.pct === 0 && !hasAnswers && s.question_count > 0
-        return !isGenuineZero
-      })
-
-      setSessions(cleaned)
+      // Tüm completed:true testleri göster — filtreleme kaldırıldı
+      // %0 testler dahil, kullanıcı kasıtlı 0 alabilir
+      setSessions(data ?? [])
       setLoading(false)
     }
     load()

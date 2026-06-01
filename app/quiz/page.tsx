@@ -281,7 +281,7 @@ function QuizPageContent() {
       fetchProfile()
       setQuestions(data.questions)
       setSessionId(data.sessionId)
-      setCurrent(0); setAnswers([]); answersRef.current = []; setChosen(null)
+      setCurrent(0); setAnswers([]); answersRef.current = []; setChosen(null); setCheckingAnswer(false)
       setScreen('quiz')
     } catch {
       clearInterval(iv)
@@ -323,6 +323,7 @@ function QuizPageContent() {
   const [matchSelections, setMatchSelections] = useState<Record<number, number>>({})
   const [orderItems, setOrderItems] = useState<string[]>([])
   const [fillInput, setFillInput] = useState('')
+  const [checkingAnswer, setCheckingAnswer] = useState(false) // ✅ AI kontrol sırasında butonu kilitle
   const [mTFAnswers, setMTFAnswers] = useState<Record<number, boolean | null>>({})
   const [tInputs, setTInputs] = useState<string[]>([])
 
@@ -364,10 +365,13 @@ function QuizPageContent() {
 
   async function submitShortAnswer() {
     if (!fillInput.trim() && !shortInput.trim()) return
+    if (checkingAnswer) return // ✅ Çift submit önle
     const q = questions[current]
     const userText = (fillInput || shortInput).trim()
     const correctAnswer = q.blank || q.opts?.[q.ans] || ''
     let correct = false
+
+    setCheckingAnswer(true) // ✅ Butonu kilitle
 
     if (isSimilarEnough(userText, correctAnswer)) {
       correct = true
@@ -397,6 +401,7 @@ function QuizPageContent() {
       answersRef.current = next
       return next
     })
+    setCheckingAnswer(false) // ✅ Kilidi aç
   }
 
   function submitMatching() {
@@ -969,7 +974,7 @@ function QuizPageContent() {
                   placeholder="Cevabınızı yazın..."
                   style={{ width: '100%', padding: '14px 16px', borderRadius: '10px', fontSize: '16px', fontFamily: 'var(--font-sans)', border: `2px solid ${chosen !== null ? (answers[answers.length-1]?.correct ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.4)') : 'var(--border)'}`, background: chosen !== null ? (answers[answers.length-1]?.correct ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', outline: 'none', boxSizing: 'border-box', color: 'var(--text)' }} />
                 {chosen === null && (
-                  <button className="btn btn-primary" onClick={submitShortAnswer} disabled={!fillInput.trim()}
+                  <button className="btn btn-primary" onClick={submitShortAnswer} disabled={!fillInput.trim() || checkingAnswer}
                     style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }}>
                     Cevapla →
                   </button>
@@ -991,7 +996,7 @@ function QuizPageContent() {
                   rows={3}
                   style={{ width: '100%', padding: '12px 16px', borderRadius: '10px', fontSize: '14px', fontFamily: 'var(--font-sans)', border: '2px solid var(--border)', background: 'var(--bg2)', outline: 'none', resize: 'vertical', boxSizing: 'border-box', color: 'var(--text)' }} />
                 {chosen === null && (
-                  <button className="btn btn-primary" onClick={submitShortAnswer} disabled={!shortInput.trim()}
+                  <button className="btn btn-primary" onClick={submitShortAnswer} disabled={!shortInput.trim() || checkingAnswer}
                     style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }}>
                     Gönder →
                   </button>
@@ -1206,7 +1211,7 @@ function QuizPageContent() {
                 <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', borderLeft: '3px solid var(--accent)', fontSize: '13px', color: 'var(--text2)', lineHeight: 1.65 }}>
                   <strong style={{ color: chosen === q.ans ? 'var(--green)' : 'var(--red)' }}>{chosen === q.ans ? 'Doğru! ' : 'Yanlış. '}</strong>{q.exp}
                 </div>
-                <button className="btn btn-primary" onClick={next} style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}>
+                <button className="btn btn-primary" onClick={next} disabled={checkingAnswer} style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}>
                   {current + 1 < questions.length ? 'Sonraki soru →' : 'Sonuçları gör →'}
                 </button>
               </>
