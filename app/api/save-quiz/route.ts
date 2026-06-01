@@ -32,10 +32,18 @@ export async function POST(req: NextRequest) {
       ? Math.round((score / session.question_count) * 100) : 0
 
     // Mark completed
-    await supabase
+    const { error: updateError, data: updateData } = await supabase
       .from('quiz_sessions')
       .update({ answers, score, pct, completed: true })
       .eq('id', sessionId)
+      .select('id, pct, score, completed')
+
+    console.log('[save-quiz] update result:', JSON.stringify({ updateData, updateError, sessionId, score, pct }))
+    
+    if (updateError) {
+      console.error('[save-quiz] update ERROR:', updateError.message, updateError.code)
+      return NextResponse.json({ error: 'DB update failed', detail: updateError.message }, { status: 500 })
+    }
 
     // Streak güncelle
     const today = new Date().toISOString().split('T')[0]
