@@ -203,7 +203,7 @@ function buildPrompt(type: string, topic: string, grade: string, difficulty: str
     ? `Topic: "${topic}". Generate questions from this content:\n${fileContent.slice(0, 3000)}`
     : `Topic: "${topic}".`
 
-  const base = `${contentNote}\nLevel: ${grade}. Difficulty: ${difficulty}. Language for all questions and explanations: ${language}. Question count: ${count}.\n\nCRITICAL ACCURACY RULES:\n1. For math: solve fully before writing, verify the answer is in opts at the correct index\n2. For science/history: only include facts you are certain about\n3. The "ans" index must point to the CORRECT answer in "opts"\n4. If you are unsure, use a simpler question\n\nReturn ONLY valid JSON, no markdown, no explanation.\n\n`
+  const base = `Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın.\n\nKESİN KURAL: Yalnızca MEB müfredatında yer alan konularda, MEB kazanımlarına uygun sorular üret. Müfredat dışı, spekülatif veya tartışmalı içerik kesinlikle üretme.\n\n${contentNote}\nSeviye: ${grade}. Zorluk: ${difficulty}. Soru dili: ${language}. Soru sayısı: ${count}.\n\nDOĞRULUK KURALLARI:\n1. Matematik: Her soruyu adım adım çöz, cevabın opts dizisinde doğru indexte olduğunu doğrula\n2. Fen/Tarih: Sadece kesin bildiğin gerçekleri yaz\n3. "ans" indexi MUTLAKA doğru cevabı göstermeli\n4. Emin olmadığın sorular yerine daha basit ama kesin sorular yaz\n5. MEB müfredatına uygun kazanım ve konu kapsamında kal\n\nYalnızca geçerli JSON döndür, markdown veya açıklama ekleme.\n\n`
 
   if (type === 'fill_blank') return base + `Generate fill-in-the-blank questions. Leave a critical word/concept as blank. Provide 4 options (one correct), write the correct answer in "blank" field too.\n\n{"questions":[{"type":"fill_blank","q":"_____ is the powerhouse of the cell.","blank":"Mitochondria","opts":["Mitochondria","Ribosome","Nucleus","Lysosome"],"ans":0,"exp":"Mitochondria produces ATP through cellular respiration."}]}`
 
@@ -344,6 +344,7 @@ export async function POST(req: NextRequest) {
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5',
       max_tokens: 4000,
+      system: 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca MEB müfredatındaki konularda soru üret. Müfredat dışı, siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.',
       messages: [{ role: 'user', content: prompt }],
     })
 
