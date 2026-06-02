@@ -39,7 +39,7 @@ const SUBJECT_MAP: Record<string, Record<string, string[]>> = {
     'Tarih': ['Osmanlı tarihi', 'Kurtuluş Savaşı', 'Atatürk dönemi', 'İlk Türk devletleri', 'Osmanlı yükseliş dönemi', 'Osmanlı duraklama dönemi'],
     'Coğrafya': ['Türkiye haritası', 'İklim bölgeleri', 'Nüfus ve göç', 'Ekonomik faaliyetler', 'Doğal afetler', 'Yeryüzü şekilleri'],
     'İngilizce': ['Present tense', 'Past tense', 'Future tense', 'Modal verbs', 'Vocabulary', 'Reading comprehension'],
-    'Din Kültürü': ['İslam'ın şartları', 'Kuran-ı Kerim', 'Peygamberler', 'Ahlak ve değerler', 'İbadetler'],
+    'Din Kültürü': ["İslam'ın şartları", 'Kuran-ı Kerim', 'Peygamberler', 'Ahlak ve değerler', 'İbadetler'],
   },
   lise: {
     'Matematik': ['Türev temelleri', 'İntegral', 'Logaritma', 'Trigonometri', 'Limit', 'Fonksiyonlar', 'Vektörler', 'Matrisler', 'Kombinasyon', 'Olasılık', 'İstatistik', 'Analitik geometri'],
