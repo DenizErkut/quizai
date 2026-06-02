@@ -81,7 +81,17 @@ CRITICAL SVG RULES:
 - Font: Arial, minimum 13px for readability
 - Add a subtle title at top relating to the question
 - NO JavaScript, NO external resources, NO foreignObject
-- Return ONLY the SVG code, nothing else, starting with <svg`
+- Return ONLY the SVG code, nothing else, starting with <svg
+
+CRITICAL - DO NOT REVEAL THE ANSWER:
+- NEVER show the correct answer, solution, or result in the diagram
+- For geometry: show the shape with labels but leave the unknown value as "?" 
+- For maps: show the region/country outline but do NOT label the answer
+- For biology: show the structure with some labels blank or marked as "?"
+- For physics: show the scenario/setup but NOT the calculated result
+- For history: show a timeline with some events marked as "?" if they are the answer
+- The diagram should ILLUSTRATE the question, not answer it
+- If the question asks "what is X?", do NOT write X's value in the diagram`
 
   const guides: Record<string, string> = {
     geometry: `Draw the geometric shape relevant to this question. Label all sides, angles, and measurements mentioned. Use blue for shapes, red for the unknown/highlighted element. Show the formula if applicable.`,
@@ -208,6 +218,7 @@ export async function POST(req: NextRequest) {
     // Tekrar eden soruları önle
     let previousQuestionsNote = ''
     try {
+      // ✅ Son 10 test, 50 soru — agresif tekrar önleme
       const { data: recentSessions } = await supabase
         .from('quiz_sessions')
         .select('questions')
@@ -215,17 +226,33 @@ export async function POST(req: NextRequest) {
         .eq('topic', topic)
         .eq('completed', true)
         .order('created_at', { ascending: false })
-        .limit(5)
+        .limit(10)
 
       if (recentSessions?.length) {
         const prevQTexts: string[] = []
+        // Anahtar kelimeler çıkar — benzer soruları da yakala
+        const prevKeywords = new Set<string>()
+
         recentSessions.forEach((s: any) => {
           (s.questions || []).forEach((q: any) => {
-            if (q.q && prevQTexts.length < 30) prevQTexts.push(q.q.slice(0, 80))
+            if (!q.q) return
+            if (prevQTexts.length < 50) prevQTexts.push(q.q.slice(0, 100))
+            // İlk 3 kelimeyi keyword olarak ekle — benzer soruları önle
+            q.q.split(' ').slice(0, 5).forEach((w: string) => {
+              if (w.length > 3) prevKeywords.add(w.toLowerCase())
+            })
           })
         })
+
         if (prevQTexts.length > 0) {
-          previousQuestionsNote = `\n\nIMPORTANT - DO NOT REPEAT these previously asked questions:\n${prevQTexts.map((q, i) => `${i + 1}. ${q}`).join('\n')}`
+          previousQuestionsNote = `\n\nCRITICAL - GENERATE COMPLETELY DIFFERENT QUESTIONS:\n` +
+            `These ${prevQTexts.length} questions were already asked recently - DO NOT repeat or rephrase them:\n` +
+            `${prevQTexts.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n\n` +
+            `VARIETY RULES:\n` +
+            `- Ask about DIFFERENT aspects, events, or concepts within the topic\n` +
+            `- Use DIFFERENT question formats and difficulty angles\n` +
+            `- If a concept was already tested, test a RELATED but DIFFERENT concept\n` +
+            `- Prioritize less-tested sub-topics and edge cases`
         }
       }
     } catch (e) {
