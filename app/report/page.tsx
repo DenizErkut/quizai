@@ -134,7 +134,7 @@ export default function StudentReportPage() {
             <div style={{ display: 'flex', gap: '12px', marginTop: '8px', fontSize: '11px' }}>
               <span style={{ color: 'var(--green)' }}>■ ≥%80</span>
               <span style={{ color: '#f59e0b' }}>■ %50-79</span>
-              <span style={{ color: 'var(--red)' }}>■ &lt;%50</span>
+              <span style={{ color: 'var(--red)' }}>■ <%50</span>
             </div>
           </div>
         )}
