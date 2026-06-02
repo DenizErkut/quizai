@@ -957,7 +957,7 @@ export default function AdminPage() {
                 }
               }}
               style={{ padding: '10px 20px', borderRadius: '10px', background: 'var(--primary)', color: '#fff', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {mebUploading ? <><span className="spinner" style={{ width: 16, height: 16, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> Yükleniyor...</> : '📤 Yükle ve Chunk'la'}
+              {mebUploading ? <><span className="spinner" style={{ width: 16, height: 16, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> Yükleniyor...</> : "📤 Yükle ve Chunkla"}
             </button>
           </div>
 
