@@ -24,35 +24,50 @@ interface Question {
 }
 interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number; daily_test_count?: number; daily_test_date?: string }
 
+// Ders bazlı konu haritası — ana ders → alt konular
+const SUBJECT_MAP: Record<string, Record<string, string[]>> = {
+  ilkokul: {
+    'Matematik': ['Toplama ve çıkarma', 'Çarpım tablosu', 'Bölme işlemi', 'Kesirler', 'Geometrik şekiller', 'Ölçü birimleri', 'Problem çözme'],
+    'Türkçe': ['Okuma anlama', 'Yazım kuralları', 'Sözcük türleri', 'Cümle bilgisi', 'Noktalama işaretleri'],
+    'Fen Bilimleri': ['Hayvanlar alemi', 'Bitkiler', 'Mevsimler ve iklim', 'Madde ve değişim', 'Duyu organları', 'Sağlıklı yaşam'],
+    'Sosyal Bilgiler': ['Türkiye haritası', 'Atatürk ve Cumhuriyet', 'Aile ve toplum', 'Haklar ve sorumluluklar', 'Üretim ve tüketim'],
+  },
+  ortaokul: {
+    'Matematik': ['Tam sayılar', 'Ondalık sayılar', 'Kesirler', 'Denklemler', 'Oran ve orantı', 'Yüzdeler', 'Geometri', 'Alan ve çevre', 'Veri analizi', 'Olasılık', 'Asal sayılar', 'OBEB/OKEK'],
+    'Fen Bilimleri': ['Hücre ve organeller', 'Fotosentez ve solunum', 'Sindirim sistemi', 'Dolaşım sistemi', 'Madde ve atom', 'Kuvvet ve hareket', 'Elektrik', 'Işık ve ses', 'Ekosistem'],
+    'Türkçe': ['Sözcük türleri', 'Cümle çeşitleri', 'Anlam bilgisi', 'Yazım kuralları', 'Paragraf', 'Metin türleri', 'Noktalama'],
+    'Tarih': ['Osmanlı tarihi', 'Kurtuluş Savaşı', 'Atatürk dönemi', 'İlk Türk devletleri', 'Osmanlı yükseliş dönemi', 'Osmanlı duraklama dönemi'],
+    'Coğrafya': ['Türkiye haritası', 'İklim bölgeleri', 'Nüfus ve göç', 'Ekonomik faaliyetler', 'Doğal afetler', 'Yeryüzü şekilleri'],
+    'İngilizce': ['Present tense', 'Past tense', 'Future tense', 'Modal verbs', 'Vocabulary', 'Reading comprehension'],
+    'Din Kültürü': ['İslam'ın şartları', 'Kuran-ı Kerim', 'Peygamberler', 'Ahlak ve değerler', 'İbadetler'],
+  },
+  lise: {
+    'Matematik': ['Türev temelleri', 'İntegral', 'Logaritma', 'Trigonometri', 'Limit', 'Fonksiyonlar', 'Vektörler', 'Matrisler', 'Kombinasyon', 'Olasılık', 'İstatistik', 'Analitik geometri'],
+    'Fizik': ['Kuvvet ve hareket', 'Enerji', 'Dalgalar', 'Optik', 'Elektrik ve manyetizma', 'Termodinamik', 'Atom fiziği', 'Newton yasaları'],
+    'Kimya': ['Organik kimya', 'Asit ve bazlar', 'Kimyasal tepkimeler', 'Periyodik tablo', 'Mol kavramı', 'Çözeltiler', 'Kimyasal bağlar'],
+    'Biyoloji': ['Genetik ve DNA', 'Evrim', 'Ekosistem', 'Hücre bölünmesi', 'Sinir sistemi', 'Endokrin sistem', 'Üreme sistemi'],
+    'Tarih': ['Atatürk ilkeleri', 'Osmanlı son dönemi', 'Cumhuriyet tarihi', 'Dünya savaşları', 'Soğuk savaş', 'Türk devlet tarihi'],
+    'Coğrafya': ['Türkiye coğrafyası', 'Dünya coğrafyası', 'Nüfus coğrafyası', 'Ekonomik coğrafya', 'Çevre sorunları'],
+    'Türk Dili ve Edebiyatı': ['Şiir türleri', 'Roman analizi', 'Divan edebiyatı', 'Cumhuriyet edebiyatı', 'Anlatı teknikleri', 'Söz sanatları'],
+    'Felsefe': ['Felsefenin temelleri', 'Varlık felsefesi', 'Bilgi felsefesi', 'Ahlak felsefesi', 'Siyaset felsefesi'],
+    'İngilizce': ['Grammar', 'Reading', 'Vocabulary', 'Writing skills', 'Tenses', 'Conditionals'],
+  },
+  universite: {
+    'Matematik': ['Diferansiyel denklemler', 'Lineer cebir', 'Sayısal analiz', 'İstatistik ve olasılık', 'Kompleks analiz'],
+    'Fizik': ['Termodinamik', 'Elektromanyetizma', 'Kuantum mekaniği', 'Klasik mekanik'],
+    'İktisat': ['Makroekonomi', 'Mikroekonomi', 'Uluslararası ekonomi', 'Para teorisi'],
+    'Bilişim': ['Veri yapıları', 'Algoritmalar', 'Veritabanı', 'Yazılım mühendisliği', 'Yapay zeka'],
+    'Havacılık': ['Uçağın kısımları', 'Aerodinamik', 'Navigasyon', 'Meteoroloji', 'Havacılık tarihi', 'Uçuş sistemleri'],
+    'Hukuk': ['Medeni hukuk', 'Ceza hukuku', 'İdare hukuku', 'Anayasa hukuku'],
+  },
+}
+
+// Eski format ile uyumluluk — suggestions için
 const TOPIC_MAP: Record<string, { topic: string; subject: string }[]> = {
-  ilkokul: [
-    { topic: 'Toplama ve cikarma', subject: 'Matematik' },
-    { topic: 'Hayvanlar alemi', subject: 'Fen' },
-    { topic: 'Mevsimler ve iklim', subject: 'Fen' },
-    { topic: 'Turkiye haritasi', subject: 'Sosyal' },
-    { topic: 'Carpim tablosu', subject: 'Matematik' },
-  ],
-  ortaokul: [
-    { topic: 'Ondalik sayilar', subject: 'Matematik' },
-    { topic: 'Hucre ve organeller', subject: 'Fen' },
-    { topic: 'Osmanli tarihi', subject: 'Tarih' },
-    { topic: 'Denklemler', subject: 'Matematik' },
-    { topic: 'Tam sayilar', subject: 'Matematik' },
-  ],
-  lise: [
-    { topic: 'Turev temelleri', subject: 'Matematik' },
-    { topic: 'Organik kimya', subject: 'Kimya' },
-    { topic: 'Ataturk ilkeleri', subject: 'Tarih' },
-    { topic: 'Logaritma', subject: 'Matematik' },
-    { topic: 'Genetik ve DNA', subject: 'Biyoloji' },
-  ],
-  universite: [
-    { topic: 'Ucagin kisimlar', subject: 'Havacilik' },
-    { topic: 'Termodinamik', subject: 'Fizik' },
-    { topic: 'Diferansiyel denklemler', subject: 'Matematik' },
-    { topic: 'Makroekonomi', subject: 'Iktisat' },
-    { topic: 'Veri yapilari', subject: 'Bilisim' },
-  ],
+  ilkokul: Object.entries(SUBJECT_MAP.ilkokul).flatMap(([subj, topics]) => topics.slice(0,1).map(t => ({ topic: t, subject: subj }))),
+  ortaokul: Object.entries(SUBJECT_MAP.ortaokul).flatMap(([subj, topics]) => topics.slice(0,1).map(t => ({ topic: t, subject: subj }))),
+  lise: Object.entries(SUBJECT_MAP.lise).flatMap(([subj, topics]) => topics.slice(0,1).map(t => ({ topic: t, subject: subj }))),
+  universite: Object.entries(SUBJECT_MAP.universite).flatMap(([subj, topics]) => topics.slice(0,1).map(t => ({ topic: t, subject: subj }))),
 }
 
 const DIFFICULTIES = [
@@ -76,6 +91,7 @@ function QuizPageContent() {
   const [screen, setScreen] = useState<Screen>('topic')
   const [selectedTopic, setSelectedTopic] = useState('')
   const [customTopic, setCustomTopic] = useState('')
+  const [openSubject, setOpenSubject] = useState<string | null>(null) // Accordion
   const [qCount, setQCount] = useState(10)
   const [difficulty, setDifficulty] = useState('normal')
   const [includeVisuals, setIncludeVisuals] = useState(true)
@@ -720,15 +736,62 @@ function QuizPageContent() {
             {currentLang !== 'Türkçe' && <span style={{ color: 'var(--accent)', marginLeft: '6px' }}>· Sorular {currentLang} dilinde</span>}
           </p>
 
-          <label className="field-label">Önerilen konular</label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px', marginBottom: '1rem' }}>
-            {suggestions.map(s => (
-              <button key={s.topic} className={`tag ${selectedTopic === s.topic ? 'active' : ''}`}
-                onClick={() => { setSelectedTopic(s.topic); setCustomTopic('') }}>
-                <span style={{ fontSize: '10px', color: 'var(--text3)', marginRight: '4px' }}>{s.subject}</span>
-                {s.topic}
-              </button>
-            ))}
+          <label className="field-label">Ders seç</label>
+          <div style={{ marginTop: '6px', marginBottom: '1rem' }}>
+            {/* Ana ders başlıkları */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+              {Object.keys(SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul).map(subj => (
+                <button
+                  key={subj}
+                  onClick={() => setOpenSubject(openSubject === subj ? null : subj)}
+                  style={{
+                    padding: '7px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: 500,
+                    cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
+                    border: `1.5px solid ${openSubject === subj ? 'var(--accent)' : 'var(--border)'}`,
+                    background: openSubject === subj ? 'var(--accent-bg)' : 'var(--bg2)',
+                    color: openSubject === subj ? 'var(--accent)' : 'var(--text2)',
+                    display: 'flex', alignItems: 'center', gap: '5px',
+                  }}>
+                  {subj}
+                  <span style={{ fontSize: '10px', opacity: 0.6 }}>{openSubject === subj ? '▲' : '▼'}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Alt konular — seçilen derse göre scroll box */}
+            {openSubject && (SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul)[openSubject] && (
+              <div style={{
+                maxHeight: '180px', overflowY: 'auto', padding: '10px 12px',
+                borderRadius: '12px', border: '1.5px solid var(--accent)',
+                background: 'var(--accent-bg)',
+                display: 'flex', flexWrap: 'wrap', gap: '7px',
+                scrollbarWidth: 'thin',
+              }}>
+                {(SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul)[openSubject].map((topic: string) => (
+                  <button
+                    key={topic}
+                    onClick={() => { setSelectedTopic(topic); setCustomTopic(''); setOpenSubject(null) }}
+                    style={{
+                      padding: '5px 12px', borderRadius: '99px', fontSize: '12px', fontWeight: 500,
+                      cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
+                      border: `1px solid ${selectedTopic === topic ? 'var(--accent)' : 'var(--border)'}`,
+                      background: selectedTopic === topic ? 'var(--accent)' : 'var(--bg)',
+                      color: selectedTopic === topic ? '#fff' : 'var(--text)',
+                      whiteSpace: 'nowrap',
+                    }}>
+                    {topic}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Seçilen konu göstergesi */}
+            {selectedTopic && (
+              <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 600 }}>✓ Seçilen: {selectedTopic}</span>
+                <button onClick={() => setSelectedTopic('')} style={{ fontSize: '11px', color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕</button>
+              </div>
+            )}
           </div>
 
           <label className="field-label">Veya kendi konunu yaz</label>
