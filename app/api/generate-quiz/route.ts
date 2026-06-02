@@ -42,75 +42,10 @@ const CURRICULUM_KEYWORDS = [
   'deneme','kazanim','ogrenme','okul','ders','test','soru','konu','mufredat','sinif',
 ]
 
-// MEB müfredatı whitelist — SUBJECT_MAP'ten üretilmiş normalize edilmiş konular
-const MEB_WHITELIST = new Set([
-  // Matematiksel kavramlar
-  'dogal sayilar','tam sayilar','ondalik sayilar','kesirler','rasyonel sayilar',
-  'asal sayilar','obeb','okek','carpanlar','katlar','oruntu','dizi',
-  'oran','orantı','yuzde','denklem','esitsizlik','cebirsel ifade',
-  'fonksiyon','koordinat','parabol','logaritma','trigonometri','limit','turev',
-  'integral','istatistik','olasilik','kombinasyon','permutasyon','binom',
-  'vektor','matris','karmasik sayi','analitik geometri',
-  'ucgen','dortgen','cember','daire','alan','cevre','hacim','prizma','piramit',
-  'geometri','simetri','donusum','karekok','uslu','polinom',
-  // Fen
-  'hucre','organeller','fotosentez','solunum','sindirim','dolasim','bosaltim',
-  'destek','hareket','sinir','endokrin','ureme','kalitim','dna','gen','evrim',
-  'ekosistem','biyocevre','madde','atom','element','bilisik','bag','mol',
-  'asit','baz','cozunurluk','termodinamik','kuvvet','newton','enerji','is','guc',
-  'momentum','dalga','ses','isik','optik','elektrik','manyetizma','induktif',
-  'atom modeli','periyodik','nukleer','radyoaktivite','fotovoltaik',
-  // Tarih
-  'osmanli','selcuklu','cumhuriyet','ataturk','inkilap','kurtulus savasi',
-  'lozan','misak','tbmm','fransiz ihtilali','sanayi devrimi','dunya savasi',
-  'soguk savas','turk tarihi','ilk uygarliklar','orta asya','islam medeniyeti',
-  'mogol','bizans','hacilar','reformasyon','aydinlanma','kolonizasyon',
-  // Coğrafya
-  'harita','iklim','yer sekli','litosfer','hidrosfer','atmosfer','biyosfer',
-  'nufus','goc','yerlесme','tarim','sanayi','enerji','ticaret','ulasim',
-  'cevre sorunu','kuresel isinma','dogal afet','erozyon','cografya',
-  // Türkçe / Edebiyat
-  'ses bilgisi','hece','vurgu','unk','kok','ek','isim','sifat','zarf','zamir',
-  'fiil','baglac','unlem','edema','cumle','paragraf','metin','tur','anlam',
-  'yazi kuralı','noktalama','sozcu','deyim','atasoz','siir','roman','hikaye',
-  'tiyatro','deneme','makale','divan','halk edebiyati','tanzimat','servetifunun',
-  'milli edebiyat','cumhuriyet edebiyati','soz sanati',
-  // İngilizce
-  'present','past','future','tense','modal','passive','reported','conditional',
-  'grammar','vocabulary','reading','writing','listening','speaking',
-  // Din Kültürü
-  'iman','ibadet','namaz','oruc','zekat','hac','kuran','peygamber','ahlak',
-  'dini bayram','islam','hristiyanlık','yahudilik','din felsefesi',
-  // Felsefe
-  'epistemoloji','ontoloji','etik','estetik','siyaset felsefesi',
-  'antik yunan','sofistler','sokrates','platon','aristoteles','kant','descartes',
-  // Havacılık (üniversite müfredatı)
-  'ucak','aerodinamik','navigasyon','aviyonik','meteoroloji','atc','vfr','ifr',
-  // Genel akademik
-  'beden egitimi','muzik','gorsel sanatlar','teknoloji tasarim',
-])
-
 function isInCurriculum(topic: string, plan: string): boolean {
-  const norm = normalizeTR(topic.trim())
-  
-  // Whitelist kontrolü — her planda geçerli
-  if (MEB_WHITELIST.has(norm)) return true
-  
-  // Kısmi eşleşme — whitelist'teki bir kelimeyi içeriyor mu
-  const words = norm.split(' ').filter(w => w.length > 3)
-  const hasWhitelistMatch = words.some(w => 
-    MEB_WHITELIST.has(w) || [...MEB_WHITELIST].some(wl => wl.includes(w) || w.includes(wl))
-  )
-  if (hasWhitelistMatch) return true
-
-  // Eski keyword kontrolü (geriye dönük uyumluluk)
-  const hasKeyword = CURRICULUM_KEYWORDS.some(kw => norm.includes(kw))
-  if (hasKeyword) return true
-
-  // Premium kullanıcılar dosya yüklemişse geçir (fileContent zaten kontrol ediliyor)
   if (plan === 'premium' || plan === 'unlimited') return true
-
-  return false
+  const norm = normalizeTR(topic)
+  return CURRICULUM_KEYWORDS.some(kw => norm.includes(kw) || kw.includes(norm.split(' ')[0]))
 }
 
 // ─── GÖRSEL KATEGORI TESPİTİ ──────────────────────────────────────────────────
@@ -146,17 +81,7 @@ CRITICAL SVG RULES:
 - Font: Arial, minimum 13px for readability
 - Add a subtle title at top relating to the question
 - NO JavaScript, NO external resources, NO foreignObject
-- Return ONLY the SVG code, nothing else, starting with <svg
-
-CRITICAL - DO NOT REVEAL THE ANSWER:
-- NEVER show the correct answer, solution, or result in the diagram
-- For geometry: show the shape with labels but leave the unknown value as "?" 
-- For maps: show the region/country outline but do NOT label the answer
-- For biology: show the structure with some labels blank or marked as "?"
-- For physics: show the scenario/setup but NOT the calculated result
-- For history: show a timeline with some events marked as "?" if they are the answer
-- The diagram should ILLUSTRATE the question, not answer it
-- If the question asks "what is X?", do NOT write X's value in the diagram`
+- Return ONLY the SVG code, nothing else, starting with <svg`
 
   const guides: Record<string, string> = {
     geometry: `Draw the geometric shape relevant to this question. Label all sides, angles, and measurements mentioned. Use blue for shapes, red for the unknown/highlighted element. Show the formula if applicable.`,
@@ -203,7 +128,7 @@ function buildPrompt(type: string, topic: string, grade: string, difficulty: str
     ? `Topic: "${topic}". Generate questions from this content:\n${fileContent.slice(0, 3000)}`
     : `Topic: "${topic}".`
 
-  const base = `Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın.\n\nKESİN KURAL: Yalnızca MEB müfredatında yer alan konularda, MEB kazanımlarına uygun sorular üret. Müfredat dışı, spekülatif veya tartışmalı içerik kesinlikle üretme.\n\n${contentNote}\nSeviye: ${grade}. Zorluk: ${difficulty}. Soru dili: ${language}. Soru sayısı: ${count}.\n\nDOĞRULUK KURALLARI:\n1. Matematik: Her soruyu adım adım çöz, cevabın opts dizisinde doğru indexte olduğunu doğrula\n2. Fen/Tarih: Sadece kesin bildiğin gerçekleri yaz\n3. "ans" indexi MUTLAKA doğru cevabı göstermeli\n4. Emin olmadığın sorular yerine daha basit ama kesin sorular yaz\n5. MEB müfredatına uygun kazanım ve konu kapsamında kal\n\nYalnızca geçerli JSON döndür, markdown veya açıklama ekleme.\n\n`
+  const base = `${contentNote}\nLevel: ${grade}. Difficulty: ${difficulty}. Language for all questions and explanations: ${language}. Question count: ${count}.\n\nCRITICAL ACCURACY RULES:\n1. For math: solve fully before writing, verify the answer is in opts at the correct index\n2. For science/history: only include facts you are certain about\n3. The "ans" index must point to the CORRECT answer in "opts"\n4. If you are unsure, use a simpler question\n\nReturn ONLY valid JSON, no markdown, no explanation.\n\n`
 
   if (type === 'fill_blank') return base + `Generate fill-in-the-blank questions. Leave a critical word/concept as blank. Provide 4 options (one correct), write the correct answer in "blank" field too.\n\n{"questions":[{"type":"fill_blank","q":"_____ is the powerhouse of the cell.","blank":"Mitochondria","opts":["Mitochondria","Ribosome","Nucleus","Lysosome"],"ans":0,"exp":"Mitochondria produces ATP through cellular respiration."}]}`
 
@@ -283,7 +208,6 @@ export async function POST(req: NextRequest) {
     // Tekrar eden soruları önle
     let previousQuestionsNote = ''
     try {
-      // ✅ Son 10 test, 50 soru — agresif tekrar önleme
       const { data: recentSessions } = await supabase
         .from('quiz_sessions')
         .select('questions')
@@ -291,33 +215,17 @@ export async function POST(req: NextRequest) {
         .eq('topic', topic)
         .eq('completed', true)
         .order('created_at', { ascending: false })
-        .limit(10)
+        .limit(5)
 
       if (recentSessions?.length) {
         const prevQTexts: string[] = []
-        // Anahtar kelimeler çıkar — benzer soruları da yakala
-        const prevKeywords = new Set<string>()
-
         recentSessions.forEach((s: any) => {
           (s.questions || []).forEach((q: any) => {
-            if (!q.q) return
-            if (prevQTexts.length < 50) prevQTexts.push(q.q.slice(0, 100))
-            // İlk 3 kelimeyi keyword olarak ekle — benzer soruları önle
-            q.q.split(' ').slice(0, 5).forEach((w: string) => {
-              if (w.length > 3) prevKeywords.add(w.toLowerCase())
-            })
+            if (q.q && prevQTexts.length < 30) prevQTexts.push(q.q.slice(0, 80))
           })
         })
-
         if (prevQTexts.length > 0) {
-          previousQuestionsNote = `\n\nCRITICAL - GENERATE COMPLETELY DIFFERENT QUESTIONS:\n` +
-            `These ${prevQTexts.length} questions were already asked recently - DO NOT repeat or rephrase them:\n` +
-            `${prevQTexts.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n\n` +
-            `VARIETY RULES:\n` +
-            `- Ask about DIFFERENT aspects, events, or concepts within the topic\n` +
-            `- Use DIFFERENT question formats and difficulty angles\n` +
-            `- If a concept was already tested, test a RELATED but DIFFERENT concept\n` +
-            `- Prioritize less-tested sub-topics and edge cases`
+          previousQuestionsNote = `\n\nIMPORTANT - DO NOT REPEAT these previously asked questions:\n${prevQTexts.map((q, i) => `${i + 1}. ${q}`).join('\n')}`
         }
       }
     } catch (e) {
@@ -344,7 +252,6 @@ export async function POST(req: NextRequest) {
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5',
       max_tokens: 4000,
-      system: 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca MEB müfredatındaki konularda soru üret. Müfredat dışı, siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.',
       messages: [{ role: 'user', content: prompt }],
     })
 
