@@ -1,4 +1,5 @@
 'use client'
+import PageHeader from '@/components/PageHeader'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -154,6 +155,7 @@ export default function ClassesPage() {
 
   if (loading) return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <PageHeader title="Sınıflarım" subtitle="Öğretmenin sınıflarına katıl, ödevlerini takip et" icon="🏫" color="#10b981" backHref="/quiz" backLabel="Teste dön" />
       <div className="spinner" />
     </main>
   )

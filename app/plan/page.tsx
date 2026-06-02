@@ -1,4 +1,5 @@
 'use client'
+import PageHeader from '@/components/PageHeader'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -279,7 +280,8 @@ export default function PlanPage() {
   )
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', padding: '1.5rem' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingTop: 0, padding: '0' }}>
+      <PageHeader title="4 Haftalık Çalışma Planı" subtitle="AI destekli kişisel gelişim planın" icon="📋" color="#06b6d4" backHref="/analysis" backLabel="Analize dön" />
       <div style={{ maxWidth: '640px', margin: '0 auto' }}>
 
         <div className="anim-up" style={{ marginBottom: '2rem' }}>

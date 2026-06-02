@@ -1,4 +1,5 @@
 'use client'
+import PageHeader from '@/components/PageHeader'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -102,7 +103,8 @@ export default function NotificationsPage() {
   )
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', padding: '1.5rem', paddingBottom: '5rem' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingTop: 0, padding: '0', paddingBottom: '5rem' }}>
+      <PageHeader title="Bildirimler" subtitle="Ödev ve duyurularını takip et" icon="🔔" color="#8b5cf6" backHref="/quiz" backLabel="Geri" />
       <div style={{ maxWidth: '640px', margin: '0 auto' }}>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>

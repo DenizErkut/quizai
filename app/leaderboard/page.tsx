@@ -1,4 +1,5 @@
 'use client'
+import PageHeader from '@/components/PageHeader'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -103,7 +104,8 @@ export default function LeaderboardPage() {
   )
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', padding: '1.5rem', paddingBottom: '5rem' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingTop: 0, padding: '0', paddingBottom: '5rem' }}>
+      <PageHeader title="Sıralama" subtitle="Haftalık ve genel başarı sıralaması" icon="🏆" color="#f59e0b" backHref="/quiz" backLabel="Teste dön" />
       <div style={{ maxWidth: '640px', margin: '0 auto' }}>
 
         <div className="anim-up" style={{ marginBottom: '1.5rem' }}>

@@ -1,4 +1,5 @@
 'use client'
+import PageHeader from '@/components/PageHeader'
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -195,7 +196,8 @@ export default function DailyPage() {
 
   // ── HOME ──
   if (screen === 'home') return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', padding: '1.5rem' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingTop: 0, padding: '0' }}>
+      <PageHeader title="Günlük Test" subtitle="Serisini koru, her gün yeni sorular" icon="🔥" color="#ef4444" backHref="/quiz" backLabel="Teste dön" />
       <div style={{ maxWidth: '560px', margin: '0 auto' }}>
 
         <div className="anim-up" style={{ marginBottom: '2rem' }}>

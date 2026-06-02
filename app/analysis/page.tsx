@@ -1,4 +1,5 @@
 'use client'
+import PageHeader from '@/components/PageHeader'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -78,16 +79,11 @@ export default function AnalysisPage() {
   )
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', padding: '1.5rem' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingTop: 0, padding: '0' }}>
+      <PageHeader title="Zayıf Konu Analizi" subtitle="Yanlış yanıtladığın sorulara göre kişisel analiz" icon="📊" color="#0ea5e9" backHref="/quiz" backLabel="Teste dön" />
       <div style={{ maxWidth: '640px', margin: '0 auto' }}>
 
-        <div className="anim-up" style={{ marginBottom: '2rem' }}>
-          <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>Analiz</div>
-          <h1 className="serif" style={{ fontSize: '28px' }}>Zayıf konu analizi</h1>
-          <p style={{ color: 'var(--text2)', fontSize: '14px', marginTop: '4px' }}>
-            Yanlış yanıtladığın sorulara göre kişisel analiz.
-          </p>
-        </div>
+
 
         {/* Zayıf konular */}
         <div className="card anim-up-1" style={{ marginBottom: '1rem' }}>

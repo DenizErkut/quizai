@@ -1,4 +1,5 @@
 'use client'
+import PageHeader from '@/components/PageHeader'
 import { useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -188,7 +189,8 @@ export default function PdfToolsPage() {
   ]
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', padding: '1.5rem', paddingBottom: '5rem' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingTop: 0, padding: '0', paddingBottom: '5rem' }}>
+      <PageHeader title="PDF Araçları" subtitle="Ders notlarını dönüştür, büyük PDF'leri küçült. Maks. 4MB." icon="🛠️" color="#7c3aed" backHref="/quiz" backLabel="Teste dön" />
       <div style={{ maxWidth: '680px', margin: '0 auto' }}>
 
         {/* Header */}
