@@ -4,200 +4,253 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-interface Session {
-  id: string; topic: string; grade: string; score: number; pct: number;
-  question_count: number; created_at: string;
-}
-interface Profile { name: string; grade: string; language: string }
+interface Session { id: string; topic: string; grade: string; score: number; pct: number; question_count: number; created_at: string }
+interface Profile { name: string; grade: string; language: string; plan: string }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('tr-TR', {
-    day: 'numeric', month: 'short', year: 'numeric',
-    timeZone: 'Europe/Istanbul'
-  })
+  return new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', timeZone: 'Europe/Istanbul' })
 }
+
+function pctColor(p: number) { return p >= 80 ? '#16a34a' : p >= 50 ? '#d97706' : '#dc2626' }
+function pctBg(p: number) { return p >= 80 ? 'rgba(22,163,74,0.12)' : p >= 50 ? 'rgba(217,119,6,0.12)' : 'rgba(220,38,38,0.12)' }
+
+// Okulyo stilinde menü ikonları
+const menuItems = [
+  { href: '/quiz',      icon: '⚡', label: 'Test Çöz',      color: '#6366f1', bg: 'rgba(99,102,241,0.12)' },
+  { href: '/analysis',  icon: '📊', label: 'Analizim',      color: '#0ea5e9', bg: 'rgba(14,165,233,0.12)' },
+  { href: '/archive',   icon: '🗂️', label: 'Arşivim',       color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+  { href: '/plan',      icon: '📋', label: 'Çalışma Planı', color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
+  { href: '/leaderboard',icon: '🏆', label: 'Sıralama',     color: '#f43f5e', bg: 'rgba(244,63,94,0.12)' },
+  { href: '/daily',     icon: '🔥', label: 'Günlük Test',   color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
+  { href: '/pdf-tools', icon: '🛠️', label: 'PDF Araçları',  color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)' },
+  { href: '/report',    icon: '📈', label: 'Raporlarım',    color: '#06b6d4', bg: 'rgba(6,182,212,0.12)' },
+  { href: '/classes',   icon: '🏫', label: 'Sınıflarım',    color: '#84cc16', bg: 'rgba(132,204,22,0.12)' },
+]
 
 export default function DashboardPage() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [sessions, setSessions] = useState<Session[]>([])       // Son 20 — liste için
-  const [totalCount, setTotalCount] = useState(0)               // ✅ Gerçek toplam
-  const [totalCorrect, setTotalCorrect] = useState(0)           // ✅ Gerçek toplam doğru
-  const [totalQ, setTotalQ] = useState(0)                       // ✅ Gerçek toplam soru
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalCorrect, setTotalCorrect] = useState(0)
+  const [totalQ, setTotalQ] = useState(0)
+  const [streak, setStreak] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [greeting, setGreeting] = useState('Merhaba')
 
   useEffect(() => {
+    const h = new Date().getHours()
+    if (h < 12) setGreeting('Günaydın')
+    else if (h < 18) setGreeting('İyi günler')
+    else setGreeting('İyi akşamlar')
+
     async function load() {
-      const supabase = createClient()
+      const supabase = createClient() as any
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      const [{ data: p }, { data: s }, { count }, { data: allStats }] = await Promise.all([
-        supabase.from('profiles').select('name,grade,language').eq('id', user.id).single(),
-        // Son 20 test — liste gösterimi için
-        supabase.from('quiz_sessions')
-          .select('id,topic,grade,score,pct,question_count,created_at')
-          .eq('user_id', user.id)
-          .eq('completed', true)
-          .order('created_at', { ascending: false })
-          .limit(20),
-        // ✅ Gerçek toplam tamamlanmış test sayısı
-        supabase.from('quiz_sessions')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('completed', true),
-        // ✅ Tüm testlerin score ve question_count toplamı
-        supabase.from('quiz_sessions')
-          .select('score,question_count')
-          .eq('user_id', user.id)
-          .eq('completed', true),
+      const [{ data: p }, { data: s }, { count }, { data: allStats }, { data: sk }] = await Promise.all([
+        supabase.from('profiles').select('name,grade,language,plan').eq('id', user.id).single(),
+        supabase.from('quiz_sessions').select('id,topic,grade,score,pct,question_count,created_at').eq('user_id', user.id).eq('completed', true).order('created_at', { ascending: false }).limit(5),
+        supabase.from('quiz_sessions').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('completed', true),
+        supabase.from('quiz_sessions').select('score,question_count').eq('user_id', user.id).eq('completed', true),
+        supabase.from('streaks').select('current_streak').eq('user_id', user.id).maybeSingle(),
       ])
 
       setProfile(p)
       setSessions(s || [])
       setTotalCount(count || 0)
-
-      // Gerçek toplam doğru ve soru sayısı
-      const allSessions = allStats || []
-      setTotalCorrect(allSessions.reduce((sum: number, x: any) => sum + (x.score || 0), 0))
-      setTotalQ(allSessions.reduce((sum: number, x: any) => sum + (x.question_count || 0), 0))
-
+      setStreak(sk?.current_streak || 0)
+      const all = allStats || []
+      setTotalCorrect(all.reduce((a: number, x: any) => a + (x.score || 0), 0))
+      setTotalQ(all.reduce((a: number, x: any) => a + (x.question_count || 0), 0))
       setLoading(false)
     }
     load()
   }, [])
 
-  const avgPct = sessions.length > 0
-    ? Math.round(sessions.reduce((s, x) => s + x.pct, 0) / sessions.length) : 0
-  const bestPct = sessions.length > 0 ? Math.max(...sessions.map(x => x.pct)) : 0
-
   if (loading) return (
-    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="spinner" />
+    <main style={{ minHeight: '100vh', background: '#082465', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="spinner" style={{ borderTopColor: '#fdd31d', borderColor: 'rgba(253,211,29,0.2)' }} />
     </main>
   )
 
+  const avgPct = totalCount > 0 ? Math.round(sessions.slice(0,10).reduce((a,s) => a + s.pct, 0) / Math.min(sessions.length, 10)) : 0
+  const firstName = profile?.name?.split(' ')[0] || ''
+  const initials = profile?.name?.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase() || 'U'
+
   return (
-    <main style={{ minHeight: '100vh', padding: '1.5rem' }}>
-      <div className="glow-blob" style={{ top: '-100px', left: '-100px' }} />
-      <div style={{ maxWidth: '720px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: '80px' }}>
 
-        <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
-          <span className="serif" style={{ fontSize: '20px' }}>pratium</span>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <Link href="/quiz" className="btn btn-primary btn-sm">Yeni test ⚡</Link>
-            <button className="btn btn-ghost btn-sm" onClick={async () => {
-              await createClient().auth.signOut(); router.push('/')
-            }}>Çıkış</button>
-          </div>
-        </nav>
+      {/* ── HERO HEADER (Okulyo stili) ── */}
+      <div style={{
+        background: 'linear-gradient(135deg, #082465 0%, #0d3b8e 60%, #1ECFB8 100%)',
+        padding: '2rem 1.5rem 3.5rem',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        {/* Dekoratif daireler */}
+        <div style={{ position: 'absolute', top: -40, right: -40, width: 160, height: 160, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
+        <div style={{ position: 'absolute', bottom: -20, left: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(30,207,184,0.15)' }} />
+        <div style={{ position: 'absolute', top: 20, right: 80, width: 60, height: 60, borderRadius: '50%', background: 'rgba(253,211,29,0.1)' }} />
 
-        <div className="anim-up" style={{ marginBottom: '1.75rem' }}>
-          <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>Dashboard</div>
-          <h1 className="serif" style={{ fontSize: '30px' }}>
-            Merhaba, {profile?.name.split(' ')[0]} 👋
-          </h1>
-          <p style={{ color: 'var(--text2)', fontSize: '14px', marginTop: '4px' }}>
-            {profile?.grade} · {profile?.language}
-          </p>
-        </div>
-
-        {/* ✅ Stats — gerçek toplam sayılar */}
-        <div className="anim-up-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '1.5rem' }}>
-          {[
-            { label: 'Test sayısı', value: totalCount, suffix: '' },
-            { label: 'Ortalama', value: avgPct, suffix: '%' },
-            { label: 'En yüksek', value: bestPct, suffix: '%' },
-            { label: 'Toplam soru', value: totalQ, suffix: '' },
-          ].map((s, i) => (
-            <div key={i} className="card-sm" style={{ textAlign: 'center' }}>
-              <div className="serif" style={{ fontSize: '28px', lineHeight: 1.1 }}>
-                {s.value}<span style={{ fontSize: '14px', color: 'var(--text2)' }}>{s.suffix}</span>
+        <div style={{ maxWidth: '480px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {/* Avatar */}
+              <div style={{
+                width: 52, height: 52, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #fdd31d, #f5a623)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '18px', fontWeight: 800, color: '#082465',
+                border: '3px solid rgba(255,255,255,0.3)',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+              }}>
+                {initials}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</div>
+              <div>
+                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>
+                  {greeting} 👋
+                </div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: '#fff' }}>
+                  {firstName}
+                </div>
+                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>
+                  {profile?.grade}
+                </div>
+              </div>
             </div>
-          ))}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {profile?.plan === 'premium' && (
+                <div style={{ padding: '4px 10px', borderRadius: '99px', background: 'rgba(253,211,29,0.2)', border: '1px solid rgba(253,211,29,0.4)', fontSize: '11px', fontWeight: 700, color: '#fdd31d' }}>
+                  ★ Premium
+                </div>
+              )}
+              <Link href="/quiz" style={{
+                padding: '8px 16px', borderRadius: '99px',
+                background: '#fdd31d', color: '#082465',
+                fontSize: '12px', fontWeight: 800,
+                display: 'flex', alignItems: 'center', gap: '4px',
+                boxShadow: '0 4px 12px rgba(253,211,29,0.4)',
+              }}>
+                ⚡ Test
+              </Link>
+            </div>
+          </div>
+
+          {/* İstatistik kartları */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+            {[
+              { label: 'Test', value: totalCount, icon: '📝' },
+              { label: 'Ort.', value: `%${avgPct}`, icon: '📊' },
+              { label: 'Soru', value: totalQ, icon: '❓' },
+              { label: 'Seri', value: `🔥${streak}`, icon: '' },
+            ].map((s, i) => (
+              <div key={i} style={{
+                background: 'rgba(255,255,255,0.1)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '14px', padding: '10px 8px', textAlign: 'center',
+                border: '1px solid rgba(255,255,255,0.15)',
+              }}>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#fff', lineHeight: 1 }}>{s.value}</div>
+                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', marginTop: '3px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
+      </div>
 
-        {/* Mini bar chart */}
-        {sessions.length > 0 && (
-          <div className="card anim-up-2" style={{ marginBottom: '1.5rem' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
-              Son {Math.min(sessions.length, 10)} test
-            </div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '60px' }}>
-              {sessions.slice(0, 10).reverse().map((s, i) => (
-                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+      {/* ── MENÜ GRİD (Okulyo stili) ── */}
+      <div style={{ maxWidth: '480px', margin: '-1.5rem auto 0', padding: '0 1.25rem', position: 'relative', zIndex: 2 }}>
+        <div style={{
+          background: 'var(--bg)',
+          borderRadius: '24px 24px 0 0',
+          padding: '1.5rem 1.25rem',
+          boxShadow: '0 -4px 24px rgba(8,36,101,0.08)',
+        }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '1.5rem' }}>
+            {menuItems.map((item, i) => (
+              <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
+                <div style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+                  padding: '16px 8px', borderRadius: '16px',
+                  background: 'var(--bg2)',
+                  border: '1px solid var(--border)',
+                  transition: 'all 0.15s',
+                  cursor: 'pointer',
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.background = item.bg; e.currentTarget.style.borderColor = item.color + '40' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'var(--border)' }}>
                   <div style={{
-                    width: '100%', borderRadius: '4px 4px 0 0',
-                    height: `${Math.max(s.pct * 0.6, 4)}px`,
-                    background: s.pct >= 80 ? 'var(--green)' : s.pct >= 50 ? 'var(--accent)' : 'var(--red)',
-                    opacity: 0.8, transition: 'height 0.4s',
-                  }} title={`${s.topic}: %${s.pct}`} />
+                    width: 48, height: 48, borderRadius: '14px',
+                    background: item.bg,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '22px',
+                  }}>
+                    {item.icon}
+                  </div>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', textAlign: 'center', lineHeight: 1.3 }}>
+                    {item.label}
+                  </span>
                 </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: '16px', marginTop: '10px', fontSize: '11px', color: 'var(--text3)' }}>
-              <span style={{ color: 'var(--green)' }}>■ ≥80%</span>
-              <span style={{ color: 'var(--accent)' }}>■ 50-79%</span>
-              <span style={{ color: 'var(--red)' }}>■ &lt;50%</span>
-            </div>
+              </Link>
+            ))}
           </div>
-        )}
 
-        {/* Sessions list */}
-        <div className="card anim-up-3">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Geçmiş testler
-            </div>
-            {totalCount > 20 && (
-              <Link href="/archive" style={{ fontSize: '12px', color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>
-                Tümünü gör ({totalCount}) →
-              </Link>
-            )}
-          </div>
-          {sessions.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text3)' }}>
-              <div style={{ fontSize: '32px', marginBottom: '0.75rem' }}>📝</div>
-              <div>Henüz test çözmedin.</div>
-              <Link href="/quiz" className="btn btn-primary btn-sm" style={{ marginTop: '1rem', display: 'inline-flex' }}>
-                İlk testini çöz ⚡
-              </Link>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-              {sessions.map((s, i) => (
-                <div key={s.id} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '12px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined,
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 500, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.topic}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>
-                      {formatDate(s.created_at)} · {s.question_count} soru
+          {/* Son testler */}
+          {sessions.length > 0 && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)' }}>Son Testler</div>
+                <Link href="/archive" style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 600 }}>Tümü →</Link>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {sessions.map((s, i) => (
+                  <Link key={s.id} href={`/archive/${s.id}`} style={{ textDecoration: 'none' }}>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: '12px',
+                      padding: '12px 14px', borderRadius: '14px',
+                      background: 'var(--bg2)', border: '1px solid var(--border)',
+                      transition: 'all 0.15s',
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(8,36,101,0.2)'; e.currentTarget.style.background = 'var(--bg3)' }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg2)' }}>
+                      <div style={{
+                        width: 44, height: 44, borderRadius: '12px',
+                        background: pctBg(s.pct),
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0,
+                      }}>
+                        <span style={{ fontSize: '13px', fontWeight: 800, color: pctColor(s.pct), lineHeight: 1 }}>%{s.pct}</span>
+                        <span style={{ fontSize: '9px', color: pctColor(s.pct), opacity: 0.7 }}>{s.score}/{s.question_count}</span>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.topic}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{formatDate(s.created_at)}</div>
+                      </div>
+                      <span style={{ color: 'var(--text4)', fontSize: '14px' }}>›</span>
                     </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: '12px' }}>
-                    <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{s.score}/{s.question_count}</span>
-                    <span className={`badge ${s.pct >= 80 ? 'badge-green' : s.pct >= 50 ? 'badge-purple' : 'badge-red'}`}>
-                      %{s.pct}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                  </Link>
+                ))}
+              </div>
             </div>
           )}
-        </div>
 
-        {sessions.length > 0 && (
-          <div className="card-sm anim-up-4" style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', color: 'var(--text2)' }}>
-              Toplam {totalCorrect} doğru / {totalQ} soru
-            </span>
-            <Link href="/quiz" className="btn btn-primary btn-sm">Yeni test ⚡</Link>
+          {sessions.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
+              <div style={{ fontSize: '48px', marginBottom: '12px' }}>📝</div>
+              <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--primary)', marginBottom: '6px' }}>Henüz test çözmedin</div>
+              <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '1.25rem' }}>İlk testini çöz, analizini gör!</div>
+              <Link href="/quiz" className="btn btn-primary" style={{ display: 'inline-flex', justifyContent: 'center' }}>
+                ⚡ İlk Testimi Çöz
+              </Link>
+            </div>
+          )}
+
+          <div style={{ marginTop: '1.25rem', padding: '12px 14px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(8,36,101,0.04), rgba(30,207,184,0.04))', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text3)' }}>Toplam {totalCorrect}/{totalQ} doğru</span>
+            <Link href="/quiz" className="btn btn-primary btn-sm">Yeni Test ⚡</Link>
           </div>
-        )}
+        </div>
       </div>
     </main>
   )
