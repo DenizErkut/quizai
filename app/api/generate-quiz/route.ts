@@ -42,10 +42,75 @@ const CURRICULUM_KEYWORDS = [
   'deneme','kazanim','ogrenme','okul','ders','test','soru','konu','mufredat','sinif',
 ]
 
+// MEB müfredatı whitelist — SUBJECT_MAP'ten üretilmiş normalize edilmiş konular
+const MEB_WHITELIST = new Set([
+  // Matematiksel kavramlar
+  'dogal sayilar','tam sayilar','ondalik sayilar','kesirler','rasyonel sayilar',
+  'asal sayilar','obeb','okek','carpanlar','katlar','oruntu','dizi',
+  'oran','orantı','yuzde','denklem','esitsizlik','cebirsel ifade',
+  'fonksiyon','koordinat','parabol','logaritma','trigonometri','limit','turev',
+  'integral','istatistik','olasilik','kombinasyon','permutasyon','binom',
+  'vektor','matris','karmasik sayi','analitik geometri',
+  'ucgen','dortgen','cember','daire','alan','cevre','hacim','prizma','piramit',
+  'geometri','simetri','donusum','karekok','uslu','polinom',
+  // Fen
+  'hucre','organeller','fotosentez','solunum','sindirim','dolasim','bosaltim',
+  'destek','hareket','sinir','endokrin','ureme','kalitim','dna','gen','evrim',
+  'ekosistem','biyocevre','madde','atom','element','bilisik','bag','mol',
+  'asit','baz','cozunurluk','termodinamik','kuvvet','newton','enerji','is','guc',
+  'momentum','dalga','ses','isik','optik','elektrik','manyetizma','induktif',
+  'atom modeli','periyodik','nukleer','radyoaktivite','fotovoltaik',
+  // Tarih
+  'osmanli','selcuklu','cumhuriyet','ataturk','inkilap','kurtulus savasi',
+  'lozan','misak','tbmm','fransiz ihtilali','sanayi devrimi','dunya savasi',
+  'soguk savas','turk tarihi','ilk uygarliklar','orta asya','islam medeniyeti',
+  'mogol','bizans','hacilar','reformasyon','aydinlanma','kolonizasyon',
+  // Coğrafya
+  'harita','iklim','yer sekli','litosfer','hidrosfer','atmosfer','biyosfer',
+  'nufus','goc','yerlесme','tarim','sanayi','enerji','ticaret','ulasim',
+  'cevre sorunu','kuresel isinma','dogal afet','erozyon','cografya',
+  // Türkçe / Edebiyat
+  'ses bilgisi','hece','vurgu','unk','kok','ek','isim','sifat','zarf','zamir',
+  'fiil','baglac','unlem','edema','cumle','paragraf','metin','tur','anlam',
+  'yazi kuralı','noktalama','sozcu','deyim','atasoz','siir','roman','hikaye',
+  'tiyatro','deneme','makale','divan','halk edebiyati','tanzimat','servetifunun',
+  'milli edebiyat','cumhuriyet edebiyati','soz sanati',
+  // İngilizce
+  'present','past','future','tense','modal','passive','reported','conditional',
+  'grammar','vocabulary','reading','writing','listening','speaking',
+  // Din Kültürü
+  'iman','ibadet','namaz','oruc','zekat','hac','kuran','peygamber','ahlak',
+  'dini bayram','islam','hristiyanlık','yahudilik','din felsefesi',
+  // Felsefe
+  'epistemoloji','ontoloji','etik','estetik','siyaset felsefesi',
+  'antik yunan','sofistler','sokrates','platon','aristoteles','kant','descartes',
+  // Havacılık (üniversite müfredatı)
+  'ucak','aerodinamik','navigasyon','aviyonik','meteoroloji','atc','vfr','ifr',
+  // Genel akademik
+  'beden egitimi','muzik','gorsel sanatlar','teknoloji tasarim',
+])
+
 function isInCurriculum(topic: string, plan: string): boolean {
+  const norm = normalizeTR(topic.trim())
+  
+  // Whitelist kontrolü — her planda geçerli
+  if (MEB_WHITELIST.has(norm)) return true
+  
+  // Kısmi eşleşme — whitelist'teki bir kelimeyi içeriyor mu
+  const words = norm.split(' ').filter(w => w.length > 3)
+  const hasWhitelistMatch = words.some(w => 
+    MEB_WHITELIST.has(w) || [...MEB_WHITELIST].some(wl => wl.includes(w) || w.includes(wl))
+  )
+  if (hasWhitelistMatch) return true
+
+  // Eski keyword kontrolü (geriye dönük uyumluluk)
+  const hasKeyword = CURRICULUM_KEYWORDS.some(kw => norm.includes(kw))
+  if (hasKeyword) return true
+
+  // Premium kullanıcılar dosya yüklemişse geçir (fileContent zaten kontrol ediliyor)
   if (plan === 'premium' || plan === 'unlimited') return true
-  const norm = normalizeTR(topic)
-  return CURRICULUM_KEYWORDS.some(kw => norm.includes(kw) || kw.includes(norm.split(' ')[0]))
+
+  return false
 }
 
 // ─── GÖRSEL KATEGORI TESPİTİ ──────────────────────────────────────────────────
