@@ -86,7 +86,7 @@ export default function StudentReportPage() {
           <StatCard label="Toplam Soru" value={stats.totalQuestions} />
           <StatCard label="Doğru" value={stats.totalCorrect} color="var(--green)" />
           <StatCard label="Başarılı" value={stats.good} sub="≥%80" color="var(--green)" />
-          <StatCard label="Zayıf" value={stats.failing} sub="<%50" color="var(--red)" />
+          <StatCard label="Zayıf" value={stats.failing} sub="&lt;%50" color="var(--red)" />
         </div>
 
         {/* Başarı dağılımı */}
@@ -96,7 +96,7 @@ export default function StudentReportPage() {
             { label: 'Mükemmel (%100)', count: stats.perfect, color: '#10b981' },
             { label: 'İyi (%80-99)', count: stats.good, color: '#34d399' },
             { label: 'Orta (%50-79)', count: stats.passing, color: '#f59e0b' },
-            { label: 'Zayıf (<%50)', count: stats.failing, color: '#ef4444' },
+            { label: 'Zayıf (&lt;%50)', count: stats.failing, color: '#ef4444' },
           ].map((row, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
               <div style={{ width: '130px', fontSize: '12px', color: 'var(--text2)', flexShrink: 0 }}>{row.label}</div>
@@ -134,7 +134,7 @@ export default function StudentReportPage() {
             <div style={{ display: 'flex', gap: '12px', marginTop: '8px', fontSize: '11px' }}>
               <span style={{ color: 'var(--green)' }}>■ ≥%80</span>
               <span style={{ color: '#f59e0b' }}>■ %50-79</span>
-              <span style={{ color: 'var(--red)' }}>■ <%50</span>
+              <span style={{ color: 'var(--red)' }}>■ &lt;%50</span>
             </div>
           </div>
         )}
