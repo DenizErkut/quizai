@@ -36,8 +36,19 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'meb'>('users')
   // Kurum formu
+  // MEB Kaynakları state
+  const [mebResources, setMebResources] = useState<any[]>([])
+  const [mebLoading, setMebLoading] = useState(false)
+  const [mebUploading, setMebUploading] = useState(false)
+  const [mebForm, setMebForm] = useState({
+    title: '', grade: '', subject: '', unit: '', level: 'ortaokul', raw_text: ''
+  })
+  const [mebFile, setMebFile] = useState<File | null>(null)
+  const [mebMsg, setMebMsg] = useState('')
+  const [mebFilter, setMebFilter] = useState({ level: '', subject: '' })
+
   const [instForm, setInstForm] = useState({ name: '', email: '', password: '', code: '', discount: '0' })
   const [instSaving, setInstSaving] = useState(false)
   const [instError, setInstError] = useState('')
@@ -354,6 +365,7 @@ export default function AdminPage() {
             { key: 'errors', label: `⚠️ Hata Bildirimleri${pendingCount > 0 ? ` (${pendingCount})` : ''}` },
             { key: 'teachers', label: `🎓 Öğretmen Başvuruları${pendingTeachers > 0 ? ` (${pendingTeachers})` : ''}` },
             { key: 'institutions', label: '🏛️ Kurumlar' },
+            { key: 'meb', label: '📚 MEB Kaynakları' },
           ] as const).map(t => (
             <button key={t.key} className={`btn btn-sm ${tab === t.key ? 'btn-primary' : ''}`}
               onClick={() => setTab(t.key)}
@@ -838,6 +850,196 @@ export default function AdminPage() {
             )}
           </div>
         )}
+      {/* MEB KAYNAKLARI */}
+      {tab === 'meb' && (
+        <div>
+          {/* Yükleme formu */}
+          <div className="card" style={{ marginBottom: '1.5rem' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>
+              📤 Yeni Kaynak Yükle
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px' }}>Başlık *</label>
+                <input value={mebForm.title} onChange={e => setMebForm(p => ({ ...p, title: e.target.value }))}
+                  placeholder="6. Sınıf Fen - Hücre Ünitesi"
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px' }}>Seviye *</label>
+                <select value={mebForm.level} onChange={e => setMebForm(p => ({ ...p, level: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)' }}>
+                  <option value="ilkokul">İlkokul</option>
+                  <option value="ortaokul">Ortaokul</option>
+                  <option value="lise">Lise</option>
+                  <option value="universite">Üniversite</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px' }}>Sınıf *</label>
+                <input value={mebForm.grade} onChange={e => setMebForm(p => ({ ...p, grade: e.target.value }))}
+                  placeholder="ortaokul 6. sinif"
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px' }}>Ders *</label>
+                <input value={mebForm.subject} onChange={e => setMebForm(p => ({ ...p, subject: e.target.value }))}
+                  placeholder="Fen Bilimleri"
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' }} />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px' }}>Ünite *</label>
+                <input value={mebForm.unit} onChange={e => setMebForm(p => ({ ...p, unit: e.target.value }))}
+                  placeholder="Hücre ve Organeller"
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+
+            {/* PDF veya metin */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px' }}>PDF Dosyası (opsiyonel)</label>
+                <input type="file" accept=".pdf,.txt,.docx"
+                  onChange={e => setMebFile(e.target.files?.[0] || null)}
+                  style={{ width: '100%', fontSize: '12px', color: 'var(--text2)' }} />
+                {mebFile && <div style={{ fontSize: '11px', color: 'var(--green)', marginTop: '4px' }}>✓ {mebFile.name} ({(mebFile.size / 1024 / 1024).toFixed(1)} MB)</div>}
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px' }}>Veya Metin İçeriği</label>
+                <textarea value={mebForm.raw_text} onChange={e => setMebForm(p => ({ ...p, raw_text: e.target.value }))}
+                  placeholder="Konu metnini buraya yapıştır..."
+                  rows={4}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '12px', fontFamily: 'var(--font-sans)', resize: 'vertical', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+
+            {mebMsg && (
+              <div style={{ padding: '10px 14px', borderRadius: '8px', marginBottom: '10px', fontSize: '13px',
+                background: mebMsg.startsWith('✅') ? 'var(--green-bg)' : 'var(--red-bg)',
+                color: mebMsg.startsWith('✅') ? 'var(--green)' : 'var(--red)',
+                border: `1px solid ${mebMsg.startsWith('✅') ? 'rgba(22,163,74,0.2)' : 'rgba(220,38,38,0.2)'}` }}>
+                {mebMsg}
+              </div>
+            )}
+
+            <button
+              disabled={mebUploading || !mebForm.title || !mebForm.grade || !mebForm.subject || !mebForm.unit}
+              onClick={async () => {
+                setMebUploading(true)
+                setMebMsg('')
+                try {
+                  const fd = new FormData()
+                  fd.append('title', mebForm.title)
+                  fd.append('grade', mebForm.grade)
+                  fd.append('subject', mebForm.subject)
+                  fd.append('unit', mebForm.unit)
+                  fd.append('level', mebForm.level)
+                  fd.append('raw_text', mebForm.raw_text)
+                  if (mebFile) fd.append('file', mebFile)
+
+                  const res = await fetch('/api/admin/meb-upload', { method: 'POST', body: fd })
+                  const data = await res.json()
+                  if (res.ok) {
+                    setMebMsg(`✅ Yüklendi! ${data.chunks} chunk, ${data.embedded} embedding, ${(data.chars/1000).toFixed(1)}K karakter`)
+                    setMebForm({ title: '', grade: '', subject: '', unit: '', level: mebForm.level, raw_text: '' })
+                    setMebFile(null)
+                    // Listeyi yenile
+                    const r2 = await fetch(`/api/admin/meb-upload?level=${mebFilter.level}&subject=${mebFilter.subject}`)
+                    const d2 = await r2.json()
+                    setMebResources(d2.resources || [])
+                  } else {
+                    setMebMsg(`❌ Hata: ${data.error}`)
+                  }
+                } catch (e: any) {
+                  setMebMsg(`❌ ${e.message}`)
+                } finally {
+                  setMebUploading(false)
+                }
+              }}
+              style={{ padding: '10px 20px', borderRadius: '10px', background: 'var(--primary)', color: '#fff', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {mebUploading ? <><span className="spinner" style={{ width: 16, height: 16, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> Yükleniyor...</> : '📤 Yükle ve Chunk'la'}
+            </button>
+          </div>
+
+          {/* Kaynak listesi */}
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)' }}>
+                📚 Yüklü Kaynaklar ({mebResources.length})
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <select value={mebFilter.level} onChange={async e => {
+                  const level = e.target.value
+                  setMebFilter(p => ({ ...p, level }))
+                  setMebLoading(true)
+                  const res = await fetch(`/api/admin/meb-upload?level=${level}&subject=${mebFilter.subject}`)
+                  const data = await res.json()
+                  setMebResources(data.resources || [])
+                  setMebLoading(false)
+                }} style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '12px', fontFamily: 'var(--font-sans)' }}>
+                  <option value="">Tüm Seviyeler</option>
+                  <option value="ilkokul">İlkokul</option>
+                  <option value="ortaokul">Ortaokul</option>
+                  <option value="lise">Lise</option>
+                  <option value="universite">Üniversite</option>
+                </select>
+                <button onClick={async () => {
+                  setMebLoading(true)
+                  const res = await fetch(`/api/admin/meb-upload?level=${mebFilter.level}&subject=${mebFilter.subject}`)
+                  const data = await res.json()
+                  setMebResources(data.resources || [])
+                  setMebLoading(false)
+                }} style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text2)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                  🔄 Yenile
+                </button>
+              </div>
+            </div>
+
+            {mebLoading ? (
+              <div style={{ textAlign: 'center', padding: '2rem' }}><div className="spinner" /></div>
+            ) : mebResources.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text3)' }}>
+                <div style={{ fontSize: '32px', marginBottom: '8px' }}>📭</div>
+                <div>Henüz kaynak yüklenmemiş. Yükle butonuna tıkla.</div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {mebResources.map((r: any) => (
+                  <div key={r.id} style={{ padding: '12px 14px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '3px' }}>{r.title}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text3)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                          <span>📚 {r.subject}</span>
+                          <span>📖 {r.unit}</span>
+                          <span>🎓 {r.grade}</span>
+                          <span>📄 {r.source_type === 'pdf' ? 'PDF' : 'Metin'}</span>
+                          <span>💬 {(r.char_count / 1000).toFixed(1)}K karakter</span>
+                          <span>🗓️ {new Date(r.created_at).toLocaleDateString('tr-TR')}</span>
+                        </div>
+                        {r.preview && (
+                          <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '500px' }}>
+                            {r.preview}...
+                          </div>
+                        )}
+                      </div>
+                      <button onClick={async () => {
+                        if (!confirm(`"${r.title}" kaynağını silmek istediğine emin misin? Tüm chunk'lar da silinecek.`)) return
+                        const res = await fetch('/api/admin/meb-upload', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: r.id }) })
+                        if (res.ok) setMebResources(prev => prev.filter((x: any) => x.id !== r.id))
+                        else alert('Silme başarısız')
+                      }} style={{ padding: '5px 10px', borderRadius: '7px', border: '1px solid rgba(220,38,38,0.3)', background: 'var(--red-bg)', color: 'var(--red)', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0, marginLeft: '12px' }}>
+                        🗑️ Sil
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       </div>
     </main>
   )
