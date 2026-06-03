@@ -387,7 +387,7 @@ export async function POST(req: NextRequest) {
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5',
-      max_tokens: 4000,
+      max_tokens: 8000, // Artırıldı — uzun konularda JSON kesilmesini önler
       system: 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca MEB müfredatındaki konularda soru üret. Müfredat dışı, siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.',
       messages: [{ role: 'user', content: prompt }],
     })
@@ -399,9 +399,43 @@ export async function POST(req: NextRequest) {
     try {
       parsed = JSON.parse(clean)
     } catch {
-      const match = clean.match(/\{[\s\S]*\}/)
-      if (!match) throw new Error('Invalid JSON')
-      parsed = JSON.parse(match[0])
+      // JSON bozuksa — questions array'ini direkt çıkar
+      try {
+        const match = clean.match(/\{[\s\S]*\}/)
+        if (match) {
+          parsed = JSON.parse(match[0])
+        } else {
+          throw new Error('No JSON object found')
+        }
+      } catch {
+        // Son çare: questions array'ini regex ile çıkar
+        try {
+          const arrMatch = clean.match(/"questions"\s*:\s*(\[[\s\S]*?\](?=\s*[},]))/)
+          if (arrMatch) {
+            // Her soruyu ayrı ayrı parse et
+            const questionsStr = arrMatch[1]
+            const safeQuestions: any[] = []
+            // Basit soru nesnelerini bul
+            const questionMatches = questionsStr.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g)
+            if (questionMatches) {
+              for (const qStr of questionMatches) {
+                try { safeQuestions.push(JSON.parse(qStr)) } catch {}
+              }
+            }
+            if (safeQuestions.length > 0) {
+              parsed = { questions: safeQuestions }
+              console.warn('[generate-quiz] JSON recovered via regex, got', safeQuestions.length, 'questions')
+            } else {
+              throw new Error('Could not recover questions')
+            }
+          } else {
+            throw new Error('Invalid JSON - no questions array')
+          }
+        } catch(e2) {
+          console.error('[generate-quiz] JSON parse failed completely:', e2)
+          return NextResponse.json({ error: 'Quiz generation failed - invalid response' }, { status: 500 })
+        }
+      }
     }
 
     if (parsed?.error?.includes?.('100 PDF pages') || parsed?.type === 'error') {
