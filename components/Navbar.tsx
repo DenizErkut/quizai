@@ -243,7 +243,7 @@ export default function Navbar() {
             {showMenu && (
               <>
                 <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setShowMenu(false)} />
-                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '8px', minWidth: '210px', boxShadow: '0 8px 40px rgba(8,36,101,0.2)', maxHeight: '80vh', overflowY: 'auto' }}>
+                <div style={{ position: 'fixed', top: '64px', right: '12px', zIndex: 9999, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '8px', minWidth: '220px', boxShadow: '0 8px 40px rgba(8,36,101,0.25)', maxHeight: 'calc(100vh - 80px)', overflowY: 'auto' }}>
                   {/* Profil özeti */}
                   <div style={{ padding: '10px 14px', marginBottom: '6px', borderBottom: '1px solid #f0f4f8' }}>
                     <div style={{ fontWeight: 700, fontSize: '14px', color: '#082465' }}>{profile.name}</div>
@@ -418,7 +418,7 @@ export default function Navbar() {
               {showMenu && (
                 <>
                   <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setShowMenu(false)} />
-                  <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '8px', minWidth: '220px', boxShadow: '0 8px 40px rgba(8,36,101,0.15)' }}>
+                  <div style={{ position: 'fixed', top: '58px', right: '8px', zIndex: 9999, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '8px', minWidth: '220px', boxShadow: '0 8px 40px rgba(8,36,101,0.2)', maxHeight: 'calc(100vh - 74px)', overflowY: 'auto' }}>
                     {/* Profil özeti */}
                     <div style={{ padding: '10px 14px 10px', marginBottom: '6px', borderBottom: '1px solid #f0f4f8' }}>
                       <div style={{ fontWeight: 700, fontSize: '14px', color: '#082465' }}>{profile.name}</div>
