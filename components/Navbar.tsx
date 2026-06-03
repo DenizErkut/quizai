@@ -399,8 +399,20 @@ export default function Navbar() {
             {/* Avatar / Dropdown */}
             <div style={{ position: 'relative' }}>
               <button onClick={() => { setShowMenu(v => !v); setShowLang(false) }}
-                style={{ width: 36, height: 36, borderRadius: '50%', background: '#fdd31d', border: 'none', color: '#082465', fontWeight: 800, fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontFamily: 'inherit' }}>
-                {profile.name?.slice(0, 2).toUpperCase()}
+                style={{
+                  width: 38, height: 38, borderRadius: '50%',
+                  background: profile.avatar_url ? 'transparent' : '#fdd31d',
+                  border: profile.avatar_url ? '2.5px solid #fdd31d' : 'none',
+                  color: '#082465', fontWeight: 800, fontSize: '13px',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, fontFamily: 'inherit', overflow: 'hidden', padding: 0,
+                  boxShadow: profile.avatar_url ? '0 2px 8px rgba(8,36,101,0.2)' : 'none',
+                }}>
+                {profile.avatar_url ? (
+                  <img src={profile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                ) : (
+                  profile.name?.slice(0, 2).toUpperCase()
+                )}
               </button>
 
               {showMenu && (
