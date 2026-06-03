@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import OnboardingModal from '@/components/OnboardingModal'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -22,7 +23,7 @@ interface Question {
   tableData?: {headers: string[]; rows: {cells: string[]; blanks: number[]}[]} // tablo (Maarif)
   tableAnswers?: string[] // tablo: doğru cevaplar sırayla
 }
-interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number; daily_test_count?: number; daily_test_date?: string }
+interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number; daily_test_count?: number; daily_test_date?: string; onboarding_completed?: boolean }
 
 // MEB müfredatına göre ders ve konu haritası
 const SUBJECT_MAP: Record<string, Record<string, string[]>> = {
@@ -277,6 +278,7 @@ type Screen = 'topic' | 'loading' | 'quiz' | 'result' | 'limit'
 function QuizPageContent() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [showOnboarding, setShowOnboarding] = useState(false)
   const [currentLang, setCurrentLang] = useState('Türkçe')
   const [screen, setScreen] = useState<Screen>('topic')
   const [selectedTopic, setSelectedTopic] = useState('')
@@ -312,11 +314,15 @@ function QuizPageContent() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return null }
     const { data } = await supabase
-      .from('profiles').select('name,grade,language,plan,monthly_test_count,daily_test_count,daily_test_date,age')
+      .from('profiles').select('name,grade,language,plan,monthly_test_count,daily_test_count,daily_test_date,age,onboarding_completed')
       .eq('id', user.id).single()
     if (!data || !data.grade || !data.age || !data.name) { router.push('/profile'); return null }
     const lang = getActiveLang(data.language)
     setProfile({ ...data, language: lang })
+    // ✅ Onboarding: ilk kez giren kullanıcı için modal göster
+    if (data && !data.onboarding_completed) {
+      setShowOnboarding(true)
+    }
     setCurrentLang(lang)
     return { ...data, language: lang }
   }, [])
@@ -1510,6 +1516,14 @@ function QuizPageContent() {
 
 export default function QuizPage() {
   return (
+    <>
+    {showOnboarding && profile && (
+      <OnboardingModal
+        userName={profile.name || ''}
+        grade={profile.grade || ''}
+        onComplete={() => setShowOnboarding(false)}
+      />
+    )}
     <Suspense fallback={<main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></main>}>
       <QuizPageContent />
     </Suspense>
