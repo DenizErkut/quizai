@@ -284,6 +284,36 @@ function QuizPageContent() {
   const [selectedTopic, setSelectedTopic] = useState('')
   const [customTopic, setCustomTopic] = useState('')
   const [openSubject, setOpenSubject] = useState<string | null>(null) // Accordion
+  const [advancedOpen, setAdvancedOpen] = useState(false) // Gelişmiş ayarlar
+  const [favorites, setFavorites] = useState<string[]>([]) // Favori konular
+
+  // localStorage'dan favori ve son ayarları yükle
+  useEffect(() => {
+    try {
+      const favs = JSON.parse(localStorage.getItem('pratium_favs') || '[]')
+      setFavorites(favs)
+      const lastSettings = JSON.parse(localStorage.getItem('pratium_last_settings') || '{}')
+      if (lastSettings.difficulty) setDifficulty(lastSettings.difficulty)
+      if (lastSettings.questionType) setQuestionType(lastSettings.questionType)
+      if (lastSettings.qCount) setQCount(lastSettings.qCount)
+    } catch {}
+  }, [])
+
+  function toggleFavorite(topic: string) {
+    setFavorites(prev => {
+      const next = prev.includes(topic) ? prev.filter(f => f !== topic) : [...prev, topic]
+      localStorage.setItem('pratium_favs', JSON.stringify(next))
+      return next
+    })
+  }
+
+  function saveLastSettings() {
+    try {
+      localStorage.setItem('pratium_last_settings', JSON.stringify({
+        difficulty, questionType, qCount
+      }))
+    } catch {}
+  }
   const [qCount, setQCount] = useState(10)
   const [difficulty, setDifficulty] = useState('normal')
   const [includeVisuals, setIncludeVisuals] = useState(true)
@@ -940,14 +970,34 @@ function QuizPageContent() {
             {currentLang !== 'Türkçe' && <span style={{ color: 'var(--accent)', marginLeft: '6px' }}>· Sorular {currentLang} dilinde</span>}
           </p>
 
+          {/* ── FAVORİLER ── */}
+          {favorites.length > 0 && (
+            <div style={{ marginBottom: '1rem' }}>
+              <label className="field-label">⭐ Favori Konularım</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', marginTop: '6px' }}>
+                {favorites.map(fav => (
+                  <button key={fav} onClick={() => { setSelectedTopic(fav); setCustomTopic('') }}
+                    style={{
+                      padding: '5px 12px', borderRadius: '99px', fontSize: '12px', fontWeight: 500,
+                      cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                      border: `1px solid ${selectedTopic === fav ? 'var(--accent-2)' : 'rgba(253,211,29,0.4)'}`,
+                      background: selectedTopic === fav ? 'var(--accent-2)' : 'var(--accent-2-bg)',
+                      color: selectedTopic === fav ? '#082465' : 'var(--text2)',
+                      display: 'flex', alignItems: 'center', gap: '5px',
+                    }}>
+                    ⭐ {fav}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── DERS VE KONU SEÇİMİ ── */}
           <label className="field-label">Ders seç</label>
           <div style={{ marginTop: '6px', marginBottom: '1rem' }}>
-            {/* Ana ders başlıkları */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
               {Object.keys(SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul).map(subj => (
-                <button
-                  key={subj}
-                  onClick={() => setOpenSubject(openSubject === subj ? null : subj)}
+                <button key={subj} onClick={() => setOpenSubject(openSubject === subj ? null : subj)}
                   style={{
                     padding: '7px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: 500,
                     cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
@@ -962,37 +1012,39 @@ function QuizPageContent() {
               ))}
             </div>
 
-            {/* Alt konular — seçilen derse göre scroll box */}
             {openSubject && (SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul)[openSubject] && (
               <div style={{
                 maxHeight: '180px', overflowY: 'auto', padding: '10px 12px',
                 borderRadius: '12px', border: '1.5px solid var(--accent)',
-                background: 'var(--accent-bg)',
-                display: 'flex', flexWrap: 'wrap', gap: '7px',
+                background: 'var(--accent-bg)', display: 'flex', flexWrap: 'wrap', gap: '7px',
                 scrollbarWidth: 'thin',
               }}>
                 {(SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul)[openSubject].map((topic: string) => (
-                  <button
-                    key={topic}
-                    onClick={() => { setSelectedTopic(topic); setCustomTopic(''); setOpenSubject(null) }}
-                    style={{
-                      padding: '5px 12px', borderRadius: '99px', fontSize: '12px', fontWeight: 500,
-                      cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
-                      border: `1px solid ${selectedTopic === topic ? 'var(--accent)' : 'var(--border)'}`,
-                      background: selectedTopic === topic ? 'var(--accent)' : 'var(--bg)',
-                      color: selectedTopic === topic ? '#fff' : 'var(--text)',
-                      whiteSpace: 'nowrap',
-                    }}>
-                    {topic}
-                  </button>
+                  <div key={topic} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    <button onClick={() => { setSelectedTopic(topic); setCustomTopic(''); setOpenSubject(null) }}
+                      style={{
+                        padding: '5px 10px', borderRadius: '99px', fontSize: '12px', fontWeight: 500,
+                        cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
+                        border: `1px solid ${selectedTopic === topic ? 'var(--accent)' : 'var(--border)'}`,
+                        background: selectedTopic === topic ? 'var(--accent)' : 'var(--bg)',
+                        color: selectedTopic === topic ? '#fff' : 'var(--text)', whiteSpace: 'nowrap',
+                      }}>
+                      {topic}
+                    </button>
+                    <button onClick={() => toggleFavorite(topic)} title={favorites.includes(topic) ? 'Favorilerden çıkar' : 'Favorilere ekle'}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', opacity: favorites.includes(topic) ? 1 : 0.35, padding: '2px', transition: 'opacity 0.15s' }}>
+                      ⭐
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
 
-            {/* Seçilen konu göstergesi */}
             {selectedTopic && (
               <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 600 }}>✓ Seçilen: {selectedTopic}</span>
+                <button onClick={() => toggleFavorite(selectedTopic)} title={favorites.includes(selectedTopic) ? 'Favorilerden çıkar' : 'Favorilere ekle'}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', opacity: favorites.includes(selectedTopic) ? 1 : 0.4, padding: 0 }}>⭐</button>
                 <button onClick={() => setSelectedTopic('')} style={{ fontSize: '11px', color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕</button>
               </div>
             )}
@@ -1013,84 +1065,104 @@ function QuizPageContent() {
             </div>
           )}
 
-          {/* Zorluk */}
-          <label className="field-label" style={{ marginTop: '16px' }}>Zorluk seviyesi</label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginTop: '6px' }}>
-            {DIFFICULTIES.map(d => (
-              <button key={d.value} onClick={() => setDifficulty(d.value)}
-                style={{ padding: '10px 8px', borderRadius: '10px', border: `1.5px solid ${difficulty === d.value ? d.border : 'var(--border)'}`, background: difficulty === d.value ? d.bg : 'var(--bg2)', color: difficulty === d.value ? d.color : 'var(--text2)', fontSize: '13px', fontWeight: difficulty === d.value ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center' }}>
-                <div style={{ fontWeight: 600, marginBottom: '2px' }}>{d.label}</div>
-                <div style={{ fontSize: '11px', opacity: 0.75 }}>{d.desc}</div>
-              </button>
-            ))}
-          </div>
+          {/* ── GELİŞMİŞ AYARLAR (accordion) ── */}
+          <button
+            onClick={() => setAdvancedOpen(v => !v)}
+            style={{
+              width: '100%', marginTop: '1.25rem', padding: '10px 14px',
+              borderRadius: '10px', border: '1px solid var(--border)',
+              background: advancedOpen ? 'var(--bg2)' : 'var(--bg)',
+              color: 'var(--text2)', fontSize: '13px', fontWeight: 500,
+              cursor: 'pointer', fontFamily: 'var(--font-sans)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+            <span>⚙️ Gelişmiş ayarlar {!advancedOpen && <span style={{ fontSize: '11px', color: 'var(--text3)', marginLeft: '6px' }}>(zorluk, soru tipi, sayı, görsel)</span>}</span>
+            <span style={{ fontSize: '12px' }}>{advancedOpen ? '▲' : '▼'}</span>
+          </button>
 
-          {/* Soru tipi seçici */}
-          <div style={{ marginTop: '16px' }}>
-            <label className="field-label">Soru tipi</label>
-            <div style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '6px', fontWeight: 500 }}>
-              📌 Maarif Modeli tipleri işaretli olanlardır
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '4px' }}>
-              {[
-                { value: 'multiple_choice', label: 'Çoktan Seçmeli', icon: '🔤', desc: 'A/B/C/D klasik', maarif: true },
-                { value: 'fill_blank', label: 'Boşluk Doldurma', icon: '✏️', desc: 'Eksik kelimeyi bul', maarif: true },
-                { value: 'true_false', label: 'Doğru / Yanlış', icon: '✓✗', desc: 'Gerekçeli D/Y', maarif: true },
-                { value: 'multi_true_false', label: 'Çoklu D/Y', icon: '📋✓✗', desc: 'Maarif Modeli', maarif: true },
-                { value: 'table_fill', label: 'Tablo Doldurma', icon: '🗂️', desc: 'Maarif Modeli', maarif: true },
-                { value: 'matching', label: 'Eşleştirme', icon: '🔗', desc: 'Kavram – tanım', maarif: true },
-                { value: 'ordering', label: 'Sıralama', icon: '📋', desc: 'Doğru sıraya koy', maarif: true },
-                { value: 'short_answer', label: 'Kısa Cevap', icon: '💬', desc: 'AI puanlar', maarif: false },
-                { value: 'mixed', label: 'Karma Sorular', icon: '🎲', desc: 'Tüm tipler karışık', maarif: false },
-              ].map(t => (
-                <button key={t.value} onClick={() => setQuestionType(t.value as QuestionType)}
-                  style={{
-                    padding: '10px 8px', borderRadius: '10px', cursor: 'pointer', textAlign: 'center',
-                    border: `1.5px solid ${questionType === t.value ? 'var(--accent)' : t.maarif ? 'rgba(91,76,245,0.2)' : 'var(--border)'}`,
-                    background: questionType === t.value ? 'var(--accent-bg)' : t.maarif ? 'rgba(91,76,245,0.03)' : 'var(--bg2)',
-                    transition: 'all 0.15s', position: 'relative',
-                  }}>
-                  {t.maarif && <span style={{ position: 'absolute', top: '4px', right: '5px', fontSize: '8px', color: 'var(--accent)', fontWeight: 700 }}>MM</span>}
-                  <div style={{ fontSize: '20px', marginBottom: '4px' }}>{t.icon}</div>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: questionType === t.value ? 'var(--accent)' : 'var(--primary)', lineHeight: 1.3 }}>{t.label}</div>
-                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '2px' }}>{t.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
+          {advancedOpen && (
+            <div style={{ marginTop: '10px', padding: '14px', borderRadius: '12px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
 
-          {/* Soru sayısı + görsel */}
-          <div style={{ display: 'flex', gap: '12px', marginTop: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1 }}>
-              <label className="field-label">Soru sayısı</label>
-              <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
-                {[5, 10, 15, 20].map(n => {
-                  const locked = n > maxQCount
-                  const active = qCount === n
-                  return (
-                    <button key={n}
-                      className={`btn btn-sm ${active && !locked ? 'btn-primary' : ''}`}
-                      onClick={() => {
-                        if (locked) { setShowPaywall('qcount'); return }
-                        setQCount(n)
-                      }}
-                      style={{ position: 'relative', opacity: locked ? 0.7 : 1, border: locked ? '1.5px solid rgba(217,119,6,0.4)' : undefined, color: locked ? '#92400e' : undefined }}>
-                      {n} soru
-                      {locked && <span style={{ fontSize: '10px', marginLeft: '3px' }}>🔒</span>}
-                    </button>
-                  )
-                })}
+              {/* Zorluk */}
+              <label className="field-label" style={{ marginTop: 0 }}>Zorluk seviyesi</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginTop: '6px' }}>
+                {DIFFICULTIES.map(d => (
+                  <button key={d.value} onClick={() => setDifficulty(d.value)}
+                    style={{ padding: '10px 8px', borderRadius: '10px', border: `1.5px solid ${difficulty === d.value ? d.border : 'var(--border)'}`, background: difficulty === d.value ? d.bg : 'var(--bg)', color: difficulty === d.value ? d.color : 'var(--text2)', fontSize: '13px', fontWeight: difficulty === d.value ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center' }}>
+                    <div style={{ fontWeight: 600, marginBottom: '2px' }}>{d.label}</div>
+                    <div style={{ fontSize: '11px', opacity: 0.75 }}>{d.desc}</div>
+                  </button>
+                ))}
               </div>
-              {plan === 'free' && <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Freemium'da max 5 soru · <a href="/pricing" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Premium'a geç</a></div>}
+
+              {/* Soru tipi */}
+              <div style={{ marginTop: '14px' }}>
+                <label className="field-label" style={{ marginTop: 0 }}>Soru tipi</label>
+                <div style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '6px', fontWeight: 500 }}>
+                  📌 Maarif Modeli tipleri işaretli olanlardır
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                  {[
+                    { value: 'multiple_choice', label: 'Çoktan Seçmeli', icon: '🔤', desc: 'A/B/C/D klasik', maarif: true },
+                    { value: 'fill_blank', label: 'Boşluk Doldurma', icon: '✏️', desc: 'Eksik kelimeyi bul', maarif: true },
+                    { value: 'true_false', label: 'Doğru / Yanlış', icon: '✓✗', desc: 'Gerekçeli D/Y', maarif: true },
+                    { value: 'multi_true_false', label: 'Çoklu D/Y', icon: '📋✓✗', desc: 'Maarif Modeli', maarif: true },
+                    { value: 'table_fill', label: 'Tablo Doldurma', icon: '🗂️', desc: 'Maarif Modeli', maarif: true },
+                    { value: 'matching', label: 'Eşleştirme', icon: '🔗', desc: 'Kavram – tanım', maarif: true },
+                    { value: 'ordering', label: 'Sıralama', icon: '📋', desc: 'Doğru sıraya koy', maarif: true },
+                    { value: 'short_answer', label: 'Kısa Cevap', icon: '💬', desc: 'AI puanlar', maarif: false },
+                    { value: 'mixed', label: 'Karma Sorular', icon: '🎲', desc: 'Tüm tipler karışık', maarif: false },
+                  ].map(t => (
+                    <button key={t.value} onClick={() => setQuestionType(t.value as QuestionType)}
+                      style={{
+                        padding: '10px 8px', borderRadius: '10px', cursor: 'pointer', textAlign: 'center',
+                        border: `1.5px solid ${questionType === t.value ? 'var(--accent)' : t.maarif ? 'rgba(91,76,245,0.2)' : 'var(--border)'}`,
+                        background: questionType === t.value ? 'var(--accent-bg)' : t.maarif ? 'rgba(91,76,245,0.03)' : 'var(--bg)',
+                        transition: 'all 0.15s', position: 'relative',
+                      }}>
+                      {t.maarif && <span style={{ position: 'absolute', top: '4px', right: '5px', fontSize: '8px', color: 'var(--accent)', fontWeight: 700 }}>MM</span>}
+                      <div style={{ fontSize: '20px', marginBottom: '4px' }}>{t.icon}</div>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: questionType === t.value ? 'var(--accent)' : 'var(--primary)', lineHeight: 1.3 }}>{t.label}</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '2px' }}>{t.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Soru sayısı + görsel — accordion içinde */}
+              <div style={{ display: 'flex', gap: '12px', marginTop: '14px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1 }}>
+                  <label className="field-label" style={{ marginTop: 0 }}>Soru sayısı</label>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+                    {[5, 10, 15, 20].map(n => {
+                      const locked = n > maxQCount
+                      const active = qCount === n
+                      return (
+                        <button key={n}
+                          className={`btn btn-sm ${active && !locked ? 'btn-primary' : ''}`}
+                          onClick={() => {
+                            if (locked) { setShowPaywall('qcount'); return }
+                            setQCount(n)
+                          }}
+                          style={{ position: 'relative', opacity: locked ? 0.7 : 1, border: locked ? '1.5px solid rgba(217,119,6,0.4)' : undefined, color: locked ? '#92400e' : undefined }}>
+                          {n} soru
+                          {locked && <span style={{ fontSize: '10px', marginLeft: '3px' }}>🔒</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {plan === 'free' && <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Freemium'da max 5 soru · <a href="/pricing" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Premium'a geç</a></div>}
+                </div>
+                <div>
+                  <label className="field-label" style={{ marginTop: 0 }}>Görsel sorular</label>
+                  <button onClick={() => setIncludeVisuals(v => !v)}
+                    style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', border: `1.5px solid ${includeVisuals ? 'var(--accent)' : 'var(--border)'}`, background: includeVisuals ? 'var(--accent-bg)' : 'var(--bg)', color: includeVisuals ? 'var(--accent)' : 'var(--text2)', fontSize: '13px', fontWeight: includeVisuals ? 600 : 400, transition: 'all 0.15s' }}>
+                    {includeVisuals ? '📊 Grafik & SVG açık' : '📝 Sadece metin'}
+                  </button>
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="field-label">Görsel sorular</label>
-              <button onClick={() => setIncludeVisuals(v => !v)}
-                style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', border: `1.5px solid ${includeVisuals ? 'var(--accent)' : 'var(--border)'}`, background: includeVisuals ? 'var(--accent-bg)' : 'var(--bg2)', color: includeVisuals ? 'var(--accent)' : 'var(--text2)', fontSize: '13px', fontWeight: includeVisuals ? 600 : 400, transition: 'all 0.15s' }}>
-                {includeVisuals ? '📊 Grafik & SVG açık' : '📝 Sadece metin'}
-              </button>
-            </div>
-          </div>
+          )}
 
           {/* Özet */}
           <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '13px', color: 'var(--text2)', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
