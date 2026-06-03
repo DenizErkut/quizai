@@ -279,6 +279,8 @@ function QuizPageContent() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [quizError, setQuizError] = useState<{code: string; title: string; desc: string; retry: boolean} | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
   const [currentLang, setCurrentLang] = useState('Türkçe')
   const [screen, setScreen] = useState<Screen>('topic')
   const [selectedTopic, setSelectedTopic] = useState('')
@@ -523,7 +525,11 @@ function QuizPageContent() {
           setTimeout(() => setScreen('topic'), 8000)
           return
         }
-        throw new Error(data.error)
+        const errInfo = getErrorInfo(data.error || 'unknown', res.status)
+        setQuizError(errInfo)
+        setScreen('error')
+        clearInterval(iv)
+        return
       }
 
       fetchProfile()
@@ -531,10 +537,12 @@ function QuizPageContent() {
       setSessionId(data.sessionId)
       setCurrent(0); setAnswers([]); answersRef.current = []; setChosen(null); setCheckingAnswer(false)
       setScreen('quiz')
-    } catch {
+    } catch (e: any) {
       clearInterval(iv)
-      setLoadMsg('Hata oluştu, tekrar deneyin.')
-      setTimeout(() => setScreen('topic'), 2000)
+      const errCode = e?.message || 'unknown'
+      const errInfo = getErrorInfo(errCode)
+      setQuizError(errInfo)
+      setScreen('error')
     }
   }
 
@@ -1196,6 +1204,86 @@ function QuizPageContent() {
       </div>
     </main>
     </>
+  )
+
+  // ── ERROR ──
+  if (screen === 'error' && quizError) return (
+    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
+      <div style={{ maxWidth: '420px', width: '100%', textAlign: 'center' }} className="anim-up">
+        {/* Hata ikonu */}
+        <div style={{ fontSize: '64px', marginBottom: '1rem' }}>
+          {quizError.code === 'daily_limit' || quizError.code === 'monthly_limit' ? '⏰' :
+           quizError.code === 'curriculum' ? '📖' :
+           quizError.code === 'pdf' ? '📄' :
+           quizError.code === 'server' || quizError.code === 'timeout' ? '🔧' : '❌'}
+        </div>
+
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)', marginBottom: '0.75rem' }}>
+          {quizError.title}
+        </h2>
+        <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
+          {quizError.desc}
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '320px', margin: '0 auto' }}>
+          {/* Retry butonu */}
+          {quizError.retry && retryCount < 1 && (
+            <button
+              className="btn btn-primary btn-lg"
+              onClick={() => {
+                setRetryCount(r => r + 1)
+                setQuizError(null)
+                setScreen('loading')
+                startQuiz()
+              }}
+              style={{ justifyContent: 'center' }}>
+              🔄 Tekrar dene
+            </button>
+          )}
+
+          {/* Plana göre CTA */}
+          {(quizError.code === 'daily_limit' || quizError.code === 'monthly_limit') && (
+            <a href="/pricing" className="btn btn-primary btn-lg" style={{ justifyContent: 'center', textDecoration: 'none' }}>
+              💎 Premium'a geç
+            </a>
+          )}
+
+          {quizError.code === 'curriculum' && (
+            <a href="/pricing" className="btn btn-lg" style={{ justifyContent: 'center', textDecoration: 'none' }}>
+              🔓 Tüm konular için Premium
+            </a>
+          )}
+
+          {/* Geri dön */}
+          <button
+            className="btn btn-ghost"
+            onClick={() => { setQuizError(null); setRetryCount(0); setScreen('topic') }}
+            style={{ justifyContent: 'center' }}>
+            ← Farklı konu seç
+          </button>
+
+          {/* Hata bildir */}
+          {(quizError.code === 'unknown' || quizError.code === 'ai_error' || quizError.code === 'server') && (
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                const msg = encodeURIComponent(`Hata kodu: ${quizError.code}\nKonu: ${customTopic || selectedTopic}\nHata: ${quizError.title}`)
+                window.open(`mailto:destek@pratium.com?subject=Hata Bildirimi&body=${msg}`)
+              }}
+              style={{ justifyContent: 'center', color: 'var(--text3)', fontSize: '12px' }}>
+              📧 Hatayı bildir
+            </button>
+          )}
+        </div>
+
+        {/* Tekrar deneme geçmişi */}
+        {retryCount >= 1 && quizError.retry && (
+          <div style={{ marginTop: '1rem', padding: '10px 14px', borderRadius: '10px', background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.2)', fontSize: '12px', color: '#92400e' }}>
+            ⚠️ Bir kez daha denendi ama başarısız oldu. Lütfen daha sonra tekrar dene veya hatayı bildir.
+          </div>
+        )}
+      </div>
+    </main>
   )
 
   // ── LOADING ──
