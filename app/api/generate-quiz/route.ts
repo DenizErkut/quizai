@@ -8,6 +8,15 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+function getLevel(grade: string): string {
+  const g = grade?.toLowerCase() || ''
+  if (g.includes('ilkokul') || g.includes('1.') || g.includes('2.') || g.includes('3.') || g.includes('4.')) return 'ilkokul'
+  if (g.includes('ortaokul') || g.includes('5.') || g.includes('6.') || g.includes('7.') || g.includes('8.')) return 'ortaokul'
+  if (g.includes('lise') || g.includes('9.') || g.includes('10.') || g.includes('11.') || g.includes('12.')) return 'lise'
+  if (g.includes('universite') || g.includes('üniversite')) return 'universite'
+  return 'ortaokul'
+}
+
 function normalizeTR(s: string): string {
   return s.toLowerCase()
     .replace(/ğ/g,'g').replace(/ü/g,'u').replace(/ş/g,'s')
@@ -42,10 +51,75 @@ const CURRICULUM_KEYWORDS = [
   'deneme','kazanim','ogrenme','okul','ders','test','soru','konu','mufredat','sinif',
 ]
 
+// MEB müfredatı whitelist — SUBJECT_MAP'ten üretilmiş normalize edilmiş konular
+const MEB_WHITELIST = new Set([
+  // Matematiksel kavramlar
+  'dogal sayilar','tam sayilar','ondalik sayilar','kesirler','rasyonel sayilar',
+  'asal sayilar','obeb','okek','carpanlar','katlar','oruntu','dizi',
+  'oran','orantı','yuzde','denklem','esitsizlik','cebirsel ifade',
+  'fonksiyon','koordinat','parabol','logaritma','trigonometri','limit','turev',
+  'integral','istatistik','olasilik','kombinasyon','permutasyon','binom',
+  'vektor','matris','karmasik sayi','analitik geometri',
+  'ucgen','dortgen','cember','daire','alan','cevre','hacim','prizma','piramit',
+  'geometri','simetri','donusum','karekok','uslu','polinom',
+  // Fen
+  'hucre','organeller','fotosentez','solunum','sindirim','dolasim','bosaltim',
+  'destek','hareket','sinir','endokrin','ureme','kalitim','dna','gen','evrim',
+  'ekosistem','biyocevre','madde','atom','element','bilisik','bag','mol',
+  'asit','baz','cozunurluk','termodinamik','kuvvet','newton','enerji','is','guc',
+  'momentum','dalga','ses','isik','optik','elektrik','manyetizma','induktif',
+  'atom modeli','periyodik','nukleer','radyoaktivite','fotovoltaik',
+  // Tarih
+  'osmanli','selcuklu','cumhuriyet','ataturk','inkilap','kurtulus savasi',
+  'lozan','misak','tbmm','fransiz ihtilali','sanayi devrimi','dunya savasi',
+  'soguk savas','turk tarihi','ilk uygarliklar','orta asya','islam medeniyeti',
+  'mogol','bizans','hacilar','reformasyon','aydinlanma','kolonizasyon',
+  // Coğrafya
+  'harita','iklim','yer sekli','litosfer','hidrosfer','atmosfer','biyosfer',
+  'nufus','goc','yerlесme','tarim','sanayi','enerji','ticaret','ulasim',
+  'cevre sorunu','kuresel isinma','dogal afet','erozyon','cografya',
+  // Türkçe / Edebiyat
+  'ses bilgisi','hece','vurgu','unk','kok','ek','isim','sifat','zarf','zamir',
+  'fiil','baglac','unlem','edema','cumle','paragraf','metin','tur','anlam',
+  'yazi kuralı','noktalama','sozcu','deyim','atasoz','siir','roman','hikaye',
+  'tiyatro','deneme','makale','divan','halk edebiyati','tanzimat','servetifunun',
+  'milli edebiyat','cumhuriyet edebiyati','soz sanati',
+  // İngilizce
+  'present','past','future','tense','modal','passive','reported','conditional',
+  'grammar','vocabulary','reading','writing','listening','speaking',
+  // Din Kültürü
+  'iman','ibadet','namaz','oruc','zekat','hac','kuran','peygamber','ahlak',
+  'dini bayram','islam','hristiyanlık','yahudilik','din felsefesi',
+  // Felsefe
+  'epistemoloji','ontoloji','etik','estetik','siyaset felsefesi',
+  'antik yunan','sofistler','sokrates','platon','aristoteles','kant','descartes',
+  // Havacılık (üniversite müfredatı)
+  'ucak','aerodinamik','navigasyon','aviyonik','meteoroloji','atc','vfr','ifr',
+  // Genel akademik
+  'beden egitimi','muzik','gorsel sanatlar','teknoloji tasarim',
+])
+
 function isInCurriculum(topic: string, plan: string): boolean {
+  const norm = normalizeTR(topic.trim())
+  
+  // Whitelist kontrolü — her planda geçerli
+  if (MEB_WHITELIST.has(norm)) return true
+  
+  // Kısmi eşleşme — whitelist'teki bir kelimeyi içeriyor mu
+  const words = norm.split(' ').filter(w => w.length > 3)
+  const hasWhitelistMatch = words.some(w => 
+    MEB_WHITELIST.has(w) || [...MEB_WHITELIST].some(wl => wl.includes(w) || w.includes(wl))
+  )
+  if (hasWhitelistMatch) return true
+
+  // Eski keyword kontrolü (geriye dönük uyumluluk)
+  const hasKeyword = CURRICULUM_KEYWORDS.some(kw => norm.includes(kw))
+  if (hasKeyword) return true
+
+  // Premium kullanıcılar dosya yüklemişse geçir (fileContent zaten kontrol ediliyor)
   if (plan === 'premium' || plan === 'unlimited') return true
-  const norm = normalizeTR(topic)
-  return CURRICULUM_KEYWORDS.some(kw => norm.includes(kw) || kw.includes(norm.split(' ')[0]))
+
+  return false
 }
 
 // ─── GÖRSEL KATEGORI TESPİTİ ──────────────────────────────────────────────────
@@ -67,7 +141,7 @@ function detectVisualCategory(topic: string): string | null {
 }
 
 // ─── SVG PROMPT OLUŞTURMA ─────────────────────────────────────────────────────
-function buildSVGPrompt(category: string, topic: string, questionText: string, grade: string): string {
+function buildSVGPrompt(category: string, topic: string, questionText: string, grade: string, correctAnswer: string = ''): string {
   const base = `You are an expert SVG educational diagram creator for Turkish students (${grade}).
 Create a SINGLE clean, educational SVG diagram for this quiz question.
 
@@ -81,7 +155,30 @@ CRITICAL SVG RULES:
 - Font: Arial, minimum 13px for readability
 - Add a subtle title at top relating to the question
 - NO JavaScript, NO external resources, NO foreignObject
-- Return ONLY the SVG code, nothing else, starting with <svg`
+- Return ONLY the SVG code, nothing else, starting with <svg
+- CORRECT ANSWER (DO NOT SHOW THIS IN SVG): "${correctAnswer}"
+
+ABSOLUTE RULE - NEVER REVEAL THE ANSWER IN THE DIAGRAM:
+You are creating a QUESTION diagram, NOT an answer key.
+
+FORBIDDEN - never include these in the SVG:
+- The word/term/value that is the correct answer to the question
+- Any text that directly answers what the question is asking
+- Formulas showing the final result if the result IS the answer
+- Labels that give away the answer
+
+ALLOWED - the diagram should show:
+- The SETUP or CONTEXT of the question (what is given)
+- Unknowns marked clearly as "?" or "___"
+- Supporting visual elements (shapes, arrows, axes) WITHOUT the answer
+- If physics: show the scenario (object, force arrows) but NOT "W=F×d=JOULE" if that's the answer
+- If fill-blank: show the concept visually but leave the blank as "___"
+
+EXAMPLE - Question: "Yapılan işe ne denir?"
+WRONG SVG: includes text "İş" or "Joule" or "W=F×d birimi Joule"  
+CORRECT SVG: shows force arrow pushing object, labels "F=Kuvvet", "d=Mesafe", unknown box "=???"
+
+The student must figure out the answer from the question, NOT from your diagram.`
 
   const guides: Record<string, string> = {
     geometry: `Draw the geometric shape relevant to this question. Label all sides, angles, and measurements mentioned. Use blue for shapes, red for the unknown/highlighted element. Show the formula if applicable.`,
@@ -106,7 +203,9 @@ async function generateVisualForQuestion(
   grade: string
 ): Promise<string | null> {
   try {
-    const prompt = buildSVGPrompt(category, topic, q.q, grade)
+    // Doğru cevabı prompt'a ekle — "bunu YAZMA" diye belirt
+    const correctAnswer = q.opts?.[q.ans] || q.blank || q.correctOrder || ''
+    const prompt = buildSVGPrompt(category, topic, q.q, grade, String(correctAnswer))
     const res = await anthropic.messages.create({
       model: 'claude-sonnet-4-5',
       max_tokens: 1500,
@@ -128,7 +227,7 @@ function buildPrompt(type: string, topic: string, grade: string, difficulty: str
     ? `Topic: "${topic}". Generate questions from this content:\n${fileContent.slice(0, 3000)}`
     : `Topic: "${topic}".`
 
-  const base = `${contentNote}\nLevel: ${grade}. Difficulty: ${difficulty}. Language for all questions and explanations: ${language}. Question count: ${count}.\n\nCRITICAL ACCURACY RULES:\n1. For math: solve fully before writing, verify the answer is in opts at the correct index\n2. For science/history: only include facts you are certain about\n3. The "ans" index must point to the CORRECT answer in "opts"\n4. If you are unsure, use a simpler question\n\nReturn ONLY valid JSON, no markdown, no explanation.\n\n`
+  const base = `Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın.\n\nKESİN KURAL: Yalnızca MEB müfredatında yer alan konularda, MEB kazanımlarına uygun sorular üret. Müfredat dışı, spekülatif veya tartışmalı içerik kesinlikle üretme.\n\n${contentNote}\nSeviye: ${grade}. Zorluk: ${difficulty}. Soru dili: ${language}. Soru sayısı: ${count}.\n\nDOĞRULUK KURALLARI:\n1. Matematik: Her soruyu adım adım çöz, cevabın opts dizisinde doğru indexte olduğunu doğrula\n2. Fen/Tarih: Sadece kesin bildiğin gerçekleri yaz\n3. "ans" indexi MUTLAKA doğru cevabı göstermeli\n4. Emin olmadığın sorular yerine daha basit ama kesin sorular yaz\n5. MEB müfredatına uygun kazanım ve konu kapsamında kal\n\nYalnızca geçerli JSON döndür, markdown veya açıklama ekleme.\n\n`
 
   if (type === 'fill_blank') return base + `Generate fill-in-the-blank questions. Leave a critical word/concept as blank. Provide 4 options (one correct), write the correct answer in "blank" field too.\n\n{"questions":[{"type":"fill_blank","q":"_____ is the powerhouse of the cell.","blank":"Mitochondria","opts":["Mitochondria","Ribosome","Nucleus","Lysosome"],"ans":0,"exp":"Mitochondria produces ATP through cellular respiration."}]}`
 
@@ -208,6 +307,7 @@ export async function POST(req: NextRequest) {
     // Tekrar eden soruları önle
     let previousQuestionsNote = ''
     try {
+      // ✅ Son 10 test, 50 soru — agresif tekrar önleme
       const { data: recentSessions } = await supabase
         .from('quiz_sessions')
         .select('questions')
@@ -215,17 +315,33 @@ export async function POST(req: NextRequest) {
         .eq('topic', topic)
         .eq('completed', true)
         .order('created_at', { ascending: false })
-        .limit(5)
+        .limit(10)
 
       if (recentSessions?.length) {
         const prevQTexts: string[] = []
+        // Anahtar kelimeler çıkar — benzer soruları da yakala
+        const prevKeywords = new Set<string>()
+
         recentSessions.forEach((s: any) => {
           (s.questions || []).forEach((q: any) => {
-            if (q.q && prevQTexts.length < 30) prevQTexts.push(q.q.slice(0, 80))
+            if (!q.q) return
+            if (prevQTexts.length < 50) prevQTexts.push(q.q.slice(0, 100))
+            // İlk 3 kelimeyi keyword olarak ekle — benzer soruları önle
+            q.q.split(' ').slice(0, 5).forEach((w: string) => {
+              if (w.length > 3) prevKeywords.add(w.toLowerCase())
+            })
           })
         })
+
         if (prevQTexts.length > 0) {
-          previousQuestionsNote = `\n\nIMPORTANT - DO NOT REPEAT these previously asked questions:\n${prevQTexts.map((q, i) => `${i + 1}. ${q}`).join('\n')}`
+          previousQuestionsNote = `\n\nCRITICAL - GENERATE COMPLETELY DIFFERENT QUESTIONS:\n` +
+            `These ${prevQTexts.length} questions were already asked recently - DO NOT repeat or rephrase them:\n` +
+            `${prevQTexts.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n\n` +
+            `VARIETY RULES:\n` +
+            `- Ask about DIFFERENT aspects, events, or concepts within the topic\n` +
+            `- Use DIFFERENT question formats and difficulty angles\n` +
+            `- If a concept was already tested, test a RELATED but DIFFERENT concept\n` +
+            `- Prioritize less-tested sub-topics and edge cases`
         }
       }
     } catch (e) {
@@ -247,11 +363,31 @@ export async function POST(req: NextRequest) {
       }
     } catch { }
 
-    const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, safeQCount, (fileContent || '') + gradeContext) + previousQuestionsNote
+    // ✅ MEB kaynağından semantic context çek
+    let mebContext = ''
+    try {
+      const mebRes = await fetch(`${req.nextUrl.origin}/api/meb-search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic, grade, subject: topic, level: getLevel(grade), limit: 4 }),
+      })
+      if (mebRes.ok) {
+        const mebData = await mebRes.json()
+        if (mebData.found && mebData.context) {
+          mebContext = `\n\nMEB KAYNAK İÇERİĞİ (Bu içeriğe dayalı soru üret):\n${mebData.context}`
+          console.log(`[generate-quiz] MEB context found: ${mebData.context.length} chars`)
+        }
+      }
+    } catch (e) {
+      console.warn('[generate-quiz] MEB search failed:', e)
+    }
+
+    const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, safeQCount, (fileContent || '') + gradeContext + mebContext) + previousQuestionsNote
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5',
       max_tokens: 4000,
+      system: 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca MEB müfredatındaki konularda soru üret. Müfredat dışı, siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.',
       messages: [{ role: 'user', content: prompt }],
     })
 
