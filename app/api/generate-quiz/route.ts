@@ -369,7 +369,8 @@ export async function POST(req: NextRequest) {
       const mebRes = await fetch(`${req.nextUrl.origin}/api/meb-search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, grade, subject: topic, level: getLevel(grade), limit: 4 }),
+        body: JSON.stringify({ topic, grade, subject: topic, level: getLevel(grade), limit: 3 }),
+        signal: AbortSignal.timeout(4000), // 4 sn timeout
       })
       if (mebRes.ok) {
         const mebData = await mebRes.json()
@@ -435,21 +436,19 @@ export async function POST(req: NextRequest) {
 
     if (includeVisuals && visualCategory) {
       // Her soru için paralel görsel üret (max 4 soru için — Vercel timeout riski)
-      const visualLimit = Math.min(questions.length, 4)
-      const visualPromises = questions.slice(0, visualLimit).map((q: any, i: number) =>
-        generateVisualForQuestion(q, visualCategory, topic, grade)
-          .then(svg => ({ i, svg }))
-          .catch(() => ({ i, svg: null }))
-      )
-
-      const visuals = await Promise.allSettled(visualPromises)
-      visuals.forEach(result => {
-        if (result.status === 'fulfilled' && result.value.svg) {
-          const { i, svg } = result.value
-          questions[i] = { ...questions[i], svg, qtype: 'svg' }
-          console.log(`[generate-quiz] visual generated for q[${i}]`)
+      const visualLimit = Math.min(questions.length, 2) // Max 2 görsel — timeout önleme
+      // Sıralı üret — timeout riskini azaltır
+      for (let i = 0; i < visualLimit; i++) {
+        try {
+          const svg = await generateVisualForQuestion(questions[i], visualCategory, topic, grade)
+          if (svg) {
+            questions[i] = { ...questions[i], svg, qtype: 'svg' }
+            console.log(`[generate-quiz] visual generated for q[${i}]`)
+          }
+        } catch(e) {
+          console.warn(`[generate-quiz] visual failed for q[${i}]:`, e)
         }
-      })
+      }
     }
     // ────────────────────────────────────────────────────────────────────────
 
