@@ -467,6 +467,19 @@ function QuizPageContent() {
   const combinedContent = uploadedFiles.map(f => `[${f.name}]\n${f.content}`).join('\n\n---\n\n')
   const hasFiles = uploadedFiles.length > 0
 
+  // ── HATA MESAJLARI ──
+  function getErrorInfo(errorCode: string, status?: number): {code: string; title: string; desc: string; retry: boolean} {
+    if (status === 429 || errorCode === 'daily_limit_reached') return { code: 'daily_limit', title: '⏰ Günlük limit doldu', desc: 'Bugünkü test hakkını kullandın. Yarın yenilenir ya da Premium'a geçerek sınırsız test çöz.', retry: false }
+    if (errorCode === 'limit_reached') return { code: 'monthly_limit', title: '📚 Aylık limit doldu', desc: 'Bu ay için test hakkın bitti. Sınırsız test için Premium'a geç.', retry: false }
+    if (errorCode === 'out_of_curriculum') return { code: 'curriculum', title: '📖 Müfredat dışı konu', desc: 'Bu konu MEB müfredatında yer almıyor. Başka bir konu dene ya da Premium ile tüm konulara eriş.', retry: false }
+    if (errorCode === 'pdf_too_long') return { code: 'pdf', title: '📄 PDF çok uzun', desc: 'PDF dosyan 100 sayfadan fazla. Daha kısa bir bölüm yükle ya da metni kopyalayıp yapıştır.', retry: false }
+    if (errorCode === 'pdf_image_only') return { code: 'pdf', title: '🖼️ PDF okunemiyor', desc: 'Bu PDF taranmış görsel içeriyor, metin çıkarılamıyor. Word veya metin dosyası yükle.', retry: false }
+    if (status === 503 || status === 502 || status === 504) return { code: 'server', title: '🔧 Sunucu meşgul', desc: 'Sunucularımız şu an yoğun. Birkaç saniye bekleyip tekrar dene.', retry: true }
+    if (errorCode?.includes('invalid response')) return { code: 'ai_error', title: '🤖 AI yanıt hatası', desc: 'Yapay zeka bu konu için geçerli soru üretemedi. Farklı bir konu veya daha kısa içerik dene.', retry: true }
+    if (errorCode?.includes('timeout') || errorCode?.includes('abort')) return { code: 'timeout', title: '⏱️ Zaman aşımı', desc: 'Sorular üretilirken zaman doldu. Daha az soru sayısı seç veya tekrar dene.', retry: true }
+    return { code: 'unknown', title: '❌ Bir sorun oluştu', desc: 'Beklenmeyen bir hata oluştu. Tekrar deneyebilir veya bize bildirebilirsin.', retry: true }
+  }
+
   async function startQuiz() {
     const topic = customTopic.trim() || selectedTopic || (hasFiles ? uploadedFiles.map(f => f.name.replace(/\.[^.]+$/, '')).join(', ') : '')
     if (!topic) { setTopicErr('Bir konu seç veya yaz.'); return }
