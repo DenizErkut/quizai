@@ -273,7 +273,7 @@ function getActiveLang(profileLang?: string): string {
   return localStorage.getItem('pratium_lang') || profileLang || 'Türkçe'
 }
 
-type Screen = 'topic' | 'loading' | 'quiz' | 'result' | 'limit'
+type Screen = 'topic' | 'loading' | 'quiz' | 'result' | 'limit' | 'error'
 
 function QuizPageContent() {
   const router = useRouter()
