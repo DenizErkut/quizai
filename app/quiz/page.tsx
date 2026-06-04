@@ -250,6 +250,28 @@ const SUBJECT_MAP: Record<string, Record<string, string[]>> = {
       'Muhasebe', 'Finansman', 'Pazarlama', 'Yönetim ve organizasyon',
       'İnsan kaynakları', 'Girişimcilik', 'Stratejik yönetim',
     ],
+    'İngilizce': [
+      'Academic writing', 'Reading comprehension', 'Listening skills',
+      'Grammar and syntax', 'Vocabulary building', 'Presentation skills',
+      'Business English', 'Research writing', 'IELTS / TOEFL hazırlık',
+      'YDS / YÖKDİL hazırlık', 'Conversational English',
+    ],
+    'Türk Dili ve Edebiyatı': [
+      'Türkçe yazım kuralları', 'Akademik yazım', 'Metin analizi',
+      'Türk edebiyatı tarihi', 'Dilbilgisi', 'İletişim becerileri',
+    ],
+    'Atatürk İlkeleri ve İnkılap Tarihi': [
+      'Osmanlı son dönemi', 'Kurtuluş Savaşı', 'Cumhuriyetin ilanı',
+      'Atatürk ilkeleri', 'Türkiye Cumhuriyeti tarihi',
+    ],
+    'Sosyoloji': [
+      'Sosyolojiye giriş', 'Toplumsal yapı', 'Kültür ve toplum',
+      'Sosyal değişme', 'Araştırma yöntemleri',
+    ],
+    'Psikoloji': [
+      'Psikolojiye giriş', 'Gelişim psikolojisi', 'Sosyal psikoloji',
+      'Klinik psikoloji', 'Bilişsel psikoloji', 'Araştırma yöntemleri',
+    ],
   },
 }
 
