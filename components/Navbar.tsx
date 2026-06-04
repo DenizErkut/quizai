@@ -13,23 +13,39 @@ const LANGS = [
   { code: 'العربية', flag: '🇸🇦' },
 ]
 
-const MENU_ITEMS = [
-  { label: '⚡ Yeni test', href: '/quiz' },
-  { label: '📅 Günlük test', href: '/daily' },
-  { label: '📊 Dashboard', href: '/dashboard' },
-  { label: '📈 Analiz', href: '/analysis' },
-  { label: '📋 Gelişim planı', href: '/plan' },
-  { label: '🏆 Sıralama', href: '/leaderboard' },
-  { label: '🏫 Sınıflarım', href: '/classes' },
-  { label: '✏️ Profil düzenle', href: '/profile/edit' },
-  { label: '📝 Notlarım', href: '/notes' },
-  { label: '🗂️ Soru arşivi', href: '/archive' },
-  { label: '🛠️ PDF Araçları', href: '/pdf-tools' },
-  { label: '📝 Ödevlerim', href: '/assignments' },
-  { label: '💎 Planlar', href: '/pricing' },
+// Desktop avatar dropdown menüsü
+const DROPDOWN_ITEMS = [
+  { label: '📈 Analiz',          href: '/analysis' },
+  { label: '🗂️ Soru Arşivi',     href: '/archive' },
+  { label: '🛠️ PDF Araçları',    href: '/pdf-tools' },
+  { label: '🏫 Sınıflarım',      href: '/classes' },
+  { label: '📝 Ödevlerim',       href: '/assignments' },
+  { label: '📋 Gelişim Planı',   href: '/plan' },
+  { label: '📝 Notlarım',        href: '/notes' },
   { label: '🎁 Davet et & kazan', href: '/referral' },
-  { label: '🎓 Öğretmen paneli', href: '/teacher' },
-  { label: '👨‍👩‍👧 Veli paneli', href: '/parent' },
+  { label: '💎 Planlar',         href: '/pricing' },
+  { label: '✏️ Profil Düzenle',  href: '/profile/edit' },
+  { label: '🔑 Şifremi Değiştir', href: '/auth/reset-password' },
+]
+
+// Tüm menü (mobile için — mevcut haliyle kalıyor)
+const MENU_ITEMS = [
+  { label: '⚡ Yeni test',        href: '/quiz' },
+  { label: '📅 Günlük test',      href: '/daily' },
+  { label: '📊 Dashboard',        href: '/dashboard' },
+  { label: '📈 Analiz',           href: '/analysis' },
+  { label: '📋 Gelişim planı',    href: '/plan' },
+  { label: '🏆 Sıralama',         href: '/leaderboard' },
+  { label: '🏫 Sınıflarım',       href: '/classes' },
+  { label: '✏️ Profil düzenle',   href: '/profile/edit' },
+  { label: '📝 Notlarım',         href: '/notes' },
+  { label: '🗂️ Soru arşivi',      href: '/archive' },
+  { label: '🛠️ PDF Araçları',     href: '/pdf-tools' },
+  { label: '📝 Ödevlerim',        href: '/assignments' },
+  { label: '💎 Planlar',          href: '/pricing' },
+  { label: '🎁 Davet et & kazan', href: '/referral' },
+  { label: '🎓 Öğretmen paneli',  href: '/teacher' },
+  { label: '👨‍👩‍👧 Veli paneli',     href: '/parent' },
   { label: '🔑 Şifremi değiştir', href: '/auth/reset-password' },
 ]
 
@@ -55,7 +71,6 @@ export default function Navbar() {
       if (p) {
         const stored = localStorage.getItem('pratium_lang')
         if (stored) p.language = stored
-        // Onaylı öğretmen mi kontrol et
         if (p.role === 'teacher') {
           const { data: tData } = await supabase.from('teachers').select('approved').eq('user_id', user.id).maybeSingle()
           p.teacher_approved = tData?.approved || false
@@ -64,7 +79,6 @@ export default function Navbar() {
       }
       setStreak(s?.current_streak || 0)
 
-      // Okunmamış bildirim sayısı
       const { count } = await supabase
         .from('notifications')
         .select('id', { count: 'exact', head: true })
@@ -78,7 +92,6 @@ export default function Navbar() {
   useEffect(() => { setShowMenu(false); setShowLang(false) }, [pathname])
 
   useEffect(() => {
-    // Dark mode başlangıç durumu
     const stored = localStorage.getItem('pratium-theme')
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     const dark = stored === 'dark' || (!stored && prefersDark)
@@ -123,6 +136,7 @@ export default function Navbar() {
   const isParent = profile?.role === 'parent'
   const isInstitution = profile?.role === 'institution_admin'
 
+  // ── Desktop ana linkler (sadeleştirildi) ──
   const NAV_LINKS = isInstitution ? [
     { href: '/institution', label: '🏛️ Kurum Paneli' },
   ] : isApprovedTeacher ? [
@@ -133,14 +147,16 @@ export default function Navbar() {
   ] : isParent ? [
     { href: '/parent', label: '👨‍👩‍👧 Veli Paneli' },
   ] : [
-    { href: '/quiz', label: '⚡ Test' },
-    { href: '/daily', label: streak > 0 ? `🔥 ${streak} gün` : '📅 Günlük' },
+    { href: '/quiz',        label: '⚡ Test' },
+    { href: '/daily',       label: streak > 0 ? `🔥 ${streak} gün` : '📅 Günlük' },
     { href: '/leaderboard', label: '🏆 Sıralama' },
-    { href: '/analysis', label: '📊 Analiz' },
-    { href: '/archive', label: '🗂️ Arşiv' },
-    { href: '/pdf-tools', label: '🛠️ PDF' },
-    { href: '/classes', label: '🏫 Sınıflarım' },
   ]
+
+  // Premium rozet tipi
+  const planBadge =
+    profile.plan === 'unlimited' ? { emoji: '⭐', color: '#0d9488', title: 'Unlimited' } :
+    profile.plan === 'premium'   ? { emoji: '★',  color: '#fdd31d', title: 'Premium' } :
+    null
 
   return (
     <>
@@ -158,16 +174,11 @@ export default function Navbar() {
         padding: '0 14px',
         boxShadow: '0 2px 12px rgba(8,36,101,0.3)',
       }}>
-        {/* Logo */}
         <Link href="/quiz" style={{ flexShrink: 0 }}>
           <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '28px', filter: 'brightness(0) invert(1)' }} />
         </Link>
 
-        {/* Sağ: bildirim + dil + avatar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-
-          {/* Bildirim çanı */}
-          {/* Dark mode toggle */}
           <button onClick={toggleDark}
             title={isDark ? 'Aydınlık mod' : 'Karanlık mod'}
             style={{ width: 38, height: 38, borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '16px', flexShrink: 0, transition: 'all 0.2s' }}
@@ -244,7 +255,6 @@ export default function Navbar() {
               <>
                 <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setShowMenu(false)} />
                 <div style={{ position: 'fixed', top: '64px', right: '12px', zIndex: 9999, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '8px', minWidth: '220px', boxShadow: '0 8px 40px rgba(8,36,101,0.25)', maxHeight: 'calc(100vh - 80px)', overflowY: 'auto' }}>
-                  {/* Profil özeti */}
                   <div style={{ padding: '10px 14px', marginBottom: '6px', borderBottom: '1px solid #f0f4f8' }}>
                     <div style={{ fontWeight: 700, fontSize: '14px', color: '#082465' }}>{profile.name}</div>
                     <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
@@ -295,7 +305,7 @@ export default function Navbar() {
             <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '76px', width: 'auto', filter: 'brightness(0) invert(1)' }} />
           </Link>
 
-          {/* Nav linkleri */}
+          {/* Ana nav linkleri — sadece Test | Günlük | Sıralama */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
             {NAV_LINKS.map(item => (
               <Link key={item.href} href={item.href} style={{
@@ -316,43 +326,17 @@ export default function Navbar() {
           {/* Sağ taraf */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
 
-            {/* Test hakkı */}
-            {testsLeft !== null && (
-              <Link href="/pricing">
-                <span style={{
-                  fontSize: '12px', padding: '5px 12px', borderRadius: '999px', fontWeight: 600,
-                  background: testsLeft <= 2 ? 'rgba(220,38,38,0.15)' : 'rgba(253,211,29,0.12)',
-                  color: testsLeft <= 2 ? '#ff6b6b' : '#fdd31d',
-                  border: `1px solid ${testsLeft <= 2 ? 'rgba(220,38,38,0.3)' : 'rgba(253,211,29,0.25)'}`,
-                  whiteSpace: 'nowrap',
-                }}>
-                  {testsLeft} test kaldı
-                </span>
-              </Link>
-            )}
-
-            {(profile.plan === 'premium' || profile.plan === 'unlimited') && (
-              <Link href="/pricing" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-                <span style={{
-                  fontSize: '12px', padding: '5px 12px', borderRadius: '999px',
-                  background: profile.plan === 'unlimited' ? '#0d9488' : '#fdd31d',
-                  color: profile.plan === 'unlimited' ? '#fff' : '#082465',
-                  fontWeight: 700, whiteSpace: 'nowrap',
-                }}>{profile.plan === 'unlimited' ? '⭐ Unlimited' : '★ Premium'}</span>
-              </Link>
-            )}
+            {/* Dark mode toggle */}
+            <button onClick={toggleDark}
+              title={isDark ? 'Aydınlık mod' : 'Karanlık mod'}
+              style={{ width: 38, height: 38, borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '16px', flexShrink: 0, transition: 'all 0.2s' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}>
+              {isDark ? '☀️' : '🌙'}
+            </button>
 
             {/* Bildirim çanı */}
-            {/* Dark mode toggle */}
-          <button onClick={toggleDark}
-            title={isDark ? 'Aydınlık mod' : 'Karanlık mod'}
-            style={{ width: 38, height: 38, borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '16px', flexShrink: 0, transition: 'all 0.2s' }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}>
-            {isDark ? '☀️' : '🌙'}
-          </button>
-
-          <a href="/notifications" onClick={() => setUnreadCount(0)} style={{
+            <a href="/notifications" onClick={() => setUnreadCount(0)} style={{
               position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: 36, height: 36, borderRadius: '8px',
               background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
@@ -396,8 +380,25 @@ export default function Navbar() {
               )}
             </div>
 
-            {/* Avatar / Dropdown */}
+            {/* Avatar + Premium badge + Dropdown */}
             <div style={{ position: 'relative' }}>
+              {/* Premium / Unlimited küçük rozet */}
+              {planBadge && (
+                <span style={{
+                  position: 'absolute', top: -6, right: -4,
+                  width: 18, height: 18, borderRadius: '50%',
+                  background: planBadge.color,
+                  color: planBadge.color === '#fdd31d' ? '#082465' : '#fff',
+                  fontSize: '9px', fontWeight: 800,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: '2px solid #082465',
+                  zIndex: 2, lineHeight: 1,
+                  title: planBadge.title,
+                }}>
+                  {planBadge.emoji}
+                </span>
+              )}
+
               <button onClick={() => { setShowMenu(v => !v); setShowLang(false) }}
                 style={{
                   width: 38, height: 38, borderRadius: '50%',
@@ -407,7 +408,10 @@ export default function Navbar() {
                   cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0, fontFamily: 'inherit', overflow: 'hidden', padding: 0,
                   boxShadow: profile.avatar_url ? '0 2px 8px rgba(8,36,101,0.2)' : 'none',
-                }}>
+                  transition: 'transform 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)' }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}>
                 {profile.avatar_url ? (
                   <img src={profile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                 ) : (
@@ -418,29 +422,55 @@ export default function Navbar() {
               {showMenu && (
                 <>
                   <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setShowMenu(false)} />
-                  <div style={{ position: 'fixed', top: '58px', right: '8px', zIndex: 9999, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '8px', minWidth: '220px', boxShadow: '0 8px 40px rgba(8,36,101,0.2)', maxHeight: 'calc(100vh - 74px)', overflowY: 'auto' }}>
+                  <div style={{
+                    position: 'fixed', top: '58px', right: '8px', zIndex: 9999,
+                    background: '#fff', border: '1px solid #e2e8f0', borderRadius: '18px',
+                    padding: '8px', minWidth: '230px',
+                    boxShadow: '0 8px 40px rgba(8,36,101,0.2)',
+                    maxHeight: 'calc(100vh - 74px)', overflowY: 'auto',
+                  }}>
                     {/* Profil özeti */}
-                    <div style={{ padding: '10px 14px 10px', marginBottom: '6px', borderBottom: '1px solid #f0f4f8' }}>
-                      <div style={{ fontWeight: 700, fontSize: '14px', color: '#082465' }}>{profile.name}</div>
-                      <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px' }}>
-                        {profile.plan === 'premium'
-                          ? <span style={{ color: '#0a9e90', fontWeight: 600 }}>★ Premium</span>
-                          : 'Ücretsiz'}
-                        {streak > 0 && <span style={{ marginLeft: '8px' }}>🔥 {streak} gün</span>}
-                      </div>
-                      {testsLeft !== null && (
-                        <div style={{ fontSize: '11px', color: testsLeft <= 2 ? '#dc2626' : '#94a3b8', marginTop: '2px' }}>
-                          Bu ay {testsLeft} test hakkı kaldı
+                    <div style={{ padding: '12px 14px', marginBottom: '6px', borderBottom: '1px solid #f0f4f8' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {/* Mini avatar */}
+                        <div style={{
+                          width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                          background: profile.avatar_url ? 'transparent' : '#fdd31d',
+                          border: profile.avatar_url ? '2px solid #fdd31d' : 'none',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          overflow: 'hidden', fontSize: '12px', fontWeight: 800, color: '#082465',
+                        }}>
+                          {profile.avatar_url
+                            ? <img src={profile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                            : profile.name?.slice(0, 2).toUpperCase()
+                          }
                         </div>
-                      )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: '14px', color: '#082465', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.name}</div>
+                          <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            {planBadge
+                              ? <span style={{ color: planBadge.color === '#fdd31d' ? '#b8860b' : planBadge.color, fontWeight: 600 }}>{planBadge.emoji} {planBadge.title}</span>
+                              : <span>Ücretsiz</span>
+                            }
+                            {streak > 0 && <span>🔥 {streak} gün</span>}
+                          </div>
+                          {testsLeft !== null && (
+                            <div style={{ fontSize: '11px', color: testsLeft <= 2 ? '#dc2626' : '#94a3b8', marginTop: '2px' }}>
+                              Bu ay {testsLeft} test hakkı kaldı
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
-                    {MENU_ITEMS.map(item => (
+                    {/* Dropdown menü öğeleri */}
+                    {DROPDOWN_ITEMS.map(item => (
                       <Link key={item.href} href={item.href} onClick={() => setShowMenu(false)} style={{
                         display: 'block', padding: '8px 14px', borderRadius: '10px',
                         fontSize: '13px', color: pathname === item.href ? '#0a9e90' : '#3B566E',
                         background: pathname === item.href ? 'rgba(30,207,184,0.08)' : 'transparent',
                         fontWeight: pathname === item.href ? 600 : 400, transition: 'all 0.1s',
+                        textDecoration: 'none',
                       }}
                         onMouseEnter={e => { if (pathname !== item.href) e.currentTarget.style.background = '#f8fafc' }}
                         onMouseLeave={e => { if (pathname !== item.href) e.currentTarget.style.background = 'transparent' }}
@@ -453,7 +483,7 @@ export default function Navbar() {
                       <button onClick={handleSignOut} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px', borderRadius: '10px', fontSize: '13px', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}
                         onMouseEnter={e => (e.currentTarget.style.background = 'rgba(220,38,38,0.06)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                        Çıkış yap
+                        🚪 Çıkış yap
                       </button>
                     </div>
                   </div>
@@ -473,11 +503,11 @@ export default function Navbar() {
         padding: '8px 0 max(8px, env(safe-area-inset-bottom))',
       }}>
         {[
-          { href: '/quiz',        label: 'Test',    icon: '⚡' },
-          { href: '/daily',       label: streak > 0 ? `${streak} gün` : 'Günlük', icon: streak > 0 ? '🔥' : '📅' },
-          { href: '/analysis',    label: 'Analiz',  icon: '📊' },
-          { href: '/archive',     label: 'Arşiv',   icon: '🗂️' },
-          { href: '/pdf-tools',   label: 'PDF',     icon: '🛠️' },
+          { href: '/quiz',      label: 'Test',    icon: '⚡' },
+          { href: '/daily',     label: streak > 0 ? `${streak} gün` : 'Günlük', icon: streak > 0 ? '🔥' : '📅' },
+          { href: '/analysis',  label: 'Analiz',  icon: '📊' },
+          { href: '/archive',   label: 'Arşiv',   icon: '🗂️' },
+          { href: '/pdf-tools', label: 'PDF',     icon: '🛠️' },
         ].map(item => (
           <Link key={item.href} href={item.href} style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
