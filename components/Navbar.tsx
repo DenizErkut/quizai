@@ -384,7 +384,7 @@ export default function Navbar() {
             <div style={{ position: 'relative' }}>
               {/* Premium / Unlimited küçük rozet */}
               {planBadge && (
-                <span style={{
+                <span title={planBadge.title} style={{
                   position: 'absolute', top: -6, right: -4,
                   width: 18, height: 18, borderRadius: '50%',
                   background: planBadge.color,
@@ -393,7 +393,6 @@ export default function Navbar() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   border: '2px solid #082465',
                   zIndex: 2, lineHeight: 1,
-                  title: planBadge.title,
                 }}>
                   {planBadge.emoji}
                 </span>
