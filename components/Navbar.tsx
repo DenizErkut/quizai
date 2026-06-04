@@ -463,7 +463,11 @@ export default function Navbar() {
                     </div>
 
                     {/* Dropdown menü öğeleri */}
-                    {DROPDOWN_ITEMS.map(item => (
+                    {[
+                      ...DROPDOWN_ITEMS,
+                      ...(isApprovedTeacher ? [{ label: '🎓 Öğretmen Paneli', href: '/teacher' }] : []),
+                      ...(isParent          ? [{ label: '👨‍👩‍👧 Veli Paneli',      href: '/parent'  }] : []),
+                    ].map(item => (
                       <Link key={item.href} href={item.href} onClick={() => setShowMenu(false)} style={{
                         display: 'block', padding: '8px 14px', borderRadius: '10px',
                         fontSize: '13px', color: pathname === item.href ? '#0a9e90' : '#3B566E',
