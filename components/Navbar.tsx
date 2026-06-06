@@ -71,10 +71,12 @@ export default function Navbar() {
       if (p) {
         const stored = localStorage.getItem('pratium_lang')
         if (stored) p.language = stored
-        if (p.role === 'teacher') {
-          const { data: tData } = await supabase.from('teachers').select('approved').eq('user_id', user.id).maybeSingle()
-          p.teacher_approved = tData?.approved || false
-        }
+        // Role'den bağımsız: teachers tablosunda onaylı mı?
+        const { data: tData } = await supabase.from('teachers').select('approved').eq('user_id', user.id).maybeSingle()
+        p.teacher_approved = tData?.approved || false
+        // Veli mi? parent_children tablosunda kaydı var mı?
+        const { count: parentCount } = await supabase.from('parent_children').select('id', { count: 'exact', head: true }).eq('parent_id', user.id)
+        p.is_parent = (parentCount || 0) > 0
         setProfile(p)
       }
       setStreak(s?.current_streak || 0)
@@ -132,8 +134,8 @@ export default function Navbar() {
   const testsLeft = profile.plan === 'free' ? 10 - (profile.monthly_test_count || 0) : null
   const activeLang = LANGS.find(l => l.code === profile.language) || LANGS[0]
 
-  const isApprovedTeacher = profile?.role === 'teacher' && profile?.teacher_approved
-  const isParent = profile?.role === 'parent'
+  const isApprovedTeacher = profile?.teacher_approved === true
+  const isParent = profile?.is_parent === true || profile?.role === 'parent'
   const isInstitution = profile?.role === 'institution_admin'
 
   // ── Desktop ana linkler (sadeleştirildi) ──
