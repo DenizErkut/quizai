@@ -207,7 +207,7 @@ export async function PATCH(req: NextRequest) {
   let totalNet = 0
 
   for (const [sectionId, sectionAnswers] of Object.entries(answers as Record<string, any[]>)) {
-    const section = (format.sections as any[]).find((s: any) => s.id === sectionId)
+    const section = (format.sections as unknown as any[]).find((s: any) => s.id === sectionId)
     if (!section) continue
 
     let correct = 0, wrong = 0, empty = 0
@@ -222,7 +222,7 @@ export async function PATCH(req: NextRequest) {
     totalNet += net * (section.netCoef || 1)
   }
 
-  const maxPossibleNet = (format.sections as any[]).reduce((sum: number, s: any) => sum + s.count * (s.netCoef || 1), 0)
+  const maxPossibleNet = (format.sections as unknown as any[]).reduce((sum: number, s: any) => sum + s.count * (s.netCoef || 1), 0)
   const estimatedScore = maxPossibleNet > 0
     ? Math.round((totalNet / maxPossibleNet) * format.maxScore)
     : 0
