@@ -669,9 +669,13 @@ function QuizPageContent() {
     } else {
       // AI ile semantik kontrol
       try {
+        const { data: { session: ckSession } } = await supabase.auth.getSession()
         const res = await fetch('/api/check-answer', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${ckSession?.access_token}`,
+          },
           body: JSON.stringify({
             question: q.q,
             correctAnswer,

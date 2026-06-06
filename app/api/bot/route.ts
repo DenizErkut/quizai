@@ -1,9 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@supabase/supabase-js'
 
 const anthropic = new Anthropic()
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
 export async function POST(req: NextRequest) {
+  // Auth kontrolü
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  }
+  const token = authHeader.slice(7)
+
+  const { data: { user } } = await supabase.auth.getUser(token)
+  if (!user) return NextResponse.json({ reply: 'Oturum geçersiz.' }, { status: 401 })
+
   try {
     const { messages, system } = await req.json()
 

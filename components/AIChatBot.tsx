@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -62,9 +63,16 @@ export default function AIChatBot() {
     setLoading(true)
 
     try {
+      const supabase = createClient() as any
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
       const res = await fetch('/api/bot', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           messages: [...messages, { role: 'user', content: userMsg }],
           system: SYSTEM_PROMPT,
@@ -156,7 +164,7 @@ export default function AIChatBot() {
           {messages.length <= 1 && (
             <div style={{ padding: '0 12px 10px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {quickQuestions.map(q => (
-                <button key={q} onClick={() => { setInput(q); setTimeout(() => { setInput(''); setMessages(prev => [...prev, { role: 'user', content: q }]); setLoading(true); fetch('/api/bot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: [...messages, { role: 'user', content: q }], system: SYSTEM_PROMPT }) }).then(r => r.json()).then(d => { setMessages(prev => [...prev, { role: 'assistant', content: d.reply }]); setLoading(false) }).catch(() => setLoading(false)) }, 0) }}
+                <button key={q} onClick={async () => { setInput(q); setTimeout(async () => { setInput(''); setMessages(prev => [...prev, { role: 'user', content: q }]); setLoading(true); try { const supabase = createClient() as any; const { data: { session } } = await supabase.auth.getSession(); const tok = session?.access_token; fetch('/api/bot', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(tok ? { Authorization: `Bearer ${tok}` } : {}) }, body: JSON.stringify({ messages: [...messages, { role: 'user', content: q }], system: SYSTEM_PROMPT }) }).then(r => r.json()).then(d => { setMessages(prev => [...prev, { role: 'assistant', content: d.reply }]); setLoading(false) }).catch(() => setLoading(false)) } catch { setLoading(false) } }, 0) }}
                   style={{ fontSize: '11px', padding: '5px 10px', borderRadius: '20px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#082465', cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s' }}>
                   {q}
                 </button>
