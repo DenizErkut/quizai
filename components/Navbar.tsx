@@ -15,6 +15,7 @@ const LANGS = [
 
 // Desktop avatar dropdown menüsü
 const DROPDOWN_ITEMS = [
+  { label: '🎯 Sınav Simülasyonu',  href: '/exam' },
   { label: '📈 Analiz',          href: '/analysis' },
   { label: '🗂️ Soru Arşivi',     href: '/archive' },
   { label: '🛠️ PDF Araçları',    href: '/pdf-tools' },
