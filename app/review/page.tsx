@@ -78,7 +78,7 @@ export default function ReviewPage() {
       <div style={{ maxWidth: '400px', margin: '0 auto', padding: '2rem 1rem', textAlign: 'center' }}>
         <div style={{ fontSize: '64px', marginBottom: '16px' }}>🧠</div>
         <div style={{ fontWeight: 800, fontSize: '22px', color: 'var(--primary)', marginBottom: '1.5rem' }}>{cards.length} kart tamamlandı!</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px', marginBottom: '2rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px', marginBottom: '2rem' }}>
           <div className="card" style={{ textAlign: 'center', padding: '12px 8px' }}>
             <div style={{ fontSize: '24px', fontWeight: 800, color: '#16a34a' }}>{stats.correct}</div>
             <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Doğru</div>
@@ -150,7 +150,7 @@ export default function ReviewPage() {
         ) : (
           <div>
             <div style={{ fontSize: '12px', color: 'var(--text2)', textAlign: 'center', marginBottom: '10px' }}>Ne kadar kolaydı?</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px' }}>
               <button onClick={() => rateCard(1)} style={{ padding: '12px 8px', borderRadius: '12px', border: '2px solid #dc2626', background: 'rgba(220,38,38,0.08)', color: '#dc2626', fontWeight: 700, fontSize: '13px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
                 😓 Yanlış<br /><span style={{ fontSize: '10px', fontWeight: 400, opacity: 0.8 }}>yarın tekrar</span>
               </button>

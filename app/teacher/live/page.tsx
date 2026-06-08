@@ -181,7 +181,7 @@ export default function TeacherLivePage() {
                 style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '14px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' }} />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px', display: 'block' }}>Soru sayısı</label>
                 <select value={form.question_count} onChange={e => setForm(p => ({ ...p, question_count: Number(e.target.value) }))}
@@ -282,7 +282,7 @@ export default function TeacherLivePage() {
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--primary)', lineHeight: 1.6, marginBottom: '1.25rem' }}>{q.q}</div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(180px,100%), 1fr))', gap: '8px' }}>
               {q.opts.map((opt: string, i: number) => {
                 const optAnswers = currentQAnswers.filter(a => a.chosen_answer === i)
                 const pct = answeredThisQ > 0 ? Math.round(optAnswers.length / answeredThisQ * 100) : 0
@@ -355,7 +355,7 @@ export default function TeacherLivePage() {
           {leaderboard.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', padding: '1rem' }}>Henüz kimse katılmadı.</div>}
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', marginTop: '1rem' }}>
+        <div style={{ display: 'flex', gap: '8px', marginTop: '1rem', flexWrap: 'wrap' }}>
           <button onClick={() => { setScreen('setup'); setLiveQuiz(null) }} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontWeight: 600, fontSize: '14px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
             🔄 Yeni Quiz
           </button>

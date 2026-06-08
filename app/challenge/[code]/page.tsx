@@ -100,7 +100,7 @@ export default function ChallengePage() {
 
         <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '16px', marginBottom: '1.5rem', textAlign: 'left' }}>
           <div style={{ fontSize: '15px', fontWeight: 700, color: '#082465', marginBottom: '8px' }}>📚 {challenge?.topic}</div>
-          <div style={{ display: 'flex', gap: '12px', fontSize: '13px', color: '#64748b' }}>
+          <div style={{ display: 'flex', gap: '8px', fontSize: '12px', color: '#64748b', flexWrap: 'wrap' }}>
             <span>📝 {challenge?.question_count} soru</span>
             <span>🏆 Onların skoru: %{challenge?.creator_pct}</span>
             <span>👥 {challenge?.participant_count} katılımcı</span>
@@ -181,7 +181,7 @@ export default function ChallengePage() {
           ))}
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button onClick={() => { navigator.clipboard.writeText(`https://pratium.com/challenge/${code}`); }} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontWeight: 600, fontSize: '14px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
             🔗 Linki Kopyala
           </button>

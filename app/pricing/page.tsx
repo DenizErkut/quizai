@@ -127,7 +127,7 @@ export default function PricingPage() {
         </div>
 
         {/* Plan cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '2.5rem' }} className="anim-up-1">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px,100%), 1fr))', gap: '14px', marginBottom: '2.5rem' }} className="anim-up-1">
           {PLANS.map(p => {
             const isCurrent = profile?.plan === p.id
             return (
@@ -172,17 +172,17 @@ export default function PricingPage() {
 
         {/* Kullanım durumu */}
         {profile && (
-          <div className="card-sm anim-up-2" style={{ marginBottom: '1.5rem', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+          <div className="card-sm anim-up-2" style={{ marginBottom: '1.5rem', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>Bu ay</div>
               <div style={{ fontWeight: 600 }}>{profile.monthly_test_count} test çözüldü</div>
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>Bu ay</div>
-              <div style={{ fontWeight: 600 }}>{profile.monthly_test_count} test · {
+              <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>Bugün</div>
+              <div style={{ fontWeight: 600 }}>{dailyUsed} test · {
                 profile.plan === 'unlimited' ? 'Sınırsız' :
-                profile.plan === 'premium' ? `${Math.max(0, 300 - (profile.monthly_test_count || 0))} kaldı` :
-                `${Math.max(0, 10 - (profile.monthly_test_count || 0))} kaldı`
+                profile.plan === 'premium' ? `${Math.max(0, 25 - dailyUsed)} kaldı` :
+                `${Math.max(0, 10 - dailyUsed)} kaldı`
               }</div>
             </div>
             <div style={{ flex: 1 }}>
@@ -197,7 +197,7 @@ export default function PricingPage() {
         {/* Referral */}
         {profile && (
           <div className="card anim-up-3" style={{ marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', gap: '12px', marginBottom: '1.25rem' }}>
               <div>
                 <h2 style={{ fontSize: '18px', fontWeight: 500, marginBottom: '4px' }}>🎁 Arkadaşlarını davet et</h2>
                 <p style={{ fontSize: '13px', color: 'var(--text2)' }}>

@@ -311,7 +311,7 @@ export default function ExamPage() {
         )}
 
         {/* Demo / Tam mod */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
           {[
             { val: true, label: '⚡ Demo', desc: 'Her bölümden ~4 soru, kısa süre' },
             { val: false, label: '📋 Tam Sınav', desc: 'Gerçek soru sayısı ve süre' },
@@ -328,7 +328,7 @@ export default function ExamPage() {
         </div>
 
         {/* Sınav kartları */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: '12px' }}>
           {Object.entries(EXAM_META).map(([key, meta]) => {
             const fmt = formats[key]
             const isSelected = selectedExam === key
@@ -543,7 +543,7 @@ export default function ExamPage() {
           )}
 
           {/* Navigasyon */}
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button onClick={prevQuestion} disabled={currentQ === 0 && currentSection === examFormat.sections[0]?.id}
               style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text2)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: '14px', fontWeight: 500 }}>
               ← Önceki

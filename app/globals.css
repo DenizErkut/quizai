@@ -351,3 +351,108 @@ textarea { border-radius: var(--radius); resize: vertical; padding: 12px 16px; }
 @media (min-width: 769px) {
   .mobile-only { display: none !important; }
 }
+
+/* ─── Kapsamlı Mobil Responsive Kurallar ─── */
+@media (max-width: 768px) {
+
+  /* Genel layout */
+  .card  { padding: 1rem !important; }
+  .card-sm { padding: 0.75rem !important; }
+
+  /* Grid'leri tek sütuna indir */
+  .mobile-stack {
+    grid-template-columns: 1fr !important;
+    flex-direction: column !important;
+  }
+
+  /* Pricing kartları */
+  .pricing-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Sınav simülasyonu */
+  .exam-select-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Canlı quiz — şık grid */
+  .live-opts-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Spaced repetition rating butonları */
+  .sr-rating-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Stats satırı */
+  .stats-row {
+    gap: 16px !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+  }
+
+  /* Büyük font küçült */
+  h1 { font-size: clamp(1.6rem, 6vw, 2.5rem) !important; }
+  h2 { font-size: clamp(1.3rem, 5vw, 2rem) !important; }
+
+  /* Buton satırları */
+  .btn-row {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+  .btn-row > * { width: 100% !important; text-align: center !important; }
+
+  /* Landing "Kim için?" kartları */
+  .who-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Pricing sayfası */
+  .pricing-grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* PageHeader padding */
+  .page-header-inner {
+    padding: 1rem !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  /* Tablo overflow */
+  table { font-size: 12px !important; }
+  table td, table th { padding: 6px 8px !important; }
+
+  /* Modal içerikleri */
+  .modal-content {
+    padding: 1rem !important;
+    margin: 0.5rem !important;
+  }
+
+  /* Soru haritası — sınav */
+  .q-map { gap: 4px !important; }
+  .q-map button { width: 26px !important; height: 26px !important; font-size: 10px !important; }
+
+  /* Zamanlayıcı bar — küçük ekranda kompakt */
+  .timer-bar { height: 4px !important; }
+
+  /* Liderboard satırları */
+  .lb-row { font-size: 13px !important; }
+
+  /* Input ve select tam genişlik */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  select,
+  textarea {
+    font-size: 16px !important; /* iOS zoom engelle */
+  }
+}
+
+/* Çok küçük ekranlar (380px altı) */
+@media (max-width: 380px) {
+  .card { padding: 0.875rem !important; }
+  .btn  { padding: 10px 14px !important; font-size: 13px !important; }
+}

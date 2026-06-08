@@ -107,7 +107,7 @@ export default function LandingPage() {
             Konunu yaz, sınıfını seç — Yapay Zeka saniyeler içinde 8 farklı soru tipiyle sana özel testler üretsin. Öğretmen paneli, sınıf sistemi ve Maarif Modeli desteğiyle.
           </p>
 
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '4rem' }}>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '3rem' }}>
             <Link href="/register" style={{
               display: 'inline-flex', alignItems: 'center', gap: '8px',
               background: '#fdd31d', color: '#082465', fontSize: '15px', fontWeight: 700,
@@ -160,7 +160,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px,100%), 1fr))', gap: '16px' }}>
             {[
               {
                 emoji: '🎒',
