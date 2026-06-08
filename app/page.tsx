@@ -134,7 +134,7 @@ export default function LandingPage() {
               { v: '8', l: 'Soru tipi' },
               { v: '6', l: 'Dil desteği' },
               { v: '4 Hafta', l: 'Kişiselleştirilmiş plan' },
-              { v: 'Her Seviye', l: 'İlkokuldan KPSS'ye' },
+              { v: "Her Seviye", l: "İlkokuldan KPSS'ye" },
             ].map((s, i) => (
               <div key={i} style={{ textAlign: 'center' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '28px', color: '#fdd31d', fontWeight: 800, lineHeight: 1 }}>{s.v}</div>
