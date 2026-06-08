@@ -134,7 +134,7 @@ export default function LandingPage() {
               { v: '8', l: 'Soru tipi' },
               { v: '6', l: 'Dil desteği' },
               { v: '4 Hafta', l: 'Kişiselleştirilmiş plan' },
-              { v: '4.–12. Sınıf', l: 'İlkokuldan üniversiteye' },
+              { v: 'Her Seviye', l: 'İlkokuldan KPSS'ye' },
             ].map((s, i) => (
               <div key={i} style={{ textAlign: 'center' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '28px', color: '#fdd31d', fontWeight: 800, lineHeight: 1 }}>{s.v}</div>
@@ -145,7 +145,124 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── ÖZELLIKLER ── */}
+      {/* ── KİM İÇİN? ── */}
+      <section style={{ background: '#f8fafc', padding: '5rem 1.5rem' }}>
+        <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+            <div style={{ display: 'inline-block', background: 'rgba(8,36,101,0.06)', borderRadius: '99px', padding: '5px 16px', fontSize: '12px', fontWeight: 700, color: '#082465', letterSpacing: '0.06em', marginBottom: '12px' }}>
+              KİM İÇİN?
+            </div>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'clamp(1.6rem, 3vw, 2.5rem)', color: '#082465', margin: 0 }}>
+              Herkes için, her seviyede
+            </h2>
+            <p style={{ color: '#64748b', fontSize: '15px', marginTop: '10px' }}>
+              İlkokuldan üniversiteye, öğrenciden öğretmene — Pratium herkese özel çalışır.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+            {[
+              {
+                emoji: '🎒',
+                role: 'Öğrenci',
+                color: '#0ea5e9',
+                bg: 'rgba(14,165,233,0.06)',
+                border: 'rgba(14,165,233,0.2)',
+                headline: 'Konuyu yaz, testi al',
+                points: ['AI ile kişisel soru üretimi', 'Zayıf konuları tespit et', '4 haftalık çalışma planı', 'LGS, YKS, KPSS hazırlık', 'Spaced repetition tekrarı'],
+                cta: 'Ücretsiz başla',
+                href: '/register',
+              },
+              {
+                emoji: '👩‍🏫',
+                role: 'Öğretmen',
+                color: '#6366f1',
+                bg: 'rgba(99,102,241,0.06)',
+                border: 'rgba(99,102,241,0.2)',
+                headline: 'Sınıfını yönet, takip et',
+                points: ['Sınıf oluştur, öğrenci ekle', 'Ödev ata ve sonuçları gör', 'Canlı quiz — anlık sonuç', 'Öğrenci performans raporu', 'Toplu bildirim gönder'],
+                cta: 'Öğretmen başvurusu',
+                href: '/register/teacher',
+              },
+              {
+                emoji: '👨‍👩‍👧',
+                role: 'Veli',
+                color: '#10b981',
+                bg: 'rgba(16,185,129,0.06)',
+                border: 'rgba(16,185,129,0.2)',
+                headline: 'Çocuğunun gelişimini izle',
+                points: ['Haftalık özet e-postası', 'Test ve konu bazlı analiz', 'Zayıf konuları anlık gör', 'Streak ve motivasyon takibi', 'Çocuğunla bağlı kal'],
+                cta: 'Veli girişi',
+                href: '/login/parent',
+              },
+              {
+                emoji: '🏛️',
+                role: 'Kurum',
+                color: '#f59e0b',
+                bg: 'rgba(245,158,11,0.06)',
+                border: 'rgba(245,158,11,0.2)',
+                headline: 'Okulunu dijitalleştir',
+                points: ['Toplu öğrenci kaydı', 'Kurum bazlı raporlama', 'Çoklu öğretmen yönetimi', 'Özel içerik ve müfredat', 'Öncelikli destek hattı'],
+                cta: 'Kurum başvurusu',
+                href: '/register/institution',
+              },
+            ].map((card) => (
+              <div key={card.role} style={{
+                background: '#fff',
+                borderRadius: '20px',
+                border: `1.5px solid ${card.border}`,
+                padding: '28px 24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0',
+                boxShadow: '0 2px 16px rgba(0,0,0,0.05)',
+                transition: 'transform 0.15s, box-shadow 0.15s',
+              }}
+                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = `0 8px 32px ${card.border}` }}
+                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = ''; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 16px rgba(0,0,0,0.05)' }}
+              >
+                {/* Emoji + Rol */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+                  <div style={{ width: 48, height: 48, borderRadius: '14px', background: card.bg, border: `1.5px solid ${card.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>
+                    {card.emoji}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '17px', color: '#082465' }}>{card.role}</div>
+                    <div style={{ fontSize: '12px', color: card.color, fontWeight: 600 }}>{card.headline}</div>
+                  </div>
+                </div>
+
+                {/* Maddeler */}
+                <ul style={{ listStyle: 'none', margin: '0 0 20px', padding: 0, display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                  {card.points.map((p, i) => (
+                    <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13px', color: '#475569' }}>
+                      <span style={{ color: card.color, fontWeight: 700, flexShrink: 0, marginTop: '1px' }}>✓</span>
+                      {p}
+                    </li>
+                  ))}
+                </ul>
+
+                {/* CTA */}
+                <a href={card.href} style={{
+                  display: 'block', textAlign: 'center',
+                  padding: '10px 16px', borderRadius: '10px',
+                  background: card.bg, border: `1.5px solid ${card.border}`,
+                  color: card.color, fontWeight: 700, fontSize: '13px',
+                  textDecoration: 'none', marginTop: 'auto',
+                  transition: 'all 0.15s',
+                }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = card.color; (e.currentTarget as HTMLAnchorElement).style.color = '#fff' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = card.bg; (e.currentTarget as HTMLAnchorElement).style.color = card.color }}
+                >
+                  {card.cta} →
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── ÖZELLIKLER ── */}}
       <section style={{ padding: '5rem 1.5rem', background: '#f8fafc' }}>
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
