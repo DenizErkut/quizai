@@ -56,22 +56,20 @@ export default function LandingPage() {
           <Link href="/">
             <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '40px', width: 'auto', filter: 'brightness(0) invert(1)' }} />
           </Link>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-            {['Test', 'Günlük', 'Analiz', 'Planlar'].map(l => (
-              <Link key={l} href={l === 'Test' ? '/quiz' : l === 'Günlük' ? '/daily' : l === 'Analiz' ? '/analysis' : '/pricing'}
-                style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 500, padding: '7px 14px', borderRadius: '8px', transition: 'color 0.15s' }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#fdd31d')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}>
-                {l}
-              </Link>
-            ))}
-            <Link href="/login" style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 500, padding: '7px 14px' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <Link href="/login" style={{
+              color: 'rgba(255,255,255,0.8)', fontSize: '14px', fontWeight: 600,
+              padding: '9px 20px', borderRadius: '8px', border: '1.5px solid rgba(255,255,255,0.2)',
+              transition: 'all 0.15s', background: 'rgba(255,255,255,0.05)',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}>
               Giriş yap
             </Link>
             <Link href="/register" style={{
-              background: '#fdd31d', color: '#082465', fontSize: '13px', fontWeight: 700,
-              padding: '9px 20px', borderRadius: '8px', whiteSpace: 'nowrap',
-              transition: 'all 0.15s',
+              background: '#fdd31d', color: '#082465', fontSize: '14px', fontWeight: 700,
+              padding: '9px 22px', borderRadius: '8px', whiteSpace: 'nowrap',
+              transition: 'all 0.15s', boxShadow: '0 4px 12px rgba(253,211,29,0.35)',
             }}
               onMouseEnter={e => { e.currentTarget.style.background = '#f5c800'; e.currentTarget.style.transform = 'translateY(-1px)' }}
               onMouseLeave={e => { e.currentTarget.style.background = '#fdd31d'; e.currentTarget.style.transform = '' }}>
@@ -135,11 +133,11 @@ export default function LandingPage() {
             {[
               { v: '8', l: 'Soru tipi' },
               { v: '6', l: 'Dil desteği' },
-              { v: '4 Hafta', l: 'Kişisel plan' },
-              { v: 'LGS/YKS', l: 'Sınav odaklı' },
+              { v: '4 Hafta', l: 'Kişiselleştirilmiş plan' },
+              { v: '4.–12. Sınıf', l: 'İlkokuldan üniversiteye' },
             ].map((s, i) => (
               <div key={i} style={{ textAlign: 'center' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '30px', color: '#fdd31d', fontWeight: 800, lineHeight: 1 }}>{s.v}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '28px', color: '#fdd31d', fontWeight: 800, lineHeight: 1 }}>{s.v}</div>
                 <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)', marginTop: '4px' }}>{s.l}</div>
               </div>
             ))}
