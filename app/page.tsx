@@ -14,13 +14,13 @@ const features = [
 ]
 
 const faqs = [
-  { q: 'Pratium ucretsiz plan neye kadar kullanılabilir?', a: 'Freemium planda günde 10 test, test başına 5 soru ve temel soru tipleri ücretsiz kullanılabilir. Müfredat dışı konular, Maarif Modeli soru tipleri ve dosya yükleme Premium plana dahildir.' },
+  { q: 'Pratium ucretsiz plan neye kadar kullanılabilir?', a: 'Freemium planda ayda 10 test, test başına 5 soru ve temel soru tipleri ücretsiz kullanılabilir. Müfredat dışı konular, Maarif Modeli soru tipleri ve dosya yükleme Premium plana dahildir.' },
   { q: 'Maarif Modeli soru tipleri neler?', a: 'Pratiumda 8 farklı soru tipi var: Çoktan Seçmeli, Boşluk Doldurma, Doğru/Yanlış, Eşleştirme, Sıralama, Kısa Cevap ve Maarif Modeline özel Çoklu D/Y (birden fazla ifadeyi değerlendirme) ile Tablo Doldurma. Freemium planda temel tipler, Premium ve üstünde tüm tipler açık.' },
   { q: 'Öğretmen paneli nasıl çalışır?', a: 'Öğretmenler başvuru yapıp onaylandıktan sonra sınıf oluşturabilir, öğrencilere davet kodu gönderebilir, ödev atayabilir ve her öğrencinin performansını takip edebilir. AI, yanlış cevaplar üzerinden öğrenci özelinde analiz hazırlar. Toplu bildirim gönderme özelliği de mevcut.' },
   { q: 'Sınıf sistemine nasıl katılabilirim?', a: 'Öğretmenin sana davet kodu verir. Uygulamada "Sınıflarım" bölümüne gidip kodu girerek katılabilirsin. Premium planda birden fazla sınıfa aynı anda üye olabilirsin.' },
   { q: 'PDF veya dosyadan soru üretebilir miyim?', a: 'Evet! PDF ve Word dosyası yükleyebilirsin. Yapay zeka o içerikten soru üretir. Bu özellik Premium ve Unlimited planlarda kullanılabilir.' },
   { q: 'Gelişim planı için kaç test çözmem gerekiyor?', a: 'En az 10 test çözdükten sonra yapay zeka test geçmişini analiz ederek 4 haftalık kişisel çalışma planı hazırlar. Daha fazla test çözdükçe plan daha isabetli olur.' },
-  { q: 'Premium ve Unlimited arasındaki fark nedir?', a: 'Premiumda günde 25 test, test başına 20 soru, tüm soru tipleri, PDF yükleme, sınıf sistemi ve öncelikli destek var (₺600/yıl). Unlimitedda ise sınırsız günlük test, tüm özellikler, gelişmiş analiz raporları ve yılda 12 birebir koç görüşmesi bulunuyor (₺6.000/yıl).' },
+  { q: 'Premium ve Unlimited arasındaki fark nedir?', a: 'Premiumda ayda 300 test, test başına 20 soru, tüm soru tipleri, PDF yükleme, sınıf sistemi ve öncelikli destek var (₺600/yıl). Unlimitedda ise sınırsız aylık test, tüm özellikler, gelişmiş analiz raporları ve yılda 12 birebir koç görüşmesi bulunuyor (₺6.000/yıl).' },
   { q: 'Kaç dil destekleniyor?', a: 'Türkçe, İngilizce, Almanca, Fransızca, İspanyolca ve Arapça olmak üzere 6 dil destekleniyor. Test arayüzü seçtiğin dilde üretilir.' },
 ]
 
@@ -340,17 +340,17 @@ export default function LandingPage() {
             {[
               {
                 label: 'Freemium', price: '₺0', sub: 'Sonsuza kadar', color: '#64748b',
-                features: ['Günde 10 test', 'Test başına 5 soru', 'Müfredat konuları', 'Temel soru tipleri', 'Arşiv & dashboard'],
+                features: ['Ayda 10 test', 'Test başına 5 soru', 'Müfredat konuları', 'Temel soru tipleri', 'Arşiv & dashboard'],
                 cta: 'Ücretsiz başla', href: '/register', accent: false,
               },
               {
                 label: 'Premium', price: '₺600', sub: '/yıl', color: '#2563eb', badge: '🏆 En popüler',
-                features: ['Günde 25 test', 'Test başına 20 soru', 'Tüm konular (müfredat dışı dahil)', 'Tüm Maarif Modeli soru tipleri', 'PDF & dosyadan soru üret', 'Sınıf sistemi', 'Detaylı analiz & gelişim planı', 'Öncelikli destek'],
+                features: ['Ayda 300 test', 'Test başına 20 soru', 'Tüm konular (müfredat dışı dahil)', 'Tüm Maarif Modeli soru tipleri', 'PDF & dosyadan soru üret', 'Sınıf sistemi', 'Detaylı analiz & gelişim planı', 'Öncelikli destek'],
                 cta: 'Premiuma geç →', href: '/pricing', accent: true,
               },
               {
                 label: 'Unlimited', price: '₺6.000', sub: '/yıl', color: '#0d9488',
-                features: ['Sınırsız günlük test', 'Test başına 20 soru', 'Tüm özellikler kısıtsız', 'Gelişmiş analiz & raporlar', 'Sınırsız sınıf', '12× birebir koç görüşmesi', 'Öncelikli & telefon desteği'],
+                features: ['Sınırsız aylık test', 'Test başına 20 soru', 'Tüm özellikler kısıtsız', 'Gelişmiş analiz & raporlar', 'Sınırsız sınıf', '12× birebir koç görüşmesi', 'Öncelikli & telefon desteği'],
                 cta: 'Unlimiteda geç →', href: '/pricing', accent: false,
               },
             ].map((p, i) => (
