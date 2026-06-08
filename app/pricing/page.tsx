@@ -178,11 +178,11 @@ export default function PricingPage() {
               <div style={{ fontWeight: 600 }}>{profile.monthly_test_count} test çözüldü</div>
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>Bugün</div>
-              <div style={{ fontWeight: 600 }}>{dailyUsed} test · {
+              <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>Bu ay</div>
+              <div style={{ fontWeight: 600 }}>{profile.monthly_test_count} test · {
                 profile.plan === 'unlimited' ? 'Sınırsız' :
-                profile.plan === 'premium' ? `${Math.max(0, 25 - dailyUsed)} kaldı` :
-                `${Math.max(0, 10 - dailyUsed)} kaldı`
+                profile.plan === 'premium' ? `${Math.max(0, 300 - (profile.monthly_test_count || 0))} kaldı` :
+                `${Math.max(0, 10 - (profile.monthly_test_count || 0))} kaldı`
               }</div>
             </div>
             <div style={{ flex: 1 }}>
