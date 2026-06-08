@@ -56,7 +56,7 @@ export default function PricingPage() {
       color: '#64748b',
       accent: false,
       features: [
-        'Günde 10 test',
+        'Ayda 10 test',
         'Test başına 5 soru',
         'Sadece müfredat konuları',
         'Temel soru tipleri',
@@ -75,7 +75,7 @@ export default function PricingPage() {
       accent: true,
       badge: 'En popüler',
       features: [
-        'Günde 25 test',
+        'Ayda 300 test',
         'Test başına 20 soru',
         'Tüm konular (müfredat dışı dahil)',
         'Tüm Maarif Modeli soru tipleri',
@@ -96,7 +96,7 @@ export default function PricingPage() {
       color: '#0d9488',
       accent: false,
       features: [
-        'Sınırsız günlük test',
+        'Sınırsız aylık test',
         'Test başına 20 soru',
         'Tüm konular — kısıtsız',
         'Tüm Maarif Modeli soru tipleri',

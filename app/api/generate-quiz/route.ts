@@ -268,14 +268,8 @@ export async function POST(req: NextRequest) {
     const plan = profile.plan || 'free'
     const today = new Date().toISOString().split('T')[0]
 
-    const DAILY_LIMIT: Record<string, number> = { free: 10, premium: 25, unlimited: 99999 }
-    const dailyLimit = DAILY_LIMIT[plan] ?? 10
-    const dailyCount = profile.daily_test_date === today ? (profile.daily_test_count || 0) : 0
-    if (dailyCount >= dailyLimit) {
-      return NextResponse.json({ error: 'daily_limit_reached' }, { status: 429 })
-    }
-
-    const MONTHLY_LIMIT: Record<string, number> = { free: 10, premium: 200, unlimited: 99999 }
+    // Günlük limit kaldırıldı — artık sadece aylık limit var
+    const MONTHLY_LIMIT: Record<string, number> = { free: 10, premium: 300, unlimited: 99999 }
     const monthlyLimit = MONTHLY_LIMIT[plan] ?? 10
     if ((profile.monthly_test_count || 0) >= monthlyLimit) {
       return NextResponse.json({ error: 'limit_reached' }, { status: 429 })
