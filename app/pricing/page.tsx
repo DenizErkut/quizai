@@ -197,7 +197,7 @@ export default function PricingPage() {
         {/* Referral */}
         {profile && (
           <div className="card anim-up-3" style={{ marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', gap: '12px', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '1.25rem' }}>
               <div>
                 <h2 style={{ fontSize: '18px', fontWeight: 500, marginBottom: '4px' }}>🎁 Arkadaşlarını davet et</h2>
                 <p style={{ fontSize: '13px', color: 'var(--text2)' }}>
