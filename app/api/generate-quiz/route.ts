@@ -260,7 +260,7 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('plan, monthly_test_count, daily_test_count, daily_test_date, grade, language')
+      .select('plan, monthly_test_count, grade, language')
       .eq('id', user.id)
       .single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
@@ -485,8 +485,6 @@ export async function POST(req: NextRequest) {
         .from('profiles')
         .update({
           monthly_test_count: (profile.monthly_test_count || 0) + 1,
-          daily_test_count: dailyCount + 1,
-          daily_test_date: today,
         })
         .eq('id', user.id)
     }
