@@ -262,7 +262,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── ÖZELLIKLER ── */}}
+      {/* ── ÖZELLIKLER ── */}
       <section style={{ padding: '5rem 1.5rem', background: '#f8fafc' }}>
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
