@@ -146,51 +146,48 @@ export default function LandingPage() {
       </section>
 
       {/* ── TEKNOLOJİ ORTAKLARI ── */}
-      <section style={{ background: '#fff', padding: '2.5rem 1.5rem', borderTop: '1px solid #f0f4f8', borderBottom: '1px solid #f0f4f8' }}>
-        <div style={{ maxWidth: '1000px', margin: '0 auto', textAlign: 'center' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '2rem' }}>
-            Güvendiğimiz teknoloji altyapısı
+      <section style={{ background: 'linear-gradient(180deg, #f8faff 0%, #fff 100%)', padding: '3rem 1.5rem', borderTop: '1px solid #e8eef8', borderBottom: '1px solid #e8eef8' }}>
+        <div style={{ maxWidth: '1060px', margin: '0 auto', textAlign: 'center' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(8,36,101,0.05)', border: '1px solid rgba(8,36,101,0.1)', borderRadius: '999px', padding: '5px 16px', marginBottom: '2rem' }}>
+            <span style={{ fontSize: '13px' }}>🔧</span>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#082465', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Güvendiğimiz teknoloji altyapısı</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '2.5rem 3rem' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '12px' }}>
             {([
-              // AI Modelleri
-              { name: 'Anthropic', sub: 'Claude — Soru & Analiz AI', color: '#c96c3f',
-                svg: '<svg viewBox="0 0 120 30" xmlns="http://www.w3.org/2000/svg"><text y="22" font-family="Georgia,serif" font-size="20" font-weight="700" fill="#c96c3f">Anthropic</text></svg>' },
-              { name: 'Google Gemini', sub: 'Gemini — Semantik Arama', color: '#4285F4',
-                svg: '<svg viewBox="0 0 130 30" xmlns="http://www.w3.org/2000/svg"><text y="22" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#4285F4">Google</text></svg>' },
-              // Altyapı
-              { name: 'Supabase', sub: 'Veritabanı & Auth & Realtime', color: '#3ECF8E',
-                svg: '<svg viewBox="0 0 110 30" xmlns="http://www.w3.org/2000/svg"><text y="22" font-family="Arial,sans-serif" font-size="18" font-weight="800" fill="#3ECF8E">Supabase</text></svg>' },
-              { name: 'Vercel', sub: 'Hosting & Cron Jobs', color: '#000',
-                svg: '<svg viewBox="0 0 80 30" xmlns="http://www.w3.org/2000/svg"><polygon points="40,2 76,28 4,28" fill="#000"/></svg>' },
-              // Ödeme
-              { name: 'iyzico', sub: 'Güvenli Ödeme', color: '#00B1E1',
-                svg: '<svg viewBox="0 0 80 30" xmlns="http://www.w3.org/2000/svg"><text y="22" font-family="Arial,sans-serif" font-size="20" font-weight="800" fill="#00B1E1">iyzico</text></svg>' },
-              // E-posta
-              { name: 'Resend', sub: 'E-posta Bildirimleri', color: '#000',
-                svg: '<svg viewBox="0 0 80 30" xmlns="http://www.w3.org/2000/svg"><text y="22" font-family="Arial,sans-serif" font-size="20" font-weight="700" fill="#000">Resend</text></svg>' },
-              // Web Push
-              { name: 'Web Push', sub: 'Anlık Bildirimler', color: '#FF6B35',
-                svg: '<svg viewBox="0 0 100 30" xmlns="http://www.w3.org/2000/svg"><text y="22" font-family="Arial,sans-serif" font-size="16" font-weight="700" fill="#FF6B35">Web Push</text></svg>' },
-              // Video
-              { name: 'YouTube', sub: 'Konu Video Önerileri', color: '#FF0000',
-                svg: '<svg viewBox="0 0 110 30" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="4" width="40" height="22" rx="5" fill="#FF0000"/><polygon points="16,8 16,20 30,14" fill="#fff"/><text x="46" y="22" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#282828">YouTube</text></svg>' },
-              // Dosya işleme
-              { name: 'Next.js', sub: 'React Framework', color: '#000',
-                svg: '<svg viewBox="0 0 85 30" xmlns="http://www.w3.org/2000/svg"><text y="22" font-family="Arial,sans-serif" font-size="18" font-weight="800" fill="#000">Next.js</text></svg>' },
-            ] as {name:string;sub:string;color:string;svg:string}[]).map(p => (
+              { name: 'Anthropic', sub: 'Soru & Analiz AI', emoji: '🤖', color: '#c96c3f', bg: 'rgba(201,108,63,0.08)', border: 'rgba(201,108,63,0.2)',
+                svg: '<svg viewBox="0 0 100 24" xmlns="http://www.w3.org/2000/svg"><text y="18" font-family="Georgia,serif" font-size="17" font-weight="700" fill="#c96c3f">Anthropic</text></svg>' },
+              { name: 'Google Gemini', sub: 'Semantik Arama', emoji: '✨', color: '#4285F4', bg: 'rgba(66,133,244,0.08)', border: 'rgba(66,133,244,0.2)',
+                svg: '<svg viewBox="0 0 140 24" xmlns="http://www.w3.org/2000/svg"><text y="18" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="#4285F4">Google </text><text x="62" y="18" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="#0F9D58">Gem</text><text x="92" y="18" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="#F4B400">ini</text></svg>' },
+              { name: 'Supabase', sub: 'Veritabanı & Realtime', emoji: '🗄️', color: '#3ECF8E', bg: 'rgba(62,207,142,0.08)', border: 'rgba(62,207,142,0.2)',
+                svg: '<svg viewBox="0 0 100 24" xmlns="http://www.w3.org/2000/svg"><text y="18" font-family="Arial,sans-serif" font-size="17" font-weight="800" fill="#3ECF8E">Supabase</text></svg>' },
+              { name: 'Vercel', sub: 'Hosting & Cron', emoji: '▲', color: '#171717', bg: 'rgba(0,0,0,0.05)', border: 'rgba(0,0,0,0.12)',
+                svg: '<svg viewBox="0 0 80 24" xmlns="http://www.w3.org/2000/svg"><polygon points="10,20 40,4 70,20" fill="#171717"/></svg>' },
+              { name: 'iyzico', sub: 'Güvenli Ödeme', emoji: '💳', color: '#00B1E1', bg: 'rgba(0,177,225,0.08)', border: 'rgba(0,177,225,0.2)',
+                svg: '<svg viewBox="0 0 70 24" xmlns="http://www.w3.org/2000/svg"><text y="18" font-family="Arial,sans-serif" font-size="19" font-weight="800" fill="#00B1E1">iyzico</text></svg>' },
+              { name: 'Resend', sub: 'E-posta', emoji: '📧', color: '#000', bg: 'rgba(0,0,0,0.05)', border: 'rgba(0,0,0,0.12)',
+                svg: '<svg viewBox="0 0 75 24" xmlns="http://www.w3.org/2000/svg"><text y="18" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#000">Resend</text></svg>' },
+              { name: 'Web Push', sub: 'Anlık Bildirimler', emoji: '🔔', color: '#FF6B35', bg: 'rgba(255,107,53,0.08)', border: 'rgba(255,107,53,0.2)',
+                svg: '<svg viewBox="0 0 90 24" xmlns="http://www.w3.org/2000/svg"><text y="18" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="#FF6B35">Web Push</text></svg>' },
+              { name: 'YouTube', sub: 'Video Önerileri', emoji: '▶️', color: '#FF0000', bg: 'rgba(255,0,0,0.06)', border: 'rgba(255,0,0,0.18)',
+                svg: '<svg viewBox="0 0 100 24" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="3" width="32" height="18" rx="4" fill="#FF0000"/><polygon points="13,7 13,17 24,12" fill="#fff"/><text x="36" y="18" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="#282828">YouTube</text></svg>' },
+              { name: 'Next.js', sub: 'React Framework', emoji: '⚡', color: '#000', bg: 'rgba(0,0,0,0.05)', border: 'rgba(0,0,0,0.12)',
+                svg: '<svg viewBox="0 0 78 24" xmlns="http://www.w3.org/2000/svg"><text y="18" font-family="Arial,sans-serif" font-size="17" font-weight="800" fill="#000">Next.js</text></svg>' },
+            ] as {name:string;sub:string;emoji:string;color:string;bg:string;border:string;svg:string}[]).map(p => (
               <div key={p.name}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', cursor: 'default', transition: 'transform 0.2s' }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)' }}
-                onMouseLeave={e => { e.currentTarget.style.transform = '' }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '10px 16px', borderRadius: '12px',
+                  background: p.bg, border: `1.5px solid ${p.border}`,
+                  cursor: 'default', transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 6px 20px ${p.border}` }}
+                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}
               >
-                <div
-                  style={{ height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.55, transition: 'opacity 0.2s', filter: 'grayscale(1)', minWidth: '80px' }}
-                  dangerouslySetInnerHTML={{ __html: p.svg }}
-                  onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.filter = 'grayscale(0)' }}
-                  onMouseLeave={e => { e.currentTarget.style.opacity = '0.55'; e.currentTarget.style.filter = 'grayscale(1)' }}
-                />
-                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 500, whiteSpace: 'nowrap' }}>{p.sub}</span>
+                <div style={{ height: '24px', display: 'flex', alignItems: 'center', minWidth: '60px' }}
+                  dangerouslySetInnerHTML={{ __html: p.svg }} />
+                <div style={{ borderLeft: `1.5px solid ${p.border}`, paddingLeft: '10px' }}>
+                  <div style={{ fontSize: '10px', color: p.color, fontWeight: 700, whiteSpace: 'nowrap' }}>{p.sub}</div>
+                </div>
               </div>
             ))}
           </div>
