@@ -11,14 +11,15 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   // Auth kontrolü
+  // Guest (landing page) için auth opsiyonel
   const authHeader = req.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
-  }
-  const token = authHeader.slice(7)
+  const isGuest = !authHeader?.startsWith('Bearer ')
 
-  const { data: { user } } = await supabase.auth.getUser(token)
-  if (!user) return NextResponse.json({ reply: 'Oturum geçersiz.' }, { status: 401 })
+  if (!isGuest) {
+    const token = authHeader!.slice(7)
+    const { data: { user } } = await supabase.auth.getUser(token)
+    if (!user) return NextResponse.json({ reply: 'Oturum geçersiz.' }, { status: 401 })
+  }
 
   try {
     const { messages, system } = await req.json()

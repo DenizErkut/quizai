@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import AIChatBot from '@/components/AIChatBot'
 
 const features = [
   { icon: '⚡', title: 'Anlık soru üretimi', desc: 'Konunu yaz, 10 saniyede sınıfına ve seviyene özel sorular hazır. Müfredat dışı konular da desteklenir.' },
@@ -473,6 +474,9 @@ export default function LandingPage() {
           </Link>
         </div>
       </section>
+
+      {/* ── AI BOT (Guest) ── */}
+      <AIChatBot isGuest={true} />
 
       {/* ── FOOTER ── */}
       <footer style={{ background: '#082465', padding: '2rem 1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>

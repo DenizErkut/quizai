@@ -7,40 +7,80 @@ interface Message {
   content: string
 }
 
-const SYSTEM_PROMPT = `You are Pratium Assistant, a helpful support bot for the Pratium AI-powered quiz platform.
+const SYSTEM_PROMPT = `Sen Pratium'un yapay zeka destekli eğitim asistanısın. Adın "Pratium Asistan".
 
-You help users with:
-- How to use Pratium features (creating tests, question types, difficulty levels, etc.)
-- Account and subscription questions (free vs premium, invite friends, etc.)
-- Teacher panel usage (creating classes, assignments, student management)
-- Technical issues and navigation
-- Understanding their progress (streaks, analysis, leaderboard, archive)
+Pratium, yapay zeka destekli bir Türk eğitim platformudur. Öğrenciler, öğretmenler ve veliler için tasarlanmıştır.
 
-STRICT RULES:
-1. NEVER answer questions about test content, quiz answers, or help users cheat on any test
-2. NEVER solve math problems, science questions, or any academic subject matter
-3. If asked about quiz answers or test content, politely decline and redirect to platform help
-4. Only discuss Pratium platform features and usage
-5. Be friendly, concise, and helpful
-6. Answer in the same language the user writes in (Turkish or English)
+GÖREV TANIMI:
+Kullanıcıların öğrenme hedeflerine ulaşmalarına yardımcı olmak için Pratium'un özelliklerini yumuşak, samimi ve motive edici bir dille tanıtırsın.
 
-Key Pratium features to help with:
-- Quiz creation: topic selection, difficulty (kolay/normal/zor/çok zor), question types (multiple choice, fill blank, true/false, matching, ordering, short answer), file upload
-- Free plan: 10 tests/month, 5 questions max
-- Premium: unlimited tests, 6 languages, 20 questions, file upload, visual questions
-- Daily tests and streak system
-- 4-week AI study plan (requires 10 completed tests)
-- Leaderboard and rankings
-- Question archive
-- AI chat assistant after tests
-- Teacher panel: requires application and admin approval, class management, assignments
-- Invite friends: 10 invites = 1 year free premium
-- Joining a class: pratium.com/join with invite code`
+TEMEL YETENEKLERİN:
+- Kullanıcının öğrenme hedefini anlamak ve Pratium'un hangi özelliğiyle bunu karşılayabileceğini anlatmak
+- Premium özellikleri doğal ve baskı yapmadan, değer odaklı önerilerle tanıtmak
+- Platform kullanımı, hesap, abonelik, öğretmen paneli, veli paneli sorularını yanıtlamak
+- Kullanıcıyı motive etmek ve doğru adımları atmaya yönlendirmek
 
-export default function AIChatBot() {
+YANIT TARZI:
+- Sıcak, samimi, teşvik edici — asla soğuk veya robotik değil
+- Kullanıcının durumunu önce anla, sonra öner
+- Premium önermelerini "sizi şuna yönlendirmeliyim" değil "bu hedef için harika bir seçim olur" şeklinde yap
+- Her yanıtta 1 somut adım öner (örn: "Şimdi Yeni Test'e tıklayabilirsin")
+- Maksimum 3-4 cümle, kısa ve net
+
+PREMIUM ÖNERİ KURALLARI:
+- Kullanıcı bir konuyu öğrenmek veya soru çözmek istiyorsa → Pratium'un quiz özelliğini anlat, ardından şunu ekle:
+  "Bu konuda derinlemesine çalışmak istiyorsan Premium üyelik çok işine yarayacak — ayda 300 test, dosyadan soru üretme ve kişisel analiz sunuyor."
+- Kullanıcı ücretsiz planda sınıra takılıyorsa → empatiyle karşıla, Premium'un sunduklarını somut örneklerle anlat
+- Asla "Premium almak zorundasın" veya "ücretsiz plan yetersiz" deme — her zaman değer odaklı konuş
+- Sınav hazırlığı (LGS/YKS/KPSS) sorularında → Pratium'un sınav simülasyonu özelliğini öner
+
+PLATFORM BİLGİSİ:
+- Freemium: Ayda 10 test, 5 soru/test, temel özellikler
+- Premium (₺600/yıl): Ayda 300 test, 20 soru/test, tüm soru tipleri, PDF yükleme, sınıf sistemi, kişisel analiz
+- Unlimited (₺6.000/yıl): Sınırsız test, koç görüşmesi, tüm özellikler
+- Özellikler: 8 soru tipi, 6 dil, 4 haftalık gelişim planı, spaced repetition, sınav simülasyonu (LGS/TYT/AYT/KPSS), canlı quiz, challenge, konu özeti
+- Öğretmen: sınıf oluşturma, ödev atama, canlı quiz, öğrenci performans takibi
+- Veli: çocuk takibi, haftalık özet e-postası
+
+SINIRLAR:
+- Sınav sorularını çözme, matematik hesaplama veya akademik içerik üretme
+- Bu tür isteklerde: "Bu konuyu Pratium'da test olarak çözersen çok daha etkili öğrenirsin! Şimdi Yeni Test'e tıklayıp [konu] yazarsan sana özel sorular hazırlarım. 🎯"
+
+Kullanıcı Türkçe yazarsa Türkçe, İngilizce yazarsa İngilizce yanıt ver.`
+
+// Landing page için auth gerektirmeyen basit versiyon
+const GUEST_SYSTEM_PROMPT = `Sen Pratium'un yapay zeka destekli tanıtım asistanısın. Adın "Pratium Asistan".
+
+Pratium, yapay zeka destekli bir Türk eğitim platformudur.
+
+GÖREV: Ziyaretçilerin Pratium'u anlamasına ve kayıt olmaya karar vermesine yardımcı ol.
+
+YANIT TARZI:
+- Sıcak, merak uyandırıcı ve motive edici
+- Her yanıtta Pratium'un ilgili özelliğini anlat
+- Sonunda yumuşak bir kayıt çağrısı yap: "Ücretsiz hesap açarak hemen deneyebilirsin 🚀"
+- Kısa tut: 2-3 cümle + 1 çağrı
+
+PLATFORM BİLGİSİ:
+- Ücretsiz: Ayda 10 test, 5 soru/test
+- Premium (₺600/yıl): 300 test/ay, 20 soru, PDF yükleme, analiz, sınıf sistemi
+- Özellikler: LGS/YKS/KPSS sınav simülasyonu, 8 soru tipi, 6 dil, 4 haftalık plan, öğretmen paneli, veli takibi
+
+SINIR: Akademik soru çözme — "Bunu Pratium'da test olarak çözersen çok daha etkili! Ücretsiz kaydol ve dene 🎯"
+
+Türkçe yaz.`
+
+interface Props {
+  isGuest?: boolean
+}
+
+export default function AIChatBot({ isGuest = false }: Props) {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Merhaba! 👋 Pratium hakkında sorularını yanıtlamak için buradayım. Özellik, kullanım veya hesap konularında nasıl yardımcı olabilirim?' }
+    { role: 'assistant', content: isGuest
+      ? 'Merhaba! 👋 Pratium hakkında merak ettiklerini sorabilirsin. Sana nasıl yardımcı olabilirim?'
+      : 'Merhaba! 👋 Öğrenme hedeflerin veya platform kullanımı hakkında sana yardımcı olmak için buradayım.'
+    }
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -49,10 +89,6 @@ export default function AIChatBot() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
-  useEffect(() => {
-    if (!open && messages.length > 1) setUnread(prev => prev + 0)
   }, [messages])
 
   async function send() {
@@ -67,6 +103,8 @@ export default function AIChatBot() {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
 
+      const systemPrompt = isGuest ? GUEST_SYSTEM_PROMPT : SYSTEM_PROMPT
+
       const res = await fetch('/api/bot', {
         method: 'POST',
         headers: {
@@ -75,7 +113,7 @@ export default function AIChatBot() {
         },
         body: JSON.stringify({
           messages: [...messages, { role: 'user', content: userMsg }],
-          system: SYSTEM_PROMPT,
+          system: systemPrompt,
         }),
       })
       const data = await res.json()
@@ -88,25 +126,29 @@ export default function AIChatBot() {
     }
   }
 
-  const quickQuestions = [
+  const quickQuestions = isGuest ? [
+    '5. sınıf Türkçe soruları çözebilir miyim?',
+    'LGS\'ye nasıl hazırlanabilirim?',
+    'Ücretsiz ne kadar kullanabilirim?',
+    'Öğretmen olarak nasıl kullanırım?',
+  ] : [
     'Test nasıl oluşturabilirim?',
+    'Sınav simülasyonu nedir?',
     'Premium\'a nasıl geçebilirim?',
-    'Sınıfa nasıl katılabilirim?',
     'Gelişim planı nedir?',
   ]
 
   return (
     <>
-      {/* Chat penceresi */}
       {open && (
         <div style={{
           position: 'fixed', bottom: '90px', right: '24px', zIndex: 9998,
-          width: '360px', maxWidth: 'calc(100vw - 32px)',
+          width: '370px', maxWidth: 'calc(100vw - 32px)',
           background: '#fff', borderRadius: '20px',
           boxShadow: '0 20px 60px rgba(8,36,101,0.18)',
           border: '1px solid #e2e8f0',
           display: 'flex', flexDirection: 'column',
-          maxHeight: '520px',
+          maxHeight: '560px',
           animation: 'botSlideUp 0.2s ease',
         }}>
           {/* Header */}
@@ -117,15 +159,25 @@ export default function AIChatBot() {
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
+              <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
                 🤖
               </div>
               <div>
                 <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>Pratium Asistan</div>
-                <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>Platform hakkında sorularınız için</div>
+                <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '11px' }}>Size yardımcı olmak için buradayım ✨</div>
               </div>
             </div>
-            <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: '4px' }}>×</button>
+            <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', fontSize: '22px', lineHeight: 1, padding: '4px' }}>×</button>
+          </div>
+
+          {/* Üst bilgi bandı */}
+          <div style={{ background: 'rgba(30,207,184,0.06)', borderBottom: '1px solid rgba(30,207,184,0.15)', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '7px' }}>
+            <span style={{ fontSize: '13px' }}>💡</span>
+            <span style={{ fontSize: '11px', color: '#0a9e90', fontWeight: 500, lineHeight: 1.4 }}>
+              {isGuest
+                ? 'Öğrenme hedefin için en doğru yolu birlikte bulalım!'
+                : 'Öğrenme hedefin, platform kullanımı veya plan soruların için buradayım.'}
+            </span>
           </div>
 
           {/* Mesajlar */}
@@ -136,8 +188,7 @@ export default function AIChatBot() {
                   <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #082465, #1ECFB8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0, marginRight: '8px', alignSelf: 'flex-end' }}>🤖</div>
                 )}
                 <div style={{
-                  maxWidth: '78%',
-                  padding: '10px 13px',
+                  maxWidth: '78%', padding: '10px 13px',
                   borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
                   background: m.role === 'user' ? 'linear-gradient(135deg, #082465, #1ECFB8)' : '#f8fafc',
                   color: m.role === 'user' ? '#fff' : '#0F172A',
@@ -160,12 +211,33 @@ export default function AIChatBot() {
             <div ref={bottomRef} />
           </div>
 
-          {/* Hızlı sorular — sadece başlangıçta */}
+          {/* Hızlı sorular */}
           {messages.length <= 1 && (
             <div style={{ padding: '0 12px 10px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {quickQuestions.map(q => (
-                <button key={q} onClick={async () => { setInput(q); setTimeout(async () => { setInput(''); setMessages(prev => [...prev, { role: 'user', content: q }]); setLoading(true); try { const supabase = createClient() as any; const { data: { session } } = await supabase.auth.getSession(); const tok = session?.access_token; fetch('/api/bot', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(tok ? { Authorization: `Bearer ${tok}` } : {}) }, body: JSON.stringify({ messages: [...messages, { role: 'user', content: q }], system: SYSTEM_PROMPT }) }).then(r => r.json()).then(d => { setMessages(prev => [...prev, { role: 'assistant', content: d.reply }]); setLoading(false) }).catch(() => setLoading(false)) } catch { setLoading(false) } }, 0) }}
-                  style={{ fontSize: '11px', padding: '5px 10px', borderRadius: '20px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#082465', cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s' }}>
+                <button key={q} onClick={async () => {
+                  setInput('')
+                  setMessages(prev => [...prev, { role: 'user', content: q }])
+                  setLoading(true)
+                  try {
+                    const supabase = createClient() as any
+                    const { data: { session } } = await supabase.auth.getSession()
+                    const tok = session?.access_token
+                    const systemPrompt = isGuest ? GUEST_SYSTEM_PROMPT : SYSTEM_PROMPT
+                    const res = await fetch('/api/bot', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', ...(tok ? { Authorization: `Bearer ${tok}` } : {}) },
+                      body: JSON.stringify({ messages: [...messages, { role: 'user', content: q }], system: systemPrompt }),
+                    })
+                    const d = await res.json()
+                    setMessages(prev => [...prev, { role: 'assistant', content: d.reply }])
+                    setLoading(false)
+                  } catch { setLoading(false) }
+                }}
+                  style={{ fontSize: '11px', padding: '5px 10px', borderRadius: '20px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#082465', cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#082465'; e.currentTarget.style.color = '#fff' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#082465' }}
+                >
                   {q}
                 </button>
               ))}
@@ -178,7 +250,7 @@ export default function AIChatBot() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
-              placeholder="Pratium hakkında bir şey sor..."
+              placeholder={isGuest ? 'Platforma dair bir şey sor...' : 'Hedefini veya sorunuzu yaz...'}
               style={{
                 flex: 1, padding: '10px 14px', borderRadius: '20px',
                 border: '1.5px solid #e2e8f0', background: '#f8fafc',
@@ -193,14 +265,22 @@ export default function AIChatBot() {
               background: input.trim() ? 'linear-gradient(135deg, #082465, #1ECFB8)' : '#e2e8f0',
               border: 'none', cursor: input.trim() ? 'pointer' : 'default',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '16px', color: '#fff', flexShrink: 0,
-              transition: 'all 0.15s',
+              fontSize: '16px', color: '#fff', flexShrink: 0, transition: 'all 0.15s',
             }}>↑</button>
           </div>
+
+          {/* Guest kayıt CTA */}
+          {isGuest && (
+            <div style={{ padding: '10px 14px', background: 'rgba(253,211,29,0.08)', borderTop: '1px solid rgba(253,211,29,0.2)', borderRadius: '0 0 20px 20px', textAlign: 'center' }}>
+              <a href="/register" style={{ fontSize: '12px', fontWeight: 700, color: '#082465', textDecoration: 'none' }}>
+                🚀 Ücretsiz hesap aç ve hemen başla →
+              </a>
+            </div>
+          )}
         </div>
       )}
 
-      {/* FAB butonu */}
+      {/* FAB */}
       <button
         onClick={() => { setOpen(v => !v); setUnread(0) }}
         style={{
