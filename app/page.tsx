@@ -145,6 +145,43 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── PARTNERS / TEKNOLOJİ ORTAKLARI ── */}
+      <section style={{ background: '#fff', padding: '3rem 1.5rem', borderTop: '1px solid #f0f4f8', borderBottom: '1px solid #f0f4f8' }}>
+        <div style={{ maxWidth: '900px', margin: '0 auto', textAlign: 'center' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '1.75rem' }}>
+            Güvendiğimiz teknoloji ortakları
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '2rem' }}>
+            {[
+              { name: 'Anthropic', sub: 'Claude AI', logo: 'https://upload.wikimedia.org/wikipedia/commons/7/78/Anthropic_logo.svg' },
+              { name: 'Google', sub: 'Gemini AI', logo: 'https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg' },
+              { name: 'OpenAI', sub: 'GPT Models', logo: 'https://upload.wikimedia.org/wikipedia/commons/4/4d/OpenAI_Logo.svg' },
+              { name: 'Vercel', sub: 'Hosting', logo: 'https://assets.vercel.com/image/upload/front/favicon/vercel/180x180.png' },
+              { name: 'Supabase', sub: 'Database', logo: 'https://supabase.com/favicon/favicon-196x196.png' },
+              { name: 'Resend', sub: 'Email', logo: 'https://resend.com/static/favicons/favicon-48x48.png' },
+            ].map(p => (
+              <div key={p.name} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', opacity: 0.65, transition: 'opacity 0.2s' }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                onMouseLeave={e => (e.currentTarget.style.opacity = '0.65')}>
+                <img src={p.logo} alt={p.name}
+                  style={{ height: '28px', width: 'auto', maxWidth: '90px', objectFit: 'contain', filter: 'grayscale(1)' }}
+                  onMouseEnter={e => ((e.target as HTMLImageElement).style.filter = 'grayscale(0)')}
+                  onMouseLeave={e => ((e.target as HTMLImageElement).style.filter = 'grayscale(1)')}
+                  onError={e => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    const txt = document.createElement('span');
+                    txt.textContent = p.name;
+                    txt.style.cssText = 'font-weight:800;font-size:15px;color:#082465;letter-spacing:-0.02em';
+                    (e.target as HTMLImageElement).parentElement?.insertBefore(txt, e.target as HTMLImageElement);
+                  }}
+                />
+                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 500 }}>{p.sub}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── KİM İÇİN? ── */}
       <section style={{ background: '#f8fafc', padding: '5rem 1.5rem' }}>
         <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
