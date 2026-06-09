@@ -88,10 +88,10 @@ export default function QuizSetup({
                     {dailyLeft === 0 ? '⏰ Günlük limit doldu' : `Bugün ${dailyLeft} test kaldı`}
                   </span>
                 )}
-                {profile.plan === 'premium' && (
+                {profile.profile?.plan === 'premium' && (
                   <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '11px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid rgba(91,76,245,0.2)', fontWeight: 600 }}>★ Premium</span>
                 )}
-                {profile.plan === 'unlimited' && (
+                {profile.profile?.plan === 'unlimited' && (
                   <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '11px', background: 'rgba(30,207,184,0.1)', color: '#0d9488', border: '1px solid rgba(30,207,184,0.3)', fontWeight: 600 }}>⭐ Unlimited</span>
                 )}
               </div>
@@ -293,7 +293,7 @@ export default function QuizSetup({
           {/* Dosya yükleme */}
           <label className="field-label" style={{ marginTop: '16px' }}>Dosyadan soru üret</label>
           <FileUploader onFilesChange={setUploadedFiles} maxFiles={5} maxMB={20} />
-          {hasFiles && (
+          {uploadedFiles.length > 0 && (
             <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--green)' }}>
               ✓ {uploadedFiles.length} dosya hazır · {uploadedFiles.reduce((s, f) => s + f.content.split(' ').length, 0)} kelime · Sorular bu içeriklerden üretilecek
             </div>
@@ -385,7 +385,7 @@ export default function QuizSetup({
                       )
                     })}
                   </div>
-                  {plan === 'free' && <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Freemium'da max 5 soru · <a href="/pricing" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Premium'a geç</a></div>}
+                  {profile?.plan === 'free' && <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Freemium'da max 5 soru · <a href="/pricing" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Premium'a geç</a></div>}
                 </div>
                 <div>
                   <label className="field-label" style={{ marginTop: 0 }}>Görsel sorular</label>
@@ -404,13 +404,13 @@ export default function QuizSetup({
             <span style={{ color: 'var(--accent)' }}>{
               {'multiple_choice':'🔤 Çoktan Seçmeli','fill_blank':'✏️ Boşluk Doldurma','true_false':'✓✗ D/Y','multi_true_false':'📋✓✗ Çoklu D/Y','table_fill':'🗂️ Tablo','matching':'🔗 Eşleştirme','ordering':'📋 Sıralama','short_answer':'💬 Kısa Cevap','mixed':'🎲 Karma'}[questionType]
             }</span>
-            <span style={{ color: activeDiff.color }}>⚡ {activeDiff.label}</span>
+            <span style={{ color: DIFFICULTIES.find(d => d.value === difficulty)?.color }}>⚡ {DIFFICULTIES.find(d => d.value === difficulty)?.label}</span>
             <span>🌐 {currentLang}</span>
-            {hasFiles && <span style={{ color: 'var(--green)' }}>📎 {uploadedFiles.length} dosya</span>}
+            {uploadedFiles.length > 0 && <span style={{ color: 'var(--green)' }}>📎 {uploadedFiles.length} dosya</span>}
             {includeVisuals && <span style={{ color: 'var(--accent)' }}>📊 Görsel</span>}
           </div>
 
-          {topicErr && !hasFiles && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{topicErr}</div>}
+          {topicErr && !uploadedFiles.length > 0 && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{topicErr}</div>}
 
           <button className="btn btn-primary btn-lg" onClick={() => {
             if (dailyLeft === 0) { onStartQuiz(); return }
