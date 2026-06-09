@@ -330,7 +330,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
   }
 
   return (
-    <div>
+    <div style={{ maxWidth: '680px', margin: '0 auto', padding: '0 1rem' }}>
       {/* Skor kartı */}
       <div className="card anim-up" style={{ marginBottom: '1rem' }}>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem', flexWrap: 'wrap' }}>
