@@ -933,7 +933,7 @@ export default function AdminPage() {
 
                   // Büyük dosya (>4MB) → önce Supabase Storage'a yükle
                   if (mebFile && mebFile.size > 4 * 1024 * 1024) {
-                    setMebMsg('📤 Büyük dosya Supabase Storage'a yükleniyor...')
+                    setMebMsg("Buyuk dosya Supabase Storage yuklenyor...")
                     const { createClient } = await import('@supabase/supabase-js')
                     const sb = createClient(
                       process.env.NEXT_PUBLIC_SUPABASE_URL!,
