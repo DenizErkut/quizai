@@ -52,19 +52,27 @@ export default function DailyPage() {
     setProfile(p)
     setStreak(s)
 
-    // Bugün günlük testten kayıt var mı? (quiz_sessions üzerinden kontrol)
-    const { data: todaySessions } = await supabase
-      .from('quiz_sessions')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('completed', true)
-      .gte('created_at', today + 'T00:00:00')
-      .lte('created_at', today + 'T23:59:59')
-      .eq('topic', c?.topic || '')
-      .limit(1)
+    // Bugün günlük test tamamlandı mı? — SADECE daily_challenges tablosuna bak
+    // (streak.last_activity_date quiz dışı aktivitede de güncellenebilir, güvenilmez)
+    const todayDoneInChallenges = c?.date === today && c?.completed === true
+    
+    // Yedek kontrol: daily_challenges'ta completed yoksa quiz_sessions'dan bak
+    // Sadece is_daily=true olan session'lara bak — normal testlerle karışmasın
+    let todayDoneInSessions = false
+    if (!todayDoneInChallenges) {
+      const { data: dailySessions } = await supabase
+        .from('quiz_sessions')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('completed', true)
+        .eq('is_daily', true)
+        .gte('created_at', today + 'T00:00:00')
+        .lte('created_at', today + 'T23:59:59')
+        .limit(1)
+      todayDoneInSessions = (dailySessions?.length || 0) > 0
+    }
 
-    // Streak last_activity_date de kontrol et (iki yöntemden biri yeterliyse done say)
-    if (s?.last_activity_date === today || (todaySessions && todaySessions.length > 0)) {
+    if (todayDoneInChallenges || todayDoneInSessions) {
       setAlreadyDone(true)
     }
 
@@ -152,6 +160,11 @@ export default function DailyPage() {
       })
 
       // Streak güncelle
+      // daily_challenges tablosunu tamamlandı olarak işaretle
+      if (challenge?.id) {
+        await supabase.from('daily_challenges').update({ completed: true }).eq('id', challenge.id)
+      }
+
       const { data: streakData } = await supabase
         .from('streaks').select('*').eq('user_id', user.id).single()
 
