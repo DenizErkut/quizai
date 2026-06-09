@@ -311,6 +311,9 @@ function QuizPageContent() {
   const [advancedOpen, setAdvancedOpen] = useState(false) // Gelişmiş ayarlar
   const [favorites, setFavorites] = useState<string[]>([]) // Favori konular
   const [mebTopics, setMebTopics] = useState<Record<string, string[]>>({}) // subject -> units (grade filtreli)
+  const [topicSummary, setTopicSummary] = useState<{summary: string; keyPoints: string[]; keyTerms: {term: string; definition: string}[]; rememberThis: string} | null>(null)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+  const [showSummary, setShowSummary] = useState(false)
 
   // MEB kaynaklarini cek — sadece kullanicinin sinifina uygun olanlar
   useEffect(() => {
@@ -364,6 +367,24 @@ function QuizPageContent() {
       if (lastSettings.qCount) setQCount(lastSettings.qCount)
     } catch {}
   }, [])
+
+  async function fetchTopicSummary(topic: string) {
+    if (!topic) return
+    setShowSummary(true)
+    setSummaryLoading(true)
+    setTopicSummary(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/topic-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ topic, grade: profile?.grade, language: currentLang }),
+      })
+      const data = await res.json()
+      if (res.ok) setTopicSummary(data)
+    } catch {}
+    setSummaryLoading(false)
+  }
 
   function toggleFavorite(topic: string) {
     setFavorites(prev => {
@@ -1167,11 +1188,64 @@ function QuizPageContent() {
             )}
 
             {selectedTopic && (
-              <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 600 }}>✓ Seçilen: {selectedTopic}</span>
                 <button onClick={() => toggleFavorite(selectedTopic)} title={favorites.includes(selectedTopic) ? 'Favorilerden çıkar' : 'Favorilere ekle'}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', opacity: favorites.includes(selectedTopic) ? 1 : 0.4, padding: 0 }}>⭐</button>
+                <button onClick={() => fetchTopicSummary(selectedTopic)}
+                  style={{ padding: '4px 10px', borderRadius: '8px', border: '1.5px solid rgba(99,102,241,0.4)', background: 'rgba(99,102,241,0.08)', color: '#6366f1', fontSize: '11px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  📖 Konuya Hızlı Bak
+                </button>
                 <button onClick={() => setSelectedTopic('')} style={{ fontSize: '11px', color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕</button>
+              </div>
+            )}
+
+            {/* Konu Özeti Modal */}
+            {showSummary && (
+              <div style={{ marginTop: '12px', borderRadius: '14px', border: '1.5px solid rgba(99,102,241,0.25)', background: 'rgba(99,102,241,0.04)', padding: '14px 16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <div style={{ fontWeight: 700, fontSize: '13px', color: '#6366f1', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    📖 {selectedTopic || customTopic.trim()} — Hızlı Özet
+                  </div>
+                  <button onClick={() => setShowSummary(false)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '16px', padding: 0 }}>×</button>
+                </div>
+
+                {summaryLoading ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text3)', fontSize: '13px' }}>
+                    <div style={{ width: 16, height: 16, border: '2px solid rgba(99,102,241,0.2)', borderTop: '2px solid #6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    Özet hazırlanıyor...
+                  </div>
+                ) : topicSummary ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.6, margin: 0 }}>{topicSummary.summary}</p>
+
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Temel Noktalar</div>
+                      {topicSummary.keyPoints.map((pt, i) => (
+                        <div key={i} style={{ fontSize: '12px', color: 'var(--text)', padding: '3px 0', display: 'flex', gap: '6px' }}>
+                          <span style={{ color: '#6366f1', fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span> {pt}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Anahtar Terimler</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {topicSummary.keyTerms.map((kt, i) => (
+                          <div key={i} title={kt.definition} style={{ padding: '3px 10px', borderRadius: '99px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', fontSize: '11px', color: '#6366f1', fontWeight: 600, cursor: 'help' }}>
+                            {kt.term}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {topicSummary.rememberThis && (
+                      <div style={{ padding: '8px 12px', borderRadius: '10px', background: 'rgba(253,211,29,0.1)', border: '1px solid rgba(253,211,29,0.3)', fontSize: '12px', color: '#92400e', fontWeight: 600 }}>
+                        💡 {topicSummary.rememberThis}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
