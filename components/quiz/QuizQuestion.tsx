@@ -374,6 +374,4 @@ export default function QuizQuestion({
       </main>
     )
   }
-
-  // ── RESULT ──
 }
