@@ -2,300 +2,14 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import OnboardingModal from '@/components/OnboardingModal'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import FileUploader, { type UploadedFile } from '@/components/FileUploader'
 import QuizResult from '@/components/QuizResult'
-
-type QuestionType = 'multiple_choice' | 'fill_blank' | 'matching' | 'true_false' | 'ordering' | 'short_answer' | 'multi_true_false' | 'table_fill' | 'mixed'
-
-interface Question {
-  q: string; opts: string[]; ans: number; exp: string
-  svg?: string | null; qtype?: 'text' | 'svg'
-  // Yeni soru tipleri
-  type?: QuestionType
-  blank?: string          // boşluk doldurma: doğru cevap
-  pairs?: {left:string; right:string}[]  // eşleştirme
-  items?: string[]        // sıralama: karışık liste
-  correctOrder?: number[] // sıralama: doğru sıra
-  statement?: boolean     // D/Y: doğru mu?
-  statements?: {text: string; correct: boolean}[]  // çoklu D/Y (Maarif)
-  tableData?: {headers: string[]; rows: {cells: string[]; blanks: number[]}[]} // tablo (Maarif)
-  tableAnswers?: string[] // tablo: doğru cevaplar sırayla
-}
-interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number; daily_test_count?: number; daily_test_date?: string; onboarding_completed?: boolean }
-
-// MEB müfredatına göre ders ve konu haritası
-const SUBJECT_MAP: Record<string, Record<string, string[]>> = {
-  ilkokul: {
-    'Matematik': [
-      'Doğal sayılar', 'Toplama işlemi', 'Çıkarma işlemi', 'Çarpma işlemi', 'Bölme işlemi',
-      'Çarpım tablosu', 'Kesirler', 'Ondalık gösterim', 'Ölçme ve ölçü birimleri',
-      'Geometrik şekiller', 'Simetri', 'Örüntüler', 'Problem çözme', 'Zaman ölçme',
-    ],
-    'Türkçe': [
-      'Okuma ve anlama', 'Dinleme becerileri', 'Konuşma becerileri', 'Yazma becerileri',
-      'Sözcük ve anlam', 'Cümle bilgisi', 'Yazım kuralları', 'Noktalama işaretleri',
-      'Metin türleri', 'Şiir ve duygu', 'Atasözleri ve deyimler',
-    ],
-    'Fen Bilimleri': [
-      'Canlılar dünyası', 'Bitkiler ve hayvanlar', 'İnsan vücudu', 'Duyu organları',
-      'Madde ve özellikleri', 'Kuvvet ve hareket', 'Işık ve ses', 'Hava ve iklim',
-      'Mevsimler', 'Çevre ve doğa', 'Geri dönüşüm', 'Sağlıklı yaşam',
-    ],
-    'Sosyal Bilgiler': [
-      'Aile ve toplum', 'Yakın çevre', 'Türkiye haritası', 'Ülkemizin güzellikleri',
-      'Milli değerler', 'Atatürk ve Kurtuluş Savaşı', 'Haklar ve sorumluluklar',
-      'Üretim ve tüketim', 'Doğal kaynaklar', 'Kültürel miras',
-    ],
-    'Din Kültürü ve Ahlak Bilgisi': [
-      'Allah inancı', 'Peygamberler', 'Namaz ve ibadet', 'Ahlaki değerler',
-      'Dini bayramlar', 'Kuran-ı Kerim', 'Dua ve zihin',
-    ],
-    'Hayat Bilgisi': [
-      'Okul heyecanım', 'Benim eşsiz yuvam', 'Dün bugün yarın',
-      'Sağlıklı yaşam', 'Güvenli yaşam', 'Doğa ve çevre',
-    ],
-  },
-
-  ortaokul: {
-    'Matematik': [
-      'Tam sayılar ve işlemler', 'Ondalık sayılar', 'Kesirler ve işlemler',
-      'Oran ve orantı', 'Yüzdeler', 'Asal çarpanlara ayırma', 'OBEB ve OKEK',
-      'Denklemler ve eşitsizlikler', 'Cebirsel ifadeler', 'Koordinat sistemi',
-      'Üçgenler ve özellikler', 'Dörtgenler', 'Çember ve daire',
-      'Alan ve çevre hesaplama', 'Hacim', 'Veri analizi ve grafik', 'Olasılık',
-      'Örüntü ve ilişkiler', 'Rasyonel sayılar', 'Üslü ifadeler', 'Kareköklü ifadeler',
-    ],
-    'Fen Bilimleri': [
-      'Hücre ve yapısı', 'Hücre organelleri', 'Canlıların sınıflandırılması',
-      'Fotosentez', 'Solunum', 'Sindirim sistemi', 'Dolaşım sistemi',
-      'Boşaltım sistemi', 'Destek ve hareket sistemi', 'Sinir sistemi',
-      'Üreme ve gelişme', 'Kalıtım', 'Ekosistem ve biyoçeşitlilik',
-      'Madde ve atom', 'Elementler ve bileşikler', 'Kimyasal tepkimeler',
-      'Asit ve bazlar', 'Kuvvet ve enerji', 'Basınç', 'Elektrik',
-      'Manyetizma', 'Işık ve ses', 'Dalgalar', 'Güneş sistemi',
-    ],
-    'Türkçe': [
-      'Sözcük türleri', 'İsim ve isim çekimi', 'Sıfatlar', 'Zarflar', 'Zamirler',
-      'Fiiller ve çekimi', 'Cümle çeşitleri', 'Cümle ögeleri',
-      'Anlam bilgisi', 'Sözcükte anlam', 'Paragraf', 'Metin türleri',
-      'Hikaye edici metin', 'Bilgilendirici metin', 'Şiir bilgisi',
-      'Yazım kuralları', 'Noktalama işaretleri', 'Anlatım bozukluğu',
-    ],
-    'T.C. İnkılap Tarihi ve Atatürkçülük': [
-      'Osmanlı Devleti son dönem', 'I. Dünya Savaşı', 'Mondros Ateşkesi',
-      'Kurtuluş Savaşı hazırlık dönemi', 'Misak-ı Millî', 'TBMM açılışı',
-      'Cepheler ve savaşlar', 'Mudanya Ateşkesi', 'Lozan Antlaşması',
-      'Cumhuriyetin ilanı', 'Atatürk ilkeleri', 'İnkılaplar',
-      'Siyasi alanda yenilikler', 'Eğitimde yenilikler', 'Ekonomik yenilikler',
-    ],
-    'Sosyal Bilgiler': [
-      'Birey ve kimlik', 'Kültür ve miras', 'İnsanlar yerler çevreler',
-      'Üretim dağıtım tüketim', 'Bilim teknoloji toplum',
-      'Gruplar kurumlar sosyal örgütler', 'Küresel bağlantılar',
-      'Türkiye coğrafyası', 'Nüfus ve yerleşme', 'Ekonomik faaliyetler',
-      'Türk tarihinde yolculuk', 'Demokrasi ve insan hakları',
-    ],
-    'İngilizce': [
-      'Greetings and introductions', 'Present simple tense', 'Present continuous',
-      'Past simple tense', 'Future tense (will/going to)', 'Modals (can/must/should)',
-      'Comparatives and superlatives', 'Prepositions', 'Question words',
-      'Vocabulary: family', 'Vocabulary: food and health', 'Vocabulary: environment',
-      'Reading comprehension', 'Listening skills', 'Writing paragraphs',
-    ],
-    'Din Kültürü ve Ahlak Bilgisi': [
-      'Allah ve sıfatları', 'Melekler', 'Kitaplar', 'Peygamberler', 'Ahiret inancı',
-      'Kader', 'İbadetler', 'Namaz', 'Oruç', 'Zekat', 'Hac',
-      'Kuran-ı Kerim', 'Hz. Muhammed', 'Ahlaki değerler', 'Dini bayramlar',
-    ],
-    'Görsel Sanatlar': [
-      'Renk teorisi', 'Perspektif', 'Sanat akımları', 'Türk sanatı', 'Heykel ve seramik',
-    ],
-    'Müzik': [
-      'Nota bilgisi', 'Ritim', 'Türk halk müziği', 'Türk sanat müziği', 'Evrensel müzik',
-    ],
-    'Beden Eğitimi': [
-      'Atletizm', 'Jimnastik', 'Takım sporları', 'Sağlıklı yaşam', 'Oyun ve spor',
-    ],
-  },
-
-  lise: {
-    'Matematik': [
-      'Mantık', 'Kümeler', 'Denklemler ve eşitsizlikler', 'Üslü ve köklü sayılar',
-      'Mutlak değer', 'Polinomlar', 'Rasyonel ifadeler', 'Fonksiyonlar',
-      'Birinci ve ikinci dereceden fonksiyonlar', 'Trigonometri', 'Logaritma',
-      'Diziler (aritmetik ve geometrik)', 'Limit ve süreklilik', 'Türev',
-      'Türevin uygulamaları', 'İntegral', 'İntegralin uygulamaları',
-      'Analitik geometri', 'Vektörler', 'Matrisler', 'Kombinasyon ve permütasyon',
-      'Binom açılımı', 'Olasılık', 'İstatistik', 'Karmaşık sayılar',
-    ],
-    'Fizik': [
-      'Fizik bilimine giriş', 'Madde ve özellikleri', 'Kuvvet ve hareket',
-      'Newton yasaları', 'İş güç enerji', 'İtme ve momentum', 'Tork ve açısal hareket',
-      'Basit harmonik hareket', 'Dalgalar', 'Ses dalgaları', 'Işık ve optik',
-      'Elektrostatik', 'Elektrik akımı', 'Manyetizma', 'Elektromanyetik indüksiyon',
-      'Atom fiziği', 'Nükleer fizik', 'Modern fizik', 'Termodinamik',
-    ],
-    'Kimya': [
-      'Kimyanın temelleri', 'Atom modelleri', 'Periyodik sistem', 'Kimyasal bağlar',
-      'Maddenin halleri', 'Gaz kanunları', 'Çözeltiler ve derişim', 'Asit ve bazlar',
-      'Kimyasal tepkimeler ve denkleştirme', 'Mol kavramı ve hesaplamalar',
-      'Kimyasal denge', 'Organik kimyaya giriş', 'Hidrokarbonlar',
-      'Fonksiyonlu organik bileşikler', 'Polimer ve plastikler', 'Elektrokimya',
-    ],
-    'Biyoloji': [
-      'Bilimsel düşünce ve biyoloji', 'Hücre', 'Hücre zarı ve transportu',
-      'Hücre bölünmeleri (mitoz-mayoz)', 'Kalıtım ve Mendel genetiği',
-      'DNA ve gen teknolojisi', 'Protein sentezi', 'Evrim', 'Canlı çeşitliliği',
-      'Bitki biyolojisi', 'Hayvan fizyolojisi', 'Sindirim sistemi',
-      'Dolaşım sistemi', 'Solunum sistemi', 'Boşaltım sistemi',
-      'Sinir sistemi', 'Endokrin sistem', 'Üreme sistemi', 'Ekosistem ekolojisi',
-      'Biyoteknoloji ve genetik mühendisliği',
-    ],
-    'Türk Dili ve Edebiyatı': [
-      'Dil bilgisi: Ses bilgisi', 'Dil bilgisi: Sözcük yapısı', 'Dil bilgisi: Cümle',
-      'Anlatım türleri', 'Şiir türleri ve özellikleri', 'Şiir dönemleri',
-      'Halk edebiyatı', 'Divan edebiyatı', 'Tanzimat edebiyatı',
-      'Servet-i Fünun dönemi', 'Milli edebiyat dönemi', 'Cumhuriyet dönemi edebiyatı',
-      'Roman ve hikaye', 'Tiyatro', 'Deneme ve makale', 'Söz sanatları',
-    ],
-    'T.C. İnkılap Tarihi ve Atatürkçülük': [
-      'Osmanlı Devleti çöküş dönemi', 'Kurtuluş Savaşı', 'Lozan Antlaşması',
-      'Cumhuriyetin ilanı', 'Halifeliğin kaldırılması', 'Çok partili hayat',
-      'Atatürk ilkeleri (Cumhuriyetçilik, Milliyetçilik, Halkçılık)',
-      'Atatürk ilkeleri (Devletçilik, Laiklik, Devrimcilik)',
-      'Hukuk alanında inkılaplar', 'Eğitim ve kültür inkılapları',
-      'Ekonomik kalkınma', 'Atatürk dönemi dış politika', 'İkinci Dünya Savaşı',
-    ],
-    'Tarih': [
-      'Tarih öncesi dönemler', 'İlk uygarlıklar', 'Orta Asya Türk tarihi',
-      'İslamiyet öncesi Türk tarihi', 'İslam medeniyeti', 'Türk-İslam devletleri',
-      'Osmanlı kuruluş dönemi', 'Osmanlı yükseliş dönemi', 'Osmanlı duraklama',
-      'Osmanlı gerileme ve çöküş', 'Fransız İhtilali', 'Sanayi Devrimi',
-      'I. Dünya Savaşı', 'Komünizm ve Faşizm', 'II. Dünya Savaşı', 'Soğuk Savaş',
-      'Günümüz Türkiye ve dünya', 'Medeniyetler tarihi',
-    ],
-    'Coğrafya': [
-      'Coğrafyanın konusu ve önemi', 'Harita bilgisi', 'Atmosfer ve iklim',
-      'İklim tipleri', 'Türkiye iklimi', 'Litosfer ve yer şekilleri',
-      'Türkiye yer şekilleri', 'Hidrosfer (sular)', 'Türkiye su kaynakları',
-      'Nüfus ve nüfus artışı', 'Göç', 'Yerleşme', 'Türkiye nüfusu',
-      'Tarım coğrafyası', 'Sanayi coğrafyası', 'Enerji kaynakları',
-      'Türkiye ekonomisi', 'Bölgesel coğrafya', 'Çevre sorunları', 'Küresel ısınma',
-    ],
-    'Felsefe': [
-      'Felsefeye giriş', 'Bilgi felsefesi (epistemoloji)', 'Varlık felsefesi (ontoloji)',
-      'Ahlak felsefesi (etik)', 'Siyaset felsefesi', 'Estetik',
-      'Din felsefesi', 'Antik Yunan felsefesi', 'Orta Çağ felsefesi',
-      'Modern felsefe', 'Çağdaş felsefe', 'Türk İslam düşüncesi',
-    ],
-    'Din Kültürü ve Ahlak Bilgisi': [
-      'İslam düşüncesinde inanç', 'Ahlak ve değerler', 'İbadet',
-      'Hz. Muhammed ve örnek ahlakı', 'Kuran mesajı',
-      'Dünya dinleri', 'Din ve laiklik', 'Güncel dini meseleler',
-    ],
-    'İngilizce': [
-      'Advanced grammar', 'Reading strategies', 'Writing essays',
-      'Listening for detail', 'Speaking fluency', 'Academic vocabulary',
-      'Conditionals', 'Passive voice', 'Reported speech',
-      'Phrasal verbs', 'Idioms', 'YDS/YÖKDİL hazırlık',
-    ],
-    'Sağlık Bilgisi': [
-      'Sağlıklı beslenme', 'Fiziksel aktivite', 'Ruh sağlığı',
-      'Bulaşıcı hastalıklar', 'Bağımlılık', 'İlk yardım',
-    ],
-  },
-
-  universite: {
-    'Matematik': [
-      'Diferansiyel ve integral hesap', 'Diferansiyel denklemler', 'Lineer cebir',
-      'Sayısal analiz', 'İstatistik ve olasılık', 'Kompleks analiz',
-      'Topoloji', 'Ayrık matematik', 'Fonksiyonel analiz',
-    ],
-    'Fizik': [
-      'Klasik mekanik', 'Elektromanyetizma', 'Termodinamik ve istatistik mekanik',
-      'Kuantum mekaniği', 'Optik', 'Nükleer ve parçacık fiziği',
-      'Katıhal fiziği', 'Görelilik teorisi',
-    ],
-    'Kimya': [
-      'Genel kimya', 'Organik kimya', 'Anorganik kimya', 'Fiziksel kimya',
-      'Analitik kimya', 'Biyokimya', 'Polimer kimyası',
-    ],
-    'Biyoloji': [
-      'Moleküler biyoloji', 'Genetik', 'Hücre biyolojisi', 'Mikrobiyoloji',
-      'Fizyoloji', 'Ekoloji', 'Evrimsel biyoloji', 'Biyoteknoloji',
-    ],
-    'İktisat': [
-      'Mikroekonomi', 'Makroekonomi', 'Uluslararası iktisat', 'Para teorisi',
-      'Kalkınma ekonomisi', 'Oyun teorisi', 'Ekonometri',
-    ],
-    'Bilişim ve Yazılım': [
-      'Veri yapıları ve algoritmalar', 'Nesne yönelimli programlama',
-      'Veritabanı yönetimi', 'İşletim sistemleri', 'Bilgisayar ağları',
-      'Yazılım mühendisliği', 'Yapay zeka ve makine öğrenmesi',
-      'Siber güvenlik', 'Mobil uygulama geliştirme',
-    ],
-    'Havacılık': [
-      'Uçak yapısı ve sistemleri', 'Aerodinamik', 'Uçuş mekaniği',
-      'Navigasyon ve seyrüsefer', 'Meteoroloji', 'Hava trafik kontrolü',
-      'Havacılık güvenliği', 'Uçuş kuralları (VFR/IFR)', 'Aviyonik sistemler',
-      'Uçak motoru (piston/jet)', 'Hidrolik ve pnömatik sistemler',
-    ],
-    'Hukuk': [
-      'Medeni hukuk', 'Borçlar hukuku', 'Ticaret hukuku', 'Ceza hukuku',
-      'İdare hukuku', 'Anayasa hukuku', 'Uluslararası hukuk', 'İş hukuku',
-    ],
-    'İşletme': [
-      'Muhasebe', 'Finansman', 'Pazarlama', 'Yönetim ve organizasyon',
-      'İnsan kaynakları', 'Girişimcilik', 'Stratejik yönetim',
-    ],
-    'İngilizce': [
-      'Academic writing', 'Reading comprehension', 'Listening skills',
-      'Grammar and syntax', 'Vocabulary building', 'Presentation skills',
-      'Business English', 'Research writing', 'IELTS / TOEFL hazırlık',
-      'YDS / YÖKDİL hazırlık', 'Conversational English',
-    ],
-    'Türk Dili ve Edebiyatı': [
-      'Türkçe yazım kuralları', 'Akademik yazım', 'Metin analizi',
-      'Türk edebiyatı tarihi', 'Dilbilgisi', 'İletişim becerileri',
-    ],
-    'Atatürk İlkeleri ve İnkılap Tarihi': [
-      'Osmanlı son dönemi', 'Kurtuluş Savaşı', 'Cumhuriyetin ilanı',
-      'Atatürk ilkeleri', 'Türkiye Cumhuriyeti tarihi',
-    ],
-    'Sosyoloji': [
-      'Sosyolojiye giriş', 'Toplumsal yapı', 'Kültür ve toplum',
-      'Sosyal değişme', 'Araştırma yöntemleri',
-    ],
-    'Psikoloji': [
-      'Psikolojiye giriş', 'Gelişim psikolojisi', 'Sosyal psikoloji',
-      'Klinik psikoloji', 'Bilişsel psikoloji', 'Araştırma yöntemleri',
-    ],
-  },
-}
-
-// Eski format ile uyumluluk — suggestions için
-const TOPIC_MAP: Record<string, { topic: string; subject: string }[]> = {
-  ilkokul: Object.entries(SUBJECT_MAP.ilkokul).flatMap(([subj, topics]) => topics.slice(0,1).map(t => ({ topic: t, subject: subj }))),
-  ortaokul: Object.entries(SUBJECT_MAP.ortaokul).flatMap(([subj, topics]) => topics.slice(0,1).map(t => ({ topic: t, subject: subj }))),
-  lise: Object.entries(SUBJECT_MAP.lise).flatMap(([subj, topics]) => topics.slice(0,1).map(t => ({ topic: t, subject: subj }))),
-  universite: Object.entries(SUBJECT_MAP.universite).flatMap(([subj, topics]) => topics.slice(0,1).map(t => ({ topic: t, subject: subj }))),
-}
-
-const DIFFICULTIES = [
-  { value: 'kolay', label: 'Kolay', desc: 'Temel kavramlar', color: '#16a34a', bg: 'rgba(22,163,74,0.08)', border: 'rgba(22,163,74,0.3)' },
-  { value: 'normal', label: 'Normal', desc: 'Müfredat seviyesi', color: '#2563eb', bg: 'rgba(37,99,235,0.08)', border: 'rgba(37,99,235,0.3)' },
-  { value: 'zor', label: 'Zor', desc: 'Analiz gerektiren', color: '#d97706', bg: 'rgba(217,119,6,0.08)', border: 'rgba(217,119,6,0.3)' },
-  { value: 'cok zor', label: 'Çok Zor', desc: 'Olimpiyat seviyesi', color: '#dc2626', bg: 'rgba(220,38,38,0.08)', border: 'rgba(220,38,38,0.3)' },
-]
-
-function getActiveLang(profileLang?: string): string {
-  if (typeof window === 'undefined') return profileLang || 'Türkçe'
-  return localStorage.getItem('pratium_lang') || profileLang || 'Türkçe'
-}
-
-type Screen = 'topic' | 'loading' | 'quiz' | 'result' | 'limit' | 'error'
+import QuizSetup, { type QuizSetupConfig } from '@/components/quiz/QuizSetup'
+import QuizQuestion from '@/components/quiz/QuizQuestion'
+import {
+  getActiveLang, type QuestionType, type Question, type Profile, type Screen
+} from '@/lib/quiz-constants'
 
 function QuizPageContent() {
   const router = useRouter()
@@ -982,6 +696,25 @@ function QuizPageContent() {
   )
 
   // ── LIMIT ──
+
+  // ── Topic screen → QuizSetup component'e delege edildi ──
+  const [setupConfig, setSetupConfig] = useState<QuizSetupConfig>({
+    qCount, difficulty, includeVisuals, questionType,
+    uploadedFiles, selectedTopic, customTopic,
+  })
+
+  // setupConfig değişince state'leri senkronize et
+  useEffect(() => {
+    setQCount(setupConfig.qCount)
+    setDifficulty(setupConfig.difficulty)
+    setIncludeVisuals(setupConfig.includeVisuals)
+    setQuestionType(setupConfig.questionType)
+    setUploadedFiles(setupConfig.uploadedFiles)
+    setSelectedTopic(setupConfig.selectedTopic)
+    setCustomTopic(setupConfig.customTopic)
+  }, [setupConfig])
+
+  // ── LIMIT ──
   if (screen === 'limit') return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', paddingBottom: '5rem', background: 'var(--bg)' }}>
       <div style={{ maxWidth: '460px', textAlign: 'center' }} className="anim-up">
@@ -1010,391 +743,27 @@ function QuizPageContent() {
   )
 
   // ── TOPIC ──
+
+  // ── TOPIC ──
   if (screen === 'topic') return (
     <>
-    {showOnboarding && profile && (
-      <OnboardingModal
-        userName={profile.name || ''}
-        grade={profile.grade || ''}
-        onComplete={() => setShowOnboarding(false)}
+      {showOnboarding && profile && <OnboardingModal profile={profile} onClose={() => setShowOnboarding(false)} />}
+      <QuizSetup
+        profile={profile}
+        currentLang={currentLang}
+        config={setupConfig}
+        setConfig={(partial) => setSetupConfig(prev => ({ ...prev, ...partial }))}
+        favorites={favorites}
+        mebTopics={mebTopics}
+        topicSummary={topicSummary}
+        summaryLoading={summaryLoading}
+        showSummary={showSummary}
+        setShowSummary={setShowSummary}
+        onFetchSummary={fetchTopicSummary}
+        onToggleFavorite={toggleFavorite}
+        onStartQuiz={startQuiz}
+        isStarting={false}
       />
-    )}
-    <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', position: 'relative', overflow: 'hidden', background: 'linear-gradient(160deg, #f0f9ff 0%, #ffffff 40%, #fff8e8 100%)' }}>
-      {showPaywall && <PaywallModal reason={showPaywall} />}
-      {/* Dekoratif arka plan elementleri */}
-      <div style={{ position: 'fixed', top: '-120px', right: '-80px', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,207,184,0.08) 0%, transparent 65%)', pointerEvents: 'none', zIndex: 0 }} />
-      <div style={{ position: 'fixed', bottom: '60px', left: '-100px', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(8,36,101,0.06) 0%, transparent 65%)', pointerEvents: 'none', zIndex: 0 }} />
-      <div style={{ position: 'fixed', top: '40%', left: '60%', width: '300px', height: '300px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,207,184,0.05) 0%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
-      <div style={{ maxWidth: '640px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
-
-        {profile && (
-          <div className="anim-up" style={{ marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--accent-bg)', border: '1.5px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontWeight: 600, fontSize: '15px' }}>
-              {profile.name.slice(0, 2).toUpperCase()}
-            </div>
-            <div>
-              <div style={{ fontWeight: 500 }}>Merhaba, {profile.name.split(' ')[0]}</div>
-              <div style={{ fontSize: '12px', color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span>{profile.grade}</span>
-                <span>·</span>
-                <span>{currentLang}</span>
-                {testsLeft !== null && (
-                  <span style={{
-                    padding: '1px 8px', borderRadius: '99px', fontSize: '11px',
-                    background: testsLeft === 0 ? 'var(--red-bg)' : testsLeft <= 2 ? 'rgba(217,119,6,0.1)' : 'var(--bg3)',
-                    color: testsLeft === 0 ? 'var(--red)' : testsLeft <= 2 ? 'var(--amber)' : 'var(--text3)',
-                    border: `1px solid ${testsLeft === 0 ? 'rgba(220,38,38,0.2)' : testsLeft <= 2 ? 'rgba(217,119,6,0.2)' : 'var(--border)'}`,
-                    fontWeight: 600,
-                  }}>
-                    {testsLeft === 0 ? '⚠ Hak kalmadı' : `${testsLeft} test kaldı`}
-                  </span>
-                )}
-                {dailyLeft !== null && dailyLeft <= 5 && (
-                  <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '11px', background: dailyLeft === 0 ? 'var(--red-bg)' : 'rgba(217,119,6,0.1)', color: dailyLeft === 0 ? 'var(--red)' : '#92400e', border: `1px solid ${dailyLeft === 0 ? 'rgba(220,38,38,0.2)' : 'rgba(217,119,6,0.2)'}`, fontWeight: 600 }}>
-                    {dailyLeft === 0 ? '⏰ Günlük limit doldu' : `Bugün ${dailyLeft} test kaldı`}
-                  </span>
-                )}
-                {profile.plan === 'premium' && (
-                  <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '11px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid rgba(91,76,245,0.2)', fontWeight: 600 }}>★ Premium</span>
-                )}
-                {profile.plan === 'unlimited' && (
-                  <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '11px', background: 'rgba(30,207,184,0.1)', color: '#0d9488', border: '1px solid rgba(30,207,184,0.3)', fontWeight: 600 }}>⭐ Unlimited</span>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Limit uyarısı */}
-        {testsLeft !== null && testsLeft <= 3 && testsLeft > 0 && (
-          <div className="anim-up" style={{ marginBottom: '1rem', padding: '12px 16px', borderRadius: '10px', background: 'rgba(217,119,6,0.07)', border: '1px solid rgba(217,119,6,0.25)', fontSize: '13px', color: '#92400e', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>⚠ Bu ay {testsLeft} test hakkın kaldı.</span>
-            <Link href="/pricing" style={{ color: 'var(--accent)', fontWeight: 600, fontSize: '12px', textDecoration: 'none' }}>Yükselt →</Link>
-          </div>
-        )}
-
-        <div className="card anim-up-1">
-          <h2 className="serif" style={{ fontSize: '24px', marginBottom: '0.25rem' }}>Hangi konuyu test edelim?</h2>
-          <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1.5rem' }}>
-            Hazır konulardan seç, kendi konunu yaz veya dosya yükle.
-            {currentLang !== 'Türkçe' && <span style={{ color: 'var(--accent)', marginLeft: '6px' }}>· Sorular {currentLang} dilinde</span>}
-          </p>
-
-          {/* ── FAVORİLER ── */}
-          {favorites.length > 0 && (
-            <div style={{ marginBottom: '1rem' }}>
-              <label className="field-label">⭐ Favori Konularım</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', marginTop: '6px' }}>
-                {favorites.map(fav => (
-                  <button key={fav} onClick={() => { setSelectedTopic(fav); setCustomTopic('') }}
-                    style={{
-                      padding: '5px 12px', borderRadius: '99px', fontSize: '12px', fontWeight: 500,
-                      cursor: 'pointer', fontFamily: 'var(--font-sans)',
-                      border: `1px solid ${selectedTopic === fav ? 'var(--accent-2)' : 'rgba(253,211,29,0.4)'}`,
-                      background: selectedTopic === fav ? 'var(--accent-2)' : 'var(--accent-2-bg)',
-                      color: selectedTopic === fav ? '#082465' : 'var(--text2)',
-                      display: 'flex', alignItems: 'center', gap: '5px',
-                    }}>
-                    ⭐ {fav}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ── DERS VE KONU SEÇİMİ ── */}
-          <label className="field-label">Ders seç</label>
-          <div style={{ marginTop: '6px', marginBottom: '1rem' }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
-              {Object.keys(SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul).map(subj => (
-                <button key={subj} onClick={() => setOpenSubject(openSubject === subj ? null : subj)}
-                  style={{
-                    padding: '7px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: 500,
-                    cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
-                    border: `1.5px solid ${openSubject === subj ? 'var(--accent)' : 'var(--border)'}`,
-                    background: openSubject === subj ? 'var(--accent-bg)' : 'var(--bg2)',
-                    color: openSubject === subj ? 'var(--accent)' : 'var(--text2)',
-                    display: 'flex', alignItems: 'center', gap: '5px',
-                  }}>
-                  {subj}
-                  <span style={{ fontSize: '10px', opacity: 0.6 }}>{openSubject === subj ? '▲' : '▼'}</span>
-                </button>
-              ))}
-            </div>
-
-            {openSubject && (SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul)[openSubject] && (
-              <div style={{
-                maxHeight: '240px', overflowY: 'auto', padding: '10px 12px',
-                borderRadius: '12px', border: '1.5px solid var(--accent)',
-                background: 'var(--accent-bg)', display: 'flex', flexDirection: 'column', gap: '10px',
-                scrollbarWidth: 'thin',
-              }}>
-                {/* MEB yüklü konular — üstte */}
-                {mebTopics[openSubject] && mebTopics[openSubject].length > 0 && (
-                  <div>
-                    <div style={{ fontSize: '10px', fontWeight: 700, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span>📚</span> MEB Müfredatı
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
-                      {mebTopics[openSubject].map((unit: string) => (
-                        <div key={unit} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <button onClick={() => { setSelectedTopic(unit); setCustomTopic(''); setOpenSubject(null) }}
-                            style={{
-                              padding: '5px 10px', borderRadius: '99px', fontSize: '12px', fontWeight: 600,
-                              cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
-                              border: `1.5px solid ${selectedTopic === unit ? '#0d9488' : 'rgba(13,148,136,0.35)'}`,
-                              background: selectedTopic === unit ? '#0d9488' : 'rgba(13,148,136,0.08)',
-                              color: selectedTopic === unit ? '#fff' : '#0d9488', whiteSpace: 'nowrap',
-                            }}>
-                            {unit}
-                          </button>
-                          <button onClick={() => toggleFavorite(unit)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', opacity: favorites.includes(unit) ? 1 : 0.35, padding: '2px' }}>
-                            ⭐
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Standart konular — altta */}
-                <div>
-                  <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
-                    Genel Konular
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
-                    {(SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul)[openSubject].map((topic: string) => (
-                      <div key={topic} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                        <button onClick={() => { setSelectedTopic(topic); setCustomTopic(''); setOpenSubject(null) }}
-                          style={{
-                            padding: '5px 10px', borderRadius: '99px', fontSize: '12px', fontWeight: 500,
-                            cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
-                            border: `1px solid ${selectedTopic === topic ? 'var(--accent)' : 'var(--border)'}`,
-                            background: selectedTopic === topic ? 'var(--accent)' : 'var(--bg)',
-                            color: selectedTopic === topic ? '#fff' : 'var(--text)', whiteSpace: 'nowrap',
-                          }}>
-                          {topic}
-                        </button>
-                        <button onClick={() => toggleFavorite(topic)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', opacity: favorites.includes(topic) ? 1 : 0.35, padding: '2px', transition: 'opacity 0.15s' }}>
-                          ⭐
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {selectedTopic && (
-              <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 600 }}>✓ Seçilen: {selectedTopic}</span>
-                <button onClick={() => toggleFavorite(selectedTopic)} title={favorites.includes(selectedTopic) ? 'Favorilerden çıkar' : 'Favorilere ekle'}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', opacity: favorites.includes(selectedTopic) ? 1 : 0.4, padding: 0 }}>⭐</button>
-                <button onClick={() => fetchTopicSummary(selectedTopic)}
-                  style={{ padding: '4px 10px', borderRadius: '8px', border: '1.5px solid rgba(99,102,241,0.4)', background: 'rgba(99,102,241,0.08)', color: '#6366f1', fontSize: '11px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  📖 Konuya Hızlı Bak
-                </button>
-                <button onClick={() => setSelectedTopic('')} style={{ fontSize: '11px', color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕</button>
-              </div>
-            )}
-
-            {/* Konu Özeti Modal */}
-            {showSummary && (
-              <div style={{ marginTop: '12px', borderRadius: '14px', border: '1.5px solid rgba(99,102,241,0.25)', background: 'rgba(99,102,241,0.04)', padding: '14px 16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <div style={{ fontWeight: 700, fontSize: '13px', color: '#6366f1', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    📖 {selectedTopic || customTopic.trim()} — Hızlı Özet
-                  </div>
-                  <button onClick={() => setShowSummary(false)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '16px', padding: 0 }}>×</button>
-                </div>
-
-                {summaryLoading ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text3)', fontSize: '13px' }}>
-                    <div style={{ width: 16, height: 16, border: '2px solid rgba(99,102,241,0.2)', borderTop: '2px solid #6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                    Özet hazırlanıyor...
-                  </div>
-                ) : topicSummary ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.6, margin: 0 }}>{topicSummary.summary}</p>
-
-                    <div>
-                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Temel Noktalar</div>
-                      {topicSummary.keyPoints.map((pt, i) => (
-                        <div key={i} style={{ fontSize: '12px', color: 'var(--text)', padding: '3px 0', display: 'flex', gap: '6px' }}>
-                          <span style={{ color: '#6366f1', fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span> {pt}
-                        </div>
-                      ))}
-                    </div>
-
-                    <div>
-                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Anahtar Terimler</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                        {topicSummary.keyTerms.map((kt, i) => (
-                          <div key={i} title={kt.definition} style={{ padding: '3px 10px', borderRadius: '99px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', fontSize: '11px', color: '#6366f1', fontWeight: 600, cursor: 'help' }}>
-                            {kt.term}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {topicSummary.rememberThis && (
-                      <div style={{ padding: '8px 12px', borderRadius: '10px', background: 'rgba(253,211,29,0.1)', border: '1px solid rgba(253,211,29,0.3)', fontSize: '12px', color: '#92400e', fontWeight: 600 }}>
-                        💡 {topicSummary.rememberThis}
-                      </div>
-                    )}
-                  </div>
-                ) : null}
-              </div>
-            )}
-          </div>
-
-          <label className="field-label">Veya kendi konunu yaz</label>
-          <textarea className="input" rows={2}
-            placeholder="Örn: Güneş sistemi, Osmanlı kuruluşu, Fotosentez..."
-            value={customTopic} onChange={e => { setCustomTopic(e.target.value); setSelectedTopic('') }}
-            style={{ resize: 'none' }} />
-
-          {/* Dosya yükleme */}
-          <label className="field-label" style={{ marginTop: '16px' }}>Dosyadan soru üret</label>
-          <FileUploader onFilesChange={setUploadedFiles} maxFiles={5} maxMB={20} />
-          {hasFiles && (
-            <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--green)' }}>
-              ✓ {uploadedFiles.length} dosya hazır · {uploadedFiles.reduce((s, f) => s + f.content.split(' ').length, 0)} kelime · Sorular bu içeriklerden üretilecek
-            </div>
-          )}
-
-          {/* ── GELİŞMİŞ AYARLAR (accordion) ── */}
-          <button
-            onClick={() => setAdvancedOpen(v => !v)}
-            style={{
-              width: '100%', marginTop: '1.25rem', padding: '10px 14px',
-              borderRadius: '10px', border: '1px solid var(--border)',
-              background: advancedOpen ? 'var(--bg2)' : 'var(--bg)',
-              color: 'var(--text2)', fontSize: '13px', fontWeight: 500,
-              cursor: 'pointer', fontFamily: 'var(--font-sans)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            }}>
-            <span>⚙️ Gelişmiş ayarlar {!advancedOpen && <span style={{ fontSize: '11px', color: 'var(--text3)', marginLeft: '6px' }}>(zorluk, soru tipi, sayı, görsel)</span>}</span>
-            <span style={{ fontSize: '12px' }}>{advancedOpen ? '▲' : '▼'}</span>
-          </button>
-
-          {advancedOpen && (
-            <div style={{ marginTop: '10px', padding: '14px', borderRadius: '12px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
-
-              {/* Zorluk */}
-              <label className="field-label" style={{ marginTop: 0 }}>Zorluk seviyesi</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginTop: '6px' }}>
-                {DIFFICULTIES.map(d => (
-                  <button key={d.value} onClick={() => setDifficulty(d.value)}
-                    style={{ padding: '10px 8px', borderRadius: '10px', border: `1.5px solid ${difficulty === d.value ? d.border : 'var(--border)'}`, background: difficulty === d.value ? d.bg : 'var(--bg)', color: difficulty === d.value ? d.color : 'var(--text2)', fontSize: '13px', fontWeight: difficulty === d.value ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center' }}>
-                    <div style={{ fontWeight: 600, marginBottom: '2px' }}>{d.label}</div>
-                    <div style={{ fontSize: '11px', opacity: 0.75 }}>{d.desc}</div>
-                  </button>
-                ))}
-              </div>
-
-              {/* Soru tipi */}
-              <div style={{ marginTop: '14px' }}>
-                <label className="field-label" style={{ marginTop: 0 }}>Soru tipi</label>
-                <div style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '6px', fontWeight: 500 }}>
-                  📌 Maarif Modeli tipleri işaretli olanlardır
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                  {[
-                    { value: 'multiple_choice', label: 'Çoktan Seçmeli', icon: '🔤', desc: 'A/B/C/D klasik', maarif: true },
-                    { value: 'fill_blank', label: 'Boşluk Doldurma', icon: '✏️', desc: 'Eksik kelimeyi bul', maarif: true },
-                    { value: 'true_false', label: 'Doğru / Yanlış', icon: '✓✗', desc: 'Gerekçeli D/Y', maarif: true },
-                    { value: 'multi_true_false', label: 'Çoklu D/Y', icon: '📋✓✗', desc: 'Maarif Modeli', maarif: true },
-                    { value: 'table_fill', label: 'Tablo Doldurma', icon: '🗂️', desc: 'Maarif Modeli', maarif: true },
-                    { value: 'matching', label: 'Eşleştirme', icon: '🔗', desc: 'Kavram – tanım', maarif: true },
-                    { value: 'ordering', label: 'Sıralama', icon: '📋', desc: 'Doğru sıraya koy', maarif: true },
-                    { value: 'short_answer', label: 'Kısa Cevap', icon: '💬', desc: 'AI puanlar', maarif: false },
-                    { value: 'mixed', label: 'Karma Sorular', icon: '🎲', desc: 'Tüm tipler karışık', maarif: false },
-                  ].map(t => (
-                    <button key={t.value} onClick={() => setQuestionType(t.value as QuestionType)}
-                      style={{
-                        padding: '10px 8px', borderRadius: '10px', cursor: 'pointer', textAlign: 'center',
-                        border: `1.5px solid ${questionType === t.value ? 'var(--accent)' : t.maarif ? 'rgba(91,76,245,0.2)' : 'var(--border)'}`,
-                        background: questionType === t.value ? 'var(--accent-bg)' : t.maarif ? 'rgba(91,76,245,0.03)' : 'var(--bg)',
-                        transition: 'all 0.15s', position: 'relative',
-                      }}>
-                      {t.maarif && <span style={{ position: 'absolute', top: '4px', right: '5px', fontSize: '8px', color: 'var(--accent)', fontWeight: 700 }}>MM</span>}
-                      <div style={{ fontSize: '20px', marginBottom: '4px' }}>{t.icon}</div>
-                      <div style={{ fontSize: '11px', fontWeight: 700, color: questionType === t.value ? 'var(--accent)' : 'var(--primary)', lineHeight: 1.3 }}>{t.label}</div>
-                      <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '2px' }}>{t.desc}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Soru sayısı + görsel — accordion içinde */}
-              <div style={{ display: 'flex', gap: '12px', marginTop: '14px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1 }}>
-                  <label className="field-label" style={{ marginTop: 0 }}>Soru sayısı</label>
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
-                    {[5, 10, 15, 20].map(n => {
-                      const locked = n > maxQCount
-                      const active = qCount === n
-                      return (
-                        <button key={n}
-                          className={`btn btn-sm ${active && !locked ? 'btn-primary' : ''}`}
-                          onClick={() => {
-                            if (locked) { setShowPaywall('qcount'); return }
-                            setQCount(n)
-                          }}
-                          style={{ position: 'relative', opacity: locked ? 0.7 : 1, border: locked ? '1.5px solid rgba(217,119,6,0.4)' : undefined, color: locked ? '#92400e' : undefined }}>
-                          {n} soru
-                          {locked && <span style={{ fontSize: '10px', marginLeft: '3px' }}>🔒</span>}
-                        </button>
-                      )
-                    })}
-                  </div>
-                  {plan === 'free' && <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Freemium'da max 5 soru · <a href="/pricing" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Premium'a geç</a></div>}
-                </div>
-                <div>
-                  <label className="field-label" style={{ marginTop: 0 }}>Görsel sorular</label>
-                  <button onClick={() => setIncludeVisuals(v => !v)}
-                    style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', border: `1.5px solid ${includeVisuals ? 'var(--accent)' : 'var(--border)'}`, background: includeVisuals ? 'var(--accent-bg)' : 'var(--bg)', color: includeVisuals ? 'var(--accent)' : 'var(--text2)', fontSize: '13px', fontWeight: includeVisuals ? 600 : 400, transition: 'all 0.15s' }}>
-                    {includeVisuals ? '📊 Grafik & SVG açık' : '📝 Sadece metin'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Özet */}
-          <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '13px', color: 'var(--text2)', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-            <span>📝 {qCount} soru</span>
-            <span style={{ color: 'var(--accent)' }}>{
-              {'multiple_choice':'🔤 Çoktan Seçmeli','fill_blank':'✏️ Boşluk Doldurma','true_false':'✓✗ D/Y','multi_true_false':'📋✓✗ Çoklu D/Y','table_fill':'🗂️ Tablo','matching':'🔗 Eşleştirme','ordering':'📋 Sıralama','short_answer':'💬 Kısa Cevap','mixed':'🎲 Karma'}[questionType]
-            }</span>
-            <span style={{ color: activeDiff.color }}>⚡ {activeDiff.label}</span>
-            <span>🌐 {currentLang}</span>
-            {hasFiles && <span style={{ color: 'var(--green)' }}>📎 {uploadedFiles.length} dosya</span>}
-            {includeVisuals && <span style={{ color: 'var(--accent)' }}>📊 Görsel</span>}
-          </div>
-
-          {topicErr && !hasFiles && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{topicErr}</div>}
-
-          <button className="btn btn-primary btn-lg" onClick={() => {
-            if (dailyLeft === 0) { setShowPaywall('daily'); return }
-            if (testsLeft === 0) { setScreen('limit'); return }
-            startQuiz()
-          }}
-            style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', opacity: (testsLeft === 0 || dailyLeft === 0) ? 0.5 : 1 }}>
-            {testsLeft === 0 ? 'Test hakkın doldu — Yükselt' : dailyLeft === 0 ? 'Günlük limit doldu ⏰' : 'Test oluştur ⚡'}
-          </button>
-
-          {(testsLeft === 0 || dailyLeft === 0) && (
-            <a href="/pricing" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '8px', display: 'flex', textDecoration: 'none' }}>
-              💎 Planları gör
-            </a>
-          )}
-        </div>
-      </div>
-    </main>
     </>
   )
 
@@ -1479,6 +848,8 @@ function QuizPageContent() {
   )
 
   // ── LOADING ──
+
+  // ── LOADING ──
   if (screen === 'loading') return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg, #f0f9ff 0%, #ffffff 40%, #fff8e8 100%)' }}>
       <div style={{ position: 'fixed', top: '-120px', right: '-80px', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,207,184,0.08) 0%, transparent 65%)', pointerEvents: 'none' }} />
@@ -1512,343 +883,35 @@ function QuizPageContent() {
   )
 
   // ── QUIZ ──
+
+  // ── QUIZ ──
   if (screen === 'quiz' && questions.length > 0) {
-    const q = questions[current]
-    const progPct = Math.round((current / questions.length) * 100)
-    const diff = DIFFICULTIES.find(d => d.value === difficulty)!
     return (
-      <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', background: 'linear-gradient(160deg, #f0f9ff 0%, #ffffff 40%, #fff8e8 100%)' }}>
-        <div style={{ position: 'fixed', top: '-120px', right: '-80px', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,207,184,0.07) 0%, transparent 65%)', pointerEvents: 'none', zIndex: 0 }} />
-        <div style={{ position: 'fixed', bottom: '60px', left: '-100px', width: '350px', height: '350px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(8,36,101,0.05) 0%, transparent 65%)', pointerEvents: 'none', zIndex: 0 }} />
-        <div style={{ maxWidth: '640px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <img src='/pratium-logo-new.svg' alt='Pratium' style={{ height: '32px' }} />
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '99px', background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600 }}>{diff.label}</span>
-              <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{answers.filter(a => a.correct).length}/{answers.length || current} doğru</span>
-            </div>
-          </div>
-          <div className="progress-bar" style={{ marginBottom: '1.5rem' }}>
-            <div className="progress-fill" style={{ width: `${progPct}%` }} />
-          </div>
-          <div className="card anim-up">
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-              <span style={{ fontSize: '12px', color: 'var(--text3)', fontWeight: 500 }}>Soru {current + 1} / {questions.length}</span>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {q.qtype === 'svg' && q.svg && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid rgba(91,76,245,0.2)' }}>📊 Görsel</span>}
-                <span style={{ fontSize: '11px', color: 'var(--text3)' }}>🌐 {currentLang}</span>
-              </div>
-            </div>
-            {q.qtype === 'svg' && q.svg && (
-              <div style={{ marginBottom: '1rem', padding: '1rem', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', overflow: 'hidden' }}>
-                <div dangerouslySetInnerHTML={{ __html: q.svg }} style={{ width: '100%' }} />
-              </div>
-            )}
-            {/* Soru tipi badge */}
-            {q.type && q.type !== 'multiple_choice' && (
-              <div style={{ marginBottom: '8px' }}>
-                <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '99px', background: 'rgba(8,36,101,0.08)', color: 'var(--primary)', fontWeight: 700, border: '1px solid rgba(8,36,101,0.15)' }}>
-                  {({'fill_blank':'✏️ Boşluk Doldurma','true_false':'✓✗ Doğru / Yanlış','matching':'🔗 Eşleştirme','ordering':'📋 Sıralama','short_answer':'💬 Kısa Cevap','multi_true_false':'📋✓✗ Çoklu D/Y — Maarif','table_fill':'🗂️ Tablo Doldurma — Maarif'} as Record<string,string>)[q.type]}
-                </span>
-              </div>
-            )}
-
-            <p style={{ fontSize: '17px', fontWeight: 500, lineHeight: 1.55, marginBottom: '1.5rem' }}>{q.q}</p>
-
-            {/* ── ÇOKTAN SEÇMELİ (default) ── */}
-            {(!q.type || q.type === 'multiple_choice') && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {(q.opts || []).map((opt, i) => {
-                  let bg = 'var(--bg2)', border = 'var(--border)', color = 'var(--text)'
-                  if (chosen !== null) {
-                    if (i === q.ans) { bg = 'var(--green-bg)'; border = 'rgba(22,163,74,0.35)'; color = 'var(--green)' }
-                    else if (i === chosen) { bg = 'var(--red-bg)'; border = 'rgba(220,38,38,0.35)'; color = 'var(--red)' }
-                  }
-                  return (
-                    <button key={i} onClick={() => choose(i)} disabled={chosen !== null}
-                      style={{ textAlign: 'left', padding: '12px 15px', borderRadius: '10px', border: `1.5px solid ${border}`, background: bg, color, fontSize: '14px', lineHeight: 1.45, cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s', fontFamily: 'var(--font-sans)' }}>
-                      <span style={{ fontWeight: 700, marginRight: '8px', opacity: 0.5 }}>{String.fromCharCode(65 + i)}.</span>{opt}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* ── DOĞRU / YANLIŞ ── */}
-            {q.type === 'true_false' && (
-              <div style={{ display: 'flex', gap: '12px' }}>
-                {[{label: '✓ Doğru', val: 0, c: 'var(--green)', bg: 'var(--green-bg)'}, {label: '✗ Yanlış', val: 1, c: 'var(--red)', bg: 'var(--red-bg)'}].map(opt => {
-                  const isChosen = chosen === opt.val
-                  const isCorrect = opt.val === q.ans
-                  const showResult = chosen !== null
-                  return (
-                    <button key={opt.val} onClick={() => choose(opt.val)} disabled={chosen !== null}
-                      style={{ flex: 1, padding: '18px', borderRadius: '12px', fontSize: '18px', fontWeight: 700,
-                        border: `2px solid ${showResult && isCorrect ? 'rgba(22,163,74,0.5)' : showResult && isChosen && !isCorrect ? 'rgba(220,38,38,0.5)' : 'var(--border)'}`,
-                        background: showResult && isCorrect ? 'var(--green-bg)' : showResult && isChosen && !isCorrect ? 'var(--red-bg)' : 'var(--bg2)',
-                        color: showResult && isCorrect ? 'var(--green)' : showResult && isChosen && !isCorrect ? 'var(--red)' : 'var(--text2)',
-                        cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s', fontFamily: 'var(--font-sans)' }}>
-                      {opt.label}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* ── BOŞLUK DOLDURMA ── */}
-            {q.type === 'fill_blank' && (
-              <div>
-                <input value={fillInput} onChange={e => setFillInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && chosen === null && submitShortAnswer()}
-                  disabled={chosen !== null}
-                  placeholder="Cevabınızı yazın..."
-                  style={{ width: '100%', padding: '14px 16px', borderRadius: '10px', fontSize: '16px', fontFamily: 'var(--font-sans)', border: `2px solid ${chosen !== null ? (answers[answers.length-1]?.correct ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.4)') : 'var(--border)'}`, background: chosen !== null ? (answers[answers.length-1]?.correct ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', outline: 'none', boxSizing: 'border-box', color: 'var(--text)' }} />
-                {chosen === null && (
-                  <button className="btn btn-primary" onClick={submitShortAnswer} disabled={!fillInput.trim() || checkingAnswer}
-                    style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }}>
-                    Cevapla →
-                  </button>
-                )}
-                {chosen !== null && (
-                  <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: 600, color: answers[answers.length-1]?.correct ? 'var(--green)' : 'var(--red)' }}>
-                    {answers[answers.length-1]?.correct ? '✓ Doğru!' : `✗ Doğru cevap: "${q.blank || q.opts?.[q.ans]}"`}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── KISA CEVAP ── */}
-            {q.type === 'short_answer' && (
-              <div>
-                <textarea value={shortInput} onChange={e => setShortInput(e.target.value)}
-                  disabled={chosen !== null}
-                  placeholder="Cevabınızı buraya yazın..."
-                  rows={3}
-                  style={{ width: '100%', padding: '12px 16px', borderRadius: '10px', fontSize: '14px', fontFamily: 'var(--font-sans)', border: '2px solid var(--border)', background: 'var(--bg2)', outline: 'none', resize: 'vertical', boxSizing: 'border-box', color: 'var(--text)' }} />
-                {chosen === null && (
-                  <button className="btn btn-primary" onClick={submitShortAnswer} disabled={!shortInput.trim() || checkingAnswer}
-                    style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }}>
-                    Gönder →
-                  </button>
-                )}
-                {chosen !== null && (
-                  <div style={{ marginTop: '8px', padding: '10px 14px', borderRadius: '8px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '13px', color: 'var(--text3)' }}>
-                    <strong style={{ color: 'var(--primary)' }}>Örnek cevap:</strong> {q.opts?.[q.ans] || q.blank}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── EŞLEŞTİRME ── */}
-            {q.type === 'matching' && (
-              <div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', paddingBottom: '4px' }}>Kavram</div>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', paddingBottom: '4px' }}>Tanım</div>
-                  {(q.pairs || []).map((pair: any, i: number) => {
-                    // matchSelections[i] = kullanıcının seçtiği shuffledPairs index'i
-                    // Doğru cevap: shuffledIndexMap[seçilen] === i (orijinal index eşleşmeli)
-                    const userShuffledIdx = matchSelections[i]
-                    const isAnswered = chosen !== null && userShuffledIdx !== undefined
-                    const isCorrect = isAnswered && shuffledIndexMap[userShuffledIdx] === i
-                    return (
-                      <>
-                        <div key={`l${i}`} style={{ padding: '10px 12px', borderRadius: '8px', background: 'rgba(8,36,101,0.06)', border: '1px solid rgba(8,36,101,0.1)', fontSize: '13px', fontWeight: 600, color: 'var(--primary)' }}>
-                          {pair.left}
-                        </div>
-                        <select key={`r${i}`}
-                          value={userShuffledIdx ?? ''}
-                          onChange={e => setMatchSelections(prev => ({ ...prev, [i]: Number(e.target.value) }))}
-                          disabled={chosen !== null}
-                          style={{ padding: '10px 12px', borderRadius: '8px', border: `1px solid ${isAnswered ? (isCorrect ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.4)') : 'var(--border)'}`, background: isAnswered ? (isCorrect ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', fontSize: '13px', color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>
-                          <option value="">Seç...</option>
-                          {shuffledPairs.map((right: string, j: number) => (
-                            <option key={j} value={j}>{right}</option>
-                          ))}
-                        </select>
-                      </>
-                    )
-                  })}
-                </div>
-                {chosen === null && (
-                  <button className="btn btn-primary" onClick={submitMatching}
-                    disabled={Object.keys(matchSelections).length < (q.pairs || []).length}
-                    style={{ width: '100%', justifyContent: 'center' }}>
-                    Eşleştir →
-                  </button>
-                )}
-                {chosen !== null && (
-                  <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '8px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '12px', color: 'var(--text3)' }}>
-                    <strong style={{ color: 'var(--primary)' }}>Doğru eşleşmeler:</strong>
-                    {(q.pairs || []).map((p: any, i: number) => (
-                      <div key={i} style={{ marginTop: '4px' }}>{p.left} → {p.right}</div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── SIRALAMA ── */}
-            {q.type === 'ordering' && (
-              <div>
-                <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px' }}>Öğeleri sürükleyerek doğru sıraya koy:</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {orderItems.map((item, i) => (
-                    <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 14px', borderRadius: '10px', border: `1.5px solid ${chosen !== null ? ((q.correctOrder || []).indexOf(q.items?.indexOf(item) ?? i) === i ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.3)') : 'var(--border)'}`, background: chosen !== null ? ((q.correctOrder || []).indexOf(q.items?.indexOf(item) ?? i) === i ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', fontSize: '13px', cursor: chosen !== null ? 'default' : 'grab' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--text4)', fontSize: '12px', width: '20px' }}>{i + 1}.</span>
-                      <span style={{ flex: 1 }}>{item}</span>
-                      {chosen === null && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <button onClick={() => i > 0 && moveItem(i, i-1)} disabled={i === 0} style={{ background: 'rgba(8,36,101,0.08)', border: '1px solid rgba(8,36,101,0.15)', borderRadius: '6px', cursor: 'pointer', color: '#082465', fontSize: '20px', padding: '4px 10px', opacity: i === 0 ? 0.3 : 1, lineHeight: 1 }}>▲</button>
-                          <button onClick={() => i < orderItems.length-1 && moveItem(i, i+1)} disabled={i === orderItems.length-1} style={{ background: 'rgba(8,36,101,0.08)', border: '1px solid rgba(8,36,101,0.15)', borderRadius: '6px', cursor: 'pointer', color: '#082465', fontSize: '20px', padding: '4px 10px', opacity: i === orderItems.length-1 ? 0.3 : 1, lineHeight: 1 }}>▼</button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                {chosen === null && (
-                  <button className="btn btn-primary" onClick={submitOrdering}
-                    style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
-                    Sıralamayı onayla →
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* ── ÇOKLU D/Y (Maarif Modeli) ── */}
-            {q.type === 'multi_true_false' && (
-              <div>
-                <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px' }}>Her ifade için Doğru veya Yanlış'ı seç:</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {(q.statements || []).map((s: any, i: number) => {
-                    const isAnswered = chosen !== null
-                    const isCorrect = s.correct === true
-                    return (
-                      <div key={i} style={{ padding: '12px 14px', borderRadius: '10px', border: `1.5px solid ${isAnswered ? (mTFAnswers[i] === s.correct ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.3)') : 'var(--border)'}`, background: isAnswered ? (mTFAnswers[i] === s.correct ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)' }}>
-                        <div style={{ fontSize: '13px', marginBottom: '8px' }}>{i + 1}. {s.text}</div>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          {[true, false].map(val => (
-                            <button key={String(val)} onClick={() => { if (chosen !== null) return; setMTFAnswers(prev => ({ ...prev, [i]: val })) }}
-                              disabled={chosen !== null}
-                              style={{ padding: '6px 16px', borderRadius: '8px', border: `1.5px solid ${mTFAnswers[i] === val ? (val ? 'rgba(22,163,74,0.6)' : 'rgba(220,38,38,0.6)') : 'var(--border)'}`, background: mTFAnswers[i] === val ? (val ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', fontWeight: 600, fontSize: '12px', cursor: chosen !== null ? 'default' : 'pointer', color: mTFAnswers[i] === val ? (val ? 'var(--green)' : 'var(--red)') : 'var(--text2)' }}>
-                              {val ? '✓ Doğru' : '✗ Yanlış'}
-                            </button>
-                          ))}
-                          {isAnswered && <span style={{ fontSize: '12px', fontWeight: 600, color: mTFAnswers[i] === s.correct ? 'var(--green)' : 'var(--red)', marginLeft: '4px' }}>{mTFAnswers[i] === s.correct ? '✓' : `✗ (${isCorrect ? 'Doğru' : 'Yanlış'})`}</span>}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-                {chosen === null && (
-                  <button className="btn btn-primary"
-                    onClick={() => {
-                      const stmts = q.statements || []
-                      const correct = stmts.every((s: any, i: number) => mTFAnswers[i] === s.correct)
-                      setChosen(correct ? 0 : -1)
-                      setAnswers(prev => {
-                        const next = [...prev, { userAns: correct ? 0 : -1, correct }]
-                        answersRef.current = next
-                        return next
-                      })
-                    }}
-                    disabled={(q.statements || []).some((_: any, i: number) => mTFAnswers[i] === undefined || mTFAnswers[i] === null)}
-                    style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
-                    Cevapları onayla →
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* ── TABLO DOLDURMA (Maarif Modeli) ── */}
-            {q.type === 'table_fill' && (() => {
-              const td = q.tableData
-              const tableAnswers = q.tableAnswers || []
-              let blankIdx = 0
-              function tableCellCorrect(userInput: string, correctAns: string): boolean {
-                const u = userInput.toLowerCase().trim()
-                const c = correctAns.toLowerCase().trim()
-                if (!u) return false
-                if (u === c) return true
-                // İçerme kontrolü — "enerji" yazdıysa "enerji üretimi" doğru sayılsın
-                if (c.includes(u) || u.includes(c)) return true
-                // Kelime bazlı — en az bir önemli kelime eşleşirse
-                const cWords = c.split(/\s+/).filter(w => w.length > 2)
-                const uWords = u.split(/\s+/).filter(w => w.length > 2)
-                return cWords.some(cw => uWords.some(uw => cw === uw || cw.startsWith(uw) || uw.startsWith(cw)))
-              }
-              function submitTable() {
-                const allCorrect = tableAnswers.every((ans: string, i: number) => tableCellCorrect(tInputs[i] || '', ans))
-                setChosen(allCorrect ? 0 : -1)
-                setAnswers(prev => {
-                  const next = [...prev, { userAns: allCorrect ? 0 : -1, correct: allCorrect }]
-                  answersRef.current = next
-                  return next
-                })
-              }
-              return (
-                <div>
-                  <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px' }}>Boş hücreleri doldurun:</p>
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                      <thead>
-                        <tr>
-                          {td?.headers?.map((h: string, i: number) => (
-                            <th key={i} style={{ padding: '8px 12px', background: 'rgba(8,36,101,0.08)', border: '1px solid var(--border)', fontWeight: 700, color: 'var(--primary)', textAlign: 'left' }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {td?.rows?.map((row: any, ri: number) => (
-                          <tr key={ri}>
-                            {row.cells.map((cell: string, ci: number) => {
-                              const isBlank = row.blanks?.includes(ci)
-                              if (isBlank) {
-                                const idx = blankIdx++
-                                const isCorrectAns = chosen !== null && tableCellCorrect(tInputs[idx] || '', tableAnswers[idx] || '')
-                                return (
-                                  <td key={ci} style={{ padding: '6px 8px', border: '1px solid var(--border)', background: chosen !== null ? (isCorrectAns ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)' }}>
-                                    {chosen !== null ? (
-                                      <span style={{ fontWeight: 600, color: isCorrectAns ? 'var(--green)' : 'var(--red)' }}>
-                                        {tInputs[idx] || '—'} {!isCorrectAns && <span style={{ fontSize: '11px' }}>→ {tableAnswers[idx]}</span>}
-                                      </span>
-                                    ) : (
-                                      <input value={tInputs[idx] || ''} onChange={e => { const n = [...tInputs]; n[idx] = e.target.value; setTInputs(n) }}
-                                        style={{ width: '100%', padding: '4px 8px', border: '1.5px solid var(--accent)', borderRadius: '6px', fontSize: '13px', fontFamily: 'var(--font-sans)', background: 'var(--bg)', color: 'var(--text)', outline: 'none', boxSizing: 'border-box' }} />
-                                    )}
-                                  </td>
-                                )
-                              }
-                              return <td key={ci} style={{ padding: '8px 12px', border: '1px solid var(--border)', background: 'var(--bg2)' }}>{cell}</td>
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {chosen === null && (
-                    <button className="btn btn-primary" onClick={submitTable} disabled={tInputs.some(t => !t?.trim())}
-                      style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
-                      Tabloyu onayla →
-                    </button>
-                  )}
-                </div>
-              )
-            })()}
-
-            {chosen !== null && (
-              <>
-                <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', borderLeft: '3px solid var(--accent)', fontSize: '13px', color: 'var(--text2)', lineHeight: 1.65 }}>
-                  <strong style={{ color: chosen === q.ans ? 'var(--green)' : 'var(--red)' }}>{chosen === q.ans ? 'Doğru! ' : 'Yanlış. '}</strong>{q.exp}
-                </div>
-                <button className="btn btn-primary" onClick={next} disabled={checkingAnswer || isSavingRef.current} style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}>
-                  {current + 1 < questions.length ? 'Sonraki soru →' : (isSavingRef.current ? 'Kaydediliyor...' : 'Sonuçları gör →')}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </main>
+      <QuizQuestion
+        questions={questions}
+        current={current}
+        answers={answers}
+        difficulty={difficulty}
+        currentLang={currentLang}
+        checkingAnswer={checkingAnswer}
+        fillInput={fillInput}
+        shortInput={shortInput}
+        chosen={chosen}
+        orderAnswer={orderAnswer}
+        matchAnswer={matchAnswer}
+        multiTFAnswer={multiTFAnswer}
+        tableFillAnswer={tableFillAnswer}
+        onSelectAnswer={selectAnswer}
+        onFillSubmit={submitFillAnswer}
+        onNext={nextQuestion}
+        setFillInput={setFillInput}
+        setShortInput={setShortInput}
+        setOrderAnswer={setOrderAnswer}
+        setMatchAnswer={setMatchAnswer}
+        setMultiTFAnswer={setMultiTFAnswer}
+        setTableFillAnswer={setTableFillAnswer}
+        onFinish={finishQuiz}
+      />
     )
   }
 
@@ -1878,6 +941,13 @@ function QuizPageContent() {
 export default function QuizPage() {
   return (
     <Suspense fallback={<main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></main>}>
+      <QuizPageContent />
+    </Suspense>
+  )
+}
+export default function QuizPage() {
+  return (
+    <Suspense fallback={<main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}><div className="spinner" /></main>}>
       <QuizPageContent />
     </Suspense>
   )
