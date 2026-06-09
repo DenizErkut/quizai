@@ -269,10 +269,11 @@ export async function GET(req: NextRequest) {
   const level = searchParams.get('level')
   const subject = searchParams.get('subject')
 
+  const sortAsc = searchParams.get('sort') === 'asc'
   let query = adminDb
     .from('meb_resources')
     .select('id, title, grade, subject, unit, level, source_type, created_at, raw_text')
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: sortAsc })
 
   if (level) query = query.eq('level', level)
   if (subject) query = query.eq('subject', subject)

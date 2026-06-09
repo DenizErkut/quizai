@@ -319,7 +319,7 @@ function QuizPageContent() {
   useEffect(() => {
     async function loadMebTopics() {
       try {
-        const res = await fetch('/api/admin/meb-upload')
+        const res = await fetch('/api/admin/meb-upload?sort=asc')
         if (!res.ok) return
         const data = await res.json()
         const map: Record<string, string[]> = {}
