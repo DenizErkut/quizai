@@ -1088,32 +1088,10 @@ function QuizPageContent() {
                 background: 'var(--accent-bg)', display: 'flex', flexDirection: 'column', gap: '10px',
                 scrollbarWidth: 'thin',
               }}>
-                {/* Standart konular */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
-                  {(SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul)[openSubject].map((topic: string) => (
-                    <div key={topic} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      <button onClick={() => { setSelectedTopic(topic); setCustomTopic(''); setOpenSubject(null) }}
-                        style={{
-                          padding: '5px 10px', borderRadius: '99px', fontSize: '12px', fontWeight: 500,
-                          cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
-                          border: `1px solid ${selectedTopic === topic ? 'var(--accent)' : 'var(--border)'}`,
-                          background: selectedTopic === topic ? 'var(--accent)' : 'var(--bg)',
-                          color: selectedTopic === topic ? '#fff' : 'var(--text)', whiteSpace: 'nowrap',
-                        }}>
-                        {topic}
-                      </button>
-                      <button onClick={() => toggleFavorite(topic)} title={favorites.includes(topic) ? 'Favorilerden çıkar' : 'Favorilere ekle'}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', opacity: favorites.includes(topic) ? 1 : 0.35, padding: '2px', transition: 'opacity 0.15s' }}>
-                        ⭐
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                {/* MEB yüklü konular */}
+                {/* MEB yüklü konular — üstte */}
                 {mebTopics[openSubject] && mebTopics[openSubject].length > 0 && (
                   <div>
-                    <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 700, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <span>📚</span> MEB Müfredatı
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
@@ -1121,10 +1099,10 @@ function QuizPageContent() {
                         <div key={unit} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                           <button onClick={() => { setSelectedTopic(unit); setCustomTopic(''); setOpenSubject(null) }}
                             style={{
-                              padding: '5px 10px', borderRadius: '99px', fontSize: '12px', fontWeight: 500,
+                              padding: '5px 10px', borderRadius: '99px', fontSize: '12px', fontWeight: 600,
                               cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
-                              border: `1.5px solid ${selectedTopic === unit ? '#0d9488' : 'rgba(13,148,136,0.3)'}`,
-                              background: selectedTopic === unit ? '#0d9488' : 'rgba(13,148,136,0.06)',
+                              border: `1.5px solid ${selectedTopic === unit ? '#0d9488' : 'rgba(13,148,136,0.35)'}`,
+                              background: selectedTopic === unit ? '#0d9488' : 'rgba(13,148,136,0.08)',
                               color: selectedTopic === unit ? '#fff' : '#0d9488', whiteSpace: 'nowrap',
                             }}>
                             {unit}
@@ -1138,6 +1116,33 @@ function QuizPageContent() {
                     </div>
                   </div>
                 )}
+
+                {/* Standart konular — altta */}
+                <div>
+                  <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
+                    Genel Konular
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
+                    {(SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul)[openSubject].map((topic: string) => (
+                      <div key={topic} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <button onClick={() => { setSelectedTopic(topic); setCustomTopic(''); setOpenSubject(null) }}
+                          style={{
+                            padding: '5px 10px', borderRadius: '99px', fontSize: '12px', fontWeight: 500,
+                            cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
+                            border: `1px solid ${selectedTopic === topic ? 'var(--accent)' : 'var(--border)'}`,
+                            background: selectedTopic === topic ? 'var(--accent)' : 'var(--bg)',
+                            color: selectedTopic === topic ? '#fff' : 'var(--text)', whiteSpace: 'nowrap',
+                          }}>
+                          {topic}
+                        </button>
+                        <button onClick={() => toggleFavorite(topic)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', opacity: favorites.includes(topic) ? 1 : 0.35, padding: '2px', transition: 'opacity 0.15s' }}>
+                          ⭐
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 
