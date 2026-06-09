@@ -1,6 +1,5 @@
 'use client'
-import { DIFFICULTIES } from '@/lib/quiz-constants'
-import type { Question } from '@/lib/quiz-constants'
+import { DIFFICULTIES, type Question } from '@/lib/quiz-constants'
 
 interface QuizQuestionProps {
   questions: Question[]

@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import FileUploader, { type UploadedFile } from '@/components/FileUploader'
 import {
-  SUBJECT_MAP, DIFFICULTIES, QUESTION_TYPE_OPTIONS,
-  type QuestionType, type Profile, type Screen,
+  SUBJECT_MAP, DIFFICULTIES,
+  type QuestionType, type Profile,
 } from '@/lib/quiz-constants'
 
 export interface QuizSetupConfig {
@@ -430,7 +430,7 @@ export default function QuizSetup({
 
           <button className="btn btn-primary btn-lg" onClick={() => {
             if (dailyLeft === 0) { setShowPaywall('daily'); return }
-            if (testsLeft === 0) { setScreen('limit'); return }
+            if (testsLeft === 0) { onStartQuiz(); return } // onStartQuiz limit kontrolü yapıyor
             startQuiz()
           }}
             style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', opacity: (testsLeft === 0 || dailyLeft === 0) ? 0.5 : 1 }}>

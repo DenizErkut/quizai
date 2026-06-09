@@ -29,7 +29,7 @@ export function getActiveLang(profileLang?: string): string {
   return localStorage.getItem('pratium_lang') || profileLang || 'Türkçe'
 }
 
-const SUBJECT_MAP: Record<string, Record<string, string[]>> = {
+export const SUBJECT_MAP: Record<string, Record<string, string[]>> = {
   ilkokul: {
     'Matematik': [
       'Doğal sayılar', 'Toplama işlemi', 'Çıkarma işlemi', 'Çarpma işlemi', 'Bölme işlemi',
@@ -279,14 +279,14 @@ const SUBJECT_MAP: Record<string, Record<string, string[]>> = {
 }
 
 // Eski format ile uyumluluk — suggestions için
-const TOPIC_MAP: Record<string, { topic: string; subject: string }[]> = {
+export const TOPIC_MAP: Record<string, { topic: string; subject: string }[]> = {
   ilkokul: Object.entries(SUBJECT_MAP.ilkokul).flatMap(([subj, topics]) => topics.slice(0,1).map(t => ({ topic: t, subject: subj }))),
   ortaokul: Object.entries(SUBJECT_MAP.ortaokul).flatMap(([subj, topics]) => topics.slice(0,1).map(t => ({ topic: t, subject: subj }))),
   lise: Object.entries(SUBJECT_MAP.lise).flatMap(([subj, topics]) => topics.slice(0,1).map(t => ({ topic: t, subject: subj }))),
   universite: Object.entries(SUBJECT_MAP.universite).flatMap(([subj, topics]) => topics.slice(0,1).map(t => ({ topic: t, subject: subj }))),
 }
 
-const DIFFICULTIES = [
+export const DIFFICULTIES = [
   { value: 'kolay', label: 'Kolay', desc: 'Temel kavramlar', color: '#16a34a', bg: 'rgba(22,163,74,0.08)', border: 'rgba(22,163,74,0.3)' },
   { value: 'normal', label: 'Normal', desc: 'Müfredat seviyesi', color: '#2563eb', bg: 'rgba(37,99,235,0.08)', border: 'rgba(37,99,235,0.3)' },
   { value: 'zor', label: 'Zor', desc: 'Analiz gerektiren', color: '#d97706', bg: 'rgba(217,119,6,0.08)', border: 'rgba(217,119,6,0.3)' },
