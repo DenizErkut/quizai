@@ -940,7 +940,12 @@ export default function AdminPage() {
                       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
                     )
                     const ext = mebFile.name.split('.').pop()
-                    const storagePath = `${mebForm.level}/${mebForm.subject}/${mebForm.unit.replace(/\s+/g, '_')}_${Date.now()}.${ext}`
+                    const normalizeTR = (s: string) => s
+                      .replace(/[çÇ]/g, 'c').replace(/[şŞ]/g, 's')
+                      .replace(/[ğĞ]/g, 'g').replace(/[ıİ]/g, 'i')
+                      .replace(/[öÖ]/g, 'o').replace(/[üÜ]/g, 'u')
+                      .replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_')
+                    const storagePath = `${normalizeTR(mebForm.level)}/${normalizeTR(mebForm.subject)}/${normalizeTR(mebForm.unit)}_${Date.now()}.${ext}`
                     const { error: upErr } = await sb.storage
                       .from('meb-resources')
                       .upload(storagePath, mebFile, { contentType: mebFile.type, upsert: true })

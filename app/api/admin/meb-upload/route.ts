@@ -158,7 +158,12 @@ export async function POST(req: NextRequest) {
 
     if (file && file.size > 0) {
       const ext = file.name.split('.').pop()
-      const path = `${level}/${subject}/${unit.replace(/\s+/g, '_')}_${Date.now()}.${ext}`
+      const normTR = (s: string) => s
+        .replace(/[çÇ]/g, 'c').replace(/[şŞ]/g, 's')
+        .replace(/[ğĞ]/g, 'g').replace(/[ıİ]/g, 'i')
+        .replace(/[öÖ]/g, 'o').replace(/[üÜ]/g, 'u')
+        .replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_')
+      const path = `${normTR(level)}/${normTR(subject)}/${normTR(unit)}_${Date.now()}.${ext}`
       const bytes = await file.arrayBuffer()
 
       const { error: uploadErr } = await adminDb.storage
