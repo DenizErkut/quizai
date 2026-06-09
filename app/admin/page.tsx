@@ -931,39 +931,23 @@ export default function AdminPage() {
                   let res: Response
                   let data: any
 
-                  // Büyük dosya (>4MB) → önce Supabase Storage'a yükle
+                  // Buyuk dosya: base64 ile API'ye gonder (service role key kullanir)
                   if (mebFile && mebFile.size > 4 * 1024 * 1024) {
-                    setMebMsg("Buyuk dosya Supabase Storage yuklenyor...")
-                    const { createClient } = await import('@supabase/supabase-js')
-                    const sb = createClient(
-                      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-                    )
-                    const ext = mebFile.name.split('.').pop()
-                    const normalizeTR = (s: string) => s
-                      .replace(/[çÇ]/g, 'c').replace(/[şŞ]/g, 's')
-                      .replace(/[ğĞ]/g, 'g').replace(/[ıİ]/g, 'i')
-                      .replace(/[öÖ]/g, 'o').replace(/[üÜ]/g, 'u')
-                      .replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_')
-                    const storagePath = `${normalizeTR(mebForm.level)}/${normalizeTR(mebForm.subject)}/${normalizeTR(mebForm.unit)}_${Date.now()}.${ext}`
-                    const { error: upErr } = await sb.storage
-                      .from('meb-resources')
-                      .upload(storagePath, mebFile, { contentType: mebFile.type, upsert: true })
-
-                    if (upErr) {
-                      setMebMsg(`❌ Storage yükleme hatası: ${upErr.message}`)
-                      setMebUploading(false); return
-                    }
-
-                    const { data: urlData } = sb.storage.from('meb-resources').getPublicUrl(storagePath)
-                    setMebMsg("PDF isleniyor ve chunklaniyor...")
-
+                    setMebMsg("Dosya hazirlanıyor...")
+                    const base64 = await new Promise<string>((resolve, reject) => {
+                      const reader = new FileReader()
+                      reader.onload = () => resolve((reader.result as string).split(',')[1])
+                      reader.onerror = reject
+                      reader.readAsDataURL(mebFile)
+                    })
+                    setMebMsg("PDF isleniyor...")
                     res = await fetch('/api/admin/meb-upload', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
-                        storage_path: storagePath,
-                        file_url: urlData.publicUrl,
+                        file_base64: base64,
+                        file_name: mebFile.name,
+                        file_type: mebFile.type,
                         title: mebForm.title,
                         grade: mebForm.grade,
                         subject: mebForm.subject,
@@ -972,9 +956,17 @@ export default function AdminPage() {
                       })
                     })
                   } else {
-                    // Küçük dosya veya metin → direkt FormData
+                    // Kucuk dosya veya metin → FormData
                     const fd = new FormData()
                     fd.append('title', mebForm.title)
+                    fd.append('grade', mebForm.grade)
+                    fd.append('subject', mebForm.subject)
+                    fd.append('unit', mebForm.unit)
+                    fd.append('level', mebForm.level)
+                    fd.append('raw_text', mebForm.raw_text)
+                    if (mebFile) fd.append('file', mebFile)
+                    res = await fetch('/api/admin/meb-upload', { method: 'POST', body: fd })
+                  }
                     fd.append('grade', mebForm.grade)
                     fd.append('subject', mebForm.subject)
                     fd.append('unit', mebForm.unit)

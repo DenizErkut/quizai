@@ -65,37 +65,53 @@ async function embedText(text: string): Promise<{ values: number[] | null; error
 }
 
 
-// Storage'dan PDF oku ve işle (büyük dosyalar için)
-async function processFromStorage(body: {
-  storage_path: string; file_url: string;
+// Base64 PDF'i service role key ile Storage'a yükle ve işle
+async function processFromBase64(body: {
+  file_base64: string; file_name: string; file_type: string;
   title: string; grade: string; subject: string; unit: string; level: string
 }) {
-  const { storage_path, file_url, title, grade, subject, unit, level } = body
+  const { file_base64, file_name, file_type, title, grade, subject, unit, level } = body
 
-  // Storage'dan dosyayı indir
-  const { data: fileData, error: dlErr } = await adminDb.storage
+  const normTR = (s: string) => s
+    .replace(/[çÇ]/g, 'c').replace(/[şŞ]/g, 's')
+    .replace(/[ğĞ]/g, 'g').replace(/[ıİ]/g, 'i')
+    .replace(/[öÖ]/g, 'o').replace(/[üÜ]/g, 'u')
+    .replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_')
+
+  const ext = file_name.split('.').pop()
+  const storagePath = `${normTR(level)}/${normTR(subject)}/${normTR(unit)}_${Date.now()}.${ext}`
+  const bytes = Buffer.from(file_base64, 'base64')
+
+  // Service role key ile Storage'a yükle (RLS bypass)
+  const { error: upErr } = await adminDb.storage
     .from('meb-resources')
-    .download(storage_path)
+    .upload(storagePath, bytes, { contentType: file_type, upsert: true })
 
-  if (dlErr || !fileData) {
-    return NextResponse.json({ error: `Storage indirme hatası: ${dlErr?.message}` }, { status: 500 })
+  if (upErr) {
+    console.error('[meb-upload] Storage upload error:', upErr.message)
+    return NextResponse.json({ error: `Storage hatası: ${upErr.message}` }, { status: 500 })
   }
 
+  const { data: urlData } = adminDb.storage.from('meb-resources').getPublicUrl(storagePath)
+  const fileUrl = urlData?.publicUrl || null
+
+  // PDF parse
   let rawText = ''
-  try {
-    const pdfParse = require('pdf-parse')
-    const bytes = await fileData.arrayBuffer()
-    const parsed = await pdfParse(Buffer.from(bytes))
-    rawText = parsed.text || ''
-    console.log(`[meb-upload] Storage PDF parsed: ${rawText.length} chars`)
-  } catch (e: any) {
-    console.warn('[meb-upload] pdf-parse failed:', e.message)
-    rawText = `[PDF yüklendi: ${file_url}]`
+  if (ext === 'pdf') {
+    try {
+      const pdfParse = require('pdf-parse')
+      const parsed = await pdfParse(bytes)
+      rawText = parsed.text || ''
+      console.log(`[meb-upload] PDF parsed: ${rawText.length} chars`)
+    } catch (e: any) {
+      console.warn('[meb-upload] pdf-parse failed:', e.message)
+    }
   }
+  if (!rawText) rawText = `[Dosya: ${fileUrl}]`
 
   const { data: resource, error: resErr } = await adminDb
     .from('meb_resources')
-    .insert({ title, grade, subject, unit, level, source_type: 'pdf', file_url, raw_text: rawText })
+    .insert({ title, grade, subject, unit, level, source_type: 'pdf', file_url: fileUrl, raw_text: rawText })
     .select('id').single()
 
   if (resErr || !resource) {
@@ -108,7 +124,6 @@ async function processFromStorage(body: {
   for (let i = 0; i < chunks.length; i++) {
     const { values: embedding, error: embedErr } = await embedText(chunks[i])
     if (embedErr && !embedError) embedError = embedErr
-
     await adminDb.from('meb_chunks').insert({
       resource_id: resource.id, chunk_index: i,
       content: chunks[i], embedding: embedding ? JSON.stringify(embedding) : null,
@@ -132,9 +147,9 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null)
 
-    // JSON body: storage-path mode (büyük PDF'ler için)
-    if (body && body.storage_path) {
-      return await processFromStorage(body)
+    // JSON body: base64 mode (büyük PDF'ler için — service role ile Storage'a yazar)
+    if (body && body.file_base64) {
+      return await processFromBase64(body)
     }
 
     // FormData mode (küçük dosyalar / metin için)
