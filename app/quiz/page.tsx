@@ -940,13 +940,6 @@ function QuizPageContent() {
 
 export default function QuizPage() {
   return (
-    <Suspense fallback={<main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></main>}>
-      <QuizPageContent />
-    </Suspense>
-  )
-}
-export default function QuizPage() {
-  return (
     <Suspense fallback={<main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}><div className="spinner" /></main>}>
       <QuizPageContent />
     </Suspense>
