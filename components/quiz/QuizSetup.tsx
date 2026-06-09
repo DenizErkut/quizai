@@ -31,6 +31,9 @@ interface QuizSetupProps {
   onFetchSummary: (topic: string) => void
   onToggleFavorite: (topic: string) => void
   onStartQuiz: () => void
+  testsLeft: number | null
+  dailyLeft: number | null
+  maxQCount: number
 }
 
 export default function QuizSetup({
@@ -39,6 +42,7 @@ export default function QuizSetup({
   questionType, setQuestionType, uploadedFiles, setUploadedFiles,
   favorites, mebTopics, topicSummary, summaryLoading, showSummary, setShowSummary,
   onFetchSummary, onToggleFavorite, onStartQuiz,
+  testsLeft, dailyLeft, maxQCount,
 }: QuizSetupProps) {
   const [openSubject, setOpenSubject] = useState<string | null>(null)
   const [advancedOpen, setAdvancedOpen] = useState(false)
@@ -371,7 +375,7 @@ export default function QuizSetup({
                         <button key={n}
                           className={`btn btn-sm ${active && !locked ? 'btn-primary' : ''}`}
                           onClick={() => {
-                            if (locked) { setShowPaywall('qcount'); return }
+                            if (locked) { onStartQuiz(); return }
                             setQCount(n)
                           }}
                           style={{ position: 'relative', opacity: locked ? 0.7 : 1, border: locked ? '1.5px solid rgba(217,119,6,0.4)' : undefined, color: locked ? '#92400e' : undefined }}>
@@ -409,7 +413,7 @@ export default function QuizSetup({
           {topicErr && !hasFiles && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{topicErr}</div>}
 
           <button className="btn btn-primary btn-lg" onClick={() => {
-            if (dailyLeft === 0) { setShowPaywall('daily'); return }
+            if (dailyLeft === 0) { onStartQuiz(); return }
             if (testsLeft === 0) { onStartQuiz(); return }
             startQuiz()
           }}

@@ -1051,6 +1051,9 @@ function QuizPageContent() {
         onFetchSummary={fetchTopicSummary}
         onToggleFavorite={toggleFavorite}
         onStartQuiz={startQuiz}
+        testsLeft={testsLeft}
+        dailyLeft={dailyLeft}
+        maxQCount={maxQCount}
       />
     </>
   )
