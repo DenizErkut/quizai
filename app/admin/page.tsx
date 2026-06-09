@@ -38,6 +38,14 @@ export default function AdminPage() {
   const [updating, setUpdating] = useState<string | null>(null)
   const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'meb'>('users')
   // Kurum formu
+  // Sınav Kitapçıkları state
+  const [examUploading, setExamUploading] = useState(false)
+  const [examMsg, setExamMsg] = useState('')
+  const [examFile, setExamFile] = useState<File | null>(null)
+  const [examForm, setExamForm] = useState({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', answer_key: '' })
+  const [examList, setExamList] = useState<any[]>([])
+  const [examListLoading, setExamListLoading] = useState(false)
+
   // MEB Kaynakları state
   const [mebResources, setMebResources] = useState<any[]>([])
   const [mebLoading, setMebLoading] = useState(false)
@@ -366,6 +374,7 @@ export default function AdminPage() {
             { key: 'teachers', label: `🎓 Öğretmen Başvuruları${pendingTeachers > 0 ? ` (${pendingTeachers})` : ''}` },
             { key: 'institutions', label: '🏛️ Kurumlar' },
             { key: 'meb', label: '📚 MEB Kaynakları' },
+            { key: 'exams', label: '🎯 Sınav Kitapçıkları' },
           ] as const).map(t => (
             <button key={t.key} className={`btn btn-sm ${tab === t.key ? 'btn-primary' : ''}`}
               onClick={() => setTab(t.key)}
@@ -851,6 +860,159 @@ export default function AdminPage() {
           </div>
         )}
       {/* MEB KAYNAKLARI */}
+      {tab === 'exams' && (
+        <div>
+          {/* Sınav kitapçığı yükleme formu */}
+          <div className="card" style={{ marginBottom: '1.5rem' }}>
+            <div style={{ fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem', fontSize: '14px' }}>
+              🎯 Yeni Sınav Kitapçığı Yükle
+            </div>
+            <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '12px', padding: '12px 14px', marginBottom: '1.25rem', fontSize: '12px', color: '#6366f1' }}>
+              📌 Geçmiş yıl LGS, TYT, AYT, KPSS kitapçıklarını yükleyin. AI bu sorulardan öğrenerek daha gerçekçi sınav soruları üretir.
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Başlık *</label>
+                <input value={examForm.title} onChange={e => setExamForm(p => ({ ...p, title: e.target.value }))}
+                  placeholder="2024 LGS Sosyal Bilgiler"
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' as const }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Sınav Türü *</label>
+                <select value={examForm.exam_type} onChange={e => setExamForm(p => ({ ...p, exam_type: e.target.value }))}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)' }}>
+                  {['LGS', 'TYT', 'AYT', 'KPSS', 'YKS', 'TEOG', 'Diğer'].map(t => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Yıl *</label>
+                <select value={examForm.year} onChange={e => setExamForm(p => ({ ...p, year: e.target.value }))}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)' }}>
+                  {Array.from({ length: 15 }, (_, i) => (new Date().getFullYear() - i).toString()).map(y => <option key={y}>{y}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Ders / Alan</label>
+                <input value={examForm.subject} onChange={e => setExamForm(p => ({ ...p, subject: e.target.value }))}
+                  placeholder="Matematik, Türkçe, Tüm Dersler..."
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' as const }} />
+              </div>
+            </div>
+
+            {/* Cevap anahtarı */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Cevap Anahtarı (opsiyonel)</label>
+              <textarea value={examForm.answer_key} onChange={e => setExamForm(p => ({ ...p, answer_key: e.target.value }))}
+                placeholder="1-A, 2-B, 3-C... veya yapıştır"
+                rows={3}
+                style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' as const, resize: 'vertical' as const }} />
+            </div>
+
+            {/* PDF yükleme */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Sınav PDF Dosyası *</label>
+              <input type="file" accept=".pdf" onChange={e => setExamFile(e.target.files?.[0] || null)} />
+              {examFile && <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '4px' }}>✓ {examFile.name} ({(examFile.size / 1024 / 1024).toFixed(1)} MB)</div>}
+            </div>
+
+            {examMsg && (
+              <div style={{ padding: '10px 14px', borderRadius: '10px', background: examMsg.startsWith('✅') ? 'rgba(22,163,74,0.08)' : examMsg.startsWith('❌') ? 'rgba(220,38,38,0.08)' : 'rgba(99,102,241,0.08)', border: `1px solid ${examMsg.startsWith('✅') ? '#16a34a' : examMsg.startsWith('❌') ? '#dc2626' : '#6366f1'}33`, fontSize: '13px', color: examMsg.startsWith('✅') ? '#15803d' : examMsg.startsWith('❌') ? '#dc2626' : '#6366f1', marginBottom: '12px' }}>
+                {examMsg}
+              </div>
+            )}
+
+            <button
+              disabled={examUploading || !examFile || !examForm.title}
+              onClick={async () => {
+                if (!examFile || !examForm.title) return
+                setExamUploading(true); setExamMsg('')
+                try {
+                  const { data: { session } } = await supabase.auth.getSession()
+
+                  // Signed URL al
+                  const normTR = (s: string) => s.replace(/[çÇ]/g, 'c').replace(/[şŞ]/g, 's').replace(/[ğĞ]/g, 'g').replace(/[ıİ]/g, 'i').replace(/[öÖ]/g, 'o').replace(/[üÜ]/g, 'u').replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_')
+                  const storagePath = `${examForm.exam_type}/${examForm.year}/${normTR(examForm.subject || 'genel')}_${Date.now()}.pdf`
+
+                  // Büyük dosya: signed URL ile
+                  let fileUrl = ''
+                  if (examFile.size > 4 * 1024 * 1024) {
+                    setExamMsg('1/3 Storage'a yukleniyor...')
+                    const signRes = await fetch(`/api/admin/meb-signed-upload?file_name=${encodeURIComponent(examFile.name)}&level=${examForm.exam_type}&subject=${encodeURIComponent(examForm.subject || 'genel')}&unit=${examForm.year}`)
+                    const signData = await signRes.json()
+                    if (!signRes.ok) { setExamMsg('❌ ' + signData.error); setExamUploading(false); return }
+                    await fetch(signData.signed_url, { method: 'PUT', headers: { 'Content-Type': 'application/pdf' }, body: examFile })
+                    fileUrl = signData.public_url
+                    setExamMsg('2/3 Sorular isleniyor...')
+                    const res = await fetch('/api/admin/exam-upload', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ storage_path: signData.storage_path, file_url: fileUrl, ...examForm })
+                    })
+                    const data = await res.json()
+                    if (res.ok) {
+                      setExamMsg(`✅ Yuklendi! ${data.chunks} soru chunk, ${data.embedded} embedding`)
+                      setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', answer_key: '' })
+                      setExamFile(null)
+                    } else setExamMsg('❌ ' + data.error)
+                  } else {
+                    setExamMsg('Dosya isleniyor...')
+                    const fd = new FormData()
+                    fd.append('file', examFile)
+                    Object.entries(examForm).forEach(([k, v]) => fd.append(k, v))
+                    const res = await fetch('/api/admin/exam-upload', { method: 'POST', body: fd })
+                    const data = await res.json()
+                    if (res.ok) {
+                      setExamMsg(`✅ Yuklendi! ${data.chunks} soru chunk`)
+                      setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', answer_key: '' })
+                      setExamFile(null)
+                    } else setExamMsg('❌ ' + data.error)
+                  }
+                } catch (e: any) {
+                  setExamMsg('❌ ' + e.message)
+                } finally {
+                  setExamUploading(false)
+                }
+              }}
+              style={{ padding: '11px 20px', borderRadius: '12px', border: 'none', background: examUploading || !examFile || !examForm.title ? 'var(--bg2)' : '#6366f1', color: examUploading || !examFile || !examForm.title ? 'var(--text3)' : '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+              {examUploading ? '⏳ Yukleniyor...' : '🚀 Yukle ve Sinav Verisine Ekle'}
+            </button>
+          </div>
+
+          {/* Yüklü kitapçıklar listesi */}
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '14px' }}>📋 Yuklu Sinav Kitapciklari</div>
+              <button onClick={async () => {
+                setExamListLoading(true)
+                const res = await fetch('/api/admin/exam-upload')
+                const data = await res.json()
+                setExamList(data.exams || [])
+                setExamListLoading(false)
+              }} className="btn btn-sm">🔄 Yenile</button>
+            </div>
+            {examListLoading ? (
+              <div style={{ textAlign: 'center', color: 'var(--text3)', padding: '2rem' }}>Yukleniyor...</div>
+            ) : examList.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'var(--text3)', padding: '2rem', fontSize: '13px' }}>Henuz kitapcik yuklenmemis.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {examList.map((ex: any) => (
+                  <div key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>🎯</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--primary)' }}>{ex.title}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{ex.exam_type} · {ex.year}{ex.subject ? ` · ${ex.subject}` : ''} · {ex.chunk_count || 0} chunk</div>
+                    </div>
+                    <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '99px', background: 'rgba(99,102,241,0.1)', color: '#6366f1', fontWeight: 600 }}>{ex.exam_type}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {tab === 'meb' && (
         <div>
           {/* Yükleme formu */}
