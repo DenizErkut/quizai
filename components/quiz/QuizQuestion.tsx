@@ -11,7 +11,7 @@ interface QuizQuestionProps {
   fillInput: string
   shortInput: string
   chosen: number | null
-  orderAnswer: number[]
+  orderAnswer: string[]
   matchAnswer: Record<number, number>
   multiTFAnswer: Record<number, boolean | null>
   tableFillAnswer: string[]
@@ -20,7 +20,7 @@ interface QuizQuestionProps {
   onNext: () => void
   setFillInput: (v: string) => void
   setShortInput: (v: string) => void
-  setOrderAnswer: (v: number[]) => void
+  setOrderAnswer: (v: string[]) => void
   setMatchAnswer: (fn: (prev: Record<number, number>) => Record<number, number>) => void
   setMultiTFAnswer: (fn: (prev: Record<number, boolean | null>) => Record<number, boolean | null>) => void
   setTableFillAnswer: (fn: (prev: string[]) => string[]) => void
