@@ -8,7 +8,7 @@ import QuizResult from '@/components/QuizResult'
 import QuizSetup, { type QuizSetupConfig } from '@/components/quiz/QuizSetup'
 import QuizQuestion from '@/components/quiz/QuizQuestion'
 import {
-  getActiveLang, TOPIC_MAP,
+  getActiveLang, TOPIC_MAP, DIFFICULTIES,
   type QuestionType, type Question, type Profile, type Screen
 } from '@/lib/quiz-constants'
 
