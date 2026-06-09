@@ -951,7 +951,7 @@ export default function AdminPage() {
                     }
 
                     const { data: urlData } = sb.storage.from('meb-resources').getPublicUrl(storagePath)
-                    setMebMsg('⚙️ PDF işleniyor ve chunk'lanıyor...')
+                    setMebMsg("PDF isleniyor ve chunklaniyor...")
 
                     res = await fetch('/api/admin/meb-upload', {
                       method: 'POST',
