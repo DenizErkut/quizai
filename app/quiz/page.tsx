@@ -312,7 +312,7 @@ function QuizPageContent() {
   const [favorites, setFavorites] = useState<string[]>([]) // Favori konular
   const [mebTopics, setMebTopics] = useState<Record<string, string[]>>({}) // subject -> units (grade filtreli)
 
-  // MEB kaynaklarından konuları çek — sadece kullanıcının sınıfına uygun olanlar
+  // MEB kaynaklarini cek — sadece kullanicinin sinifina uygun olanlar
   useEffect(() => {
     async function loadMebTopics() {
       try {
@@ -321,42 +321,37 @@ function QuizPageContent() {
         const data = await res.json()
         const map: Record<string, string[]> = {}
 
-        // Kullanıcının grade'ini normalize et (örn: "ortaokul 6. sinif" → "6")
         const userGradeRaw = (profile?.grade || '').toLowerCase()
-        const userGradeNum = userGradeRaw.match(/\d+/)?.[0] || ''
+        const userGradeNum = (userGradeRaw.match(/\d+/) || [])[0] || ''
         const userLevel = userGradeRaw.includes('universite') ? 'universite'
           : userGradeRaw.includes('lise') ? 'lise'
           : userGradeRaw.includes('ortaokul') ? 'ortaokul'
           : userGradeRaw.includes('ilkokul') ? 'ilkokul'
-          : level // fallback: seçili level
+          : 'ortaokul'
 
         for (const r of (data.resources || [])) {
-          // MEB kaynağının grade'ini normalize et
           const resGradeRaw = (r.grade || '').toLowerCase()
-          const resGradeNum = resGradeRaw.match(/\d+/)?.[0] || ''
+          const resGradeNum = (resGradeRaw.match(/\d+/) || [])[0] || ''
           const resLevel = resGradeRaw.includes('universite') ? 'universite'
             : resGradeRaw.includes('lise') ? 'lise'
             : resGradeRaw.includes('ortaokul') ? 'ortaokul'
             : resGradeRaw.includes('ilkokul') ? 'ilkokul'
-            : r.level || ''
+            : (r.level || '')
 
-          // Seviye eşleşmeli, sınıf numarası da eşleşmeli (varsa)
-          const levelMatch = resLevel === userLevel || resLevel === level
+          const levelMatch = resLevel === userLevel
           const gradeMatch = !resGradeNum || !userGradeNum || resGradeNum === userGradeNum
 
           if (levelMatch && gradeMatch) {
-            const key = r.subject || 'Diğer'
+            const key = r.subject || 'Diger'
             if (!map[key]) map[key] = []
-            if (r.unit && !map[key].includes(r.unit)) {
-              map[key].push(r.unit)
-            }
+            if (r.unit && !map[key].includes(r.unit)) map[key].push(r.unit)
           }
         }
         setMebTopics(map)
       } catch {}
     }
-    if (profile !== null) loadMebTopics() // profil yüklendikten sonra çalıştır
-  }, [profile, level])
+    loadMebTopics()
+  }, [profile?.grade])
 
   // localStorage'dan favori ve son ayarları yükle
   useEffect(() => {
