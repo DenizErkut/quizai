@@ -37,11 +37,10 @@ function chunkText(text: string, chunkSize = 3000, overlap = 300): string[] {
 }
 
 // Embedding üret — Anthropic'te embedding yok, Gemini kullan
-async function embedText(text: string): Promise<number[] | null> {
+async function embedText(text: string): Promise<{ values: number[] | null; error?: string }> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
-    console.warn('[meb-upload] GEMINI_API_KEY missing, skipping embedding')
-    return null
+    return { values: null, error: 'GEMINI_API_KEY eksik — embedding atlandı, metin yine de kaydedildi' }
   }
   try {
     const res = await fetch(
@@ -52,11 +51,16 @@ async function embedText(text: string): Promise<number[] | null> {
         body: JSON.stringify({ model: 'models/text-embedding-004', content: { parts: [{ text: text.slice(0, 2000) }] } })
       }
     )
+    if (!res.ok) {
+      const err = await res.text()
+      console.error('[meb-upload] Gemini API error:', res.status, err)
+      return { values: null, error: `Gemini ${res.status}: ${err.slice(0, 100)}` }
+    }
     const data = await res.json()
-    return data?.embedding?.values || null
-  } catch (e) {
+    return { values: data?.embedding?.values || null }
+  } catch (e: any) {
     console.error('[meb-upload] embed error:', e)
-    return null
+    return { values: null, error: e.message }
   }
 }
 
@@ -116,6 +120,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Dosya veya metin içeriği gerekli' }, { status: 400 })
     }
 
+    // rawText tamamen boşsa dosya yüklendi ama metin çıkarılamadı — yine kaydet
+    if (!rawText && fileUrl) {
+      rawText = `[Dosya yüklendi: ${fileUrl}]`
+    }
+
     // meb_resources tablosuna kaydet
     const { data: resource, error: resErr } = await adminDb
       .from('meb_resources')
@@ -132,16 +141,29 @@ export async function POST(req: NextRequest) {
     console.log(`[meb-upload] ${chunks.length} chunks created`)
 
     let embeddedCount = 0
+    let embedError = ''
+
+    // Chunk'ları batch halinde kaydet (tek tek değil — rate limit için)
     for (let i = 0; i < chunks.length; i++) {
-      const embedding = await embedText(chunks[i])
-      await adminDb.from('meb_chunks').insert({
+      const { values: embedding, error: embedErr } = await embedText(chunks[i])
+      if (embedErr && !embedError) embedError = embedErr
+
+      const { error: insertErr } = await adminDb.from('meb_chunks').insert({
         resource_id: resource.id,
         chunk_index: i,
         content: chunks[i],
         embedding: embedding ? JSON.stringify(embedding) : null,
         grade, subject, unit, level,
       })
-      if (embedding) embeddedCount++
+
+      if (insertErr) {
+        console.error(`[meb-upload] chunk ${i} insert error:`, insertErr.message)
+      } else {
+        if (embedding) embeddedCount++
+      }
+
+      // Rate limit için kısa bekleme
+      if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 200))
     }
 
     console.log(`[meb-upload] SUCCESS: ${chunks.length} chunks, ${embeddedCount} embedded`)
@@ -151,6 +173,7 @@ export async function POST(req: NextRequest) {
       chunks: chunks.length,
       embedded: embeddedCount,
       chars: rawText.length,
+      warning: embedError || undefined,
     })
   } catch (e: any) {
     console.error('[meb-upload] error:', e.message)

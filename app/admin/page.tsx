@@ -940,7 +940,8 @@ export default function AdminPage() {
                   const res = await fetch('/api/admin/meb-upload', { method: 'POST', body: fd })
                   const data = await res.json()
                   if (res.ok) {
-                    setMebMsg(`✅ Yüklendi! ${data.chunks} chunk, ${data.embedded} embedding, ${(data.chars/1000).toFixed(1)}K karakter`)
+                    const warn = data.warning ? ` ⚠️ ${data.warning}` : ''
+                    setMebMsg(`✅ Yüklendi! ${data.chunks} chunk, ${data.embedded} embedding, ${(data.chars/1000).toFixed(1)}K karakter${warn}`)
                     setMebForm({ title: '', grade: '', subject: '', unit: '', level: mebForm.level, raw_text: '' })
                     setMebFile(null)
                     // Listeyi yenile
