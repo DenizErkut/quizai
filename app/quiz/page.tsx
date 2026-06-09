@@ -310,9 +310,9 @@ function QuizPageContent() {
   const [openSubject, setOpenSubject] = useState<string | null>(null) // Accordion
   const [advancedOpen, setAdvancedOpen] = useState(false) // Gelişmiş ayarlar
   const [favorites, setFavorites] = useState<string[]>([]) // Favori konular
-  const [mebTopics, setMebTopics] = useState<Record<string, string[]>>({}) // MEB'den yüklenen konular
+  const [mebTopics, setMebTopics] = useState<Record<string, string[]>>({}) // subject -> units (grade filtreli)
 
-  // MEB kaynaklarından konuları çek
+  // MEB kaynaklarından konuları çek — sadece kullanıcının sınıfına uygun olanlar
   useEffect(() => {
     async function loadMebTopics() {
       try {
@@ -320,18 +320,43 @@ function QuizPageContent() {
         if (!res.ok) return
         const data = await res.json()
         const map: Record<string, string[]> = {}
+
+        // Kullanıcının grade'ini normalize et (örn: "ortaokul 6. sinif" → "6")
+        const userGradeRaw = (profile?.grade || '').toLowerCase()
+        const userGradeNum = userGradeRaw.match(/\d+/)?.[0] || ''
+        const userLevel = userGradeRaw.includes('universite') ? 'universite'
+          : userGradeRaw.includes('lise') ? 'lise'
+          : userGradeRaw.includes('ortaokul') ? 'ortaokul'
+          : userGradeRaw.includes('ilkokul') ? 'ilkokul'
+          : level // fallback: seçili level
+
         for (const r of (data.resources || [])) {
-          const key = r.subject || 'Diğer'
-          if (!map[key]) map[key] = []
-          if (r.unit && !map[key].includes(r.unit)) {
-            map[key].push(r.unit)
+          // MEB kaynağının grade'ini normalize et
+          const resGradeRaw = (r.grade || '').toLowerCase()
+          const resGradeNum = resGradeRaw.match(/\d+/)?.[0] || ''
+          const resLevel = resGradeRaw.includes('universite') ? 'universite'
+            : resGradeRaw.includes('lise') ? 'lise'
+            : resGradeRaw.includes('ortaokul') ? 'ortaokul'
+            : resGradeRaw.includes('ilkokul') ? 'ilkokul'
+            : r.level || ''
+
+          // Seviye eşleşmeli, sınıf numarası da eşleşmeli (varsa)
+          const levelMatch = resLevel === userLevel || resLevel === level
+          const gradeMatch = !resGradeNum || !userGradeNum || resGradeNum === userGradeNum
+
+          if (levelMatch && gradeMatch) {
+            const key = r.subject || 'Diğer'
+            if (!map[key]) map[key] = []
+            if (r.unit && !map[key].includes(r.unit)) {
+              map[key].push(r.unit)
+            }
           }
         }
         setMebTopics(map)
       } catch {}
     }
-    loadMebTopics()
-  }, [])
+    if (profile !== null) loadMebTopics() // profil yüklendikten sonra çalıştır
+  }, [profile, level])
 
   // localStorage'dan favori ve son ayarları yükle
   useEffect(() => {
