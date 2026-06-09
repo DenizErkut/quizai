@@ -1183,16 +1183,16 @@ function QuizPageContent() {
         matchAnswer={matchAnswer}
         multiTFAnswer={multiTFAnswer}
         tableFillAnswer={tableFillAnswer}
-        onSelectAnswer={selectAnswer}
-        onFillSubmit={submitFillAnswer}
-        onNext={nextQuestion}
+        onSelectAnswer={choose}
+        onFillSubmit={submitShortAnswer}
+        onNext={next}
         setFillInput={setFillInput}
         setShortInput={setShortInput}
         setOrderAnswer={setOrderAnswer}
         setMatchAnswer={setMatchAnswer}
         setMultiTFAnswer={setMultiTFAnswer}
         setTableFillAnswer={setTableFillAnswer}
-        onFinish={finishQuiz}
+        onFinish={() => setScreen('result')}
       />
     )
   }
