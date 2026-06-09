@@ -749,7 +749,7 @@ function QuizPageContent() {
   // ── TOPIC ──
   if (screen === 'topic') return (
     <>
-      {showOnboarding && profile && <OnboardingModal profile={profile} onClose={() => setShowOnboarding(false)} />}
+      {showOnboarding && profile && <OnboardingModal userName={profile.name} grade={profile.grade} onComplete={() => setShowOnboarding(false)} />}
       <QuizSetup
         profile={profile}
         currentLang={currentLang}
