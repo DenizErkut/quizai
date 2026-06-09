@@ -251,17 +251,17 @@ export default function QuizQuestion({
                     const isAnswered = chosen !== null
                     const isCorrect = s.correct === true
                     return (
-                      <div key={i} style={{ padding: '12px 14px', borderRadius: '10px', border: `1.5px solid ${isAnswered ? (mTFAnswers[i] === s.correct ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.3)') : 'var(--border)'}`, background: isAnswered ? (mTFAnswers[i] === s.correct ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)' }}>
+                      <div key={i} style={{ padding: '12px 14px', borderRadius: '10px', border: `1.5px solid ${isAnswered ? (multiTFAnswer[i] === s.correct ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.3)') : 'var(--border)'}`, background: isAnswered ? (multiTFAnswer[i] === s.correct ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)' }}>
                         <div style={{ fontSize: '13px', marginBottom: '8px' }}>{i + 1}. {s.text}</div>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                           {[true, false].map(val => (
-                            <button key={String(val)} onClick={() => { if (chosen !== null) return; setMTFAnswers(prev => ({ ...prev, [i]: val })) }}
+                            <button key={String(val)} onClick={() => { if (chosen !== null) return; setMultiTFAnswer(prev => ({ ...prev, [i]: val })) }}
                               disabled={chosen !== null}
-                              style={{ padding: '6px 16px', borderRadius: '8px', border: `1.5px solid ${mTFAnswers[i] === val ? (val ? 'rgba(22,163,74,0.6)' : 'rgba(220,38,38,0.6)') : 'var(--border)'}`, background: mTFAnswers[i] === val ? (val ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', fontWeight: 600, fontSize: '12px', cursor: chosen !== null ? 'default' : 'pointer', color: mTFAnswers[i] === val ? (val ? 'var(--green)' : 'var(--red)') : 'var(--text2)' }}>
+                              style={{ padding: '6px 16px', borderRadius: '8px', border: `1.5px solid ${multiTFAnswer[i] === val ? (val ? 'rgba(22,163,74,0.6)' : 'rgba(220,38,38,0.6)') : 'var(--border)'}`, background: multiTFAnswer[i] === val ? (val ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', fontWeight: 600, fontSize: '12px', cursor: chosen !== null ? 'default' : 'pointer', color: multiTFAnswer[i] === val ? (val ? 'var(--green)' : 'var(--red)') : 'var(--text2)' }}>
                               {val ? '✓ Doğru' : '✗ Yanlış'}
                             </button>
                           ))}
-                          {isAnswered && <span style={{ fontSize: '12px', fontWeight: 600, color: mTFAnswers[i] === s.correct ? 'var(--green)' : 'var(--red)', marginLeft: '4px' }}>{mTFAnswers[i] === s.correct ? '✓' : `✗ (${isCorrect ? 'Doğru' : 'Yanlış'})`}</span>}
+                          {isAnswered && <span style={{ fontSize: '12px', fontWeight: 600, color: multiTFAnswer[i] === s.correct ? 'var(--green)' : 'var(--red)', marginLeft: '4px' }}>{multiTFAnswer[i] === s.correct ? '✓' : `✗ (${isCorrect ? 'Doğru' : 'Yanlış'})`}</span>}
                         </div>
                       </div>
                     )
@@ -271,7 +271,7 @@ export default function QuizQuestion({
                   <button className="btn btn-primary"
                     onClick={() => {
                       const stmts = q.statements || []
-                      const correct = stmts.every((s: any, i: number) => mTFAnswers[i] === s.correct)
+                      const correct = stmts.every((s: any, i: number) => multiTFAnswer[i] === s.correct)
                       onSelectAnswer(correct ? 0 : -1)
                       setAnswers(prev => {
                         const next = [...prev, { userAns: correct ? 0 : -1, correct }]
@@ -279,7 +279,7 @@ export default function QuizQuestion({
                         return next
                       })
                     }}
-                    disabled={(q.statements || []).some((_: any, i: number) => mTFAnswers[i] === undefined || mTFAnswers[i] === null)}
+                    disabled={(q.statements || []).some((_: any, i: number) => multiTFAnswer[i] === undefined || multiTFAnswer[i] === null)}
                     style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
                     Cevapları onayla →
                   </button>
