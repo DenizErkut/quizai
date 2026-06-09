@@ -967,14 +967,6 @@ export default function AdminPage() {
                     if (mebFile) fd.append('file', mebFile)
                     res = await fetch('/api/admin/meb-upload', { method: 'POST', body: fd })
                   }
-                    fd.append('grade', mebForm.grade)
-                    fd.append('subject', mebForm.subject)
-                    fd.append('unit', mebForm.unit)
-                    fd.append('level', mebForm.level)
-                    fd.append('raw_text', mebForm.raw_text)
-                    if (mebFile) fd.append('file', mebFile)
-                    res = await fetch('/api/admin/meb-upload', { method: 'POST', body: fd })
-                  }
 
                   data = await res.json()
                   if (res.ok) {
