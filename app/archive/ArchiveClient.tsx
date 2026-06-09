@@ -181,6 +181,7 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
   const [dateFilter, setDateFilter] = useState('all')
   const [sortBy, setSortBy] = useState<'date' | 'pct_asc' | 'pct_desc'>('date')
   const [showFilters, setShowFilters] = useState(false)
+  const [activeStatFilter, setActiveStatFilter] = useState<'all' | 'weak' | 'good' | 'best'>('all')
   const [exportingId, setExportingId] = useState<string | null>(null) // ✅ YENİ
 
   const grades = useMemo(() => [...new Set(sessions.map(s => s.grade))].filter(Boolean).sort(), [sessions])
@@ -196,6 +197,10 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
         if (scoreFilter === 'weak' && s.pct >= 55) return false
         if (scoreFilter === 'mid' && (s.pct < 55 || s.pct >= 80)) return false
         if (scoreFilter === 'good' && s.pct < 80) return false
+        // Stat kartı filtreleri
+        if (activeStatFilter === 'weak' && s.pct >= 55) return false
+        if (activeStatFilter === 'good' && s.pct < 80) return false
+        if (activeStatFilter === 'best' && stats && s.id !== stats.best.id) return false
         if (dateFilter === 'week' && now - new Date(s.created_at).getTime() > 7 * 86400000) return false
         if (dateFilter === 'month' && now - new Date(s.created_at).getTime() > 30 * 86400000) return false
         return true
@@ -205,7 +210,7 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
         if (sortBy === 'pct_desc') return b.pct - a.pct
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       })
-  }, [sessions, search, gradeFilter, typeFilter, scoreFilter, dateFilter, sortBy])
+  }, [sessions, search, gradeFilter, typeFilter, scoreFilter, dateFilter, sortBy, activeStatFilter])
 
   const stats = useMemo(() => {
     if (!sessions.length) return null
@@ -263,19 +268,32 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
       {/* İstatistik kartları */}
       {stats && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginBottom: '1.5rem' }}>
-          {[
-            { label: 'Toplam Test', value: stats.total, icon: '📝' },
-            { label: 'Genel Ort.', value: `%${stats.avg}`, icon: '📊', color: pctColor(stats.avg) },
-            { label: 'En İyi', value: `%${stats.best.pct}`, icon: '🏆', color: 'var(--green)', sub: stats.best.topic.slice(0, 12) + '…' },
-            { label: 'Zayıf Test', value: stats.weakCount, icon: '⚠️', color: stats.weakCount > 0 ? 'var(--red)' : 'var(--green)' },
-          ].map((s, i) => (
-            <div key={i} className="card" style={{ textAlign: 'center', padding: '12px 8px' }}>
-              <div style={{ fontSize: '18px', marginBottom: '2px' }}>{s.icon}</div>
-              <div style={{ fontWeight: 800, fontSize: '18px', color: (s as any).color || 'var(--primary)' }}>{s.value}</div>
-              <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '2px' }}>{s.label}</div>
-              {(s as any).sub && <div style={{ fontSize: '9px', color: 'var(--text4)', marginTop: '1px' }}>{(s as any).sub}</div>}
-            </div>
-          ))}
+          {([
+            { label: 'Toplam Test', value: stats.total, icon: '📝', filter: 'all' as const, desc: 'Tüm testleri göster' },
+            { label: 'Genel Ort.', value: `%${stats.avg}`, icon: '📊', color: pctColor(stats.avg), filter: 'good' as const, desc: '%80+ testleri filtrele' },
+            { label: 'En İyi', value: `%${stats.best.pct}`, icon: '🏆', color: 'var(--green)', sub: stats.best.topic.slice(0, 12) + '…', filter: 'best' as const, desc: 'En iyi teste git' },
+            { label: 'Zayıf Test', value: stats.weakCount, icon: '⚠️', color: stats.weakCount > 0 ? 'var(--red)' : 'var(--green)', filter: 'weak' as const, desc: 'Zayıf testleri filtrele' },
+          ] as {label:string;value:any;icon:string;color?:string;sub?:string;filter:'all'|'good'|'best'|'weak';desc:string}[]).map((s, i) => {
+            const isActive = activeStatFilter === s.filter
+            return (
+            <button key={i} onClick={() => setActiveStatFilter(prev => prev === s.filter ? 'all' : s.filter)}
+              title={s.desc}
+              style={{
+                textAlign: 'center', padding: '12px 8px',
+                borderRadius: '14px', border: `2px solid ${isActive ? (s.color || 'var(--accent)') : 'var(--border)'}`,
+                background: isActive ? (s.color ? s.color.replace('var(--green)', 'rgba(22,163,74,0.08)').replace('var(--red)', 'rgba(220,38,38,0.08)') : 'var(--accent-bg)') : 'var(--bg)',
+                cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                transition: 'all 0.15s',
+                boxShadow: isActive ? `0 4px 16px ${s.color ? s.color.replace('var(--green)', 'rgba(22,163,74,0.2)').replace('var(--red)', 'rgba(220,38,38,0.2)') : 'rgba(30,207,184,0.2)'}` : '0 1px 4px rgba(0,0,0,0.05)',
+                transform: isActive ? 'translateY(-2px)' : '',
+              }}>
+              <div style={{ fontSize: '20px', marginBottom: '4px' }}>{s.icon}</div>
+              <div style={{ fontWeight: 800, fontSize: '18px', color: s.color || 'var(--primary)' }}>{s.value}</div>
+              <div style={{ fontSize: '10px', color: isActive ? (s.color || 'var(--accent)') : 'var(--text3)', marginTop: '2px', fontWeight: isActive ? 600 : 400 }}>{s.label}</div>
+              {s.sub && <div style={{ fontSize: '9px', color: 'var(--text3)', marginTop: '1px' }}>{s.sub}</div>}
+              {isActive && <div style={{ fontSize: '9px', color: s.color || 'var(--accent)', marginTop: '4px', fontWeight: 600 }}>✓ Filtre aktif</div>}
+            </button>
+          )})}
         </div>
       )}
 
@@ -349,7 +367,18 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
           </div>
         )}
 
-        {activeFilters > 0 && !showFilters && (
+        {/* Stat filtresi aktif göstergesi */}
+      {activeStatFilter !== 'all' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', padding: '8px 12px', borderRadius: '10px', background: 'var(--accent-bg)', border: '1px solid var(--accent)' }}>
+          <span style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 600 }}>
+            {activeStatFilter === 'weak' ? '⚠️ Zayıf testler filtreleniyor' : activeStatFilter === 'good' ? '📊 İyi testler filtreleniyor' : '🏆 En iyi test gösteriliyor'}
+          </span>
+          <button onClick={() => setActiveStatFilter('all')} style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+            × Temizle
+          </button>
+        </div>
+      )}
+      {activeFilters > 0 && !showFilters && (
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             {gradeFilter !== 'all' && <FilterTag label={`Sınıf: ${gradeFilter}`} onRemove={() => setGradeFilter('all')} />}
             {scoreFilter !== 'all' && <FilterTag label={scoreFilter === 'good' ? 'İyi testler' : scoreFilter === 'mid' ? 'Orta testler' : 'Zayıf testler'} onRemove={() => setScoreFilter('all')} />}
