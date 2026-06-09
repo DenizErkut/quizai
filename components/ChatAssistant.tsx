@@ -69,9 +69,9 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
     }
   }
 
-  async function quickAsk(text: string) {
+  function quickAsk(text: string) {
     setInput(text)
-    setTimeout(() => {
+    setTimeout(async () => {
       setInput('')
       setMessages(prev => [...prev, { role: 'user', content: text }])
       setLoading(true)
@@ -84,7 +84,7 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
       })
         .then(r => r.json())
         .then(d => setMessages(prev => [...prev, { role: 'assistant', content: d.reply }]))
-        .catch(() => setMessages(prev => [...prev, { role: 'assistant', content: 'Bir hata oluştu.' }]))
+        .catch(() => setMessages(prev => [...prev, { role: 'assistant', content: 'Bir hata olustu.' }]))
         .finally(() => setLoading(false))
     }, 0)
   }
