@@ -211,9 +211,9 @@ export default function LandingPage() {
                   ) : null}
                   <span style={{
                     display: p.logo ? 'none' : 'flex',
-                    fontSize: '24px', alignItems: 'center', justifyContent: 'center',
+                    alignItems: 'center', justifyContent: 'center',
                     width: '100%', height: '100%',
-                    fontWeight: 800, color: p.color, fontSize: '13px', textAlign: 'center',
+                    fontWeight: 800, color: p.color, fontSize: '13px', textAlign: 'center' as const,
                   }}>
                     {p.fallbackText}
                   </span>
