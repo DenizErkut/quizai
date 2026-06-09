@@ -39,8 +39,8 @@ export default function QuizQuestion({
   const progPct = Math.round((current / questions.length) * 100)
   const diff = DIFFICULTIES.find(d => d.value === difficulty)!
 
-    return (
-      <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', background: 'linear-gradient(160deg, #f0f9ff 0%, #ffffff 40%, #fff8e8 100%)' }}>
+  return (
+    <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', background: 'linear-gradient(160deg, #f0f9ff 0%, #ffffff 40%, #fff8e8 100%)' }}>
         <div style={{ position: 'fixed', top: '-120px', right: '-80px', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,207,184,0.07) 0%, transparent 65%)', pointerEvents: 'none', zIndex: 0 }} />
         <div style={{ position: 'fixed', bottom: '60px', left: '-100px', width: '350px', height: '350px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(8,36,101,0.05) 0%, transparent 65%)', pointerEvents: 'none', zIndex: 0 }} />
         <div style={{ maxWidth: '640px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
@@ -373,5 +373,4 @@ export default function QuizQuestion({
         </div>
       </main>
     )
-  }
 }
