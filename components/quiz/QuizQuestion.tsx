@@ -88,7 +88,7 @@ export default function QuizQuestion({
                     else if (i === chosen) { bg = 'var(--red-bg)'; border = 'rgba(220,38,38,0.35)'; color = 'var(--red)' }
                   }
                   return (
-                    <button key={i} onClick={() => choose(i)} disabled={chosen !== null}
+                    <button key={i} onClick={() => onSelectAnswer(i)} disabled={chosen !== null}
                       style={{ textAlign: 'left', padding: '12px 15px', borderRadius: '10px', border: `1.5px solid ${border}`, background: bg, color, fontSize: '14px', lineHeight: 1.45, cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s', fontFamily: 'var(--font-sans)' }}>
                       <span style={{ fontWeight: 700, marginRight: '8px', opacity: 0.5 }}>{String.fromCharCode(65 + i)}.</span>{opt}
                     </button>
@@ -105,7 +105,7 @@ export default function QuizQuestion({
                   const isCorrect = opt.val === q.ans
                   const showResult = chosen !== null
                   return (
-                    <button key={opt.val} onClick={() => choose(opt.val)} disabled={chosen !== null}
+                    <button key={opt.val} onClick={() => onSelectAnswer(opt.val)} disabled={chosen !== null}
                       style={{ flex: 1, padding: '18px', borderRadius: '12px', fontSize: '18px', fontWeight: 700,
                         border: `2px solid ${showResult && isCorrect ? 'rgba(22,163,74,0.5)' : showResult && isChosen && !isCorrect ? 'rgba(220,38,38,0.5)' : 'var(--border)'}`,
                         background: showResult && isCorrect ? 'var(--green-bg)' : showResult && isChosen && !isCorrect ? 'var(--red-bg)' : 'var(--bg2)',
@@ -122,12 +122,12 @@ export default function QuizQuestion({
             {q.type === 'fill_blank' && (
               <div>
                 <input value={fillInput} onChange={e => setFillInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && chosen === null && submitShortAnswer()}
+                  onKeyDown={e => e.key === 'Enter' && chosen === null && onFillSubmit()}
                   disabled={chosen !== null}
                   placeholder="Cevabınızı yazın..."
                   style={{ width: '100%', padding: '14px 16px', borderRadius: '10px', fontSize: '16px', fontFamily: 'var(--font-sans)', border: `2px solid ${chosen !== null ? (answers[answers.length-1]?.correct ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.4)') : 'var(--border)'}`, background: chosen !== null ? (answers[answers.length-1]?.correct ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', outline: 'none', boxSizing: 'border-box', color: 'var(--text)' }} />
                 {chosen === null && (
-                  <button className="btn btn-primary" onClick={submitShortAnswer} disabled={!fillInput.trim() || checkingAnswer}
+                  <button className="btn btn-primary" onClick={onFillSubmit} disabled={!fillInput.trim() || checkingAnswer}
                     style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }}>
                     Cevapla →
                   </button>
@@ -149,7 +149,7 @@ export default function QuizQuestion({
                   rows={3}
                   style={{ width: '100%', padding: '12px 16px', borderRadius: '10px', fontSize: '14px', fontFamily: 'var(--font-sans)', border: '2px solid var(--border)', background: 'var(--bg2)', outline: 'none', resize: 'vertical', boxSizing: 'border-box', color: 'var(--text)' }} />
                 {chosen === null && (
-                  <button className="btn btn-primary" onClick={submitShortAnswer} disabled={!shortInput.trim() || checkingAnswer}
+                  <button className="btn btn-primary" onClick={onFillSubmit} disabled={!shortInput.trim() || checkingAnswer}
                     style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }}>
                     Gönder →
                   </button>
@@ -194,7 +194,7 @@ export default function QuizQuestion({
                   })}
                 </div>
                 {chosen === null && (
-                  <button className="btn btn-primary" onClick={submitMatching}
+                  <button className="btn btn-primary" onClick={() => { const allMatched = q.pairs?.every((_: any, i: number) => matchAnswer[i] !== undefined); if (!allMatched) return; const correct = q.pairs?.every((_: any, i: number) => matchAnswer[i] === i) ?? false; onSelectAnswer(correct ? 0 : -1) }}
                     disabled={Object.keys(matchSelections).length < (q.pairs || []).length}
                     style={{ width: '100%', justifyContent: 'center' }}>
                     Eşleştir →
@@ -216,21 +216,21 @@ export default function QuizQuestion({
               <div>
                 <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px' }}>Öğeleri sürükleyerek doğru sıraya koy:</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {orderItems.map((item, i) => (
+                  {orderAnswer.map((item, i) => (
                     <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 14px', borderRadius: '10px', border: `1.5px solid ${chosen !== null ? ((q.correctOrder || []).indexOf(q.items?.indexOf(item) ?? i) === i ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.3)') : 'var(--border)'}`, background: chosen !== null ? ((q.correctOrder || []).indexOf(q.items?.indexOf(item) ?? i) === i ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', fontSize: '13px', cursor: chosen !== null ? 'default' : 'grab' }}>
                       <span style={{ fontWeight: 700, color: 'var(--text4)', fontSize: '12px', width: '20px' }}>{i + 1}.</span>
                       <span style={{ flex: 1 }}>{item}</span>
                       {chosen === null && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <button onClick={() => i > 0 && moveItem(i, i-1)} disabled={i === 0} style={{ background: 'rgba(8,36,101,0.08)', border: '1px solid rgba(8,36,101,0.15)', borderRadius: '6px', cursor: 'pointer', color: '#082465', fontSize: '20px', padding: '4px 10px', opacity: i === 0 ? 0.3 : 1, lineHeight: 1 }}>▲</button>
-                          <button onClick={() => i < orderItems.length-1 && moveItem(i, i+1)} disabled={i === orderItems.length-1} style={{ background: 'rgba(8,36,101,0.08)', border: '1px solid rgba(8,36,101,0.15)', borderRadius: '6px', cursor: 'pointer', color: '#082465', fontSize: '20px', padding: '4px 10px', opacity: i === orderItems.length-1 ? 0.3 : 1, lineHeight: 1 }}>▼</button>
+                          <button onClick={() => { if (i === 0) return; const a = [...orderAnswer]; [a[i-1], a[i]] = [a[i], a[i-1]]; setOrderAnswer(a) }} disabled={i === 0} style={{ background: 'rgba(8,36,101,0.08)', border: '1px solid rgba(8,36,101,0.15)', borderRadius: '6px', cursor: 'pointer', color: '#082465', fontSize: '20px', padding: '4px 10px', opacity: i === 0 ? 0.3 : 1, lineHeight: 1 }}>▲</button>
+                          <button onClick={() => { if (i >= orderAnswer.length-1) return; const a = [...orderAnswer]; [a[i], a[i+1]] = [a[i+1], a[i]]; setOrderAnswer(a) }} disabled={i === orderAnswer.length-1} style={{ background: 'rgba(8,36,101,0.08)', border: '1px solid rgba(8,36,101,0.15)', borderRadius: '6px', cursor: 'pointer', color: '#082465', fontSize: '20px', padding: '4px 10px', opacity: i === orderAnswer.length-1 ? 0.3 : 1, lineHeight: 1 }}>▼</button>
                         </div>
                       )}
                     </div>
                   ))}
                 </div>
                 {chosen === null && (
-                  <button className="btn btn-primary" onClick={submitOrdering}
+                  <button className="btn btn-primary" onClick={() => { const correct = orderAnswer.every((v, i) => v === q.correctOrder?.[i]); onSelectAnswer(correct ? 0 : -1) }}
                     style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
                     Sıralamayı onayla →
                   </button>
@@ -268,7 +268,7 @@ export default function QuizQuestion({
                     onClick={() => {
                       const stmts = q.statements || []
                       const correct = stmts.every((s: any, i: number) => mTFAnswers[i] === s.correct)
-                      setChosen(correct ? 0 : -1)
+                      onSelectAnswer(correct ? 0 : -1)
                       setAnswers(prev => {
                         const next = [...prev, { userAns: correct ? 0 : -1, correct }]
                         answersRef.current = next
@@ -301,8 +301,8 @@ export default function QuizQuestion({
                 return cWords.some(cw => uWords.some(uw => cw === uw || cw.startsWith(uw) || uw.startsWith(cw)))
               }
               function submitTable() {
-                const allCorrect = tableAnswers.every((ans: string, i: number) => tableCellCorrect(tInputs[i] || '', ans))
-                setChosen(allCorrect ? 0 : -1)
+                const allCorrect = tableAnswers.every((ans: string, i: number) => tableCellCorrect(tableFillAnswer[i] || '', ans))
+                onSelectAnswer(allCorrect ? 0 : -1)
                 setAnswers(prev => {
                   const next = [...prev, { userAns: allCorrect ? 0 : -1, correct: allCorrect }]
                   answersRef.current = next
@@ -328,15 +328,15 @@ export default function QuizQuestion({
                               const isBlank = row.blanks?.includes(ci)
                               if (isBlank) {
                                 const idx = blankIdx++
-                                const isCorrectAns = chosen !== null && tableCellCorrect(tInputs[idx] || '', tableAnswers[idx] || '')
+                                const isCorrectAns = chosen !== null && tableCellCorrect(tableFillAnswer[idx] || '', tableAnswers[idx] || '')
                                 return (
                                   <td key={ci} style={{ padding: '6px 8px', border: '1px solid var(--border)', background: chosen !== null ? (isCorrectAns ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)' }}>
                                     {chosen !== null ? (
                                       <span style={{ fontWeight: 600, color: isCorrectAns ? 'var(--green)' : 'var(--red)' }}>
-                                        {tInputs[idx] || '—'} {!isCorrectAns && <span style={{ fontSize: '11px' }}>→ {tableAnswers[idx]}</span>}
+                                        {tableFillAnswer[idx] || '—'} {!isCorrectAns && <span style={{ fontSize: '11px' }}>→ {tableAnswers[idx]}</span>}
                                       </span>
                                     ) : (
-                                      <input value={tInputs[idx] || ''} onChange={e => { const n = [...tInputs]; n[idx] = e.target.value; setTInputs(n) }}
+                                      <input value={tableFillAnswer[idx] || ''} onChange={e => { const n = [...tableFillAnswer]; n[idx] = e.target.value; setTableFillAnswer(() => n) }}
                                         style={{ width: '100%', padding: '4px 8px', border: '1.5px solid var(--accent)', borderRadius: '6px', fontSize: '13px', fontFamily: 'var(--font-sans)', background: 'var(--bg)', color: 'var(--text)', outline: 'none', boxSizing: 'border-box' }} />
                                     )}
                                   </td>
@@ -350,7 +350,7 @@ export default function QuizQuestion({
                     </table>
                   </div>
                   {chosen === null && (
-                    <button className="btn btn-primary" onClick={submitTable} disabled={tInputs.some(t => !t?.trim())}
+                    <button className="btn btn-primary" onClick={submitTableFn} disabled={tableFillAnswer.some(t => !t?.trim())}
                       style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
                       Tabloyu onayla →
                     </button>
@@ -364,7 +364,7 @@ export default function QuizQuestion({
                 <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', borderLeft: '3px solid var(--accent)', fontSize: '13px', color: 'var(--text2)', lineHeight: 1.65 }}>
                   <strong style={{ color: chosen === q.ans ? 'var(--green)' : 'var(--red)' }}>{chosen === q.ans ? 'Doğru! ' : 'Yanlış. '}</strong>{q.exp}
                 </div>
-                <button className="btn btn-primary" onClick={next} disabled={checkingAnswer || isSavingRef.current} style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}>
+                <button className="btn btn-primary" onClick={onNext} disabled={checkingAnswer || isSavingRef.current} style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}>
                   {current + 1 < questions.length ? 'Sonraki soru →' : (isSavingRef.current ? 'Kaydediliyor...' : 'Sonuçları gör →')}
                 </button>
               </>
