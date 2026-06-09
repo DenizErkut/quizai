@@ -88,10 +88,10 @@ export default function QuizSetup({
                     {dailyLeft === 0 ? '⏰ Günlük limit doldu' : `Bugün ${dailyLeft} test kaldı`}
                   </span>
                 )}
-                {profile.profile?.plan === 'premium' && (
+                {profile?.plan === 'premium' && (
                   <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '11px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid rgba(91,76,245,0.2)', fontWeight: 600 }}>★ Premium</span>
                 )}
-                {profile.profile?.plan === 'unlimited' && (
+                {profile?.plan === 'unlimited' && (
                   <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '11px', background: 'rgba(30,207,184,0.1)', color: '#0d9488', border: '1px solid rgba(30,207,184,0.3)', fontWeight: 600 }}>⭐ Unlimited</span>
                 )}
               </div>
