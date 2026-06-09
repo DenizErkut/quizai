@@ -449,52 +449,53 @@ export async function POST(req: NextRequest) {
 
     let questions = parsed.questions || []
 
-    // Soru doğrulama
-    if (questions.length > 0) {
-      try {
-        const verifyRes = await fetch(`${req.nextUrl.origin}/api/verify-questions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
-          body: JSON.stringify({ questions, topic, grade, language: lang, questionType }),
-        })
-        if (verifyRes.ok) {
-          const verifyData = await verifyRes.json()
-          if (verifyData.questions?.length > 0) {
-            questions = verifyData.questions
-          }
-        }
-      } catch { }
-    }
-
-    // ─── GÖRSEL ÜRETİMİ ─────────────────────────────────────────────────────
+    // Soru doğrulama + SVG üretimi — PARALEL çalışır (timeout optimizasyonu)
     const visualCategory = detectVisualCategory(topic)
     console.log(`[generate-quiz] topic="${topic}" visualCategory=${visualCategory} includeVisuals=${includeVisuals}`)
 
-    if (includeVisuals && visualCategory) {
-      // Her soru için paralel görsel üret (max 4 soru için — Vercel timeout riski)
-      const visualLimit = Math.min(questions.length, 2) // Max 2 görsel — timeout önleme
-      // Sıralı üret — timeout riskini azaltır
-      for (let i = 0; i < visualLimit; i++) {
-        try {
-          const svg = await generateVisualForQuestion(questions[i], visualCategory, topic, grade)
-          if (svg) {
-            questions[i] = { ...questions[i], svg, qtype: 'svg' }
-            console.log(`[generate-quiz] visual generated for q[${i}]`)
-          }
-        } catch(e) {
-          console.warn(`[generate-quiz] visual failed for q[${i}]:`, e)
+    // Verify ve SVG'yi aynı anda başlat
+    const [verifyResult, svgResults] = await Promise.allSettled([
+      // 1. Soru doğrulama
+      questions.length > 0
+        ? fetch(`${req.nextUrl.origin}/api/verify-questions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
+            body: JSON.stringify({ questions, topic, grade, language: lang, questionType }),
+          }).then(r => r.ok ? r.json() : null).catch(() => null)
+        : Promise.resolve(null),
+
+      // 2. SVG üretimi (max 2, paralel)
+      includeVisuals && visualCategory
+        ? Promise.all(
+            Array.from({ length: Math.min(questions.length, 2) }, (_, i) =>
+              generateVisualForQuestion(questions[i], visualCategory, topic, grade)
+                .then(svg => ({ i, svg }))
+                .catch(() => ({ i, svg: null }))
+            )
+          )
+        : Promise.resolve([]),
+    ])
+
+    // Verify sonucunu uygula
+    if (verifyResult.status === 'fulfilled' && verifyResult.value?.questions?.length > 0) {
+      questions = verifyResult.value.questions
+    }
+
+    // SVG sonuçlarını uygula
+    if (svgResults.status === 'fulfilled' && Array.isArray(svgResults.value)) {
+      for (const { i, svg } of svgResults.value as { i: number; svg: string | null }[]) {
+        if (svg && questions[i]) {
+          questions[i] = { ...questions[i], svg, qtype: 'svg' }
+          console.log(`[generate-quiz] visual generated for q[${i}]`)
         }
       }
     }
-    // ────────────────────────────────────────────────────────────────────────
 
     if (!dailyChallenge) {
       await supabase
         .from('profiles')
         .update({
           monthly_test_count: (profile.monthly_test_count || 0) + 1,
-          daily_test_count: dailyCount + 1,
-          daily_test_date: today,
         })
         .eq('id', user.id)
     }
