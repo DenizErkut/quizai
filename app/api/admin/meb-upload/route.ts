@@ -64,12 +64,83 @@ async function embedText(text: string): Promise<{ values: number[] | null; error
   }
 }
 
+
+// Storage'dan PDF oku ve işle (büyük dosyalar için)
+async function processFromStorage(body: {
+  storage_path: string; file_url: string;
+  title: string; grade: string; subject: string; unit: string; level: string
+}) {
+  const { storage_path, file_url, title, grade, subject, unit, level } = body
+
+  // Storage'dan dosyayı indir
+  const { data: fileData, error: dlErr } = await adminDb.storage
+    .from('meb-resources')
+    .download(storage_path)
+
+  if (dlErr || !fileData) {
+    return NextResponse.json({ error: `Storage indirme hatası: ${dlErr?.message}` }, { status: 500 })
+  }
+
+  let rawText = ''
+  try {
+    const pdfParse = require('pdf-parse')
+    const bytes = await fileData.arrayBuffer()
+    const parsed = await pdfParse(Buffer.from(bytes))
+    rawText = parsed.text || ''
+    console.log(`[meb-upload] Storage PDF parsed: ${rawText.length} chars`)
+  } catch (e: any) {
+    console.warn('[meb-upload] pdf-parse failed:', e.message)
+    rawText = `[PDF yüklendi: ${file_url}]`
+  }
+
+  const { data: resource, error: resErr } = await adminDb
+    .from('meb_resources')
+    .insert({ title, grade, subject, unit, level, source_type: 'pdf', file_url, raw_text: rawText })
+    .select('id').single()
+
+  if (resErr || !resource) {
+    return NextResponse.json({ error: `DB kayıt hatası: ${resErr?.message}` }, { status: 500 })
+  }
+
+  const chunks = chunkText(rawText)
+  let embeddedCount = 0, embedError = ''
+
+  for (let i = 0; i < chunks.length; i++) {
+    const { values: embedding, error: embedErr } = await embedText(chunks[i])
+    if (embedErr && !embedError) embedError = embedErr
+
+    await adminDb.from('meb_chunks').insert({
+      resource_id: resource.id, chunk_index: i,
+      content: chunks[i], embedding: embedding ? JSON.stringify(embedding) : null,
+      grade, subject, unit, level,
+    })
+    if (embedding) embeddedCount++
+    if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 200))
+  }
+
+  return NextResponse.json({
+    success: true, resource_id: resource.id,
+    chunks: chunks.length, embedded: embeddedCount,
+    chars: rawText.length, warning: embedError || undefined,
+  })
+}
+
 export async function POST(req: NextRequest) {
   const user = await getAdminUser()
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
-    const form = await req.formData()
+    const body = await req.json().catch(() => null)
+
+    // JSON body: storage-path mode (büyük PDF'ler için)
+    if (body && body.storage_path) {
+      return await processFromStorage(body)
+    }
+
+    // FormData mode (küçük dosyalar / metin için)
+    const form = await req.formData().catch(() => null)
+    if (!form) return NextResponse.json({ error: 'Geçersiz istek' }, { status: 400 })
+
     const file = form.get('file') as File | null
     const title = form.get('title') as string
     const grade = form.get('grade') as string
@@ -85,7 +156,6 @@ export async function POST(req: NextRequest) {
     let rawText = rawTextInput || ''
     let fileUrl: string | null = null
 
-    // PDF yüklendiyse — Storage'a kaydet + metin çıkar
     if (file && file.size > 0) {
       const ext = file.name.split('.').pop()
       const path = `${level}/${subject}/${unit.replace(/\s+/g, '_')}_${Date.now()}.${ext}`
@@ -103,7 +173,6 @@ export async function POST(req: NextRequest) {
       const { data: urlData } = adminDb.storage.from('meb-resources').getPublicUrl(path)
       fileUrl = urlData?.publicUrl || null
 
-      // PDF ise metin çıkar
       if (ext === 'pdf' && !rawText) {
         try {
           const pdfParse = require('pdf-parse')
@@ -111,7 +180,7 @@ export async function POST(req: NextRequest) {
           rawText = parsed.text || ''
           console.log(`[meb-upload] PDF parsed: ${rawText.length} chars`)
         } catch (e) {
-          console.warn('[meb-upload] pdf-parse failed, using empty text')
+          console.warn('[meb-upload] pdf-parse failed')
         }
       }
     }

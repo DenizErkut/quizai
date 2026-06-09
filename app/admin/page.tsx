@@ -928,17 +928,58 @@ export default function AdminPage() {
                 setMebUploading(true)
                 setMebMsg('')
                 try {
-                  const fd = new FormData()
-                  fd.append('title', mebForm.title)
-                  fd.append('grade', mebForm.grade)
-                  fd.append('subject', mebForm.subject)
-                  fd.append('unit', mebForm.unit)
-                  fd.append('level', mebForm.level)
-                  fd.append('raw_text', mebForm.raw_text)
-                  if (mebFile) fd.append('file', mebFile)
+                  let res: Response
+                  let data: any
 
-                  const res = await fetch('/api/admin/meb-upload', { method: 'POST', body: fd })
-                  const data = await res.json()
+                  // Büyük dosya (>4MB) → önce Supabase Storage'a yükle
+                  if (mebFile && mebFile.size > 4 * 1024 * 1024) {
+                    setMebMsg('📤 Büyük dosya Supabase Storage'a yükleniyor...')
+                    const { createClient } = await import('@supabase/supabase-js')
+                    const sb = createClient(
+                      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+                    )
+                    const ext = mebFile.name.split('.').pop()
+                    const storagePath = `${mebForm.level}/${mebForm.subject}/${mebForm.unit.replace(/\s+/g, '_')}_${Date.now()}.${ext}`
+                    const { error: upErr } = await sb.storage
+                      .from('meb-resources')
+                      .upload(storagePath, mebFile, { contentType: mebFile.type, upsert: true })
+
+                    if (upErr) {
+                      setMebMsg(`❌ Storage yükleme hatası: ${upErr.message}`)
+                      setMebUploading(false); return
+                    }
+
+                    const { data: urlData } = sb.storage.from('meb-resources').getPublicUrl(storagePath)
+                    setMebMsg('⚙️ PDF işleniyor ve chunk'lanıyor...')
+
+                    res = await fetch('/api/admin/meb-upload', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        storage_path: storagePath,
+                        file_url: urlData.publicUrl,
+                        title: mebForm.title,
+                        grade: mebForm.grade,
+                        subject: mebForm.subject,
+                        unit: mebForm.unit,
+                        level: mebForm.level,
+                      })
+                    })
+                  } else {
+                    // Küçük dosya veya metin → direkt FormData
+                    const fd = new FormData()
+                    fd.append('title', mebForm.title)
+                    fd.append('grade', mebForm.grade)
+                    fd.append('subject', mebForm.subject)
+                    fd.append('unit', mebForm.unit)
+                    fd.append('level', mebForm.level)
+                    fd.append('raw_text', mebForm.raw_text)
+                    if (mebFile) fd.append('file', mebFile)
+                    res = await fetch('/api/admin/meb-upload', { method: 'POST', body: fd })
+                  }
+
+                  data = await res.json()
                   if (res.ok) {
                     const warn = data.warning ? ` ⚠️ ${data.warning}` : ''
                     setMebMsg(`✅ Yüklendi! ${data.chunks} chunk, ${data.embedded} embedding, ${(data.chars/1000).toFixed(1)}K karakter${warn}`)
