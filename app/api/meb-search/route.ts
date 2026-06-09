@@ -26,6 +26,13 @@ async function embedQuery(text: string): Promise<number[] | null> {
 }
 
 export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  const token = authHeader.slice(7)
+  const sbAuth = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  const { data: { user } } = await sbAuth.auth.getUser(token)
+  if (!user) return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 })
+
   try {
     const { topic, grade, subject, unit, level, limit = 4 } = await req.json()
 

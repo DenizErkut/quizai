@@ -1,21 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+// NEXT_PUBLIC_SUPABASE_ANON_KEY used for auth verification
 
 export async function POST(req: NextRequest) {
+  // Auth kontrolü — userId artık token'dan alınıyor, body'den değil
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  const token = authHeader.slice(7)
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const anonSb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  const { data: { user: authUser } } = await anonSb.auth.getUser(token)
+  if (!authUser) return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 })
+
   try {
     const body = await req.json()
-    console.log(`[save-quiz] START sessionId=${body?.sessionId} userId=${body?.userId} score=${body?.score}`)
+    console.log(`[save-quiz] START sessionId=${body?.sessionId} userId=${authUser.id} score=${body?.score}`)
 
-    const { sessionId, answers, score, userId } = body
+    const { sessionId, answers, score } = body
+    const userId = authUser.id // Token'dan al, body'den değil
 
     if (!sessionId || !userId) {
       return NextResponse.json({ error: 'Missing params' }, { status: 400 })
     }
-
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
 
     // Get session
     const { data: session, error: sessionErr } = await supabase

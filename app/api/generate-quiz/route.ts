@@ -260,7 +260,7 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('plan, monthly_test_count, grade, language')
+      .select('plan, monthly_test_count, daily_test_count, daily_test_date, grade, language')
       .eq('id', user.id)
       .single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
@@ -268,8 +268,14 @@ export async function POST(req: NextRequest) {
     const plan = profile.plan || 'free'
     const today = new Date().toISOString().split('T')[0]
 
-    // Günlük limit kaldırıldı — artık sadece aylık limit var
-    const MONTHLY_LIMIT: Record<string, number> = { free: 10, premium: 300, unlimited: 99999 }
+    const DAILY_LIMIT: Record<string, number> = { free: 10, premium: 25, unlimited: 99999 }
+    const dailyLimit = DAILY_LIMIT[plan] ?? 10
+    const dailyCount = profile.daily_test_date === today ? (profile.daily_test_count || 0) : 0
+    if (dailyCount >= dailyLimit) {
+      return NextResponse.json({ error: 'daily_limit_reached' }, { status: 429 })
+    }
+
+    const MONTHLY_LIMIT: Record<string, number> = { free: 10, premium: 200, unlimited: 99999 }
     const monthlyLimit = MONTHLY_LIMIT[plan] ?? 10
     if ((profile.monthly_test_count || 0) >= monthlyLimit) {
       return NextResponse.json({ error: 'limit_reached' }, { status: 429 })
@@ -446,7 +452,7 @@ export async function POST(req: NextRequest) {
       try {
         const verifyRes = await fetch(`${req.nextUrl.origin}/api/verify-questions`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
           body: JSON.stringify({ questions, topic, grade, language: lang, questionType }),
         })
         if (verifyRes.ok) {
@@ -485,6 +491,8 @@ export async function POST(req: NextRequest) {
         .from('profiles')
         .update({
           monthly_test_count: (profile.monthly_test_count || 0) + 1,
+          daily_test_count: dailyCount + 1,
+          daily_test_date: today,
         })
         .eq('id', user.id)
     }

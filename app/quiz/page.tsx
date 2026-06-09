@@ -864,8 +864,8 @@ function QuizPageContent() {
         try {
           const saveRes = await fetch('/api/save-quiz', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId, answers: finalAnswers, score, userId: currentUser.id }),
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+            body: JSON.stringify({ sessionId, answers: finalAnswers, score }),
           })
           if (!saveRes.ok) {
             const err = await saveRes.json().catch(() => ({}))

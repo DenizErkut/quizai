@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
 interface Question {
   q: string; opts: string[]; ans: number; exp: string
@@ -49,15 +50,14 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
     setLoading(true)
 
     try {
+      const supabase = createClient() as any
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
         body: JSON.stringify({
           messages: [...messages, { role: 'user', content: userMsg }],
-          topic,
-          language,
-          questions,
-          answers,
+          topic, language, questions, answers,
         }),
       })
       const data = await res.json()
@@ -69,15 +69,17 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
     }
   }
 
-  function quickAsk(text: string) {
+  async function quickAsk(text: string) {
     setInput(text)
     setTimeout(() => {
       setInput('')
       setMessages(prev => [...prev, { role: 'user', content: text }])
       setLoading(true)
+      const supabase2 = createClient() as any
+      const { data: { session: sess2 } } = await supabase2.auth.getSession()
       fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sess2?.access_token}` },
         body: JSON.stringify({ messages: [...messages, { role: 'user', content: text }], topic, language, questions, answers }),
       })
         .then(r => r.json())
