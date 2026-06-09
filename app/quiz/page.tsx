@@ -394,6 +394,10 @@ function QuizPageContent() {
   const [orderItems, setOrderItems] = useState<string[]>([])
   const [fillInput, setFillInput] = useState('')
   const [checkingAnswer, setCheckingAnswer] = useState(false)
+  const [orderAnswer, setOrderAnswer] = useState<number[]>([])
+  const [matchAnswer, setMatchAnswer] = useState<Record<number, number>>({})
+  const [multiTFAnswer, setMultiTFAnswer] = useState<Record<number, boolean | null>>({})
+  const [tableFillAnswer, setTableFillAnswer] = useState<string[]>([])
   const [mTFAnswers, setMTFAnswers] = useState<Record<number, boolean | null>>({})
   const [tInputs, setTInputs] = useState<string[]>([])
 
