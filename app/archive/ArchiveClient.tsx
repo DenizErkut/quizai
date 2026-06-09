@@ -185,6 +185,12 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
   const [exportingId, setExportingId] = useState<string | null>(null) // ✅ YENİ
 
   const grades = useMemo(() => [...new Set(sessions.map(s => s.grade))].filter(Boolean).sort(), [sessions])
+
+  // En iyi testin ID'si — sessions'dan doğrudan hesapla (stats'tan bağımsız)
+  const bestSessionId = useMemo(() => {
+    if (!sessions.length) return null
+    return sessions.reduce((a, s) => s.pct > a.pct ? s : a).id
+  }, [sessions])
   const types = useMemo(() => [...new Set(sessions.map(s => s.question_type).filter(Boolean))], [sessions])
 
   const filtered = useMemo(() => {
@@ -200,7 +206,7 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
         // Stat kartı filtreleri
         if (activeStatFilter === 'weak' && s.pct >= 55) return false
         if (activeStatFilter === 'good' && s.pct < 80) return false
-        if (activeStatFilter === 'best' && stats && s.id !== stats.best.id) return false
+        if (activeStatFilter === 'best' && bestSessionId && s.id !== bestSessionId) return false
         if (dateFilter === 'week' && now - new Date(s.created_at).getTime() > 7 * 86400000) return false
         if (dateFilter === 'month' && now - new Date(s.created_at).getTime() > 30 * 86400000) return false
         return true
@@ -210,7 +216,7 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
         if (sortBy === 'pct_desc') return b.pct - a.pct
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       })
-  }, [sessions, search, gradeFilter, typeFilter, scoreFilter, dateFilter, sortBy, activeStatFilter])
+  }, [sessions, search, gradeFilter, typeFilter, scoreFilter, dateFilter, sortBy, activeStatFilter, bestSessionId])
 
   const stats = useMemo(() => {
     if (!sessions.length) return null
