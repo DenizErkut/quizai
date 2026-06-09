@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+export const maxDuration = 60
+export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 
@@ -11,6 +13,17 @@ export async function POST(req: NextRequest) {
   const sbAuth = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
   const { data: { user } } = await sbAuth.auth.getUser(token)
   if (!user) return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 })
+
+  // Rate limiting — 30 istek/gün
+  try {
+    const rlDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+    const today = new Date().toISOString().split('T')[0]
+    const { data: rl } = await rlDb.from('api_rate_limits').select('id, count').eq('user_id', user.id).eq('endpoint', 'chat').eq('window_date', today).maybeSingle()
+    if (rl) {
+      if (rl.count >= 30) return NextResponse.json({ error: 'Günlük chat limiti aşıldı.', limit: 30 }, { status: 429 })
+      await rlDb.from('api_rate_limits').update({ count: rl.count + 1 }).eq('id', rl.id)
+    } else { await rlDb.from('api_rate_limits').insert({ user_id: user.id, endpoint: 'chat', count: 1, window_date: today }) }
+  } catch { /* devam et */ }
 
   try {
     const { messages, topic, language, questions, answers } = await req.json()
