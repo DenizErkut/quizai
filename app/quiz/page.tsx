@@ -310,6 +310,28 @@ function QuizPageContent() {
   const [openSubject, setOpenSubject] = useState<string | null>(null) // Accordion
   const [advancedOpen, setAdvancedOpen] = useState(false) // Gelişmiş ayarlar
   const [favorites, setFavorites] = useState<string[]>([]) // Favori konular
+  const [mebTopics, setMebTopics] = useState<Record<string, string[]>>({}) // MEB'den yüklenen konular
+
+  // MEB kaynaklarından konuları çek
+  useEffect(() => {
+    async function loadMebTopics() {
+      try {
+        const res = await fetch('/api/admin/meb-upload')
+        if (!res.ok) return
+        const data = await res.json()
+        const map: Record<string, string[]> = {}
+        for (const r of (data.resources || [])) {
+          const key = r.subject || 'Diğer'
+          if (!map[key]) map[key] = []
+          if (r.unit && !map[key].includes(r.unit)) {
+            map[key].push(r.unit)
+          }
+        }
+        setMebTopics(map)
+      } catch {}
+    }
+    loadMebTopics()
+  }, [])
 
   // localStorage'dan favori ve son ayarları yükle
   useEffect(() => {
@@ -1061,29 +1083,61 @@ function QuizPageContent() {
 
             {openSubject && (SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul)[openSubject] && (
               <div style={{
-                maxHeight: '180px', overflowY: 'auto', padding: '10px 12px',
+                maxHeight: '240px', overflowY: 'auto', padding: '10px 12px',
                 borderRadius: '12px', border: '1.5px solid var(--accent)',
-                background: 'var(--accent-bg)', display: 'flex', flexWrap: 'wrap', gap: '7px',
+                background: 'var(--accent-bg)', display: 'flex', flexDirection: 'column', gap: '10px',
                 scrollbarWidth: 'thin',
               }}>
-                {(SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul)[openSubject].map((topic: string) => (
-                  <div key={topic} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                    <button onClick={() => { setSelectedTopic(topic); setCustomTopic(''); setOpenSubject(null) }}
-                      style={{
-                        padding: '5px 10px', borderRadius: '99px', fontSize: '12px', fontWeight: 500,
-                        cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
-                        border: `1px solid ${selectedTopic === topic ? 'var(--accent)' : 'var(--border)'}`,
-                        background: selectedTopic === topic ? 'var(--accent)' : 'var(--bg)',
-                        color: selectedTopic === topic ? '#fff' : 'var(--text)', whiteSpace: 'nowrap',
-                      }}>
-                      {topic}
-                    </button>
-                    <button onClick={() => toggleFavorite(topic)} title={favorites.includes(topic) ? 'Favorilerden çıkar' : 'Favorilere ekle'}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', opacity: favorites.includes(topic) ? 1 : 0.35, padding: '2px', transition: 'opacity 0.15s' }}>
-                      ⭐
-                    </button>
+                {/* Standart konular */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
+                  {(SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul)[openSubject].map((topic: string) => (
+                    <div key={topic} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <button onClick={() => { setSelectedTopic(topic); setCustomTopic(''); setOpenSubject(null) }}
+                        style={{
+                          padding: '5px 10px', borderRadius: '99px', fontSize: '12px', fontWeight: 500,
+                          cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
+                          border: `1px solid ${selectedTopic === topic ? 'var(--accent)' : 'var(--border)'}`,
+                          background: selectedTopic === topic ? 'var(--accent)' : 'var(--bg)',
+                          color: selectedTopic === topic ? '#fff' : 'var(--text)', whiteSpace: 'nowrap',
+                        }}>
+                        {topic}
+                      </button>
+                      <button onClick={() => toggleFavorite(topic)} title={favorites.includes(topic) ? 'Favorilerden çıkar' : 'Favorilere ekle'}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', opacity: favorites.includes(topic) ? 1 : 0.35, padding: '2px', transition: 'opacity 0.15s' }}>
+                        ⭐
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* MEB yüklü konular */}
+                {mebTopics[openSubject] && mebTopics[openSubject].length > 0 && (
+                  <div>
+                    <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span>📚</span> MEB Müfredatı
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
+                      {mebTopics[openSubject].map((unit: string) => (
+                        <div key={unit} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <button onClick={() => { setSelectedTopic(unit); setCustomTopic(''); setOpenSubject(null) }}
+                            style={{
+                              padding: '5px 10px', borderRadius: '99px', fontSize: '12px', fontWeight: 500,
+                              cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
+                              border: `1.5px solid ${selectedTopic === unit ? '#0d9488' : 'rgba(13,148,136,0.3)'}`,
+                              background: selectedTopic === unit ? '#0d9488' : 'rgba(13,148,136,0.06)',
+                              color: selectedTopic === unit ? '#fff' : '#0d9488', whiteSpace: 'nowrap',
+                            }}>
+                            {unit}
+                          </button>
+                          <button onClick={() => toggleFavorite(unit)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', opacity: favorites.includes(unit) ? 1 : 0.35, padding: '2px' }}>
+                            ⭐
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
+                )}
               </div>
             )}
 
