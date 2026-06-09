@@ -1193,6 +1193,8 @@ function QuizPageContent() {
         setMultiTFAnswer={setMultiTFAnswer}
         setTableFillAnswer={setTableFillAnswer}
         onFinish={() => setScreen('result')}
+        shuffledPairs={shuffledPairs}
+        shuffledIndexMap={shuffledIndexMap}
       />
     )
   }

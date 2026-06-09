@@ -25,6 +25,8 @@ interface QuizQuestionProps {
   setMultiTFAnswer: (fn: (prev: Record<number, boolean | null>) => Record<number, boolean | null>) => void
   setTableFillAnswer: (fn: (prev: string[]) => string[]) => void
   onFinish: () => void
+  shuffledPairs: string[]
+  shuffledIndexMap: number[]
 }
 
 export default function QuizQuestion({
@@ -34,6 +36,8 @@ export default function QuizQuestion({
   onSelectAnswer, onFillSubmit, onNext, setFillInput, setShortInput,
   setOrderAnswer, setMatchAnswer, setMultiTFAnswer, setTableFillAnswer,
   onFinish,
+  shuffledPairs,
+  shuffledIndexMap,
 }: QuizQuestionProps) {
   const q = questions[current]
   const progPct = Math.round((current / questions.length) * 100)
@@ -169,9 +173,9 @@ export default function QuizQuestion({
                   <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', paddingBottom: '4px' }}>Kavram</div>
                   <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', paddingBottom: '4px' }}>Tanım</div>
                   {(q.pairs || []).map((pair: any, i: number) => {
-                    // matchSelections[i] = kullanıcının seçtiği shuffledPairs index'i
+                    // matchAnswer[i] = kullanıcının seçtiği shuffledPairs index'i
                     // Doğru cevap: shuffledIndexMap[seçilen] === i (orijinal index eşleşmeli)
-                    const userShuffledIdx = matchSelections[i]
+                    const userShuffledIdx = matchAnswer[i]
                     const isAnswered = chosen !== null && userShuffledIdx !== undefined
                     const isCorrect = isAnswered && shuffledIndexMap[userShuffledIdx] === i
                     return (
@@ -195,7 +199,7 @@ export default function QuizQuestion({
                 </div>
                 {chosen === null && (
                   <button className="btn btn-primary" onClick={() => { const allMatched = q.pairs?.every((_: any, i: number) => matchAnswer[i] !== undefined); if (!allMatched) return; const correct = q.pairs?.every((_: any, i: number) => matchAnswer[i] === i) ?? false; onSelectAnswer(correct ? 0 : -1) }}
-                    disabled={Object.keys(matchSelections).length < (q.pairs || []).length}
+                    disabled={Object.keys(matchAnswer).length < (q.pairs || []).length}
                     style={{ width: '100%', justifyContent: 'center' }}>
                     Eşleştir →
                   </button>
