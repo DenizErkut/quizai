@@ -51,7 +51,6 @@ export default function QuizSetup({
   return (
     <>
     <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', position: 'relative', overflow: 'hidden', background: 'linear-gradient(160deg, #f0f9ff 0%, #ffffff 40%, #fff8e8 100%)' }}>
-      {showPaywall && <PaywallModal reason={showPaywall} />}
       {/* Dekoratif arka plan elementleri */}
       <div style={{ position: 'fixed', top: '-120px', right: '-80px', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,207,184,0.08) 0%, transparent 65%)', pointerEvents: 'none', zIndex: 0 }} />
       <div style={{ position: 'fixed', bottom: '60px', left: '-100px', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(8,36,101,0.06) 0%, transparent 65%)', pointerEvents: 'none', zIndex: 0 }} />
@@ -411,7 +410,7 @@ export default function QuizSetup({
 
           <button className="btn btn-primary btn-lg" onClick={() => {
             if (dailyLeft === 0) { setShowPaywall('daily'); return }
-            if (testsLeft === 0) { setScreen('limit'); return }
+            if (testsLeft === 0) { onStartQuiz(); return }
             startQuiz()
           }}
             style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', opacity: (testsLeft === 0 || dailyLeft === 0) ? 0.5 : 1 }}>
