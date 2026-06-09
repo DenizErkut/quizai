@@ -182,7 +182,7 @@ export default function QuizSetup({
                             }}>
                             {unit}
                           </button>
-                          <button onClick={() => toggleFavorite(unit)}
+                          <button onClick={() => onToggleFavorite(unit)}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', opacity: favorites.includes(unit) ? 1 : 0.35, padding: '2px' }}>
                             ⭐
                           </button>
@@ -210,7 +210,7 @@ export default function QuizSetup({
                           }}>
                           {topic}
                         </button>
-                        <button onClick={() => toggleFavorite(topic)}
+                        <button onClick={() => onToggleFavorite(topic)}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', opacity: favorites.includes(topic) ? 1 : 0.35, padding: '2px', transition: 'opacity 0.15s' }}>
                           ⭐
                         </button>
@@ -224,9 +224,9 @@ export default function QuizSetup({
             {selectedTopic && (
               <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 600 }}>✓ Seçilen: {selectedTopic}</span>
-                <button onClick={() => toggleFavorite(selectedTopic)} title={favorites.includes(selectedTopic) ? 'Favorilerden çıkar' : 'Favorilere ekle'}
+                <button onClick={() => onToggleFavorite(selectedTopic)} title={favorites.includes(selectedTopic) ? 'Favorilerden çıkar' : 'Favorilere ekle'}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', opacity: favorites.includes(selectedTopic) ? 1 : 0.4, padding: 0 }}>⭐</button>
-                <button onClick={() => fetchTopicSummary(selectedTopic)}
+                <button onClick={() => onFetchSummary(selectedTopic)}
                   style={{ padding: '4px 10px', borderRadius: '8px', border: '1.5px solid rgba(99,102,241,0.4)', background: 'rgba(99,102,241,0.08)', color: '#6366f1', fontSize: '11px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   📖 Konuya Hızlı Bak
                 </button>
@@ -415,7 +415,7 @@ export default function QuizSetup({
           <button className="btn btn-primary btn-lg" onClick={() => {
             if (dailyLeft === 0) { onStartQuiz(); return }
             if (testsLeft === 0) { onStartQuiz(); return }
-            startQuiz()
+            onStartQuiz()
           }}
             style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', opacity: (testsLeft === 0 || dailyLeft === 0) ? 0.5 : 1 }}>
             {testsLeft === 0 ? 'Test hakkın doldu — Yükselt' : dailyLeft === 0 ? 'Günlük limit doldu ⏰' : 'Test oluştur ⚡'}
