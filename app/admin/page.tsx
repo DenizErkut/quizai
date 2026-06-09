@@ -937,7 +937,7 @@ export default function AdminPage() {
                   // Büyük dosya: signed URL ile
                   let fileUrl = ''
                   if (examFile.size > 4 * 1024 * 1024) {
-                    setExamMsg('1/3 Storage'a yukleniyor...')
+                    setExamMsg("1/3 Storage yukleniyor...")
                     const signRes = await fetch(`/api/admin/meb-signed-upload?file_name=${encodeURIComponent(examFile.name)}&level=${examForm.exam_type}&subject=${encodeURIComponent(examForm.subject || 'genel')}&unit=${examForm.year}`)
                     const signData = await signRes.json()
                     if (!signRes.ok) { setExamMsg('❌ ' + signData.error); setExamUploading(false); return }
