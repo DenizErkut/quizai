@@ -6,12 +6,298 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import FileUploader, { type UploadedFile } from '@/components/FileUploader'
 import QuizResult from '@/components/QuizResult'
-import QuizSetup, { type QuizSetupConfig } from '@/components/quiz/QuizSetup'
+import QuizSetup from '@/components/quiz/QuizSetup'
 import QuizQuestion from '@/components/quiz/QuizQuestion'
-import {
-  getActiveLang, TOPIC_MAP, DIFFICULTIES,
-  type QuestionType, type Question, type Profile, type Screen
-} from '@/lib/quiz-constants'
+
+type QuestionType = 'multiple_choice' | 'fill_blank' | 'matching' | 'true_false' | 'ordering' | 'short_answer' | 'multi_true_false' | 'table_fill' | 'mixed'
+
+interface Question {
+  q: string; opts: string[]; ans: number; exp: string
+  svg?: string | null; qtype?: 'text' | 'svg'
+  // Yeni soru tipleri
+  type?: QuestionType
+  blank?: string          // boşluk doldurma: doğru cevap
+  pairs?: {left:string; right:string}[]  // eşleştirme
+  items?: string[]        // sıralama: karışık liste
+  correctOrder?: number[] // sıralama: doğru sıra
+  statement?: boolean     // D/Y: doğru mu?
+  statements?: {text: string; correct: boolean}[]  // çoklu D/Y (Maarif)
+  tableData?: {headers: string[]; rows: {cells: string[]; blanks: number[]}[]} // tablo (Maarif)
+  tableAnswers?: string[] // tablo: doğru cevaplar sırayla
+}
+interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number; daily_test_count?: number; daily_test_date?: string; onboarding_completed?: boolean }
+
+// MEB müfredatına göre ders ve konu haritası
+const SUBJECT_MAP: Record<string, Record<string, string[]>> = {
+  ilkokul: {
+    'Matematik': [
+      'Doğal sayılar', 'Toplama işlemi', 'Çıkarma işlemi', 'Çarpma işlemi', 'Bölme işlemi',
+      'Çarpım tablosu', 'Kesirler', 'Ondalık gösterim', 'Ölçme ve ölçü birimleri',
+      'Geometrik şekiller', 'Simetri', 'Örüntüler', 'Problem çözme', 'Zaman ölçme',
+    ],
+    'Türkçe': [
+      'Okuma ve anlama', 'Dinleme becerileri', 'Konuşma becerileri', 'Yazma becerileri',
+      'Sözcük ve anlam', 'Cümle bilgisi', 'Yazım kuralları', 'Noktalama işaretleri',
+      'Metin türleri', 'Şiir ve duygu', 'Atasözleri ve deyimler',
+    ],
+    'Fen Bilimleri': [
+      'Canlılar dünyası', 'Bitkiler ve hayvanlar', 'İnsan vücudu', 'Duyu organları',
+      'Madde ve özellikleri', 'Kuvvet ve hareket', 'Işık ve ses', 'Hava ve iklim',
+      'Mevsimler', 'Çevre ve doğa', 'Geri dönüşüm', 'Sağlıklı yaşam',
+    ],
+    'Sosyal Bilgiler': [
+      'Aile ve toplum', 'Yakın çevre', 'Türkiye haritası', 'Ülkemizin güzellikleri',
+      'Milli değerler', 'Atatürk ve Kurtuluş Savaşı', 'Haklar ve sorumluluklar',
+      'Üretim ve tüketim', 'Doğal kaynaklar', 'Kültürel miras',
+    ],
+    'Din Kültürü ve Ahlak Bilgisi': [
+      'Allah inancı', 'Peygamberler', 'Namaz ve ibadet', 'Ahlaki değerler',
+      'Dini bayramlar', 'Kuran-ı Kerim', 'Dua ve zihin',
+    ],
+    'Hayat Bilgisi': [
+      'Okul heyecanım', 'Benim eşsiz yuvam', 'Dün bugün yarın',
+      'Sağlıklı yaşam', 'Güvenli yaşam', 'Doğa ve çevre',
+    ],
+  },
+
+  ortaokul: {
+    'Matematik': [
+      'Tam sayılar ve işlemler', 'Ondalık sayılar', 'Kesirler ve işlemler',
+      'Oran ve orantı', 'Yüzdeler', 'Asal çarpanlara ayırma', 'OBEB ve OKEK',
+      'Denklemler ve eşitsizlikler', 'Cebirsel ifadeler', 'Koordinat sistemi',
+      'Üçgenler ve özellikler', 'Dörtgenler', 'Çember ve daire',
+      'Alan ve çevre hesaplama', 'Hacim', 'Veri analizi ve grafik', 'Olasılık',
+      'Örüntü ve ilişkiler', 'Rasyonel sayılar', 'Üslü ifadeler', 'Kareköklü ifadeler',
+    ],
+    'Fen Bilimleri': [
+      'Hücre ve yapısı', 'Hücre organelleri', 'Canlıların sınıflandırılması',
+      'Fotosentez', 'Solunum', 'Sindirim sistemi', 'Dolaşım sistemi',
+      'Boşaltım sistemi', 'Destek ve hareket sistemi', 'Sinir sistemi',
+      'Üreme ve gelişme', 'Kalıtım', 'Ekosistem ve biyoçeşitlilik',
+      'Madde ve atom', 'Elementler ve bileşikler', 'Kimyasal tepkimeler',
+      'Asit ve bazlar', 'Kuvvet ve enerji', 'Basınç', 'Elektrik',
+      'Manyetizma', 'Işık ve ses', 'Dalgalar', 'Güneş sistemi',
+    ],
+    'Türkçe': [
+      'Sözcük türleri', 'İsim ve isim çekimi', 'Sıfatlar', 'Zarflar', 'Zamirler',
+      'Fiiller ve çekimi', 'Cümle çeşitleri', 'Cümle ögeleri',
+      'Anlam bilgisi', 'Sözcükte anlam', 'Paragraf', 'Metin türleri',
+      'Hikaye edici metin', 'Bilgilendirici metin', 'Şiir bilgisi',
+      'Yazım kuralları', 'Noktalama işaretleri', 'Anlatım bozukluğu',
+    ],
+    'T.C. İnkılap Tarihi ve Atatürkçülük': [
+      'Osmanlı Devleti son dönem', 'I. Dünya Savaşı', 'Mondros Ateşkesi',
+      'Kurtuluş Savaşı hazırlık dönemi', 'Misak-ı Millî', 'TBMM açılışı',
+      'Cepheler ve savaşlar', 'Mudanya Ateşkesi', 'Lozan Antlaşması',
+      'Cumhuriyetin ilanı', 'Atatürk ilkeleri', 'İnkılaplar',
+      'Siyasi alanda yenilikler', 'Eğitimde yenilikler', 'Ekonomik yenilikler',
+    ],
+    'Sosyal Bilgiler': [
+      'Birey ve kimlik', 'Kültür ve miras', 'İnsanlar yerler çevreler',
+      'Üretim dağıtım tüketim', 'Bilim teknoloji toplum',
+      'Gruplar kurumlar sosyal örgütler', 'Küresel bağlantılar',
+      'Türkiye coğrafyası', 'Nüfus ve yerleşme', 'Ekonomik faaliyetler',
+      'Türk tarihinde yolculuk', 'Demokrasi ve insan hakları',
+    ],
+    'İngilizce': [
+      'Greetings and introductions', 'Present simple tense', 'Present continuous',
+      'Past simple tense', 'Future tense (will/going to)', 'Modals (can/must/should)',
+      'Comparatives and superlatives', 'Prepositions', 'Question words',
+      'Vocabulary: family', 'Vocabulary: food and health', 'Vocabulary: environment',
+      'Reading comprehension', 'Listening skills', 'Writing paragraphs',
+    ],
+    'Din Kültürü ve Ahlak Bilgisi': [
+      'Allah ve sıfatları', 'Melekler', 'Kitaplar', 'Peygamberler', 'Ahiret inancı',
+      'Kader', 'İbadetler', 'Namaz', 'Oruç', 'Zekat', 'Hac',
+      'Kuran-ı Kerim', 'Hz. Muhammed', 'Ahlaki değerler', 'Dini bayramlar',
+    ],
+    'Görsel Sanatlar': [
+      'Renk teorisi', 'Perspektif', 'Sanat akımları', 'Türk sanatı', 'Heykel ve seramik',
+    ],
+    'Müzik': [
+      'Nota bilgisi', 'Ritim', 'Türk halk müziği', 'Türk sanat müziği', 'Evrensel müzik',
+    ],
+    'Beden Eğitimi': [
+      'Atletizm', 'Jimnastik', 'Takım sporları', 'Sağlıklı yaşam', 'Oyun ve spor',
+    ],
+  },
+
+  lise: {
+    'Matematik': [
+      'Mantık', 'Kümeler', 'Denklemler ve eşitsizlikler', 'Üslü ve köklü sayılar',
+      'Mutlak değer', 'Polinomlar', 'Rasyonel ifadeler', 'Fonksiyonlar',
+      'Birinci ve ikinci dereceden fonksiyonlar', 'Trigonometri', 'Logaritma',
+      'Diziler (aritmetik ve geometrik)', 'Limit ve süreklilik', 'Türev',
+      'Türevin uygulamaları', 'İntegral', 'İntegralin uygulamaları',
+      'Analitik geometri', 'Vektörler', 'Matrisler', 'Kombinasyon ve permütasyon',
+      'Binom açılımı', 'Olasılık', 'İstatistik', 'Karmaşık sayılar',
+    ],
+    'Fizik': [
+      'Fizik bilimine giriş', 'Madde ve özellikleri', 'Kuvvet ve hareket',
+      'Newton yasaları', 'İş güç enerji', 'İtme ve momentum', 'Tork ve açısal hareket',
+      'Basit harmonik hareket', 'Dalgalar', 'Ses dalgaları', 'Işık ve optik',
+      'Elektrostatik', 'Elektrik akımı', 'Manyetizma', 'Elektromanyetik indüksiyon',
+      'Atom fiziği', 'Nükleer fizik', 'Modern fizik', 'Termodinamik',
+    ],
+    'Kimya': [
+      'Kimyanın temelleri', 'Atom modelleri', 'Periyodik sistem', 'Kimyasal bağlar',
+      'Maddenin halleri', 'Gaz kanunları', 'Çözeltiler ve derişim', 'Asit ve bazlar',
+      'Kimyasal tepkimeler ve denkleştirme', 'Mol kavramı ve hesaplamalar',
+      'Kimyasal denge', 'Organik kimyaya giriş', 'Hidrokarbonlar',
+      'Fonksiyonlu organik bileşikler', 'Polimer ve plastikler', 'Elektrokimya',
+    ],
+    'Biyoloji': [
+      'Bilimsel düşünce ve biyoloji', 'Hücre', 'Hücre zarı ve transportu',
+      'Hücre bölünmeleri (mitoz-mayoz)', 'Kalıtım ve Mendel genetiği',
+      'DNA ve gen teknolojisi', 'Protein sentezi', 'Evrim', 'Canlı çeşitliliği',
+      'Bitki biyolojisi', 'Hayvan fizyolojisi', 'Sindirim sistemi',
+      'Dolaşım sistemi', 'Solunum sistemi', 'Boşaltım sistemi',
+      'Sinir sistemi', 'Endokrin sistem', 'Üreme sistemi', 'Ekosistem ekolojisi',
+      'Biyoteknoloji ve genetik mühendisliği',
+    ],
+    'Türk Dili ve Edebiyatı': [
+      'Dil bilgisi: Ses bilgisi', 'Dil bilgisi: Sözcük yapısı', 'Dil bilgisi: Cümle',
+      'Anlatım türleri', 'Şiir türleri ve özellikleri', 'Şiir dönemleri',
+      'Halk edebiyatı', 'Divan edebiyatı', 'Tanzimat edebiyatı',
+      'Servet-i Fünun dönemi', 'Milli edebiyat dönemi', 'Cumhuriyet dönemi edebiyatı',
+      'Roman ve hikaye', 'Tiyatro', 'Deneme ve makale', 'Söz sanatları',
+    ],
+    'T.C. İnkılap Tarihi ve Atatürkçülük': [
+      'Osmanlı Devleti çöküş dönemi', 'Kurtuluş Savaşı', 'Lozan Antlaşması',
+      'Cumhuriyetin ilanı', 'Halifeliğin kaldırılması', 'Çok partili hayat',
+      'Atatürk ilkeleri (Cumhuriyetçilik, Milliyetçilik, Halkçılık)',
+      'Atatürk ilkeleri (Devletçilik, Laiklik, Devrimcilik)',
+      'Hukuk alanında inkılaplar', 'Eğitim ve kültür inkılapları',
+      'Ekonomik kalkınma', 'Atatürk dönemi dış politika', 'İkinci Dünya Savaşı',
+    ],
+    'Tarih': [
+      'Tarih öncesi dönemler', 'İlk uygarlıklar', 'Orta Asya Türk tarihi',
+      'İslamiyet öncesi Türk tarihi', 'İslam medeniyeti', 'Türk-İslam devletleri',
+      'Osmanlı kuruluş dönemi', 'Osmanlı yükseliş dönemi', 'Osmanlı duraklama',
+      'Osmanlı gerileme ve çöküş', 'Fransız İhtilali', 'Sanayi Devrimi',
+      'I. Dünya Savaşı', 'Komünizm ve Faşizm', 'II. Dünya Savaşı', 'Soğuk Savaş',
+      'Günümüz Türkiye ve dünya', 'Medeniyetler tarihi',
+    ],
+    'Coğrafya': [
+      'Coğrafyanın konusu ve önemi', 'Harita bilgisi', 'Atmosfer ve iklim',
+      'İklim tipleri', 'Türkiye iklimi', 'Litosfer ve yer şekilleri',
+      'Türkiye yer şekilleri', 'Hidrosfer (sular)', 'Türkiye su kaynakları',
+      'Nüfus ve nüfus artışı', 'Göç', 'Yerleşme', 'Türkiye nüfusu',
+      'Tarım coğrafyası', 'Sanayi coğrafyası', 'Enerji kaynakları',
+      'Türkiye ekonomisi', 'Bölgesel coğrafya', 'Çevre sorunları', 'Küresel ısınma',
+    ],
+    'Felsefe': [
+      'Felsefeye giriş', 'Bilgi felsefesi (epistemoloji)', 'Varlık felsefesi (ontoloji)',
+      'Ahlak felsefesi (etik)', 'Siyaset felsefesi', 'Estetik',
+      'Din felsefesi', 'Antik Yunan felsefesi', 'Orta Çağ felsefesi',
+      'Modern felsefe', 'Çağdaş felsefe', 'Türk İslam düşüncesi',
+    ],
+    'Din Kültürü ve Ahlak Bilgisi': [
+      'İslam düşüncesinde inanç', 'Ahlak ve değerler', 'İbadet',
+      'Hz. Muhammed ve örnek ahlakı', 'Kuran mesajı',
+      'Dünya dinleri', 'Din ve laiklik', 'Güncel dini meseleler',
+    ],
+    'İngilizce': [
+      'Advanced grammar', 'Reading strategies', 'Writing essays',
+      'Listening for detail', 'Speaking fluency', 'Academic vocabulary',
+      'Conditionals', 'Passive voice', 'Reported speech',
+      'Phrasal verbs', 'Idioms', 'YDS/YÖKDİL hazırlık',
+    ],
+    'Sağlık Bilgisi': [
+      'Sağlıklı beslenme', 'Fiziksel aktivite', 'Ruh sağlığı',
+      'Bulaşıcı hastalıklar', 'Bağımlılık', 'İlk yardım',
+    ],
+  },
+
+  universite: {
+    'Matematik': [
+      'Diferansiyel ve integral hesap', 'Diferansiyel denklemler', 'Lineer cebir',
+      'Sayısal analiz', 'İstatistik ve olasılık', 'Kompleks analiz',
+      'Topoloji', 'Ayrık matematik', 'Fonksiyonel analiz',
+    ],
+    'Fizik': [
+      'Klasik mekanik', 'Elektromanyetizma', 'Termodinamik ve istatistik mekanik',
+      'Kuantum mekaniği', 'Optik', 'Nükleer ve parçacık fiziği',
+      'Katıhal fiziği', 'Görelilik teorisi',
+    ],
+    'Kimya': [
+      'Genel kimya', 'Organik kimya', 'Anorganik kimya', 'Fiziksel kimya',
+      'Analitik kimya', 'Biyokimya', 'Polimer kimyası',
+    ],
+    'Biyoloji': [
+      'Moleküler biyoloji', 'Genetik', 'Hücre biyolojisi', 'Mikrobiyoloji',
+      'Fizyoloji', 'Ekoloji', 'Evrimsel biyoloji', 'Biyoteknoloji',
+    ],
+    'İktisat': [
+      'Mikroekonomi', 'Makroekonomi', 'Uluslararası iktisat', 'Para teorisi',
+      'Kalkınma ekonomisi', 'Oyun teorisi', 'Ekonometri',
+    ],
+    'Bilişim ve Yazılım': [
+      'Veri yapıları ve algoritmalar', 'Nesne yönelimli programlama',
+      'Veritabanı yönetimi', 'İşletim sistemleri', 'Bilgisayar ağları',
+      'Yazılım mühendisliği', 'Yapay zeka ve makine öğrenmesi',
+      'Siber güvenlik', 'Mobil uygulama geliştirme',
+    ],
+    'Havacılık': [
+      'Uçak yapısı ve sistemleri', 'Aerodinamik', 'Uçuş mekaniği',
+      'Navigasyon ve seyrüsefer', 'Meteoroloji', 'Hava trafik kontrolü',
+      'Havacılık güvenliği', 'Uçuş kuralları (VFR/IFR)', 'Aviyonik sistemler',
+      'Uçak motoru (piston/jet)', 'Hidrolik ve pnömatik sistemler',
+    ],
+    'Hukuk': [
+      'Medeni hukuk', 'Borçlar hukuku', 'Ticaret hukuku', 'Ceza hukuku',
+      'İdare hukuku', 'Anayasa hukuku', 'Uluslararası hukuk', 'İş hukuku',
+    ],
+    'İşletme': [
+      'Muhasebe', 'Finansman', 'Pazarlama', 'Yönetim ve organizasyon',
+      'İnsan kaynakları', 'Girişimcilik', 'Stratejik yönetim',
+    ],
+    'İngilizce': [
+      'Academic writing', 'Reading comprehension', 'Listening skills',
+      'Grammar and syntax', 'Vocabulary building', 'Presentation skills',
+      'Business English', 'Research writing', 'IELTS / TOEFL hazırlık',
+      'YDS / YÖKDİL hazırlık', 'Conversational English',
+    ],
+    'Türk Dili ve Edebiyatı': [
+      'Türkçe yazım kuralları', 'Akademik yazım', 'Metin analizi',
+      'Türk edebiyatı tarihi', 'Dilbilgisi', 'İletişim becerileri',
+    ],
+    'Atatürk İlkeleri ve İnkılap Tarihi': [
+      'Osmanlı son dönemi', 'Kurtuluş Savaşı', 'Cumhuriyetin ilanı',
+      'Atatürk ilkeleri', 'Türkiye Cumhuriyeti tarihi',
+    ],
+    'Sosyoloji': [
+      'Sosyolojiye giriş', 'Toplumsal yapı', 'Kültür ve toplum',
+      'Sosyal değişme', 'Araştırma yöntemleri',
+    ],
+    'Psikoloji': [
+      'Psikolojiye giriş', 'Gelişim psikolojisi', 'Sosyal psikoloji',
+      'Klinik psikoloji', 'Bilişsel psikoloji', 'Araştırma yöntemleri',
+    ],
+  },
+}
+
+// Eski format ile uyumluluk — suggestions için
+const TOPIC_MAP: Record<string, { topic: string; subject: string }[]> = {
+  ilkokul: Object.entries(SUBJECT_MAP.ilkokul).flatMap(([subj, topics]) => topics.slice(0,1).map(t => ({ topic: t, subject: subj }))),
+  ortaokul: Object.entries(SUBJECT_MAP.ortaokul).flatMap(([subj, topics]) => topics.slice(0,1).map(t => ({ topic: t, subject: subj }))),
+  lise: Object.entries(SUBJECT_MAP.lise).flatMap(([subj, topics]) => topics.slice(0,1).map(t => ({ topic: t, subject: subj }))),
+  universite: Object.entries(SUBJECT_MAP.universite).flatMap(([subj, topics]) => topics.slice(0,1).map(t => ({ topic: t, subject: subj }))),
+}
+
+const DIFFICULTIES = [
+  { value: 'kolay', label: 'Kolay', desc: 'Temel kavramlar', color: '#16a34a', bg: 'rgba(22,163,74,0.08)', border: 'rgba(22,163,74,0.3)' },
+  { value: 'normal', label: 'Normal', desc: 'Müfredat seviyesi', color: '#2563eb', bg: 'rgba(37,99,235,0.08)', border: 'rgba(37,99,235,0.3)' },
+  { value: 'zor', label: 'Zor', desc: 'Analiz gerektiren', color: '#d97706', bg: 'rgba(217,119,6,0.08)', border: 'rgba(217,119,6,0.3)' },
+  { value: 'cok zor', label: 'Çok Zor', desc: 'Olimpiyat seviyesi', color: '#dc2626', bg: 'rgba(220,38,38,0.08)', border: 'rgba(220,38,38,0.3)' },
+]
+
+function getActiveLang(profileLang?: string): string {
+  if (typeof window === 'undefined') return profileLang || 'Türkçe'
+  return localStorage.getItem('pratium_lang') || profileLang || 'Türkçe'
+}
+
+type Screen = 'topic' | 'loading' | 'quiz' | 'result' | 'limit' | 'error'
 
 function QuizPageContent() {
   const router = useRouter()
@@ -394,10 +680,6 @@ function QuizPageContent() {
   const [orderItems, setOrderItems] = useState<string[]>([])
   const [fillInput, setFillInput] = useState('')
   const [checkingAnswer, setCheckingAnswer] = useState(false)
-  const [orderAnswer, setOrderAnswer] = useState<number[]>([])
-  const [matchAnswer, setMatchAnswer] = useState<Record<number, number>>({})
-  const [multiTFAnswer, setMultiTFAnswer] = useState<Record<number, boolean | null>>({})
-  const [tableFillAnswer, setTableFillAnswer] = useState<string[]>([])
   const [mTFAnswers, setMTFAnswers] = useState<Record<number, boolean | null>>({})
   const [tInputs, setTInputs] = useState<string[]>([])
 
@@ -702,25 +984,6 @@ function QuizPageContent() {
   )
 
   // ── LIMIT ──
-
-  // ── Topic screen → QuizSetup component'e delege edildi ──
-  const [setupConfig, setSetupConfig] = useState<QuizSetupConfig>({
-    qCount, difficulty, includeVisuals, questionType,
-    uploadedFiles, selectedTopic, customTopic,
-  })
-
-  // setupConfig değişince state'leri senkronize et
-  useEffect(() => {
-    setQCount(setupConfig.qCount)
-    setDifficulty(setupConfig.difficulty)
-    setIncludeVisuals(setupConfig.includeVisuals)
-    setQuestionType(setupConfig.questionType)
-    setUploadedFiles(setupConfig.uploadedFiles)
-    setSelectedTopic(setupConfig.selectedTopic)
-    setCustomTopic(setupConfig.customTopic)
-  }, [setupConfig])
-
-  // ── LIMIT ──
   if (screen === 'limit') return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', paddingBottom: '5rem', background: 'var(--bg)' }}>
       <div style={{ maxWidth: '460px', textAlign: 'center' }} className="anim-up">
@@ -748,17 +1011,33 @@ function QuizPageContent() {
     </main>
   )
 
-  // ── TOPIC ──
-
-  // ── TOPIC ──
+  // ── TOPIC ── (QuizSetup component'e delege edildi)
   if (screen === 'topic') return (
     <>
-      {showOnboarding && profile && <OnboardingModal userName={profile.name} grade={profile.grade} onComplete={() => setShowOnboarding(false)} />}
+      {showOnboarding && profile && (
+        <OnboardingModal
+          userName={profile.name}
+          grade={profile.grade}
+          onComplete={() => setShowOnboarding(false)}
+        />
+      )}
       <QuizSetup
         profile={profile}
         currentLang={currentLang}
-        config={setupConfig}
-        setConfig={(partial) => setSetupConfig(prev => ({ ...prev, ...partial }))}
+        selectedTopic={selectedTopic}
+        setSelectedTopic={setSelectedTopic}
+        customTopic={customTopic}
+        setCustomTopic={setCustomTopic}
+        qCount={qCount}
+        setQCount={setQCount}
+        difficulty={difficulty}
+        setDifficulty={setDifficulty}
+        includeVisuals={includeVisuals}
+        setIncludeVisuals={setIncludeVisuals}
+        questionType={questionType}
+        setQuestionType={setQuestionType}
+        uploadedFiles={uploadedFiles}
+        setUploadedFiles={setUploadedFiles}
         favorites={favorites}
         mebTopics={mebTopics}
         topicSummary={topicSummary}
@@ -768,12 +1047,9 @@ function QuizPageContent() {
         onFetchSummary={fetchTopicSummary}
         onToggleFavorite={toggleFavorite}
         onStartQuiz={startQuiz}
-        isStarting={false}
       />
     </>
   )
-
-  // ── ERROR ──
   if (screen === 'error' && quizError) return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
       <div style={{ maxWidth: '420px', width: '100%', textAlign: 'center' }} className="anim-up">
@@ -854,8 +1130,6 @@ function QuizPageContent() {
   )
 
   // ── LOADING ──
-
-  // ── LOADING ──
   if (screen === 'loading') return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg, #f0f9ff 0%, #ffffff 40%, #fff8e8 100%)' }}>
       <div style={{ position: 'fixed', top: '-120px', right: '-80px', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,207,184,0.08) 0%, transparent 65%)', pointerEvents: 'none' }} />
@@ -888,9 +1162,7 @@ function QuizPageContent() {
     </main>
   )
 
-  // ── QUIZ ──
-
-  // ── QUIZ ──
+  // ── QUIZ ── (QuizQuestion component'e delege edildi)
   if (screen === 'quiz' && questions.length > 0) {
     return (
       <QuizQuestion
@@ -920,8 +1192,6 @@ function QuizPageContent() {
       />
     )
   }
-
-  // ── RESULT ──
   if (screen === 'result') {
     const topic = customTopic.trim() || selectedTopic
     return (
@@ -946,7 +1216,7 @@ function QuizPageContent() {
 
 export default function QuizPage() {
   return (
-    <Suspense fallback={<main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}><div className="spinner" /></main>}>
+    <Suspense fallback={<main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></main>}>
       <QuizPageContent />
     </Suspense>
   )

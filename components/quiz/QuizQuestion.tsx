@@ -373,4 +373,7 @@ export default function QuizQuestion({
         </div>
       </main>
     )
+  }
+
+  // ── RESULT ──
 }

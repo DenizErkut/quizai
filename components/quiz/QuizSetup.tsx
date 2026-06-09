@@ -1,28 +1,27 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import FileUploader, { type UploadedFile } from '@/components/FileUploader'
-import {
-  SUBJECT_MAP, DIFFICULTIES,
-  type QuestionType, type Profile,
-} from '@/lib/quiz-constants'
-
-export interface QuizSetupConfig {
-  qCount: number
-  difficulty: string
-  includeVisuals: boolean
-  questionType: QuestionType
-  uploadedFiles: UploadedFile[]
-  selectedTopic: string
-  customTopic: string
-}
+import { SUBJECT_MAP, DIFFICULTIES, type QuestionType, type Profile } from '@/lib/quiz-constants'
 
 interface QuizSetupProps {
   profile: Profile | null
   currentLang: string
-  config: QuizSetupConfig
-  setConfig: (c: Partial<QuizSetupConfig>) => void
+  selectedTopic: string
+  setSelectedTopic: (v: string) => void
+  customTopic: string
+  setCustomTopic: (v: string) => void
+  qCount: number
+  setQCount: (v: number) => void
+  difficulty: string
+  setDifficulty: (v: string) => void
+  includeVisuals: boolean
+  setIncludeVisuals: (v: boolean) => void
+  questionType: QuestionType
+  setQuestionType: (v: QuestionType) => void
+  uploadedFiles: UploadedFile[]
+  setUploadedFiles: (v: UploadedFile[]) => void
   favorites: string[]
   mebTopics: Record<string, string[]>
   topicSummary: { summary: string; keyPoints: string[]; keyTerms: { term: string; definition: string }[]; rememberThis: string } | null
@@ -32,34 +31,23 @@ interface QuizSetupProps {
   onFetchSummary: (topic: string) => void
   onToggleFavorite: (topic: string) => void
   onStartQuiz: () => void
-  isStarting: boolean
 }
 
 export default function QuizSetup({
-  profile, currentLang, config, setConfig,
-  favorites, mebTopics, topicSummary, summaryLoading, showSummary,
-  setShowSummary, onFetchSummary, onToggleFavorite, onStartQuiz, isStarting,
+  profile, currentLang, selectedTopic, setSelectedTopic, customTopic, setCustomTopic,
+  qCount, setQCount, difficulty, setDifficulty, includeVisuals, setIncludeVisuals,
+  questionType, setQuestionType, uploadedFiles, setUploadedFiles,
+  favorites, mebTopics, topicSummary, summaryLoading, showSummary, setShowSummary,
+  onFetchSummary, onToggleFavorite, onStartQuiz,
 }: QuizSetupProps) {
   const [openSubject, setOpenSubject] = useState<string | null>(null)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const level = profile ? (
-    profile.grade.includes('üniversite') || profile.grade.includes('universite') ? 'universite' :
-    profile.grade.includes('lise') ? 'lise' :
-    profile.grade.includes('ortaokul') ? 'ortaokul' : 'ilkokul'
+    profile.grade.toLowerCase().includes('üniversite') || profile.grade.toLowerCase().includes('universite') ? 'universite' :
+    profile.grade.toLowerCase().includes('lise') ? 'lise' :
+    profile.grade.toLowerCase().includes('ortaokul') ? 'ortaokul' : 'ilkokul'
   ) : 'ortaokul'
 
-  const { qCount, difficulty, includeVisuals, questionType, uploadedFiles, selectedTopic, customTopic } = config
-
-  // Kısayollar
-  const setSelectedTopic = (v: string) => setConfig({ selectedTopic: v })
-  const setCustomTopic = (v: string) => setConfig({ customTopic: v })
-  const setQCount = (v: number) => setConfig({ qCount: v })
-  const setDifficulty = (v: string) => setConfig({ difficulty: v })
-  const setIncludeVisuals = (v: boolean) => setConfig({ includeVisuals: v })
-  const setQuestionType = (v: QuestionType) => setConfig({ questionType: v })
-  const setUploadedFiles = (v: UploadedFile[]) => setConfig({ uploadedFiles: v })
-
-  // topic screen JSX
   return (
     <>
     {showOnboarding && profile && (
@@ -430,7 +418,7 @@ export default function QuizSetup({
 
           <button className="btn btn-primary btn-lg" onClick={() => {
             if (dailyLeft === 0) { setShowPaywall('daily'); return }
-            if (testsLeft === 0) { onStartQuiz(); return } // onStartQuiz limit kontrolü yapıyor
+            if (testsLeft === 0) { setScreen('limit'); return }
             startQuiz()
           }}
             style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', opacity: (testsLeft === 0 || dailyLeft === 0) ? 0.5 : 1 }}>
