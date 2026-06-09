@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 
 interface Session { id: string; topic: string; grade: string; score: number; pct: number; question_count: number; created_at: string }
 interface Profile { name: string; grade: string; language: string; plan: string }
+interface DashStats { total_count: number; total_correct: number; total_questions: number; avg_pct: number; best_pct: number; weak_count: number }
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', timeZone: 'Europe/Istanbul' })
@@ -31,9 +32,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
-  const [totalCount, setTotalCount] = useState(0)
-  const [totalCorrect, setTotalCorrect] = useState(0)
-  const [totalQ, setTotalQ] = useState(0)
+  const [stats, setStats] = useState<DashStats>({ total_count: 0, total_correct: 0, total_questions: 0, avg_pct: 0, best_pct: 0, weak_count: 0 })
   const [streak, setStreak] = useState(0)
   const [loading, setLoading] = useState(true)
   const [greeting, setGreeting] = useState('Merhaba')
@@ -49,21 +48,22 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      const [{ data: p }, { data: s }, { count }, { data: allStats }, { data: sk }] = await Promise.all([
+      const [{ data: p }, { data: s }, { data: dashStats }, { data: sk }] = await Promise.all([
         supabase.from('profiles').select('name,grade,language,plan').eq('id', user.id).single(),
-        supabase.from('quiz_sessions').select('id,topic,grade,score,pct,question_count,created_at').eq('user_id', user.id).eq('completed', true).order('created_at', { ascending: false }).limit(5),
-        supabase.from('quiz_sessions').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('completed', true),
-        supabase.from('quiz_sessions').select('score,question_count').eq('user_id', user.id).eq('completed', true),
+        // Son 5 test — sadece ihtiyaç duyulan alanlar
+        supabase.from('quiz_sessions')
+          .select('id,topic,grade,score,pct,question_count,created_at')
+          .eq('user_id', user.id).eq('completed', true)
+          .order('created_at', { ascending: false }).limit(5),
+        // Tüm istatistikler tek sorguda — aggregate RPC
+        supabase.rpc('get_dashboard_stats', { p_user_id: user.id }),
         supabase.from('streaks').select('current_streak').eq('user_id', user.id).maybeSingle(),
       ])
 
       setProfile(p)
       setSessions(s || [])
-      setTotalCount(count || 0)
+      setStats(dashStats || { total_count: 0, total_correct: 0, total_questions: 0, avg_pct: 0, best_pct: 0, weak_count: 0 })
       setStreak(sk?.current_streak || 0)
-      const all = allStats || []
-      setTotalCorrect(all.reduce((a: number, x: any) => a + (x.score || 0), 0))
-      setTotalQ(all.reduce((a: number, x: any) => a + (x.question_count || 0), 0))
       setLoading(false)
     }
     load()
@@ -75,7 +75,7 @@ export default function DashboardPage() {
     </main>
   )
 
-  const avgPct = totalCount > 0 ? Math.round(sessions.slice(0,10).reduce((a,s) => a + s.pct, 0) / Math.min(sessions.length, 10)) : 0
+  const avgPct = stats.avg_pct
   const firstName = profile?.name?.split(' ')[0] || ''
   const initials = profile?.name?.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase() || 'U'
 
@@ -140,9 +140,9 @@ export default function DashboardPage() {
           {/* İstatistik kartları */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
             {[
-              { label: 'Test', value: totalCount, icon: '📝' },
+              { label: 'Test', value: stats.total_count, icon: '📝' },
               { label: 'Ort.', value: `%${avgPct}`, icon: '📊' },
-              { label: 'Soru', value: totalQ, icon: '❓' },
+              { label: 'Soru', value: stats.total_questions, icon: '❓' },
               { label: 'Seri', value: `🔥${streak}`, icon: '' },
             ].map((s, i) => (
               <div key={i} style={{
@@ -247,7 +247,7 @@ export default function DashboardPage() {
           )}
 
           <div style={{ marginTop: '1.25rem', padding: '12px 14px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(8,36,101,0.04), rgba(30,207,184,0.04))', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text3)' }}>Toplam {totalCorrect}/{totalQ} doğru</span>
+            <span style={{ fontSize: '12px', color: 'var(--text3)' }}>Toplam {stats.total_correct}/{stats.total_questions} doğru</span>
             <Link href="/quiz" className="btn btn-primary btn-sm">Yeni Test ⚡</Link>
           </div>
         </div>
