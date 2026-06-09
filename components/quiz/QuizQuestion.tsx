@@ -234,7 +234,7 @@ export default function QuizQuestion({
                   ))}
                 </div>
                 {chosen === null && (
-                  <button className="btn btn-primary" onClick={() => { const correct = orderAnswer.every((v, i) => v === q.correctOrder?.[i]); onSelectAnswer(correct ? 0 : -1) }}
+                  <button className="btn btn-primary" onClick={() => { const correct = orderAnswer.every((v, i) => (q.items?.indexOf(v) ?? i) === (q.correctOrder?.[i] ?? i)); onSelectAnswer(correct ? 0 : -1) }}
                     style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
                     Sıralamayı onayla →
                   </button>
