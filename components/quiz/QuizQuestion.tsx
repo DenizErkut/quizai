@@ -185,7 +185,7 @@ export default function QuizQuestion({
                         </div>
                         <select key={`r${i}`}
                           value={userShuffledIdx ?? ''}
-                          onChange={e => setMatchSelections(prev => ({ ...prev, [i]: Number(e.target.value) }))}
+                          onChange={e => setMatchAnswer(prev => ({ ...prev, [i]: Number(e.target.value) }))}
                           disabled={chosen !== null}
                           style={{ padding: '10px 12px', borderRadius: '8px', border: `1px solid ${isAnswered ? (isCorrect ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.4)') : 'var(--border)'}`, background: isAnswered ? (isCorrect ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', fontSize: '13px', color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>
                           <option value="">Seç...</option>
