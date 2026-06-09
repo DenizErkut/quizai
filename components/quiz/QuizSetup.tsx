@@ -50,13 +50,6 @@ export default function QuizSetup({
 
   return (
     <>
-    {showOnboarding && profile && (
-      <OnboardingModal
-        userName={profile.name || ''}
-        grade={profile.grade || ''}
-        onComplete={() => setShowOnboarding(false)}
-      />
-    )}
     <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', position: 'relative', overflow: 'hidden', background: 'linear-gradient(160deg, #f0f9ff 0%, #ffffff 40%, #fff8e8 100%)' }}>
       {showPaywall && <PaywallModal reason={showPaywall} />}
       {/* Dekoratif arka plan elementleri */}
