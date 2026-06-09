@@ -931,23 +931,42 @@ export default function AdminPage() {
                   let res: Response
                   let data: any
 
-                  // Buyuk dosya: base64 ile API'ye gonder (service role key kullanir)
+                  // Buyuk dosya: signed URL ile direkt Storage upload
                   if (mebFile && mebFile.size > 4 * 1024 * 1024) {
-                    setMebMsg("Dosya hazirlanıyor...")
-                    const base64 = await new Promise<string>((resolve, reject) => {
-                      const reader = new FileReader()
-                      reader.onload = () => resolve((reader.result as string).split(',')[1])
-                      reader.onerror = reject
-                      reader.readAsDataURL(mebFile)
+                    setMebMsg("1/3 Yukleme URL'i aliniyor...")
+
+                    // Signed URL al
+                    const signedRes = await fetch(
+                      `/api/admin/meb-signed-upload?file_name=${encodeURIComponent(mebFile.name)}&level=${encodeURIComponent(mebForm.level)}&subject=${encodeURIComponent(mebForm.subject)}&unit=${encodeURIComponent(mebForm.unit)}`
+                    )
+                    const signedData = await signedRes.json()
+                    if (!signedRes.ok) {
+                      setMebMsg(`Signed URL hatasi: ${signedData.error}`)
+                      setMebUploading(false); return
+                    }
+
+                    setMebMsg("2/3 Dosya Storage'a yukleniyor...")
+
+                    // Dosyayı direkt Storage'a yükle (signed URL ile)
+                    const uploadRes = await fetch(signedData.signed_url, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': mebFile.type },
+                      body: mebFile,
                     })
-                    setMebMsg("PDF isleniyor...")
+                    if (!uploadRes.ok) {
+                      setMebMsg("Storage upload hatasi: " + uploadRes.status)
+                      setMebUploading(false); return
+                    }
+
+                    setMebMsg("3/3 PDF isleniyor ve chunklaniyor...")
+
+                    // API'ye sadece path gönder — parse + chunk + embed
                     res = await fetch('/api/admin/meb-upload', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
-                        file_base64: base64,
-                        file_name: mebFile.name,
-                        file_type: mebFile.type,
+                        storage_path: signedData.storage_path,
+                        file_url: signedData.public_url,
                         title: mebForm.title,
                         grade: mebForm.grade,
                         subject: mebForm.subject,
@@ -956,7 +975,7 @@ export default function AdminPage() {
                       })
                     })
                   } else {
-                    // Kucuk dosya veya metin → FormData
+                    // Kucuk dosya veya metin
                     const fd = new FormData()
                     fd.append('title', mebForm.title)
                     fd.append('grade', mebForm.grade)
@@ -967,6 +986,7 @@ export default function AdminPage() {
                     if (mebFile) fd.append('file', mebFile)
                     res = await fetch('/api/admin/meb-upload', { method: 'POST', body: fd })
                   }
+
 
                   data = await res.json()
                   if (res.ok) {
