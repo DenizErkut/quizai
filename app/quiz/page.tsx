@@ -8,7 +8,8 @@ import QuizResult from '@/components/QuizResult'
 import QuizSetup, { type QuizSetupConfig } from '@/components/quiz/QuizSetup'
 import QuizQuestion from '@/components/quiz/QuizQuestion'
 import {
-  getActiveLang, type QuestionType, type Question, type Profile, type Screen
+  getActiveLang, TOPIC_MAP,
+  type QuestionType, type Question, type Profile, type Screen
 } from '@/lib/quiz-constants'
 
 function QuizPageContent() {
