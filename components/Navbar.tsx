@@ -272,7 +272,40 @@ export default function Navbar() {
                       </div>
                     )}
                   </div>
-                  {MENU_ITEMS.map(item => (
+                  {/* Mobil menü — desktop dropdown ile birebir aynı */}
+                  {[
+                    // Role bazlı ana linkler
+                    ...(isInstitution ? [
+                      { label: '🏛️ Kurum Paneli', href: '/institution' },
+                    ] : isApprovedTeacher ? [
+                      { label: '🏫 Öğretmen Paneli', href: '/teacher' },
+                      { label: '⚡ Yeni Test', href: '/quiz' },
+                      { label: '📝 Ödev Ata', href: '/teacher/assign' },
+                      { label: '📊 Performans', href: '/teacher/performance' },
+                      { label: '🔔 Bildirim', href: '/teacher/notify' },
+                    ] : isParent ? [
+                      { label: '👨‍👩‍👧 Veli Paneli', href: '/parent' },
+                      { label: '⚡ Yeni Test', href: '/quiz' },
+                      { label: '📅 Günlük Test', href: '/daily' },
+                    ] : [
+                      { label: '⚡ Yeni Test', href: '/quiz' },
+                      { label: '📅 Günlük Test', href: '/daily' },
+                      { label: '🏆 Sıralama', href: '/leaderboard' },
+                    ]),
+                    // Ortak özellikler (herkese)
+                    { label: '🎯 Sınav Simülasyonu', href: '/exam' },
+                    { label: '📈 Analiz', href: '/analysis' },
+                    { label: '🗂️ Soru Arşivi', href: '/archive' },
+                    { label: '🛠️ PDF Araçları', href: '/pdf-tools' },
+                    { label: '🏫 Sınıflarım', href: '/classes' },
+                    { label: '📝 Ödevlerim', href: '/assignments' },
+                    { label: '📋 Gelişim Planı', href: '/plan' },
+                    { label: '📝 Notlarım', href: '/notes' },
+                    { label: '🎁 Davet et & kazan', href: '/referral' },
+                    { label: '💎 Planlar', href: '/pricing' },
+                    { label: '✏️ Profil Düzenle', href: '/profile/edit' },
+                    { label: '🔑 Şifremi Değiştir', href: '/auth/reset-password' },
+                  ].map(item => (
                     <Link key={item.href} href={item.href} onClick={() => setShowMenu(false)} style={{
                       display: 'block', padding: '8px 14px', borderRadius: '10px',
                       fontSize: '13px', color: pathname === item.href ? '#0a9e90' : '#3B566E',
@@ -500,7 +533,7 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* ── MOBILE BOTTOM NAV ── */}
+      {/* ── MOBILE BOTTOM NAV — role bazlı ── */}
       <div className="mobile-only" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 999,
         background: '#082465',
@@ -508,20 +541,35 @@ export default function Navbar() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-around',
         padding: '8px 0 max(8px, env(safe-area-inset-bottom))',
       }}>
-        {[
-          { href: '/quiz',      label: 'Test',    icon: '⚡' },
-          { href: '/daily',     label: streak > 0 ? `${streak} gün` : 'Günlük', icon: streak > 0 ? '🔥' : '📅' },
-          { href: '/analysis',  label: 'Analiz',  icon: '📊' },
-          { href: '/archive',   label: 'Arşiv',   icon: '🗂️' },
-          { href: '/pdf-tools', label: 'PDF',     icon: '🛠️' },
-        ].map(item => (
+        {(isInstitution ? [
+          { href: '/institution',           label: 'Panel',       icon: '🏛️' },
+          { href: '/analysis',              label: 'Analiz',      icon: '📈' },
+          { href: '/pricing',               label: 'Planlar',     icon: '💎' },
+        ] : isApprovedTeacher ? [
+          { href: '/teacher',               label: 'Panel',       icon: '🏫' },
+          { href: '/teacher/assign',        label: 'Ödev Ata',    icon: '📝' },
+          { href: '/teacher/performance',   label: 'Performans',  icon: '📊' },
+          { href: '/quiz',                  label: 'Test',        icon: '⚡' },
+          { href: '/teacher/live',          label: 'Canlı Quiz',  icon: '🎯' },
+        ] : isParent ? [
+          { href: '/parent',                label: 'Panel',       icon: '👨‍👩‍👧' },
+          { href: '/quiz',                  label: 'Test',        icon: '⚡' },
+          { href: '/analysis',              label: 'Analiz',      icon: '📈' },
+          { href: '/archive',               label: 'Arşiv',       icon: '🗂️' },
+        ] : [
+          { href: '/quiz',                  label: 'Test',        icon: '⚡' },
+          { href: '/daily',                 label: streak > 0 ? `${streak}g` : 'Günlük', icon: streak > 0 ? '🔥' : '📅' },
+          { href: '/exam',                  label: 'Sınav',       icon: '🎯' },
+          { href: '/analysis',              label: 'Analiz',      icon: '📈' },
+          { href: '/review',                label: 'Tekrar',      icon: '🧠' },
+        ]).map(item => (
           <Link key={item.href} href={item.href} style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
-            textDecoration: 'none', padding: '6px 8px', borderRadius: '10px', minWidth: '52px', flex: 1,
+            textDecoration: 'none', padding: '6px 4px', borderRadius: '10px', minWidth: '44px', flex: 1,
             background: pathname === item.href ? 'rgba(253,211,29,0.12)' : 'transparent',
           }}>
-            <span style={{ fontSize: '20px', lineHeight: 1 }}>{item.icon}</span>
-            <span style={{ fontSize: '10px', fontWeight: pathname === item.href ? 700 : 400, color: pathname === item.href ? '#fdd31d' : 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '19px', lineHeight: 1 }}>{item.icon}</span>
+            <span style={{ fontSize: '9px', fontWeight: pathname === item.href ? 700 : 400, color: pathname === item.href ? '#fdd31d' : 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
               {item.label}
             </span>
           </Link>
