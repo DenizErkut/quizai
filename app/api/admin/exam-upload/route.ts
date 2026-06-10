@@ -154,10 +154,12 @@ export async function POST(req: NextRequest) {
 
       fileUrl = body.file_url
       try {
+        if ((await fileData.arrayBuffer()).byteLength < 10 * 1024 * 1024) {
         const pdfParse = require('pdf-parse')
         const parsed = await pdfParse(Buffer.from(await fileData.arrayBuffer()))
         rawText = parsed.text || ''
       } catch { rawText = `[PDF: ${fileUrl}]` }
+        } else { rawText = `[PDF cok buyuk - Storage: ${fileUrl}]` }
 
     } else {
       // FormData mod (küçük dosya)
@@ -179,10 +181,12 @@ export async function POST(req: NextRequest) {
           fileUrl = u?.publicUrl || ''
         }
         try {
+          if (bytes.length < 10 * 1024 * 1024) {
           const pdfParse = require('pdf-parse')
           const parsed = await pdfParse(Buffer.from(bytes))
           rawText = parsed.text || ''
         } catch { rawText = `[PDF yuklendi]` }
+          } else { rawText = `[PDF cok buyuk (${Math.round(bytes.length/1024/1024)}MB)]` }
       }
     }
 
@@ -198,6 +202,7 @@ export async function POST(req: NextRequest) {
 
   } catch (e: any) {
     console.error('[exam-upload]', e)
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    const msg = e?.message || 'Bilinmeyen hata'
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
