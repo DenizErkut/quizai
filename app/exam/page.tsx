@@ -418,6 +418,36 @@ export default function ExamPage() {
     return (
       <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: '100px' }}>
 
+        {/* ── FLOATING TIMER — Sağ köşe, masaüstü ── */}
+        <div className="desktop-only" style={{
+          position: 'fixed', right: '24px', top: '80px', zIndex: 200,
+          background: timeWarning ? 'linear-gradient(135deg, #7f1d1d, #991b1b)' : 'linear-gradient(135deg, #082465, #1e3a8a)',
+          borderRadius: '20px',
+          padding: '16px 20px',
+          boxShadow: timeWarning ? '0 8px 32px rgba(220,38,38,0.4)' : '0 8px 32px rgba(8,36,101,0.4)',
+          border: `1px solid ${timeWarning ? 'rgba(252,165,165,0.3)' : 'rgba(255,255,255,0.1)'}`,
+          textAlign: 'center',
+          minWidth: '120px',
+          animation: timeWarning && timeLeft < 60 ? 'pulse 1s infinite' : 'none',
+        }}>
+          {/* Saat ikonu */}
+          <div style={{ fontSize: '28px', marginBottom: '6px', lineHeight: 1 }}>
+            {timeWarning ? '⏰' : '🕐'}
+          </div>
+          {/* Zaman */}
+          <div style={{
+            fontFamily: 'monospace', fontWeight: 800, fontSize: '28px',
+            color: timeWarning ? '#fca5a5' : '#fff',
+            letterSpacing: '2px', lineHeight: 1,
+          }}>
+            {formatTime(timeLeft)}
+          </div>
+          {/* Alt etiket */}
+          <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginTop: '6px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            {timeWarning ? 'Az kaldı!' : 'Kalan Süre'}
+          </div>
+        </div>
+
         {/* ── ÜST BAR ── */}
         <div style={{
           position: 'sticky', top: 0, zIndex: 100,
@@ -437,15 +467,14 @@ export default function ExamPage() {
           </div>
           <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', flexShrink: 0 }}>{stats.answered}/{totalQCount}</div>
 
-          {/* Zamanlayıcı */}
-          <div style={{
+          {/* Üst bardaki timer — sadece mobilde görünür */}
+          <div className="mobile-only" style={{
             padding: '5px 12px', borderRadius: '8px',
             background: timeWarning ? 'rgba(220,38,38,0.2)' : 'rgba(255,255,255,0.1)',
             border: `1px solid ${timeWarning ? 'rgba(220,38,38,0.5)' : 'rgba(255,255,255,0.15)'}`,
             fontFamily: 'monospace', fontWeight: 700, fontSize: '14px',
             color: timeWarning ? '#fca5a5' : '#fff',
             flexShrink: 0,
-            animation: timeWarning && timeLeft < 60 ? 'pulse 1s infinite' : 'none',
           }}>
             {formatTime(timeLeft)}
           </div>
