@@ -254,6 +254,7 @@ function buildPrompt(type: string, topic: string, grade: string, difficulty: str
 
 export async function POST(req: NextRequest) {
   let promptStr = ''
+  let countRef = 5
   try {
     const authHeader = req.headers.get('Authorization')
     const token = authHeader?.replace('Bearer ', '')
@@ -389,6 +390,7 @@ export async function POST(req: NextRequest) {
 
     const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, safeQCount, (fileContent || '') + gradeContext + mebContext) + previousQuestionsNote
     promptStr = prompt
+    countRef = safeQCount
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5',
@@ -526,7 +528,7 @@ export async function POST(req: NextRequest) {
     // GPT-4o yedek model
     try {
       if (!promptStr) throw new Error('No prompt')
-      const fallbackText = await generateQuizFallback(promptStr, count)
+      const fallbackText = await generateQuizFallback(promptStr, countRef)
       const clean = fallbackText.replace(/```json|```/g, '').trim()
       const parsed = JSON.parse(clean)
       const fbQuestions = parsed.questions || parsed
