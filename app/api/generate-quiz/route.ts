@@ -253,6 +253,7 @@ function buildPrompt(type: string, topic: string, grade: string, difficulty: str
 }
 
 export async function POST(req: NextRequest) {
+  let promptStr = ''
   try {
     const authHeader = req.headers.get('Authorization')
     const token = authHeader?.replace('Bearer ', '')
@@ -387,7 +388,7 @@ export async function POST(req: NextRequest) {
     }
 
     const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, safeQCount, (fileContent || '') + gradeContext + mebContext) + previousQuestionsNote
-    const promptStr: string = prompt // fallback için
+    promptStr = prompt
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5',
