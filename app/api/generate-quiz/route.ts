@@ -206,6 +206,19 @@ async function generateVisualForQuestion(
   grade: string
 ): Promise<string | null> {
   try {
+    // Soru tipine göre SVG uygunluk kontrolü
+    // true_false ve short_answer sorularında SVG üretme
+    if (q.type === 'true_false' || q.type === 'short_answer' || q.type === 'multi_true_false') {
+      return null
+    }
+    // Soru metni şekil/görsel gerektiriyor mu kontrol et
+    const qText = (q.q || '').toLowerCase()
+    const needsVisual = /şekil|grafik|tablo|diyagram|geometr|koordinat|venn|kesir|şema|harita|ok.*diyagram|ağaç/.test(qText)
+    const hasShape = /kare|dikdörtgen|üçgen|daire|çember|çokgen|prizma|küp|silindir|koni|küre|paralelkenar|eşkenar|ikizkenar/.test(qText)
+    // Sadece görsel gerektiren sorularda SVG üret
+    if (category !== 'math' && !needsVisual && !hasShape) {
+      return null
+    }
     // Doğru cevabı prompt'a ekle — "bunu YAZMA" diye belirt
     const correctAnswer = q.opts?.[q.ans] || q.blank || q.correctOrder || ''
     const prompt = buildSVGPrompt(category, topic, q.q, grade, String(correctAnswer))
