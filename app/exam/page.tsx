@@ -64,6 +64,8 @@ export default function ExamPage() {
 
   // Sonuç
   const [result, setResult] = useState<any>(null)
+  const [aiAnalysis, setAiAnalysis] = useState<string>('')
+  const [aiLoading, setAiLoading] = useState(false)
   const [loadingMsg, setLoadingMsg] = useState('')
 
   // ── YÜKLEMELERl ─────────────────────────────────────────────────────────
@@ -236,6 +238,46 @@ export default function ExamPage() {
   }
 
   // ── SINAV BİTİR ──────────────────────────────────────────────────────────
+  const analyzeWrongAnswers = async () => {
+    const wrongQs = Object.entries(userAnswers)
+      .filter(([key, ans]) => {
+        const [secId, qIdx] = key.split('_')
+        const q = sections[secId]?.[Number(qIdx)]
+        return q && ans !== q.ans
+      })
+      .slice(0, 5) // Max 5 yanlış analiz et
+      .map(([key, ans]) => {
+        const [secId, qIdx] = key.split('_')
+        const q = sections[secId]?.[Number(qIdx)]
+        return `Soru: ${q?.q}
+Verilen cevap: ${q?.opts[ans as number] || '?'}
+Doğru cevap: ${q?.opts[q.ans]}
+Açıklama: ${q?.exp || ''}`
+      })
+
+    if (wrongQs.length === 0) return
+    setAiLoading(true)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          messages: [{
+            role: 'user',
+            content: `Öğrenci şu soruları yanlış yaptı. Her birini kısaca (2-3 cümle) analiz et ve neden yanlış yaptığını, nasıl öğreneceğini açıkla:\n\n${wrongQs.join('\n---\n')}`
+          }],
+          topic: 'sınav analizi',
+          language: 'Türkçe'
+        })
+      })
+      const data = await res.json()
+      setAiAnalysis(data.reply || '')
+    } catch {}
+    setAiLoading(false)
+  }
+
   const finishExam = useCallback(async () => {
     if (timerRef.current) clearInterval(timerRef.current)
     const spent = Math.round((Date.now() - startTimeRef.current) / 1000)
@@ -253,6 +295,8 @@ export default function ExamPage() {
       const data = await res.json()
       setResult(data)
       setScreen('result')
+      // AI yanlış analizi başlat
+      setTimeout(() => analyzeWrongAnswers(), 500)
     } catch {
       setScreen('result')
     }
@@ -524,7 +568,11 @@ export default function ExamPage() {
           {q ? (
             <div className="card" style={{ marginBottom: '1rem' }}>
               <div style={{ fontSize: '15px', fontWeight: 500, color: 'var(--primary)', lineHeight: 1.65, marginBottom: '1.25rem' }}>
-                {q.q}
+                {q.q.split(/(\[[^\]]+\])/).map((part: string, idx: number) =>
+                  part.startsWith('[') && part.endsWith(']')
+                    ? <span key={idx} style={{ textDecoration: 'underline', textDecorationStyle: 'double', textDecorationColor: '#6366f1', fontWeight: 700 }}>{part.slice(1, -1)}</span>
+                    : <span key={idx}>{part}</span>
+                )}
               </div>
 
               {/* Şıklar */}
@@ -678,6 +726,32 @@ export default function ExamPage() {
               📊 Analize Git
             </button>
           </div>
+
+          {/* AI Yanlış Analizi */}
+          {(aiLoading || aiAnalysis) && (
+            <div style={{ marginTop: '1rem', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(99,102,241,0.2)' }}>
+              <div style={{ background: 'linear-gradient(135deg, #082465, #1e3a8a)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '20px' }}>🤖</span>
+                <div>
+                  <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>AI Yanlış Analizi</div>
+                  <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>Pratium Asistan yanlışlarını değerlendiriyor</div>
+                </div>
+              </div>
+              <div style={{ padding: '16px', background: 'var(--bg2)' }}>
+                {aiLoading ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text3)', fontSize: '13px' }}>
+                    <div style={{ width: 16, height: 16, border: '2px solid rgba(99,102,241,0.2)', borderTop: '2px solid #6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+                    Yanlışların analiz ediliyor...
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                    {aiAnalysis}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
         </div>
       </main>
     )
