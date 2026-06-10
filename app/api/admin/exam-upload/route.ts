@@ -185,11 +185,13 @@ export async function POST(req: NextRequest) {
         }
         try {
           if (bytes.length < 10 * 1024 * 1024) {
-          const pdfParse = require('pdf-parse')
-          const parsed = await pdfParse(Buffer.from(bytes))
-          rawText = parsed.text || ''
-        } catch { rawText = `[PDF yuklendi]` }
-          } else { rawText = `[PDF cok buyuk (${Math.round(bytes.length/1024/1024)}MB)]` }
+            const pdfParse = require('pdf-parse')
+            const parsed = await pdfParse(Buffer.from(bytes))
+            rawText = parsed.text || ''
+          } else {
+            rawText = `[PDF cok buyuk (${Math.round(bytes.length/1024/1024)}MB)]`
+          }
+        } catch { rawText = '[PDF yuklendi]' }
       }
     }
 
