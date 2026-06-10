@@ -239,20 +239,20 @@ export default function ExamPage() {
 
   // ── SINAV BİTİR ──────────────────────────────────────────────────────────
   const analyzeWrongAnswers = async () => {
-    const wrongQs = Object.entries(userAnswers)
-      .filter(([key, ans]) => {
-        const [secId, qIdx] = key.split('_')
-        const q = sections[secId]?.[Number(qIdx)]
-        return q && ans !== q.ans
-      })
-      .slice(0, 5) // Max 5 yanlış analiz et
-      .map(([key, ans]) => {
-        const [secId, qIdx] = key.split('_')
-        const q = sections[secId]?.[Number(qIdx)]
-        return `Soru: ${q?.q}
-Verilen cevap: ${q?.opts[ans as number] || '?'}
-Doğru cevap: ${q?.opts[q.ans]}
-Açıklama: ${q?.exp || ''}`
+  const analyzeWrongAnswers = async () => {
+    // answers: { [sectionId]: {questionIndex, answer, ...}[] }
+    const wrongQs: string[] = []
+    for (const [secId, sectionAnswers] of Object.entries(answers)) {
+      for (const sa of (sectionAnswers as any[])) {
+        if (wrongQs.length >= 5) break
+        const qIdx = sa.questionIndex ?? sa.qIndex ?? sa.idx ?? 0
+        const q = sections[secId]?.[qIdx]
+        if (q && sa.answer !== undefined && sa.answer !== null && sa.answer !== q.ans) {
+          wrongQs.push(`Soru: ${q.q}\nVerilen: ${q.opts?.[sa.answer] || '?'}\nDoğru: ${q.opts?.[q.ans]}\nAçıklama: ${q.exp || ''}`)
+        }
+      }
+    }
+
       })
 
     if (wrongQs.length === 0) return
