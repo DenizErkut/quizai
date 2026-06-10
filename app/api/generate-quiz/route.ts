@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 60
 export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
+import { generateQuizFallback } from '@/lib/openai'
 import { createClient } from '@supabase/supabase-js'
 
 const anthropic = new Anthropic()
@@ -518,8 +519,22 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
 
     return NextResponse.json({ questions, sessionId: sessionRow?.id })
-  } catch (error) {
-    console.error('Generate quiz error:', error)
+  } catch (error: any) {
+    console.error('Generate quiz error, trying OpenAI fallback:', error?.message)
+    // GPT-4o yedek model
+    try {
+      if (!prompt) throw new Error('No prompt')
+      const fallbackText = await generateQuizFallback(prompt, count)
+      const clean = fallbackText.replace(/```json|```/g, '').trim()
+      const parsed = JSON.parse(clean)
+      const fbQuestions = parsed.questions || parsed
+      if (Array.isArray(fbQuestions) && fbQuestions.length > 0) {
+        console.log('[generate-quiz] OpenAI fallback success:', fbQuestions.length, 'questions')
+        return NextResponse.json({ questions: fbQuestions, sessionId: crypto.randomUUID() })
+      }
+    } catch (fe: any) {
+      console.error('[generate-quiz] OpenAI fallback failed:', fe?.message)
+    }
     return NextResponse.json({ error: 'Quiz generation failed' }, { status: 500 })
   }
 }

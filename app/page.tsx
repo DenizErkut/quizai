@@ -155,6 +155,9 @@ export default function LandingPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
             {([
+              { name: 'OpenAI', sub: 'GPT-4o Yedek Model', color: '#10a37f', bg: '#f0fdf9', border: 'rgba(16,163,127,0.25)',
+                logo: 'https://openai.com/favicon.ico',
+                fallbackText: 'OpenAI' },
               { name: 'Anthropic', sub: 'Soru & Analiz AI', color: '#c96c3f', bg: '#fff5f0', border: 'rgba(201,108,63,0.25)',
                 logo: 'https://www.anthropic.com/images/icons/safari-pinned-tab.svg',
                 fallbackText: 'Anthropic' },

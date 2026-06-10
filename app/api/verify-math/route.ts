@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { verifyMathWithOpenAI } from '@/lib/openai'
 
 const anthropic = new Anthropic()
 
