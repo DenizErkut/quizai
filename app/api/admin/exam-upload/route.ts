@@ -184,12 +184,12 @@ export async function POST(req: NextRequest) {
           fileUrl = u?.publicUrl || ''
         }
         try {
-          if (bytes.length < 10 * 1024 * 1024) {
+          if (Buffer.from(bytes).length < 10 * 1024 * 1024) {
             const pdfParse = require('pdf-parse')
             const parsed = await pdfParse(Buffer.from(bytes))
             rawText = parsed.text || ''
           } else {
-            rawText = `[PDF cok buyuk (${Math.round(bytes.length/1024/1024)}MB)]`
+            rawText = `[PDF cok buyuk (${Math.round(Buffer.from(bytes).length/1024/1024)}MB)]`
           }
         } catch { rawText = '[PDF yuklendi]' }
       }
