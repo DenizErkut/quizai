@@ -223,8 +223,8 @@ async function generateVisualForQuestion(
     const correctAnswer = q.opts?.[q.ans] || q.blank || q.correctOrder || ''
     const prompt = buildSVGPrompt(category, topic, q.q, grade, String(correctAnswer))
     const res = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 1500,
+      model: 'claude-haiku-4-5-20251001', // SVG için hızlı model yeterli
+      max_tokens: 1200,
       messages: [{ role: 'user', content: prompt }],
     })
     const text = res.content[0].type === 'text' ? res.content[0].text.trim() : ''
@@ -381,36 +381,36 @@ export async function POST(req: NextRequest) {
       }
     } catch { }
 
-    // ✅ MEB kaynağından semantic context çek
+    // ✅ MEB search — paralel çalışır, max 3sn bekle
     let mebContext = ''
     try {
       const mebRes = await fetch(`${req.nextUrl.origin}/api/meb-search`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, grade, subject: topic, level: getLevel(grade), limit: 3 }),
-        signal: AbortSignal.timeout(4000), // 4 sn timeout
+        headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
+        body: JSON.stringify({ topic, grade, subject: topic, level: getLevel(grade), limit: 2 }),
+        signal: AbortSignal.timeout(3000), // 3sn — daha agresif timeout
       })
       if (mebRes.ok) {
         const mebData = await mebRes.json()
         if (mebData.found && mebData.context) {
-          mebContext = `\n\nMEB KAYNAK İÇERİĞİ (Bu içeriğe dayalı soru üret):\n${mebData.context}`
-          console.log(`[generate-quiz] MEB context found: ${mebData.context.length} chars`)
+          mebContext = `\n\nMEB KAYNAK İÇERİĞİ:\n${mebData.context.slice(0, 800)}` // Max 800 char
         }
       }
-    } catch (e) {
-      console.warn('[generate-quiz] MEB search failed:', e)
-    }
+    } catch { /* MEB opsiyonel */ }
 
     const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, safeQCount, (fileContent || '') + gradeContext + mebContext) + previousQuestionsNote
     promptStr = prompt
     countRef = safeQCount
 
+    // Hız optimizasyonu: az soru → Haiku (3x hızlı), çok soru → Sonnet
+    const useHaiku = safeQCount <= 7
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 8000, // Artırıldı — uzun konularda JSON kesilmesini önler
+      model: useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5',
+      max_tokens: useHaiku ? 2500 : 3500,
       system: 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca MEB müfredatındaki konularda soru üret. Müfredat dışı, siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.',
       messages: [{ role: 'user', content: prompt }],
     })
+    console.log(`[generate-quiz] model=${useHaiku ? 'haiku' : 'sonnet'} qCount=${safeQCount}`)
 
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
     const clean = text.replace(/```json|```/g, '').trim()
@@ -485,7 +485,7 @@ export async function POST(req: NextRequest) {
       // 2. SVG üretimi (max 2, paralel)
       includeVisuals && visualCategory
         ? Promise.all(
-            Array.from({ length: Math.min(questions.length, 2) }, (_, i) =>
+            Array.from({ length: Math.min(questions.length, 1) }, (_, i) => // Max 1 SVG — hız optimizasyonu
               generateVisualForQuestion(questions[i], visualCategory, topic, grade)
                 .then(svg => ({ i, svg }))
                 .catch(() => ({ i, svg: null }))
