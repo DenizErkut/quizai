@@ -239,7 +239,6 @@ export default function ExamPage() {
 
   // ── SINAV BİTİR ──────────────────────────────────────────────────────────
   const analyzeWrongAnswers = async () => {
-  const analyzeWrongAnswers = async () => {
     // answers: { [sectionId]: {questionIndex, answer, ...}[] }
     const wrongQs: string[] = []
     for (const [secId, sectionAnswers] of Object.entries(answers)) {
