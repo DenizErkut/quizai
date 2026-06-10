@@ -61,36 +61,25 @@ export default function Navbar() {
   const [isDark, setIsDark] = useState(false)
   const supabase = createClient() as any
 
-  useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const [{ data: p }, { data: s }] = await Promise.all([
-        supabase.from('profiles').select('name,plan,monthly_test_count,language,referral_code,avatar_url,role').eq('id', user.id).maybeSingle(),
-        supabase.from('streaks').select('current_streak').eq('user_id', user.id).maybeSingle(),
-      ])
-      if (p) {
-        const stored = localStorage.getItem('pratium_lang')
-        if (stored) p.language = stored
-        // Role'den bağımsız: teachers tablosunda onaylı mı?
-        const { data: tData } = await supabase.from('teachers').select('approved').eq('user_id', user.id).maybeSingle()
-        p.teacher_approved = tData?.approved || false
-        // Veli mi? parent_children tablosunda kaydı var mı?
-        const { count: parentCount } = await supabase.from('parent_children').select('id', { count: 'exact', head: true }).eq('parent_id', user.id)
-        p.is_parent = (parentCount || 0) > 0
-        setProfile(p)
-      }
-      setStreak(s?.current_streak || 0)
+  // Context'ten veri al — her route değişiminde yeniden sorgu YOK
+  const {
+    profile: ctxProfile, streak: ctxStreak, unreadCount: ctxUnread,
+    isApprovedTeacher: ctxIsApprovedTeacher, isParent: ctxIsParent,
+    isInstitution: ctxIsInstitution, updateLanguage: ctxUpdateLanguage
+  } = useUser()
 
-      const { count } = await supabase
-        .from('notifications')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('read', false)
-      setUnreadCount(count || 0)
+  useEffect(() => {
+    if (ctxProfile) {
+      const p = { ...ctxProfile } as any
+      const stored = localStorage.getItem('pratium_lang')
+      if (stored) p.language = stored
+      p.teacher_approved = ctxIsApprovedTeacher
+      p.is_parent = ctxIsParent
+      setProfile(p)
     }
-    load()
-  }, [pathname])
+    setStreak(ctxStreak)
+    setUnreadCount(ctxUnread)
+  }, [ctxProfile, ctxStreak, ctxUnread, ctxIsApprovedTeacher, ctxIsParent])
 
   useEffect(() => { setShowMenu(false); setShowLang(false) }, [pathname])
 
@@ -114,8 +103,7 @@ export default function Navbar() {
     if (!profile) return
     localStorage.setItem('pratium_lang', lang)
     setProfile((prev: any) => prev ? { ...prev, language: lang } : prev)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) await supabase.from('profiles').update({ language: lang }).eq('id', user.id)
+    await ctxUpdateLanguage(lang)
   }
 
   async function handleSignOut() {

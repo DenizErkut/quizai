@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import Navbar from '@/components/Navbar'
+import { UserProvider } from '@/lib/user-context'
 import AIChatBot from '@/components/AIChatBot'
 
 export const metadata: Metadata = {
@@ -67,8 +68,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             } catch(e) {}
           })();
         `}} />
-        <Navbar />
-        {children}
+        <UserProvider>
+          <Navbar />
+          {children}
+        </UserProvider>
         <AIChatBot />
       </body>
     </html>
