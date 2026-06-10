@@ -154,12 +154,15 @@ export async function POST(req: NextRequest) {
 
       fileUrl = body.file_url
       try {
-        if ((await fileData.arrayBuffer()).byteLength < 10 * 1024 * 1024) {
-        const pdfParse = require('pdf-parse')
-        const parsed = await pdfParse(Buffer.from(await fileData.arrayBuffer()))
-        rawText = parsed.text || ''
+        const pdfBytes = Buffer.from(await fileData.arrayBuffer())
+        if (pdfBytes.length < 10 * 1024 * 1024) {
+          const pdfParse = require('pdf-parse')
+          const parsed = await pdfParse(pdfBytes)
+          rawText = parsed.text || ''
+        } else {
+          rawText = `[PDF cok buyuk (${Math.round(pdfBytes.length/1024/1024)}MB) - Storage: ${fileUrl}]`
+        }
       } catch { rawText = `[PDF: ${fileUrl}]` }
-        } else { rawText = `[PDF cok buyuk - Storage: ${fileUrl}]` }
 
     } else {
       // FormData mod (küçük dosya)
