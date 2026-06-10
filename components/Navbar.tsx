@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useUser } from '@/lib/user-context'
 
 const LANGS = [
   { code: 'Türkçe', flag: '🇹🇷' },
