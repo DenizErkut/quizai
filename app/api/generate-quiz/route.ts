@@ -387,6 +387,7 @@ export async function POST(req: NextRequest) {
     }
 
     const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, safeQCount, (fileContent || '') + gradeContext + mebContext) + previousQuestionsNote
+    const promptStr: string = prompt // fallback için
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5',
@@ -523,8 +524,8 @@ export async function POST(req: NextRequest) {
     console.error('Generate quiz error, trying OpenAI fallback:', error?.message)
     // GPT-4o yedek model
     try {
-      if (!prompt) throw new Error('No prompt')
-      const fallbackText = await generateQuizFallback(prompt, count)
+      if (!promptStr) throw new Error('No prompt')
+      const fallbackText = await generateQuizFallback(promptStr, count)
       const clean = fallbackText.replace(/```json|```/g, '').trim()
       const parsed = JSON.parse(clean)
       const fbQuestions = parsed.questions || parsed
