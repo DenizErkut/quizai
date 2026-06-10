@@ -253,7 +253,6 @@ export default function ExamPage() {
       }
     }
 
-      })
 
     if (wrongQs.length === 0) return
     setAiLoading(true)
