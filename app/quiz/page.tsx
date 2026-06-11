@@ -324,12 +324,23 @@ function QuizPageContent() {
       try {
         const res = await fetch('/api/admin/curriculum')
         const data = await res.json()
-        const userGrade = profile?.grade || ''
+        const userGrade = profile?.grade || '' // örn: "ortaokul 6. sınıf"
+        // Kullanıcının tam sınıf numarasını çıkar
+        const userGradeNum = (userGrade.match(/\d+/) || [])[0] || ''
+        const userLevel = userGrade.toLowerCase().includes('lise') ? 'lise'
+          : userGrade.toLowerCase().includes('ortaokul') ? 'ortaokul'
+          : userGrade.toLowerCase().includes('ilkokul') ? 'ilkokul'
+          : 'universite'
+
         const subjects = (data.curriculum || [])
-          .filter((c: any) => c.is_active && (
-            userGrade.toLowerCase().includes(c.grade.toLowerCase().split('.')[0].trim()) ||
-            userGrade.toLowerCase().includes(c.level)
-          ))
+          .filter((c: any) => {
+            if (!c.is_active) return false
+            // Level eşleşmeli
+            if (c.level !== userLevel) return false
+            // Sınıf numarası tam eşleşmeli (örn: "6. sınıf" → "6")
+            const cGradeNum = (c.grade.match(/\d+/) || [])[0] || ''
+            return cGradeNum === userGradeNum
+          })
           .map((c: any) => c.subject)
         setDynamicSubjects([...new Set(subjects)] as string[])
       } catch {}
