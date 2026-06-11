@@ -411,7 +411,7 @@ export default function QuizSetup({
             {includeVisuals && <span style={{ color: 'var(--accent)' }}>📊 Görsel</span>}
           </div>
 
-          {topicErr && !uploadedFiles.length > 0 && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{topicErr}</div>}
+          {topicErr && uploadedFiles.length === 0 && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{topicErr}</div>}
 
           <button className="btn btn-primary btn-lg" onClick={() => {
             if (dailyLeft === 0) { onStartQuiz(); return }
