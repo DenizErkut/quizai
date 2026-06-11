@@ -36,8 +36,15 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'meb' | 'exams'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'meb' | 'exams' | 'curriculum'>('users')
   // Kurum formu
+  // Müfredat state
+  const [curriculum, setCurriculum] = useState<any[]>([])
+  const [currLoading, setCurrLoading] = useState(false)
+  const [currFilter, setCurrFilter] = useState({ level: 'ortaokul', grade: '' })
+  const [newItem, setNewItem] = useState({ level: 'ortaokul', grade: '6. sınıf', subject: '' })
+  const [currMsg, setCurrMsg] = useState('')
+
   // Sınav Kitapçıkları state
   const [examUploading, setExamUploading] = useState(false)
   const [examMsg, setExamMsg] = useState('')
@@ -375,6 +382,7 @@ export default function AdminPage() {
             { key: 'institutions', label: '🏛️ Kurumlar' },
             { key: 'meb', label: '📚 MEB Kaynakları' },
             { key: 'exams', label: '🎯 Sınav Kitapçıkları' },
+            { key: 'curriculum', label: '📋 Müfredat Yönetimi' },
           ] as const).map(t => (
             <button key={t.key} className={`btn btn-sm ${tab === t.key ? 'btn-primary' : ''}`}
               onClick={() => setTab(t.key)}
@@ -860,6 +868,131 @@ export default function AdminPage() {
           </div>
         )}
       {/* MEB KAYNAKLARI */}
+      {tab === 'curriculum' && (
+        <div>
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '1rem' }}>
+              📋 Müfredat Yönetimi — Sınıf Bazlı Ders Ekleme/Çıkarma
+            </div>
+
+            {/* Filtre */}
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap' }}>
+              {['ilkokul', 'ortaokul', 'lise', 'universite'].map(l => (
+                <button key={l} onClick={() => { setCurrFilter(p => ({ ...p, level: l, grade: '' })); setCurriculum([]) }}
+                  style={{ padding: '6px 14px', borderRadius: '99px', border: `1.5px solid ${currFilter.level === l ? 'var(--accent)' : 'var(--border)'}`, background: currFilter.level === l ? 'var(--accent)' : 'var(--bg)', color: currFilter.level === l ? '#fff' : 'var(--text2)', fontSize: '13px', cursor: 'pointer', fontFamily: 'var(--font-sans)', textTransform: 'capitalize' }}>
+                  {l}
+                </button>
+              ))}
+              <button onClick={async () => {
+                setCurrLoading(true)
+                const res = await fetch('/api/admin/curriculum')
+                const data = await res.json()
+                setCurriculum(data.curriculum || [])
+                setCurrLoading(false)
+              }} className="btn btn-sm" style={{ marginLeft: 'auto' }}>
+                🔄 Yükle
+              </button>
+            </div>
+
+            {/* Yeni ders ekleme */}
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', padding: '12px', borderRadius: '12px', background: 'var(--bg2)', border: '1px solid var(--border)', marginBottom: '1rem' }}>
+              <select value={newItem.level} onChange={e => setNewItem(p => ({ ...p, level: e.target.value }))}
+                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)' }}>
+                {['ilkokul', 'ortaokul', 'lise', 'universite'].map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+              <input value={newItem.grade} onChange={e => setNewItem(p => ({ ...p, grade: e.target.value }))}
+                placeholder="Sınıf (örn: 6. sınıf)"
+                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', flex: 1, minWidth: '120px' }} />
+              <input value={newItem.subject} onChange={e => setNewItem(p => ({ ...p, subject: e.target.value }))}
+                placeholder="Ders adı (örn: Türkçe)"
+                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', flex: 2, minWidth: '150px' }} />
+              <button onClick={async () => {
+                if (!newItem.subject.trim()) return
+                const res = await fetch('/api/admin/curriculum', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(newItem)
+                })
+                const data = await res.json()
+                if (res.ok) {
+                  setCurriculum(p => [...p, data.item])
+                  setNewItem(p => ({ ...p, subject: '' }))
+                  setCurrMsg('✅ Ders eklendi')
+                  setTimeout(() => setCurrMsg(''), 2000)
+                } else setCurrMsg('❌ ' + data.error)
+              }} className="btn btn-primary" style={{ padding: '8px 16px' }}>
+                + Ekle
+              </button>
+            </div>
+
+            {currMsg && <div style={{ fontSize: '13px', color: currMsg.startsWith('✅') ? '#16a34a' : '#dc2626', marginBottom: '8px' }}>{currMsg}</div>}
+
+            {/* Ders listesi — sınıf bazlı gruplandırma */}
+            {currLoading ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text3)' }}>Yukleniyor...</div>
+            ) : curriculum.length > 0 ? (() => {
+              // Level filtrele ve grade'e gore grupla
+              const filtered = curriculum.filter(c => c.level === currFilter.level)
+              const grades = [...new Set(filtered.map(c => c.grade))].sort()
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {grades.map(grade => (
+                    <div key={grade}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', marginBottom: '8px', padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                        📚 {grade}
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {filtered.filter(c => c.grade === grade).map((item: any) => (
+                          <div key={item.id} style={{
+                            display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px',
+                            borderRadius: '10px', border: `1.5px solid ${item.is_active ? 'var(--border)' : 'rgba(220,38,38,0.3)'}`,
+                            background: item.is_active ? 'var(--bg2)' : 'rgba(220,38,38,0.05)',
+                            opacity: item.is_active ? 1 : 0.6,
+                          }}>
+                            <span style={{ fontSize: '13px', fontWeight: 500, color: item.is_active ? 'var(--text)' : '#dc2626' }}>
+                              {item.subject}
+                            </span>
+                            {/* Aktif/Pasif toggle */}
+                            <button onClick={async () => {
+                              const res = await fetch('/api/admin/curriculum', {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: item.id, is_active: !item.is_active })
+                              })
+                              if (res.ok) setCurriculum(p => p.map(c => c.id === item.id ? { ...c, is_active: !c.is_active } : c))
+                            }} title={item.is_active ? 'Pasifleştir' : 'Aktifleştir'}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', padding: '0 2px', opacity: 0.7 }}>
+                              {item.is_active ? '👁️' : '🚫'}
+                            </button>
+                            {/* Sil */}
+                            <button onClick={async () => {
+                              if (!confirm(`"${item.subject}" dersini silmek istediğinize emin misiniz?`)) return
+                              const res = await fetch('/api/admin/curriculum', {
+                                method: 'DELETE',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: item.id })
+                              })
+                              if (res.ok) setCurriculum(p => p.filter(c => c.id !== item.id))
+                            }} title="Sil"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: '#dc2626', padding: '0 2px', opacity: 0.7 }}>
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            })() : (
+              <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', padding: '1.5rem' }}>
+                "Yükle" butonuna tıklayarak müfredatı görüntüleyin
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {tab === 'exams' && (
         <div>
           {/* Sınav kitapçığı yükleme formu */}
@@ -954,7 +1087,7 @@ export default function AdminPage() {
                       setExamMsg(`✅ Yuklendi! ${data.chunks} soru chunk, ${data.embedded} embedding`)
                       setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', answer_key: '' })
                       setExamFile(null)
-                    } else setExamMsg('❌ ' + data.error)
+                    } else setExamMsg('❌ ' + (data.error || 'Sunucu hatasi'))
                   } else {
                     setExamMsg('Dosya isleniyor...')
                     const fd = new FormData()
@@ -966,7 +1099,7 @@ export default function AdminPage() {
                       setExamMsg(`✅ Yuklendi! ${data.chunks} soru chunk`)
                       setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', answer_key: '' })
                       setExamFile(null)
-                    } else setExamMsg('❌ ' + data.error)
+                    } else setExamMsg('❌ ' + (data.error || 'Sunucu hatasi'))
                   }
                 } catch (e: any) {
                   setExamMsg('❌ ' + e.message)
