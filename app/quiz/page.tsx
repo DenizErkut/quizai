@@ -1074,6 +1074,7 @@ function QuizPageContent() {
         testsLeft={testsLeft}
         dailyLeft={dailyLeft}
         maxQCount={maxQCount}
+        dynamicSubjects={dynamicSubjects}
       />
     </>
   )

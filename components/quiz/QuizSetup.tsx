@@ -35,6 +35,7 @@ interface QuizSetupProps {
   dailyLeft: number | null
   maxQCount: number
   topicErr?: string
+  dynamicSubjects?: string[]
 }
 
 export default function QuizSetup({
@@ -43,7 +44,7 @@ export default function QuizSetup({
   questionType, setQuestionType, uploadedFiles, setUploadedFiles,
   favorites, mebTopics, topicSummary, summaryLoading, showSummary, setShowSummary,
   onFetchSummary, onToggleFavorite, onStartQuiz,
-  testsLeft, dailyLeft, maxQCount, topicErr,
+  testsLeft, dailyLeft, maxQCount, topicErr, dynamicSubjects = [],
 }: QuizSetupProps) {
   const [openSubject, setOpenSubject] = useState<string | null>(null)
   const [advancedOpen, setAdvancedOpen] = useState(false)
@@ -141,7 +142,10 @@ export default function QuizSetup({
           <label className="field-label">Ders seç</label>
           <div style={{ marginTop: '6px', marginBottom: '1rem' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
-              {Object.keys(SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul).map(subj => (
+              {(dynamicSubjects.length > 0
+                ? dynamicSubjects
+                : Object.keys(SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul)
+              ).map(subj => (
                 <button key={subj} onClick={() => setOpenSubject(openSubject === subj ? null : subj)}
                   style={{
                     padding: '7px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: 500,
