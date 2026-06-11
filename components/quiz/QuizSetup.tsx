@@ -390,7 +390,7 @@ export default function QuizSetup({
                 </div>
                 <div>
                   <label className="field-label" style={{ marginTop: 0 }}>Görsel sorular</label>
-                  <button onClick={() => setIncludeVisuals(v => !v)}
+                  <button onClick={() => setIncludeVisuals(!includeVisuals)}
                     style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', border: `1.5px solid ${includeVisuals ? 'var(--accent)' : 'var(--border)'}`, background: includeVisuals ? 'var(--accent-bg)' : 'var(--bg)', color: includeVisuals ? 'var(--accent)' : 'var(--text2)', fontSize: '13px', fontWeight: includeVisuals ? 600 : 400, transition: 'all 0.15s' }}>
                     {includeVisuals ? '📊 Grafik & SVG açık' : '📝 Sadece metin'}
                   </button>
