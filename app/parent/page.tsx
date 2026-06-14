@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Suspense } from 'react'
+import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface ChildData {
   child_id: string
@@ -26,7 +27,9 @@ function ParentContent() {
   const [children, setChildren] = useState<ChildData[]>([])
   const [selectedChild, setSelectedChild] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'archive' | 'leaderboard' | 'add'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'trend' | 'archive' | 'leaderboard' | 'add'>('dashboard')
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [emailSent, setEmailSent] = useState(false)
   const [addCode, setAddCode] = useState('')
   const [adding, setAdding] = useState(false)
   const [addError, setAddError] = useState('')
@@ -178,6 +181,7 @@ function ParentContent() {
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
           {[
             { key: 'dashboard', label: '📊 Durum' },
+            { key: 'trend', label: '📈 Trend' },
             { key: 'archive', label: '📦 Arşiv' },
             { key: 'leaderboard', label: '🏆 Sıralama' },
             { key: 'add', label: '➕ Çocuk Ekle' },
@@ -305,6 +309,123 @@ function ParentContent() {
         )}
 
         {/* ARŞİV */}
+        {/* TREND SEKMESİ */}
+        {activeTab === 'trend' && selected && (() => {
+          const pctColor = (p: number) => p >= 75 ? '#10b981' : p >= 50 ? '#f59e0b' : '#ef4444'
+
+          // Haftalık trend
+          const weeks: Record<string, {week: string; total: number; count: number}> = {}
+          selected.sessions.forEach((s: any) => {
+            const d = new Date(s.created_at)
+            const weekStart = new Date(d)
+            weekStart.setDate(d.getDate() - d.getDay())
+            const key = weekStart.toISOString().split('T')[0]
+            const label = `${weekStart.getDate()}/${weekStart.getMonth()+1}`
+            if (!weeks[key]) weeks[key] = { week: label, total: 0, count: 0 }
+            weeks[key].total += s.pct
+            weeks[key].count += 1
+          })
+          const trendData = Object.entries(weeks)
+            .sort(([a],[b]) => a.localeCompare(b))
+            .slice(-8)
+            .map(([,v]) => ({ ...v, avg: Math.round(v.total/v.count) }))
+
+          // Konu başarısı
+          const topicMap: Record<string, {total: number; count: number}> = {}
+          selected.sessions.forEach((s: any) => {
+            if (!topicMap[s.topic]) topicMap[s.topic] = { total: 0, count: 0 }
+            topicMap[s.topic].total += s.pct
+            topicMap[s.topic].count += 1
+          })
+          const topicData = Object.entries(topicMap)
+            .map(([topic, v]) => ({ topic: topic.length > 16 ? topic.slice(0,16)+'…' : topic, avg: Math.round(v.total/v.count) }))
+            .sort((a,b) => b.avg - a.avg)
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+              {/* Haftalık E-posta Gönder */}
+              <div className="card" style={{ background: 'linear-gradient(135deg, rgba(8,36,101,0.04), rgba(30,207,184,0.04))', border: '1px solid rgba(99,102,241,0.2)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)' }}>📧 Haftalık Özet E-postası</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>Her Pazar 08:00'de otomatik gönderilir. Şimdi de isteyebilirsin.</div>
+                  </div>
+                  <button onClick={async () => {
+                    setSendingEmail(true)
+                    try {
+                      const { data: { session } } = await supabase.auth.getSession()
+                      const res = await fetch('/api/parent/send-summary', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+                      })
+                      if (res.ok) setEmailSent(true)
+                    } catch {}
+                    setSendingEmail(false)
+                  }} disabled={sendingEmail || emailSent}
+                    className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '13px' }}>
+                    {emailSent ? '✅ Gönderildi!' : sendingEmail ? '⏳ Gönderiliyor...' : '📨 Özet Gönder'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Haftalık Trend */}
+              {trendData.length > 0 && (
+                <div className="card">
+                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '12px' }}>📈 Haftalık Başarı Trendi</div>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <AreaChart data={trendData}>
+                      <defs>
+                        <linearGradient id="parentTrend" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="week" tick={{ fontSize: 12 }} />
+                      <YAxis domain={[0,100]} tickFormatter={v => `%${v}`} tick={{ fontSize: 11 }} />
+                      <Tooltip formatter={(v: any) => [`%${v}`, 'Haftalık Ort.']} />
+                      <Area type="monotone" dataKey="avg" stroke="#6366f1" strokeWidth={2.5} fill="url(#parentTrend)" dot={{ fill: '#6366f1', r: 4 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Konu bazlı başarı */}
+              {topicData.length > 0 && (
+                <div className="card">
+                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '12px' }}>📚 Konu Başarısı</div>
+                  <ResponsiveContainer width="100%" height={Math.max(180, topicData.length * 30)}>
+                    <BarChart data={topicData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis type="number" domain={[0,100]} tickFormatter={v => `%${v}`} tick={{ fontSize: 11 }} />
+                      <YAxis type="category" dataKey="topic" width={120} tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+                      <Tooltip formatter={(v: any) => [`%${v}`, 'Başarı']} />
+                      <Bar dataKey="avg" radius={[0,6,6,0]}>
+                        {topicData.map((d, i) => <Cell key={i} fill={pctColor(d.avg)} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Zayıf konular */}
+              {selected.weakTopics?.length > 0 && (
+                <div className="card" style={{ border: '1.5px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.03)' }}>
+                  <div style={{ fontWeight: 700, fontSize: '14px', color: '#dc2626', marginBottom: '10px' }}>⚠️ Çalışılması Gereken Konular</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {selected.weakTopics.map((topic: string, i: number) => (
+                      <span key={i} style={{ padding: '5px 12px', borderRadius: '99px', background: 'rgba(239,68,68,0.1)', color: '#dc2626', fontSize: '12px', fontWeight: 600 }}>
+                        ⚠️ {topic}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })()}
+
         {activeTab === 'archive' && selected && (
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>

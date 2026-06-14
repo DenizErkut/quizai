@@ -1,17 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/cron/due-assignments",
-      "schedule": "0 5 * * *"
-    },
-    {
-      "path": "/api/push",
-      "schedule": "0 16 * * *"
+      "path": "/api/cron/weekly-parent-summary",
+      "schedule": "0 8 * * 0"
     }
-  ],
-  "functions": {
-    "app/api/pdf-tools/route.ts": {
-      "maxDuration": 60
-    }
-  }
+  ]
 }
