@@ -141,6 +141,7 @@ export default function Navbar() {
     { href: '/parent', label: '👨‍👩‍👧 Veli Paneli' },
   ] : [
     { href: '/quiz',        label: '⚡ Test' },
+    { href: '/live',        label: '🎯 Canlı' },
     { href: '/daily',       label: streak > 0 ? `🔥 ${streak} gün` : '📅 Günlük' },
     { href: '/leaderboard', label: '🏆 Sıralama' },
   ]
