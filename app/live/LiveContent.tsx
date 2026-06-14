@@ -199,6 +199,7 @@ export default function LiveContent() {
       .eq('live_quiz_id', liveQuizId)
     const scoreMap: Record<string, { name: string; correct: number; total: number }> = {}
     for (const a of (ans ?? [])) {
+      if (a.question_index < 0) continue  // join marker'ı atla
       if (!scoreMap[a.user_id]) scoreMap[a.user_id] = { name: a.profiles?.name || 'Öğrenci', correct: 0, total: 0 }
       scoreMap[a.user_id].total++
       if (a.is_correct) scoreMap[a.user_id].correct++

@@ -61,11 +61,13 @@ export default function TeacherLivePage() {
       .from('live_quiz_answers')
       .select('user_id, question_index, chosen_answer, is_correct, answered_at, profiles(name, avatar_url)')
       .eq('live_quiz_id', liveQuizId)
-    setAnswers(ans ?? [])
+    // Join marker'ları (-1) UI hesaplamalarından hariç tut
+    const realAnswers = (ans ?? []).filter((a: any) => a.question_index >= 0)
+    setAnswers(realAnswers)
 
     // Liderboard hesapla
     const scoreMap: Record<string, { name: string; avatar: string | null; correct: number; total: number }> = {}
-    for (const a of (ans ?? [])) {
+    for (const a of realAnswers) {
       if (!scoreMap[a.user_id]) scoreMap[a.user_id] = { name: a.profiles?.name || 'Öğrenci', avatar: a.profiles?.avatar_url || null, correct: 0, total: 0 }
       scoreMap[a.user_id].total++
       if (a.is_correct) scoreMap[a.user_id].correct++
