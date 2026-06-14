@@ -1,8 +1,13 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import {
+  BarChart, Bar, RadarChart, Radar, PolarGrid, PolarAngleAxis,
+  PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Legend
+} from 'recharts'
 
 export default function TeacherPerformancePage() {
   const [teacher, setTeacher] = useState<any>(null)
@@ -28,6 +33,7 @@ export default function TeacherPerformancePage() {
   const [rankTab, setRankTab] = useState<'general' | 'assignments' | 'streak'>('general')
   const [pdfLoading, setPdfLoading] = useState(false)
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null) // assignment içinde öğrenci detayı
+  const [chartView, setChartView] = useState<'list' | 'charts'>('list')
   const router = useRouter()
   const supabase = createClient() as any
 
@@ -440,6 +446,151 @@ export default function TeacherPerformancePage() {
               <div style={{ fontSize: '14px', color: 'var(--text3)' }}>Bu sınıfta henüz öğrenci yok.</div>
             </div>
           ) : (
+            <>
+              {/* Görünüm toggle + özet istatistik */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {[
+                    { key: 'list', label: '👥 Öğrenci Listesi' },
+                    { key: 'charts', label: '📊 Sınıf Grafikleri' },
+                  ].map(t => (
+                    <button key={t.key} onClick={() => setChartView(t.key as any)}
+                      style={{ padding: '6px 14px', borderRadius: '99px', border: `1.5px solid ${chartView === t.key ? 'var(--accent)' : 'var(--border)'}`, background: chartView === t.key ? 'var(--accent)' : 'var(--bg)', color: chartView === t.key ? '#fff' : 'var(--text2)', fontSize: '13px', fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                {/* Sınıf özet statsları */}
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'Öğrenci', value: studentStats.length, icon: '👥' },
+                    { label: 'Sınıf Ort.', value: `%${Math.round(studentStats.reduce((a,s) => a + (s.avgPct||0), 0) / (studentStats.length||1))}`, icon: '📈' },
+                    { label: 'Risk', value: studentStats.filter(s => (s.avgPct||0) < 50).length, icon: '⚠️', color: '#ef4444' },
+                    { label: 'Başarılı', value: studentStats.filter(s => (s.avgPct||0) >= 75).length, icon: '🏆', color: '#16a34a' },
+                  ].map((st, i) => (
+                    <div key={i} style={{ textAlign: 'center', padding: '6px 12px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{st.icon} {st.label}</div>
+                      <div style={{ fontWeight: 700, fontSize: '16px', color: st.color || 'var(--primary)' }}>{st.value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* GRAFİK GÖRÜNÜMÜ */}
+              {chartView === 'charts' && (() => {
+                const COLORS = ['#6366f1','#1ECFB8','#f59e0b','#ef4444','#3b82f6','#10b981','#8b5cf6','#f97316']
+                const pctColor = (p: number) => p >= 75 ? '#10b981' : p >= 50 ? '#f59e0b' : '#ef4444'
+
+                // Başarı dağılımı (Pie)
+                const distribution = [
+                  { name: '🏆 Başarılı (75+)', value: studentStats.filter(s => (s.avgPct||0) >= 75).length, color: '#10b981' },
+                  { name: '~ Orta (50-74)', value: studentStats.filter(s => (s.avgPct||0) >= 50 && (s.avgPct||0) < 75).length, color: '#f59e0b' },
+                  { name: '⚠️ Risk (<50)', value: studentStats.filter(s => (s.avgPct||0) < 50).length, color: '#ef4444' },
+                ].filter(d => d.value > 0)
+
+                // Öğrenci bazlı bar
+                const studentBars = [...studentStats]
+                  .sort((a, b) => (b.avgPct||0) - (a.avgPct||0))
+                  .slice(0, 15)
+                  .map(s => ({ name: (s.name||'').split(' ')[0], pct: s.avgPct||0, test: s.totalTests||0 }))
+
+                // Konu bazlı sınıf ortalaması
+                const topicMap: Record<string, {total: number, count: number}> = {}
+                studentStats.forEach(s => {
+                  (s.sessions||[]).forEach((sess: any) => {
+                    if (!topicMap[sess.topic]) topicMap[sess.topic] = { total: 0, count: 0 }
+                    topicMap[sess.topic].total += sess.pct || 0
+                    topicMap[sess.topic].count += 1
+                  })
+                })
+                const topicBars = Object.entries(topicMap)
+                  .map(([topic, v]) => ({ topic: topic.length > 18 ? topic.slice(0,18)+'…' : topic, avg: Math.round(v.total/v.count) }))
+                  .sort((a,b) => a.avg - b.avg)
+                  .slice(0, 10)
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '14px' }}>
+                      {/* Başarı Dağılımı Pie */}
+                      <div className="card">
+                        <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '12px' }}>🍩 Başarı Dağılımı</div>
+                        <ResponsiveContainer width="100%" height={220}>
+                          <PieChart>
+                            <Pie data={distribution} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3}>
+                              {distribution.map((d, i) => <Cell key={i} fill={d.color} />)}
+                            </Pie>
+                            <Tooltip formatter={(v: any, n: any) => [v + ' öğrenci', n]} />
+                            <Legend iconSize={10} wrapperStyle={{ fontSize: '12px' }} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* En Zayıf Konular */}
+                      {topicBars.length > 0 && (
+                        <div className="card">
+                          <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '12px' }}>⚠️ Sınıf Zayıf Konular</div>
+                          <ResponsiveContainer width="100%" height={220}>
+                            <BarChart data={topicBars} layout="vertical">
+                              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                              <XAxis type="number" domain={[0,100]} tickFormatter={v => `%${v}`} tick={{ fontSize: 10 }} />
+                              <YAxis type="category" dataKey="topic" width={130} tick={{ fontSize: 10, fill: 'var(--text2)' }} />
+                              <Tooltip formatter={(v: any) => [`%${v}`, 'Sınıf Ort.']} />
+                              <Bar dataKey="avg" radius={[0,6,6,0]}>
+                                {topicBars.map((d, i) => <Cell key={i} fill={pctColor(d.avg)} />)}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Öğrenci Sıralaması Bar */}
+                    <div className="card">
+                      <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '12px' }}>👥 Öğrenci Performans Sıralaması</div>
+                      <ResponsiveContainer width="100%" height={Math.max(200, studentBars.length * 32)}>
+                        <BarChart data={studentBars} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                          <XAxis type="number" domain={[0,100]} tickFormatter={v => `%${v}`} tick={{ fontSize: 11 }} />
+                          <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: 'var(--text2)' }} />
+                          <Tooltip formatter={(v: any, _: any, p: any) => [`%${v} (${p.payload.test} test)`, 'Ortalama']} />
+                          <Bar dataKey="pct" radius={[0,6,6,0]}>
+                            {studentBars.map((d, i) => <Cell key={i} fill={pctColor(d.pct)} />)}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Risk altındaki öğrenciler */}
+                    {studentStats.filter(s => (s.avgPct||0) < 50).length > 0 && (
+                      <div className="card" style={{ border: '1.5px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.03)' }}>
+                        <div style={{ fontWeight: 700, fontSize: '14px', color: '#dc2626', marginBottom: '12px' }}>🚨 Risk Altındaki Öğrenciler (Ort. &lt;%50)</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {studentStats.filter(s => (s.avgPct||0) < 50).map((s: any) => (
+                            <div key={s.student_id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', cursor: 'pointer' }}
+                              onClick={() => { setView('student' as any); openStudent(s) }}>
+                              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>
+                                {(s.name||'?').slice(0,2).toUpperCase()}
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 600, fontSize: '13px' }}>{s.name}</div>
+                                <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{s.totalTests} test · Son: {s.lastTopic || 'Yok'}</div>
+                              </div>
+                              <div style={{ fontWeight: 800, fontSize: '18px', color: '#dc2626' }}>%{s.avgPct||0}</div>
+                              <button onClick={e => { e.stopPropagation(); /* ödev ata */ }}
+                                style={{ padding: '5px 12px', borderRadius: '8px', background: '#dc2626', color: '#fff', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                                📝 Ödev At
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {/* LİSTE GÖRÜNÜMÜ */}
+              {chartView === 'list' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {studentStats.map((s: any) => (
                 <div key={s.student_id} className="card" style={{ cursor: 'pointer', transition: 'all 0.15s' }}
@@ -482,6 +633,8 @@ export default function TeacherPerformancePage() {
                 </div>
               ))}
             </div>
+              )}
+            </>
           )
         )}
 
