@@ -243,7 +243,7 @@ export default function LiveContent() {
       </div>
       <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: '16px', padding: '16px 32px', backdropFilter: 'blur(10px)' }}>
         <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '4px' }}>Toplam</div>
-        <div style={{ fontSize: '32px', fontWeight: 900, color: '#fff' }}>{score.correct}/{score.total}</div>
+        <div style={{ fontSize: '32px', fontWeight: 900, color: '#fff' }}>{score.correct}/{liveQuiz?.questions?.length || score.total}</div>
       </div>
       <div style={{ marginTop: '2rem', fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>Sonraki soru geliyor...</div>
     </main>
@@ -256,7 +256,7 @@ export default function LiveContent() {
         <div style={{ fontSize: '14px', opacity: 0.7, marginBottom: '4px' }}>Toplam sonucun</div>
         <div style={{ fontSize: '52px', fontWeight: 900 }}>{score.correct}/{liveQuiz?.questions?.length || score.total}</div>
         <div style={{ fontSize: '13px', opacity: 0.7, marginTop: '4px' }}>
-          {score.total > 0 ? `%${Math.round(score.correct / score.total * 100)}` : '%0'} başarı
+          {liveQuiz?.questions?.length > 0 ? `%${Math.round(score.correct / liveQuiz.questions.length * 100)}` : '%0'} başarı
         </div>
       </div>
 
