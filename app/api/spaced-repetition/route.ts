@@ -60,9 +60,8 @@ export async function POST(req: NextRequest) {
   const { questions, topic } = await req.json()
   // questions: [{q, opts, ans, exp, type}] — yanlış cevaplananlar
 
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  const nextReview = tomorrow.toISOString().split('T')[0]
+  const today_date = new Date().toISOString().split('T')[0]
+  const nextReview = today_date  // Yeni kartlar bugün gösterilsin
 
   const cards = (questions || []).map((q: any) => ({
     user_id: user.id,
