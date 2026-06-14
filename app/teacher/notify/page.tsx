@@ -47,7 +47,8 @@ export default function TeacherNotifyPage() {
   }
 
   async function sendNotification() {
-    if (!message.trim() || !selectedClass) return
+    if (!message.trim()) { alert('Lütfen mesaj girin.'); return }
+    if (!selectedClass) { alert('Lütfen bir sınıf seçin.'); return }
     setSending(true)
     setResult(null)
 
@@ -106,7 +107,8 @@ export default function TeacherNotifyPage() {
           {/* Sınıf seçimi */}
           <div style={{ marginBottom: '10px' }}>
             <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>Sınıf</label>
-            <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} style={inputStyle}>
+            <select value={selectedClass || ''} onChange={e => setSelectedClass(e.target.value || null)} style={inputStyle}>
+              <option value="">— Sınıf seçin —</option>
               {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
