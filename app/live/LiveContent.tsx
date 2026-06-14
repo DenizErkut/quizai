@@ -21,6 +21,15 @@ export default function LiveContent() {
   const [error, setError] = useState('')
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const channelRef = useRef<any>(null)
+  // Refs — polling/realtime callback'lerinde güncel değerlere erişmek için
+  const liveQuizRef = useRef<any>(null)
+  const screenRef = useRef<string>('join')
+  const currentQRef = useRef<number>(0)
+
+  // Ref'leri state ile senkron tut
+  useEffect(() => { liveQuizRef.current = liveQuiz }, [liveQuiz])
+  useEffect(() => { screenRef.current = screen }, [screen])
+  useEffect(() => { currentQRef.current = currentQ }, [currentQ])
 
   useEffect(() => {
     const urlCode = searchParams.get('code')
@@ -48,14 +57,18 @@ export default function LiveContent() {
     if (!lq) { setError('Bu koda ait aktif quiz bulunamadı.'); setJoining(false); return }
 
     setLiveQuiz(lq)
+    liveQuizRef.current = lq
     setJoining(false)
 
     if (lq.status === 'active') {
       setCurrentQ(lq.current_question)
+      currentQRef.current = lq.current_question
       setScreen('question')
+      screenRef.current = 'question'
       startTimer(lq.time_per_question)
     } else {
       setScreen('waiting')
+      screenRef.current = 'waiting'
     }
 
     // Realtime: quiz güncellemelerini dinle
@@ -64,7 +77,7 @@ export default function LiveContent() {
         event: 'UPDATE', schema: 'public', table: 'live_quizzes',
         filter: `id=eq.${lq.id}`,
       }, (payload: any) => {
-        handleQuizUpdate(payload.new, lq)
+        handleQuizUpdate(payload.new)
       })
       .subscribe()
     channelRef.current = channel
@@ -76,8 +89,7 @@ export default function LiveContent() {
         .select('id, status, current_question, time_per_question')
         .eq('id', lq.id)
         .single()
-      if (updated) handleQuizUpdate(updated, lq)
-      // finished ise polling durdur
+      if (updated) handleQuizUpdate(updated)
       if (updated?.status === 'finished') clearInterval(pollId)
     }, 2000)
 
@@ -85,40 +97,53 @@ export default function LiveContent() {
     setTimeout(() => clearInterval(pollId), 30 * 60 * 1000)
   }
 
-  function handleQuizUpdate(updated: any, lq: any) {
-    setLiveQuiz((p: any) => {
-      const prev = p || {}
-      // current_question değişti mi? — answer_sent veya question ekranındayken de geç
-      if (updated.status === 'finished') {
-        if (timerRef.current) clearInterval(timerRef.current)
-        fetchLeaderboard(lq?.id)
-        setScreen('results')
-        return { ...prev, ...updated }
-      }
+  function handleQuizUpdate(updated: any) {
+    const prev = liveQuizRef.current
+    if (!prev) return
+
+    // ① Öğretmen quizi bitirdi
+    if (updated.status === 'finished') {
+      if (timerRef.current) clearInterval(timerRef.current)
+      fetchLeaderboard(prev.id)
+      setScreen('results')
+      screenRef.current = 'results'
+      setLiveQuiz((p: any) => ({ ...p, ...updated }))
+      return
+    }
+
+    // ② Yeni soru geldi (current_question değişti)
     if (
-        updated.status === 'active' &&
-        updated.current_question !== undefined &&
-        updated.current_question !== prev.current_question
-      ) {
-        setCurrentQ(updated.current_question)
-        setChosen(null)
-        setIsCorrect(null)
-        setScreen('question')
-        startTimer(updated.time_per_question || lq?.time_per_question || 30)
-      }
-      // İlk kez active oldu (waiting → question)
-      if (updated.status === 'active' && prev.status !== 'active') {
-        setCurrentQ(updated.current_question ?? 0)
-        setChosen(null)
-        setIsCorrect(null)
-        setScreen('question')
-        startTimer(updated.time_per_question || lq?.time_per_question || 30)
-      }
-      return { ...prev, ...updated }
-    })
+      updated.status === 'active' &&
+      updated.current_question !== undefined &&
+      updated.current_question !== currentQRef.current
+    ) {
+      setCurrentQ(updated.current_question)
+      currentQRef.current = updated.current_question
+      setChosen(null)
+      setIsCorrect(null)
+      setScreen('question')
+      screenRef.current = 'question'
+      startTimer(updated.time_per_question || prev.time_per_question || 30)
+      setLiveQuiz((p: any) => ({ ...p, ...updated }))
+      return
+    }
+
+    // ③ waiting → active (quiz başladı)
+    if (updated.status === 'active' && screenRef.current === 'waiting') {
+      setCurrentQ(updated.current_question ?? 0)
+      currentQRef.current = updated.current_question ?? 0
+      setChosen(null)
+      setIsCorrect(null)
+      setScreen('question')
+      screenRef.current = 'question'
+      startTimer(updated.time_per_question || prev.time_per_question || 30)
+      setLiveQuiz((p: any) => ({ ...p, ...updated }))
+      return
+    }
+
+    // Diğer durumlarda sadece state güncelle
+    setLiveQuiz((p: any) => ({ ...p, ...updated }))
   }
-
-
 
   function startTimer(duration: number) {
     setTimeLeft(duration)
@@ -140,11 +165,24 @@ export default function LiveContent() {
     const res = await fetch('/api/live-quiz', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ live_quiz_id: liveQuiz.id, question_index: currentQ, chosen_answer: idx }),
+      body: JSON.stringify({ live_quiz_id: liveQuizRef.current?.id, question_index: currentQRef.current, chosen_answer: idx }),
     })
     const data = await res.json()
     setIsCorrect(data.is_correct)
-    setScore(prev => ({ correct: prev.correct + (data.is_correct ? 1 : 0), total: prev.total + 1 }))
+
+    const newScore = { correct: score.correct + (data.is_correct ? 1 : 0), total: score.total + 1 }
+    setScore(newScore)
+
+    const totalQuestions = liveQuizRef.current?.questions?.length || 0
+
+    // Öğrenci tüm soruları bitirdiyse ve öğretmen de bitirmişse → results
+    if (liveQuizRef.current?.status === 'finished') {
+      fetchLeaderboard(liveQuizRef.current?.id)
+      setScreen('results')
+      return
+    }
+
+    // Son soruyu da cevapladı — öğretmenin "finished" yapmasını bekle (answer_sent ekranında kal)
     setScreen('answer_sent')
   }
 
