@@ -36,10 +36,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
   }
 
-  const { classroom_id, message, title } = await req.json()
+  const body = await req.json()
+  const { classroom_id, message, title } = body
+  console.log('[notify] body:', { classroom_id, message: message?.slice(0,20), teacher_id: teacher?.id })
 
-  if (!classroom_id || !message?.trim()) {
-    return NextResponse.json({ error: 'Eksik parametre.' }, { status: 400 })
+  if (!classroom_id) {
+    return NextResponse.json({ error: 'Sınıf seçilmedi. Lütfen bir sınıf seçin.', debug: { classroom_id, teacher_approved: teacher?.approved } }, { status: 400 })
+  }
+  if (!message?.trim()) {
+    return NextResponse.json({ error: 'Mesaj boş olamaz.' }, { status: 400 })
   }
 
   // Sınıftaki öğrencileri çek
