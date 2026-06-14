@@ -1,4 +1,5 @@
 'use client'
+import { useABTest } from '@/lib/useABTest'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -14,6 +15,7 @@ interface Profile {
 }
 
 export default function PricingPage() {
+  const { variant, track } = useABTest('pricing_cta')
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [referralCount, setReferralCount] = useState(0)
@@ -63,7 +65,7 @@ export default function PricingPage() {
         'Temel arşiv & dashboard',
         'Davet ile premium kazan',
       ],
-      cta: 'Ücretsiz başla',
+      cta: variant === 'treatment' ? 'Hemen Başla — Ücretsiz 🚀' : 'Ücretsiz başla',
       ctaHref: '/register',
     },
     {
@@ -163,7 +165,7 @@ export default function PricingPage() {
                 ) : p.id === 'free' ? (
                   <Link href={p.ctaHref} className="btn" style={{ width: '100%', justifyContent: 'center', display: 'flex' }}>{p.cta}</Link>
                 ) : (
-                  <Link href={p.ctaHref} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', display: 'flex', background: p.color, borderColor: p.color }}>{p.cta}</Link>
+                  <Link href={p.ctaHref} className="btn btn-primary" onClick={() => track('click')} style={{ width: '100%', justifyContent: 'center', display: 'flex', background: p.color, borderColor: p.color }}>{p.cta}</Link>
                 )}
               </div>
             )
