@@ -379,25 +379,28 @@ export default function ProfileEditPage() {
                     setInstMsg('')
                     if (val.length === 8) {
                       const { data: inst } = await supabase.from('institutions').select('name').eq('code', val).eq('active', true).maybeSingle()
-                      setInstName(inst?.name ? `✓ ${inst.name}` : '')
-                      if (!inst) setInstMsg('Kurum bulunamadı.')
+                      if (inst) setInstMsg(`🏛️ ${inst.name} — Katılmak için butona bas`)
+                      else setInstMsg('Kurum bulunamadı.')
                     }
                   }}
                 />
                 <button disabled={instSaving || instCode.length !== 8} onClick={async () => {
                   setInstSaving(true); setInstMsg('')
                   const { data: { user: u } } = await supabase.auth.getUser()
-                  const { data: inst } = await supabase.from('institutions').select('id, name').eq('code', instCode).eq('active', true).maybeSingle()
-                  if (!inst) { setInstMsg('Geçersiz kurum kodu.'); setInstSaving(false); return }
-                  const { error: joinErr } = await supabase
-                    .from('institution_users')
-                    .insert({ institution_id: inst.id, user_id: u.id, role: 'student' })
-                  if (joinErr) {
-                    setInstMsg(`Hata: ${joinErr.message}`)
+                  if (!u) { setInstMsg('Oturum bulunamadı.'); setInstSaving(false); return }
+                  const { data: { session } } = await supabase.auth.getSession()
+                  const res = await fetch('/api/institution/join', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+                    body: JSON.stringify({ institution_code: instCode, user_id: u.id }),
+                  })
+                  const json = await res.json()
+                  if (!res.ok) {
+                    setInstMsg(`Hata: ${json.error}`)
                     setInstSaving(false)
                     return
                   }
-                  setInstName(inst.name)
+                  setInstName(json.institution_name)
                   setInstJoined(new Date().toISOString())
                   setInstMsg('✅ Kuruma başarıyla kaydoldunuz!')
                   setInstSaving(false)
@@ -405,8 +408,8 @@ export default function ProfileEditPage() {
                   {instSaving ? '...' : 'Katıl'}
                 </button>
               </div>
-              {instName && !instMsg && <div style={{ fontSize: '12px', color: 'var(--green)', marginTop: '6px' }}>{instName}</div>}
-              {instMsg && <div style={{ fontSize: '12px', color: instMsg.startsWith('✅') ? 'var(--green)' : 'var(--red)', marginTop: '6px' }}>{instMsg}</div>}
+
+              {instMsg && <div style={{ fontSize: '12px', color: instMsg.startsWith('✅') ? 'var(--green)' : instMsg.startsWith('🏛️') ? '#6366f1' : 'var(--red)', marginTop: '6px' }}>{instMsg}</div>}
             </div>
           )}
         </div>

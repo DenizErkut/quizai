@@ -139,13 +139,13 @@ function RegisterContent() {
           role: 'student',
         })
 
-        // Kurum kodu
+        // Kurum kodu — service_role API üzerinden (RLS bypass)
         if (institutionCode.trim()) {
-          const { data: inst } = await supabase.from('institutions')
-            .select('id').eq('code', institutionCode.trim().toUpperCase()).eq('active', true).maybeSingle()
-          if (inst) {
-            await supabase.from('institution_users').insert({ institution_id: inst.id, user_id: data.user.id, role: 'student' })
-          }
+          await fetch('/api/institution/join', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ institution_code: institutionCode.trim(), user_id: data.user.id }),
+          }).catch(() => {}) // Hata sessizce geç, kayıt iptal olmasın
         }
 
         // Referral
