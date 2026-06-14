@@ -251,10 +251,25 @@ export default function TeacherLivePage() {
           )}
         </div>
 
+        {/* Katılımcı sayısı */}
+        <div style={{ marginBottom: '1rem', padding: '10px', borderRadius: '10px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', fontSize: '13px', color: '#6366f1', textAlign: 'center' }}>
+          {participants.length === 0
+            ? '⏳ Öğrenciler bağlanıyor...'
+            : `✅ ${participants.length} öğrenci hazır`}
+        </div>
+
         <button onClick={startQuiz}
-          style={{ width: '100%', padding: '14px', borderRadius: '12px', border: 'none', background: '#6366f1', color: '#fff', fontWeight: 700, fontSize: '16px', cursor: 'pointer', fontFamily: 'var(--font-sans)', boxShadow: '0 4px 16px rgba(99,102,241,0.3)' }}>
-          ▶ Quizi Başlat ({liveQuiz?.questions?.length || 0} soru)
+          disabled={participants.length === 0}
+          style={{ width: '100%', padding: '18px', borderRadius: '14px', border: 'none',
+            background: participants.length === 0 ? 'rgba(99,102,241,0.3)' : 'linear-gradient(135deg, #6366f1, #4f46e5)',
+            color: '#fff', fontWeight: 800, fontSize: '18px', cursor: participants.length === 0 ? 'not-allowed' : 'pointer',
+            fontFamily: 'var(--font-sans)', boxShadow: participants.length > 0 ? '0 8px 24px rgba(99,102,241,0.4)' : 'none',
+            transition: 'all 0.2s', letterSpacing: '0.02em' }}>
+          {participants.length === 0 ? '⏳ Öğrenci bekleniyor...' : `▶ Sınavı Başlat — ${liveQuiz?.questions?.length || 0} Soru`}
         </button>
+        <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text3)', marginTop: '8px' }}>
+          Tüm öğrenciler katıldıktan sonra başlatabilirsin
+        </p>
       </div>
     </main>
   )

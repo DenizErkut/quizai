@@ -34,6 +34,7 @@ const DROPDOWN_ITEMS = [
 const MENU_ITEMS = [
   { label: '⚡ Yeni test',        href: '/quiz' },
   { label: '📅 Günlük test',      href: '/daily' },
+  { label: '🎯 Canlı Quiz',       href: '/live' },
   { label: '📊 Dashboard',        href: '/dashboard' },
   { label: '📈 Analiz',           href: '/analysis' },
   { label: '📋 Gelişim planı',    href: '/plan' },
@@ -548,9 +549,9 @@ export default function Navbar() {
         ] : [
           { href: '/quiz',                  label: 'Test',        icon: '⚡' },
           { href: '/daily',                 label: streak > 0 ? `${streak}g` : 'Günlük', icon: streak > 0 ? '🔥' : '📅' },
-          { href: '/exam',                  label: 'Sınav',       icon: '🎯' },
+          { href: '/live',                  label: 'Canlı',       icon: '🎯' },
           { href: '/analysis',              label: 'Analiz',      icon: '📈' },
-          { href: '/review',                label: 'Tekrar',      icon: '🧠' },
+          { href: '/exam',                  label: 'Sınav',       icon: '📝' },
         ]).map(item => (
           <Link key={item.href} href={item.href} style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
