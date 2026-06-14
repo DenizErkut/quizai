@@ -84,19 +84,35 @@ export default function LiveContent() {
   }
 
   function handleQuizUpdate(updated: any, lq: any) {
-    setLiveQuiz((p: any) => ({ ...p, ...updated }))
-    if (updated.status === 'active' && updated.current_question !== undefined) {
-      setCurrentQ(updated.current_question)
-      setChosen(null)
-      setIsCorrect(null)
-      setScreen('question')
-      startTimer(updated.time_per_question || lq?.time_per_question || 30)
-    }
-    if (updated.status === 'finished') {
-      if (timerRef.current) clearInterval(timerRef.current)
-      fetchLeaderboard(lq?.id)
-      setScreen('results')
-    }
+    setLiveQuiz((p: any) => {
+      const prev = p || {}
+      // current_question değişti mi? — answer_sent veya question ekranındayken de geç
+      if (
+        updated.status === 'active' &&
+        updated.current_question !== undefined &&
+        updated.current_question !== prev.current_question
+      ) {
+        setCurrentQ(updated.current_question)
+        setChosen(null)
+        setIsCorrect(null)
+        setScreen('question')
+        startTimer(updated.time_per_question || lq?.time_per_question || 30)
+      }
+      // İlk kez active oldu (waiting → question)
+      if (updated.status === 'active' && prev.status !== 'active') {
+        setCurrentQ(updated.current_question ?? 0)
+        setChosen(null)
+        setIsCorrect(null)
+        setScreen('question')
+        startTimer(updated.time_per_question || lq?.time_per_question || 30)
+      }
+      if (updated.status === 'finished') {
+        if (timerRef.current) clearInterval(timerRef.current)
+        fetchLeaderboard(lq?.id)
+        setScreen('results')
+      }
+      return { ...prev, ...updated }
+    })
   }
 
 
