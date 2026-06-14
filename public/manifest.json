@@ -1,21 +1,42 @@
 {
-  "name": "Pratium — AI Destekli Testler",
+  "name": "Pratium — AI Destekli Eğitim",
   "short_name": "Pratium",
-  "description": "Sınıfına göre AI destekli anlık test platformu",
+  "description": "Sınıfına göre AI destekli anlık test platformu. Günlük test, SM-2 tekrar ve kişisel analiz.",
   "start_url": "/quiz",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#6B21A8",
-  "orientation": "portrait",
-  "icons": [
-    { "src": "/favicon-16.png", "sizes": "16x16", "type": "image/png" },
-    { "src": "/favicon-32.png", "sizes": "32x32", "type": "image/png" },
-    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
-    { "src": "/logo-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/logo-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "/logo-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/logo-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ],
+  "background_color": "#082465",
+  "theme_color": "#082465",
+  "orientation": "portrait-primary",
+  "lang": "tr",
   "categories": ["education"],
-  "lang": "tr"
+  "icons": [
+    { "src": "/favicon-16.png",      "sizes": "16x16",   "type": "image/png" },
+    { "src": "/favicon-32.png",      "sizes": "32x32",   "type": "image/png" },
+    { "src": "/apple-touch-icon.png","sizes": "180x180", "type": "image/png" },
+    { "src": "/logo-192.png",        "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/logo-192.png",        "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/logo-512.png",        "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/logo-512.png",        "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Yeni Test",
+      "short_name": "Test",
+      "url": "/quiz",
+      "icons": [{ "src": "/logo-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Günlük Test",
+      "short_name": "Günlük",
+      "url": "/daily",
+      "icons": [{ "src": "/logo-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Tekrar",
+      "short_name": "Tekrar",
+      "url": "/review",
+      "icons": [{ "src": "/logo-192.png", "sizes": "192x192" }]
+    }
+  ]
 }
