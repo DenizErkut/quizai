@@ -18,6 +18,7 @@ function pctBg(p: number) { return p >= 80 ? 'rgba(22,163,74,0.12)' : p >= 50 ? 
 // Okulyo stilinde menü ikonları
 const menuItems = [
   { href: '/quiz',      icon: '⚡', label: 'Test Çöz',      color: '#6366f1', bg: 'rgba(99,102,241,0.12)' },
+  { href: '/live',      icon: '🎯', label: 'Canlı Test',    color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
   { href: '/analysis',  icon: '📊', label: 'Analizim',      color: '#0ea5e9', bg: 'rgba(14,165,233,0.12)' },
   { href: '/archive',   icon: '🗂️', label: 'Arşivim',       color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
   { href: '/plan',      icon: '📋', label: 'Çalışma Planı', color: '#10b981', bg: 'rgba(16,185,129,0.12)' },

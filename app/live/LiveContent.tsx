@@ -73,10 +73,12 @@ export default function LiveContent() {
     const pollId = setInterval(async () => {
       const { data: updated } = await supabase
         .from('live_quizzes')
-        .select('status, current_question, time_per_question')
+        .select('id, status, current_question, time_per_question')
         .eq('id', lq.id)
         .single()
       if (updated) handleQuizUpdate(updated, lq)
+      // finished ise polling durdur
+      if (updated?.status === 'finished') clearInterval(pollId)
     }, 2000)
 
     // 30dk sonra polling durdur
@@ -87,7 +89,13 @@ export default function LiveContent() {
     setLiveQuiz((p: any) => {
       const prev = p || {}
       // current_question değişti mi? — answer_sent veya question ekranındayken de geç
-      if (
+      if (updated.status === 'finished') {
+        if (timerRef.current) clearInterval(timerRef.current)
+        fetchLeaderboard(lq?.id)
+        setScreen('results')
+        return { ...prev, ...updated }
+      }
+    if (
         updated.status === 'active' &&
         updated.current_question !== undefined &&
         updated.current_question !== prev.current_question
@@ -105,11 +113,6 @@ export default function LiveContent() {
         setIsCorrect(null)
         setScreen('question')
         startTimer(updated.time_per_question || lq?.time_per_question || 30)
-      }
-      if (updated.status === 'finished') {
-        if (timerRef.current) clearInterval(timerRef.current)
-        fetchLeaderboard(lq?.id)
-        setScreen('results')
       }
       return { ...prev, ...updated }
     })
