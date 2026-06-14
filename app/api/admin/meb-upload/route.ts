@@ -135,16 +135,19 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
-    const body = await req.json().catch(() => null)
+    const contentType = req.headers.get('content-type') || ''
 
     // JSON body: storage_path mode (büyük PDF'ler — signed URL ile yüklendi)
-    if (body && body.storage_path) {
-      return await processFromStorage(body)
+    if (contentType.includes('application/json')) {
+      const body = await req.json().catch(() => null)
+      if (!body) return NextResponse.json({ error: 'Geçersiz JSON' }, { status: 400 })
+      if (body.storage_path) return await processFromStorage(body)
+      return NextResponse.json({ error: 'storage_path gerekli' }, { status: 400 })
     }
 
     // FormData mode (küçük dosyalar / metin için)
     const form = await req.formData().catch(() => null)
-    if (!form) return NextResponse.json({ error: 'Geçersiz istek' }, { status: 400 })
+    if (!form) return NextResponse.json({ error: 'Geçersiz istek — FormData bekleniyor' }, { status: 400 })
 
     const file = form.get('file') as File | null
     const title = form.get('title') as string
