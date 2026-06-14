@@ -47,10 +47,13 @@ export default function TeacherLivePage() {
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'live_quiz_answers',
         filter: `live_quiz_id=eq.${liveQuizId}`,
-      }, () => { fetchAnswers(liveQuizId) })
+      }, () => { fetchAnswers(liveQuizId); fetchParticipants(liveQuizId) })
       .subscribe()
     realtimeRef.current = channel
     fetchAnswers(liveQuizId)
+    // Polling — Realtime gecikirse katılımcıları 3sn'de bir güncelle
+    const pollInterval = setInterval(() => fetchParticipants(liveQuizId), 3000)
+    setTimeout(() => clearInterval(pollInterval), 300000) // 5dk sonra durdur
   }
 
   async function fetchAnswers(liveQuizId: string) {
@@ -259,16 +262,15 @@ export default function TeacherLivePage() {
         </div>
 
         <button onClick={startQuiz}
-          disabled={participants.length === 0}
           style={{ width: '100%', padding: '18px', borderRadius: '14px', border: 'none',
-            background: participants.length === 0 ? 'rgba(99,102,241,0.3)' : 'linear-gradient(135deg, #6366f1, #4f46e5)',
-            color: '#fff', fontWeight: 800, fontSize: '18px', cursor: participants.length === 0 ? 'not-allowed' : 'pointer',
-            fontFamily: 'var(--font-sans)', boxShadow: participants.length > 0 ? '0 8px 24px rgba(99,102,241,0.4)' : 'none',
+            background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+            color: '#fff', fontWeight: 800, fontSize: '18px', cursor: 'pointer',
+            fontFamily: 'var(--font-sans)', boxShadow: '0 8px 24px rgba(99,102,241,0.4)',
             transition: 'all 0.2s', letterSpacing: '0.02em' }}>
-          {participants.length === 0 ? '⏳ Öğrenci bekleniyor...' : `▶ Sınavı Başlat — ${liveQuiz?.questions?.length || 0} Soru`}
+          ▶ Sınavı Başlat — {liveQuiz?.questions?.length || 0} Soru
         </button>
         <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text3)', marginTop: '8px' }}>
-          Tüm öğrenciler katıldıktan sonra başlatabilirsin
+          {participants.length > 0 ? `✅ ${participants.length} öğrenci hazır` : 'Öğrenci olmasa da başlatabilirsin'}
         </p>
       </div>
     </main>

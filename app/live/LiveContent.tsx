@@ -64,25 +64,42 @@ export default function LiveContent() {
         event: 'UPDATE', schema: 'public', table: 'live_quizzes',
         filter: `id=eq.${lq.id}`,
       }, (payload: any) => {
-        const updated = payload.new
-        setLiveQuiz((p: any) => ({ ...p, ...updated }))
-
-        if (updated.status === 'active' && updated.current_question !== undefined) {
-          setCurrentQ(updated.current_question)
-          setChosen(null)
-          setIsCorrect(null)
-          setScreen('question')
-          startTimer(updated.time_per_question || lq.time_per_question)
-        }
-        if (updated.status === 'finished') {
-          if (timerRef.current) clearInterval(timerRef.current)
-          fetchLeaderboard(lq.id)
-          setScreen('results')
-        }
+        handleQuizUpdate(payload.new, lq)
       })
       .subscribe()
     channelRef.current = channel
+
+    // Polling — Realtime gecikirse 2sn'de bir kontrol et
+    const pollId = setInterval(async () => {
+      const { data: updated } = await supabase
+        .from('live_quizzes')
+        .select('status, current_question, time_per_question')
+        .eq('id', lq.id)
+        .single()
+      if (updated) handleQuizUpdate(updated, lq)
+    }, 2000)
+
+    // 30dk sonra polling durdur
+    setTimeout(() => clearInterval(pollId), 30 * 60 * 1000)
   }
+
+  function handleQuizUpdate(updated: any, lq: any) {
+    setLiveQuiz((p: any) => ({ ...p, ...updated }))
+    if (updated.status === 'active' && updated.current_question !== undefined) {
+      setCurrentQ(updated.current_question)
+      setChosen(null)
+      setIsCorrect(null)
+      setScreen('question')
+      startTimer(updated.time_per_question || lq?.time_per_question || 30)
+    }
+    if (updated.status === 'finished') {
+      if (timerRef.current) clearInterval(timerRef.current)
+      fetchLeaderboard(lq?.id)
+      setScreen('results')
+    }
+  }
+
+
 
   function startTimer(duration: number) {
     setTimeLeft(duration)
