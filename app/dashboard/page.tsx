@@ -67,14 +67,15 @@ export default function DashboardPage() {
       setStats(dashStats || { total_count: 0, total_correct: 0, total_questions: 0, avg_pct: 0, best_pct: 0, weak_count: 0 })
       setStreak(sk?.current_streak || 0)
       // SM-2 bugün bekleyen kartlar
-    try {
-      const srRes = await fetch('/api/spaced-repetition', {
-        headers: { Authorization: `Bearer ${session?.access_token}` }
-      })
-      const srData = await srRes.json()
-      setDueCards(srData.totalDue || 0)
-    } catch {}
-    setLoading(false)
+      try {
+        const { data: { session: srSession } } = await supabase.auth.getSession()
+        const srRes = await fetch('/api/spaced-repetition', {
+          headers: { Authorization: `Bearer ${srSession?.access_token}` }
+        })
+        const srData = await srRes.json()
+        setDueCards(srData.totalDue || 0)
+      } catch {}
+      setLoading(false)
     }
     load()
   }, [])
