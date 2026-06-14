@@ -96,8 +96,10 @@ export default function LiveContent() {
         .eq('id', lq.id)
         .single()
       if (updated) handleQuizUpdate(updated)
-      if (updated?.status === 'finished') clearInterval(pollId)
-    }, 2000)
+      if (updated?.status === 'finished') {
+        clearInterval(pollId)
+      }
+    }, 1000)
 
     // 30dk sonra polling durdur
     setTimeout(() => clearInterval(pollId), 30 * 60 * 1000)
@@ -291,6 +293,15 @@ export default function LiveContent() {
         <div style={{ fontSize: '32px', fontWeight: 900, color: '#fff' }}>{score.correct}/{liveQuiz?.questions?.length || score.total}</div>
       </div>
       <div style={{ marginTop: '2rem', fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>Sonraki soru geliyor...</div>
+
+      {/* Öğretmen bitirdiyse otomatik geçilir; takılı kalırsa manuel buton */}
+      {score.total >= (liveQuizRef.current?.questions?.length || 999) && (
+        <button
+          onClick={() => { fetchLeaderboard(liveQuizRef.current?.id); setScreen('results') }}
+          style={{ marginTop: '1.5rem', padding: '12px 28px', borderRadius: '12px', border: '2px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.15)', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', backdropFilter: 'blur(10px)' }}>
+          🏆 Sonuçları Gör
+        </button>
+      )}
     </main>
   )
 
