@@ -60,6 +60,12 @@ export default function LiveContent() {
     liveQuizRef.current = lq
     setJoining(false)
 
+    // Join marker — öğretmen panelinde "Katılanlar" sayısına yansısın
+    const { data: { session: joinSession } } = await supabase.auth.getSession()
+    await fetch(`/api/live-quiz?live_quiz_id=${lq.id}`, {
+      headers: { Authorization: `Bearer ${joinSession?.access_token}` }
+    }).catch(() => {}) // Sessizce başarısız ol
+
     if (lq.status === 'active') {
       setCurrentQ(lq.current_question)
       currentQRef.current = lq.current_question

@@ -146,3 +146,29 @@ export async function PUT(req: NextRequest) {
 
   return NextResponse.json({ is_correct, correct_ans: question?.ans })
 }
+
+// Öğrenci: quize katıl (join kaydı — question_index: -1 ile marker)
+export async function GET(req: NextRequest) {
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  const token = authHeader.slice(7)
+
+  const { data: { user } } = await supabase.auth.getUser(token)
+  if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+
+  const { searchParams } = new URL(req.url)
+  const live_quiz_id = searchParams.get('live_quiz_id')
+  if (!live_quiz_id) return NextResponse.json({ error: 'live_quiz_id gerekli.' }, { status: 400 })
+
+  // question_index: -1 = "katıldı" marker'ı — sadece bir kez yaz
+  await supabase.from('live_quiz_answers').upsert({
+    live_quiz_id,
+    user_id: user.id,
+    question_index: -1,
+    chosen_answer: -1,
+    is_correct: false,
+    answered_at: new Date().toISOString(),
+  }, { onConflict: 'live_quiz_id,user_id,question_index' })
+
+  return NextResponse.json({ success: true })
+}

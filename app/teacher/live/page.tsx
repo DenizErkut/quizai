@@ -75,12 +75,13 @@ export default function TeacherLivePage() {
     setLeaderboard(lb)
   }
 
-  // Katılımcıları izle
+  // Katılımcıları izle — question_index:-1 join marker'larından çek
   async function fetchParticipants(liveQuizId: string) {
     const { data } = await supabase
       .from('live_quiz_answers')
       .select('user_id, profiles(name)')
       .eq('live_quiz_id', liveQuizId)
+      .eq('question_index', -1)
     const unique = [...new Map((data ?? []).map((d: any) => [d.user_id, d])).values()]
     setParticipants(unique)
   }
