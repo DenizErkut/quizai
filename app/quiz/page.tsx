@@ -540,6 +540,8 @@ function QuizPageContent() {
             difficulty: diff,
             language: lang,
             questionType: qtype,
+            subject: openSubject || undefined,
+            unit: topicDecoded || undefined,
           }),
         })
         const data = await res.json()
@@ -627,6 +629,8 @@ function QuizPageContent() {
           fileType: uploadedFiles[0]?.fileType || undefined,
           includeVisuals,
           questionType,
+          subject: openSubject || undefined,
+          unit: topic || undefined,
         }),
       })
       const data = await res.json()

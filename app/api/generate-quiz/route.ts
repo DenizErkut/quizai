@@ -309,6 +309,8 @@ export async function POST(req: NextRequest) {
       includeVisuals = true,
       questionType = 'multiple_choice',
       dailyChallenge = false,
+      subject,
+      unit,
     } = body
 
     const MAX_QCOUNT: Record<string, number> = { free: 5, premium: 20, unlimited: 20 }
@@ -387,7 +389,7 @@ export async function POST(req: NextRequest) {
       const mebRes = await fetch(`${req.nextUrl.origin}/api/meb-search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
-        body: JSON.stringify({ topic, grade, subject: topic, level: getLevel(grade), limit: 2 }),
+        body: JSON.stringify({ topic, grade, subject: subject || topic, unit: unit || topic, level: getLevel(grade), limit: 5 }),
         signal: AbortSignal.timeout(3000), // 3sn — daha agresif timeout
       })
       if (mebRes.ok) {
