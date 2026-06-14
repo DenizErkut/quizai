@@ -393,7 +393,7 @@ export async function POST(req: NextRequest) {
       if (mebRes.ok) {
         const mebData = await mebRes.json()
         if (mebData.found && mebData.context) {
-          mebContext = `\n\nMEB KAYNAK İÇERİĞİ:\n${mebData.context.slice(0, 800)}` // Max 800 char
+          mebContext = `\n\nMEB KAYNAK İÇERİĞİ (Bu içeriğe SADIK KAL, dışına çıkma):\n${mebData.context.slice(0, 3000)}` // Max 800 char
         }
       }
     } catch { /* MEB opsiyonel */ }
