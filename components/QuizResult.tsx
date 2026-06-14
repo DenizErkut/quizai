@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import ChatAssistant from '@/components/ChatAssistant'
@@ -83,6 +83,23 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
     'Tekrar çalışmak isteyebilirsin.'
 
   const [sharing, setSharing] = useState(false)
+  const [sm2Added, setSm2Added] = useState(false)
+
+  // Quiz bitince yanlış soruları SM-2'ye otomatik ekle
+  useEffect(() => {
+    if (wrongQuestions.length === 0 || sm2Added) return
+    async function addToSM2() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      await fetch('/api/spaced-repetition', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ questions: wrongQuestions, topic }),
+      })
+      setSm2Added(true)
+    }
+    addToSM2()
+  }, [])
 
   async function generateShareCard(): Promise<Blob | null> {
     try {
@@ -357,6 +374,18 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
               </button>
             )}
           </div>
+          {wrongQuestions.length > 0 && (
+            <div style={{ marginBottom: '10px', padding: '10px 14px', borderRadius: '12px', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '20px' }}>🧠</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#7c3aed' }}>{wrongQuestions.length} soru tekrar listene eklendi</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>SM-2 algoritması en iyi zamanı hesaplar</div>
+              </div>
+              <a href="/review" style={{ padding: '7px 12px', borderRadius: '8px', background: '#8b5cf6', color: '#fff', fontSize: '12px', fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                Tekrar Et →
+              </a>
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px' }}>
             <button className="btn" onClick={shareResult} disabled={sharing}
               style={{ justifyContent: 'center', fontSize: '13px', padding: '10px', color: 'var(--accent)', borderColor: 'rgba(0,149,200,0.3)' }}>

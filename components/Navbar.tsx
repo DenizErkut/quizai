@@ -142,6 +142,7 @@ export default function Navbar() {
   ] : [
     { href: '/quiz',        label: '⚡ Test' },
     { href: '/live',        label: '🎯 Canlı' },
+    { href: '/review',      label: '🧠 Tekrar' },
     { href: '/daily',       label: streak > 0 ? `🔥 ${streak} gün` : '📅 Günlük' },
     { href: '/leaderboard', label: '🏆 Sıralama' },
   ]
@@ -549,6 +550,7 @@ export default function Navbar() {
           { href: '/archive',               label: 'Arşiv',       icon: '🗂️' },
         ] : [
           { href: '/quiz',                  label: 'Test',        icon: '⚡' },
+          { href: '/review',                label: 'Tekrar',      icon: '🧠' },
           { href: '/daily',                 label: streak > 0 ? `${streak}g` : 'Günlük', icon: streak > 0 ? '🔥' : '📅' },
           { href: '/live',                  label: 'Canlı',       icon: '🎯' },
           { href: '/analysis',              label: 'Analiz',      icon: '📈' },

@@ -36,6 +36,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashStats>({ total_count: 0, total_correct: 0, total_questions: 0, avg_pct: 0, best_pct: 0, weak_count: 0 })
   const [streak, setStreak] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [dueCards, setDueCards] = useState(0)
   const [greeting, setGreeting] = useState('Merhaba')
 
   useEffect(() => {
@@ -65,7 +66,15 @@ export default function DashboardPage() {
       setSessions(s || [])
       setStats(dashStats || { total_count: 0, total_correct: 0, total_questions: 0, avg_pct: 0, best_pct: 0, weak_count: 0 })
       setStreak(sk?.current_streak || 0)
-      setLoading(false)
+      // SM-2 bugün bekleyen kartlar
+    try {
+      const srRes = await fetch('/api/spaced-repetition', {
+        headers: { Authorization: `Bearer ${session?.access_token}` }
+      })
+      const srData = await srRes.json()
+      setDueCards(srData.totalDue || 0)
+    } catch {}
+    setLoading(false)
     }
     load()
   }, [])
@@ -168,6 +177,18 @@ export default function DashboardPage() {
           padding: '1.5rem 1.25rem',
           boxShadow: '0 -4px 24px rgba(8,36,101,0.08)',
         }}>
+          {/* SM-2 Tekrar Widget */}
+          {dueCards > 0 && (
+            <a href="/review" style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(124,58,237,0.06))', border: '1.5px solid rgba(139,92,246,0.25)', textDecoration: 'none', marginBottom: '1rem', cursor: 'pointer' }}>
+              <div style={{ width: 46, height: 46, borderRadius: '12px', background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>🧠</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: '14px', color: '#7c3aed' }}>Tekrar zamanı!</div>
+                <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>{dueCards} kart seni bekliyor · SM-2</div>
+              </div>
+              <span style={{ fontSize: '18px', color: '#8b5cf6' }}>→</span>
+            </a>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '1.5rem' }}>
             {menuItems.map((item, i) => (
               <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
