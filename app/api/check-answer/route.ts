@@ -35,23 +35,55 @@ export async function POST(req: NextRequest) {
   try {
     const { question, correctAnswer, userAnswer, language } = await req.json()
 
+    // Normalize yardımcı fonksiyon
+    const normalize = (s: string) => s
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/,/g, '.')      // Türkçe virgül → nokta (2,7 → 2.7)
+      .replace(/\s+/g, ' ')
+
+    const normCorrect = normalize(correctAnswer)
+    const normUser = normalize(userAnswer)
+
+    // Sayısal cevap kontrolü — matematik/fen soruları için AI bypass
+    const isNumeric = (s: string) => /^-?\d+(\.\d+)?$/.test(s)
+    if (isNumeric(normCorrect) && isNumeric(normUser)) {
+      const correct = Math.abs(parseFloat(normCorrect) - parseFloat(normUser)) < 0.0001
+      return NextResponse.json({ correct })
+    }
+
+    // Tam eşleşme kontrolü (case-insensitive, trim)
+    if (normCorrect === normUser) {
+      return NextResponse.json({ correct: true })
+    }
+
+    // Kısa cevap (≤3 kelime) — AI'sız direkt karşılaştır, partial match yok
+    const wordCount = normCorrect.split(' ').length
+    if (wordCount <= 2) {
+      // Sadece tam eşleşme veya içerme (her iki yönde)
+      const correct = normCorrect === normUser ||
+        (normCorrect.length > 3 && normUser === normCorrect)
+      return NextResponse.json({ correct })
+    }
+
+    // Uzun/açıklama gerektiren cevaplar için AI kullan
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5',
       max_tokens: 100,
       messages: [{
         role: 'user',
-        content: `You are a teacher grading a fill-in-the-blank or short answer question.
+        content: `You are a teacher grading a fill-in-the-blank question.
 
 Question: ${question}
 Correct answer: ${correctAnswer}
 Student answer: ${userAnswer}
 
-Is the student answer semantically correct or close enough to be accepted? 
-Consider:
-- Partial matches (e.g. "lift" for "lift force" = correct)
-- Synonyms and paraphrases
-- Minor spelling variations
-- The answer being a part of the correct answer or vice versa
+Rules:
+- For factual/exact answers: only accept if meaning is identical
+- Do NOT accept numerically different answers as correct
+- Minor spelling variations are OK for non-numeric answers
+- Synonyms are OK only if meaning is truly equivalent
 
 Respond with ONLY: {"correct": true} or {"correct": false}`
       }]
