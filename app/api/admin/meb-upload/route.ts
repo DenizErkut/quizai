@@ -87,11 +87,10 @@ async function processFromStorage(body: {
   }
 
   const chunks = chunkText(rawText)
-  let embeddedCount = 0, embedError = ''
+  let embeddedCount = 0
 
   for (let i = 0; i < chunks.length; i++) {
-    const { values: embedding, error: embedErr } = await embedText(chunks[i])
-    if (embedErr && !embedError) embedError = embedErr
+    const { values: embedding } = await embedText(chunks[i])
     await adminDb.from('meb_chunks').insert({
       resource_id: resource.id, chunk_index: i,
       content: chunks[i], embedding: embedding ? JSON.stringify(embedding) : null,
@@ -201,12 +200,10 @@ export async function POST(req: NextRequest) {
     console.log(`[meb-upload] ${chunks.length} chunks created`)
 
     let embeddedCount = 0
-    let embedError = ''
 
     // Chunk'ları batch halinde kaydet (tek tek değil — rate limit için)
     for (let i = 0; i < chunks.length; i++) {
-      const { values: embedding, error: embedErr } = await embedText(chunks[i])
-      if (embedErr && !embedError) embedError = embedErr
+      const { values: embedding } = await embedText(chunks[i])
 
       const { error: insertErr } = await adminDb.from('meb_chunks').insert({
         resource_id: resource.id,
