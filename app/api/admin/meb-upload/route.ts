@@ -36,32 +36,10 @@ function chunkText(text: string, chunkSize = 3000, overlap = 300): string[] {
   return chunks
 }
 
-// Embedding üret — Anthropic'te embedding yok, Gemini kullan
-async function embedText(text: string): Promise<{ values: number[] | null; error?: string }> {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) {
-    return { values: null, error: 'GEMINI_API_KEY eksik — embedding atlandı, metin yine de kaydedildi' }
-  }
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/embedding-001:embedContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'models/text-embedding-004', content: { parts: [{ text: text.slice(0, 2000) }] } })
-      }
-    )
-    if (!res.ok) {
-      const err = await res.text()
-      console.error('[meb-upload] Gemini API error:', res.status, err)
-      return { values: null, error: `Gemini ${res.status}: ${err.slice(0, 100)}` }
-    }
-    const data = await res.json()
-    return { values: data?.embedding?.values || null }
-  } catch (e: any) {
-    console.error('[meb-upload] embed error:', e)
-    return { values: null, error: e.message }
-  }
+// Embedding devre dışı — keyword bazlı arama yeterli
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function embedText(_text: string): Promise<{ values: number[] | null }> {
+  return { values: null }
 }
 
 
@@ -126,7 +104,7 @@ async function processFromStorage(body: {
   return NextResponse.json({
     success: true, resource_id: resource.id,
     chunks: chunks.length, embedded: embeddedCount,
-    chars: rawText.length, warning: embedError || undefined,
+    chars: rawText.length, // embedding kaldırıldı
   })
 }
 
@@ -255,7 +233,7 @@ export async function POST(req: NextRequest) {
       chunks: chunks.length,
       embedded: embeddedCount,
       chars: rawText.length,
-      warning: embedError || undefined,
+      // embedding kaldırıldı
     })
   } catch (e: any) {
     console.error('[meb-upload] error:', e.message)
