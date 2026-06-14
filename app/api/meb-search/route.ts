@@ -113,6 +113,29 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Sınav kitapçığı chunk'larını da ekle
+    if (subject || topic) {
+      let examQ = adminDb
+        .from('exam_chunks')
+        .select('content, subject, exam_type, year')
+        .limit(3)
+
+      if (subject) examQ = examQ.ilike('subject', `%${subject}%`)
+      else if (topic) {
+        const words = topic.split(' ').filter((w: string) => w.length > 3)
+        if (words.length > 0) examQ = examQ.ilike('content', `%${words[0]}%`)
+      }
+
+      const { data: examChunks } = await examQ
+      if (examChunks?.length) {
+        const examContext = examChunks.map((c: any, i: number) =>
+          `[Sınav Sorusu ${i + 1} - ${c.subject || ''} ${c.exam_type || ''} ${c.year || ''}]\n${c.content}`
+        ).join('\n\n---\n\n')
+        context = context ? context + '\n\n' + examContext : examContext
+        console.log(`[meb-search] exam chunks: ${examChunks.length} found`)
+      }
+    }
+
     return NextResponse.json({ context, found: context.length > 0 })
   } catch (e: any) {
     console.error('[meb-search] error:', e.message)
