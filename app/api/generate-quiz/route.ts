@@ -238,12 +238,16 @@ async function generateVisualForQuestion(
   }
 }
 
-function buildPrompt(type: string, topic: string, grade: string, difficulty: string, language: string, count: number, fileContent?: string): string {
+function buildPrompt(type: string, topic: string, grade: string, difficulty: string, language: string, count: number, fileContent?: string, gradeCtx?: string, mebCtx?: string): string {
   const contentNote = fileContent
     ? `Topic: "${topic}". Generate questions from this content:\n${fileContent.slice(0, 3000)}`
     : `Topic: "${topic}".`
 
-  const base = `Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın.\n\nKESİN KURAL: Yalnızca MEB müfredatında yer alan konularda, MEB kazanımlarına uygun sorular üret. Müfredat dışı, spekülatif veya tartışmalı içerik kesinlikle üretme.\n\n${contentNote}\nSeviye: ${grade}. Zorluk: ${difficulty}. Soru dili: ${language}. Soru sayısı: ${count}.\n\nDOĞRULUK KURALLARI:\n1. Matematik: Her soruyu adım adım çöz, cevabın opts dizisinde doğru indexte olduğunu doğrula\n2. Fen/Tarih: Sadece kesin bildiğin gerçekleri yaz\n3. "ans" indexi MUTLAKA doğru cevabı göstermeli\n4. Emin olmadığın sorular yerine daha basit ama kesin sorular yaz\n5. MEB müfredatına uygun kazanım ve konu kapsamında kal\n6. Sadece multiple_choice ve true_false sorularında altı çizili/vurgulu metin için [köşeli parantez] kullan. fill_blank sorularında ASLA kullanma.\n\nYalnızca geçerli JSON döndür, markdown veya açıklama ekleme.\n\n`
+  const mebSection = mebCtx
+    ? `\n\n⚠️ KRİTİK TALİMAT: Aşağıdaki MEB kaynak metninden soru üret. Bu metinde geçen kişiler, olaylar ve bilgilere SADIK KAL. Metinde olmayan bilgileri UYDURMA.\n\nMEB KAYNAK METNİ:\n${mebCtx}\n\n`
+    : ''
+
+  const base = \`Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın.\n\nKESİN KURAL: Yalnızca MEB müfredatında yer alan konularda, MEB kazanımlarına uygun sorular üret. Müfredat dışı, spekülatif veya tartışmalı içerik kesinlikle üretme.\n\n${mebSection}${contentNote}${gradeCtx || ''}\nSeviye: ${grade}. Zorluk: ${difficulty}. Soru dili: ${language}. Soru sayısı: ${count}.\n\nDOĞRULUK KURALLARI:\n1. Matematik: Her soruyu adım adım çöz, cevabın opts dizisinde doğru indexte olduğunu doğrula\n2. Fen/Tarih: Sadece kesin bildiğin gerçekleri yaz\n3. "ans" indexi MUTLAKA doğru cevabı göstermeli\n4. Emin olmadığın sorular yerine daha basit ama kesin sorular yaz\n5. MEB müfredatına uygun kazanım ve konu kapsamında kal\n6. Sadece multiple_choice ve true_false sorularında altı çizili/vurgulu metin için [köşeli parantez] kullan. fill_blank sorularında ASLA kullanma.\n7. MEB kaynak metni verilmişse: Metindeki gerçek kişi, olay ve bilgileri kullan — uydurma.\n\nYalnızca geçerli JSON döndür, markdown veya açıklama ekleme.\n\n\`
 
   if (type === 'fill_blank') return base + `Generate fill-in-the-blank questions. Leave a critical word/concept as blank. Provide 4 options (one correct), write the correct answer in "blank" field too.\n\nCRITICAL RULES:\n1. NEVER put the answer or any hint inside the question text. The blank ___ must be the ONLY clue.\n2. Do NOT use [brackets] in fill_blank questions - brackets reveal the answer!\n3. Do NOT add (verb), (noun), (drink) or any word hints in parentheses.\n4. WRONG: "Normal koşullarda en kararlı karbon formu olan [grafit], kurşun kalemlerinde kullanılır." (REVEALS ANSWER!)\n5. CORRECT: "Normal koşullarda en kararlı karbon formu olan _____, kurşun kalemlerinde kullanılır."\n\n{"questions":[{"type":"fill_blank","q":"_____ is the powerhouse of the cell.","blank":"Mitochondria","opts":["Mitochondria","Ribosome","Nucleus","Lysosome"],"ans":0,"exp":"Mitochondria produces ATP through cellular respiration."}]}`
 
@@ -309,8 +313,6 @@ export async function POST(req: NextRequest) {
       includeVisuals = true,
       questionType = 'multiple_choice',
       dailyChallenge = false,
-      subject,
-      unit,
     } = body
 
     const MAX_QCOUNT: Record<string, number> = { free: 5, premium: 20, unlimited: 20 }
@@ -389,18 +391,18 @@ export async function POST(req: NextRequest) {
       const mebRes = await fetch(`${req.nextUrl.origin}/api/meb-search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
-        body: JSON.stringify({ topic, grade, subject: subject || topic, unit: unit || topic, level: getLevel(grade), limit: 5 }),
+        body: JSON.stringify({ topic, grade, subject: topic, level: getLevel(grade), limit: 2 }),
         signal: AbortSignal.timeout(3000), // 3sn — daha agresif timeout
       })
       if (mebRes.ok) {
         const mebData = await mebRes.json()
         if (mebData.found && mebData.context) {
-          mebContext = `\n\nMEB KAYNAK İÇERİĞİ (Bu içeriğe SADIK KAL, dışına çıkma):\n${mebData.context.slice(0, 3000)}` // Max 800 char
+          mebContext = mebData.context.slice(0, 4000)
         }
       }
     } catch { /* MEB opsiyonel */ }
 
-    const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, safeQCount, (fileContent || '') + gradeContext + mebContext) + previousQuestionsNote
+    const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, safeQCount, fileContent || '', gradeContext, mebContext) + previousQuestionsNote
     promptStr = prompt
     countRef = safeQCount
 
