@@ -1223,6 +1223,25 @@ export default function AdminPage() {
                 setMebUploading(true)
                 setMebMsg('')
                 try {
+                  // ── Duplicate kontrolü ──────────────────────────────
+                  const { data: existing } = await supabase
+                    .from('meb_resources')
+                    .select('id, title, created_at')
+                    .ilike('subject', mebForm.subject)
+                    .ilike('unit', mebForm.unit)
+                    .eq('grade', mebForm.grade)
+                    .limit(1)
+
+                  if (existing && existing.length > 0) {
+                    const ex = existing[0]
+                    const tarih = new Date(ex.created_at).toLocaleDateString('tr-TR')
+                    const devam = window.confirm(
+                      `⚠️ Bu ders zaten yüklü!\n\n"${ex.title}"\nTarih: ${tarih}\n\nYine de yüklemek istiyor musun?`
+                    )
+                    if (!devam) { setMebUploading(false); return }
+                  }
+                  // ────────────────────────────────────────────────────
+
                   let res: Response
                   let data: any
 
