@@ -59,57 +59,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Embedding yoksa veya sonuç bulunamadıysa — keyword search
+    // meb_resources.raw_text'ten direkt ara (chunk'sız — disk IO tasarrufu)
     if (!context) {
-      // Önce unit ile eşleştir (en güvenilir)
-      if (unit) {
-        const { data: unitChunks } = await adminDb
-          .from('meb_chunks')
-          .select('content, subject, unit, grade')
-          .ilike('unit', `%${unit}%`)
-          .eq(subject ? 'subject' : 'id', subject || '')
-          .limit(limit)
+      let q = adminDb
+        .from('meb_resources')
+        .select('title, subject, unit, grade, raw_text')
+        .limit(3)
 
-        if (unitChunks?.length) {
-          context = unitChunks.map((c: any, i: number) =>
-            `[MEB Kaynak ${i + 1} - ${c.subject}/${c.unit}]\n${c.content}`
-          ).join('\n\n---\n\n')
-          console.log(`[meb-search] unit match: ${unitChunks.length} chunks for "${unit}"`)
-        }
-      }
+      // Önce unit eşleştir
+      if (unit) q = q.ilike('unit', `%${unit}%`)
+      else if (subject) q = q.ilike('subject', `%${subject}%`)
+      else if (grade) q = q.eq('grade', grade)
 
-      // Unit ile bulunamadıysa subject + grade ile ara
-      if (!context && (subject || grade)) {
-        let q = adminDb
-          .from('meb_chunks')
-          .select('content, subject, unit, grade')
-          .limit(limit)
-        if (subject) q = q.ilike('subject', `%${subject}%`)
-        if (grade) q = q.eq('grade', grade)
-        const { data: subjectChunks } = await q
-        if (subjectChunks?.length) {
-          context = subjectChunks.map((c: any, i: number) =>
-            `[MEB Kaynak ${i + 1} - ${c.subject}/${c.unit}]\n${c.content}`
-          ).join('\n\n---\n\n')
-          console.log(`[meb-search] subject match: ${subjectChunks.length} chunks`)
-        }
-      }
+      const { data: resources } = await q
 
-      // Hiçbiri yoksa topic kelimeleriyle ara
-      if (!context && topic) {
-        const words = topic.split(' ').filter((w: string) => w.length > 2)
-        const searchWord = words[words.length - 1] || topic // Son anlamlı kelime
-        const { data: topicChunks } = await adminDb
-          .from('meb_chunks')
-          .select('content, subject, unit')
-          .ilike('content', `%${searchWord}%`)
-          .limit(limit)
-        if (topicChunks?.length) {
-          context = topicChunks.map((c: any, i: number) =>
-            `[MEB Kaynak ${i + 1} - ${c.subject}/${c.unit}]\n${c.content}`
-          ).join('\n\n---\n\n')
-          console.log(`[meb-search] topic keyword: ${topicChunks.length} chunks for "${searchWord}"`)
-        }
+      if (resources?.length) {
+        context = resources.map((r: any, i: number) =>
+          `[MEB Kaynak ${i + 1} - ${r.subject || ''}/${r.unit || ''}]\n${(r.raw_text || '').slice(0, 3000)}`
+        ).join('\n\n---\n\n')
+        console.log(`[meb-search] resources: ${resources.length} found`)
       }
     }
 
