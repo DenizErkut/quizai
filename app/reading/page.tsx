@@ -24,6 +24,7 @@ export default function ReadingPage() {
   // Yükleme
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [processingText, setProcessingText] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -73,52 +74,79 @@ export default function ReadingPage() {
     setUploadError('')
     setUploading(true)
     setUploadProgress(0)
+    setProcessingText(false)
 
     const sid = `${Date.now()}_${Math.random().toString(36).slice(2)}`
     const headers = await authHeader()
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
+    const UPLOAD_CONCURRENCY = 4
+    let completedChunks = 0
+    let finalData: any = null
+    let uploadFailed: any = null
+
+    async function sendChunk(i: number) {
+      if (uploadFailed) return
+      const start = i * CHUNK_SIZE
+      const end = Math.min(start + CHUNK_SIZE, file.size)
+      const fd = new FormData()
+      fd.append('chunk', file.slice(start, end), file.name)
+      fd.append('chunkIndex', String(i))
+      fd.append('totalChunks', String(totalChunks))
+      fd.append('sessionId', sid)
+      fd.append('ext', ext)
+      fd.append('filename', file.name)
+      fd.append('title', file.name.replace(/\.[^.]+$/, ''))
+
+      const res = await fetch('/api/reading/upload', { method: 'POST', headers, body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Yükleme hatası.')
+
+      completedChunks++
+      if (data.status === 'chunk_received') {
+        // 0-70: aktarım, geri kalan işleme (metin çıkarma/OCR) aşamasına ayrılır
+        setUploadProgress(Math.max(data.progress, Math.round((completedChunks / totalChunks) * 70)))
+        if (completedChunks === totalChunks) setProcessingText(true)
+      } else if (data.status === 'complete') {
+        setProcessingText(false)
+        setUploadProgress(100)
+        finalData = data
+      }
+    }
 
     try {
-      for (let i = 0; i < totalChunks; i++) {
-        const start = i * CHUNK_SIZE
-        const end = Math.min(start + CHUNK_SIZE, file.size)
-        const fd = new FormData()
-        fd.append('chunk', file.slice(start, end), file.name)
-        fd.append('chunkIndex', String(i))
-        fd.append('totalChunks', String(totalChunks))
-        fd.append('sessionId', sid)
-        fd.append('ext', ext)
-        fd.append('filename', file.name)
-        fd.append('title', file.name.replace(/\.[^.]+$/, ''))
-
-        const res = await fetch('/api/reading/upload', { method: 'POST', headers, body: fd })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data?.error || 'Yükleme hatası.')
-
-        if (data.status === 'chunk_received') {
-          setUploadProgress(data.progress)
-        } else if (data.status === 'complete') {
-          setUploadProgress(100)
-          setMaterialId(data.material_id)
-          setTitle(data.title)
-          setChunks(data.chunks)
-
-          // Okuma oturumu oluştur
-          const { data: { user } } = await supabase.auth.getUser()
-          const { data: sessionRow } = await supabase.from('reading_sessions').insert({
-            user_id: user.id,
-            material_id: data.material_id,
-            total_chunks: data.chunk_count,
-          }).select('id').single()
-
-          setSessionId(sessionRow?.id || '')
-          setPhase('ready')
+      // Parçaları belirli bir eşzamanlılık sınırıyla paralel gönder — sunucu tarafı
+      // sıra bağımsız kabul ettiği için (indexli dizi) transfer süresi ciddi kısalır.
+      let cursor = 0
+      async function worker() {
+        while (cursor < totalChunks) {
+          const i = cursor++
+          await sendChunk(i)
         }
       }
+      await Promise.all(Array.from({ length: Math.min(UPLOAD_CONCURRENCY, totalChunks) }, worker))
+
+      if (!finalData) throw new Error('Yükleme tamamlanamadı, tekrar dene.')
+
+      setMaterialId(finalData.material_id)
+      setTitle(finalData.title)
+      setChunks(finalData.chunks)
+
+      // Okuma oturumu oluştur
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: sessionRow } = await supabase.from('reading_sessions').insert({
+        user_id: user.id,
+        material_id: finalData.material_id,
+        total_chunks: finalData.chunk_count,
+      }).select('id').single()
+
+      setSessionId(sessionRow?.id || '')
+      setPhase('ready')
     } catch (e: any) {
+      uploadFailed = e
       setUploadError(e.message || 'Dosya yüklenemedi.')
     } finally {
       setUploading(false)
+      setProcessingText(false)
     }
   }
 
@@ -340,11 +368,17 @@ export default function ReadingPage() {
             {uploading && (
               <div style={{ marginTop: '1rem' }}>
                 <div style={{ height: '8px', borderRadius: '99px', background: 'var(--border)', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${uploadProgress}%`, background: 'var(--accent)', transition: 'width 0.3s' }} />
+                  <div style={{
+                    height: '100%', width: `${uploadProgress}%`, background: 'var(--accent)',
+                    transition: 'width 0.3s', ...(processingText ? { animation: 'pulse-bar 1.4s ease-in-out infinite' } : {}),
+                  }} />
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '6px', textAlign: 'center' }}>
-                  Kitap işleniyor... {uploadProgress}%
+                  {processingText
+                    ? '📖 Kitap taranıyor ve metin çıkarılıyor... (taranmış sayfalarda birkaç dakika sürebilir)'
+                    : `Yükleniyor... ${uploadProgress}%`}
                 </div>
+                <style>{`@keyframes pulse-bar { 0%,100% { opacity: 1 } 50% { opacity: 0.5 } }`}</style>
               </div>
             )}
 

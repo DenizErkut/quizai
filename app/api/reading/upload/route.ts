@@ -9,7 +9,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { requireAuth } from '@/lib/auth-middleware'
 
 export const runtime = 'nodejs'
-export const maxDuration = 120
+export const maxDuration = 280
 export const dynamic = 'force-dynamic'
 
 const adminDb = createClient(
@@ -55,7 +55,44 @@ async function extractWithGeminiVision(buffer: Buffer): Promise<string> {
   return text.trim()
 }
 
-// Metni cümle sınırlarını bozmadan ~WORDS_PER_CHUNK kelimelik parçalara böler
+// Küçük eşzamanlılık havuzu — aynı anda en fazla `limit` kadar iş çalışır
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T, idx: number) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length)
+  let cursor = 0
+  async function worker() {
+    while (cursor < items.length) {
+      const i = cursor++
+      results[i] = await fn(items[i], i)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  return results
+}
+
+// PDF'i sayfa gruplarına böler (pdf-lib) — büyük/taranmış kitaplarda paralel OCR için
+async function splitPdfIntoBatches(buffer: Buffer, pagesPerBatch: number): Promise<Buffer[]> {
+  const { PDFDocument } = await import('pdf-lib')
+  const src = await PDFDocument.load(buffer, { ignoreEncryption: true })
+  const totalPages = src.getPageCount()
+  const batches: Buffer[] = []
+  for (let start = 0; start < totalPages; start += pagesPerBatch) {
+    const end = Math.min(start + pagesPerBatch, totalPages)
+    const sub = await PDFDocument.create()
+    const indices = Array.from({ length: end - start }, (_, i) => start + i)
+    const copied = await sub.copyPages(src, indices)
+    copied.forEach(p => sub.addPage(p))
+    batches.push(Buffer.from(await sub.save()))
+  }
+  return batches
+}
+
+async function getPdfPageCount(buffer: Buffer): Promise<number> {
+  try {
+    const { PDFDocument } = await import('pdf-lib')
+    const doc = await PDFDocument.load(buffer, { ignoreEncryption: true })
+    return doc.getPageCount()
+  } catch { return 0 }
+}
 function chunkForReading(text: string, wordsPerChunk = WORDS_PER_CHUNK): string[] {
   const clean = text.replace(/\r\n/g, '\n').replace(/[ \t]+/g, ' ').trim()
   const sentences = clean.split(/(?<=[.!?…])\s+/).filter(s => s.trim().length > 0)
@@ -104,37 +141,65 @@ async function extractText(buffer: Buffer, ext: string): Promise<{ text: string;
       return { text: parsedText.slice(0, MAX_CHARS), engine: 'pdf-parse' }
     }
 
-    // Taranmış / görsel PDF — Gemini Vision'ı dene
+    // Taranmış / görsel PDF — sayfa sayısını öğren, büyükse paralel batch'ler halinde OCR yap
+    const pageCount = totalPages || await getPdfPageCount(buffer)
+    const BATCH_SIZE = 8      // batch başına sayfa sayısı
+    const CONCURRENCY = 4     // aynı anda kaç batch işlenecek
+
     if (process.env.GEMINI_API_KEY) {
       try {
-        console.log('[reading/upload] Taranmis PDF - Gemini Vision deneniyor...')
-        const geminiText = await extractWithGeminiVision(buffer)
-        if (geminiText.length >= 100) {
-          return { text: geminiText.slice(0, MAX_CHARS), engine: 'gemini-vision' }
+        if (pageCount > BATCH_SIZE) {
+          console.log(`[reading/upload] ${pageCount} sayfa - Gemini Vision paralel batch (${CONCURRENCY} eszamanli)...`)
+          const batches = await splitPdfIntoBatches(buffer, BATCH_SIZE)
+          const texts = await mapWithConcurrency(batches, CONCURRENCY, async (batchBuf) => {
+            try { return await extractWithGeminiVision(batchBuf) } catch (e) {
+              console.warn('[reading/upload] Gemini batch basarisiz:', (e as any)?.message)
+              return ''
+            }
+          })
+          const combined = texts.filter(Boolean).join('\n\n').trim()
+          if (combined.length >= 100) {
+            return { text: combined.slice(0, MAX_CHARS), engine: 'gemini-vision-parallel' }
+          }
+        } else {
+          console.log('[reading/upload] Taranmis PDF - Gemini Vision deneniyor...')
+          const geminiText = await extractWithGeminiVision(buffer)
+          if (geminiText.length >= 100) {
+            return { text: geminiText.slice(0, MAX_CHARS), engine: 'gemini-vision' }
+          }
         }
       } catch (e) {
         console.warn('[reading/upload] Gemini Vision basarisiz:', (e as any)?.message)
       }
     }
 
-    // Gemini yoksa/başarısızsa — Claude fallback (büyük/çok sayfalı kitaplarda maliyet nedeniyle sınırlı)
-    if (buffer.length <= 15 * 1024 * 1024 && totalPages <= 60) {
+    // Gemini yoksa/başarısızsa — Claude fallback (paralel batch, maliyet için sayfa/boyut sınırlı)
+    if (buffer.length <= 15 * 1024 * 1024 && pageCount <= 60) {
       try {
-        const base64 = buffer.toString('base64')
-        const message = await anthropic.messages.create({
-          model: 'claude-sonnet-4-5',
-          max_tokens: 4000,
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } } as any,
-              { type: 'text', text: 'Bu PDF taranmis/gorsel bir kitap. Tum sayfalardaki metni sayfa sirasina gore eksiksiz cikar. Sadece metni dondur.' },
-            ],
-          }],
-        }) as any
-        const claudeText = (message.content[0]?.text || '').trim()
-        if (claudeText.length >= 100) {
-          return { text: claudeText.slice(0, MAX_CHARS), engine: 'claude' }
+        const claudeBatches = pageCount > BATCH_SIZE ? await splitPdfIntoBatches(buffer, BATCH_SIZE) : [buffer]
+        const texts = await mapWithConcurrency(claudeBatches, 3, async (batchBuf) => {
+          try {
+            const base64 = batchBuf.toString('base64')
+            const message = await anthropic.messages.create({
+              model: 'claude-sonnet-4-5',
+              max_tokens: 4000,
+              messages: [{
+                role: 'user',
+                content: [
+                  { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } } as any,
+                  { type: 'text', text: 'Bu PDF taranmis/gorsel bir kitabin bir bolumu. Tum sayfalardaki metni sayfa sirasina gore eksiksiz cikar. Sadece metni dondur.' },
+                ],
+              }],
+            }) as any
+            return (message.content[0]?.text || '').trim()
+          } catch (e) {
+            console.warn('[reading/upload] Claude batch basarisiz:', (e as any)?.message)
+            return ''
+          }
+        })
+        const combined = texts.filter(Boolean).join('\n\n').trim()
+        if (combined.length >= 100) {
+          return { text: combined.slice(0, MAX_CHARS), engine: 'claude-parallel' }
         }
       } catch (e) {
         console.warn('[reading/upload] Claude fallback basarisiz:', (e as any)?.message)
