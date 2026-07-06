@@ -138,13 +138,19 @@ function RegisterContent() {
         // NOT: 'age' bilerek gönderilmiyor — profiles tablosunda böyle bir kolon
         // yok. Yaş formda hâlâ isteniyor ve doğrulanıyor (yukarıdaki 5-35 ve
         // 18 yaş altı veli onayı kontrolleri için), ama veritabanına yazılmıyor.
-        await supabase.from('profiles').upsert({
+        const { error: upsertError } = await supabase.from('profiles').upsert({
           id: data.user.id,
           name: fullName,
           grade,
           language: 'Türkçe',
           role: 'student',
         })
+        if (upsertError) {
+          console.error('profiles upsert hatasi (register):', upsertError)
+          setError('Profil oluşturulamadı: ' + upsertError.message)
+          setLoading(false)
+          return
+        }
 
         // KVKK rıza kayıtları (ispat yükümlülüğü)
         const consentRows: any[] = [

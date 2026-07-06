@@ -64,13 +64,14 @@ export default function ProfileSetupPage() {
 
     setError(''); setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setError('Oturum bulunamadı, lütfen tekrar giriş yapın.'); setLoading(false); router.push('/login'); return }
 
     // NOT: 'age' bilerek gönderilmiyor — profiles tablosunda böyle bir kolon
     // yok (şema: id, name, surname, grade, school, ... ). Yaş formda hâlâ
     // isteniyor ve doğrulanıyor (5-35 aralığı), ama veritabanına yazılmıyor.
     // İleride yaş bilgisini kalıcı saklamak istenirse önce Supabase'de
     // `age INTEGER` kolonu migration ile eklenmeli.
-    await supabase.from('profiles').upsert({
+    const { error: upsertError } = await supabase.from('profiles').upsert({
       id: user.id,
       name: `${name.trim()} ${surname.trim()}`,
       grade,
@@ -79,6 +80,12 @@ export default function ProfileSetupPage() {
       instagram: instagram || null,
       tiktok: tiktok || null,
     })
+    if (upsertError) {
+      console.error('profiles upsert hatasi:', upsertError)
+      setError('Profil kaydedilemedi: ' + upsertError.message)
+      setLoading(false)
+      return
+    }
 
     // Kurum kodu işle
     if (institutionCode.trim()) {
