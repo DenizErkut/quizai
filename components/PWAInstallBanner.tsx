@@ -6,9 +6,36 @@ export default function PWAInstallBanner() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
 
   useEffect(() => {
-    // SW kayıt
+    // SW kayıt + otomatik güncelleme mekanizması
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {})
+      navigator.serviceWorker.register('/sw.js').then(registration => {
+        // Sayfa açıkken arka planda yeni SW var mı diye periyodik kontrol et
+        // (Next.js deploy sonrası kullanıcı sekmeyi hiç kapatmasa bile yakalar)
+        setInterval(() => {
+          registration.update().catch(() => {})
+        }, 60 * 1000) // her 60 saniyede bir
+
+        // Yeni bir SW bulunup "waiting" durumuna geçtiğinde hemen aktive olmasını iste
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing
+          if (!newWorker) return
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // Yeni sürüm hazır ama henüz devrede değil — hemen devreye al
+              newWorker.postMessage({ type: 'SKIP_WAITING' })
+            }
+          })
+        })
+      }).catch(() => {})
+
+      // Yeni SW kontrolü ele alınca (controllerchange) sayfayı SESSİZCE yenile
+      // — kullanıcı ne bir şey görür ne de eski/kırık bir sürümde takılı kalır
+      let refreshing = false
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return
+        refreshing = true
+        window.location.reload()
+      })
     }
 
     // Install prompt

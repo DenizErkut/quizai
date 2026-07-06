@@ -1,6 +1,7 @@
-// Pratium Service Worker v2 — Offline Cache + Push Notifications
+// Pratium Service Worker v3 — Offline Cache + Push Notifications
+// v3: Otomatik güncelleme mekanizması eklendi — kullanıcı artık hard refresh yapmak zorunda değil
 
-const CACHE_NAME = 'pratium-v2'
+const CACHE_NAME = 'pratium-v3'
 const STATIC_ASSETS = [
   '/',
   '/quiz',
@@ -27,12 +28,27 @@ self.addEventListener('install', function(event) {
   )
 })
 
-// ── Activate: eski cache'leri temizle ────────────────────────────────────────
+// ── Client'tan gelen SKIP_WAITING mesajını dinle — anında aktive ol ─────────
+self.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  }
+})
+
+// ── Activate: eski cache'leri temizle + açık sekmeleri hemen devral ─────────
 self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
     ).then(() => clients.claim())
+     .then(() => {
+       // Yeni SW aktif oldu — açık tüm sekmelere haber ver, onlar sayfayı
+       // kullanıcıyı rahatsız etmeden kendi mantıklarıyla yenileyebilsinler
+       return clients.matchAll({ type: 'window', includeUncontrolled: true })
+     })
+     .then(clientList => {
+       clientList.forEach(client => client.postMessage({ type: 'SW_UPDATED' }))
+     })
   )
 })
 
@@ -66,16 +82,21 @@ self.addEventListener('fetch', function(event) {
     return
   }
 
-  // Statik dosyalar (logo, font, css) — Cache first, Network fallback
+  // Statik dosyalar (logo, font, css, js) — Stale-while-revalidate:
+  // cache'den hemen yanıt ver AMA arka planda ağdan tazele, böylece bir
+  // sonraki ziyarette güncel içerik cache'de hazır olur (hard refresh gerekmez)
   event.respondWith(
     caches.match(request).then(cached => {
-      if (cached) return cached
-      return fetch(request).then(res => {
-        if (!res || res.status !== 200) return res
-        const clone = res.clone()
-        caches.open(CACHE_NAME).then(cache => cache.put(request, clone))
+      const networkFetch = fetch(request).then(res => {
+        if (res && res.status === 200) {
+          const clone = res.clone()
+          caches.open(CACHE_NAME).then(cache => cache.put(request, clone))
+        }
         return res
-      }).catch(() => cached || new Response('', { status: 404 }))
+      }).catch(() => cached)
+
+      // Cache varsa hemen onu dön, yoksa network'ü bekle
+      return cached || networkFetch
     })
   )
 })
