@@ -16,6 +16,7 @@ const LANGS = [
 
 // Desktop avatar dropdown menüsü
 const DROPDOWN_ITEMS = [
+  { label: '🎧 Sesli Okuma',      href: '/reading' },
   { label: '🎯 Sınav Simülasyonu',  href: '/exam' },
   { label: '📈 Analiz',          href: '/analysis' },
   { label: '🗂️ Soru Arşivi',     href: '/archive' },
@@ -33,6 +34,7 @@ const DROPDOWN_ITEMS = [
 // Tüm menü (mobile için — mevcut haliyle kalıyor)
 const MENU_ITEMS = [
   { label: '⚡ Yeni test',        href: '/quiz' },
+  { label: '🎧 Sesli Okuma',      href: '/reading' },
   { label: '📅 Günlük test',      href: '/daily' },
   { label: '🎯 Canlı Quiz',       href: '/live' },
   { label: '📊 Dashboard',        href: '/dashboard' },
@@ -285,6 +287,7 @@ export default function Navbar() {
                       { label: '🏆 Sıralama', href: '/leaderboard' },
                     ]),
                     // Ortak özellikler (herkese)
+                    { label: '🎧 Sesli Okuma', href: '/reading' },
                     { label: '🎯 Sınav Simülasyonu', href: '/exam' },
                     { label: '📈 Analiz', href: '/analysis' },
                     { label: '🗂️ Soru Arşivi', href: '/archive' },
