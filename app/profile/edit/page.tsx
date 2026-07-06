@@ -72,7 +72,6 @@ export default function ProfileEditPage() {
         .single()
       if (data) {
         setName(data.name || '')
-        setAge(data.age?.toString() || '')
         setGender(data.gender || '')
         setGrade(data.grade || '')
         setSchool(data.school || '')
@@ -132,7 +131,6 @@ export default function ProfileEditPage() {
     await supabase.from('profiles').upsert({
       id: user.id,
       name: name.trim(),
-      age: age ? parseInt(age) : null,
       gender: gender || null,
       grade,
       school: school || null,
