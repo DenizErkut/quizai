@@ -78,6 +78,9 @@ function RegisterContent() {
   const [grade, setGrade] = useState('')
   const [institutionCode, setInstitutionCode] = useState('')
   const [institutionName, setInstitutionName] = useState('')
+  const [kvkkAydinlatma, setKvkkAydinlatma] = useState(false)
+  const [kvkkAcikRiza, setKvkkAcikRiza] = useState(false)
+  const [veliOnayi, setVeliOnayi] = useState(false)
 
   // Öğretmen alanları
   const [school, setSchool] = useState('')
@@ -108,7 +111,9 @@ function RegisterContent() {
     if (!surname.trim()) { setError('Soyad zorunludur.'); return }
     if (!email.trim()) { setError('E-posta zorunludur.'); return }
     if (pass.length < 6) { setError('Şifre en az 6 karakter olmalıdır.'); return }
-    if (!kvkk) { setError('Gizlilik Politikasi ve KVKK metnini kabul etmelisiniz.'); return }
+    if (!kvkkAydinlatma) { setError('KVKK Aydınlatma Metnini okuduğunuzu onaylamalısınız.'); return }
+    if (!kvkkAcikRiza) { setError('Yapay zeka destekli analiz için açık rıza vermelisiniz.'); return }
+    if (selectedRole === 'student' && age && parseInt(age) < 18 && !veliOnayi) { setError('18 yaş altı kayıtlar için veli onayı beyanı gereklidir.'); return }
 
     // Öğrenci için ek kontrol
     if (selectedRole === 'student') {
@@ -139,21 +144,35 @@ function RegisterContent() {
           role: 'student',
         })
 
-        // Kurum kodu — service_role API üzerinden (RLS bypass)
+        // KVKK rıza kayıtları (ispat yükümlülüğü)
+        const consentRows: any[] = [
+          { user_id: data.user.id, consent_type: 'aydinlatma', consent_version: 'v1.0', granted: kvkkAydinlatma },
+          { user_id: data.user.id, consent_type: 'acik_riza_analiz', consent_version: 'v1.0', granted: kvkkAcikRiza },
+        ]
+        if (parseInt(age) < 18) {
+          consentRows.push({ user_id: data.user.id, consent_type: 'veli_onayi', consent_version: 'v1.0', granted: veliOnayi })
+        }
+        await supabase.from('consent_records').insert(consentRows).then(() => {}, () => {})
+
+        // Kurum kodu
         if (institutionCode.trim()) {
-          await fetch('/api/institution/join', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ institution_code: institutionCode.trim(), user_id: data.user.id }),
-          }).catch(() => {}) // Hata sessizce geç, kayıt iptal olmasın
+          const { data: inst } = await supabase.from('institutions')
+            .select('id').eq('code', institutionCode.trim().toUpperCase()).eq('active', true).maybeSingle()
+          if (inst) {
+            await supabase.from('institution_users').insert({ institution_id: inst.id, user_id: data.user.id, role: 'student' })
+          }
         }
 
-        // Referral
+        // Referral — ödül sistemi ile
         if (ref) {
           const { data: referrer } = await supabase.from('profiles').select('id').eq('referral_code', ref.toUpperCase()).single()
           if (referrer && referrer.id !== data.user.id) {
             await new Promise(r => setTimeout(r, 800))
-            await supabase.from('referrals').insert({ referrer_id: referrer.id, referred_id: data.user.id })
+            await fetch('/api/referral/reward', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ referrer_id: referrer.id, referred_id: data.user.id }),
+            }).catch(() => {})
           }
         }
 
@@ -406,15 +425,35 @@ function RegisterContent() {
             </div>
           )}
 
-          {/* KVKK */}
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', marginBottom: '1rem' }}>
-            <input type="checkbox" checked={kvkk} onChange={e => setKvkk(e.target.checked)}
+          {/* KVKK — Aydınlatma ve Açık Rıza AYRI metinler (KVKK Kurulu İlke Kararı 2026/347) */}
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', marginBottom: '8px' }}>
+            <input type="checkbox" checked={kvkkAydinlatma} onChange={e => { setKvkkAydinlatma(e.target.checked); setKvkk(e.target.checked && kvkkAcikRiza) }}
               style={{ marginTop: '2px', flexShrink: 0, width: 16, height: 16, accentColor: 'var(--accent)' }} />
             <span style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.5 }}>
-              <Link href="/privacy" style={{ color: 'var(--accent)', fontWeight: 600 }}>Gizlilik Politikasi</Link> ve{' '}
-              <Link href="/terms" style={{ color: 'var(--accent)', fontWeight: 600 }}>KVKK Metni</Link>'ni okudum, kabul ediyorum.
+              <Link href="/kvkk/aydinlatma" target="_blank" style={{ color: 'var(--accent)', fontWeight: 600 }}>KVKK Aydınlatma Metni</Link>'ni okudum.
+              (<Link href="/terms" target="_blank" style={{ color: 'var(--accent)' }}>Kullanım Koşulları</Link>)
             </span>
           </label>
+
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', marginBottom: '8px' }}>
+            <input type="checkbox" checked={kvkkAcikRiza} onChange={e => { setKvkkAcikRiza(e.target.checked); setKvkk(kvkkAydinlatma && e.target.checked) }}
+              style={{ marginTop: '2px', flexShrink: 0, width: 16, height: 16, accentColor: 'var(--accent)' }} />
+            <span style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.5 }}>
+              Performans verilerimin yapay zeka destekli analiz ve kişiselleştirilmiş öneriler için işlenmesine{' '}
+              <Link href="/kvkk/acik-riza" target="_blank" style={{ color: 'var(--accent)', fontWeight: 600 }}>açık rıza</Link> veriyorum.
+            </span>
+          </label>
+
+          {selectedRole === 'student' && age && parseInt(age) < 18 && (
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', marginBottom: '1rem', padding: '10px', borderRadius: '10px', background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.2)' }}>
+              <input type="checkbox" checked={veliOnayi} onChange={e => setVeliOnayi(e.target.checked)}
+                style={{ marginTop: '2px', flexShrink: 0, width: 16, height: 16, accentColor: '#7c3aed' }} />
+              <span style={{ fontSize: '12px', color: 'var(--text2)', lineHeight: 1.5 }}>
+                <b>18 yaşından küçüğüm:</b> Bu platforma kaydım ve kişisel verilerimin işlenmesi konusunda
+                velimin/vasimin bilgisi ve onayı vardır. Velim, Veli Paneli üzerinden hesabımı takip edebilir.
+              </span>
+            </label>
+          )}
 
           {error && (
             <div style={{ marginBottom: '12px', padding: '10px 12px', background: 'var(--red-bg)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)', lineHeight: 1.5 }}>
@@ -422,7 +461,7 @@ function RegisterContent() {
             </div>
           )}
 
-          <button className="btn btn-primary" onClick={handleRegister} disabled={loading || !kvkk}
+          <button className="btn btn-primary" onClick={handleRegister} disabled={loading || !kvkkAydinlatma || !kvkkAcikRiza}
             style={{ width: '100%', justifyContent: 'center', background: selectedRole === 'teacher' ? 'linear-gradient(135deg, #7c3aed, #5b21b6)' : selectedRole === 'parent' ? 'linear-gradient(135deg, #1ECFB8, #0a9e90)' : undefined }}>
             {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : (
               selectedRole === 'teacher' ? 'Hesap Oluştur → Başvuruya Devam Et' :
