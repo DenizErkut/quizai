@@ -65,10 +65,14 @@ export default function ProfileSetupPage() {
     setError(''); setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
 
+    // NOT: 'age' bilerek gönderilmiyor — profiles tablosunda böyle bir kolon
+    // yok (şema: id, name, surname, grade, school, ... ). Yaş formda hâlâ
+    // isteniyor ve doğrulanıyor (5-35 aralığı), ama veritabanına yazılmıyor.
+    // İleride yaş bilgisini kalıcı saklamak istenirse önce Supabase'de
+    // `age INTEGER` kolonu migration ile eklenmeli.
     await supabase.from('profiles').upsert({
       id: user.id,
       name: `${name.trim()} ${surname.trim()}`,
-      age: parseInt(age),
       grade,
       language: 'Türkçe',
       phone: phone || null,
