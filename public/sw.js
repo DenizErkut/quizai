@@ -93,9 +93,12 @@ self.addEventListener('fetch', function(event) {
           caches.open(CACHE_NAME).then(cache => cache.put(request, clone))
         }
         return res
-      }).catch(() => cached)
+      }).catch(() => {
+        // Network başarısız — cache varsa onu, yoksa boş 404 Response dön
+        return cached || new Response('', { status: 404, statusText: 'Not Found' })
+      })
 
-      // Cache varsa hemen onu dön, yoksa network'ü bekle
+      // Cache varsa hemen onu dön, yoksa network'ü bekle (o da her koşulda Response döner)
       return cached || networkFetch
     })
   )
