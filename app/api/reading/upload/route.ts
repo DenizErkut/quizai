@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import Anthropic from '@anthropic-ai/sdk'
 import { requireAuth } from '@/lib/auth-middleware'
 
 export const runtime = 'nodejs'
@@ -16,12 +17,43 @@ const adminDb = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+
 const MAX_CHARS = 400_000      // ~ orta boy bir roman
 const MAX_READING_CHUNKS = 800  // TTS/dikkat sorusu maliyetini sınırlamak için üst sınır
 const WORDS_PER_CHUNK = 120      // ~ 45-60 saniyelik konuşma parçası
 
 // Upload oturumu başına gelen parçaları tutan bellek içi depo (extract-file ile aynı desen)
 const chunkStore = new Map<string, Buffer[]>()
+
+// Gemini API helper (extract-file/route.ts ile aynı desen — taranmış PDF'ler için)
+async function callGemini(model: string, parts: any[]): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY!
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts }],
+      generationConfig: { maxOutputTokens: 8000, temperature: 0.1 },
+    }),
+  })
+  if (!res.ok) {
+    const err = await res.json()
+    throw new Error(`Gemini API hatasi: ${err?.error?.message || res.status}`)
+  }
+  const data = await res.json()
+  return data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+}
+
+async function extractWithGeminiVision(buffer: Buffer): Promise<string> {
+  const base64 = buffer.toString('base64')
+  const text = await callGemini('gemini-1.5-flash', [
+    { inlineData: { mimeType: 'application/pdf', data: base64 } },
+    { text: 'Bu PDF taranmış/görsel bir kitap. Tüm sayfalardaki metni, sayfa sırasına göre, Türkçe olarak eksiksiz çıkar. Başlıkları ve paragrafları koru. Sadece metni döndür, başka açıklama ekleme.' },
+  ])
+  return text.trim()
+}
 
 // Metni cümle sınırlarını bozmadan ~WORDS_PER_CHUNK kelimelik parçalara böler
 function chunkForReading(text: string, wordsPerChunk = WORDS_PER_CHUNK): string[] {
@@ -50,19 +82,66 @@ function chunkForReading(text: string, wordsPerChunk = WORDS_PER_CHUNK): string[
   return filtered.length > 0 ? filtered : [text.slice(0, 2000)]
 }
 
-async function extractText(buffer: Buffer, ext: string): Promise<string> {
+async function extractText(buffer: Buffer, ext: string): Promise<{ text: string; engine: string }> {
   if (ext === 'txt') {
-    return buffer.toString('utf-8').slice(0, MAX_CHARS)
+    return { text: buffer.toString('utf-8').slice(0, MAX_CHARS), engine: 'text' }
   }
 
   if (ext === 'pdf') {
-    const pdfParse = require('pdf-parse')
-    const parsed = await pdfParse(buffer, { max: 0 })
-    const text = (parsed?.text || '').trim()
-    if (text.length < 50) {
-      throw new Error('PDF içinden metin çıkarılamadı. Taranmış (görsel) bir PDF olabilir.')
+    let parsedText = ''
+    let totalPages = 0
+    try {
+      const pdfParse = require('pdf-parse')
+      const parsed = await pdfParse(buffer, { max: 0 })
+      parsedText = (parsed?.text || '').trim()
+      totalPages = parsed?.numpages || 0
+    } catch (e) {
+      console.warn('[reading/upload] pdf-parse basarisiz:', (e as any)?.message)
     }
-    return text.slice(0, MAX_CHARS)
+
+    // Yeterli metin çıktıysa direkt kullan
+    if (parsedText.length >= 100) {
+      return { text: parsedText.slice(0, MAX_CHARS), engine: 'pdf-parse' }
+    }
+
+    // Taranmış / görsel PDF — Gemini Vision'ı dene
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        console.log('[reading/upload] Taranmis PDF - Gemini Vision deneniyor...')
+        const geminiText = await extractWithGeminiVision(buffer)
+        if (geminiText.length >= 100) {
+          return { text: geminiText.slice(0, MAX_CHARS), engine: 'gemini-vision' }
+        }
+      } catch (e) {
+        console.warn('[reading/upload] Gemini Vision basarisiz:', (e as any)?.message)
+      }
+    }
+
+    // Gemini yoksa/başarısızsa — Claude fallback (büyük/çok sayfalı kitaplarda maliyet nedeniyle sınırlı)
+    if (buffer.length <= 15 * 1024 * 1024 && totalPages <= 60) {
+      try {
+        const base64 = buffer.toString('base64')
+        const message = await anthropic.messages.create({
+          model: 'claude-sonnet-4-5',
+          max_tokens: 4000,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } } as any,
+              { type: 'text', text: 'Bu PDF taranmis/gorsel bir kitap. Tum sayfalardaki metni sayfa sirasina gore eksiksiz cikar. Sadece metni dondur.' },
+            ],
+          }],
+        }) as any
+        const claudeText = (message.content[0]?.text || '').trim()
+        if (claudeText.length >= 100) {
+          return { text: claudeText.slice(0, MAX_CHARS), engine: 'claude' }
+        }
+      } catch (e) {
+        console.warn('[reading/upload] Claude fallback basarisiz:', (e as any)?.message)
+      }
+    }
+
+    throw new Error('Bu PDF taranmış/görsel bir kitap ve metni otomatik olarak çıkarılamadı. Lütfen farklı bir dosya deneyin veya birkaç sayfa sonra tekrar yükleyin.')
   }
 
   if (ext === 'docx') {
@@ -77,7 +156,7 @@ async function extractText(buffer: Buffer, ext: string): Promise<string> {
       .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
       .replace(/\n{3,}/g, '\n\n').trim()
     if (content.length < 50) throw new Error('DOCX içinden metin çıkarılamadı.')
-    return content.slice(0, MAX_CHARS)
+    return { text: content.slice(0, MAX_CHARS), engine: 'docx' }
   }
 
   throw new Error(`Desteklenmeyen dosya türü: .${ext} (sadece PDF, DOCX, TXT desteklenir)`)
@@ -120,7 +199,8 @@ export async function POST(req: NextRequest) {
     const fullBuffer = Buffer.concat(chunks)
     chunkStore.delete(sessionId)
 
-    const rawText = await extractText(fullBuffer, ext)
+    const { text: rawText, engine } = await extractText(fullBuffer, ext)
+    console.log(`[reading/upload] metin cikarildi: ${rawText.length} karakter, engine=${engine}`)
     const readingChunks = chunkForReading(rawText)
 
     const { data: material, error: insertErr } = await adminDb
@@ -173,3 +253,4 @@ export async function GET(req: NextRequest) {
   if (listErr) return NextResponse.json({ error: listErr.message }, { status: 500 })
   return NextResponse.json({ materials: data || [] })
 }
+
