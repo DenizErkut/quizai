@@ -13,7 +13,6 @@ export type Database = {
         Row: {
           id: string
           name: string
-          age: number | null
           gender: string | null
           grade: string
           school: string | null
@@ -35,7 +34,6 @@ export type Database = {
         Insert: {
           id: string
           name: string
-          age?: number | null
           gender?: string | null
           grade: string
           school?: string | null
@@ -57,7 +55,6 @@ export type Database = {
         Update: {
           id?: string
           name?: string
-          age?: number | null
           gender?: string | null
           grade?: string
           school?: string | null

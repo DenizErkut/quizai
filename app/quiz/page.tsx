@@ -464,9 +464,12 @@ function QuizPageContent() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return null }
     const { data } = await supabase
-      .from('profiles').select('name,grade,language,plan,monthly_test_count,daily_test_count,daily_test_date,age,onboarding_completed')
+      .from('profiles').select('name,grade,language,plan,monthly_test_count,daily_test_count,daily_test_date,onboarding_completed')
       .eq('id', user.id).single()
-    if (!data || !data.grade || !data.age || !data.name) { router.push('/profile'); return null }
+    // NOT: 'age' kolonu profiles tablosunda yok (bkz. profile/page.tsx içindeki not).
+    // Önceden buradaki select 'age' istediği için Supabase 400 döndürüyor, data null
+    // kalıyor ve kullanıcı /quiz <-> /profile arasında sonsuz döngüye giriyordu.
+    if (!data || !data.grade || !data.name) { router.push('/profile'); return null }
     const lang = getActiveLang(data.language)
     setProfile({ ...data, language: lang })
     // ✅ Onboarding: ilk kez giren kullanıcı için modal göster

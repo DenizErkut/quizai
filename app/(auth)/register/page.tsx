@@ -135,10 +135,12 @@ function RegisterContent() {
     if (data.user) {
       if (selectedRole === 'student') {
         // Öğrenci profili
+        // NOT: 'age' bilerek gönderilmiyor — profiles tablosunda böyle bir kolon
+        // yok. Yaş formda hâlâ isteniyor ve doğrulanıyor (yukarıdaki 5-35 ve
+        // 18 yaş altı veli onayı kontrolleri için), ama veritabanına yazılmıyor.
         await supabase.from('profiles').upsert({
           id: data.user.id,
           name: fullName,
-          age: parseInt(age),
           grade,
           language: 'Türkçe',
           role: 'student',
