@@ -3,7 +3,6 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-const CHUNK_SIZE = 3 * 1024 * 1024 // 3MB — extract-file ile aynı upload sözleşmesi
 const QUESTION_INTERVAL_SECONDS = 90 // dikkat sorusu aralığı
 
 type Phase = 'upload' | 'ready' | 'playing' | 'question' | 'finished'
@@ -45,11 +44,28 @@ export default function ReadingPage() {
   const accumulatedSeconds = useRef(0)
   const pendingText = useRef('')
 
-  // Dikkat sorusu
-  const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
+  // Dikkat soruları — artık bir kerede en az 3 soru geliyor, sırayla soruluyor
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [questionIdx, setQuestionIdx] = useState(0)
   const [chosenIndex, setChosenIndex] = useState<number | null>(null)
   const [questionLoading, setQuestionLoading] = useState(false)
   const [score, setScore] = useState({ correct: 0, total: 0 })
+
+  // Kitaplık — daha önce yüklenen kitapların SADECE başlığı (içerik saklanmıyor)
+  const [library, setLibrary] = useState<{ id: string; title: string; created_at: string }[]>([])
+
+  useEffect(() => {
+    loadLibrary()
+  }, [])
+
+  async function loadLibrary() {
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/reading/upload', { headers })
+      const data = await res.json()
+      if (res.ok) setLibrary(data.materials || [])
+    } catch {}
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }: any) => {
@@ -65,84 +81,66 @@ export default function ReadingPage() {
   }
 
   // ── Dosya yükleme ──
+  // Dosya doğrudan Supabase Storage'a yüklenir (kendi user_id klasörüne),
+  // sonra API'ye sadece dosya yolu gönderilir. Önceki parçalı yükleme Vercel
+  // serverless'ta güvenilir değildi (parçalar farklı sunucu kopyalarına düşüp
+  // birleşemiyordu ve yükleme %40-70 arasında takılıyordu).
   async function handleFile(file: File) {
     const ext = file.name.split('.').pop()?.toLowerCase() || ''
     if (!['pdf', 'docx', 'txt'].includes(ext)) {
       setUploadError('Sadece PDF, Word (.docx) veya düz metin (.txt) dosyaları desteklenir.')
       return
     }
+    if (file.size > 50 * 1024 * 1024) {
+      setUploadError('Dosya çok büyük (en fazla 50MB).')
+      return
+    }
     setUploadError('')
     setUploading(true)
-    setUploadProgress(0)
+    setUploadProgress(5)
     setProcessingText(false)
 
-    const sid = `${Date.now()}_${Math.random().toString(36).slice(2)}`
-    const headers = await authHeader()
-    const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
-    const UPLOAD_CONCURRENCY = 4
-    let completedChunks = 0
-    let finalData: any = null
-    let uploadFailed: any = null
-
-    async function sendChunk(i: number) {
-      if (uploadFailed) return
-      const start = i * CHUNK_SIZE
-      const end = Math.min(start + CHUNK_SIZE, file.size)
-      const fd = new FormData()
-      fd.append('chunk', file.slice(start, end), file.name)
-      fd.append('chunkIndex', String(i))
-      fd.append('totalChunks', String(totalChunks))
-      fd.append('sessionId', sid)
-      fd.append('ext', ext)
-      fd.append('filename', file.name)
-      fd.append('title', file.name.replace(/\.[^.]+$/, ''))
-
-      const res = await fetch('/api/reading/upload', { method: 'POST', headers, body: fd })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'Yükleme hatası.')
-
-      completedChunks++
-      if (data.status === 'chunk_received') {
-        // 0-70: aktarım, geri kalan işleme (metin çıkarma/OCR) aşamasına ayrılır
-        setUploadProgress(Math.max(data.progress, Math.round((completedChunks / totalChunks) * 70)))
-        if (completedChunks === totalChunks) setProcessingText(true)
-      } else if (data.status === 'complete') {
-        setProcessingText(false)
-        setUploadProgress(100)
-        finalData = data
-      }
-    }
-
     try {
-      // Parçaları belirli bir eşzamanlılık sınırıyla paralel gönder — sunucu tarafı
-      // sıra bağımsız kabul ettiği için (indexli dizi) transfer süresi ciddi kısalır.
-      let cursor = 0
-      async function worker() {
-        while (cursor < totalChunks) {
-          const i = cursor++
-          await sendChunk(i)
-        }
-      }
-      await Promise.all(Array.from({ length: Math.min(UPLOAD_CONCURRENCY, totalChunks) }, worker))
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
 
-      if (!finalData) throw new Error('Yükleme tamamlanamadı, tekrar dene.')
+      // 1) Storage'a yükle
+      const storagePath = `${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+      setUploadProgress(15)
+      const { error: upErr } = await supabase.storage
+        .from('reading-uploads')
+        .upload(storagePath, file, { contentType: file.type || undefined, upsert: false })
+      if (upErr) throw new Error('Dosya yüklenemedi: ' + upErr.message)
 
-      setMaterialId(finalData.material_id)
-      setTitle(finalData.title)
-      setChunks(finalData.chunks)
+      // 2) API'ye işlet — metin çıkarma/OCR bu aşamada
+      setUploadProgress(60)
+      setProcessingText(true)
+      const headers = await authHeader()
+      const res = await fetch('/api/reading/upload', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: storagePath, ext, title: file.name.replace(/\.[^.]+$/, '') }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Dosya işlenemedi.')
+
+      setProcessingText(false)
+      setUploadProgress(100)
+      setMaterialId(data.material_id)
+      setTitle(data.title)
+      setChunks(data.chunks)
 
       // Okuma oturumu oluştur
-      const { data: { user } } = await supabase.auth.getUser()
       const { data: sessionRow } = await supabase.from('reading_sessions').insert({
         user_id: user.id,
-        material_id: finalData.material_id,
-        total_chunks: finalData.chunk_count,
+        material_id: data.material_id,
+        total_chunks: data.chunk_count,
       }).select('id').single()
 
       setSessionId(sessionRow?.id || '')
       setPhase('ready')
+      loadLibrary()
     } catch (e: any) {
-      uploadFailed = e
       setUploadError(e.message || 'Dosya yüklenemedi.')
     } finally {
       setUploading(false)
@@ -228,6 +226,8 @@ export default function ReadingPage() {
     setPhase('question')
     setIsPlaying(false)
     setQuestionLoading(true)
+    setQuestions([])
+    setQuestionIdx(0)
     setChosenIndex(null)
     try {
       const headers = await authHeader()
@@ -237,22 +237,24 @@ export default function ReadingPage() {
         body: JSON.stringify({ text: pendingText.current, grade }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data?.error)
-      setCurrentQuestion(data)
+      if (!res.ok || !Array.isArray(data.questions) || data.questions.length === 0) throw new Error(data?.error)
+      setQuestions(data.questions)
     } catch {
-      // Soru üretilemezse dikkat kontrolünü atla, okumaya devam et
-      setCurrentQuestion(null)
-      resumeAfterQuestion(null)
+      // Sorular üretilemezse dikkat kontrolünü atla, okumaya devam et
+      setQuestions([])
+      resumeAfterQuestion()
     } finally {
       setQuestionLoading(false)
     }
   }
 
   async function answerQuestion(idx: number) {
+    const currentQuestion = questions[questionIdx]
     if (chosenIndex !== null || !currentQuestion) return
     setChosenIndex(idx)
     const isCorrect = idx === currentQuestion.correct_index
-    setScore(s => ({ correct: s.correct + (isCorrect ? 1 : 0), total: s.total + 1 }))
+    const newScore = { correct: score.correct + (isCorrect ? 1 : 0), total: score.total + 1 }
+    setScore(newScore)
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -268,18 +270,29 @@ export default function ReadingPage() {
         answered_at: new Date().toISOString(),
       })
       await supabase.from('reading_sessions').update({
-        correct_count: score.correct + (isCorrect ? 1 : 0),
-        total_questions: score.total + 1,
+        correct_count: newScore.correct,
+        total_questions: newScore.total,
         current_chunk: currentIndex,
         last_activity_at: new Date().toISOString(),
       }).eq('id', sessionId)
     } catch { /* skorlama başarısız olsa da okumayı bloklamayalım */ }
   }
 
-  function resumeAfterQuestion(_: null) {
+  function nextQuestionOrResume() {
+    if (questionIdx < questions.length - 1) {
+      setQuestionIdx(i => i + 1)
+      setChosenIndex(null)
+    } else {
+      resumeAfterQuestion()
+    }
+  }
+
+  function resumeAfterQuestion() {
     accumulatedSeconds.current = 0
     pendingText.current = ''
-    setCurrentQuestion(null)
+    setQuestions([])
+    setQuestionIdx(0)
+    setChosenIndex(null)
 
     if (currentIndex >= chunks.length - 1) {
       finishSession()
@@ -318,7 +331,7 @@ export default function ReadingPage() {
     audioCache.current.clear()
     setPhase('upload')
     setMaterialId(''); setTitle(''); setChunks([]); setSessionId('')
-    setCurrentIndex(0); setIsPlaying(false); setCurrentQuestion(null)
+    setCurrentIndex(0); setIsPlaying(false); setQuestions([]); setQuestionIdx(0); setChosenIndex(null)
     setScore({ correct: 0, total: 0 })
     accumulatedSeconds.current = 0
     pendingText.current = ''
@@ -387,6 +400,34 @@ export default function ReadingPage() {
                 {uploadError}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── KİTAPLIĞIM (sadece başlık geçmişi — içerik saklanmıyor) ── */}
+        {phase === 'upload' && library.length > 0 && (
+          <div className="card anim-up" style={{ padding: '1.25rem', marginTop: '1.25rem' }}>
+            <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '10px' }}>
+              📚 Daha Önce Dinlediklerin
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {library.map(item => (
+                <div key={item.id} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 12px', borderRadius: '10px', background: 'var(--bg2)',
+                  border: '1px solid var(--border)', fontSize: '13px',
+                }}>
+                  <span style={{ color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    📖 {item.title}
+                  </span>
+                  <span style={{ color: 'var(--text3)', fontSize: '11px', flexShrink: 0, marginLeft: '10px' }}>
+                    {new Date(item.created_at).toLocaleDateString('tr-TR')}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '10px' }}>
+              Not: Kitapların içeriği saklanmaz, sadece hangi kitapları dinlediğin burada listelenir. Tekrar dinlemek için dosyayı yeniden yüklemen gerekir.
+            </div>
           </div>
         )}
 
@@ -473,22 +514,22 @@ export default function ReadingPage() {
                 {questionLoading && (
                   <div style={{ textAlign: 'center', padding: '2rem 0' }}>
                     <span className="spinner" style={{ width: 24, height: 24 }} />
-                    <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '10px' }}>Dikkat sorusu hazırlanıyor...</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '10px' }}>Dikkat soruları hazırlanıyor...</div>
                   </div>
                 )}
 
-                {!questionLoading && currentQuestion && (
+                {!questionLoading && questions.length > 0 && (
                   <div>
                     <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(30,207,184,0.08)', border: '1px solid rgba(30,207,184,0.2)', fontSize: '12px', color: '#0f766e', marginBottom: '1rem', textAlign: 'center' }}>
-                      🎯 Dikkat kontrolü — az önce dinlediğin bölümle ilgili
+                      🎯 Dikkat kontrolü — soru {questionIdx + 1} / {questions.length}
                     </div>
                     <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--primary)', marginBottom: '1rem' }}>
-                      {currentQuestion.question}
+                      {questions[questionIdx].question}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {currentQuestion.options.map((opt, i) => {
+                      {questions[questionIdx].options.map((opt, i) => {
                         const isChosen = chosenIndex === i
-                        const isCorrectOpt = i === currentQuestion.correct_index
+                        const isCorrectOpt = i === questions[questionIdx].correct_index
                         const showResult = chosenIndex !== null
                         const bg = showResult
                           ? (isCorrectOpt ? 'rgba(34,197,94,0.12)' : isChosen ? 'rgba(220,38,38,0.1)' : 'var(--bg2)')
@@ -510,8 +551,8 @@ export default function ReadingPage() {
                     </div>
 
                     {chosenIndex !== null && (
-                      <button className="btn btn-primary" onClick={() => resumeAfterQuestion(null)} style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem' }}>
-                        Okumaya Devam Et →
+                      <button className="btn btn-primary" onClick={nextQuestionOrResume} style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem' }}>
+                        {questionIdx < questions.length - 1 ? 'Sıradaki Soru →' : 'Okumaya Devam Et →'}
                       </button>
                     )}
                   </div>

@@ -1,7 +1,13 @@
 // app/api/reading/upload/route.ts
-// Öğrenci kitap/metin yükler → metin çıkarılır → sesli okuma için parçalara bölünür.
-// FileUploader.tsx / extract-file ile aynı chunked-upload sözleşmesini kullanır
-// (chunk, chunkIndex, totalChunks, sessionId, ext, filename) — büyük dosyalar için.
+// Öğrenci kitabı doğrudan Supabase Storage'a yükler (reading-uploads bucket,
+// kendi user_id klasörüne), sonra bu API'ye SADECE dosya yolunu gönderir.
+// API dosyayı Storage'dan indirir, metni çıkarır, parçalara böler ve Storage'daki
+// dosyayı SİLER (içerik kalıcı saklanmaz — sadece başlık geçmişi tutulur).
+//
+// NOT: Önceki chunked-upload (bellek içi chunkStore) yaklaşımı Vercel serverless'ta
+// güvenilir değildi — paralel parçalar farklı lambda kopyalarına düşünce birleştirme
+// asla tamamlanmıyor ve yükleme %40-70 arasında takılı kalıyordu. Storage üzerinden
+// akış bu sorunu kökten çözer.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -22,9 +28,7 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 const MAX_CHARS = 400_000      // ~ orta boy bir roman
 const MAX_READING_CHUNKS = 800  // TTS/dikkat sorusu maliyetini sınırlamak için üst sınır
 const WORDS_PER_CHUNK = 120      // ~ 45-60 saniyelik konuşma parçası
-
-// Upload oturumu başına gelen parçaları tutan bellek içi depo (extract-file ile aynı desen)
-const chunkStore = new Map<string, Buffer[]>()
+const BUCKET = 'reading-uploads'
 
 // Gemini API helper (extract-file/route.ts ile aynı desen — taranmış PDF'ler için)
 async function callGemini(model: string, parts: any[]): Promise<string> {
@@ -231,52 +235,44 @@ export async function POST(req: NextRequest) {
   const { user, error } = await requireAuth(req)
   if (error) return error
 
+  let storagePath = ''
   try {
-    const form = await req.formData()
-    const chunk = form.get('chunk') as File | null
-    const chunkIndex = parseInt(form.get('chunkIndex') as string || '0')
-    const totalChunks = parseInt(form.get('totalChunks') as string || '1')
-    const sessionId = form.get('sessionId') as string
-    const ext = ((form.get('ext') as string) || '').toLowerCase()
-    const filename = (form.get('filename') as string) || 'Kitap'
-    const title = (form.get('title') as string) || filename.replace(/\.[^.]+$/, '')
+    const body = await req.json()
+    storagePath = (body?.path as string) || ''
+    const ext = ((body?.ext as string) || '').toLowerCase()
+    const title = ((body?.title as string) || 'Kitap').slice(0, 200)
 
-    if (!chunk) return NextResponse.json({ error: 'Dosya bulunamadı.' }, { status: 400 })
-    if (!['pdf', 'docx', 'txt'].includes(ext)) {
-      return NextResponse.json({ error: 'Sadece PDF, DOCX ve TXT dosyaları desteklenir.' }, { status: 400 })
+    if (!storagePath || !['pdf', 'docx', 'txt'].includes(ext)) {
+      return NextResponse.json({ error: 'Geçersiz istek (path/ext eksik).' }, { status: 400 })
+    }
+    // Güvenlik: kullanıcı sadece kendi klasöründeki dosyayı işletebilir
+    if (!storagePath.startsWith(`${user.id}/`)) {
+      return NextResponse.json({ error: 'Bu dosyaya erişim yetkiniz yok.' }, { status: 403 })
     }
 
-    const chunkBuffer = Buffer.from(await chunk.arrayBuffer())
-    if (!chunkStore.has(sessionId)) chunkStore.set(sessionId, [])
-    const chunks = chunkStore.get(sessionId)!
-    chunks[chunkIndex] = chunkBuffer
-
-    const received = chunks.filter(Boolean).length
-    if (received < totalChunks) {
-      return NextResponse.json({
-        status: 'chunk_received',
-        received,
-        total: totalChunks,
-        progress: Math.round((received / totalChunks) * 70),
-      })
+    // Dosyayı Storage'dan indir (service role — RLS'e takılmaz, yol zaten doğrulandı)
+    const { data: fileData, error: dlErr } = await adminDb.storage.from(BUCKET).download(storagePath)
+    if (dlErr || !fileData) {
+      console.error('[reading/upload] Storage indirme hatasi:', dlErr)
+      return NextResponse.json({ error: 'Dosya Storage üzerinden okunamadı.' }, { status: 500 })
     }
-
-    const fullBuffer = Buffer.concat(chunks)
-    chunkStore.delete(sessionId)
+    const fullBuffer = Buffer.from(await fileData.arrayBuffer())
 
     const { text: rawText, engine } = await extractText(fullBuffer, ext)
     console.log(`[reading/upload] metin cikarildi: ${rawText.length} karakter, engine=${engine}`)
     const readingChunks = chunkForReading(rawText)
 
+    // NOT: Kitabın içeriği (metin) veritabanında SAKLANMIYOR — telif/gizlilik
+    // nedeniyle sadece başlık + istatistikler tutuluyor (kullanıcının "hangi
+    // kitapları dinledim" listesi için). Parçalar sadece bu response ile
+    // istemciye dönüyor ve o oturum boyunca tarayıcı belleğinde kalıyor.
     const { data: material, error: insertErr } = await adminDb
       .from('reading_materials')
       .insert({
         user_id: user.id,
         title,
         source_type: ext,
-        raw_text: rawText,
         char_count: rawText.length,
-        chunks: readingChunks,
         chunk_count: readingChunks.length,
       })
       .select('id, title, chunk_count, char_count')
@@ -300,6 +296,12 @@ export async function POST(req: NextRequest) {
   } catch (e: any) {
     console.error('[reading/upload]', e)
     return NextResponse.json({ error: e?.message || 'Dosya işlenemedi.' }, { status: 500 })
+  } finally {
+    // İçerik kalıcı saklanmıyor — işlenen (veya başarısız olan) dosyayı Storage'dan temizle
+    if (storagePath) {
+      adminDb.storage.from(BUCKET).remove([storagePath]).catch((e: any) =>
+        console.warn('[reading/upload] Storage temizligi basarisiz:', e?.message))
+    }
   }
 }
 
