@@ -44,7 +44,8 @@ export default function ReadingPage() {
   const accumulatedSeconds = useRef(0)
   const pendingText = useRef('')
 
-  // Dikkat soruları — artık bir kerede en az 3 soru geliyor, sırayla soruluyor
+  // Dikkat sorusu — her 90 saniyede/bölüm sonunda TEK soru geliyor
+  // (üç soru denemesi güvenilirlik sorunu çıkardığı için tek soruya döndürüldü)
   const [questions, setQuestions] = useState<Question[]>([])
   const [questionIdx, setQuestionIdx] = useState(0)
   const [chosenIndex, setChosenIndex] = useState<number | null>(null)
@@ -550,7 +551,7 @@ export default function ReadingPage() {
                 {!questionLoading && !questionError && questions.length > 0 && (
                   <div>
                     <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(30,207,184,0.08)', border: '1px solid rgba(30,207,184,0.2)', fontSize: '12px', color: '#0f766e', marginBottom: '1rem', textAlign: 'center' }}>
-                      🎯 Dikkat kontrolü — soru {questionIdx + 1} / {questions.length}
+                      🎯 Dikkat kontrolü{questions.length > 1 ? ` — soru ${questionIdx + 1} / ${questions.length}` : ''}
                     </div>
                     <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--primary)', marginBottom: '1rem' }}>
                       {questions[questionIdx].question}

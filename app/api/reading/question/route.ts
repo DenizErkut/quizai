@@ -1,6 +1,10 @@
 // app/api/reading/question/route.ts
-// Öğrencinin az önce dinlediği metin parçasından TEK bir çoktan seçmeli
-// dikkat/anlama sorusu üretir. Sabit aralıklarla (ör. 90sn) çağrılır.
+// Öğrencinin az önce dinlediği metin parçasından, dikkatini/anlamasını ölçmek
+// için TEK bir çoktan seçmeli soru üretir. Sabit aralıklarla (ör. 90sn) çağrılır.
+//
+// NOT: Önceden aynı anda 3 soru üretiliyordu, ama modelin 3 sorunun TAMAMINI
+// (her biri tam 4 şıklı) hatasız formatta üretme oranı düşüktü — bu da üretimde
+// sık sık "soru hazırlanamadı" hatasına yol açıyordu. Tek soru çok daha güvenilir.
 
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
@@ -11,6 +15,7 @@ export const runtime = 'nodejs'
 export const maxDuration = 30
 
 const anthropic = new Anthropic()
+const QUESTION_COUNT = 1
 
 export async function POST(req: NextRequest) {
   const { user, error } = await requireAuth(req)
@@ -34,7 +39,9 @@ Kurallar:
 - Soru, metindeki küçük ama fark edilebilir bir detayı veya olayı sorsun (amaç dikkat testi, genel kültür değil).
 - Soru ve şıklar Türkçe olsun.
 - SADECE geçerli JSON döndür, başka hiçbir açıklama ekleme:
-{"question": "...", "options": ["...", "...", "...", "..."], "correct_index": 0}
+{"questions": [
+  {"question": "...", "options": ["...", "...", "...", "..."], "correct_index": 0}
+]}
 
 METİN:
 """
@@ -56,26 +63,37 @@ ${text.slice(0, 3000)}
     } catch {
       const match = clean.match(/\{[\s\S]*\}/)
       if (match) parsed = JSON.parse(match[0])
-      else throw new Error('Soru üretilemedi (format hatası).')
+      else throw new Error('Sorular üretilemedi (format hatası).')
     }
 
+    const questions = parsed?.questions
+    // correct_index bazen sayı yerine "0" gibi string gelebiliyor — normalize et
+    if (Array.isArray(questions)) {
+      questions.forEach((q: any) => {
+        if (q && typeof q.correct_index === 'string' && /^\d+$/.test(q.correct_index)) {
+          q.correct_index = parseInt(q.correct_index, 10)
+        }
+      })
+    }
     if (
-      !parsed?.question ||
-      !Array.isArray(parsed.options) ||
-      parsed.options.length !== 4 ||
-      typeof parsed.correct_index !== 'number' ||
-      parsed.correct_index < 0 || parsed.correct_index > 3
+      !Array.isArray(questions) || questions.length < QUESTION_COUNT ||
+      questions.some((q: any) =>
+        !q?.question || !Array.isArray(q.options) || q.options.length !== 4 ||
+        typeof q.correct_index !== 'number' || q.correct_index < 0 || q.correct_index > 3
+      )
     ) {
-      throw new Error('Üretilen soru geçersiz formatta.')
+      throw new Error('Üretilen sorular geçersiz formatta.')
     }
 
     return NextResponse.json({
-      question: parsed.question,
-      options: parsed.options,
-      correct_index: parsed.correct_index,
+      questions: questions.slice(0, QUESTION_COUNT).map((q: any) => ({
+        question: q.question,
+        options: q.options,
+        correct_index: q.correct_index,
+      })),
     })
   } catch (e: any) {
     console.error('[reading/question]', e)
-    return NextResponse.json({ error: e?.message || 'Soru üretilemedi.' }, { status: 500 })
+    return NextResponse.json({ error: e?.message || 'Sorular üretilemedi.' }, { status: 500 })
   }
 }
