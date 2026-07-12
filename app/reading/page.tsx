@@ -49,7 +49,12 @@ export default function ReadingPage() {
   const [questionIdx, setQuestionIdx] = useState(0)
   const [chosenIndex, setChosenIndex] = useState<number | null>(null)
   const [questionLoading, setQuestionLoading] = useState(false)
+  const [questionError, setQuestionError] = useState(false)
   const [score, setScore] = useState({ correct: 0, total: 0 })
+  // Ses 'ended' olayı bazı tarayıcılarda aynı parça için iki kez tetiklenebiliyor —
+  // bu, aynı anda iki soru isteği atılıp birinin diğerinin state'ini ezmesine yol
+  // açabiliyordu (sorular sessizce kayboluyordu). Bu kilitle önlüyoruz.
+  const questionRequestInFlight = useRef(false)
 
   // Kitaplık — daha önce yüklenen kitapların SADECE başlığı (içerik saklanmıyor)
   const [library, setLibrary] = useState<{ id: string; title: string; created_at: string }[]>([])
@@ -207,7 +212,7 @@ export default function ReadingPage() {
     const isLastChunk = currentIndex >= chunks.length - 1
     const shouldAsk = accumulatedSeconds.current >= QUESTION_INTERVAL_SECONDS || isLastChunk
 
-    if (shouldAsk && pendingText.current.trim().length > 30) {
+    if (shouldAsk && pendingText.current.trim().length > 30 && !questionRequestInFlight.current) {
       await askAttentionQuestion()
       return
     }
@@ -222,10 +227,15 @@ export default function ReadingPage() {
     playChunk(next)
   }
 
-  async function askAttentionQuestion() {
+  async function askAttentionQuestion(retryLeft = 1) {
+    // Aynı anda ikinci bir istek atılmasını engelle (audio 'ended' çift tetiklenmesi vb.)
+    if (questionRequestInFlight.current) return
+    questionRequestInFlight.current = true
+
     setPhase('question')
     setIsPlaying(false)
     setQuestionLoading(true)
+    setQuestionError(false)
     setQuestions([])
     setQuestionIdx(0)
     setChosenIndex(null)
@@ -237,14 +247,25 @@ export default function ReadingPage() {
         body: JSON.stringify({ text: pendingText.current, grade }),
       })
       const data = await res.json()
-      if (!res.ok || !Array.isArray(data.questions) || data.questions.length === 0) throw new Error(data?.error)
+      if (!res.ok || !Array.isArray(data.questions) || data.questions.length === 0) {
+        throw new Error(data?.error || `Beklenmeyen yanıt (status ${res.status})`)
+      }
       setQuestions(data.questions)
-    } catch {
-      // Sorular üretilemezse dikkat kontrolünü atla, okumaya devam et
+    } catch (e: any) {
+      console.error('[reading] Dikkat sorusu alınamadı:', e?.message || e)
+      if (retryLeft > 0) {
+        questionRequestInFlight.current = false
+        await askAttentionQuestion(retryLeft - 1)
+        return
+      }
+      // Yeniden deneme de başarısız oldu — kullanıcıya GÖRÜNÜR şekilde bildir,
+      // sessizce atlama (önceki davranış hatayı fark edilemez kılıyordu)
       setQuestions([])
-      resumeAfterQuestion()
+      setQuestionError(true)
+      setTimeout(() => { setQuestionError(false); resumeAfterQuestion() }, 2200)
     } finally {
       setQuestionLoading(false)
+      questionRequestInFlight.current = false
     }
   }
 
@@ -331,10 +352,11 @@ export default function ReadingPage() {
     audioCache.current.clear()
     setPhase('upload')
     setMaterialId(''); setTitle(''); setChunks([]); setSessionId('')
-    setCurrentIndex(0); setIsPlaying(false); setQuestions([]); setQuestionIdx(0); setChosenIndex(null)
+    setCurrentIndex(0); setIsPlaying(false); setQuestions([]); setQuestionIdx(0); setChosenIndex(null); setQuestionError(false)
     setScore({ correct: 0, total: 0 })
     accumulatedSeconds.current = 0
     pendingText.current = ''
+    questionRequestInFlight.current = false
   }
 
   const estMinutes = chunks.length > 0
@@ -518,7 +540,14 @@ export default function ReadingPage() {
                   </div>
                 )}
 
-                {!questionLoading && questions.length > 0 && (
+                {!questionLoading && questionError && (
+                  <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+                    <div style={{ fontSize: '28px', marginBottom: '8px' }}>⚠️</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text2)' }}>Bu bölüm için soru hazırlanamadı, okumaya devam ediliyor...</div>
+                  </div>
+                )}
+
+                {!questionLoading && !questionError && questions.length > 0 && (
                   <div>
                     <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(30,207,184,0.08)', border: '1px solid rgba(30,207,184,0.2)', fontSize: '12px', color: '#0f766e', marginBottom: '1rem', textAlign: 'center' }}>
                       🎯 Dikkat kontrolü — soru {questionIdx + 1} / {questions.length}
