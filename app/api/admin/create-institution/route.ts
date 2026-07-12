@@ -1,6 +1,7 @@
 // app/api/admin/create-institution/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { generateUniqueInstitutionCode } from '@/lib/institution-code'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,20 +27,32 @@ export async function POST(req: NextRequest) {
   if (!profile?.is_admin) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
 
   const body = await req.json()
-  const { name, email, password, code, discount } = body
+  const { name, email, password, discount } = body
+  let { code } = body
 
-  if (!name?.trim() || !email?.trim() || !password || !code?.trim()) {
-    return NextResponse.json({ error: 'Tum zorunlu alanlar doldurulmali.' }, { status: 400 })
-  }
-  if (code.length !== 8) {
-    return NextResponse.json({ error: 'Kurum kodu 8 karakter olmali.' }, { status: 400 })
+  if (!name?.trim() || !email?.trim() || !password) {
+    return NextResponse.json({ error: 'Kurum adı, e-posta ve şifre zorunlu.' }, { status: 400 })
   }
 
-  // Kod benzersiz mi?
-  const { data: existing } = await supabaseAdmin
-    .from('institutions').select('id').eq('code', code.toUpperCase()).maybeSingle()
-  if (existing) {
-    return NextResponse.json({ error: 'Bu kurum kodu zaten kullanımda.' }, { status: 400 })
+  if (code?.trim()) {
+    // Admin kendi kodunu girdi — biçim ve benzersizlik kontrolü yap
+    code = code.trim().toUpperCase()
+    if (code.length !== 8) {
+      return NextResponse.json({ error: 'Kurum kodu 8 karakter olmali.' }, { status: 400 })
+    }
+    const { data: existing } = await supabaseAdmin
+      .from('institutions').select('id').eq('code', code).maybeSingle()
+    if (existing) {
+      return NextResponse.json({ error: 'Bu kurum kodu zaten kullanımda.' }, { status: 400 })
+    }
+  } else {
+    // Kod boş bırakıldı — otomatik üret. Kurum, istediği zaman kendi panelinden
+    // (Profil sekmesi → "Yeni Kod Oluştur") bu kodu değiştirebilir.
+    const generated = await generateUniqueInstitutionCode(supabaseAdmin, 8)
+    if (!generated) {
+      return NextResponse.json({ error: 'Kurum kodu otomatik üretilemedi, lütfen tekrar deneyin.' }, { status: 500 })
+    }
+    code = generated
   }
 
   // 1. Auth kullanıcısı oluştur — Supabase Admin API
@@ -73,7 +86,7 @@ export async function POST(req: NextRequest) {
     .from('institutions')
     .insert({
       name: name.trim(),
-      code: code.toUpperCase(),
+      code, // zaten yukarıda normalize edildi (elle girilmiş ya da otomatik üretilmiş)
       admin_email: email.trim(),
       discount_rate: parseFloat(discount) || 0,
       active: true,
@@ -108,6 +121,6 @@ export async function POST(req: NextRequest) {
     success: true,
     institution: inst,
     user_id: newUserId,
-    message: `"${name}" kurumu olusturuldu. Kod: ${code.toUpperCase()}`,
+    message: `"${name}" kurumu olusturuldu. Kod: ${code}`,
   })
 }
