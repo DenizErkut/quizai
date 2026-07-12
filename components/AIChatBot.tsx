@@ -36,7 +36,7 @@ PREMIUM ÖNERİ KURALLARI:
 
 PLATFORM BİLGİSİ:
 - Freemium: Ayda 10 test, 5 soru/test, temel özellikler
-- Premium (₺600/yıl): Ayda 300 test, 20 soru/test, tüm soru tipleri, PDF yükleme, sınıf sistemi, kişisel analiz
+- Premium (₺1.200/yıl): Ayda 300 test, 20 soru/test, tüm soru tipleri, PDF yükleme, sınıf sistemi, kişisel analiz
 - Unlimited (₺6.000/yıl): Sınırsız test, koç görüşmesi, tüm özellikler
 - Özellikler: 8 soru tipi, 6 dil, 4 haftalık gelişim planı, spaced repetition, sınav simülasyonu (LGS/TYT/AYT/KPSS), canlı quiz, challenge, konu özeti
 - Öğretmen: sınıf oluşturma, ödev atama, canlı quiz, öğrenci performans takibi
@@ -63,7 +63,7 @@ YANIT TARZI:
 
 PLATFORM BİLGİSİ:
 - Ücretsiz: Ayda 10 test, 5 soru/test
-- Premium (₺600/yıl): 300 test/ay, 20 soru, PDF yükleme, analiz, sınıf sistemi
+- Premium (₺1.200/yıl): 300 test/ay, 20 soru, PDF yükleme, analiz, sınıf sistemi
 - Özellikler: LGS/YKS/KPSS sınav simülasyonu, 8 soru tipi, 6 dil, 4 haftalık plan, öğretmen paneli, veli takibi
 
 SINIR: Akademik soru çözme — "Bunu Pratium'da test olarak çözersen çok daha etkili! Ücretsiz kaydol ve dene 🎯"

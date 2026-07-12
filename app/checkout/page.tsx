@@ -15,13 +15,11 @@ const PLANS = {
   },
   yearly: {
     name: 'Yıllık Premium',
-    price: '599',
-    originalPrice: '948',
+    price: '1.200',
     period: 'yıl',
-    saving: '%37 tasarruf',
     badge: '🏆 En popüler',
     color: '#2563eb',
-    features: ['Günde 25 test', '20 soru/test', 'Tüm soru tipleri', 'Dosya yükleme', '6 dil', 'Öncelikli destek', '4 ay bedava'],
+    features: ['Günde 25 test', '20 soru/test', 'Tüm soru tipleri', 'Dosya yükleme', '6 dil', 'Öncelikli destek'],
   },
   unlimited: {
     name: 'Yıllık Unlimited',

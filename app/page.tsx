@@ -21,7 +21,7 @@ const faqs = [
   { q: 'Sınıf sistemine nasıl katılabilirim?', a: 'Öğretmenin sana davet kodu verir. Uygulamada "Sınıflarım" bölümüne gidip kodu girerek katılabilirsin. Premium planda birden fazla sınıfa aynı anda üye olabilirsin.' },
   { q: 'PDF veya dosyadan soru üretebilir miyim?', a: 'Evet! PDF ve Word dosyası yükleyebilirsin. Yapay zeka o içerikten soru üretir. Bu özellik Premium ve Unlimited planlarda kullanılabilir.' },
   { q: 'Gelişim planı için kaç test çözmem gerekiyor?', a: 'En az 10 test çözdükten sonra yapay zeka test geçmişini analiz ederek 4 haftalık kişisel çalışma planı hazırlar. Daha fazla test çözdükçe plan daha isabetli olur.' },
-  { q: 'Premium ve Unlimited arasındaki fark nedir?', a: 'Premiumda ayda 300 test, test başına 20 soru, tüm soru tipleri, PDF yükleme, sınıf sistemi ve öncelikli destek var (₺600/yıl). Unlimitedda ise sınırsız aylık test, tüm özellikler, gelişmiş analiz raporları ve yılda 12 birebir koç görüşmesi bulunuyor (₺6.000/yıl).' },
+  { q: 'Premium ve Unlimited arasındaki fark nedir?', a: 'Premiumda ayda 300 test, test başına 20 soru, tüm soru tipleri, PDF yükleme, sınıf sistemi ve öncelikli destek var (₺1.200/yıl). Unlimitedda ise sınırsız aylık test, tüm özellikler, gelişmiş analiz raporları ve yılda 12 birebir koç görüşmesi bulunuyor (₺6.000/yıl).' },
   { q: 'Kaç dil destekleniyor?', a: 'Türkçe, İngilizce, Almanca, Fransızca, İspanyolca ve Arapça olmak üzere 6 dil destekleniyor. Test arayüzü seçtiğin dilde üretilir.' },
 ]
 
@@ -431,7 +431,7 @@ export default function LandingPage() {
                 cta: 'Ücretsiz başla', href: '/register', accent: false,
               },
               {
-                label: 'Premium', price: '₺600', sub: '/yıl', color: '#2563eb', badge: '🏆 En popüler',
+                label: 'Premium', price: '₺1.200', sub: '/yıl', color: '#2563eb', badge: '🏆 En popüler',
                 features: ['Ayda 300 test', 'Test başına 20 soru', 'Tüm konular (müfredat dışı dahil)', 'Tüm Maarif Modeli soru tipleri', 'PDF & dosyadan soru üret', 'Sınıf sistemi', 'Detaylı analiz & gelişim planı', 'Öncelikli destek'],
                 cta: 'Premiuma geç →', href: '/pricing', accent: true,
               },

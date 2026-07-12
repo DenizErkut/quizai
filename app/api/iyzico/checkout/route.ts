@@ -24,7 +24,7 @@ function generateAuthHeader(body: string): string {
 
 const PLANS = {
   monthly:   { price: '79.0',    name: 'Pratium Premium - Aylık',    months: 1,  plan: 'premium'   },
-  yearly:    { price: '599.0',   name: 'Pratium Premium - Yıllık',   months: 12, plan: 'premium'   },
+  yearly:    { price: '1200.0',  name: 'Pratium Premium - Yıllık',   months: 12, plan: 'premium'   },
   unlimited: { price: '6000.0',  name: 'Pratium Unlimited - Yıllık', months: 12, plan: 'unlimited' },
 }
 

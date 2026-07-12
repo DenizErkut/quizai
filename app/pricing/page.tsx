@@ -71,7 +71,7 @@ export default function PricingPage() {
     {
       id: 'premium',
       label: 'Premium',
-      price: '₺600',
+      price: '₺1.200',
       sub: 'yıllık',
       color: '#2563eb',
       accent: true,
