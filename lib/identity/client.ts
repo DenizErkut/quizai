@@ -55,6 +55,23 @@ export async function getIdentityBySupabaseId(supabaseUserId: string): Promise<I
   return rows[0] ?? null
 }
 
+// Birden çok Supabase user_id için toplu kimlik getir (sınıf listesi, sıralama, vb.)
+// Tek sorguda döner — N+1 önlemek için.
+export async function getIdentitiesBySupabaseIds(supabaseUserIds: string[]): Promise<Record<string, Identity>> {
+  const uniqueIds = [...new Set(supabaseUserIds.filter(Boolean))]
+  if (uniqueIds.length === 0) return {}
+  const { rows } = await trPool.query(
+    // ::text karşılaştırması, kolonun uuid ya da text olmasından bağımsız çalışır
+    `SELECT * FROM identities WHERE supabase_user_id::text = ANY($1::text[])`,
+    [uniqueIds]
+  )
+  const map: Record<string, Identity> = {}
+  for (const row of rows as Identity[]) {
+    map[row.supabase_user_id] = row
+  }
+  return map
+}
+
 // Kimlik güncelle
 export async function updateIdentity(supabaseUserId: string, updates: Partial<Identity>): Promise<void> {
   const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'supabase_user_id')

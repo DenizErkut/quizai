@@ -47,31 +47,40 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const load = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
       if (!user) {
         setData(d => ({ ...d, user: null, profile: null, loading: false }))
         return
       }
 
-      // Tek Promise.all — 4 sorgu paralel
+      // Tek Promise.all — Supabase (davranış verisi) + TR-PG (kimlik) paralel
+      // İsim artık profiles'ta değil; TR-PG'den /api/identity/resolve ile gelir.
       const [
         { data: profile },
         { data: streak },
         { data: teacher },
         { count: parentCount },
         { count: unread },
+        identityRes,
       ] = await Promise.all([
-        supabase.from('profiles').select('name,plan,monthly_test_count,language,referral_code,avatar_url,role').eq('id', user.id).maybeSingle(),
+        supabase.from('profiles').select('plan,monthly_test_count,language,referral_code,avatar_url,role').eq('id', user.id).maybeSingle(),
         supabase.from('streaks').select('current_streak').eq('user_id', user.id).maybeSingle(),
         supabase.from('teachers').select('approved').eq('user_id', user.id).maybeSingle(),
         supabase.from('parent_children').select('id', { count: 'exact', head: true }).eq('parent_id', user.id),
         supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('read', false),
+        fetch('/api/identity/resolve', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: [user.id] }),
+        }).then(r => r.ok ? r.json() : { identities: {} }).catch(() => ({ identities: {} })),
       ])
 
+      const fullName = identityRes?.identities?.[user.id]?.full_name || ''
       const role = profile?.role || 'student'
       setData({
         user,
-        profile,
+        profile: profile ? { ...profile, name: fullName } : (fullName ? { name: fullName } as any : null),
         streak: streak?.current_streak || 0,
         unreadCount: unread || 0,
         isTeacher: !!teacher,
