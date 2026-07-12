@@ -17,6 +17,7 @@ export type Database = {
           grade: string
           school: string | null
           phone: string | null
+          class_number: string | null
           language: string
           plan: string
           is_admin: boolean
@@ -39,6 +40,7 @@ export type Database = {
           grade: string
           school?: string | null
           phone?: string | null
+          class_number?: string | null
           language?: string
           plan?: string
           is_admin?: boolean
@@ -61,6 +63,7 @@ export type Database = {
           grade?: string
           school?: string | null
           phone?: string | null
+          class_number?: string | null
           language?: string
           plan?: string
           is_admin?: boolean

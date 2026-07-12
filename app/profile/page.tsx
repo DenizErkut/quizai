@@ -28,6 +28,8 @@ export default function ProfileSetupPage() {
   const [surname, setSurname] = useState('')
   const [age, setAge] = useState('')
   const [grade, setGrade] = useState('')
+  const [school, setSchool] = useState('')
+  const [classNumber, setClassNumber] = useState('')
   const [institutionCode, setInstitutionCode] = useState('')
   const [institutionName, setInstitutionName] = useState('')
   const [phone, setPhone] = useState('')
@@ -61,6 +63,8 @@ export default function ProfileSetupPage() {
     if (!surname.trim()) { setError('Soyad zorunludur.'); return }
     if (!age || parseInt(age) < 5 || parseInt(age) > 35) { setError('Geçerli bir yaş girin (5-35).'); return }
     if (!grade) { setError('Sınıf / eğitim seviyesi zorunludur.'); return }
+    if (!school.trim()) { setError('Okul adı zorunludur.'); return }
+    if (!classNumber.trim()) { setError('Sınıf numarası zorunludur.'); return }
 
     setError(''); setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
@@ -75,6 +79,8 @@ export default function ProfileSetupPage() {
       id: user.id,
       name: `${name.trim()} ${surname.trim()}`,
       grade,
+      school: school.trim(),
+      class_number: classNumber.trim(),
       language: 'Türkçe',
       phone: phone || null,
       instagram: instagram || null,
@@ -170,6 +176,14 @@ export default function ProfileSetupPage() {
                     <option value="">Seç</option>
                     {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
                   </select>
+                </div>
+                <div>
+                  <label className="field-label">Okul Adı <span style={{ color: 'var(--red)' }}>*</span></label>
+                  <input className="input" placeholder="Örn: Atatürk Ortaokulu" value={school} onChange={e => setSchool(e.target.value)} />
+                </div>
+                <div>
+                  <label className="field-label">Sınıf Numarası <span style={{ color: 'var(--red)' }}>*</span></label>
+                  <input className="input" placeholder="Örn: 14" value={classNumber} onChange={e => setClassNumber(e.target.value)} />
                 </div>
               </div>
 

@@ -77,6 +77,8 @@ function RegisterContent() {
   // Öğrenci alanları
   const [age, setAge] = useState('')
   const [grade, setGrade] = useState('')
+  const [studentSchool, setStudentSchool] = useState('')
+  const [classNumber, setClassNumber] = useState('')
   const [institutionCode, setInstitutionCode] = useState(kurumParam.toUpperCase())
   const [institutionName, setInstitutionName] = useState('')
   const [kvkkAydinlatma, setKvkkAydinlatma] = useState(false)
@@ -142,6 +144,8 @@ function RegisterContent() {
     if (selectedRole === 'student') {
       if (!age || parseInt(age) < 5 || parseInt(age) > 35) { setError('Gecerli bir yas girin (5-35).'); return }
       if (!grade) { setError('Sinif / egitim seviyesi zorunludur.'); return }
+      if (!studentSchool.trim()) { setError('Okul adı zorunludur.'); return }
+      if (!classNumber.trim()) { setError('Sınıf numarası zorunludur.'); return }
     }
 
     setError(''); setLoading(true)
@@ -165,6 +169,8 @@ function RegisterContent() {
           id: data.user.id,
           name: fullName,
           grade,
+          school: studentSchool.trim(),
+          class_number: classNumber.trim(),
           language: 'Türkçe',
           role: 'student',
         })
@@ -424,6 +430,14 @@ function RegisterContent() {
                   <option value="">Seç...</option>
                   {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
                 </select>
+              </div>
+              <div>
+                <label className="field-label">Okul Adı *</label>
+                <input className="input" placeholder="Örn: Atatürk Ortaokulu" value={studentSchool} onChange={e => setStudentSchool(e.target.value)} />
+              </div>
+              <div>
+                <label className="field-label">Sınıf Numarası *</label>
+                <input className="input" placeholder="Örn: 14" value={classNumber} onChange={e => setClassNumber(e.target.value)} />
               </div>
             </div>
           )}
