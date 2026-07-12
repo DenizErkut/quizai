@@ -96,13 +96,20 @@ function RegisterTeacherContent() {
       }
     }
 
+    // Kimlik (ad-soyad, telefon) TR-PG'ye yazılır — yoksa oluşturulur.
+    // teachers tablosuna kimlik alanı (name/email/phone) yazılmaz.
+    const { data: { session } } = await supabase.auth.getSession()
+    const idRes = await fetch('/api/profile/update-identity', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fullName: name.trim(), phone: phone.trim() || null, role: 'teacher' }),
+    })
+    if (!idRes.ok) { setError('Kimlik bilgileri kaydedilemedi. Lütfen tekrar deneyin.'); setLoading(false); return }
+
     const { error: insertErr } = await supabase.from('teachers').insert({
       user_id: uid,
-      name: name.trim(),
-      email: userEmail,
       school: school.trim(),
       subject: subject.trim(),
-      phone: phone.trim() || null,
       document_url: docUrl || null,
       approved: false,
     })

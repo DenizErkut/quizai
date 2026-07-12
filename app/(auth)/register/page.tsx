@@ -117,8 +117,11 @@ function RegisterContent() {
   const [referrerName, setReferrerName] = useState('')
   useEffect(() => {
     if (!ref) return
-    supabase.from('profiles').select('name').eq('referral_code', ref.toUpperCase()).single()
-      .then(({ data }: any) => { if (data) setReferrerName(data.name.split(' ')[0]) })
+    // İsim TR-PG'de olduğu için küçük genel endpoint üzerinden ilk adı çek
+    fetch(`/api/referral/referrer-name?code=${encodeURIComponent(ref.toUpperCase())}`)
+      .then(r => r.ok ? r.json() : { firstName: null })
+      .then(({ firstName }) => { if (firstName) setReferrerName(firstName) })
+      .catch(() => {})
   }, [ref])
 
   async function handleOAuth() {
@@ -160,14 +163,36 @@ function RegisterContent() {
     if (err) { setError(err.message); setLoading(false); return }
 
     if (data.user) {
+      // ── Kimlik (ad-soyad, yaş) + KVKK rızaları TR-PG'de oluşturulur.
+      // Supabase Auth sadece oturum içindir; profiles'a kimlik alanı yazılmaz.
+      const accessToken = data.session?.access_token
+        || (await supabase.auth.getSession()).data.session?.access_token
+      if (!accessToken) {
+        setError('Oturum oluşturulamadı. Lütfen e-postanızı doğrulayıp tekrar giriş yapın.')
+        setLoading(false)
+        return
+      }
+      const idRes = await fetch('/api/auth/create-identity', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName,
+          age: age ? parseInt(age) : undefined,
+          role: selectedRole,
+          kvkkAydinlatma, kvkkAcikRiza, veliOnayi,
+        }),
+      })
+      if (!idRes.ok) {
+        setError('Kimlik kaydı oluşturulamadı. Lütfen tekrar deneyin.')
+        setLoading(false)
+        return
+      }
+
       if (selectedRole === 'student') {
-        // Öğrenci profili
-        // NOT: 'age' bilerek gönderilmiyor — profiles tablosunda böyle bir kolon
-        // yok. Yaş formda hâlâ isteniyor ve doğrulanıyor (yukarıdaki 5-35 ve
-        // 18 yaş altı veli onayı kontrolleri için), ama veritabanına yazılmıyor.
+        // Öğrenci platform verisi (kimlik alanları TR-PG'de).
+        // NOT: 'age' burada tutulmuyor — profiles'ta kolon yok, yaş TR-PG'de.
         const { error: upsertError } = await supabase.from('profiles').upsert({
           id: data.user.id,
-          name: fullName,
           grade,
           school: studentSchool.trim(),
           class_number: classNumber.trim(),
@@ -180,16 +205,6 @@ function RegisterContent() {
           setLoading(false)
           return
         }
-
-        // KVKK rıza kayıtları (ispat yükümlülüğü)
-        const consentRows: any[] = [
-          { user_id: data.user.id, consent_type: 'aydinlatma', consent_version: 'v1.0', granted: kvkkAydinlatma },
-          { user_id: data.user.id, consent_type: 'acik_riza_analiz', consent_version: 'v1.0', granted: kvkkAcikRiza },
-        ]
-        if (parseInt(age) < 18) {
-          consentRows.push({ user_id: data.user.id, consent_type: 'veli_onayi', consent_version: 'v1.0', granted: veliOnayi })
-        }
-        await supabase.from('consent_records').insert(consentRows).then(() => {}, () => {})
 
         // Kurum kodu
         if (institutionCode.trim()) {
@@ -217,10 +232,9 @@ function RegisterContent() {
         router.push('/quiz')
 
       } else if (selectedRole === 'parent') {
-        // Veli profili
+        // Veli platform verisi (ad TR-PG'de)
         await supabase.from('profiles').upsert({
           id: data.user.id,
-          name: fullName,
           language: 'Türkçe',
           role: 'parent',
         })
@@ -228,10 +242,9 @@ function RegisterContent() {
         router.push('/parent')
 
       } else if (selectedRole === 'teacher') {
-        // Öğretmen: profil + başvuru
+        // Öğretmen platform verisi (ad TR-PG'de) + başvuru adımı
         await supabase.from('profiles').upsert({
           id: data.user.id,
-          name: fullName,
           language: 'Türkçe',
           role: 'teacher',
         })
@@ -259,16 +272,24 @@ function RegisterContent() {
       }
     }
 
+    // Öğretmenin ad-soyad/e-postası zaten TR-PG kimliğinde (kayıt adımında).
+    // teachers tablosuna kimlik alanı yazılmaz; telefon TR-PG'ye güncellenir.
     await supabase.from('teachers').insert({
       user_id: user.id,
-      name: `${name.trim()} ${surname.trim()}`,
-      email: user.email,
       school: school.trim(),
       subject: subject.trim(),
-      phone: phone.trim() || null,
       document_url: docUrl || null,
       approved: false,
     })
+
+    if (phone.trim()) {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch('/api/profile/update-identity', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phone.trim(), role: 'teacher' }),
+      }).catch(() => {})
+    }
 
     setLoading(false)
     // Öğretmen onay bekliyor — quiz'e git ama panel kısıtlı
