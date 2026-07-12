@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { resolveIdentities } from '@/lib/identity/resolve-client'
 
 interface ReferralUser {
   id: string
@@ -34,18 +35,20 @@ export default function ReferralPage() {
 
       const [{ data: p }, { data: refs }] = await Promise.all([
         supabase.from('profiles')
-          .select('name, plan, plan_expires_at, referral_code, monthly_test_count')
+          .select('plan, plan_expires_at, referral_code, monthly_test_count')
           .eq('id', user.id).single(),
         supabase.from('referrals')
-          .select('referred_id, created_at, profiles!referrals_referred_id_fkey(name, grade)')
+          .select('referred_id, created_at, profiles!referrals_referred_id_fkey(grade)')
           .eq('referrer_id', user.id)
           .order('created_at', { ascending: false }),
       ])
 
       setProfile(p)
+      // Davet edilen kullanıcıların isimleri TR-PG'den
+      const refIdentities = await resolveIdentities(supabase, (refs || []).map((r: any) => r.referred_id))
       setReferrals((refs || []).map((r: any) => ({
         id: r.referred_id,
-        name: r.profiles?.name || 'Kullanıcı',
+        name: refIdentities[r.referred_id]?.full_name || 'Kullanıcı',
         grade: r.profiles?.grade || '',
         created_at: r.created_at,
       })))

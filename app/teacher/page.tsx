@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { resolveIdentities, resolveName } from '@/lib/identity/resolve-client'
 
 export default function TeacherDashboard() {
   const [teacher, setTeacher] = useState<any>(null)
@@ -26,8 +27,11 @@ export default function TeacherDashboard() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login/teacher'); return }
 
-    const { data: t } = await supabase.from('teachers').select('*').eq('user_id', user.id).maybeSingle()
-    if (!t) { router.push('/register/teacher'); return }
+    const { data: tRow } = await supabase.from('teachers').select('*').eq('user_id', user.id).maybeSingle()
+    if (!tRow) { router.push('/register/teacher'); return }
+    // Öğretmenin adı artık TR-PG kimliğinde
+    const teacherName = await resolveName(supabase, user.id)
+    const t = { ...tRow, name: teacherName }
     if (!t.approved) { setTeacher(t); setLoading(false); return }
 
     setTeacher(t)
@@ -62,9 +66,10 @@ export default function TeacherDashboard() {
         ids.forEach((id: string) => { if (!allStudentIds.includes(id)) allStudentIds.push(id) })
       }
 
+      const studentIdentities = await resolveIdentities(supabase, allStudentIds)
       const studentData = await Promise.all(allStudentIds.map(async (sid: string) => {
         const [profileRes, streakRes, sessionsRes, completionsRes] = await Promise.all([
-          supabase.from('profiles').select('name, grade, avatar_url').eq('id', sid).maybeSingle(),
+          supabase.from('profiles').select('grade, avatar_url').eq('id', sid).maybeSingle(),
           supabase.from('streaks').select('current_streak').eq('user_id', sid).maybeSingle(),
           supabase.from('quiz_sessions').select('pct, created_at, topic').eq('user_id', sid).eq('completed', true).order('created_at', { ascending: false }).limit(20),
           supabase.from('assignment_completions').select('score, total').eq('student_id', sid),
@@ -75,7 +80,7 @@ export default function TeacherDashboard() {
         const classroomIds = Object.entries(classStudentMap).filter(([, ids]) => ids.includes(sid)).map(([cid]) => cid)
         return {
           id: sid,
-          name: profileRes.data?.name ?? 'İsimsiz',
+          name: studentIdentities[sid]?.full_name ?? 'İsimsiz',
           grade: profileRes.data?.grade ?? '',
           avatar_url: profileRes.data?.avatar_url ?? null,
           streak: streakRes.data?.current_streak ?? 0,

@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { resolveIdentities } from '@/lib/identity/resolve-client'
 
 export default function LiveContent() {
   const router = useRouter()
@@ -197,12 +198,14 @@ export default function LiveContent() {
   async function fetchLeaderboard(liveQuizId: string) {
     const { data: ans } = await supabase
       .from('live_quiz_answers')
-      .select('user_id, is_correct, profiles(name)')
+      .select('user_id, is_correct')
       .eq('live_quiz_id', liveQuizId)
+    // İsimler TR-PG'den toplu çekilir
+    const identities = await resolveIdentities(supabase, (ans ?? []).map((a: any) => a.user_id))
     const scoreMap: Record<string, { name: string; correct: number; total: number }> = {}
     for (const a of (ans ?? [])) {
       if (a.question_index < 0) continue  // join marker'ı atla
-      if (!scoreMap[a.user_id]) scoreMap[a.user_id] = { name: a.profiles?.name || 'Öğrenci', correct: 0, total: 0 }
+      if (!scoreMap[a.user_id]) scoreMap[a.user_id] = { name: identities[a.user_id]?.full_name || 'Öğrenci', correct: 0, total: 0 }
       scoreMap[a.user_id].total++
       if (a.is_correct) scoreMap[a.user_id].correct++
     }

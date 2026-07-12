@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { resolveIdentities } from '@/lib/identity/resolve-client'
 import {
   BarChart, Bar, RadarChart, Radar, PolarGrid, PolarAngleAxis,
   PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -63,12 +64,14 @@ export default function TeacherPerformancePage() {
 
     const studentIds = students.map((s: any) => s.student_id)
 
+    // İsimler TR-PG'den, diğer alanlar Supabase'den
+    const identities = await resolveIdentities(supabase, studentIds)
     const profileMap: Record<string, any> = {}
     await Promise.all(
       studentIds.map(async (id: string) => {
         const { data: p } = await supabase
           .from('profiles')
-          .select('id, name, grade, monthly_test_count')
+          .select('id, grade, monthly_test_count')
           .eq('id', id)
           .maybeSingle()
         if (p) profileMap[id] = p
@@ -117,7 +120,7 @@ export default function TeacherPerformancePage() {
         ? Math.round(userCompletions.reduce((acc: number, c: any) => acc + c.pct, 0) / userCompletions.length) : null
       return {
         student_id: s.student_id,
-        name: profile.name || 'İsimsiz',
+        name: identities[s.student_id]?.full_name || 'İsimsiz',
         grade: profile.grade,
         totalTests: userSessions.length,
         avgPct,
@@ -136,7 +139,7 @@ export default function TeacherPerformancePage() {
         ? Math.round(asgComps.reduce((acc: number, c: any) => acc + c.pct, 0) / asgComps.length) : null
       const studentResults = asgComps.map((c: any) => ({
         ...c,
-        name: profileMap[c.student_id]?.name || 'İsimsiz',
+        name: identities[c.student_id]?.full_name || 'İsimsiz',
       }))
       return { ...a, completedCount: asgComps.length, totalStudents: students.length, avgScore, studentResults }
     })

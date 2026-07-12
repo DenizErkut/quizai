@@ -3,6 +3,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { resolveIdentities, resolveName } from '@/lib/identity/resolve-client'
 
 function JoinContent() {
   const router = useRouter()
@@ -24,14 +25,20 @@ function JoinContent() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setCheckingMembership(false); return }
 
-    // Get classes the user is a member of
+    // Get classes the user is a member of (öğretmen adı TR-PG'den)
     const { data: memberships } = await supabase
       .from('classroom_students')
-      .select('classroom_id, joined_at, classrooms(id, name, invite_code, grade, teachers(name, school))')
+      .select('classroom_id, joined_at, classrooms(id, name, invite_code, grade, teachers(user_id, school))')
       .eq('student_id', user.id)
+
+    const teacherUserIds = (memberships || []).map((m: any) => m.classrooms?.teachers?.user_id).filter(Boolean)
+    const teacherIdentities = await resolveIdentities(supabase, teacherUserIds)
 
     setMyClasses((memberships || []).map((m: any) => ({
       ...m.classrooms,
+      teachers: m.classrooms?.teachers
+        ? { ...m.classrooms.teachers, name: teacherIdentities[m.classrooms.teachers.user_id]?.full_name || null }
+        : null,
       joined_at: m.joined_at,
     })))
     setCheckingMembership(false)
@@ -49,13 +56,22 @@ function JoinContent() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    const { data: classroom } = await supabase
+    const { data: classroomRaw } = await supabase
       .from('classrooms')
-      .select('*, teachers(name, school)')
+      .select('*, teachers(user_id, school)')
       .eq('invite_code', joinCode)
       .single()
 
-    if (!classroom) { setError('Bu koda ait sınıf bulunamadı.'); setLoading(false); return }
+    if (!classroomRaw) { setError('Bu koda ait sınıf bulunamadı.'); setLoading(false); return }
+
+    // Öğretmen adı TR-PG'den
+    const teacherName = classroomRaw.teachers?.user_id
+      ? await resolveName(supabase, classroomRaw.teachers.user_id)
+      : null
+    const classroom = {
+      ...classroomRaw,
+      teachers: classroomRaw.teachers ? { ...classroomRaw.teachers, name: teacherName } : null,
+    }
 
     const { data: existing } = await supabase
       .from('classroom_students')

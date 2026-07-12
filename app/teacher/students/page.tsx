@@ -3,6 +3,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { resolveIdentities } from '@/lib/identity/resolve-client'
 
 function TeacherStudentsContent() {
   const [teacher, setTeacher] = useState<any>(null)
@@ -55,21 +56,25 @@ function TeacherStudentsContent() {
     if (!cs?.length) { setStudents([]); return [] }
 
     // Fetch profiles one by one to bypass any RLS edge cases
+    // (isimler TR-PG'den, diğer alanlar Supabase'den)
     const profileMap: Record<string, any> = {}
-    await Promise.all(
-      cs.map(async (c: any) => {
-        const { data: p } = await supabase
-          .from('profiles')
-          .select('id, name, grade, school, monthly_test_count')
-          .eq('id', c.student_id)
-          .maybeSingle()
-        if (p) profileMap[c.student_id] = p
-      })
-    )
+    const [identities] = await Promise.all([
+      resolveIdentities(supabase, cs.map((c: any) => c.student_id)),
+      Promise.all(
+        cs.map(async (c: any) => {
+          const { data: p } = await supabase
+            .from('profiles')
+            .select('id, grade, school, monthly_test_count')
+            .eq('id', c.student_id)
+            .maybeSingle()
+          if (p) profileMap[c.student_id] = p
+        })
+      ),
+    ])
 
     const merged = cs.map((c: any) => ({
       ...c,
-      profiles: profileMap[c.student_id] || null,
+      profiles: { ...(profileMap[c.student_id] || {}), name: identities[c.student_id]?.full_name || 'İsimsiz' },
     }))
     setStudents(merged)
     return merged
@@ -88,7 +93,7 @@ function TeacherStudentsContent() {
     // Aynı okul veya aynı sınıf seviyesindeki öğrencileri öner
     let query = supabase
       .from('profiles')
-      .select('id, name, grade, school')
+      .select('id, grade, school')
       .neq('id', t.user_id)
       .limit(20)
 
@@ -104,7 +109,10 @@ function TeacherStudentsContent() {
     const filtered = (candidates ?? []).filter(
       (c: any) => !existingIds.includes(c.id)
     )
-    setSuggestedStudents(filtered.slice(0, 8))
+    // İsimleri TR-PG'den ekle
+    const candidateIdentities = await resolveIdentities(supabase, filtered.map((c: any) => c.id))
+    const withNames = filtered.map((c: any) => ({ ...c, name: candidateIdentities[c.id]?.full_name || 'İsimsiz' }))
+    setSuggestedStudents(withNames.slice(0, 8))
   }
 
   async function selectClassroom(cls: any) {

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { resolveName } from '@/lib/identity/resolve-client'
 
 interface Session { id: string; topic: string; grade: string; score: number; pct: number; question_count: number; created_at: string }
 interface Profile { name: string; grade: string; language: string; plan: string }
@@ -50,8 +51,8 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      const [{ data: p }, { data: s }, { data: dashStats }, { data: sk }] = await Promise.all([
-        supabase.from('profiles').select('name,grade,language,plan').eq('id', user.id).single(),
+      const [{ data: p }, { data: s }, { data: dashStats }, { data: sk }, displayName] = await Promise.all([
+        supabase.from('profiles').select('grade,language,plan').eq('id', user.id).single(),
         // Son 5 test — sadece ihtiyaç duyulan alanlar
         supabase.from('quiz_sessions')
           .select('id,topic,grade,score,pct,question_count,created_at')
@@ -60,9 +61,10 @@ export default function DashboardPage() {
         // Tüm istatistikler tek sorguda — aggregate RPC
         supabase.rpc('get_dashboard_stats', { p_user_id: user.id }),
         supabase.from('streaks').select('current_streak').eq('user_id', user.id).maybeSingle(),
+        resolveName(supabase, user.id),
       ])
 
-      setProfile(p)
+      setProfile(p ? { ...p, name: displayName } : (displayName ? { name: displayName } : null))
       setSessions(s || [])
       setStats(dashStats || { total_count: 0, total_correct: 0, total_questions: 0, avg_pct: 0, best_pct: 0, weak_count: 0 })
       setStreak(sk?.current_streak || 0)

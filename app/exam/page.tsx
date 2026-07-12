@@ -73,7 +73,7 @@ export default function ExamPage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
-      const { data: p } = await supabase.from('profiles').select('name,plan,grade').eq('id', user.id).maybeSingle()
+      const { data: p } = await supabase.from('profiles').select('plan,grade').eq('id', user.id).maybeSingle()
       setProfile(p)
 
       // Format listesini API'den çek

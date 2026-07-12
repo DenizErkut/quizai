@@ -3,6 +3,7 @@ import PageHeader from '@/components/PageHeader'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { resolveIdentities } from '@/lib/identity/resolve-client'
 
 interface ClassRoom {
   id: string
@@ -79,21 +80,21 @@ export default function ClassesPage() {
     if (!classData?.length) { setLoading(false); return }
 
     // Her sınıf için öğrenci listesini ve öğretmen adını çek
+    // (isimler TR-PG'den, grade/plan Supabase'den)
     const enriched = await Promise.all(classData.map(async (cls: any) => {
-      const [{ data: students }, { data: teacher }] = await Promise.all([
-        supabase.from('classroom_students')
-          .select('student_id, joined_at, profiles(name, grade, plan)')
-          .eq('classroom_id', cls.id),
-        supabase.from('profiles').select('name').eq('id', cls.teacher_id).single(),
-      ])
+      const { data: students } = await supabase.from('classroom_students')
+        .select('student_id, joined_at, profiles(grade, plan)')
+        .eq('classroom_id', cls.id)
+
+      const identities = await resolveIdentities(supabase, [cls.teacher_id, ...(students || []).map((s: any) => s.student_id)])
 
       return {
         ...cls,
-        teacher_name: teacher?.name || '—',
+        teacher_name: identities[cls.teacher_id]?.full_name || '—',
         student_count: students?.length || 0,
         students: (students || []).map((s: any) => ({
           id: s.student_id,
-          name: s.profiles?.name || 'İsimsiz',
+          name: identities[s.student_id]?.full_name || 'İsimsiz',
           grade: s.profiles?.grade || '—',
           plan: s.profiles?.plan || 'free',
           joined_at: s.joined_at,

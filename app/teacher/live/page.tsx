@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
 import { createClient } from '@/lib/supabase/client'
+import { resolveIdentities } from '@/lib/identity/resolve-client'
 
 export default function TeacherLivePage() {
   const router = useRouter()
@@ -59,10 +60,16 @@ export default function TeacherLivePage() {
   async function fetchAnswers(liveQuizId: string) {
     const { data: ans } = await supabase
       .from('live_quiz_answers')
-      .select('user_id, question_index, chosen_answer, is_correct, answered_at, profiles(name, avatar_url)')
+      .select('user_id, question_index, chosen_answer, is_correct, answered_at, profiles(avatar_url)')
       .eq('live_quiz_id', liveQuizId)
+    // İsimler TR-PG'den; her cevap satırına profiles.name olarak enjekte edilir
+    const identities = await resolveIdentities(supabase, (ans ?? []).map((a: any) => a.user_id))
+    const enriched = (ans ?? []).map((a: any) => ({
+      ...a,
+      profiles: { name: identities[a.user_id]?.full_name || null, avatar_url: a.profiles?.avatar_url || null },
+    }))
     // Join marker'ları (-1) UI hesaplamalarından hariç tut
-    const realAnswers = (ans ?? []).filter((a: any) => a.question_index >= 0)
+    const realAnswers = enriched.filter((a: any) => a.question_index >= 0)
     setAnswers(realAnswers)
 
     // Liderboard hesapla
@@ -81,10 +88,13 @@ export default function TeacherLivePage() {
   async function fetchParticipants(liveQuizId: string) {
     const { data } = await supabase
       .from('live_quiz_answers')
-      .select('user_id, profiles(name)')
+      .select('user_id')
       .eq('live_quiz_id', liveQuizId)
       .eq('question_index', -1)
-    const unique = [...new Map((data ?? []).map((d: any) => [d.user_id, d])).values()]
+    // İsimler TR-PG'den; profiles.name olarak enjekte edilir
+    const identities = await resolveIdentities(supabase, (data ?? []).map((d: any) => d.user_id))
+    const enriched = (data ?? []).map((d: any) => ({ ...d, profiles: { name: identities[d.user_id]?.full_name || null } }))
+    const unique = [...new Map(enriched.map((d: any) => [d.user_id, d])).values()]
     setParticipants(unique)
   }
 

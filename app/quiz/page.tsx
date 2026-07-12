@@ -4,6 +4,7 @@ import OnboardingModal from '@/components/OnboardingModal'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { resolveName } from '@/lib/identity/resolve-client'
 import FileUploader, { type UploadedFile } from '@/components/FileUploader'
 import QuizResult from '@/components/QuizResult'
 import QuizSetup from '@/components/quiz/QuizSetup'
@@ -464,14 +465,16 @@ function QuizPageContent() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return null }
     const { data } = await supabase
-      .from('profiles').select('name,grade,language,plan,monthly_test_count,daily_test_count,daily_test_date,onboarding_completed')
+      .from('profiles').select('grade,language,plan,monthly_test_count,daily_test_count,daily_test_date,onboarding_completed')
       .eq('id', user.id).single()
+    // İsim artik profiles'ta degil, TR-PG kimliginde — resolve ile cekilir
+    const displayName = await resolveName(supabase, user.id)
     // NOT: 'age' kolonu profiles tablosunda yok (bkz. profile/page.tsx içindeki not).
     // Önceden buradaki select 'age' istediği için Supabase 400 döndürüyor, data null
     // kalıyor ve kullanıcı /quiz <-> /profile arasında sonsuz döngüye giriyordu.
-    if (!data || !data.grade || !data.name) { router.push('/profile'); return null }
+    if (!data || !data.grade || !displayName) { router.push('/profile'); return null }
     const lang = getActiveLang(data.language)
-    setProfile({ ...data, language: lang })
+    setProfile({ ...data, name: displayName, language: lang })
     // ✅ Onboarding: ilk kez giren kullanıcı için modal göster
     if (data && !data.onboarding_completed) {
       setShowOnboarding(true)

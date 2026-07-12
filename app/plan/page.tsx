@@ -3,6 +3,7 @@ import PageHeader from '@/components/PageHeader'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { resolveName } from '@/lib/identity/resolve-client'
 
 interface PlanWeek {
   week: number
@@ -43,14 +44,15 @@ export default function PlanPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      const [{ data: p }, { data: existingPlan }, { data: wt }, { data: s }] = await Promise.all([
-        supabase.from('profiles').select('name,grade,language,plan').eq('id', user.id).single(),
+      const [{ data: p }, { data: existingPlan }, { data: wt }, { data: s }, displayName] = await Promise.all([
+        supabase.from('profiles').select('grade,language,plan').eq('id', user.id).single(),
         supabase.from('study_plans').select('*').eq('user_id', user.id).order('generated_at', { ascending: false }).limit(1).single(),
         supabase.from('weak_topics').select('topic,wrong_count,total_count').eq('user_id', user.id).order('wrong_count', { ascending: false }).limit(5),
         supabase.from('quiz_sessions').select('score,pct,question_count').eq('user_id', user.id).eq('completed', true),
+        resolveName(supabase, user.id),
       ])
 
-      setProfile(p)
+      setProfile(p ? { ...p, name: displayName } : (displayName ? { name: displayName } : null))
       setStats({ weakTopics: wt || [], sessions: s || [] })
 
       if (existingPlan?.plan) {

@@ -33,7 +33,7 @@ export default function DailyPage() {
     const today = new Date().toISOString().split('T')[0]
 
     // Önce profili çek — grade'e göre challenge seçeceğiz
-    const { data: p } = await supabase.from('profiles').select('name,grade,language,plan').eq('id', user.id).maybeSingle()
+    const { data: p } = await supabase.from('profiles').select('grade,language,plan').eq('id', user.id).maybeSingle()
 
     const gradeGroup = !p?.grade ? 'ortaokul'
       : p.grade.includes('ilkokul') ? 'ilkokul'

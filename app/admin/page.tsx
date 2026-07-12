@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { resolveIdentities } from '@/lib/identity/resolve-client'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -205,13 +206,15 @@ export default function AdminPage() {
         : 0,
     })
 
-    // Hata bildirimleri
+    // Hata bildirimleri (raporlayanın adı TR-PG'den)
     const { data: reports } = await supabase
       .from('error_reports')
-      .select('*, profiles(name)')
+      .select('*')
       .order('reported_at', { ascending: false })
-    setErrorReports(reports || [])
-    setPendingCount((reports || []).filter((r: ErrorReport) => r.status === 'pending').length)
+    const reportIdentities = await resolveIdentities(supabase, (reports || []).map((r: any) => r.user_id))
+    const reportsWithNames = (reports || []).map((r: any) => ({ ...r, profiles: { name: reportIdentities[r.user_id]?.full_name || null } }))
+    setErrorReports(reportsWithNames)
+    setPendingCount(reportsWithNames.filter((r: ErrorReport) => r.status === 'pending').length)
 
     // Öğretmen başvurularını çek
     // service_role ile tüm öğretmenleri çek (RLS bypass)
@@ -304,8 +307,8 @@ export default function AdminPage() {
 
   const filtered = users.filter(u => {
     const matchSearch = !search ||
-      u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.grade.toLowerCase().includes(search.toLowerCase())
+      (u.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (u.grade || '').toLowerCase().includes(search.toLowerCase())
     const matchPlan = planFilter === 'all' || u.plan === planFilter
     return matchSearch && matchPlan
   })
@@ -479,10 +482,10 @@ export default function AdminPage() {
                         <td style={{ padding: '10px 14px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <div style={{ width: 30, height: 30, borderRadius: '50%', background: u.is_admin ? 'rgba(220,38,38,0.1)' : 'var(--accent-bg)', border: `1.5px solid ${u.is_admin ? 'var(--red)' : 'var(--accent)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: u.is_admin ? 'var(--red)' : 'var(--accent)', fontWeight: 600, fontSize: '11px', flexShrink: 0 }}>
-                              {u.name.slice(0, 2).toUpperCase()}
+                              {(u.name || 'Kullanıcı').slice(0, 2).toUpperCase()}
                             </div>
                             <div>
-                              <div style={{ fontWeight: 500 }}>{u.name}</div>
+                              <div style={{ fontWeight: 500 }}>{u.name || 'İsimsiz'}</div>
                               {u.is_admin && <div style={{ fontSize: '10px', color: 'var(--red)' }}>Admin</div>}
                             </div>
                           </div>
@@ -616,10 +619,10 @@ export default function AdminPage() {
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                         <div style={{ width: 32, height: 32, borderRadius: '50%', background: t.approved ? 'var(--gradient)' : 'rgba(253,211,29,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: t.approved ? '#fff' : '#082465', flexShrink: 0 }}>
-                          {t.name.slice(0, 2).toUpperCase()}
+                          {(t.name || 'Öğretmen').slice(0, 2).toUpperCase()}
                         </div>
                         <div>
-                          <div style={{ fontWeight: 600, fontSize: '14px' }}>{t.name}</div>
+                          <div style={{ fontWeight: 600, fontSize: '14px' }}>{t.name || 'İsimsiz'}</div>
                           <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{t.email}</div>
                         </div>
                       </div>

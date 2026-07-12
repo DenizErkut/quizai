@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { resolveIdentities, resolveName } from '@/lib/identity/resolve-client'
 import { Suspense } from 'react'
 import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
@@ -58,9 +59,12 @@ function ParentContent() {
     const nicknameMap: Record<string, string> = {}
     links.forEach((l: any) => { nicknameMap[l.child_id] = l.nickname || '' })
 
+    // İsimler TR-PG'den toplu çekilir; grade Supabase'de kalır
+    const childIdentities = await resolveIdentities(supabase, childIds)
+
     const childData = await Promise.all(childIds.map(async (cid: string) => {
       const [profileRes, streakRes, sessionsRes, completionsRes, weakRes] = await Promise.all([
-        supabase.from('profiles').select('name, grade').eq('id', cid).maybeSingle(),
+        supabase.from('profiles').select('grade').eq('id', cid).maybeSingle(),
         supabase.from('streaks').select('current_streak').eq('user_id', cid).maybeSingle(),
         supabase.from('quiz_sessions').select('id, pct, topic, question_count, score, created_at, question_type').eq('user_id', cid).eq('completed', true).order('created_at', { ascending: false }).limit(50),
         supabase.from('assignment_completions').select('id').eq('student_id', cid),
@@ -73,8 +77,8 @@ function ParentContent() {
       const recentTopics = [...new Set(sessions.slice(0, 5).map((s: any) => s.topic))].slice(0, 3) as string[]
       return {
         child_id: cid,
-        nickname: nicknameMap[cid] || profileRes.data?.name || 'Çocuğum',
-        name: profileRes.data?.name ?? 'İsimsiz',
+        nickname: nicknameMap[cid] || childIdentities[cid]?.full_name || 'Çocuğum',
+        name: childIdentities[cid]?.full_name ?? 'İsimsiz',
         grade: profileRes.data?.grade ?? '',
         streak: streakRes.data?.current_streak ?? 0,
         totalTests: sessions.length,
@@ -90,17 +94,18 @@ function ParentContent() {
       }
     }))
 
-    // Leaderboard
+    // Leaderboard (isimler TR-PG'den, grade Supabase'den)
     const { data: lbData } = await supabase
       .from('profiles')
-      .select('id, name, grade')
+      .select('id, grade')
       .limit(100)
 
     if (lbData?.length) {
+      const lbIdentities = await resolveIdentities(supabase, lbData.map((p: any) => p.id))
       const lbWithStats = await Promise.all(lbData.map(async (p: any) => {
         const { data: s } = await supabase.from('quiz_sessions').select('pct').eq('user_id', p.id).eq('completed', true)
         const avg = s?.length ? Math.round(s.reduce((a: number, x: any) => a + x.pct, 0) / s.length) : 0
-        return { ...p, avgPct: avg, totalTests: s?.length ?? 0 }
+        return { ...p, name: lbIdentities[p.id]?.full_name ?? 'İsimsiz', avgPct: avg, totalTests: s?.length ?? 0 }
       }))
       const sorted = lbWithStats.filter(p => p.totalTests > 0).sort((a, b) => b.avgPct - a.avgPct)
       setLeaderboard(sorted.slice(0, 20))
@@ -125,13 +130,14 @@ function ParentContent() {
     if (!addCode.trim()) return
     setAdding(true); setAddError(''); setAddSuccess('')
     const { data: { user } } = await supabase.auth.getUser()
-    const { data: childProfile } = await supabase.from('profiles').select('id, name').eq('parent_code', addCode.trim().toLowerCase()).maybeSingle()
+    const { data: childProfile } = await supabase.from('profiles').select('id').eq('parent_code', addCode.trim().toLowerCase()).maybeSingle()
     if (!childProfile) { setAddError('Kod bulunamadı. Çocuğunuzdan doğru kodu aldığınızdan emin olun.'); setAdding(false); return }
     if (childProfile.id === user.id) { setAddError('Kendi hesabınızı ekleyemezsiniz.'); setAdding(false); return }
     const { data: existing } = await supabase.from('parent_children').select('id').eq('parent_id', user.id).eq('child_id', childProfile.id).maybeSingle()
     if (existing) { setAddError('Bu çocuk zaten listenizde.'); setAdding(false); return }
-    await supabase.from('parent_children').insert({ parent_id: user.id, child_id: childProfile.id, nickname: childProfile.name })
-    setAddSuccess(`${childProfile.name} başarıyla eklendi!`)
+    const childName = await resolveName(supabase, childProfile.id)
+    await supabase.from('parent_children').insert({ parent_id: user.id, child_id: childProfile.id, nickname: childName })
+    setAddSuccess(`${childName || 'Çocuğunuz'} başarıyla eklendi!`)
     setAddCode('')
     await load()
     setAdding(false)

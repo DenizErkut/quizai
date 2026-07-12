@@ -3,6 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { resolveIdentities } from '@/lib/identity/resolve-client'
 
 export default function ParentLoginPage() {
   const router = useRouter()
@@ -39,18 +40,21 @@ export default function ParentLoginPage() {
       return
     }
 
-    // Profilleri çek
+    // Profilleri çek (grade/avatar Supabase'den, isim TR-PG'den)
     const childIds = links.map((l: any) => l.child_id)
     const profileMap: Record<string, any> = {}
-    await Promise.all(childIds.map(async (id: string) => {
-      const { data: p } = await supabase.from('profiles').select('id, name, grade, avatar_url').eq('id', id).maybeSingle()
-      if (p) profileMap[id] = p
-    }))
+    const [identities] = await Promise.all([
+      resolveIdentities(supabase, childIds),
+      Promise.all(childIds.map(async (id: string) => {
+        const { data: p } = await supabase.from('profiles').select('id, grade, avatar_url').eq('id', id).maybeSingle()
+        if (p) profileMap[id] = p
+      })),
+    ])
 
     const childrenData = links.map((l: any) => ({
       child_id: l.child_id,
-      nickname: l.nickname || profileMap[l.child_id]?.name || 'Cocuk',
-      name: profileMap[l.child_id]?.name || 'Isimsiz',
+      nickname: l.nickname || identities[l.child_id]?.full_name || 'Cocuk',
+      name: identities[l.child_id]?.full_name || 'Isimsiz',
       grade: profileMap[l.child_id]?.grade || '',
       avatar_url: profileMap[l.child_id]?.avatar_url || null,
     }))
