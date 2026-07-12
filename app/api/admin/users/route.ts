@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
+import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 
 export async function GET() {
   // Admin kontrolü — normal anon key ile
@@ -27,10 +28,14 @@ export async function GET() {
 
   const { data, error } = await adminClient
     .from('profiles')
-    .select('id, name, grade, plan, plan_expires_at, monthly_test_count, is_admin, created_at')
+    .select('id, grade, plan, plan_expires_at, monthly_test_count, is_admin, created_at')
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json(data)
+  // İsimler TR-PG'den toplu çekilir ve listeye eklenir
+  const identities = await getIdentitiesBySupabaseIds((data ?? []).map((u: any) => u.id))
+  const withNames = (data ?? []).map((u: any) => ({ ...u, name: identities[u.id]?.full_name ?? null }))
+
+  return NextResponse.json(withNames)
 }

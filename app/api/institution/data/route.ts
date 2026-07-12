@@ -1,6 +1,7 @@
 // app/api/institution/data/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -49,10 +50,13 @@ export async function GET(req: NextRequest) {
 
   const userIds = members.map((m: any) => m.user_id)
 
+  // İsimler TR-PG'den toplu çekilir (grade/avatar Supabase'de kalır)
+  const identities = await getIdentitiesBySupabaseIds(userIds)
+
   // Her öğrenci için profil + streak + test verileri (son 90 gün)
   const studentData = await Promise.all(userIds.map(async (uid: string) => {
     const [profileRes, streakRes, sessionsRes] = await Promise.all([
-      supabaseAdmin.from('profiles').select('name, grade, avatar_url').eq('id', uid).maybeSingle(),
+      supabaseAdmin.from('profiles').select('grade, avatar_url').eq('id', uid).maybeSingle(),
       supabaseAdmin.from('streaks').select('current_streak').eq('user_id', uid).maybeSingle(),
       supabaseAdmin.from('quiz_sessions')
         .select('pct, score, question_count, topic, grade, created_at')
@@ -84,7 +88,7 @@ export async function GET(req: NextRequest) {
 
     return {
       id: uid,
-      name: profileRes.data?.name ?? 'İsimsiz',
+      name: identities[uid]?.full_name ?? 'İsimsiz',
       grade: profileRes.data?.grade ?? '',
       avatar_url: profileRes.data?.avatar_url ?? null,
       streak: streakRes.data?.current_streak ?? 0,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { getIdentityBySupabaseId } from '@/lib/identity/client'
 
 const IYZICO_API_KEY = process.env.IYZICO_API_KEY!
 const IYZICO_SECRET_KEY = process.env.IYZICO_SECRET_KEY!
@@ -44,19 +45,17 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Oturum geçersiz.' }, { status: 401 })
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('name, grade')
-    .eq('id', user.id)
-    .single()
-
   const body = await req.json()
   const planType = body.plan as 'monthly' | 'yearly' | 'unlimited'
   const plan = PLANS[planType]
   if (!plan) return NextResponse.json({ error: 'Geçersiz plan.' }, { status: 400 })
 
+  // Fatura için ad-soyad TR-PG kimliğinden
+  const identity = await getIdentityBySupabaseId(user.id)
+  const fullName = identity?.full_name || 'Kullanici'
+
   const conversationId = `${user.id}_${planType}_${Date.now()}`
-  const nameParts = (profile?.name || 'Kullanici').split(' ')
+  const nameParts = fullName.split(' ')
   const firstName = nameParts[0] || 'Kullanici'
   const lastName = nameParts.slice(1).join(' ') || 'Kullanici'
 
@@ -83,13 +82,13 @@ export async function POST(req: NextRequest) {
       country: 'Turkey',
     },
     shippingAddress: {
-      contactName: profile?.name || 'Kullanici',
+      contactName: fullName,
       city: 'Istanbul',
       country: 'Turkey',
       address: 'Türkiye',
     },
     billingAddress: {
-      contactName: profile?.name || 'Kullanici',
+      contactName: fullName,
       city: 'Istanbul',
       country: 'Turkey',
       address: 'Türkiye',

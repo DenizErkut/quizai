@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { getIdentityBySupabaseId, getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,17 +21,20 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await sb.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
 
-  // Velinin e-postasını al
-  const { data: parentProfile } = await adminDb
-    .from('profiles').select('name, email').eq('id', user.id).single()
-  if (!parentProfile?.email) return NextResponse.json({ error: 'E-posta bulunamadı' }, { status: 400 })
+  // Velinin ad/e-postası TR-PG kimliğinden (login e-postası yedek olarak auth'tan)
+  const parentIdentity = await getIdentityBySupabaseId(user.id)
+  const parentName = parentIdentity?.full_name || 'Veli'
+  const parentEmail = parentIdentity?.email || user.email
+  if (!parentEmail) return NextResponse.json({ error: 'E-posta bulunamadı' }, { status: 400 })
 
-  // Çocukları al
+  // Çocukları al (grade Supabase'de kalır, isim TR-PG'den)
   const { data: links } = await adminDb
-    .from('parent_children').select('child_id, profiles!parent_children_child_id_fkey(name, grade)')
+    .from('parent_children').select('child_id, profiles!parent_children_child_id_fkey(grade)')
     .eq('parent_id', user.id)
 
   if (!links?.length) return NextResponse.json({ error: 'Çocuk bulunamadı' }, { status: 400 })
+
+  const childIdentities = await getIdentitiesBySupabaseIds(links.map((l: any) => l.child_id))
 
   const oneWeekAgo = new Date()
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
@@ -38,6 +42,7 @@ export async function POST(req: NextRequest) {
   const childSummaries = []
   for (const link of links) {
     const childProfile = (link as any).profiles
+    const childName = childIdentities[link.child_id]?.full_name
     const { data: sessions } = await adminDb
       .from('quiz_sessions').select('score, pct, question_count, topic, created_at')
       .eq('user_id', link.child_id).eq('completed', true)
@@ -45,7 +50,7 @@ export async function POST(req: NextRequest) {
       .order('created_at', { ascending: false })
 
     if (!sessions?.length) {
-      childSummaries.push({ name: childProfile?.name, grade: childProfile?.grade, testCount: 0, avgPct: null, weakestTopic: null, sessions: [] })
+      childSummaries.push({ name: childName, grade: childProfile?.grade, testCount: 0, avgPct: null, weakestTopic: null, sessions: [] })
       continue
     }
 
@@ -59,18 +64,18 @@ export async function POST(req: NextRequest) {
       .map(([topic, s]) => ({ topic, avg: Math.round(s.sum/s.total) }))
       .sort((a,b) => a.avg - b.avg)[0]?.topic || null
 
-    childSummaries.push({ name: childProfile?.name, grade: childProfile?.grade, testCount: sessions.length, avgPct, weakestTopic, sessions: sessions.slice(0,3) })
+    childSummaries.push({ name: childName, grade: childProfile?.grade, testCount: sessions.length, avgPct, weakestTopic, sessions: sessions.slice(0,3) })
   }
 
   // E-posta gönder
-  const emailHtml = buildEmailHtml(parentProfile.name, childSummaries)
+  const emailHtml = buildEmailHtml(parentName, childSummaries)
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
     body: JSON.stringify({
       from: 'Pratium <ozet@pratium.com>',
-      to: [parentProfile.email],
+      to: [parentEmail],
       subject: `📊 Haftalık Özet — ${childSummaries.map(c => c.name).join(', ')}`,
       html: emailHtml,
     })

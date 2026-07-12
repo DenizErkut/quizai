@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
+import { getIdentityBySupabaseId } from '@/lib/identity/client'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -53,12 +54,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ analysis: cached.analysis, cached: true })
   }
 
-  // Öğrenci bilgisi
+  // Öğrenci bilgisi (isim TR-PG'den, grade Supabase'den)
   const { data: profile } = await supabaseAdmin
     .from('profiles')
-    .select('name, grade')
+    .select('grade')
     .eq('id', student_id)
     .maybeSingle()
+  const studentIdentity = await getIdentityBySupabaseId(student_id)
 
   // Ödev bilgisi
   const { data: assignment } = await supabaseAdmin
@@ -97,7 +99,7 @@ export async function POST(req: NextRequest) {
   const prompt = `Sen deneyimli bir Türk eğitim uzmanısın. Bir öğrencinin ödev sonucunu analiz edeceksin.
 
 ## Öğrenci Bilgisi
-Ad: ${profile?.name ?? 'Bilinmiyor'}
+Ad: ${studentIdentity?.full_name ?? 'Bilinmiyor'}
 Sınıf: ${profile?.grade ?? 'Bilinmiyor'}
 
 ## Ödev Bilgisi

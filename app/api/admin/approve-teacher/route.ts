@@ -1,6 +1,7 @@
 // app/api/admin/approve-teacher/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getIdentityBySupabaseId } from '@/lib/identity/client'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -94,11 +95,16 @@ export async function POST(req: NextRequest) {
 
   const { data: teacher } = await supabaseAdmin
     .from('teachers')
-    .select('id, user_id, name, email, school')
+    .select('id, user_id, school')
     .eq('id', teacher_id)
     .single()
 
   if (!teacher) return NextResponse.json({ error: 'Öğretmen bulunamadı.' }, { status: 404 })
+
+  // Öğretmenin ad-soyad ve e-postası artık TR-PG kimliğinde
+  const identity = await getIdentityBySupabaseId(teacher.user_id)
+  const teacherName = identity?.full_name || 'Öğretmen'
+  const teacherEmail = identity?.email
 
   if (action === 'approve') {
     await supabaseAdmin.from('teachers').update({ approved: true }).eq('id', teacher_id)
@@ -112,13 +118,13 @@ export async function POST(req: NextRequest) {
       data: { href: '/teacher' },
     })
 
-    await sendEmail(teacher.email, '🎓 Öğretmen başvurunuz onaylandı — Pratium', APPROVE_HTML(teacher.name))
+    if (teacherEmail) await sendEmail(teacherEmail, '🎓 Öğretmen başvurunuz onaylandı — Pratium', APPROVE_HTML(teacherName))
     return NextResponse.json({ success: true, action: 'approved' })
   }
 
   if (action === 'reject') {
     await supabaseAdmin.from('teachers').delete().eq('id', teacher_id)
-    await sendEmail(teacher.email, 'Öğretmen başvurunuz hakkında — Pratium', REJECT_HTML(teacher.name))
+    if (teacherEmail) await sendEmail(teacherEmail, 'Öğretmen başvurunuz hakkında — Pratium', REJECT_HTML(teacherName))
     return NextResponse.json({ success: true, action: 'rejected' })
   }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
+import { getIdentityBySupabaseId } from '@/lib/identity/client'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -21,7 +22,9 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
-  const { data: profile } = await supabase.from('profiles').select('name,grade,language').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('grade,language').eq('id', user.id).single()
+  const identity = await getIdentityBySupabaseId(user.id)
+  const displayName = identity?.full_name ?? 'Öğrenci'
   const body = await req.json()
   const { weakTopics, avgPct, totalTests } = body
 
@@ -39,7 +42,7 @@ export async function POST(req: NextRequest) {
     max_tokens: 1500,
     messages: [{
       role: 'user',
-      content: `Sen bir egitim kocusun. ${profile?.name} icin 4 haftalik kisisel calisma plani olustur.
+      content: `Sen bir egitim kocusun. ${displayName} icin 4 haftalik kisisel calisma plani olustur.
 Profil: ${profile?.grade}
 Ortalama basari: %${avgPct}
 Toplam test: ${totalTests}

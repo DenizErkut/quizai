@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getIdentityBySupabaseId, getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -55,12 +56,15 @@ export async function GET(req: NextRequest) {
 
   const { data: challenge } = await supabase
     .from('challenges')
-    .select('id,topic,question_count,creator_pct,expires_at,profiles(name)')
+    .select('id,topic,question_count,creator_pct,expires_at,creator_id')
     .eq('share_code', code)
     .gte('expires_at', new Date().toISOString())
     .single()
 
   if (!challenge) return NextResponse.json({ error: 'Challenge bulunamadı veya süresi dolmuş.' }, { status: 404 })
+
+  // Oluşturanın adı TR-PG'den (istemci ile uyumlu profiles.name şekli korunur)
+  const creatorIdentity = await getIdentityBySupabaseId(challenge.creator_id)
 
   // Katılımcı sayısı
   const { count } = await supabase
@@ -68,7 +72,7 @@ export async function GET(req: NextRequest) {
     .select('id', { count: 'exact', head: true })
     .eq('challenge_id', challenge.id)
 
-  return NextResponse.json({ ...challenge, participant_count: count || 0 })
+  return NextResponse.json({ ...challenge, profiles: { name: creatorIdentity?.full_name ?? null }, participant_count: count || 0 })
 }
 
 // Challenge cevapla — sonuç kaydet
@@ -89,13 +93,19 @@ export async function PATCH(req: NextRequest) {
     completed_at: new Date().toISOString(),
   }, { onConflict: 'challenge_id,user_id' })
 
-  // Liderboard — tüm katılımcılar
+  // Liderboard — tüm katılımcılar (isim TR-PG'den, avatar Supabase'den)
   const { data: attempts } = await supabase
     .from('challenge_attempts')
-    .select('user_id, pct, score, profiles(name, avatar_url)')
+    .select('user_id, pct, score, profiles(avatar_url)')
     .eq('challenge_id', challenge_id)
     .order('pct', { ascending: false })
     .limit(10)
 
-  return NextResponse.json({ leaderboard: attempts || [] })
+  const attemptIdentities = await getIdentitiesBySupabaseIds((attempts ?? []).map((a: any) => a.user_id))
+  const leaderboard = (attempts ?? []).map((a: any) => ({
+    ...a,
+    profiles: { name: attemptIdentities[a.user_id]?.full_name ?? null, avatar_url: a.profiles?.avatar_url ?? null },
+  }))
+
+  return NextResponse.json({ leaderboard })
 }

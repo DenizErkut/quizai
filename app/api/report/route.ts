@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { getIdentityBySupabaseId, getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 
 const adminClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -83,7 +84,7 @@ export async function GET(req: NextRequest) {
   // Profil ve rol kontrolü
   const { data: profile } = await adminClient
     .from('profiles')
-    .select('id, name, grade, plan, is_admin, role')
+    .select('id, grade, plan, is_admin, role')
     .eq('id', user.id)
     .single()
 
@@ -123,14 +124,17 @@ export async function GET(req: NextRequest) {
 
       if (!links?.length) return NextResponse.json({ type: 'parent', children: [] })
 
+      // İsimler TR-PG'den toplu çekilir; grade Supabase'de kalır
+      const childIdentities = await getIdentitiesBySupabaseIds(links.map((l: any) => l.child_id))
       const children = await Promise.all(links.map(async (l: any) => {
-        const { data: p } = await adminClient.from('profiles').select('name, grade').eq('id', l.child_id).maybeSingle()
+        const { data: p } = await adminClient.from('profiles').select('grade').eq('id', l.child_id).maybeSingle()
+        const childName = childIdentities[l.child_id]?.full_name
         const stats = await getUserStats(l.child_id)
         const { data: streak } = await adminClient.from('streaks').select('current_streak').eq('user_id', l.child_id).maybeSingle()
         return {
           child_id: l.child_id,
-          nickname: l.nickname || p?.name,
-          name: p?.name,
+          nickname: l.nickname || childName,
+          name: childName,
           grade: p?.grade,
           streak: streak?.current_streak ?? 0,
           ...stats,
@@ -142,11 +146,12 @@ export async function GET(req: NextRequest) {
     // Belirli çocuğun detaylı raporu
     const { data: link } = await adminClient.from('parent_children').select('nickname').eq('parent_id', user.id).eq('child_id', targetId).maybeSingle()
     if (!link) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-    const { data: p } = await adminClient.from('profiles').select('name, grade').eq('id', targetId).maybeSingle()
+    const { data: p } = await adminClient.from('profiles').select('grade').eq('id', targetId).maybeSingle()
+    const childIdentity = await getIdentityBySupabaseId(targetId)
     const stats = await getUserStats(targetId)
     const { data: streak } = await adminClient.from('streaks').select('current_streak, longest_streak, total_points').eq('user_id', targetId).maybeSingle()
     const { data: weakTopics } = await adminClient.from('weak_topics').select('topic, subject, wrong_count, total_count').eq('user_id', targetId).order('wrong_count', { ascending: false }).limit(5)
-    return NextResponse.json({ type: 'parent', name: p?.name, grade: p?.grade, nickname: link.nickname, stats, streak, weakTopics })
+    return NextResponse.json({ type: 'parent', name: childIdentity?.full_name, grade: p?.grade, nickname: link.nickname, stats, streak, weakTopics })
   }
 
   // ── ÖĞRETMEN RAPORU ──
@@ -163,11 +168,12 @@ export async function GET(req: NextRequest) {
     const { data: members } = await adminClient.from('classroom_students').select('student_id').eq('classroom_id', classId)
     if (!members?.length) return NextResponse.json({ type: 'teacher', students: [] })
 
+    const studentIdentities = await getIdentitiesBySupabaseIds(members.map((m: any) => m.student_id))
     const students = await Promise.all(members.map(async (m: any) => {
-      const { data: p } = await adminClient.from('profiles').select('name, grade').eq('id', m.student_id).maybeSingle()
+      const { data: p } = await adminClient.from('profiles').select('grade').eq('id', m.student_id).maybeSingle()
       const stats = await getUserStats(m.student_id)
       const { data: streak } = await adminClient.from('streaks').select('current_streak').eq('user_id', m.student_id).maybeSingle()
-      return { student_id: m.student_id, name: p?.name, grade: p?.grade, streak: streak?.current_streak ?? 0, ...stats }
+      return { student_id: m.student_id, name: studentIdentities[m.student_id]?.full_name, grade: p?.grade, streak: streak?.current_streak ?? 0, ...stats }
     }))
     return NextResponse.json({ type: 'teacher', students: students.sort((a, b) => b.avgPct - a.avgPct) })
   }

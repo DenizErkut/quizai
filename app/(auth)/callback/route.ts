@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { createIdentity, getIdentityBySupabaseId } from '@/lib/identity/client'
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
@@ -40,10 +41,20 @@ export async function GET(request: NextRequest) {
         .maybeSingle()
 
       if (!existing) {
-        // Yeni kullanici - role gore profil olustur
+        // Yeni kullanici - kimlik (ad/e-posta) TR-PG'ye, davranış verisi Supabase'e
+        const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Kullanici'
+        // Kimlik yalnızca yoksa oluştur (idempotent — çift OAuth çağrısına karşı)
+        const existingIdentity = await getIdentityBySupabaseId(user.id)
+        if (!existingIdentity) {
+          await createIdentity({
+            supabaseUserId: user.id,
+            fullName,
+            email: user.email || '',
+            role,
+          }).catch((e) => console.error('[callback] createIdentity error:', e?.message))
+        }
         await supabase.from('profiles').insert({
           id: user.id,
-          name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Kullanici',
           grade: role === 'student' ? 'ortaokul 6. sinif' : null,
           language: 'Türkçe',
           role,
