@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { resolveName } from '@/lib/identity/resolve-client'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -71,7 +72,8 @@ export default function ProfileEditPage() {
         .eq('id', user.id)
         .single()
       if (data) {
-        setName(data.name || '')
+        // İsim TR-PG kimliğinden gelir (profiles'ta artık yok)
+        setName((await resolveName(supabase, user.id)) || '')
         setGender(data.gender || '')
         setGrade(data.grade || '')
         setSchool(data.school || '')
@@ -128,9 +130,17 @@ export default function ProfileEditPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
+    // Ad-soyad kimlik verisidir → TR-PG'ye yazılır
+    const { data: { session } } = await supabase.auth.getSession()
+    const idRes = await fetch('/api/profile/update-identity', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fullName: name.trim() }),
+    })
+    if (!idRes.ok) { setError('İsim kaydedilemedi. Lütfen tekrar deneyin.'); setSaving(false); return }
+
     await supabase.from('profiles').upsert({
       id: user.id,
-      name: name.trim(),
       gender: gender || null,
       grade,
       school: school || null,

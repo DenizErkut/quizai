@@ -75,14 +75,26 @@ export default function ProfileSetupPage() {
     // isteniyor ve doğrulanıyor (5-35 aralığı), ama veritabanına yazılmıyor.
     // İleride yaş bilgisini kalıcı saklamak istenirse önce Supabase'de
     // `age INTEGER` kolonu migration ile eklenmeli.
+    // Ad-soyad ve telefon kimlik verisidir → TR-PG'ye yazılır (Supabase'e değil)
+    const { data: { session } } = await supabase.auth.getSession()
+    const idRes = await fetch('/api/profile/update-identity', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fullName: `${name.trim()} ${surname.trim()}`, phone: phone || null, role: 'student' }),
+    })
+    if (!idRes.ok) {
+      setError('Kimlik bilgileri kaydedilemedi. Lütfen tekrar deneyin.')
+      setLoading(false)
+      return
+    }
+
+    // Davranış/platform verisi Supabase'de kalır (kimlik alanları hariç)
     const { error: upsertError } = await supabase.from('profiles').upsert({
       id: user.id,
-      name: `${name.trim()} ${surname.trim()}`,
       grade,
       school: school.trim(),
       class_number: classNumber.trim(),
       language: 'Türkçe',
-      phone: phone || null,
       instagram: instagram || null,
       tiktok: tiktok || null,
     })
