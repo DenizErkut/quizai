@@ -57,6 +57,7 @@ function RegisterContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const ref = searchParams.get('ref') || ''
+  const kurumParam = searchParams.get('kurum') || ''
   const supabase = createClient() as any
 
   // Adım yönetimi
@@ -76,7 +77,7 @@ function RegisterContent() {
   // Öğrenci alanları
   const [age, setAge] = useState('')
   const [grade, setGrade] = useState('')
-  const [institutionCode, setInstitutionCode] = useState('')
+  const [institutionCode, setInstitutionCode] = useState(kurumParam.toUpperCase())
   const [institutionName, setInstitutionName] = useState('')
   const [kvkkAydinlatma, setKvkkAydinlatma] = useState(false)
   const [kvkkAcikRiza, setKvkkAcikRiza] = useState(false)
@@ -87,6 +88,28 @@ function RegisterContent() {
   const [subject, setSubject] = useState('')
   const [phone, setPhone] = useState('')
   const [doc, setDoc] = useState<File | null>(null)
+
+  // Kurum davet kodunu doğrular (hem manuel giriş hem de QR/link ile gelen ?kurum= için ortak)
+  async function verifyInstitutionCode(val: string) {
+    if (val.length === 8) {
+      const { data: inst } = await supabase.from('institutions').select('name').eq('code', val).eq('active', true).maybeSingle()
+      setInstitutionName(inst?.name || '')
+    } else {
+      setInstitutionName('')
+    }
+  }
+
+  // QR kod / paylaşılan link (?kurum=KOD) ile gelindiyse: kodu doğrula ve
+  // öğrenciyi doğrudan kayıt adımına götür (rol seçimini atla — davet zaten
+  // "öğrenci kaydı" niyetini taşıyor).
+  useEffect(() => {
+    if (kurumParam.length === 8) {
+      verifyInstitutionCode(kurumParam.toUpperCase())
+      setSelectedRole('student')
+      setStep('info')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Referral
   const [referrerName, setReferrerName] = useState('')
@@ -423,10 +446,7 @@ function RegisterContent() {
                 onChange={async e => {
                   const val = e.target.value.toUpperCase()
                   setInstitutionCode(val)
-                  if (val.length === 8) {
-                    const { data: inst } = await supabase.from('institutions').select('name').eq('code', val).eq('active', true).maybeSingle()
-                    setInstitutionName(inst?.name || '')
-                  } else setInstitutionName('')
+                  await verifyInstitutionCode(val)
                 }}
               />
               {institutionName && <div style={{ fontSize: '12px', color: 'var(--green)', fontWeight: 600, marginTop: '4px' }}>✓ {institutionName} kurumuna baglaniyor</div>}

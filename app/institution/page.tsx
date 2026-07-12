@@ -16,6 +16,9 @@ export default function InstitutionPage() {
   const [search, setSearch] = useState('')
   const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'analytics' | 'risk' | 'profile'>('overview')
   const [sortBy, setSortBy] = useState<'name' | 'avgPct' | 'totalTests' | 'streak'>('avgPct')
+  const [regenerating, setRegenerating] = useState(false)
+  const [regenMsg, setRegenMsg] = useState('')
+  const [linkCopied, setLinkCopied] = useState(false)
   const router = useRouter()
   const supabase = createClient() as any
 
@@ -54,6 +57,50 @@ export default function InstitutionPage() {
       topScorer: [...studentData].sort((a: any, b: any) => (b.avgPct ?? 0) - (a.avgPct ?? 0))[0],
     })
     setLoading(false)
+  }
+
+  async function regenerateCode() {
+    const hasExisting = !!institution?.code
+    if (hasExisting) {
+      const confirmed = window.confirm(
+        'Yeni bir davet kodu oluşturursan mevcut kod (' + institution.code + ') artık geçersiz olur — bu kodu paylaştığın öğrenciler yeni kayıt için yeni kodu kullanmalı. Zaten kayıtlı öğrenciler etkilenmez. Devam edilsin mi?'
+      )
+      if (!confirmed) return
+    }
+    setRegenerating(true)
+    setRegenMsg('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/institution/regenerate-code', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Kod oluşturulamadı.')
+      setInstitution((prev: any) => ({ ...prev, code: json.code }))
+      setRegenMsg('✅ Yeni davet kodu oluşturuldu.')
+    } catch (e: any) {
+      setRegenMsg('❌ ' + (e.message || 'Kod oluşturulamadı.'))
+    } finally {
+      setRegenerating(false)
+      setTimeout(() => setRegenMsg(''), 4000)
+    }
+  }
+
+  // Davet kodunu doğrudan kayıt ekranına yönlendiren link — QR kod ve
+  // "linki kopyala" butonu bunu kullanıyor. register/page.tsx bu ?kurum=
+  // parametresini okuyup kodu otomatik doğruluyor ve öğrenciyi kayıt
+  // adımına götürüyor (rol seçimini atlıyor).
+  const registerLink = institution?.code
+    ? `${typeof window !== 'undefined' ? window.location.origin : 'https://www.pratium.com'}/register?kurum=${institution.code}`
+    : ''
+
+  function copyRegisterLink() {
+    if (!registerLink) return
+    navigator.clipboard.writeText(registerLink).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    })
   }
 
   function pctColor(pct: number | null) {
@@ -208,8 +255,20 @@ export default function InstitutionPage() {
                 </div>
                 {students.length === 0 && (
                   <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '8px', lineHeight: 1.6 }}>
-                    Kurum kodunu paylaşın:<br />
-                    <strong style={{ fontFamily: 'monospace', fontSize: '20px', color: '#6366f1', letterSpacing: '0.1em' }}>{institution?.code}</strong>
+                    {institution?.code ? (
+                      <>
+                        Kurum kodunu paylaşın:<br />
+                        <strong style={{ fontFamily: 'monospace', fontSize: '20px', color: '#6366f1', letterSpacing: '0.1em' }}>{institution.code}</strong>
+                      </>
+                    ) : (
+                      <>
+                        Henüz bir davet kodunuz yok.<br />
+                        <button onClick={() => setActiveTab('profile')}
+                          style={{ marginTop: '8px', padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#6366f1', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                          ✨ Profil sekmesinden oluştur
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -428,11 +487,72 @@ export default function InstitutionPage() {
             </div>
 
             <div className="card">
-              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>📋 Kurum Kodu Paylaş</div>
-              <div style={{ padding: '20px', background: 'var(--bg2)', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>Öğrenciler kayıt sırasında bu kodu kullanacak</div>
-                <div style={{ fontFamily: 'monospace', fontSize: '32px', fontWeight: 900, color: '#6366f1', letterSpacing: '0.15em' }}>{institution?.code}</div>
-                <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '8px' }}>pratium.com/register</div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>📋 Kurum Davet Kodu ve Linki</div>
+              <div style={{ padding: '20px', background: 'var(--bg2)', borderRadius: '12px', display: 'flex', gap: '24px', alignItems: 'center', flexWrap: 'wrap' }}>
+
+                {/* Sol: QR kod — kayıt linkine bağlı, doğrudan taranarak açılır */}
+                <div style={{ flexShrink: 0, textAlign: 'center' }}>
+                  {institution?.code ? (
+                    <>
+                      <div style={{ padding: '10px', background: '#fff', borderRadius: '14px', display: 'inline-block', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&color=082465&bgcolor=ffffff&data=${encodeURIComponent(registerLink)}`}
+                          alt={`${institution.name} kayıt QR kodu`}
+                          width={160} height={160}
+                          style={{ display: 'block' }}
+                        />
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '8px', maxWidth: '180px' }}>
+                        Öğrenciler telefonla okutunca doğrudan kurumunuza bağlı kayıt ekranı açılır
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ width: 160, height: 160, borderRadius: '14px', background: '#fff', border: '1.5px dashed var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'var(--text3)', textAlign: 'center', padding: '10px' }}>
+                      Kod oluşturunca<br />QR burada görünecek
+                    </div>
+                  )}
+                </div>
+
+                {/* Sağ: kod, link ve işlemler */}
+                <div style={{ flex: 1, minWidth: '220px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>Öğrenciler kayıt sırasında bu kodu kullanacak</div>
+                  {institution?.code ? (
+                    <div style={{ fontFamily: 'monospace', fontSize: '32px', fontWeight: 900, color: '#6366f1', letterSpacing: '0.15em' }}>{institution.code}</div>
+                  ) : (
+                    <div style={{ fontSize: '13px', color: 'var(--text3)', fontStyle: 'italic' }}>Henüz davet kodu oluşturulmadı</div>
+                  )}
+
+                  {institution?.code && (
+                    <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <code style={{ fontSize: '11px', color: 'var(--text2)', background: '#fff', padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border)', wordBreak: 'break-all' }}>
+                        {registerLink}
+                      </code>
+                      <button onClick={copyRegisterLink}
+                        style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: '#fff', color: 'var(--primary)', fontSize: '11px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap' }}>
+                        {linkCopied ? '✅ Kopyalandı' : '🔗 Linki Kopyala'}
+                      </button>
+                    </div>
+                  )}
+
+                  <button onClick={regenerateCode} disabled={regenerating}
+                    style={{
+                      marginTop: '16px', padding: '10px 20px', borderRadius: '10px', border: 'none',
+                      background: regenerating ? 'var(--border)' : '#6366f1', color: '#fff',
+                      fontSize: '13px', fontWeight: 700, cursor: regenerating ? 'default' : 'pointer',
+                      fontFamily: 'var(--font-sans)', display: 'inline-flex', alignItems: 'center', gap: '8px',
+                    }}>
+                    {regenerating ? <span className="spinner" style={{ width: 14, height: 14 }} /> : (institution?.code ? '🔄' : '✨')}
+                    {institution?.code ? 'Yeni Kod Oluştur' : 'Davet Kodu Oluştur'}
+                  </button>
+                  {regenMsg && (
+                    <div style={{ fontSize: '12px', marginTop: '10px', color: regenMsg.startsWith('✅') ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>
+                      {regenMsg}
+                    </div>
+                  )}
+                  <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '10px', lineHeight: 1.5 }}>
+                    Bu kod (veya QR / link) ile kayıt olan tüm öğrenciler otomatik olarak kurumunuzun öğrenci listesine eklenir.
+                  </div>
+                </div>
               </div>
             </div>
           </div>
