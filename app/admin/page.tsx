@@ -130,8 +130,8 @@ export default function AdminPage() {
   }
 
   async function createInstitution() {
-    if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password || !instForm.code.trim()) {
-      setInstError('Kurum adı, mail, şifre ve kod zorunlu.')
+if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
+      setInstError('Kurum adı, mail ve şifre zorunlu.')
       return
     }
     setInstSaving(true); setInstError(''); setInstSuccess('')
@@ -150,7 +150,8 @@ export default function AdminPage() {
 
     if (authData?.error) { setInstError(authData.error); setInstSaving(false); return }
 
-    setInstSuccess(`Kurum "${instForm.name}" oluşturuldu! Kod: ${instForm.code}`)
+    const createdCode = authData?.institution?.code || instForm.code
+    setInstSuccess(`Kurum "${instForm.name}" oluşturuldu! Kod: ${createdCode}`)
     setInstForm({ name: '', email: '', password: '', code: '', discount: '0' })
     await fetchData()
     setInstSaving(false)
