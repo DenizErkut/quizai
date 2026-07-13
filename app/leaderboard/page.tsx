@@ -3,6 +3,7 @@ import PageHeader from '@/components/PageHeader'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { resolveIdentities } from '@/lib/identity/resolve-client'
 
 interface LeaderEntry {
   id: string; name: string; grade: string
@@ -66,7 +67,9 @@ export default function LeaderboardPage() {
         supabase.from('badges').select('badge_key, earned_at').eq('user_id', user.id),
       ])
 
-      const allEntries = lb || []
+      // İsimler TR-PG'den çözülür; leaderboard view'i yalnızca id/grade/puan sağlar
+      const identities = await resolveIdentities(supabase, (lb || []).map((e: any) => e.id))
+      const allEntries = (lb || []).map((e: any) => ({ ...e, name: identities[e.id]?.full_name || 'İsimsiz' }))
       setEntries(allEntries)
       setMyEntry(allEntries.find((e: LeaderEntry) => e.id === user.id) || null)
       setMyGrade(profile?.grade || '')

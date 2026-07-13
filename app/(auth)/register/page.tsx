@@ -154,10 +154,12 @@ function RegisterContent() {
     setError(''); setLoading(true)
     const fullName = `${name.trim()} ${surname.trim()}`
 
+    // NOT: 'name' artık auth metadata'ya YAZILMIYOR — kimlik TR-PG'de (create-identity).
+    // Bu değişiklik, handle_new_user trigger'ından name'in çıkarılmasıyla AYNI
+    // deploy'da gitmeli (bkz. scripts/002_handle_new_user_drop_name.sql).
     const { data, error: err } = await supabase.auth.signUp({
       email,
       password: pass,
-      options: { data: { name: fullName } },
     })
 
     if (err) { setError(err.message); setLoading(false); return }
