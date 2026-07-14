@@ -2,6 +2,7 @@
 // KVKK m.11 — İlgili kişi hakları: veri indirme (taşınabilirlik) ve silme talebi
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { exportIdentityData, deleteIdentity } from '@/lib/identity/client'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,17 +21,23 @@ export async function GET(req: NextRequest) {
   const user = await getUser(req)
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
-  const [profile, sessions, srCards, referrals, notifications] = await Promise.all([
+  const [profile, sessions, srCards, referrals, notifications, identityExport] = await Promise.all([
     supabaseAdmin.from('profiles').select('*').eq('id', user.id).maybeSingle(),
     supabaseAdmin.from('quiz_sessions').select('*').eq('user_id', user.id),
     supabaseAdmin.from('spaced_repetition_cards').select('*').eq('user_id', user.id),
     supabaseAdmin.from('referrals').select('*').eq('referrer_id', user.id),
     supabaseAdmin.from('notifications').select('*').eq('user_id', user.id),
+    // Kimlik verisi (ad-soyad, e-posta, yaş, rıza kayıtları) TR-PG'de yaşıyor
+    exportIdentityData(user.id).catch(() => null),
   ])
 
   const exportData = {
     exported_at: new Date().toISOString(),
     kvkk_notice: 'Bu dosya KVKK m.11 kapsamındaki veri taşınabilirliği talebiniz üzerine oluşturulmuştur.',
+    // TR-PG kimlik kaydı + KVKK rıza/talep geçmişi
+    identity: identityExport?.identity ?? null,
+    consent_records: identityExport?.consent_records ?? [],
+    kvkk_requests: identityExport?.kvkk_requests ?? [],
     profile: profile.data,
     quiz_sessions: sessions.data ?? [],
     spaced_repetition_cards: srCards.data ?? [],
@@ -77,6 +84,8 @@ export async function DELETE(req: NextRequest) {
   await supabaseAdmin.from('referrals').delete().eq('referred_id', user.id).then(() => {}, () => {})
   // Profil sil
   await supabaseAdmin.from('profiles').delete().eq('id', user.id)
+  // Kimlik verisini TR-PG'den de sil (ad-soyad, e-posta, rıza kayıtları — CASCADE)
+  await deleteIdentity(user.id).catch((e) => console.error('[kvkk] deleteIdentity error:', e?.message))
   // Auth kullanıcısını sil
   await supabaseAdmin.auth.admin.deleteUser(user.id)
 
