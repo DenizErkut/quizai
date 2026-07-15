@@ -215,8 +215,13 @@ function CheckoutContent() {
                 : `₺${PLANS[selectedPlan].price} — Ödemeye geç →`}
             </button>
 
-            <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text3)', marginTop: '1rem' }}>
-              Ödemeye geçerek <a href="#" style={{ color: 'var(--text2)' }}>Kullanım Şartları</a>'nı kabul etmiş olursun.
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
+              <img src="/payment/iyzico-ile-ode.svg" alt="iyzico ile öde" style={{ height: '28px' }} />
+            </div>
+
+            <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text3)', marginTop: '0.75rem' }}>
+              Ödemeye geçerek <a href="/terms" target="_blank" style={{ color: 'var(--text2)' }}>Kullanım Şartları</a>'nı ve{' '}
+              <a href="/mesafeli-satis" target="_blank" style={{ color: 'var(--text2)' }}>Mesafeli Satış Sözleşmesi</a>'ni kabul etmiş olursun.
             </p>
           </>
         ) : (

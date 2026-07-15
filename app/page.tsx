@@ -517,18 +517,31 @@ export default function LandingPage() {
 
       {/* ── FOOTER ── */}
       <footer style={{ background: '#082465', padding: '2rem 1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-          <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '72px', filter: 'brightness(0) invert(1)' }} />
-          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-            {[{ href: '/privacy', label: 'Gizlilik' }, { href: '/terms', label: 'Kullanım Şartları' }, { href: '/pricing', label: 'Planlar' }].map(l => (
-              <Link key={l.href} href={l.href} style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', transition: 'color 0.15s' }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#fdd31d')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.4)')}>
-                {l.label}
-              </Link>
-            ))}
+        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+            <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '72px', filter: 'brightness(0) invert(1)' }} />
+            <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+              {[
+                { href: '/hakkimizda', label: 'Hakkımızda' },
+                { href: '/privacy', label: 'Gizlilik' },
+                { href: '/terms', label: 'Kullanım Şartları' },
+                { href: '/mesafeli-satis', label: 'Mesafeli Satış Sözleşmesi' },
+                { href: '/teslimat-iade', label: 'Teslimat ve İade' },
+                { href: '/pricing', label: 'Planlar' },
+              ].map(l => (
+                <Link key={l.href} href={l.href} style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', transition: 'color 0.15s' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#fdd31d')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.4)')}>
+                  {l.label}
+                </Link>
+              ))}
+            </div>
           </div>
-          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.25)' }}>© 2026 Pratium.</p>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+            <img src="/payment/iyzico-band.svg" alt="iyzico ile öde — Visa, Mastercard, Troy" style={{ height: '32px' }} />
+            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.25)' }}>© 2026 Dumerk Elektronik Sanayi ve Ticaret Limited Şirketi.</p>
+          </div>
         </div>
       </footer>
     </main>
