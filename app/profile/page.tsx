@@ -1,6 +1,6 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 const GRADES = [
@@ -22,8 +22,11 @@ const GRADES = [
   { value: 'universite 4. sinif', label: 'Üniversite 4. Sınıf' },
 ]
 
-export default function ProfileSetupPage() {
+function ProfileSetupContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const next = searchParams.get('next')
+  const isSafeNext = (n: string | null) => !!n && n.startsWith('/') && !n.startsWith('//') && !n.startsWith('/login')
   const [name, setName] = useState('')
   const [surname, setSurname] = useState('')
   const [age, setAge] = useState('')
@@ -44,7 +47,7 @@ export default function ProfileSetupPage() {
   useEffect(() => {
     // Kullanıcı yoksa login'e
     supabase.auth.getUser().then(({ data: { user } }: any) => {
-      if (!user) router.push('/login')
+      if (!user) router.push(isSafeNext(next) ? `/login?next=${encodeURIComponent(next!)}` : '/login')
       // Google'dan gelen isim varsa doldur
       if (user?.user_metadata?.full_name) {
         const parts = user.user_metadata.full_name.split(' ')
@@ -68,7 +71,7 @@ export default function ProfileSetupPage() {
 
     setError(''); setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setError('Oturum bulunamadı, lütfen tekrar giriş yapın.'); setLoading(false); router.push('/login'); return }
+    if (!user) { setError('Oturum bulunamadı, lütfen tekrar giriş yapın.'); setLoading(false); router.push(isSafeNext(next) ? `/login?next=${encodeURIComponent(next!)}` : '/login'); return }
 
     // NOT: 'age' bilerek gönderilmiyor — profiles tablosunda böyle bir kolon
     // yok (şema: id, name, surname, grade, school, ... ). Yaş formda hâlâ
@@ -123,7 +126,7 @@ export default function ProfileSetupPage() {
     }
 
     setLoading(false)
-    router.push('/quiz')
+    router.push(isSafeNext(next) ? next! : '/quiz')
   }
 
   return (
@@ -261,5 +264,13 @@ export default function ProfileSetupPage() {
         </div>
       </div>
     </main>
+  )
+}
+
+export default function ProfileSetupPage() {
+  return (
+    <Suspense fallback={null}>
+      <ProfileSetupContent />
+    </Suspense>
   )
 }

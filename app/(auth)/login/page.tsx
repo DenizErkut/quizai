@@ -86,7 +86,7 @@ function LoginSelectContent() {
         {/* Kayıt ol */}
         <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '13px', color: 'var(--text3)' }} className="anim-up-2">
           Hesabın yok mu?{' '}
-          <Link href="/register" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>
+          <Link href={next ? `/register?next=${encodeURIComponent(next)}` : '/register'} style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>
             Kayıt ol
           </Link>
         </div>

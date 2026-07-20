@@ -58,6 +58,8 @@ function RegisterContent() {
   const searchParams = useSearchParams()
   const ref = searchParams.get('ref') || ''
   const kurumParam = searchParams.get('kurum') || ''
+  const next = searchParams.get('next') || ''
+  const isSafeNext = (n: string) => n.startsWith('/') && !n.startsWith('//') && !n.startsWith('/login')
   const supabase = createClient() as any
 
   // Adım yönetimi
@@ -130,7 +132,7 @@ function RegisterContent() {
     localStorage.setItem('pending_role', selectedRole)
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback?role=${selectedRole}${ref ? `&ref=${ref}` : ''}` },
+      options: { redirectTo: `${window.location.origin}/auth/callback?role=${selectedRole}${ref ? `&ref=${ref}` : ''}${isSafeNext(next) ? `&next=${encodeURIComponent(next)}` : ''}` },
     })
   }
 
@@ -231,7 +233,7 @@ function RegisterContent() {
         }
 
         setLoading(false)
-        router.push('/quiz')
+        router.push(isSafeNext(next) ? next : '/quiz')
 
       } else if (selectedRole === 'parent') {
         // Veli platform verisi (ad TR-PG'de)
@@ -341,7 +343,7 @@ function RegisterContent() {
 
           <div style={{ textAlign: 'center', fontSize: '13px', color: 'var(--text3)' }} className="anim-up-2">
             Zaten hesabın var mı?{' '}
-            <Link href="/login" style={{ color: 'var(--accent)', fontWeight: 600 }}>Giriş yap</Link>
+            <Link href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'} style={{ color: 'var(--accent)', fontWeight: 600 }}>Giriş yap</Link>
           </div>
         </div>
       </main>
@@ -537,7 +539,7 @@ function RegisterContent() {
 
           <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '13px', color: 'var(--text3)' }}>
             Zaten hesabın var mı?{' '}
-            <Link href="/login" style={{ color: 'var(--accent)', fontWeight: 600 }}>Giriş yap</Link>
+            <Link href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'} style={{ color: 'var(--accent)', fontWeight: 600 }}>Giriş yap</Link>
           </div>
         </div>
       </div>

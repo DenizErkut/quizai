@@ -81,7 +81,9 @@ export async function GET(request: NextRequest) {
         }
 
         // Yeni kullanici - profil kurulumuna yonlendir
-        return NextResponse.redirect(new URL('/profile', requestUrl.origin))
+        const profileUrl = new URL('/profile', requestUrl.origin)
+        if (safeNext) profileUrl.searchParams.set('next', safeNext)
+        return NextResponse.redirect(profileUrl)
       }
     }
   }

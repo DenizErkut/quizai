@@ -163,7 +163,7 @@ function LoginPageContent() {
               </button>
 
               <div className="divider">veya</div>
-              <Link href="/register" className="btn" style={{ width: '100%', justifyContent: 'center' }}>
+              <Link href={isSafeNext(next) ? `/register?next=${encodeURIComponent(next!)}` : '/register'} className="btn" style={{ width: '100%', justifyContent: 'center' }}>
                 Hesap oluştur
               </Link>
             </>
