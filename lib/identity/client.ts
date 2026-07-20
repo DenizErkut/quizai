@@ -72,7 +72,16 @@ export async function getIdentitiesBySupabaseIds(supabaseUserIds: string[]): Pro
   return map
 }
 
-// Kimlik güncelle
+// TR-PG'deki TÜM identity kayıtlarının supabase_user_id'lerini döner.
+// Supabase profiles listesiyle karşılaştırıp eksik kimlikleri (identity
+// oluşturma sırasında sessizce başarısız olmuş kayıtları) bulmak için
+// kullanılır — bkz. lib/identity/reconcile.ts
+export async function listAllIdentitySupabaseIds(): Promise<Set<string>> {
+  const { rows } = await trPool.query(`SELECT supabase_user_id FROM identities`)
+  return new Set(rows.map((r: { supabase_user_id: string }) => r.supabase_user_id))
+}
+
+
 export async function updateIdentity(supabaseUserId: string, updates: Partial<Identity>): Promise<void> {
   const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'supabase_user_id')
   if (fields.length === 0) return

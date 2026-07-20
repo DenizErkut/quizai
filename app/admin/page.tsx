@@ -38,6 +38,10 @@ export default function AdminPage() {
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
   const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'meb' | 'exams' | 'curriculum'>('users')
+  const [identityMissing, setIdentityMissing] = useState<number | null>(null)
+  const [identityScanning, setIdentityScanning] = useState(false)
+  const [identityFixing, setIdentityFixing] = useState(false)
+  const [identityReport, setIdentityReport] = useState<{ fixed: number; fixedUsers: { fullName: string }[]; failed: { id: string; reason: string }[] } | null>(null)
   // Kurum formu
   // Müfredat state
   const [curriculum, setCurriculum] = useState<any[]>([])
@@ -94,9 +98,45 @@ export default function AdminPage() {
 
       setIsAdmin(true)
       await fetchData()
+      scanIdentityMismatch()
     }
     load()
   }, [])
+
+  async function scanIdentityMismatch() {
+    setIdentityScanning(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin/reconcile-identities', {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      })
+      const json = await res.json()
+      if (res.ok) setIdentityMissing(json.missing)
+    } catch {
+      // sessiz geç — bu bilgilendirici bir tarama, kritik değil
+    }
+    setIdentityScanning(false)
+  }
+
+  async function fixIdentityMismatch() {
+    setIdentityFixing(true)
+    setIdentityReport(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin/reconcile-identities', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      })
+      const json = await res.json()
+      if (res.ok) {
+        setIdentityReport(json)
+        setIdentityMissing(json.failed?.length ?? 0)
+      }
+    } catch {
+      // no-op
+    }
+    setIdentityFixing(false)
+  }
 
   async function generateInstCode() {
     return Math.random().toString(36).substring(2, 6).toUpperCase() +
@@ -439,6 +479,40 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         {/* Users tab */}
         {tab === 'users' && (
           <div className="anim-up">
+            {/* Kimlik uzlaştırma banner'ı — Supabase profiles ↔ TR-PG identities
+                arasında eksik kayıt varsa (örn. "İsimsiz" kullanıcı) burada
+                görünür ve tek tıkla düzeltilebilir. Her gün 06:00'da (cron)
+                otomatik de çalışıyor, bu sadece anlık durum + manuel tetik. */}
+            {identityMissing !== null && identityMissing > 0 && (
+              <div className="card-sm" style={{ marginBottom: '1rem', border: '1px solid rgba(220,38,38,0.25)', background: 'var(--red-bg)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--red)', fontWeight: 600 }}>
+                    ⚠️ {identityMissing} kullanıcının TR-PG'de kimlik kaydı eksik (admin listesinde &quot;İsimsiz&quot; görünürler).
+                  </span>
+                  <button className="btn btn-sm" style={{ marginLeft: 'auto', color: 'var(--red)', borderColor: 'rgba(220,38,38,0.3)' }}
+                    onClick={fixIdentityMismatch} disabled={identityFixing}>
+                    {identityFixing ? <span className="spinner" style={{ width: 14, height: 14 }} /> : 'Şimdi Düzelt'}
+                  </button>
+                </div>
+                {identityReport && (
+                  <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text2)' }}>
+                    ✅ {identityReport.fixed} kayıt otomatik dolduruldu
+                    {identityReport.fixedUsers?.length > 0 && (
+                      <> ({identityReport.fixedUsers.map(u => u.fullName).join(', ')})</>
+                    )}
+                    {identityReport.failed?.length > 0 && (
+                      <div style={{ marginTop: '4px', color: 'var(--red)' }}>
+                        ❌ {identityReport.failed.length} kayıt otomatik düzeltilemedi — manuel kontrol gerekli:
+                        {identityReport.failed.map(f => (
+                          <div key={f.id} style={{ marginLeft: '12px' }}>• {f.id}: {f.reason}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Araçlar */}
             <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
               <input className="input" placeholder="İsim veya sınıf ara..." value={search}
