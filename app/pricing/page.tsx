@@ -173,6 +173,10 @@ export default function PricingPage() {
           })}
         </div>
 
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '0 0 1.5rem' }}>
+          <img src="/payment/iyzico-band.svg" alt="iyzico ile öde — Mastercard, Visa, American Express, Troy" style={{ height: '26px', maxWidth: '100%' }} />
+        </div>
+
         {/* Kullanım durumu */}
         {profile && (
           <div className="card-sm anim-up-2" style={{ marginBottom: '1.5rem', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>

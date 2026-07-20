@@ -216,7 +216,7 @@ function CheckoutContent() {
             </button>
 
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
-              <img src="/payment/iyzico-ile-ode.svg" alt="iyzico ile öde" style={{ height: '28px' }} />
+              <img src="/payment/iyzico-band.svg" alt="iyzico ile öde — Mastercard, Visa, American Express, Troy" style={{ height: '30px', maxWidth: '100%' }} />
             </div>
 
             <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text3)', marginTop: '0.75rem' }}>
