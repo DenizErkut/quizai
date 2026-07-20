@@ -18,7 +18,7 @@ export interface Identity {
   full_name: string
   email: string
   age: number | null
-  role: 'student' | 'teacher' | 'parent'
+  role: 'student' | 'teacher' | 'parent' | 'institution_admin'
   parent_email: string | null
   parent_verified: boolean
   institution_name: string | null
