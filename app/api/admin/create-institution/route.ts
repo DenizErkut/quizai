@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { generateUniqueInstitutionCode } from '@/lib/institution-code'
+import { createIdentity } from '@/lib/identity/client'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -98,15 +99,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Kurum kaydi hatası: ${instErr.message}` }, { status: 500 })
   }
 
-  // 3. Profil oluştur
+  // 3. Kimlik (ad) TR-PG'de oluşturulur — profiles'a ASLA name yazılmaz.
+  //    (Bu route daha önce doğrudan profiles.name'e yazıyordu; bu yüzden
+  //    admin panelinde bu kurum yöneticileri "İsimsiz" görünüyordu — admin
+  //    paneli ismi sadece TR-PG'den okuyor.)
+  await createIdentity({
+    supabaseUserId: newUserId,
+    fullName: name.trim(),
+    email: email.trim(),
+    role: 'institution_admin',
+  }).catch((e) => console.error('[create-institution] createIdentity error:', e?.message))
+
+  // 4. Profil oluştur (kimlik alanı hariç — role/language platform verisi)
   await supabaseAdmin.from('profiles').upsert({
     id: newUserId,
-    name: name.trim(),
     role: 'institution_admin',
     language: 'Türkçe',
   })
 
-  // 4. institution_users'a admin olarak ekle
+  // 5. institution_users'a admin olarak ekle
   const { error: iuErr } = await supabaseAdmin.from('institution_users').insert({
     institution_id: inst.id,
     user_id: newUserId,

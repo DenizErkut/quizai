@@ -41,12 +41,24 @@ export async function GET(request: NextRequest) {
       // bu yüzden identity oluşturmayı 'existing' kontrolünün DIŞINDA yapıyoruz.
       const existingIdentity = await getIdentityBySupabaseId(user.id)
       if (!existingIdentity) {
-        await createIdentity({
+        const identityParams = {
           supabaseUserId: user.id,
           fullName: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Kullanıcı',
           email: user.email || '',
           role,
-        }).catch((e) => console.error('[auth/callback] createIdentity error:', e?.message))
+        }
+        // Tek seferlik retry — TR-PG'ye geçici bağlantı sorunlarında (soğuk
+        // pool, kısa kesinti) sessizce "İsimsiz" kalan kullanıcı bırakmamak
+        // için. İkinci deneme de başarısız olursa login yine de engellenmez,
+        // sadece loglanır (identity resolve edilene kadar admin panelinde
+        // "İsimsiz" görünür, elle düzeltilebilir).
+        await createIdentity(identityParams).catch(async (e) => {
+          console.error('[auth/callback] createIdentity error (1. deneme):', e?.message)
+          await new Promise(r => setTimeout(r, 500))
+          await createIdentity(identityParams).catch((e2) =>
+            console.error('[auth/callback] createIdentity error (2. deneme, vazgeçildi):', e2?.message)
+          )
+        })
       }
 
       // Profil var mi kontrol et
