@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import crypto from 'crypto'
+import { generateIyzicoAuthHeader } from '@/lib/iyzico'
 
-const IYZICO_API_KEY = process.env.IYZICO_API_KEY!
-const IYZICO_SECRET_KEY = process.env.IYZICO_SECRET_KEY!
 const IYZICO_BASE_URL = process.env.IYZICO_BASE_URL!
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://pratium.com'
 
@@ -12,14 +10,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-function generateAuthHeader(body: string): string {
-  const randomKey = Math.random().toString(36).substring(2)
-  const toSign = IYZICO_API_KEY + randomKey + IYZICO_SECRET_KEY + body
-  const hash = crypto.createHmac('sha256', IYZICO_SECRET_KEY)
-    .update(toSign).digest('base64')
-  const authString = `apiKey:${IYZICO_API_KEY}&randomKey:${randomKey}&signature:${hash}`
-  return 'IYZWSv2 ' + Buffer.from(authString).toString('base64')
-}
+const IYZICO_DETAIL_URI_PATH = '/payment/iyzipos/checkoutform/auth/ecom/detail'
 
 const PLAN_META: Record<string, { months: number; plan: string }> = {
   monthly:   { months: 1,  plan: 'premium'   },
@@ -45,7 +36,7 @@ export async function POST(req: NextRequest) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: generateAuthHeader(verifyBody),
+          Authorization: generateIyzicoAuthHeader(IYZICO_DETAIL_URI_PATH, verifyBody),
         },
         body: verifyBody,
       }

@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import crypto from 'crypto'
 import { getIdentityBySupabaseId } from '@/lib/identity/client'
+import { generateIyzicoAuthHeader } from '@/lib/iyzico'
 
-const IYZICO_API_KEY = process.env.IYZICO_API_KEY!
-const IYZICO_SECRET_KEY = process.env.IYZICO_SECRET_KEY!
 const IYZICO_BASE_URL = process.env.IYZICO_BASE_URL!
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://pratium.com'
 
@@ -13,15 +11,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// iyzico HMAC-SHA256 imzası
-function generateAuthHeader(body: string): string {
-  const randomKey = Math.random().toString(36).substring(2)
-  const toSign = IYZICO_API_KEY + randomKey + IYZICO_SECRET_KEY + body
-  const hash = crypto.createHmac('sha256', IYZICO_SECRET_KEY)
-    .update(toSign).digest('base64')
-  const authString = `apiKey:${IYZICO_API_KEY}&randomKey:${randomKey}&signature:${hash}`
-  return 'IYZWSv2 ' + Buffer.from(authString).toString('base64')
-}
+const IYZICO_CHECKOUT_URI_PATH = '/payment/iyzipos/checkoutform/initialize/auth/ecom'
 
 const PLANS = {
   monthly:   { price: '79.0',    name: 'Pratium Premium - Aylık',    months: 1,  plan: 'premium'   },
@@ -111,7 +101,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: generateAuthHeader(bodyStr),
+        Authorization: generateIyzicoAuthHeader(IYZICO_CHECKOUT_URI_PATH, bodyStr),
       },
       body: bodyStr,
     })
