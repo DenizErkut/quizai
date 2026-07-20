@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import SiteFooter from '@/components/SiteFooter'
 
 export default function DistanceSalesPage() {
   return (
@@ -84,6 +85,7 @@ export default function DistanceSalesPage() {
           </div>
         </div>
       </div>
+    <SiteFooter />
     </main>
   )
 }

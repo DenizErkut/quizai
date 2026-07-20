@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import SiteFooter from '@/components/SiteFooter'
 
 export default function AboutPage() {
   return (
@@ -70,6 +71,7 @@ export default function AboutPage() {
           </div>
         </div>
       </div>
+    <SiteFooter />
     </main>
   )
 }

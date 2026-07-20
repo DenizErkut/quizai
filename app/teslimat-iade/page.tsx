@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import SiteFooter from '@/components/SiteFooter'
 
 export default function DeliveryReturnPage() {
   return (
@@ -75,6 +76,7 @@ export default function DeliveryReturnPage() {
           </div>
         </div>
       </div>
+    <SiteFooter />
     </main>
   )
 }

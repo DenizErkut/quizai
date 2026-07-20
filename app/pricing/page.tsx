@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import SiteFooter from '@/components/SiteFooter'
 
 interface Profile {
   plan: string
@@ -245,6 +246,7 @@ export default function PricingPage() {
           ))}
         </div>
       </div>
+      <SiteFooter />
     </main>
   )
 }

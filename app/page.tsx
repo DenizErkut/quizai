@@ -539,7 +539,7 @@ export default function LandingPage() {
           </div>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-            <img src="/payment/iyzico-band.svg" alt="iyzico ile öde — Visa, Mastercard, Troy" style={{ height: '32px' }} />
+            <img src="/payment/iyzico-band-white.svg" alt="iyzico ile öde — Mastercard, Visa, American Express, Troy" style={{ height: '32px' }} />
             <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.25)' }}>© 2026 Dumerk Elektronik Sanayi ve Ticaret Limited Şirketi.</p>
           </div>
         </div>
