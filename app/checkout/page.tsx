@@ -76,7 +76,11 @@ function CheckoutContent() {
     setError(''); setLoading(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
+      if (!session) {
+        const next = `/checkout?plan=${selectedPlan}`
+        router.push(`/login?next=${encodeURIComponent(next)}`)
+        return
+      }
 
       const res = await fetch('/api/iyzico/checkout', {
         method: 'POST',

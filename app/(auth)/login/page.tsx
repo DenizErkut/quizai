@@ -1,6 +1,7 @@
 'use client'
+import { Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 
 const ROLES = [
   {
@@ -45,7 +46,10 @@ const ROLES = [
   },
 ]
 
-export default function LoginSelectPage() {
+function LoginSelectContent() {
+  const searchParams = useSearchParams()
+  const next = searchParams.get('next')
+  const withNext = (href: string) => next ? `${href}?next=${encodeURIComponent(next)}` : href
   return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
       <div style={{ width: '100%', maxWidth: '440px' }}>
@@ -63,7 +67,7 @@ export default function LoginSelectPage() {
         {/* Rol kartları */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }} className="anim-up-1">
           {ROLES.map(role => (
-            <Link key={role.key} href={role.href}
+            <Link key={role.key} href={withNext(role.href)}
               style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 20px', borderRadius: '16px', border: `1.5px solid ${role.border}`, background: role.bg, textDecoration: 'none', transition: 'all 0.15s' }}
               onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)' }}
               onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}>
@@ -88,5 +92,13 @@ export default function LoginSelectPage() {
         </div>
       </div>
     </main>
+  )
+}
+
+export default function LoginSelectPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginSelectContent />
+    </Suspense>
   )
 }

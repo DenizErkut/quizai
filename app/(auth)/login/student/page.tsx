@@ -1,11 +1,14 @@
 'use client'
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const next = searchParams.get('next')
+  const isSafeNext = (n: string | null) => !!n && n.startsWith('/') && !n.startsWith('//')
   const [email, setEmail] = useState('')
   const [pass, setPass] = useState('')
   const [error, setError] = useState('')
@@ -24,15 +27,19 @@ export default function LoginPage() {
     const { error: err } = await supabase.auth.signInWithPassword({ email, password: pass })
     setLoading(false)
     if (err) { setError('E-posta veya şifre hatalı.'); return }
-    router.push('/quiz')
+    router.push(isSafeNext(next) ? next! : '/quiz')
   }
 
   async function handleOAuth(provider: 'google' | 'apple') {
     setOauthLoading(provider)
     const ref = new URLSearchParams(window.location.search).get('ref') || ''
+    const params = new URLSearchParams()
+    if (ref) params.set('ref', ref)
+    if (isSafeNext(next)) params.set('next', next!)
+    const qs = params.toString()
     await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback${ref ? `?ref=${ref}` : ''}` },
+      options: { redirectTo: `${window.location.origin}/auth/callback${qs ? `?${qs}` : ''}` },
     })
   }
 
@@ -164,5 +171,13 @@ export default function LoginPage() {
         </div>
       </div>
     </main>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageContent />
+    </Suspense>
   )
 }

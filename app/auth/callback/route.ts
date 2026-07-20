@@ -8,6 +8,10 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get('code')
   const ref = requestUrl.searchParams.get('ref') // referral code
   const role = requestUrl.searchParams.get('role') || 'student'
+  const nextParam = requestUrl.searchParams.get('next')
+  const safeNext = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') && !nextParam.startsWith('/login')
+    ? nextParam
+    : null
 
   if (code) {
     const cookieStore = await cookies()
@@ -82,5 +86,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(new URL('/quiz', requestUrl.origin))
+  return NextResponse.redirect(new URL(safeNext || '/quiz', requestUrl.origin))
 }
