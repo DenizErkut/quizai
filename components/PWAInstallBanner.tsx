@@ -29,10 +29,18 @@ export default function PWAInstallBanner() {
       }).catch(() => {})
 
       // Yeni SW kontrolü ele alınca (controllerchange) sayfayı SESSİZCE yenile
-      // — kullanıcı ne bir şey görür ne de eski/kırık bir sürümde takılı kalır
+      // — kullanıcı ne bir şey görür ne de eski/kırık bir sürümde takılı kalır.
+      // ÖNEMLİ: controllerchange, SW'nin İLK KEZ bir sayfayı devralmasında da
+      // tetiklenir (henüz "güncelleme" değil, sadece kurulum). Bu durumda
+      // reload yapmak, o an devam eden bir sayfa geçişini (örn. /teacher'dan
+      // /teacher/live'a tıklama) iptal edip kullanıcıyı olduğu sayfada
+      // "yeniden yükler" — /teacher/live'ın hiç açılmayıp /teacher'a geri
+      // dönmüş gibi görünmesinin sebebi buydu. Sadece daha önce zaten bir
+      // controller varken (yani gerçek bir güncelleme sırasında) reload et.
+      const hadControllerAtLoad = !!navigator.serviceWorker.controller
       let refreshing = false
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (refreshing) return
+        if (!hadControllerAtLoad || refreshing) return
         refreshing = true
         window.location.reload()
       })

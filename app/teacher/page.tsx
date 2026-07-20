@@ -180,11 +180,11 @@ export default function TeacherDashboard() {
             { key: 'live', label: '🎯 Canlı Test', href: '/teacher/live' },
           ].map(t => (
             (t as any).href ? (
-              <a key={t.key} href={(t as any).href}
+              <Link key={t.key} href={(t as any).href}
                 style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)',
                   background: 'rgba(255,255,255,0.1)', color: '#fff', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', border: '1px solid rgba(255,255,255,0.2)' }}>
                 {t.label}
-              </a>
+              </Link>
             ) : (
               <button key={t.key} onClick={() => setActiveTab(t.key as any)}
                 style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
