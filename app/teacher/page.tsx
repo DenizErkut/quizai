@@ -178,6 +178,7 @@ export default function TeacherDashboard() {
             { key: 'performance', label: '📈 Analiz' },
             { key: 'notify', label: '🔔 Bildirim' },
             { key: 'reports', label: '📋 Öğrenci Raporları', href: '/teacher/reports' },
+            { key: 'sectional', label: '📚 Ders Bazlı Rapor', href: '/teacher/reports-sectional' },
             { key: 'import', label: '📥 Not İçe Aktar', href: '/teacher/import-grades' },
             { key: 'live', label: '🎯 Canlı Test', href: '/teacher/live' },
           ].map(t => (

@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
-import { attachGradesAndStats, ReportStudentBase } from '@/lib/student-reports'
+import { attachGradesAndStats, buildSectionalReport, ReportStudentBase } from '@/lib/student-reports'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -65,6 +65,12 @@ export async function GET(req: NextRequest) {
     grade: profileMap.get(m.student_id)?.grade ?? null,
     classroomName: classroomMap.get(m.classroom_id) ?? null,
   }))
+
+  const mode = req.nextUrl.searchParams.get('mode')
+  if (mode === 'sectional') {
+    const { students, subjects } = await buildSectionalReport(roster, importId)
+    return NextResponse.json({ imports, selectedImportId: importId, students, subjects, classrooms })
+  }
 
   const { students, subjectColumns } = await attachGradesAndStats(roster, importId)
   return NextResponse.json({ imports, selectedImportId: importId, students, subjectColumns, classrooms })

@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities, resolveName } from '@/lib/identity/resolve-client'
 import StudentReportTable from '@/components/StudentReportTable'
+import SectionalReportTable from '@/components/SectionalReportTable'
 import { Suspense } from 'react'
 import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
@@ -29,7 +30,7 @@ function ParentContent() {
   const [children, setChildren] = useState<ChildData[]>([])
   const [selectedChild, setSelectedChild] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'trend' | 'archive' | 'leaderboard' | 'reports' | 'add'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'trend' | 'archive' | 'leaderboard' | 'reports' | 'sectional' | 'add'>('dashboard')
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
   const [addCode, setAddCode] = useState('')
@@ -192,6 +193,7 @@ function ParentContent() {
             { key: 'archive', label: '📦 Arşiv' },
             { key: 'leaderboard', label: '🏆 Sıralama' },
             { key: 'reports', label: '📋 Raporlar' },
+            { key: 'sectional', label: '📚 Ders Bazlı' },
             { key: 'add', label: '➕ Çocuk Ekle' },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key as any)}
@@ -519,6 +521,17 @@ function ParentContent() {
               Okuldan içe aktarılan sınav/dönem notları ile Pratium test sonuçlarını bir arada gösterir.
             </p>
             <StudentReportTable fetchEndpoint="/api/parent/reports" />
+          </div>
+        )}
+
+        {/* DERS BAZLI RAPOR */}
+        {activeTab === 'sectional' && (
+          <div>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.25rem' }}>📚 Ders Bazlı Rapor</h1>
+            <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '1.25rem' }}>
+              Okul notları ile Pratium'da o derse ait konularda çözülen testlerin başarı yüzdesini ders ders karşılaştırır.
+            </p>
+            <SectionalReportTable fetchEndpoint="/api/parent/reports" />
           </div>
         )}
 
