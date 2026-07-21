@@ -34,6 +34,16 @@ export async function POST(req: NextRequest) {
   if (!label?.trim()) return NextResponse.json({ error: 'Etiket (import adı) zorunlu.' }, { status: 400 })
   if (!Array.isArray(rows) || rows.length === 0) return NextResponse.json({ error: 'İçe aktarılacak satır yok.' }, { status: 400 })
 
+  // Güvenlik: admin SADECE kendi kurumundaki öğrencilere not girebilir.
+  const { data: members } = await supabaseAdmin
+    .from('institution_users').select('user_id')
+    .eq('institution_id', instUser.institution_id).eq('role', 'student')
+  const allowedStudentIds = new Set((members ?? []).map((m: any) => m.user_id))
+  const invalidRows = rows.filter(r => !allowedStudentIds.has(r.studentId))
+  if (invalidRows.length > 0) {
+    return NextResponse.json({ error: `${invalidRows.length} öğrenci senin kurumuna ait değil.` }, { status: 403 })
+  }
+
   try {
     const result = await commitGradeImport({
       scope: 'institution',

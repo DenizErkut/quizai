@@ -44,6 +44,7 @@ export default function GradeImportWizard({
   commitEndpoint: string
 }) {
   const supabase = createClient() as any
+  const [mode, setMode] = useState<'file' | 'manual'>('file')
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview' | 'done'>('upload')
   const [fileName, setFileName] = useState('')
   const [headers, setHeaders] = useState<string[]>([])
@@ -57,6 +58,57 @@ export default function GradeImportWizard({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<{ matchedRows: number; totalRows: number; gradesInserted: number } | null>(null)
+
+  // ---------- Elle not girişi (dosyasız) ----------
+  const [manualStudentId, setManualStudentId] = useState('')
+  const [manualLabel, setManualLabel] = useState('')
+  const [manualSubjects, setManualSubjects] = useState([{ name: '', value: '' }])
+  const [manualSaving, setManualSaving] = useState(false)
+  const [manualResult, setManualResult] = useState<{ gradesInserted: number } | null>(null)
+
+  useEffect(() => {
+    if (mode === 'manual' && roster.length === 0) loadRoster()
+  }, [mode])
+
+  function addManualSubjectRow() {
+    setManualSubjects(prev => [...prev, { name: '', value: '' }])
+  }
+  function removeManualSubjectRow(i: number) {
+    setManualSubjects(prev => prev.filter((_, idx) => idx !== i))
+  }
+  function updateManualSubjectRow(i: number, field: 'name' | 'value', val: string) {
+    setManualSubjects(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: val } : r))
+  }
+
+  async function submitManual() {
+    if (!manualStudentId) { setError('Önce bir öğrenci seç.'); return }
+    const subjects: Record<string, string> = {}
+    for (const r of manualSubjects) {
+      if (r.name.trim() && r.value.trim()) subjects[r.name.trim()] = r.value.trim()
+    }
+    if (Object.keys(subjects).length === 0) { setError('En az bir ders + not girmelisin.'); return }
+
+    setManualSaving(true)
+    setError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(commitEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          label: manualLabel.trim() || 'Elle Girildi',
+          rows: [{ studentId: manualStudentId, subjects }],
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setError(json.error || 'Kaydetme başarısız.'); setManualSaving(false); return }
+      setManualResult({ gradesInserted: json.gradesInserted })
+      setManualSubjects([{ name: '', value: '' }])
+    } catch (e: any) {
+      setError(e?.message || 'Kaydetme başarısız.')
+    }
+    setManualSaving(false)
+  }
 
   // ---------- 1. Dosya yükleme ----------
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -197,11 +249,70 @@ export default function GradeImportWizard({
 
   return (
     <div className="card" style={{ padding: '1.5rem' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem' }}>
+        <button className="btn btn-sm" onClick={() => setMode('file')}
+          style={mode === 'file' ? { background: 'var(--accent)', color: '#fff', borderColor: 'var(--accent)' } : {}}>
+          📄 Dosyadan İçe Aktar
+        </button>
+        <button className="btn btn-sm" onClick={() => setMode('manual')}
+          style={mode === 'manual' ? { background: 'var(--accent)', color: '#fff', borderColor: 'var(--accent)' } : {}}>
+          ✍️ Elle Gir
+        </button>
+      </div>
+
       {error && (
         <div style={{ marginBottom: '1rem', padding: '10px 14px', borderRadius: '10px', background: 'var(--red-bg)', color: 'var(--red)', fontSize: '13px' }}>
           {error}
         </div>
       )}
+
+      {mode === 'manual' ? (
+        <div>
+          <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '1rem' }}>
+            Tek bir öğrenciye, dosya yüklemeden doğrudan not/değer gir.
+          </p>
+          {rosterLoading ? <div className="spinner" /> : (
+            <>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                <select className="input" style={{ minWidth: '220px' }} value={manualStudentId} onChange={e => setManualStudentId(e.target.value)}>
+                  <option value="">— Öğrenci seç —</option>
+                  {roster.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.fullName}{s.schoolNo ? ` (No: ${s.schoolNo})` : ''}{s.classroomName ? ` · ${s.classroomName}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <input className="input" placeholder="Etiket (örn. 1. Dönem 2. Yazılı)" value={manualLabel}
+                  onChange={e => setManualLabel(e.target.value)} style={{ minWidth: '220px' }} />
+              </div>
+
+              {manualSubjects.map((r, i) => (
+                <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                  <input className="input" placeholder="Ders (örn. Matematik)" value={r.name}
+                    onChange={e => updateManualSubjectRow(i, 'name', e.target.value)} style={{ flex: 1 }} />
+                  <input className="input" placeholder="Not (örn. 85)" value={r.value}
+                    onChange={e => updateManualSubjectRow(i, 'value', e.target.value)} style={{ width: '120px' }} />
+                  <button className="btn btn-sm" onClick={() => removeManualSubjectRow(i)}>✕</button>
+                </div>
+              ))}
+              <button className="btn btn-sm" onClick={addManualSubjectRow} style={{ marginBottom: '1.25rem' }}>+ Ders Ekle</button>
+
+              <div>
+                <button className="btn btn-primary" onClick={submitManual} disabled={manualSaving || !manualStudentId}>
+                  {manualSaving ? 'Kaydediliyor…' : 'Kaydet'}
+                </button>
+              </div>
+
+              {manualResult && (
+                <p style={{ marginTop: '1rem', fontSize: '13px', color: 'var(--green)', fontWeight: 600 }}>
+                  ✅ {manualResult.gradesInserted} not kaydedildi.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      ) : (
+      <>
 
       {/* ADIM 1: Yükleme */}
       {step === 'upload' && (
@@ -352,6 +463,8 @@ export default function GradeImportWizard({
           </p>
           <button className="btn btn-primary" onClick={reset}>Yeni Dosya Yükle</button>
         </div>
+      )}
+      </>
       )}
     </div>
   )

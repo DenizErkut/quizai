@@ -41,6 +41,10 @@ export default function NotesPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [aiAnalysis, setAiAnalysis] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
+  // Bir kuruma öğrenci olarak bağlıysa notlarını kendi giremez/düzenleyemez
+  // — sadece kurum/öğretmenin girdiği/içe aktardığı notları görüntüler.
+  const [isInstitutionStudent, setIsInstitutionStudent] = useState(false)
+  const [importedGrades, setImportedGrades] = useState<{ subject: string; value_text: string; created_at: string }[]>([])
   const supabase = createClient() as any
 
   // Yeni ders formu
@@ -57,6 +61,23 @@ export default function NotesPage() {
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
+
+    const { data: instMembership } = await supabase
+      .from('institution_users').select('id').eq('user_id', user.id).eq('role', 'student').maybeSingle()
+    const affiliated = !!instMembership
+    setIsInstitutionStudent(affiliated)
+
+    if (affiliated) {
+      // Kuruma bağlıysa notlar artık grade_notes'ta değil, kurum/öğretmenin
+      // girdiği/içe aktardığı student_grades'te — sadece görüntüleme.
+      const { data: grades } = await supabase
+        .from('student_grades').select('subject, value_text, created_at')
+        .eq('student_id', user.id).order('created_at', { ascending: false })
+      setImportedGrades(grades ?? [])
+      setLoading(false)
+      return
+    }
+
     const { data } = await supabase
       .from('grade_notes')
       .select('*')
@@ -216,20 +237,61 @@ export default function NotesPage() {
               Ders notlarını gir — AI zayıf derslerine odaklansın
             </p>
           </div>
-          <button onClick={() => { resetForm(); setEditingId(null); setShowAdd(true) }}
-            className="btn btn-primary" style={{ fontSize: '13px' }}>
-            + Ders Ekle
-          </button>
+          {!isInstitutionStudent && (
+            <button onClick={() => { resetForm(); setEditingId(null); setShowAdd(true) }}
+              className="btn btn-primary" style={{ fontSize: '13px' }}>
+              + Ders Ekle
+            </button>
+          )}
         </div>
 
         {/* Bilgi kutusu */}
         <div className="card" style={{ marginBottom: '1.5rem', borderLeft: '3px solid var(--accent)', background: 'var(--accent-bg)' }}>
-          <p style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.7, margin: 0 }}>
-            💡 Ders notlarını girdikten sonra <strong>AI Analizi</strong> butonu ile zayıf derslerini öğren.
-            Test üretirken veya gelişim planı hazırlarken AI bu notları otomatik dikkate alır.
-          </p>
+          {isInstitutionStudent ? (
+            <p style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.7, margin: 0 }}>
+              🏫 Bir kuruma bağlısın — ders notların artık <strong>kurumun veya öğretmenin</strong> tarafından
+              giriliyor/içe aktarılıyor. Burada sadece görüntüleyebilirsin.
+            </p>
+          ) : (
+            <p style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.7, margin: 0 }}>
+              💡 Ders notlarını girdikten sonra <strong>AI Analizi</strong> butonu ile zayıf derslerini öğren.
+              Test üretirken veya gelişim planı hazırlarken AI bu notları otomatik dikkate alır.
+            </p>
+          )}
         </div>
 
+        {/* Kuruma bağlı öğrenciler için salt-okunur not listesi */}
+        {isInstitutionStudent && (
+          importedGrades.length === 0 ? (
+            <div className="card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
+              <div style={{ fontSize: '40px', marginBottom: '10px' }}>📒</div>
+              <div style={{ fontWeight: 700, color: 'var(--primary)', marginBottom: '6px' }}>Henüz not girilmemiş</div>
+              <p style={{ fontSize: '13px', color: 'var(--text3)' }}>Kurumun veya öğretmenin not girdiğinde burada görünecek.</p>
+            </div>
+          ) : (
+            <div className="card">
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr><th style={{ textAlign: 'left', padding: '8px', borderBottom: '2px solid var(--border)' }}>Ders</th>
+                    <th style={{ textAlign: 'left', padding: '8px', borderBottom: '2px solid var(--border)' }}>Not</th>
+                    <th style={{ textAlign: 'left', padding: '8px', borderBottom: '2px solid var(--border)' }}>Tarih</th></tr>
+                </thead>
+                <tbody>
+                  {importedGrades.map((g, i) => (
+                    <tr key={i}>
+                      <td style={{ padding: '8px', borderBottom: '1px solid var(--border)', fontWeight: 600 }}>{g.subject}</td>
+                      <td style={{ padding: '8px', borderBottom: '1px solid var(--border)' }}>{g.value_text}</td>
+                      <td style={{ padding: '8px', borderBottom: '1px solid var(--border)', color: 'var(--text3)' }}>{new Date(g.created_at).toLocaleDateString('tr-TR')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        )}
+
+        {!isInstitutionStudent && (
+        <>
         {/* Ders ekle / düzenle formu */}
         {showAdd && (
           <div className="card" style={{ marginBottom: '1.5rem', border: '2px solid var(--accent)' }}>
@@ -448,6 +510,8 @@ export default function NotesPage() {
               )}
             </div>
           </>
+        )}
+        </>
         )}
       </div>
     </main>

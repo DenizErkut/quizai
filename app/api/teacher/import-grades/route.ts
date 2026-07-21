@@ -30,6 +30,20 @@ export async function POST(req: NextRequest) {
   if (!label?.trim()) return NextResponse.json({ error: 'Etiket (import adı) zorunlu.' }, { status: 400 })
   if (!Array.isArray(rows) || rows.length === 0) return NextResponse.json({ error: 'İçe aktarılacak satır yok.' }, { status: 400 })
 
+  // Güvenlik: öğretmen SADECE kendi sınıflarındaki öğrencilere not girebilir.
+  // Sihirbaz zaten sadece kendi roster'ından seçtiriyor ama bu kontrolü
+  // sadece arayüze bırakmak yetmez — istek doğrudan API'ye de atılabilir.
+  const { data: classrooms } = await supabaseAdmin.from('classrooms').select('id').eq('teacher_id', teacher.id)
+  const classroomIds = (classrooms ?? []).map((c: any) => c.id)
+  const { data: members } = classroomIds.length
+    ? await supabaseAdmin.from('classroom_students').select('student_id').in('classroom_id', classroomIds)
+    : { data: [] as any[] }
+  const allowedStudentIds = new Set((members ?? []).map((m: any) => m.student_id))
+  const invalidRows = rows.filter(r => !allowedStudentIds.has(r.studentId))
+  if (invalidRows.length > 0) {
+    return NextResponse.json({ error: `${invalidRows.length} öğrenci senin sınıflarına ait değil.` }, { status: 403 })
+  }
+
   try {
     const result = await commitGradeImport({
       scope: 'teacher',
