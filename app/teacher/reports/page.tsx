@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
-import StudentReportTable from '@/components/StudentReportTable'
+import ReportsHub from '@/components/ReportsHub'
 import { createClient } from '@/lib/supabase/client'
 
 export default function TeacherReportsPage() {
@@ -31,13 +31,13 @@ export default function TeacherReportsPage() {
     <main style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       <PageHeader
         icon="📋"
-        title="Öğrenci Raporları"
-        subtitle="Sınıflarındaki öğrencilerin notları ve Pratium sonuçları"
+        title="Raporlar"
+        subtitle="Sınıflarındaki öğrencilerin notları, ilerlemesi ve Pratium sonuçları"
         backHref="/teacher"
         backLabel="Öğretmen paneli"
       />
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem' }}>
-        <StudentReportTable fetchEndpoint="/api/teacher/reports" />
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '1.5rem' }}>
+        <ReportsHub scope="teacher" gradesEndpoint="/api/teacher/reports" sectionalEndpoint="/api/teacher/reports" hubEndpoint="/api/teacher/reports-hub" />
       </div>
     </main>
   )
