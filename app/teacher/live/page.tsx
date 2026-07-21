@@ -29,7 +29,6 @@ export default function TeacherLivePage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login/teacher'); return }
       const { data: t } = await supabase.from('teachers').select('*').eq('user_id', user.id).single()
-console.log('DEBUG teacher check:', JSON.stringify(t), 'user.id:', user.id)
       if (!t?.approved) { router.push('/teacher'); return }
       setTeacher(t)
       const { data: cls } = await supabase.from('classrooms').select('*, classroom_students(count)').eq('teacher_id', t.id)

@@ -72,7 +72,7 @@ export default function TeacherDashboard() {
           supabase.from('profiles').select('grade, avatar_url').eq('id', sid).maybeSingle(),
           supabase.from('streaks').select('current_streak').eq('user_id', sid).maybeSingle(),
           supabase.from('quiz_sessions').select('pct, created_at, topic').eq('user_id', sid).eq('completed', true).order('created_at', { ascending: false }).limit(20),
-          supabase.from('assignment_completions').select('score, total').eq('student_id', sid),
+          supabase.from('assignment_completions').select('id, score').eq('student_id', sid),
         ])
         const sessions = sessionsRes.data ?? []
         const completions = completionsRes.data ?? []
