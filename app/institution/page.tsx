@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import GradeImportWizard from '@/components/GradeImportWizard'
+import StudentReportTable from '@/components/StudentReportTable'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Cell
@@ -15,7 +16,7 @@ export default function InstitutionPage() {
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'analytics' | 'risk' | 'import' | 'profile'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'analytics' | 'risk' | 'import' | 'reports' | 'profile'>('overview')
   const [sortBy, setSortBy] = useState<'name' | 'avgPct' | 'totalTests' | 'streak'>('avgPct')
   const [regenerating, setRegenerating] = useState(false)
   const [regenMsg, setRegenMsg] = useState('')
@@ -128,6 +129,7 @@ export default function InstitutionPage() {
     { key: 'students',   label: '👥 Öğrenciler' },
     { key: 'analytics',  label: '📈 Analitik' },
     { key: 'risk',       label: `⚠️ Risk${analytics?.riskStudents?.length ? ` (${analytics.riskStudents.length})` : ''}` },
+    { key: 'reports',    label: '📋 Öğrenci Raporları' },
     { key: 'import',     label: '📥 Not İçe Aktar' },
     { key: 'profile',    label: '⚙️ Profil' },
   ]
@@ -460,6 +462,17 @@ export default function InstitutionPage() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── ÖĞRENCİ RAPORLARI ───────────────────────────────────────────── */}
+        {activeTab === 'reports' && (
+          <div>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.25rem' }}>📋 Öğrenci Raporları</h1>
+            <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '1.25rem' }}>
+              İçe aktarılan sınav/dönem notları ile Pratium test sonuçlarını bir arada gösterir.
+            </p>
+            <StudentReportTable fetchEndpoint="/api/institution/reports" />
           </div>
         )}
 

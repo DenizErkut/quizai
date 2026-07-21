@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities, resolveName } from '@/lib/identity/resolve-client'
+import StudentReportTable from '@/components/StudentReportTable'
 import { Suspense } from 'react'
 import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
@@ -28,7 +29,7 @@ function ParentContent() {
   const [children, setChildren] = useState<ChildData[]>([])
   const [selectedChild, setSelectedChild] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'trend' | 'archive' | 'leaderboard' | 'add'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'trend' | 'archive' | 'leaderboard' | 'reports' | 'add'>('dashboard')
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
   const [addCode, setAddCode] = useState('')
@@ -190,6 +191,7 @@ function ParentContent() {
             { key: 'trend', label: '📈 Trend' },
             { key: 'archive', label: '📦 Arşiv' },
             { key: 'leaderboard', label: '🏆 Sıralama' },
+            { key: 'reports', label: '📋 Raporlar' },
             { key: 'add', label: '➕ Çocuk Ekle' },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key as any)}
@@ -506,6 +508,17 @@ function ParentContent() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* RAPORLAR */}
+        {activeTab === 'reports' && (
+          <div>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.25rem' }}>📋 Çocuklarımın Raporları</h1>
+            <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '1.25rem' }}>
+              Okuldan içe aktarılan sınav/dönem notları ile Pratium test sonuçlarını bir arada gösterir.
+            </p>
+            <StudentReportTable fetchEndpoint="/api/parent/reports" />
           </div>
         )}
 
