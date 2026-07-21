@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import GradeImportWizard from '@/components/GradeImportWizard'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Cell
@@ -14,7 +15,7 @@ export default function InstitutionPage() {
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'analytics' | 'risk' | 'profile'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'analytics' | 'risk' | 'import' | 'profile'>('overview')
   const [sortBy, setSortBy] = useState<'name' | 'avgPct' | 'totalTests' | 'streak'>('avgPct')
   const [regenerating, setRegenerating] = useState(false)
   const [regenMsg, setRegenMsg] = useState('')
@@ -127,6 +128,7 @@ export default function InstitutionPage() {
     { key: 'students',   label: '👥 Öğrenciler' },
     { key: 'analytics',  label: '📈 Analitik' },
     { key: 'risk',       label: `⚠️ Risk${analytics?.riskStudents?.length ? ` (${analytics.riskStudents.length})` : ''}` },
+    { key: 'import',     label: '📥 Not İçe Aktar' },
     { key: 'profile',    label: '⚙️ Profil' },
   ]
 
@@ -458,6 +460,18 @@ export default function InstitutionPage() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── NOT İÇE AKTAR ───────────────────────────────────────────────── */}
+        {activeTab === 'import' && (
+          <div>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.25rem' }}>📥 Not / Veri İçe Aktar</h1>
+            <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '1.25rem' }}>
+              MOZAİK, e-Okul veya kendi hazırladığın Excel/CSV dosyalarındaki öğrenci numarası, sınıf,
+              isim ve ders notlarını kuruma kayıtlı öğrencilerle eşleştirip içeri aktar.
+            </p>
+            <GradeImportWizard scope="institution" rosterEndpoint="/api/institution/students-roster" commitEndpoint="/api/institution/import-grades" />
           </div>
         )}
 

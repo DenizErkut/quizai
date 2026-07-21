@@ -177,6 +177,7 @@ export default function TeacherDashboard() {
             { key: 'assign', label: '📝 Ödev Ata' },
             { key: 'performance', label: '📈 Analiz' },
             { key: 'notify', label: '🔔 Bildirim' },
+            { key: 'import', label: '📥 Not İçe Aktar', href: '/teacher/import-grades' },
             { key: 'live', label: '🎯 Canlı Test', href: '/teacher/live' },
           ].map(t => (
             (t as any).href ? (
