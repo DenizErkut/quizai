@@ -53,6 +53,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, already_member: true, institution_name: inst.name })
   }
 
+  // Bir öğrenci aynı anda sadece TEK kuruma üye olabilir (DB'de de
+  // one_institution_per_student unique index'iyle zorunlu kılınıyor).
+  const { data: otherMembership } = await supabaseAdmin
+    .from('institution_users')
+    .select('institution_id, institutions(name)')
+    .eq('user_id', user_id)
+    .eq('role', 'student')
+    .maybeSingle()
+
+  if (otherMembership) {
+    const otherName = (otherMembership.institutions as any)?.name || 'başka bir kurum'
+    return NextResponse.json(
+      { error: `Zaten "${otherName}" kurumuna kayıtlısınız. Önce oradan ayrılmanız gerekiyor.` },
+      { status: 409 }
+    )
+  }
+
   // Service role ile insert — RLS bypass
   const { error } = await supabaseAdmin
     .from('institution_users')

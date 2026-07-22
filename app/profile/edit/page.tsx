@@ -82,13 +82,18 @@ export default function ProfileEditPage() {
         setReferralCode(data.referral_code || '')
         setParentCode(data.parent_code || '')
 
-        // Mevcut kurum bağlantısı
-        const { data: instUser } = await supabase
+        // Mevcut kurum bağlantısı — maybeSingle() yerine en son katılımı
+        // alıyoruz: eski (constraint öncesi) test verilerinde bir kullanıcının
+        // birden fazla kurum kaydı olabiliyordu, maybeSingle() bu durumda
+        // hata fırlatıp sessizce boş dönüyordu.
+        const { data: instRows } = await supabase
           .from('institution_users')
           .select('joined_at, institutions(name, code)')
           .eq('user_id', user.id)
           .eq('role', 'student')
-          .maybeSingle()
+          .order('joined_at', { ascending: false })
+          .limit(1)
+        const instUser = instRows?.[0]
         if (instUser) {
           setInstJoined(instUser.joined_at)
           setInstName((instUser.institutions as any)?.name || '')
