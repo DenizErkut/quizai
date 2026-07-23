@@ -35,6 +35,12 @@ export const SUBJECT_MAP: Record<string, Record<string, string[]>> = {
       'Okul heyecanım', 'Benim eşsiz yuvam', 'Dün bugün yarın',
       'Sağlıklı yaşam', 'Güvenli yaşam', 'Doğa ve çevre',
     ],
+    'İngilizce': [
+      'Alphabet and letters', 'Numbers', 'Colours and shapes', 'Greetings',
+      'My family', 'Animals', 'My body', 'Days and months', 'Weather',
+      'Classroom objects', 'Toys and games', 'Food and drinks',
+      'Simple present: I like / I have', 'Basic questions: What, Where, Who',
+    ],
   },
 
   ortaokul: {

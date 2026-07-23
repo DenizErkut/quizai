@@ -239,8 +239,26 @@ export async function POST(req: NextRequest) {
 }
 
 // Kaynakları listele
+// NOT: Bu endpoint /quiz sayfasında TÜM öğrenciler tarafından "MEB Müfredatı"
+// konu önerilerini göstermek için çağrılıyor (app/quiz/page.tsx, loadMebTopics).
+// Önceden is_admin şartı vardı — normal öğrenci/öğretmen hesapları için istek
+// her zaman 403 dönüyordu, bu yüzden yüklenen hiçbir kaynak (PDF ya da metin
+// fark etmeksizin) öğrenciye konu önerisi olarak hiç görünmüyordu. Listeleme
+// hassas veri içermediği için (sadece başlık/ders/ünite), artık herhangi bir
+// oturum açmış kullanıcıya açık — yazma (POST/DELETE) hâlâ admin-only.
+async function getAuthedUser() {
+  const cookieStore = await cookies()
+  const sb = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (n) => cookieStore.get(n)?.value } }
+  )
+  const { data: { user } } = await sb.auth.getUser()
+  return user
+}
+
 export async function GET(req: NextRequest) {
-  const user = await getAdminUser()
+  const user = await getAuthedUser()
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { searchParams } = new URL(req.url)
