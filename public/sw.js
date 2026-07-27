@@ -1,7 +1,8 @@
-// Pratium Service Worker v3 — Offline Cache + Push Notifications
-// v3: Otomatik güncelleme mekanizması eklendi — kullanıcı artık hard refresh yapmak zorunda değil
+// Pratium Service Worker v4 — RSC/prefetch istekleri artik cache'lenmiyor
+// (v3'te bu istekler farkli sayfalarin verilerini yanlislikla birbirine
+// karistirabiliyordu)
 
-const CACHE_NAME = 'pratium-v3'
+const CACHE_NAME = 'pratium-v4'
 const STATIC_ASSETS = [
   '/',
   '/quiz',
@@ -59,6 +60,15 @@ self.addEventListener('fetch', function(event) {
 
   // API isteklerini cache'leme
   if (url.pathname.startsWith('/api/')) return
+
+  // Next.js'in <Link>/router.push ile yaptığı RSC (React Server Component)
+  // veri isteklerini de cache'leme. Bunlar aynı pathname'e farklı içerik
+  // döndürebiliyor (route segment/header'a göre değişiyor) — SW bunları
+  // URL bazlı cache'leyince, önceden ziyaret edilmiş bir sayfanın cache'i
+  // sonradan tıklanan FARKLI bir sayfanın isteğine yanlışlıkla dönebiliyordu
+  // ("bir sayfaya girip geri dönünce, başka bir linke tıklayınca ilk
+  // girdiğim sayfa açılıyor" hatasının kaynağı buydu).
+  if (request.headers.get('RSC') === '1' || url.searchParams.has('_rsc')) return
 
   // Sadece GET isteklerini cache'le
   if (request.method !== 'GET') return
