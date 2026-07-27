@@ -5,7 +5,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { ReportStudentBase } from '@/lib/student-reports'
-import { DIGER_DERS } from '@/lib/student-report-topics'
+import { inferSubject, normalizeSubjectName, DIGER_DERS } from '@/lib/student-report-topics'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -258,13 +258,13 @@ export async function buildGradeComparisonReport(roster: ReportStudentBase[], im
     if (!selfReported.has(n.user_id)) selfReported.set(n.user_id, new Map())
     const avg = [n.term1_avg, n.term2_avg].filter((v: any) => v != null)
     const combined = avg.length ? avg.reduce((a: number, b: number) => a + b, 0) / avg.length : null
-    selfReported.get(n.user_id)!.set(n.subject, combined)
+    selfReported.get(n.user_id)!.set(normalizeSubjectName(n.subject), combined)
   }
 
   const imported = new Map<string, Map<string, number | null>>()
   for (const g of (gradesRes.data ?? [])) {
     if (!imported.has(g.student_id)) imported.set(g.student_id, new Map())
-    imported.get(g.student_id)!.set(g.subject, g.value_numeric)
+    imported.get(g.student_id)!.set(normalizeSubjectName(g.subject), g.value_numeric)
   }
 
   const students = roster

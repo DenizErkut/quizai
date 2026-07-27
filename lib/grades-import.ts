@@ -4,6 +4,7 @@
 // tarafından kullanılır.
 
 import { createClient } from '@supabase/supabase-js'
+import { normalizeSubjectName } from './student-report-topics'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -81,7 +82,7 @@ export async function commitGradeImport(params: CommitGradeImportParams): Promis
       gradeRecords.push({
         student_id: row.studentId,
         import_id: importRow.id,
-        subject,
+        subject: normalizeSubjectName(subject),
         value_text: value,
         value_numeric: parseNumeric(value),
       })

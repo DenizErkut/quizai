@@ -4,7 +4,7 @@
 // istatistikleriyle (quiz_sessions, streaks) birleştirir.
 
 import { createClient } from '@supabase/supabase-js'
-import { inferSubject, DIGER_DERS } from './student-report-topics'
+import { inferSubject, normalizeSubjectName, DIGER_DERS } from './student-report-topics'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -53,9 +53,10 @@ export async function attachGradesAndStats(
   const gradesByStudent = new Map<string, Record<string, string>>()
   const subjectSet = new Set<string>()
   for (const g of (gradesRes.data ?? [])) {
+    const subj = normalizeSubjectName(g.subject)
     if (!gradesByStudent.has(g.student_id)) gradesByStudent.set(g.student_id, {})
-    gradesByStudent.get(g.student_id)![g.subject] = g.value_text
-    subjectSet.add(g.subject)
+    gradesByStudent.get(g.student_id)![subj] = g.value_text
+    subjectSet.add(subj)
   }
 
   const statsByStudent = new Map<string, { total: number; sum: number }>()
@@ -122,9 +123,10 @@ export async function buildSectionalReport(
   const importedByStudent = new Map<string, Map<string, string>>()
   const subjectSet = new Set<string>()
   for (const g of (gradesRes.data ?? [])) {
+    const subj = normalizeSubjectName(g.subject)
     if (!importedByStudent.has(g.student_id)) importedByStudent.set(g.student_id, new Map())
-    importedByStudent.get(g.student_id)!.set(g.subject, g.value_text)
-    subjectSet.add(g.subject)
+    importedByStudent.get(g.student_id)!.set(subj, g.value_text)
+    subjectSet.add(subj)
   }
 
   // student_id -> { ders -> { toplam, adet } } (Pratium test sonuçları, konudan derse çıkarılmış)
