@@ -6,6 +6,7 @@ import Link from 'next/link'
 export default function SiteFooter() {
   const links = [
     { href: '/hakkimizda', label: 'Hakkımızda' },
+    { href: '/ozel-kocluk', label: 'Özel Koçluk' },
     { href: '/privacy', label: 'Gizlilik' },
     { href: '/terms', label: 'Kullanım Şartları' },
     { href: '/mesafeli-satis', label: 'Mesafeli Satış Sözleşmesi' },

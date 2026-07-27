@@ -37,7 +37,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'meb' | 'exams' | 'curriculum'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'meb' | 'exams' | 'curriculum' | 'coaching'>('users')
   const [identityMissing, setIdentityMissing] = useState<number | null>(null)
   const [identityScanning, setIdentityScanning] = useState(false)
   const [identityFixing, setIdentityFixing] = useState(false)
@@ -45,6 +45,8 @@ export default function AdminPage() {
   // Kurum formu
   // Müfredat state
   const [curriculum, setCurriculum] = useState<any[]>([])
+  const [coachingLeads, setCoachingLeads] = useState<any[]>([])
+  const [coachingLoading, setCoachingLoading] = useState(false)
   const [currLoading, setCurrLoading] = useState(false)
   const [currFilter, setCurrFilter] = useState({ level: 'ortaokul', grade: '' })
   const [newItem, setNewItem] = useState({ level: 'ortaokul', grade: '6. sınıf', subject: '' })
@@ -102,6 +104,31 @@ export default function AdminPage() {
     }
     load()
   }, [])
+
+  async function loadCoachingLeads() {
+    setCoachingLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/coaching-leads', { headers: { Authorization: `Bearer ${session?.access_token}` } })
+      const json = await res.json()
+      if (res.ok) setCoachingLeads(json.leads ?? [])
+    } catch { /* no-op */ }
+    setCoachingLoading(false)
+  }
+
+  useEffect(() => {
+    if (tab === 'coaching' && isAdmin) loadCoachingLeads()
+  }, [tab, isAdmin])
+
+  async function updateLeadStatus(id: string, status: string) {
+    setCoachingLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l))
+    const { data: { session } } = await supabase.auth.getSession()
+    await fetch('/api/coaching-leads', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ id, status }),
+    })
+  }
 
   async function scanIdentityMismatch() {
     setIdentityScanning(true)
@@ -427,6 +454,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             { key: 'meb', label: '📚 MEB Kaynakları' },
             { key: 'exams', label: '🎯 Sınav Kitapçıkları' },
             { key: 'curriculum', label: '📋 Müfredat Yönetimi' },
+            { key: 'coaching', label: '🎯 Özel Koçluk Talepleri' },
           ] as const).map(t => (
             <button key={t.key} className={`btn btn-sm ${tab === t.key ? 'btn-primary' : ''}`}
               onClick={() => setTab(t.key)}
@@ -1480,6 +1508,50 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {tab === 'coaching' && (
+        <div>
+          <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>
+            🎯 Özel Koçluk Talepleri
+          </h3>
+          <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '1.25rem' }}>
+            /ozel-kocluk sayfasındaki formdan gelen kurum ve bireysel talepler. Görüşme sonrası durumu güncelle.
+          </p>
+          {coachingLoading ? <div className="spinner" /> : coachingLeads.length === 0 ? (
+            <p style={{ fontSize: '13px', color: 'var(--text3)' }}>Henüz talep yok.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {coachingLeads.map((l: any) => (
+                <div key={l.id} className="card-sm" style={{ padding: '12px 14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div>
+                      <span className={`badge ${l.lead_type === 'kurum' ? 'badge-purple' : 'badge-accent'}`} style={{ marginRight: '8px' }}>
+                        {l.lead_type === 'kurum' ? '🏫 Kurum' : '👨‍👩‍👧 Bireysel'}
+                      </span>
+                      <b>{l.name}</b>{l.institution_name ? ` — ${l.institution_name}` : ''}
+                      {l.student_grade ? ` (${l.student_grade})` : ''}
+                    </div>
+                    <span style={{ fontSize: '11px', color: 'var(--text3)' }}>{new Date(l.created_at).toLocaleDateString('tr-TR')}</span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text2)', marginTop: '6px' }}>
+                    📧 {l.email} {l.phone ? `· 📞 ${l.phone}` : ''}
+                  </div>
+                  {l.message && <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '4px', fontStyle: 'italic' }}>"{l.message}"</div>}
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
+                    {(['yeni', 'gorusuldu', 'anlasma', 'reddedildi'] as const).map(s => (
+                      <button key={s} onClick={() => updateLeadStatus(l.id, s)}
+                        className="btn btn-sm"
+                        style={l.status === s ? { background: 'var(--accent)', color: '#fff', borderColor: 'var(--accent)' } : {}}>
+                        {{ yeni: 'Yeni', gorusuldu: 'Görüşüldü', anlasma: 'Anlaşma Yapıldı', reddedildi: 'Reddedildi' }[s]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
