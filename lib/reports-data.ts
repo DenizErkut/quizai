@@ -320,3 +320,41 @@ export async function buildClassroomCompareReport(roster: ReportStudentBase[], g
 
   return { groups: rows }
 }
+
+// ────────────────────────────────────────────────────────────────────────
+// 9) AÇIK UÇLU SORULAR — MEB ortak sınav formatı (senaryo + rubrik) ile
+// çözülen sorularda öğrenci başına ortalama başarı % ve soru sayısı.
+// ────────────────────────────────────────────────────────────────────────
+export async function buildOpenEndedReport(roster: ReportStudentBase[]) {
+  if (!roster.length) return { students: [] }
+  const { data } = await supabaseAdmin
+    .from('open_ended_sessions')
+    .select('user_id, subject, total_earned, total_possible, graded_at')
+    .in('user_id', ids(roster))
+    .not('graded_at', 'is', null)
+
+  const stats = new Map<string, { count: number; sumPct: number; lastAt: string; subjects: Set<string> }>()
+  for (const r of (data ?? [])) {
+    if (r.total_possible == null || r.total_possible === 0) continue
+    const pct = (r.total_earned / r.total_possible) * 100
+    const cur = stats.get(r.user_id) ?? { count: 0, sumPct: 0, lastAt: r.graded_at, subjects: new Set<string>() }
+    cur.count += 1
+    cur.sumPct += pct
+    if (r.subject) cur.subjects.add(r.subject)
+    if (r.graded_at > cur.lastAt) cur.lastAt = r.graded_at
+    stats.set(r.user_id, cur)
+  }
+
+  const students = roster.map(s => {
+    const st = stats.get(s.id)
+    return {
+      id: s.id, fullName: s.fullName,
+      questionsAnswered: st?.count ?? 0,
+      avgPct: st && st.count > 0 ? Math.round(st.sumPct / st.count) : null,
+      subjectsCovered: st ? [...st.subjects].join(', ') : '',
+      lastActivity: st?.lastAt ?? null,
+    }
+  }).sort((a, b) => b.questionsAnswered - a.questionsAnswered)
+
+  return { students }
+}

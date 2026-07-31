@@ -4,7 +4,7 @@ import { getAuthedUser, buildTeacherContext } from '@/lib/report-context'
 import {
   buildProgressReport, buildWeakTopicsReport, buildAssignmentsReport,
   buildLiveQuizReport, buildInactivityReport, buildReadingReport,
-  buildGradeComparisonReport, buildClassroomCompareReport,
+  buildGradeComparisonReport, buildClassroomCompareReport, buildOpenEndedReport,
 } from '@/lib/reports-data'
 
 export async function GET(req: NextRequest) {
@@ -34,6 +34,8 @@ export async function GET(req: NextRequest) {
     }
     case 'classroom-compare':
       return NextResponse.json({ ...(await buildClassroomCompareReport(roster, 'classroomName')), classrooms })
+    case 'open-ended':
+      return NextResponse.json({ ...(await buildOpenEndedReport(roster)), classrooms })
     case 'assignments':
       return NextResponse.json({ ...(await buildAssignmentsReport(roster, classroomIds)), classrooms })
     case 'live-quiz':

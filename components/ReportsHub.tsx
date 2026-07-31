@@ -6,7 +6,7 @@ import SectionalReportTable from '@/components/SectionalReportTable'
 
 type ReportKey =
   | 'grades' | 'sectional' | 'progress' | 'weak-topics' | 'assignments'
-  | 'live-quiz' | 'inactivity' | 'reading' | 'comparison' | 'classroom-compare'
+  | 'live-quiz' | 'inactivity' | 'reading' | 'open-ended' | 'comparison' | 'classroom-compare'
 
 const ALL_TABS: { key: ReportKey; label: string }[] = [
   { key: 'grades',            label: '📋 Öğrenci Raporları' },
@@ -17,6 +17,7 @@ const ALL_TABS: { key: ReportKey; label: string }[] = [
   { key: 'live-quiz',         label: '🎮 Canlı Quiz' },
   { key: 'inactivity',        label: '😴 Devamsızlık' },
   { key: 'reading',           label: '📖 Sesli Okuma' },
+  { key: 'open-ended',        label: '✍️ Açık Uçlu Sorular' },
   { key: 'comparison',        label: '⚖️ Not Karşılaştırma' },
   { key: 'classroom-compare', label: '🏫 Sınıf Karşılaştırma' },
 ]
@@ -112,6 +113,7 @@ function GenericReportPanel({ scope, hubEndpoint, report }: { scope: string; hub
       {report === 'live-quiz' && <LiveQuizPanel data={data} />}
       {report === 'inactivity' && <InactivityPanel data={data} />}
       {report === 'reading' && <ReadingPanel data={data} />}
+      {report === 'open-ended' && <OpenEndedPanel data={data} />}
       {report === 'comparison' && <ComparisonPanel data={data} />}
       {report === 'classroom-compare' && <ClassroomComparePanel data={data} />}
     </div>
@@ -262,6 +264,30 @@ function ReadingPanel({ data }: { data: any }) {
             <td style={{ ...td, fontWeight: 600 }}>{s.fullName}</td>
             <td style={td}>{s.materialsCompleted}</td>
             <td style={td}>{s.attentionAccuracyPct != null ? `%${s.attentionAccuracyPct} (${s.attentionChecksAnswered} soru)` : '—'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+function OpenEndedPanel({ data }: { data: any }) {
+  if (!data.students?.length) return empty
+  const answered = data.students.filter((s: any) => s.questionsAnswered > 0)
+  if (!answered.length) return <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', padding: '2rem 0' }}>Henüz Açık Uçlu Sorular'dan çözülen bir soru yok.</p>
+  return (
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+      <thead><tr><th style={th}>İsim</th><th style={th}>Çözülen Soru</th><th style={th}>Ort. Başarı</th><th style={th}>Dersler</th><th style={th}>Son Aktivite</th></tr></thead>
+      <tbody>
+        {answered.map((s: any) => (
+          <tr key={s.id}>
+            <td style={{ ...td, fontWeight: 600 }}>{s.fullName}</td>
+            <td style={td}>{s.questionsAnswered}</td>
+            <td style={{ ...td, fontWeight: 700, color: s.avgPct != null && s.avgPct < 50 ? 'var(--red)' : 'var(--green)' }}>
+              {s.avgPct != null ? `%${s.avgPct}` : '—'}
+            </td>
+            <td style={td}>{s.subjectsCovered || '—'}</td>
+            <td style={td}>{s.lastActivity ? new Date(s.lastActivity).toLocaleDateString('tr-TR') : '—'}</td>
           </tr>
         ))}
       </tbody>

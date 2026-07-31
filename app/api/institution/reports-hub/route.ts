@@ -5,7 +5,7 @@ import { getAuthedUser, buildInstitutionContext } from '@/lib/report-context'
 import {
   buildProgressReport, buildWeakTopicsReport, buildAssignmentsReport,
   buildLiveQuizReport, buildInactivityReport, buildReadingReport,
-  buildGradeComparisonReport, buildClassroomCompareReport,
+  buildGradeComparisonReport, buildClassroomCompareReport, buildOpenEndedReport,
 } from '@/lib/reports-data'
 
 const supabaseAdmin = createClient(
@@ -38,6 +38,8 @@ export async function GET(req: NextRequest) {
     }
     case 'classroom-compare':
       return NextResponse.json(await buildClassroomCompareReport(roster, 'grade'))
+    case 'open-ended':
+      return NextResponse.json(await buildOpenEndedReport(roster))
     case 'assignments':
     case 'live-quiz': {
       // Kuruma bağlı öğretmenlerin sınıfları üzerinden
