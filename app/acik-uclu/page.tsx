@@ -190,7 +190,7 @@ export default function AcikUcluPage() {
               <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)' }}>Cevabın</label>
               <textarea className="input" rows={8} value={answer} onChange={e => setAnswer(e.target.value)}
                 placeholder="Kendi cümlelerinle, düşüncelerini gerekçelendirerek yaz…"
-                style={{ marginTop: '8px', marginBottom: '1rem', resize: 'vertical' }} />
+                style={{ marginTop: '8px', marginBottom: '1rem', resize: 'vertical', borderRadius: '12px' }} />
               <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}
                 onClick={submitAnswer} disabled={grading}>
                 {grading ? 'Değerlendiriliyor…' : 'Cevabımı Gönder'}
