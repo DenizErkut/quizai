@@ -25,10 +25,10 @@ const CHOICES = [
     bg: 'linear-gradient(135deg, #2CB5E8 0%, #1B6FA8 100%)',
   },
   {
-    href: '/quiz?type=short_answer',
+    href: '/acik-uclu',
     icon: '✍️',
     title: 'Açık Uçlu Sorular',
-    desc: 'Şıksız, kendi cümlelerinle yazarak cevapla',
+    desc: 'MEB ortak sınav formatında senaryo + rubrikli değerlendirme',
     color: '#4CA84C',
     bg: 'linear-gradient(135deg, #6BC96B 0%, #3E8E3E 100%)',
   },
