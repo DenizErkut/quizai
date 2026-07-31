@@ -27,7 +27,7 @@ function LoginPageContent() {
     const { error: err } = await supabase.auth.signInWithPassword({ email, password: pass })
     setLoading(false)
     if (err) { setError('E-posta veya şifre hatalı.'); return }
-    router.push(isSafeNext(next) ? next! : '/quiz')
+    router.push(isSafeNext(next) ? next! : '/home')
   }
 
   async function handleOAuth(provider: 'google' | 'apple') {

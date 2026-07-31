@@ -233,7 +233,7 @@ function RegisterContent() {
         }
 
         setLoading(false)
-        router.push(isSafeNext(next) ? next : '/quiz')
+        router.push(isSafeNext(next) ? next : '/home')
 
       } else if (selectedRole === 'parent') {
         // Veli platform verisi (ad TR-PG'de)

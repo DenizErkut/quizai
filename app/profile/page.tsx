@@ -126,7 +126,7 @@ function ProfileSetupContent() {
     }
 
     setLoading(false)
-    router.push(isSafeNext(next) ? next! : '/quiz')
+    router.push(isSafeNext(next) ? next! : '/home')
   }
 
   return (
