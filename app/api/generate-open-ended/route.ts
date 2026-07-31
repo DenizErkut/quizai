@@ -16,6 +16,15 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// Guvenlik agi: AI modeli nadiren Turkce metnin arasina yabanci alfabe
+// (Korece/Cince/Japonca vb.) karakterleri sikistirabiliyor. Bu unicode
+// araliklarindaki karakterleri temizler - Turkce/Latin/matematik
+// sembollerini etkilemez.
+function stripForeignScripts(text: string): string {
+  if (!text) return text
+  return text.replace(/[\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]/g, '').replace(/\s{2,}/g, ' ').trim()
+}
+
 function getLevel(grade: string): string {
   const g = grade?.toLowerCase() || ''
   if (g.includes('ilkokul')) return 'ilkokul'
@@ -75,6 +84,8 @@ Konu: ${topic}
 
 Yukarıdaki konuya uygun, ${grade} seviyesine uygun zorlukta, gerçek bir MEB ortak sınav sorusu gibi bir senaryo+soru+rubrik hazırla.
 
+ÖNEMLİ: Tüm metinleri SADECE TÜRKÇE yaz. Başka hiçbir dilden (İngilizce, Korece, Çince vb.) tek bir kelime bile kullanma.
+
 SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir açıklama ekleme:
 {
   "scenario": "Senaryo/durum metni (2-4 cümle, Türkçe)",
@@ -105,6 +116,15 @@ Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
     if (!parsed?.scenario || !parsed?.question || !Array.isArray(parsed?.rubric)) {
       return NextResponse.json({ error: 'Soru üretilemedi, tekrar dene.' }, { status: 500 })
     }
+
+    // Guvenlik agi: yabanci alfabe karakterlerini temizle
+    parsed.scenario = stripForeignScripts(parsed.scenario)
+    parsed.question = stripForeignScripts(parsed.question)
+    parsed.rubric = parsed.rubric.map((r: any) => ({
+      ...r,
+      criterion: stripForeignScripts(r.criterion || ''),
+      description: stripForeignScripts(r.description || ''),
+    }))
 
     const totalPossible = parsed.rubric.reduce((s: number, r: any) => s + (r.maxPoints || 0), 0)
 

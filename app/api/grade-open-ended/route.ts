@@ -16,6 +16,15 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// Guvenlik agi: AI modeli nadiren Turkce metnin arasina yabanci alfabe
+// (Korece/Cince/Japonca vb.) karakterleri sikistirabiliyor. Bu unicode
+// araliklarindaki karakterleri temizler - Turkce/Latin/matematik
+// sembollerini etkilemez.
+function stripForeignScripts(text: string): string {
+  if (!text) return text
+  return text.replace(/[\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]/g, '').replace(/\s{2,}/g, ' ').trim()
+}
+
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('Authorization')
@@ -64,6 +73,8 @@ ${studentAnswer.trim()}
 Her kriteri ayrı ayrı değerlendir, kaç puan hak ettiğini belirle (0 ile o kriterin maxPoints'i arasında, tam sayı) ve öğrenciye yönelik kısa, yapıcı bir geri bildirim yaz (1-2 cümle, doğrudan öğrenciye hitaben "sen" dilinde).
 Ayrıca genel bir değerlendirme cümlesi yaz.
 
+ÖNEMLİ: Tüm metinleri SADECE TÜRKÇE yaz. Başka hiçbir dilden (İngilizce, Korece, Çince vb.) tek bir kelime bile kullanma.
+
 SADECE aşağıdaki JSON formatında yanıt ver:
 {
   "criteriaResults": [
@@ -92,6 +103,14 @@ SADECE aşağıdaki JSON formatında yanıt ver:
     if (!Array.isArray(parsed?.criteriaResults)) {
       return NextResponse.json({ error: 'Puanlama başarısız, tekrar dene.' }, { status: 500 })
     }
+
+    // Guvenlik agi: yabanci alfabe karakterlerini temizle
+    parsed.criteriaResults = parsed.criteriaResults.map((r: any) => ({
+      ...r,
+      feedback: stripForeignScripts(r.feedback || ''),
+      criterion: stripForeignScripts(r.criterion || ''),
+    }))
+    parsed.overallFeedback = stripForeignScripts(parsed.overallFeedback || '')
 
     const totalEarned = parsed.criteriaResults.reduce((s: number, r: any) => s + (r.earnedPoints || 0), 0)
 
