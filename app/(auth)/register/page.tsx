@@ -3,6 +3,7 @@ import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { savePendingRegistration } from '@/lib/pending-registration'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -63,8 +64,9 @@ function RegisterContent() {
   const supabase = createClient() as any
 
   // Adım yönetimi
-  const [step, setStep] = useState<'role' | 'info' | 'teacher_info'>('role')
+  const [step, setStep] = useState<'role' | 'info' | 'teacher_info' | 'check-email'>('role')
   const [selectedRole, setSelectedRole] = useState<'student' | 'teacher' | 'parent' | null>(null)
+  const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent'>('idle')
 
   // Ortak alanlar
   const [name, setName] = useState('')
@@ -159,9 +161,17 @@ function RegisterContent() {
     // NOT: 'name' artık auth metadata'ya YAZILMIYOR — kimlik TR-PG'de (create-identity).
     // Bu değişiklik, handle_new_user trigger'ından name'in çıkarılmasıyla AYNI
     // deploy'da gitmeli (bkz. scripts/002_handle_new_user_drop_name.sql).
+    // 'pending_role' İSTİSNA — PII değil, sadece rol string'i (student/teacher/parent).
+    // E-posta onayı bekleyen ve localStorage'ı kaybeden kullanıcılar (farklı
+    // cihaz/tarayıcı) için complete-profile'da hangi formun gösterileceğini
+    // bilmek amacıyla auth metadata'sında tutulur.
     const { data, error: err } = await supabase.auth.signUp({
       email,
       password: pass,
+      options: {
+        data: { pending_role: selectedRole },
+        emailRedirectTo: `${window.location.origin}/auth/complete-profile`,
+      },
     })
 
     if (err) { setError(err.message); setLoading(false); return }
@@ -172,8 +182,21 @@ function RegisterContent() {
       const accessToken = data.session?.access_token
         || (await supabase.auth.getSession()).data.session?.access_token
       if (!accessToken) {
-        setError('Oturum oluşturulamadı. Lütfen e-postanızı doğrulayıp tekrar giriş yapın.')
+        // E-posta onayı ZORUNLU ve henüz onaylanmadı — session yok.
+        // Formda toplanan veriyi geçici olarak sakla, onay sonrası
+        // /auth/complete-profile bu veriyi okuyup TR-PG kaydını tamamlayacak.
+        savePendingRegistration({
+          role: selectedRole!,
+          email,
+          fullName,
+          age: age ? parseInt(age) : undefined,
+          grade, studentSchool: studentSchool.trim(), classNumber: classNumber.trim(),
+          institutionCode: institutionCode.trim(),
+          kvkkAydinlatma, kvkkAcikRiza, veliOnayi,
+          ref, next,
+        })
         setLoading(false)
+        setStep('check-email')
         return
       }
       const idRes = await fetch('/api/auth/create-identity', {
@@ -298,6 +321,47 @@ function RegisterContent() {
     setLoading(false)
     // Öğretmen onay bekliyor — quiz'e git ama panel kısıtlı
     router.push('/teacher')
+  }
+
+  async function handleResendConfirmation() {
+    setResendStatus('sending')
+    await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/complete-profile` },
+    }).catch(() => {})
+    setResendStatus('sent')
+    setTimeout(() => setResendStatus('idle'), 15000)
+  }
+
+  // ── ADIM: E-posta Onayı Bekleniyor ──
+  if (step === 'check-email') {
+    return (
+      <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
+        <div style={{ width: '100%', maxWidth: '440px' }}>
+          <div className="card anim-up" style={{ textAlign: 'center', padding: '2.5rem 2rem' }}>
+            <div style={{ fontSize: '56px', marginBottom: '1rem' }}>📬</div>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '8px' }}>
+              E-postanı kontrol et
+            </h1>
+            <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7, marginBottom: '4px' }}>
+              <b>{email}</b> adresine bir onay bağlantısı gönderdik.
+            </p>
+            <p style={{ fontSize: '13px', color: 'var(--text3)', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+              Bağlantıya tıkladığında hesabın aktifleşecek ve kaydına kaldığı yerden devam edeceğiz. Gelen kutusunda göremezsen spam/gereksiz klasörünü kontrol et.
+            </p>
+            <button className="btn" onClick={handleResendConfirmation} disabled={resendStatus === 'sending'}
+              style={{ width: '100%', justifyContent: 'center', marginBottom: '10px' }}>
+              {resendStatus === 'sending' ? <span className="spinner" style={{ width: 18, height: 18 }} />
+                : resendStatus === 'sent' ? 'Tekrar gönderildi ✓' : 'E-postayı tekrar gönder'}
+            </button>
+            <button onClick={() => setStep('role')} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--text3)', fontFamily: 'var(--font-sans)' }}>
+              ← Farklı bir e-posta ile kaydol
+            </button>
+          </div>
+        </div>
+      </main>
+    )
   }
 
   // ── ADIM 1: Rol Seçimi ──

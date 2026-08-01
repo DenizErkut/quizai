@@ -37,10 +37,11 @@ function RegisterTeacherContent() {
   const [phone, setPhone] = useState('')
   const [doc, setDoc] = useState<File | null>(null)
 
-  const [step, setStep] = useState<'account' | 'info' | 'done'>('account')
+  const [step, setStep] = useState<'account' | 'info' | 'check-email' | 'done'>('account')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [userId, setUserId] = useState('')
+  const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent'>('idle')
 
   async function handleOAuth() {
     setOauthLoading(true)
@@ -57,12 +58,38 @@ function RegisterTeacherContent() {
     if (pass.length < 6) { setError('Sifre en az 6 karakter olmali.'); return }
     setError(''); setLoading(true)
 
-    const { data, error: err } = await supabase.auth.signUp({ email, password: pass })
+    const { data, error: err } = await supabase.auth.signUp({
+      email,
+      password: pass,
+      options: { emailRedirectTo: `${window.location.origin}/register/teacher?step=info` },
+    })
     if (err) { setError(err.message); setLoading(false); return }
 
     setUserId(data.user?.id || '')
     setLoading(false)
+
+    const hasSession = !!(data.session?.access_token || (await supabase.auth.getSession()).data.session?.access_token)
+    if (!hasSession) {
+      // E-posta onayı zorunlu ve henüz onaylanmadı. Hesap oluşturuldu ama
+      // henüz oturum yok — öğretmen bilgileri formunu (info) onaydan SONRA
+      // göstereceğiz. Onay linki zaten ?step=info'ya yönlendiriyor; kullanıcı
+      // linke tıklayınca üstteki useEffect session'ı bulup otomatik olarak
+      // 'info' adımına geçirecek.
+      setStep('check-email')
+      return
+    }
     setStep('info')
+  }
+
+  async function handleResendConfirmation() {
+    setResendStatus('sending')
+    await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/register/teacher?step=info` },
+    }).catch(() => {})
+    setResendStatus('sent')
+    setTimeout(() => setResendStatus('idle'), 15000)
   }
 
   async function handleApply() {
@@ -187,6 +214,27 @@ function RegisterTeacherContent() {
               Hesabiniz var mi?{' '}
               <Link href="/login/teacher" style={{ color: '#7c3aed', fontWeight: 600 }}>Giris yapin</Link>
             </div>
+          </div>
+        )}
+
+        {/* Adım: E-posta onayı bekleniyor */}
+        {step === 'check-email' && (
+          <div className="card anim-up-1" style={{ textAlign: 'center', padding: '2.5rem 2rem' }}>
+            <div style={{ fontSize: '48px', marginBottom: '1rem' }}>📬</div>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 800, color: 'var(--primary)', marginBottom: '8px' }}>
+              E-postanı kontrol et
+            </h2>
+            <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7, marginBottom: '4px' }}>
+              <b>{email}</b> adresine bir onay bağlantısı gönderdik.
+            </p>
+            <p style={{ fontSize: '13px', color: 'var(--text3)', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+              Bağlantıya tıkladığında öğretmen bilgilerini gireceğin adıma otomatik geçeceksin.
+            </p>
+            <button className="btn" onClick={handleResendConfirmation} disabled={resendStatus === 'sending'}
+              style={{ width: '100%', justifyContent: 'center' }}>
+              {resendStatus === 'sending' ? <span className="spinner" style={{ width: 18, height: 18 }} />
+                : resendStatus === 'sent' ? 'Tekrar gönderildi ✓' : 'E-postayı tekrar gönder'}
+            </button>
           </div>
         )}
 
