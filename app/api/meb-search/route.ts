@@ -74,20 +74,43 @@ export async function POST(req: NextRequest) {
       let q = adminDb
         .from('meb_resources')
         .select('title, subject, unit, grade, raw_text')
-        .limit(3)
+        .limit(5) // birkaç fazla cek, asagida en zengin olanlari secelim
 
       // Önce unit eşleştir
       if (unit) q = q.ilike('unit', `%${unit}%`)
       else if (subject) q = q.ilike('subject', `%${subject}%`)
       else if (grade) q = q.eq('grade', grade)
 
-      const { data: resources } = await q
+      const { data: allResources } = await q
 
-      if (resources?.length) {
+      if (allResources?.length) {
+        // Bazı yüklenen kaynaklar sadece MÜFREDAT KAZANIM KODU LİSTESİ
+        // (örn. "SB.6.4.1. ... a) ... b) ...") - bunlar ogretmene yonelik
+        // ogrenme ciktisi tanimlaridir, ogrenciye sorulacak GERCEK ders
+        // icerigi degildir. Boyle bir kaynaktan soru uretilirse "hangi
+        // kazanimin 'c' alt maddesi X der" gibi anlamsiz, ogrenciye
+        // hicbir sey ifade etmeyen sorular ortaya cikar. Bu paternde
+        // olan kaynaklari, gercek anlatisal/orneklerle dolu icerik
+        // varsa ELE. Yoksa (tek secenek buysa) yine kullan.
+        const kazanimPattern = /[A-ZÇĞİÖŞÜ]{1,4}\.\d+\.\d+\.\d+\./g
+        const isKazanimListesi = (text: string) => {
+          const matches = text.match(kazanimPattern)
+          return !!matches && matches.length >= 2 && text.length < 4000
+        }
+
+        const narrative = allResources.filter((r: any) => !isKazanimListesi(r.raw_text || ''))
+        const pool = narrative.length > 0 ? narrative : allResources
+
+        // En zengin (en uzun) icerigi one al - daha cok ornek/hikaye/haber
+        // demek, sorulari cesitlendirmek icin daha fazla malzeme demek
+        const resources = pool
+          .sort((a: any, b: any) => (b.raw_text?.length || 0) - (a.raw_text?.length || 0))
+          .slice(0, 3)
+
         context = resources.map((r: any, i: number) =>
           `[MEB Kaynak ${i + 1} - ${r.subject || ''}/${r.unit || ''}]\n${(r.raw_text || '').slice(0, 3000)}`
         ).join('\n\n---\n\n')
-        console.log(`[meb-search] resources: ${resources.length} found`)
+        console.log(`[meb-search] resources: ${resources.length} found (${allResources.length} aday, ${narrative.length} anlatisal)`)
       }
     }
 
