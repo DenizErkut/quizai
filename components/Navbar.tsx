@@ -171,7 +171,7 @@ export default function Navbar() {
         padding: '0 14px',
         boxShadow: '0 2px 12px rgba(8,36,101,0.3)',
       }}>
-        <Link href="/quiz" style={{ flexShrink: 0 }}>
+        <Link href="/home" style={{ flexShrink: 0 }}>
           <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '28px', filter: 'brightness(0) invert(1)' }} />
         </Link>
 
@@ -332,7 +332,7 @@ export default function Navbar() {
         <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%', padding: '0 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
 
           {/* Logo */}
-          <Link href="/quiz" style={{ flexShrink: 0 }}>
+          <Link href="/home" style={{ flexShrink: 0 }}>
             <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '76px', width: 'auto', filter: 'brightness(0) invert(1)' }} />
           </Link>
 
