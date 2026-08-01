@@ -197,11 +197,6 @@ function RegisterContent() {
       // _sessionResponse'da yok.) Yani data.user'ın null olması BAŞARISIZLIK
       // anlamına gelmiyor — bu senaryoda her zaman böyle. Bu yüzden artık
       // SADECE `error` alanına güveniyoruz, data.user'a değil.
-      console.log('[handleRegister] signUp sonucu:', {
-        hasData: !!data,
-        hasUser: !!data?.user,
-        hasSession: !!data?.session,
-      })
 
       // NOT: data.user null olabileceği için "zaten kayıtlı" (identities: [])
       // tespiti de bu durumda çalışmaz — bu bilinen bir sınırlama, kütüphane
