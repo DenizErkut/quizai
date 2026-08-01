@@ -85,6 +85,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [unread, setUnread] = useState(0)
+  const [bubbleDismissed, setBubbleDismissed] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -142,7 +143,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
     <>
       {open && (
         <div style={{
-          position: 'fixed', bottom: '90px', right: '24px', zIndex: 9998,
+          position: 'fixed', bottom: '108px', right: '24px', zIndex: 9998,
           width: '370px', maxWidth: 'calc(100vw - 32px)',
           background: '#fff', borderRadius: '20px',
           boxShadow: '0 20px 60px rgba(8,36,101,0.18)',
@@ -284,27 +285,73 @@ export default function AIChatBot({ isGuest = false }: Props) {
         </div>
       )}
 
+      {/* Konuşma balonu — sohbet kapalıyken ve kapatılmadıysa görünür */}
+      {!open && !bubbleDismissed && (
+        <div
+          onClick={() => { setOpen(true); setUnread(0) }}
+          style={{
+            position: 'fixed', bottom: '108px', right: '24px', zIndex: 9998,
+            maxWidth: '230px',
+            background: '#fff',
+            borderRadius: '18px 18px 4px 18px',
+            padding: '12px 16px',
+            boxShadow: '0 10px 32px rgba(8,36,101,0.18)',
+            border: '1.5px solid rgba(30,207,184,0.25)',
+            cursor: 'pointer',
+            animation: 'botSlideUp 0.3s ease',
+          }}
+        >
+          <button
+            onClick={e => { e.stopPropagation(); setBubbleDismissed(true) }}
+            aria-label="Kapat"
+            style={{
+              position: 'absolute', top: '-8px', right: '-8px',
+              width: 22, height: 22, borderRadius: '50%',
+              background: '#fff', border: '1.5px solid #e2e8f0',
+              color: '#64748b', fontSize: '13px', lineHeight: 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+            }}
+          >×</button>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: '#082465', marginBottom: '2px' }}>
+            Merhaba, ben Prati! 👋
+          </div>
+          <div style={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.5 }}>
+            AI asistanınızım — size yardımcı olmak için buradayım.
+          </div>
+          {/* balon kuyruğu */}
+          <div style={{
+            position: 'absolute', bottom: '-8px', right: '28px',
+            width: 0, height: 0,
+            borderLeft: '8px solid transparent',
+            borderRight: '8px solid transparent',
+            borderTop: '8px solid #fff',
+            filter: 'drop-shadow(0 2px 1px rgba(8,36,101,0.06))',
+          }} />
+        </div>
+      )}
+
       {/* FAB */}
       <button
-        onClick={() => { setOpen(v => !v); setUnread(0) }}
+        onClick={() => { setOpen(v => !v); setUnread(0); setBubbleDismissed(true) }}
         style={{
           position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999,
-          width: 64, height: 64, borderRadius: '50%',
+          width: 80, height: 80, borderRadius: '50%',
           background: open ? 'linear-gradient(135deg, #082465, #1ECFB8)' : '#ffffff',
           border: open ? 'none' : '2px solid rgba(30,207,184,0.25)',
           cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: '0 8px 32px rgba(8,36,101,0.3)',
           transition: 'transform 0.2s, box-shadow 0.2s',
-          padding: open ? 0 : '6px',
+          padding: open ? 0 : '8px',
         }}
         onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(8,36,101,0.4)' }}
         onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 8px 32px rgba(8,36,101,0.3)' }}
         aria-label={open ? 'Sohbeti kapat' : 'Prati ile sohbet et'}
       >
         {open
-          ? <span style={{ fontSize: '26px', color: '#fff' }}>×</span>
-          : <img src="/mascot-prati.svg" alt="Prati" style={{ width: '100%', height: '100%' }} />
+          ? <span style={{ fontSize: '28px', color: '#fff' }}>×</span>
+          : <img src="/mascot-prati.svg" alt="Prati" style={{ width: '100%', height: '100%', animation: 'botFloat 2.6s ease-in-out infinite' }} />
         }
         {!open && unread > 0 && (
           <span style={{ position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#FDD31D', color: '#082465', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
@@ -321,6 +368,10 @@ export default function AIChatBot({ isGuest = false }: Props) {
         @keyframes botBounce {
           0%, 60%, 100% { transform: translateY(0); }
           30% { transform: translateY(-5px); }
+        }
+        @keyframes botFloat {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          50% { transform: translateY(-5px) rotate(-3deg); }
         }
       `}</style>
     </>
