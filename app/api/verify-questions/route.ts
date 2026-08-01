@@ -3,8 +3,17 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { verifyQuestionWithOpenAI } from '@/lib/openai'
+import { verifyQuestionWithGemini } from '@/lib/verify-gemini'
 
 const anthropic = new Anthropic()
+
+// Matematik icerikli soru mu - varsa bagimsiz kontrol icin OpenAI'a yonlendirilir
+// (Claude'un kendi urettigini yine Claude'a kontrol ettirmek yerine)
+function isMathQuestion(q: any): boolean {
+  const text = `${q.q || ''} ${(q.opts || []).join(' ')}`
+  return /[0-9]\s*[+\-*/=]\s*[0-9]|denklem|hesapla|çöz|eşitlik|kaçtır|toplam|fark|çarp|bölüm|equation|solve|calculate/i.test(text)
+}
 
 // Soru tipine göre doğrulama prompt'u
 function buildVerifyPrompt(q: any, lang: string): string {
@@ -139,23 +148,38 @@ export async function POST(req: NextRequest) {
         }
 
         try {
-          const res = await anthropic.messages.create({
-            model: 'claude-sonnet-4-5',
-            max_tokens: 150,
-            messages: [{ role: 'user', content: buildVerifyPrompt(q, lang) }],
-          })
+          // Matematik sorularinda BAGIMSIZ kontrol icin OpenAI (Claude kendi
+          // urettigini yine Claude'a kontrol ettirmiyor). Diger tipler icin
+          // Claude ile devam ediyoruz.
+          const verifyPrompt = buildVerifyPrompt(q, lang)
+          const primaryCheck = isMathQuestion(q)
+            ? await verifyQuestionWithOpenAI(verifyPrompt)
+            : await (async () => {
+                const res = await anthropic.messages.create({
+                  model: 'claude-sonnet-4-5',
+                  max_tokens: 150,
+                  messages: [{ role: 'user', content: verifyPrompt }],
+                })
+                const text = res.content[0].type === 'text' ? res.content[0].text.trim() : ''
+                const match = text.match(/\{[\s\S]*\}/)
+                return match ? JSON.parse(match[0]) : { ok: true }
+              })()
 
-          const text = res.content[0].type === 'text' ? res.content[0].text.trim() : ''
-          const match = text.match(/\{[\s\S]*\}/)
-
-          if (match) {
-            const result = JSON.parse(match[0])
-            if (!result.ok) {
-              rejected.push(idx)
-              rejectReasons.push(`Q${idx} (${q.type}): ${result.reason || 'failed'}`)
-              return
-            }
+          if (!primaryCheck.ok) {
+            rejected.push(idx)
+            rejectReasons.push(`Q${idx} (${q.type}): ${primaryCheck.reason || 'failed'}`)
+            return
           }
+
+          // Ucuncu bagimsiz katman: Gemini (GEMINI_API_KEY tanimliysa aktif,
+          // tanimli degilse sessizce atlanir - uretimi bozmaz)
+          const geminiCheck = await verifyQuestionWithGemini(verifyPrompt)
+          if (geminiCheck && !geminiCheck.ok) {
+            rejected.push(idx)
+            rejectReasons.push(`Q${idx} (${q.type}) [gemini]: ${geminiCheck.reason || 'failed'}`)
+            return
+          }
+
           verified.push(q)
         } catch {
           // AI check failed → kabul et

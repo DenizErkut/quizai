@@ -54,4 +54,19 @@ export async function verifyMathWithOpenAI(question: string, answer: string, lan
   try { return JSON.parse(result) } catch { return { correct: false, explanation: result } }
 }
 
+// 4. Genel soru doğrulama — bağımsız çapraz kontrol için (matematik odaklı,
+// Claude'un kendi ürettiğini yine Claude'a kontrol ettirmek yerine farklı
+// bir modelle gerçek bağımsız doğrulama sağlar)
+export async function verifyQuestionWithOpenAI(prompt: string): Promise<{ ok: boolean; reason?: string; fix?: string }> {
+  try {
+    const result = await callOpenAI([
+      { role: 'system', content: 'You are a strict educational content verifier. Respond only with valid JSON.' },
+      { role: 'user', content: prompt },
+    ], { model: 'gpt-4o', max_tokens: 250, json: true })
+    return JSON.parse(result)
+  } catch {
+    return { ok: true } // Doğrulama başarısız olursa soruyu reddetme, geç
+  }
+}
+
 export { callOpenAI }
