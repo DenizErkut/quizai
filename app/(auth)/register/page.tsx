@@ -159,6 +159,15 @@ function RegisterContent() {
     const fullName = `${name.trim()} ${surname.trim()}`
 
     try {
+      // Formu her göndermeden önce tarayıcıda kalmış ESKİ bir oturumu (örn.
+      // bir önceki yarım kalmış deneme, farklı bir e-postayla) temizle.
+      // Aksi halde signUp() sonrası accessToken kontrolü yanlışlıkla o eski
+      // oturumu geçerli sanabilir ve yeni kullanıcının verisini eski
+      // kullanıcının kimliğiyle yazmaya çalışır (RLS bunu reddeder, "Kayıt
+      // oluşturulamadı" hatası görünür — ama e-posta zaten gönderilmiş olur,
+      // kafa karıştırıcı bir görünüm).
+      await supabase.auth.signOut().catch(() => {})
+
       // NOT: 'name' artık auth metadata'ya YAZILMIYOR — kimlik TR-PG'de (create-identity).
       // Bu değişiklik, handle_new_user trigger'ından name'in çıkarılmasıyla AYNI
       // deploy'da gitmeli (bkz. scripts/002_handle_new_user_drop_name.sql).
@@ -184,8 +193,11 @@ function RegisterContent() {
 
       // ── Kimlik (ad-soyad, yaş) + KVKK rızaları TR-PG'de oluşturulur.
       // Supabase Auth sadece oturum içindir; profiles'a kimlik alanı yazılmaz.
+      // ÖNEMLİ: SADECE bu signUp() çağrısının kendi döndürdüğü session'a
+      // güveniyoruz — getSession() fallback'i KASITLI OLARAK yok, çünkü
+      // tarayıcıda kalmış farklı bir kullanıcının oturumunu yanlışlıkla
+      // "bu kullanıcının oturumu" sanabilirdi.
       const accessToken = data.session?.access_token
-        || (await supabase.auth.getSession()).data.session?.access_token
       if (!accessToken) {
         // E-posta onayı ZORUNLU ve henüz onaylanmadı — session yok.
         // Formda toplanan veriyi geçici olarak sakla, onay sonrası

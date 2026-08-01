@@ -59,6 +59,10 @@ function RegisterTeacherContent() {
     setError(''); setLoading(true)
 
     try {
+      // Önceki bir denemeden kalmış oturumu temizle (bkz. register/page.tsx'teki
+      // aynı düzeltmenin notu — stale session farklı kullanıcıyla karışabilir).
+      await supabase.auth.signOut().catch(() => {})
+
       const { data, error: err } = await supabase.auth.signUp({
         email,
         password: pass,
@@ -68,7 +72,8 @@ function RegisterTeacherContent() {
 
       setUserId(data.user?.id || '')
 
-      const hasSession = !!(data.session?.access_token || (await supabase.auth.getSession()).data.session?.access_token)
+      // SADECE bu signUp() çağrısının döndürdüğü session'a güveniyoruz.
+      const hasSession = !!data.session?.access_token
       if (!hasSession) {
         // E-posta onayı zorunlu ve henüz onaylanmadı. Hesap oluşturuldu ama
         // henüz oturum yok — öğretmen bilgileri formunu (info) onaydan SONRA
