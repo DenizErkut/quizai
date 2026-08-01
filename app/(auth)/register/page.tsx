@@ -186,26 +186,27 @@ function RegisterContent() {
 
       if (err) { setError(err.message); return }
 
-      // GEÇİCİ TEŞHİS LOGU — sorunu netleştirdikten sonra kaldırılacak.
+      // ── BİLİNEN @supabase/supabase-js DAVRANIŞI ──
+      // GoTrue, e-posta onayı zorunluyken (session yokken) signUp() yanıtında
+      // kullanıcı objesini SARMALAMADAN düz döndürür ({id, email, ...} —
+      // {user: {...}} değil). @supabase/supabase-js'in signUp() için kullandığı
+      // dönüştürücü (_sessionResponse) bu düz şekli tanımıyor ve SADECE
+      // data.user alanına bakıyor — o da bu durumda hep undefined olduğu için
+      // `user` HER ZAMAN null dönüyor. (Kaynak: node_modules/@supabase/
+      // auth-js/src/lib/fetch.ts — _userResponse'da bu fallback var ama
+      // _sessionResponse'da yok.) Yani data.user'ın null olması BAŞARISIZLIK
+      // anlamına gelmiyor — bu senaryoda her zaman böyle. Bu yüzden artık
+      // SADECE `error` alanına güveniyoruz, data.user'a değil.
       console.log('[handleRegister] signUp sonucu:', {
         hasData: !!data,
         hasUser: !!data?.user,
-        userId: data?.user?.id,
-        identitiesLength: data?.user?.identities?.length,
         hasSession: !!data?.session,
-        fullDataUser: data?.user,
       })
 
-      if (!data.user) {
-        setError('Kayıt oluşturulamadı. Lütfen tekrar deneyin.')
-        return
-      }
-
-      // Supabase, GÜVENLİK amacıyla (e-posta numaralandırma saldırılarını
-      // önlemek için) zaten kayıtlı+onaylı bir e-postayla signUp() çağrılınca
-      // HATA DÖNDÜRMEZ — sanki başarılıymış gibi bir kullanıcı nesnesi döner
-      // ama identities dizisi boştur. Bu, "bu e-posta zaten kayıtlı" sinyalidir.
-      if (data.user.identities && data.user.identities.length === 0) {
+      // NOT: data.user null olabileceği için "zaten kayıtlı" (identities: [])
+      // tespiti de bu durumda çalışmaz — bu bilinen bir sınırlama, kütüphane
+      // düzeyinde çözülmesi gerekiyor (aşağıda ayrıca not edildi).
+      if (data.user?.identities && data.user.identities.length === 0) {
         setError('Bu e-posta adresiyle zaten bir hesabın var. Giriş yapmayı dene ya da şifreni sıfırla.')
         return
       }
