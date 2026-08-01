@@ -186,6 +186,16 @@ function RegisterContent() {
 
       if (err) { setError(err.message); return }
 
+      // GEÇİCİ TEŞHİS LOGU — sorunu netleştirdikten sonra kaldırılacak.
+      console.log('[handleRegister] signUp sonucu:', {
+        hasData: !!data,
+        hasUser: !!data?.user,
+        userId: data?.user?.id,
+        identitiesLength: data?.user?.identities?.length,
+        hasSession: !!data?.session,
+        fullDataUser: data?.user,
+      })
+
       if (!data.user) {
         setError('Kayıt oluşturulamadı. Lütfen tekrar deneyin.')
         return
