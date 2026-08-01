@@ -1,0 +1,62 @@
+<svg viewBox="0 0 200 210" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a2f7a"/>
+      <stop offset="100%" stop-color="#1ECFB8"/>
+    </linearGradient>
+    <linearGradient id="headGrad" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#0d3488"/>
+      <stop offset="100%" stop-color="#17b8a4"/>
+    </linearGradient>
+    <radialGradient id="eyeGlow" cx="35%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#9CFFF3"/>
+      <stop offset="100%" stop-color="#1ECFB8"/>
+    </radialGradient>
+  </defs>
+
+  <!-- shadow -->
+  <ellipse cx="100" cy="198" rx="40" ry="6" fill="#082465" opacity="0.15"/>
+
+  <!-- left arm, resting -->
+  <path d="M62 130 q-20 4 -22 26" stroke="url(#bodyGrad)" stroke-width="15" fill="none" stroke-linecap="round"/>
+  <circle cx="40" cy="158" r="10" fill="#082465"/>
+
+  <!-- right arm, waving -->
+  <path d="M138 128 q26 -6 34 -30" stroke="url(#bodyGrad)" stroke-width="15" fill="none" stroke-linecap="round"/>
+  <circle cx="173" cy="96" r="11" fill="#082465"/>
+
+  <!-- body -->
+  <rect x="56" y="122" width="88" height="62" rx="28" fill="url(#bodyGrad)"/>
+  <!-- chest badge: pencil-tip motif, echoes the Pratium logo -->
+  <g transform="translate(100 152)">
+    <circle r="16" fill="#0a1f4f"/>
+    <path d="M -7 7 L 7 -7 L 7 5 Z" fill="#1ECFB8"/>
+    <path d="M -7 7 L -1 7 L -7 1 Z" fill="#F5A623"/>
+  </g>
+
+  <!-- feet -->
+  <rect x="64" y="180" width="22" height="15" rx="7.5" fill="#082465"/>
+  <rect x="114" y="180" width="22" height="15" rx="7.5" fill="#082465"/>
+
+  <!-- head -->
+  <circle cx="100" cy="76" r="62" fill="url(#headGrad)"/>
+  <ellipse cx="80" cy="42" rx="26" ry="12" fill="#ffffff" opacity="0.14"/>
+
+  <!-- antenna -->
+  <line x1="100" y1="16" x2="100" y2="-4" stroke="#082465" stroke-width="4" stroke-linecap="round"/>
+  <path d="M100 -20
+           L104 -8 L116 -12 L106 -3 L112 9 L100 2 L88 9 L94 -3 L84 -12 L96 -8 Z"
+        fill="#F5A623"/>
+
+  <!-- face plate -->
+  <ellipse cx="100" cy="80" rx="44" ry="38" fill="#04122E"/>
+
+  <!-- eyes -->
+  <ellipse cx="80" cy="80" rx="12" ry="15" fill="url(#eyeGlow)"/>
+  <ellipse cx="120" cy="80" rx="12" ry="15" fill="url(#eyeGlow)"/>
+  <circle cx="83.5" cy="74" r="3.2" fill="#ffffff"/>
+  <circle cx="123.5" cy="74" r="3.2" fill="#ffffff"/>
+
+  <!-- smile -->
+  <path d="M82 100 Q100 111 118 100" stroke="#9CFFF3" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+</svg>

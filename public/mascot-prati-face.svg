@@ -1,0 +1,34 @@
+<svg viewBox="26 -30 148 168" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="headGrad" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#0d3488"/>
+      <stop offset="100%" stop-color="#17b8a4"/>
+    </linearGradient>
+    <radialGradient id="eyeGlow" cx="35%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#9CFFF3"/>
+      <stop offset="100%" stop-color="#1ECFB8"/>
+    </radialGradient>
+  </defs>
+
+  <!-- head -->
+  <circle cx="100" cy="76" r="62" fill="url(#headGrad)"/>
+  <ellipse cx="80" cy="42" rx="26" ry="12" fill="#ffffff" opacity="0.14"/>
+
+  <!-- antenna -->
+  <line x1="100" y1="16" x2="100" y2="-4" stroke="#082465" stroke-width="4" stroke-linecap="round"/>
+  <path d="M100 -20
+           L104 -8 L116 -12 L106 -3 L112 9 L100 2 L88 9 L94 -3 L84 -12 L96 -8 Z"
+        fill="#F5A623"/>
+
+  <!-- face plate -->
+  <ellipse cx="100" cy="80" rx="44" ry="38" fill="#04122E"/>
+
+  <!-- eyes -->
+  <ellipse cx="80" cy="80" rx="12" ry="15" fill="url(#eyeGlow)"/>
+  <ellipse cx="120" cy="80" rx="12" ry="15" fill="url(#eyeGlow)"/>
+  <circle cx="83.5" cy="74" r="3.2" fill="#ffffff"/>
+  <circle cx="123.5" cy="74" r="3.2" fill="#ffffff"/>
+
+  <!-- smile -->
+  <path d="M82 100 Q100 111 118 100" stroke="#9CFFF3" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+</svg>

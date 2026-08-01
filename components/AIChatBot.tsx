@@ -159,8 +159,8 @@ export default function AIChatBot({ isGuest = false }: Props) {
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
-                🤖
+              <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '5px' }}>
+                <img src="/mascot-prati-face.svg" alt="Prati" style={{ width: '100%', height: '100%' }} />
               </div>
               <div>
                 <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>Pratium Asistan</div>
@@ -185,7 +185,9 @@ export default function AIChatBot({ isGuest = false }: Props) {
             {messages.map((m, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
                 {m.role === 'assistant' && (
-                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #082465, #1ECFB8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0, marginRight: '8px', alignSelf: 'flex-end' }}>🤖</div>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #082465, #1ECFB8)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: '8px', alignSelf: 'flex-end', padding: '3px' }}>
+                    <img src="/mascot-prati-face.svg" alt="Prati" style={{ width: '100%', height: '100%' }} />
+                  </div>
                 )}
                 <div style={{
                   maxWidth: '78%', padding: '10px 13px',
@@ -202,7 +204,9 @@ export default function AIChatBot({ isGuest = false }: Props) {
             ))}
             {loading && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #082465, #1ECFB8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>🤖</div>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #082465, #1ECFB8)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3px' }}>
+                  <img src="/mascot-prati-face.svg" alt="Prati" style={{ width: '100%', height: '100%' }} />
+                </div>
                 <div style={{ display: 'flex', gap: '4px', padding: '10px 14px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
                   {[0,1,2].map(i => <span key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: '#1ECFB8', display: 'inline-block', animation: `botBounce 1.2s ${i * 0.2}s infinite` }} />)}
                 </div>
@@ -285,18 +289,23 @@ export default function AIChatBot({ isGuest = false }: Props) {
         onClick={() => { setOpen(v => !v); setUnread(0) }}
         style={{
           position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999,
-          width: 60, height: 60, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #082465, #1ECFB8)',
-          border: 'none', cursor: 'pointer',
+          width: 64, height: 64, borderRadius: '50%',
+          background: open ? 'linear-gradient(135deg, #082465, #1ECFB8)' : '#ffffff',
+          border: open ? 'none' : '2px solid rgba(30,207,184,0.25)',
+          cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '26px',
           boxShadow: '0 8px 32px rgba(8,36,101,0.3)',
           transition: 'transform 0.2s, box-shadow 0.2s',
+          padding: open ? 0 : '6px',
         }}
         onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(8,36,101,0.4)' }}
         onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 8px 32px rgba(8,36,101,0.3)' }}
+        aria-label={open ? 'Sohbeti kapat' : 'Prati ile sohbet et'}
       >
-        {open ? '×' : '🤖'}
+        {open
+          ? <span style={{ fontSize: '26px', color: '#fff' }}>×</span>
+          : <img src="/mascot-prati.svg" alt="Prati" style={{ width: '100%', height: '100%' }} />
+        }
         {!open && unread > 0 && (
           <span style={{ position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#FDD31D', color: '#082465', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
             {unread}
