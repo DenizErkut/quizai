@@ -244,7 +244,7 @@ function buildPrompt(type: string, topic: string, grade: string, difficulty: str
     : `Topic: "${topic}".`
 
   const mebSection = mebCtx
-    ? `\n\n⚠️ KRİTİK TALİMAT: Aşağıdaki MEB kaynak metninden soru üret. Bu metinde geçen kişiler, olaylar ve bilgilere SADIK KAL. Metinde olmayan bilgileri UYDURMA.\n\nMEB KAYNAK METNİ:\n${mebCtx}\n\n`
+    ? `\n\n⚠️ KRİTİK TALİMAT: Aşağıdaki MEB kaynak metni verilmiştir. Üreteceğin ${count} sorunun TAMAMI (yalnızca bazıları değil, ${count} sorunun ${count}'ü de) bu metindeki bilgilere, örneklere, olaylara veya kavramlara dayanmalıdır. Her soruyu hazırlarken metnin FARKLI bir bölümünü/paragrafını/örneğini kullan ki sorular birbirini tekrar etmesin ama hepsi metne sadık kalsın. Metinde geçen kişiler, olaylar, örnekler ve bilgilere SADIK KAL. Metinde olmayan bilgileri UYDURMA. Eğer metin bir sorunun tamamını karşılamıyorsa bile, o soruyu yine metindeki en yakın kavram/örnek üzerinden kur — genel/metin dışı bilgiye başvurma.\n\nMEB KAYNAK METNİ:\n${mebCtx}\n\n`
     : ''
 
   const base = `Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın.\n\nKESİN KURAL: Yalnızca MEB müfredatında yer alan konularda, MEB kazanımlarına uygun sorular üret. Müfredat dışı, spekülatif veya tartışmalı içerik kesinlikle üretme.\n\n${mebSection}${contentNote}${gradeCtx || ''}\nSeviye: ${grade}. Zorluk: ${difficulty}. Soru dili: ${language}. Soru sayısı: ${count}.\n\nDOĞRULUK KURALLARI:\n1. Matematik: Her soruyu adım adım çöz, cevabın opts dizisinde doğru indexte olduğunu doğrula\n2. Fen/Tarih: Sadece kesin bildiğin gerçekleri yaz\n3. "ans" indexi MUTLAKA doğru cevabı göstermeli\n4. Emin olmadığın sorular yerine daha basit ama kesin sorular yaz\n5. MEB müfredatına uygun kazanım ve konu kapsamında kal\n6. Sadece multiple_choice ve true_false sorularında altı çizili/vurgulu metin için [köşeli parantez] kullan. fill_blank sorularında ASLA kullanma.\n7. MEB kaynak metni verilmişse: Metindeki gerçek kişi, olay ve bilgileri kullan — uydurma.\n\nYalnızca geçerli JSON döndür, markdown veya açıklama ekleme.\n\n`
@@ -397,7 +397,7 @@ export async function POST(req: NextRequest) {
       if (mebRes.ok) {
         const mebData = await mebRes.json()
         if (mebData.found && mebData.context) {
-          mebContext = mebData.context.slice(0, 4000)
+          mebContext = mebData.context.slice(0, 9000)
         }
       }
     } catch { /* MEB opsiyonel */ }
