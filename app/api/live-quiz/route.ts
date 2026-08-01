@@ -8,7 +8,7 @@ const supabase = createClient(
 )
 const anthropic = new Anthropic()
 
-export const maxDuration = 60
+export const maxDuration = 120
 export const runtime = 'nodejs'
 
 // Öğretmen: canlı quiz oluştur ve sınıfa gönder

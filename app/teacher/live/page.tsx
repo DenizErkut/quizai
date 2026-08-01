@@ -14,6 +14,7 @@ export default function TeacherLivePage() {
   const [screen, setScreen] = useState<'setup' | 'waiting' | 'active' | 'results'>('setup')
   const [form, setForm] = useState({ classroom_id: '', topic: '', question_count: 5, difficulty: 'normal', time_per_question: 30 })
   const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState('')
   const [liveQuiz, setLiveQuiz] = useState<any>(null)
   const [joinCode, setJoinCode] = useState('')
   const [currentQ, setCurrentQ] = useState(0)
@@ -101,23 +102,50 @@ export default function TeacherLivePage() {
   async function createLiveQuiz() {
     if (!form.classroom_id || !form.topic.trim()) return
     setCreating(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch('/api/live-quiz', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify(form),
-    })
-    const data = await res.json()
-    if (!res.ok) { setCreating(false); return }
-    setLiveQuiz({ id: data.liveQuizId, questions: [] })
-    setJoinCode(data.joinCode)
-    setCreating(false)
-    setScreen('waiting')
-    subscribeToAnswers(data.liveQuizId)
+    setCreateError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/live-quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify(form),
+      })
 
-    // Soruları çek
-    const { data: lq } = await supabase.from('live_quizzes').select('questions').eq('id', data.liveQuizId).single()
-    setLiveQuiz((p: any) => ({ ...p, questions: lq?.questions || [] }))
+      // ÖNEMLİ: res.ok kontrolünden önce res.json() çağırma. Sunucu 504/502
+      // gibi platform seviyesinde bir hatayla dönerse (örn. fonksiyon zaman
+      // aşımına uğrarsa) gövde JSON değil HTML/düz metin olur — doğrudan
+      // .json() çağırmak SyntaxError fırlatır ve bu yakalanmazsa "creating"
+      // durumu sonsuza kadar true kalır (ekran donmuş gibi görünür).
+      if (!res.ok) {
+        let msg = res.status === 504
+          ? 'Soru üretimi zaman aşımına uğradı. Soru sayısını azaltıp tekrar dene.'
+          : 'Quiz oluşturulamadı. Lütfen tekrar dene.'
+        try {
+          const errBody = await res.json()
+          if (errBody?.error) msg = errBody.error
+        } catch {
+          // gövde JSON değil (örn. platform hata sayfası) — yukarıdaki
+          // varsayılan mesaj kalır
+        }
+        setCreateError(msg)
+        return
+      }
+
+      const data = await res.json()
+      setLiveQuiz({ id: data.liveQuizId, questions: [] })
+      setJoinCode(data.joinCode)
+      setScreen('waiting')
+      subscribeToAnswers(data.liveQuizId)
+
+      // Soruları çek
+      const { data: lq } = await supabase.from('live_quizzes').select('questions').eq('id', data.liveQuizId).single()
+      setLiveQuiz((p: any) => ({ ...p, questions: lq?.questions || [] }))
+    } catch (e: any) {
+      console.error('[createLiveQuiz] beklenmeyen hata:', e)
+      setCreateError('Beklenmeyen bir hata oluştu. Lütfen tekrar dene.')
+    } finally {
+      setCreating(false)
+    }
   }
 
   async function startQuiz() {
@@ -225,6 +253,12 @@ export default function TeacherLivePage() {
                 ))}
               </div>
             </div>
+
+            {createError && (
+              <div style={{ padding: '10px 12px', background: 'var(--red-bg)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)', lineHeight: 1.5 }}>
+                {createError}
+              </div>
+            )}
 
             <button onClick={createLiveQuiz} disabled={creating || !form.topic.trim() || !form.classroom_id}
               style={{ padding: '13px', borderRadius: '12px', border: 'none', background: creating ? 'var(--bg2)' : '#6366f1', color: creating ? 'var(--text3)' : '#fff', fontWeight: 700, fontSize: '15px', cursor: creating ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)' }}>
