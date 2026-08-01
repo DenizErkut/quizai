@@ -26,12 +26,22 @@ async function embedQuery(text: string): Promise<number[] | null> {
 }
 
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
-  const token = authHeader.slice(7)
-  const sbAuth = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
-  const { data: { user } } = await sbAuth.auth.getUser(token)
-  if (!user) return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 })
+  // Ic route'lardan (orn. generate-quiz) x-internal-secret ile gelen
+  // sunucu-sunucu cagrilari icin bypass - diger ic route'larla (verify-
+  // questions, verify-math) ayni desen. Bu kontrol OLMADIGI icin generate-
+  // quiz'in bu route'a yaptigi TUM ic cagrilar 401 ile basarisiz oluyordu -
+  // MEB mufredat baglami hicbir zaman soru uretimine eklenemiyordu.
+  const internalSecret = req.headers.get('x-internal-secret')
+  const isInternal = internalSecret && internalSecret === (process.env.CRON_SECRET || 'internal')
+
+  if (!isInternal) {
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+    const token = authHeader.slice(7)
+    const sbAuth = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+    const { data: { user } } = await sbAuth.auth.getUser(token)
+    if (!user) return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 })
+  }
 
   try {
     const { topic, grade, subject, unit, level, limit = 4 } = await req.json()
