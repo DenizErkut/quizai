@@ -21,6 +21,7 @@ export async function verifyQuestionWithGemini(prompt: string): Promise<{ ok: bo
           contents: [{ parts: [{ text: prompt + '\n\nRespond ONLY with valid JSON, no other text.' }] }],
           generationConfig: { temperature: 0.1, maxOutputTokens: 250 },
         }),
+        signal: AbortSignal.timeout(6000), // 6sn - yavas yanit tum dogrulamayi kilitlemesin
       }
     )
     if (!res.ok) return null // Gemini hatası — soruyu reddetme, sadece bu katmanı atla

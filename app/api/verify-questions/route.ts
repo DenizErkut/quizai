@@ -2,6 +2,8 @@
 // Tüm soru tipleri için AI doğrulama — generate-quiz sonrası otomatik çalışır
 
 import { NextRequest, NextResponse } from 'next/server'
+export const maxDuration = 90
+export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
 import { verifyQuestionWithOpenAI } from '@/lib/openai'
 import { verifyQuestionWithGemini } from '@/lib/verify-gemini'
@@ -152,28 +154,32 @@ export async function POST(req: NextRequest) {
           // urettigini yine Claude'a kontrol ettirmiyor). Diger tipler icin
           // Claude ile devam ediyoruz.
           const verifyPrompt = buildVerifyPrompt(q, lang)
-          const primaryCheck = isMathQuestion(q)
-            ? await verifyQuestionWithOpenAI(verifyPrompt)
-            : await (async () => {
-                const res = await anthropic.messages.create({
-                  model: 'claude-sonnet-4-5',
-                  max_tokens: 150,
-                  messages: [{ role: 'user', content: verifyPrompt }],
-                })
-                const text = res.content[0].type === 'text' ? res.content[0].text.trim() : ''
-                const match = text.match(/\{[\s\S]*\}/)
-                return match ? JSON.parse(match[0]) : { ok: true }
-              })()
+
+          // Birincil (OpenAI/Claude) ve Gemini kontrollerini SIRALI degil
+          // PARALEL calistir - sirali calistirmak toplam gecikmeyi ikiye
+          // katliyordu ve generate-quiz'in 60sn'lik zaman asimina neden
+          // oluyordu.
+          const [primaryCheck, geminiCheck] = await Promise.all([
+            isMathQuestion(q)
+              ? verifyQuestionWithOpenAI(verifyPrompt)
+              : (async () => {
+                  const res = await anthropic.messages.create({
+                    model: 'claude-sonnet-4-5',
+                    max_tokens: 150,
+                    messages: [{ role: 'user', content: verifyPrompt }],
+                  })
+                  const text = res.content[0].type === 'text' ? res.content[0].text.trim() : ''
+                  const match = text.match(/\{[\s\S]*\}/)
+                  return match ? JSON.parse(match[0]) : { ok: true }
+                })(),
+            verifyQuestionWithGemini(verifyPrompt),
+          ])
 
           if (!primaryCheck.ok) {
             rejected.push(idx)
             rejectReasons.push(`Q${idx} (${q.type}): ${primaryCheck.reason || 'failed'}`)
             return
           }
-
-          // Ucuncu bagimsiz katman: Gemini (GEMINI_API_KEY tanimliysa aktif,
-          // tanimli degilse sessizce atlanir - uretimi bozmaz)
-          const geminiCheck = await verifyQuestionWithGemini(verifyPrompt)
           if (geminiCheck && !geminiCheck.ok) {
             rejected.push(idx)
             rejectReasons.push(`Q${idx} (${q.type}) [gemini]: ${geminiCheck.reason || 'failed'}`)

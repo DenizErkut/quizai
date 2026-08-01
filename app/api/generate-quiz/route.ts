@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-export const maxDuration = 60
+export const maxDuration = 120
 export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
 import { generateQuizFallback } from '@/lib/openai'
@@ -397,7 +397,7 @@ export async function POST(req: NextRequest) {
       if (mebRes.ok) {
         const mebData = await mebRes.json()
         if (mebData.found && mebData.context) {
-          mebContext = mebData.context.slice(0, 9000)
+          mebContext = mebData.context.slice(0, 6500)
         }
       }
     } catch { /* MEB opsiyonel */ }
@@ -483,6 +483,7 @@ export async function POST(req: NextRequest) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
             body: JSON.stringify({ questions, topic, grade, language: lang, questionType }),
+            signal: AbortSignal.timeout(40000), // 40sn - asilmasin, generate-quiz kendi butcesini korusun
           }).then(r => r.ok ? r.json() : null).catch(() => null)
         : Promise.resolve(null),
 
