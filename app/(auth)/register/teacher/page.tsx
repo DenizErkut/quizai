@@ -70,6 +70,15 @@ function RegisterTeacherContent() {
       })
       if (err) { setError(err.message); return }
 
+      // Supabase, zaten kayıtlı+onaylı bir e-postayla signUp() çağrılınca
+      // hata döndürmez (numaralandırma saldırılarını önlemek için) — boş
+      // identities dizisiyle "sanki başarılı" bir yanıt döner. Bu, "bu
+      // e-posta zaten kayıtlı" sinyalidir.
+      if (data.user?.identities && data.user.identities.length === 0) {
+        setError('Bu e-posta adresiyle zaten bir hesabın var. Giriş yapmayı dene ya da şifreni sıfırla.')
+        return
+      }
+
       setUserId(data.user?.id || '')
 
       // SADECE bu signUp() çağrısının döndürdüğü session'a güveniyoruz.

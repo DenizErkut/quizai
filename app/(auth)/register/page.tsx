@@ -191,6 +191,15 @@ function RegisterContent() {
         return
       }
 
+      // Supabase, GÜVENLİK amacıyla (e-posta numaralandırma saldırılarını
+      // önlemek için) zaten kayıtlı+onaylı bir e-postayla signUp() çağrılınca
+      // HATA DÖNDÜRMEZ — sanki başarılıymış gibi bir kullanıcı nesnesi döner
+      // ama identities dizisi boştur. Bu, "bu e-posta zaten kayıtlı" sinyalidir.
+      if (data.user.identities && data.user.identities.length === 0) {
+        setError('Bu e-posta adresiyle zaten bir hesabın var. Giriş yapmayı dene ya da şifreni sıfırla.')
+        return
+      }
+
       // ── Kimlik (ad-soyad, yaş) + KVKK rızaları TR-PG'de oluşturulur.
       // Supabase Auth sadece oturum içindir; profiles'a kimlik alanı yazılmaz.
       // ÖNEMLİ: SADECE bu signUp() çağrısının kendi döndürdüğü session'a
