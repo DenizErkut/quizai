@@ -71,35 +71,44 @@ export default function CompleteProfilePage() {
     let cancelled = false
 
     async function run() {
-      // createBrowserClient ?code=...'u otomatik değiştirir (detectSessionInUrl).
-      // Bu işlem async olduğu için getUser() birkaç deneme gerektirebilir.
-      let user = null
-      for (let i = 0; i < 6; i++) {
-        const { data } = await supabase.auth.getUser()
-        if (data?.user) { user = data.user; break }
-        await new Promise(r => setTimeout(r, 500))
-      }
-      if (cancelled) return
+      try {
+        // createBrowserClient ?code=...'u otomatik değiştirir (detectSessionInUrl).
+        // Bu işlem async olduğu için getUser() birkaç deneme gerektirebilir.
+        let user = null
+        for (let i = 0; i < 6; i++) {
+          const { data } = await supabase.auth.getUser()
+          if (data?.user) { user = data.user; break }
+          await new Promise(r => setTimeout(r, 500))
+        }
+        if (cancelled) return
 
-      if (!user) {
-        setErrorMsg('Onay bağlantısı geçersiz veya süresi dolmuş olabilir. Lütfen tekrar kayıt olmayı deneyin ya da giriş yapmayı dene — hesabın zaten onaylanmış olabilir.')
+        if (!user) {
+          setErrorMsg('Onay bağlantısı geçersiz veya süresi dolmuş olabilir. Lütfen tekrar kayıt olmayı deneyin ya da giriş yapmayı dene — hesabın zaten onaylanmış olabilir.')
+          setPhase('error')
+          return
+        }
+        setUserId(user.id)
+
+        const pending = loadPendingRegistration()
+
+        if (pending) {
+          await completeWithPendingData(user.id, pending)
+          return
+        }
+
+        // localStorage'da veri yok (farklı cihaz/tarayıcı vb.) — user_metadata'daki
+        // pending_role ipucuyla fallback formu göster.
+        const metaRole = (user.user_metadata?.pending_role as PendingRole) || 'student'
+        setFbRole(metaRole)
+        setPhase('fallback-form')
+      } catch (e: any) {
+        // Hiçbir hata 'loading' ekranında sonsuza kadar takılı bırakmasın —
+        // kullanıcı en azından tekrar deneme/giriş seçenekleri görsün.
+        if (cancelled) return
+        console.error('[complete-profile run] beklenmeyen hata:', e)
+        setErrorMsg('Beklenmeyen bir hata oluştu (' + (e?.message || 'bilinmeyen') + '). Lütfen tekrar dene.')
         setPhase('error')
-        return
       }
-      setUserId(user.id)
-
-      const pending = loadPendingRegistration()
-
-      if (pending) {
-        await completeWithPendingData(user.id, pending)
-        return
-      }
-
-      // localStorage'da veri yok (farklı cihaz/tarayıcı vb.) — user_metadata'daki
-      // pending_role ipucuyla fallback formu göster.
-      const metaRole = (user.user_metadata?.pending_role as PendingRole) || 'student'
-      setFbRole(metaRole)
-      setPhase('fallback-form')
     }
 
     run()
@@ -196,36 +205,42 @@ export default function CompleteProfilePage() {
     if (!school.trim()) { setTeacherError('Okul/Kurum zorunlu.'); return }
     setTeacherError(''); setLoading(true)
 
-    let docUrl = ''
-    if (doc) {
-      const ext = doc.name.split('.').pop()
-      const path = `teacher-docs/${userId}-${Date.now()}.${ext}`
-      const { data: uploadData } = await supabase.storage.from('teacher-documents').upload(path, doc, { upsert: true })
-      if (uploadData) {
-        const { data: urlData } = supabase.storage.from('teacher-documents').getPublicUrl(path)
-        docUrl = urlData.publicUrl
+    try {
+      let docUrl = ''
+      if (doc) {
+        const ext = doc.name.split('.').pop()
+        const path = `teacher-docs/${userId}-${Date.now()}.${ext}`
+        const { data: uploadData } = await supabase.storage.from('teacher-documents').upload(path, doc, { upsert: true })
+        if (uploadData) {
+          const { data: urlData } = supabase.storage.from('teacher-documents').getPublicUrl(path)
+          docUrl = urlData.publicUrl
+        }
       }
+
+      await supabase.from('teachers').insert({
+        user_id: userId,
+        school: school.trim(),
+        subject: subject.trim(),
+        document_url: docUrl || null,
+        approved: false,
+      })
+
+      if (phone.trim()) {
+        const { data: { session } } = await supabase.auth.getSession()
+        await fetch('/api/profile/update-identity', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: phone.trim(), role: 'teacher' }),
+        }).catch(() => {})
+      }
+
+      router.push('/teacher')
+    } catch (e: any) {
+      console.error('[complete-profile handleTeacherApply] beklenmeyen hata:', e)
+      setTeacherError('Beklenmeyen bir hata oluştu (' + (e?.message || 'bilinmeyen') + '). Lütfen tekrar dene.')
+    } finally {
+      setLoading(false)
     }
-
-    await supabase.from('teachers').insert({
-      user_id: userId,
-      school: school.trim(),
-      subject: subject.trim(),
-      document_url: docUrl || null,
-      approved: false,
-    })
-
-    if (phone.trim()) {
-      const { data: { session } } = await supabase.auth.getSession()
-      await fetch('/api/profile/update-identity', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone.trim(), role: 'teacher' }),
-      }).catch(() => {})
-    }
-
-    setLoading(false)
-    router.push('/teacher')
   }
 
   async function handleFallbackSubmit() {
@@ -242,37 +257,41 @@ export default function CompleteProfilePage() {
 
     setFbError(''); setLoading(true)
 
-    const { data: { session } } = await supabase.auth.getSession()
-    const accessToken = session?.access_token
-    if (!accessToken) { setFbError('Oturum bulunamadı.'); setLoading(false); return }
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const accessToken = session?.access_token
+      if (!accessToken) { setFbError('Oturum bulunamadı.'); return }
 
-    const idRes = await fetch('/api/auth/create-identity', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fullName: fbName.trim(),
-        age: fbRole === 'student' && fbAge ? parseInt(fbAge) : undefined,
-        role: fbRole,
-        kvkkAydinlatma: fbKvkkAydinlatma, kvkkAcikRiza: fbKvkkAcikRiza, veliOnayi: fbVeliOnayi,
-      }),
-    })
-    if (!idRes.ok) { setFbError('Kimlik kaydı oluşturulamadı.'); setLoading(false); return }
-
-    if (fbRole === 'student') {
-      await supabase.from('profiles').upsert({
-        id: userId, grade: fbGrade, school: fbSchool.trim(), class_number: fbClassNumber.trim(),
-        language: 'Türkçe', role: 'student',
+      const idRes = await fetch('/api/auth/create-identity', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: fbName.trim(),
+          age: fbRole === 'student' && fbAge ? parseInt(fbAge) : undefined,
+          role: fbRole,
+          kvkkAydinlatma: fbKvkkAydinlatma, kvkkAcikRiza: fbKvkkAcikRiza, veliOnayi: fbVeliOnayi,
+        }),
       })
+      if (!idRes.ok) { setFbError('Kimlik kaydı oluşturulamadı.'); return }
+
+      if (fbRole === 'student') {
+        await supabase.from('profiles').upsert({
+          id: userId, grade: fbGrade, school: fbSchool.trim(), class_number: fbClassNumber.trim(),
+          language: 'Türkçe', role: 'student',
+        })
+        router.push('/home')
+      } else if (fbRole === 'parent') {
+        await supabase.from('profiles').upsert({ id: userId, language: 'Türkçe', role: 'parent' })
+        router.push('/parent')
+      } else {
+        await supabase.from('profiles').upsert({ id: userId, language: 'Türkçe', role: 'teacher' })
+        setPhase('teacher-apply')
+      }
+    } catch (e: any) {
+      console.error('[handleFallbackSubmit] beklenmeyen hata:', e)
+      setFbError('Beklenmeyen bir hata oluştu (' + (e?.message || 'bilinmeyen') + '). Lütfen tekrar dene.')
+    } finally {
       setLoading(false)
-      router.push('/home')
-    } else if (fbRole === 'parent') {
-      await supabase.from('profiles').upsert({ id: userId, language: 'Türkçe', role: 'parent' })
-      setLoading(false)
-      router.push('/parent')
-    } else {
-      await supabase.from('profiles').upsert({ id: userId, language: 'Türkçe', role: 'teacher' })
-      setLoading(false)
-      setPhase('teacher-apply')
     }
   }
 

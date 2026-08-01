@@ -58,27 +58,33 @@ function RegisterTeacherContent() {
     if (pass.length < 6) { setError('Sifre en az 6 karakter olmali.'); return }
     setError(''); setLoading(true)
 
-    const { data, error: err } = await supabase.auth.signUp({
-      email,
-      password: pass,
-      options: { emailRedirectTo: `${window.location.origin}/register/teacher?step=info` },
-    })
-    if (err) { setError(err.message); setLoading(false); return }
+    try {
+      const { data, error: err } = await supabase.auth.signUp({
+        email,
+        password: pass,
+        options: { emailRedirectTo: `${window.location.origin}/register/teacher?step=info` },
+      })
+      if (err) { setError(err.message); return }
 
-    setUserId(data.user?.id || '')
-    setLoading(false)
+      setUserId(data.user?.id || '')
 
-    const hasSession = !!(data.session?.access_token || (await supabase.auth.getSession()).data.session?.access_token)
-    if (!hasSession) {
-      // E-posta onayı zorunlu ve henüz onaylanmadı. Hesap oluşturuldu ama
-      // henüz oturum yok — öğretmen bilgileri formunu (info) onaydan SONRA
-      // göstereceğiz. Onay linki zaten ?step=info'ya yönlendiriyor; kullanıcı
-      // linke tıklayınca üstteki useEffect session'ı bulup otomatik olarak
-      // 'info' adımına geçirecek.
-      setStep('check-email')
-      return
+      const hasSession = !!(data.session?.access_token || (await supabase.auth.getSession()).data.session?.access_token)
+      if (!hasSession) {
+        // E-posta onayı zorunlu ve henüz onaylanmadı. Hesap oluşturuldu ama
+        // henüz oturum yok — öğretmen bilgileri formunu (info) onaydan SONRA
+        // göstereceğiz. Onay linki zaten ?step=info'ya yönlendiriyor; kullanıcı
+        // linke tıklayınca üstteki useEffect session'ı bulup otomatik olarak
+        // 'info' adımına geçirecek.
+        setStep('check-email')
+        return
+      }
+      setStep('info')
+    } catch (e: any) {
+      console.error('[handleCreateAccount] beklenmeyen hata:', e)
+      setError('Beklenmeyen bir hata oluştu (' + (e?.message || 'bilinmeyen') + '). Lütfen tekrar dene.')
+    } finally {
+      setLoading(false)
     }
-    setStep('info')
   }
 
   async function handleResendConfirmation() {
@@ -97,54 +103,57 @@ function RegisterTeacherContent() {
     if (!school.trim()) { setError('Okul/Kurum zorunlu.'); return }
     setError(''); setLoading(true)
 
-    // userId state'inden, yoksa session'dan, yoksa getUser'dan al
-    let uid = userId
-    let userEmail = email
-    if (!uid) {
-      const { data: sessionData } = await supabase.auth.getSession()
-      uid = sessionData?.session?.user?.id || ''
-      userEmail = sessionData?.session?.user?.email || email
-    }
-    if (!uid) {
-      const { data: { user } } = await supabase.auth.getUser()
-      uid = user?.id || ''
-      userEmail = user?.email || email
-    }
-    if (!uid) { setError('Oturum bulunamadi. Lutfen once hesap olusturun.'); setLoading(false); return }
-
-    let docUrl = ''
-    if (doc) {
-      const ext = doc.name.split('.').pop()
-      const path = `teacher-docs/${uid}-${Date.now()}.${ext}`
-      const { data: uploadData } = await supabase.storage.from('teacher-documents').upload(path, doc, { upsert: true })
-      if (uploadData) {
-        const { data: urlData } = supabase.storage.from('teacher-documents').getPublicUrl(path)
-        docUrl = urlData.publicUrl
+    try {
+      // userId state'inden, yoksa session'dan, yoksa getUser'dan al
+      let uid = userId
+      if (!uid) {
+        const { data: sessionData } = await supabase.auth.getSession()
+        uid = sessionData?.session?.user?.id || ''
       }
+      if (!uid) {
+        const { data: { user } } = await supabase.auth.getUser()
+        uid = user?.id || ''
+      }
+      if (!uid) { setError('Oturum bulunamadi. Lutfen once hesap olusturun.'); return }
+
+      let docUrl = ''
+      if (doc) {
+        const ext = doc.name.split('.').pop()
+        const path = `teacher-docs/${uid}-${Date.now()}.${ext}`
+        const { data: uploadData } = await supabase.storage.from('teacher-documents').upload(path, doc, { upsert: true })
+        if (uploadData) {
+          const { data: urlData } = supabase.storage.from('teacher-documents').getPublicUrl(path)
+          docUrl = urlData.publicUrl
+        }
+      }
+
+      // Kimlik (ad-soyad, telefon) TR-PG'ye yazılır — yoksa oluşturulur.
+      // teachers tablosuna kimlik alanı (name/email/phone) yazılmaz.
+      const { data: { session } } = await supabase.auth.getSession()
+      const idRes = await fetch('/api/profile/update-identity', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fullName: name.trim(), phone: phone.trim() || null, role: 'teacher' }),
+      })
+      if (!idRes.ok) { setError('Kimlik bilgileri kaydedilemedi. Lütfen tekrar deneyin.'); return }
+
+      const { error: insertErr } = await supabase.from('teachers').insert({
+        user_id: uid,
+        school: school.trim(),
+        subject: subject.trim(),
+        document_url: docUrl || null,
+        approved: false,
+      })
+
+      if (insertErr) { setError(insertErr.message); return }
+
+      setStep('done')
+    } catch (e: any) {
+      console.error('[handleApply] beklenmeyen hata:', e)
+      setError('Beklenmeyen bir hata oluştu (' + (e?.message || 'bilinmeyen') + '). Lütfen tekrar dene.')
+    } finally {
+      setLoading(false)
     }
-
-    // Kimlik (ad-soyad, telefon) TR-PG'ye yazılır — yoksa oluşturulur.
-    // teachers tablosuna kimlik alanı (name/email/phone) yazılmaz.
-    const { data: { session } } = await supabase.auth.getSession()
-    const idRes = await fetch('/api/profile/update-identity', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fullName: name.trim(), phone: phone.trim() || null, role: 'teacher' }),
-    })
-    if (!idRes.ok) { setError('Kimlik bilgileri kaydedilemedi. Lütfen tekrar deneyin.'); setLoading(false); return }
-
-    const { error: insertErr } = await supabase.from('teachers').insert({
-      user_id: uid,
-      school: school.trim(),
-      subject: subject.trim(),
-      document_url: docUrl || null,
-      approved: false,
-    })
-
-    if (insertErr) { setError(insertErr.message); setLoading(false); return }
-
-    setLoading(false)
-    setStep('done')
   }
 
   return (

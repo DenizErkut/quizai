@@ -158,25 +158,30 @@ function RegisterContent() {
     setError(''); setLoading(true)
     const fullName = `${name.trim()} ${surname.trim()}`
 
-    // NOT: 'name' artık auth metadata'ya YAZILMIYOR — kimlik TR-PG'de (create-identity).
-    // Bu değişiklik, handle_new_user trigger'ından name'in çıkarılmasıyla AYNI
-    // deploy'da gitmeli (bkz. scripts/002_handle_new_user_drop_name.sql).
-    // 'pending_role' İSTİSNA — PII değil, sadece rol string'i (student/teacher/parent).
-    // E-posta onayı bekleyen ve localStorage'ı kaybeden kullanıcılar (farklı
-    // cihaz/tarayıcı) için complete-profile'da hangi formun gösterileceğini
-    // bilmek amacıyla auth metadata'sında tutulur.
-    const { data, error: err } = await supabase.auth.signUp({
-      email,
-      password: pass,
-      options: {
-        data: { pending_role: selectedRole },
-        emailRedirectTo: `${window.location.origin}/auth/complete-profile`,
-      },
-    })
+    try {
+      // NOT: 'name' artık auth metadata'ya YAZILMIYOR — kimlik TR-PG'de (create-identity).
+      // Bu değişiklik, handle_new_user trigger'ından name'in çıkarılmasıyla AYNI
+      // deploy'da gitmeli (bkz. scripts/002_handle_new_user_drop_name.sql).
+      // 'pending_role' İSTİSNA — PII değil, sadece rol string'i (student/teacher/parent).
+      // E-posta onayı bekleyen ve localStorage'ı kaybeden kullanıcılar (farklı
+      // cihaz/tarayıcı) için complete-profile'da hangi formun gösterileceğini
+      // bilmek amacıyla auth metadata'sında tutulur.
+      const { data, error: err } = await supabase.auth.signUp({
+        email,
+        password: pass,
+        options: {
+          data: { pending_role: selectedRole },
+          emailRedirectTo: `${window.location.origin}/auth/complete-profile`,
+        },
+      })
 
-    if (err) { setError(err.message); setLoading(false); return }
+      if (err) { setError(err.message); return }
 
-    if (data.user) {
+      if (!data.user) {
+        setError('Kayıt oluşturulamadı. Lütfen tekrar deneyin.')
+        return
+      }
+
       // ── Kimlik (ad-soyad, yaş) + KVKK rızaları TR-PG'de oluşturulur.
       // Supabase Auth sadece oturum içindir; profiles'a kimlik alanı yazılmaz.
       const accessToken = data.session?.access_token
@@ -195,7 +200,6 @@ function RegisterContent() {
           kvkkAydinlatma, kvkkAcikRiza, veliOnayi,
           ref, next,
         })
-        setLoading(false)
         setStep('check-email')
         return
       }
@@ -211,7 +215,6 @@ function RegisterContent() {
       })
       if (!idRes.ok) {
         setError('Kimlik kaydı oluşturulamadı. Lütfen tekrar deneyin.')
-        setLoading(false)
         return
       }
 
@@ -229,7 +232,6 @@ function RegisterContent() {
         if (upsertError) {
           console.error('profiles upsert hatasi (register):', upsertError)
           setError('Profil oluşturulamadı: ' + upsertError.message)
-          setLoading(false)
           return
         }
 
@@ -255,7 +257,6 @@ function RegisterContent() {
           }
         }
 
-        setLoading(false)
         router.push(isSafeNext(next) ? next : '/home')
 
       } else if (selectedRole === 'parent') {
@@ -265,7 +266,6 @@ function RegisterContent() {
           language: 'Türkçe',
           role: 'parent',
         })
-        setLoading(false)
         router.push('/parent')
 
       } else if (selectedRole === 'teacher') {
@@ -276,8 +276,14 @@ function RegisterContent() {
           role: 'teacher',
         })
         setStep('teacher_info')
-        setLoading(false)
       }
+    } catch (e: any) {
+      // Ne olursa olsun (ağ hatası, beklenmeyen exception...) ekran donmasın —
+      // kullanıcı her zaman ya sonucu ya da anlaşılır bir hata mesajı görsün.
+      console.error('[handleRegister] beklenmeyen hata:', e)
+      setError('Beklenmeyen bir hata oluştu (' + (e?.message || 'bilinmeyen') + '). Lütfen tekrar dene; sorun devam ederse sayfayı yenile.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -285,42 +291,48 @@ function RegisterContent() {
     if (!school.trim()) { setError('Okul/Kurum zorunlu.'); return }
     setError(''); setLoading(true)
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setError('Oturum bulunamadi.'); setLoading(false); return }
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setError('Oturum bulunamadi.'); return }
 
-    let docUrl = ''
-    if (doc) {
-      const ext = doc.name.split('.').pop()
-      const path = `teacher-docs/${user.id}-${Date.now()}.${ext}`
-      const { data: uploadData } = await supabase.storage.from('teacher-documents').upload(path, doc, { upsert: true })
-      if (uploadData) {
-        const { data: urlData } = supabase.storage.from('teacher-documents').getPublicUrl(path)
-        docUrl = urlData.publicUrl
+      let docUrl = ''
+      if (doc) {
+        const ext = doc.name.split('.').pop()
+        const path = `teacher-docs/${user.id}-${Date.now()}.${ext}`
+        const { data: uploadData } = await supabase.storage.from('teacher-documents').upload(path, doc, { upsert: true })
+        if (uploadData) {
+          const { data: urlData } = supabase.storage.from('teacher-documents').getPublicUrl(path)
+          docUrl = urlData.publicUrl
+        }
       }
+
+      // Öğretmenin ad-soyad/e-postası zaten TR-PG kimliğinde (kayıt adımında).
+      // teachers tablosuna kimlik alanı yazılmaz; telefon TR-PG'ye güncellenir.
+      await supabase.from('teachers').insert({
+        user_id: user.id,
+        school: school.trim(),
+        subject: subject.trim(),
+        document_url: docUrl || null,
+        approved: false,
+      })
+
+      if (phone.trim()) {
+        const { data: { session } } = await supabase.auth.getSession()
+        await fetch('/api/profile/update-identity', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: phone.trim(), role: 'teacher' }),
+        }).catch(() => {})
+      }
+
+      // Öğretmen onay bekliyor — quiz'e git ama panel kısıtlı
+      router.push('/teacher')
+    } catch (e: any) {
+      console.error('[handleTeacherApply] beklenmeyen hata:', e)
+      setError('Beklenmeyen bir hata oluştu (' + (e?.message || 'bilinmeyen') + '). Lütfen tekrar dene.')
+    } finally {
+      setLoading(false)
     }
-
-    // Öğretmenin ad-soyad/e-postası zaten TR-PG kimliğinde (kayıt adımında).
-    // teachers tablosuna kimlik alanı yazılmaz; telefon TR-PG'ye güncellenir.
-    await supabase.from('teachers').insert({
-      user_id: user.id,
-      school: school.trim(),
-      subject: subject.trim(),
-      document_url: docUrl || null,
-      approved: false,
-    })
-
-    if (phone.trim()) {
-      const { data: { session } } = await supabase.auth.getSession()
-      await fetch('/api/profile/update-identity', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone.trim(), role: 'teacher' }),
-      }).catch(() => {})
-    }
-
-    setLoading(false)
-    // Öğretmen onay bekliyor — quiz'e git ama panel kısıtlı
-    router.push('/teacher')
   }
 
   async function handleResendConfirmation() {
