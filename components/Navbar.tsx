@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/user-context'
+import LightbulbIcon from '@/components/LightbulbIcon'
 
 const LANGS = [
   { code: 'Türkçe', flag: '🇹🇷' },
@@ -178,10 +179,10 @@ export default function Navbar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button onClick={toggleDark}
             title={isDark ? 'Aydınlık mod' : 'Karanlık mod'}
-            style={{ width: 38, height: 38, borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '16px', flexShrink: 0, transition: 'all 0.2s' }}
+            style={{ width: 38, height: 38, borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, transition: 'all 0.2s' }}
             onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
             onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}>
-            {isDark ? '☀️' : '🌙'}
+            <LightbulbIcon isDark={isDark} size={18} offColor="#ffffff" />
           </button>
 
           <a href="/notifications" onClick={() => setUnreadCount(0)} style={{
@@ -360,10 +361,10 @@ export default function Navbar() {
             {/* Dark mode toggle */}
             <button onClick={toggleDark}
               title={isDark ? 'Aydınlık mod' : 'Karanlık mod'}
-              style={{ width: 38, height: 38, borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '16px', flexShrink: 0, transition: 'all 0.2s' }}
+              style={{ width: 38, height: 38, borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, transition: 'all 0.2s' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
               onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}>
-              {isDark ? '☀️' : '🌙'}
+              <LightbulbIcon isDark={isDark} size={18} offColor="#ffffff" />
             </button>
 
             {/* Bildirim çanı */}

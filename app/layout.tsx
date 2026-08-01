@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import Navbar from '@/components/Navbar'
+import ThemeToggleFloating from '@/components/ThemeToggleFloating'
 import { UserProvider } from '@/lib/user-context'
 import AIChatBot from '@/components/AIChatBot'
 import PWAInstallBanner from '@/components/PWAInstallBanner'
@@ -72,6 +73,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         `}} />
         <UserProvider>
           <Navbar />
+          <ThemeToggleFloating />
           {children}
         </UserProvider>
         <AIChatBot />
