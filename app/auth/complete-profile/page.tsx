@@ -60,8 +60,12 @@ export default function CompleteProfilePage() {
   const [fbName, setFbName] = useState('')
   const [fbAge, setFbAge] = useState('')
   const [fbGrade, setFbGrade] = useState('')
-  const [fbSchool, setFbSchool] = useState('')
+  const [fbSchool, setFbSchool] = useState('') // öğretmen: serbest metin okul/kurum adı
   const [fbClassNumber, setFbClassNumber] = useState('')
+  const [fbInstitutionCode, setFbInstitutionCode] = useState('')
+  const [fbInstitutionName, setFbInstitutionName] = useState('') // öğrenci: kurum kaydından otomatik
+  const [fbParentEmail, setFbParentEmail] = useState('')
+  const [fbPhone, setFbPhone] = useState('')
   const [fbKvkkAydinlatma, setFbKvkkAydinlatma] = useState(false)
   const [fbKvkkAcikRiza, setFbKvkkAcikRiza] = useState(false)
   const [fbVeliOnayi, setFbVeliOnayi] = useState(false)
@@ -259,7 +263,10 @@ export default function CompleteProfilePage() {
     if (fbRole === 'student') {
       if (!fbAge || parseInt(fbAge) < 5 || parseInt(fbAge) > 35) { setFbError('Geçerli bir yaş girin (5-35).'); return }
       if (!fbGrade) { setFbError('Sınıf zorunludur.'); return }
-      if (!fbSchool.trim()) { setFbError('Okul adı zorunludur.'); return }
+      // Okul adı/sınıf numarası SADECE kurum kodu doğrulandığında zorunlu —
+      // internetten bireysel kayıtta hiç istenmiyor (bkz. register/page.tsx
+      // ve profile/page.tsx'teki aynı mantık).
+      if (fbInstitutionName && !fbClassNumber.trim()) { setFbError('Sınıf numarası zorunludur.'); return }
       if (parseInt(fbAge) < 18 && !fbVeliOnayi) { setFbError('18 yaş altı için veli onayı gereklidir.'); return }
     }
     if (fbRole === 'teacher' && !fbSchool.trim()) { setFbError('Okul/Kurum zorunludur.'); return }
@@ -278,14 +285,27 @@ export default function CompleteProfilePage() {
           fullName: fbName.trim(),
           age: fbRole === 'student' && fbAge ? parseInt(fbAge) : undefined,
           role: fbRole,
+          parentEmail: fbRole === 'student' ? (fbParentEmail.trim() || undefined) : undefined,
+          institutionName: fbRole === 'student' ? (fbInstitutionName || undefined) : undefined,
           kvkkAydinlatma: fbKvkkAydinlatma, kvkkAcikRiza: fbKvkkAcikRiza, veliOnayi: fbVeliOnayi,
         }),
       })
       if (!idRes.ok) { setFbError('Kimlik kaydı oluşturulamadı.'); return }
+      if (fbRole === 'student' && fbPhone.trim()) {
+        await fetch('/api/profile/update-identity', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: fbPhone.trim(), role: 'student' }),
+        }).catch(() => {})
+      }
 
       if (fbRole === 'student') {
+        // school SADECE kurum kodu doğrulandığında dolar (fbInstitutionName) —
+        // elle yazılmış bir okul adı asla kabul edilmez.
         await supabase.from('profiles').upsert({
-          id: userId, grade: fbGrade, school: fbSchool.trim(), class_number: fbClassNumber.trim(),
+          id: userId, grade: fbGrade,
+          school: fbInstitutionName || null,
+          class_number: fbInstitutionName ? fbClassNumber.trim() : null,
           language: 'Türkçe', role: 'student',
         })
         router.push('/home')
@@ -301,6 +321,15 @@ export default function CompleteProfilePage() {
       setFbError('Beklenmeyen bir hata oluştu (' + (e?.message || 'bilinmeyen') + '). Lütfen tekrar dene.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function verifyFbInstitutionCode(val: string) {
+    if (val.length === 8) {
+      const { data: inst } = await supabase.from('institutions').select('name').eq('code', val).eq('active', true).maybeSingle()
+      setFbInstitutionName(inst?.name || '')
+    } else {
+      setFbInstitutionName('')
     }
   }
 
@@ -388,27 +417,66 @@ export default function CompleteProfilePage() {
           <input className="input" value={fbName} onChange={e => setFbName(e.target.value)} placeholder="Ahmet Yılmaz" />
 
           {fbRole === 'student' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div>
-                <label className="field-label">Yaş *</label>
-                <input className="input" type="number" value={fbAge} onChange={e => setFbAge(e.target.value)} placeholder="16" />
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label className="field-label">Yaş *</label>
+                  <input className="input" type="number" value={fbAge} onChange={e => setFbAge(e.target.value)} placeholder="16" />
+                </div>
+                <div>
+                  <label className="field-label">Sınıf *</label>
+                  <select className="input" value={fbGrade} onChange={e => setFbGrade(e.target.value)} style={{ cursor: 'pointer' }}>
+                    <option value="">Seç...</option>
+                    {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="field-label">Sınıf *</label>
-                <select className="input" value={fbGrade} onChange={e => setFbGrade(e.target.value)} style={{ cursor: 'pointer' }}>
-                  <option value="">Seç...</option>
-                  {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
-                </select>
+
+              {/* Kurum kodu — okul adı BURADAN otomatik gelir, elle yazılmaz */}
+              <div style={{ marginTop: '10px', padding: '12px 14px', borderRadius: '12px', background: 'rgba(217,119,6,0.04)', border: '1.5px solid rgba(217,119,6,0.15)' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#d97706', marginBottom: '6px' }}>🏛️ Kurum Kodu (Opsiyonel)</div>
+                <input className="input" placeholder="8 haneli kurum kodu"
+                  value={fbInstitutionCode}
+                  onChange={async e => {
+                    const val = e.target.value.toUpperCase()
+                    setFbInstitutionCode(val)
+                    await verifyFbInstitutionCode(val)
+                  }}
+                />
+                {fbInstitutionName && (
+                  <div style={{ fontSize: '12px', color: 'var(--green)', fontWeight: 600, marginTop: '4px' }}>
+                    ✓ {fbInstitutionName} kurumuna bağlanıyor
+                  </div>
+                )}
               </div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label className="field-label">Okul Adı *</label>
-                <input className="input" value={fbSchool} onChange={e => setFbSchool(e.target.value)} placeholder="Örn: Atatürk Ortaokulu" />
+
+              {/* Okul adı + sınıf numarası: SADECE kurum kodu doğrulandığında
+                  görünür ve zorunludur. */}
+              {fbInstitutionName && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+                  <div>
+                    <label className="field-label">Okul Adı</label>
+                    <input className="input" value={fbInstitutionName} readOnly disabled
+                      style={{ background: 'var(--bg2)', color: 'var(--text2)', cursor: 'not-allowed' }} />
+                  </div>
+                  <div>
+                    <label className="field-label">Sınıf Numarası *</label>
+                    <input className="input" value={fbClassNumber} onChange={e => setFbClassNumber(e.target.value)} placeholder="Örn: 14" />
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+                <div>
+                  <label className="field-label">Veli E-postası (Opsiyonel)</label>
+                  <input className="input" type="email" value={fbParentEmail} onChange={e => setFbParentEmail(e.target.value)} placeholder="veli@mail.com" />
+                </div>
+                <div>
+                  <label className="field-label">Telefon (Opsiyonel)</label>
+                  <input className="input" type="tel" value={fbPhone} onChange={e => setFbPhone(e.target.value)} placeholder="05xx xxx xx xx" />
+                </div>
               </div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label className="field-label">Sınıf Numarası</label>
-                <input className="input" value={fbClassNumber} onChange={e => setFbClassNumber(e.target.value)} placeholder="Örn: 14" />
-              </div>
-            </div>
+            </>
           )}
 
           <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', marginTop: '10px', marginBottom: '8px' }}>

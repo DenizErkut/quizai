@@ -127,10 +127,19 @@ export async function POST(req: NextRequest) {
     .from('profiles').select('plan, grade').eq('id', user.id).single()
 
   if (!profile) return NextResponse.json({ error: 'Profil bulunamadı.' }, { status: 404 })
-  if (profile.plan === 'free') return NextResponse.json({ error: 'premium_required' }, { status: 403 })
+  const isFree = profile.plan === 'free'
 
   const body = await req.json()
-  const { examType, sectionIds, demo } = body as { examType: ExamKey; sectionIds?: string[]; demo?: boolean }
+  const { examType, sectionIds, demo: demoParam } = body as { examType: ExamKey; sectionIds?: string[]; demo?: boolean }
+
+  // Freemium: SADECE demo modu — tam sınav (demo=false) isteği reddedilir.
+  // Bu kontrol istemci tarafındaki (disabled buton) kontrolden BAĞIMSIZ —
+  // istemci atlatılsa bile sunucu asla freemium'a tam sınav üretmez.
+  if (isFree && demoParam === false) {
+    return NextResponse.json({ error: 'premium_required' }, { status: 403 })
+  }
+  // Defense-in-depth: freemium için demo her koşulda true kabul edilir.
+  const demo = isFree ? true : !!demoParam
 
   const format = EXAM_FORMATS[examType]
   if (!format) return NextResponse.json({ error: 'Geçersiz sınav türü.' }, { status: 400 })
@@ -139,7 +148,7 @@ export async function POST(req: NextRequest) {
     ? format.sections.filter((s: any) => sectionIds.includes(s.id))
     : format.sections
 
-  // Demo: her bölümden 4 soru (hızlı)
+  // Demo: her bölümden 4 soru (hızlı) — Freemium demo: her alanda TAM 1 soru
   const countMultiplier = demo ? 0.2 : 1
 
   try {
@@ -149,7 +158,7 @@ export async function POST(req: NextRequest) {
     for (let i = 0; i < sectionsToGenerate.length; i += CHUNK) {
       const chunk = sectionsToGenerate.slice(i, i + CHUNK)
       await Promise.all(chunk.map(async (section: any) => {
-        const sectionCount = Math.max(4, Math.round(section.count * countMultiplier))
+        const sectionCount = isFree ? 1 : Math.max(4, Math.round(section.count * countMultiplier))
         const prompt = buildSectionPrompt(section.subject, section.grade, sectionCount, format.label)
 
         try {
