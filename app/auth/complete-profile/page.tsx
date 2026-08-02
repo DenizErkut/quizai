@@ -132,6 +132,8 @@ export default function CompleteProfilePage() {
         fullName: pending.fullName,
         age: pending.age,
         role: pending.role,
+        parentEmail: pending.parentEmail || undefined,
+        institutionName: pending.studentSchool || undefined,
         kvkkAydinlatma: pending.kvkkAydinlatma,
         kvkkAcikRiza: pending.kvkkAcikRiza,
         veliOnayi: pending.veliOnayi,
@@ -141,6 +143,13 @@ export default function CompleteProfilePage() {
       setErrorMsg('Kimlik kaydı oluşturulamadı. Lütfen tekrar dene.')
       setPhase('error')
       return
+    }
+    if (pending.phone) {
+      await fetch('/api/profile/update-identity', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: pending.phone, role: pending.role }),
+      }).catch(() => {})
     }
 
     const safeNext = pending.next && pending.next.startsWith('/') && !pending.next.startsWith('//') && !pending.next.startsWith('/login')

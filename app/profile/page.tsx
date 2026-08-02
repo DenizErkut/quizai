@@ -31,11 +31,11 @@ function ProfileSetupContent() {
   const [surname, setSurname] = useState('')
   const [age, setAge] = useState('')
   const [grade, setGrade] = useState('')
-  const [school, setSchool] = useState('')
   const [classNumber, setClassNumber] = useState('')
   const [institutionCode, setInstitutionCode] = useState('')
   const [institutionName, setInstitutionName] = useState('')
   const [phone, setPhone] = useState('')
+  const [parentEmail, setParentEmail] = useState('')
   const [instagram, setInstagram] = useState('')
   const [tiktok, setTiktok] = useState('')
   const [showOptional, setShowOptional] = useState(false)
@@ -66,8 +66,11 @@ function ProfileSetupContent() {
     if (!surname.trim()) { setError('Soyad zorunludur.'); return }
     if (!age || parseInt(age) < 5 || parseInt(age) > 35) { setError('Geçerli bir yaş girin (5-35).'); return }
     if (!grade) { setError('Sınıf / eğitim seviyesi zorunludur.'); return }
-    if (!school.trim()) { setError('Okul adı zorunludur.'); return }
-    if (!classNumber.trim()) { setError('Sınıf numarası zorunludur.'); return }
+    // Okul adı ve sınıf numarası SADECE kurum kodu üzerinden bağlanan
+    // öğrenciler için zorunlu — okul adı kurum kaydından otomatik gelir.
+    if (institutionName) {
+      if (!classNumber.trim()) { setError('Sınıf numarası zorunludur.'); return }
+    }
 
     setError(''); setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
@@ -83,7 +86,7 @@ function ProfileSetupContent() {
     const idRes = await fetch('/api/profile/update-identity', {
       method: 'POST',
       headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fullName: `${name.trim()} ${surname.trim()}`, phone: phone || null, role: 'student' }),
+      body: JSON.stringify({ fullName: `${name.trim()} ${surname.trim()}`, phone: phone || null, parentEmail: parentEmail || null, role: 'student' }),
     })
     if (!idRes.ok) {
       setError('Kimlik bilgileri kaydedilemedi. Lütfen tekrar deneyin.')
@@ -91,12 +94,14 @@ function ProfileSetupContent() {
       return
     }
 
-    // Davranış/platform verisi Supabase'de kalır (kimlik alanları hariç)
+    // Behavior/platform verisi Supabase'de kalır (kimlik alanları hariç).
+    // school SADECE kurum kodu doğrulandığında dolar (institutionName) —
+    // elle yazılmış bir okul adı asla kabul edilmez.
     const { error: upsertError } = await supabase.from('profiles').upsert({
       id: user.id,
       grade,
-      school: school.trim(),
-      class_number: classNumber.trim(),
+      school: institutionName || null,
+      class_number: institutionName ? classNumber.trim() : null,
       language: 'Türkçe',
       instagram: instagram || null,
       tiktok: tiktok || null,
@@ -192,21 +197,13 @@ function ProfileSetupContent() {
                     {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="field-label">Okul Adı <span style={{ color: 'var(--red)' }}>*</span></label>
-                  <input className="input" placeholder="Örn: Atatürk Ortaokulu" value={school} onChange={e => setSchool(e.target.value)} />
-                </div>
-                <div>
-                  <label className="field-label">Sınıf Numarası <span style={{ color: 'var(--red)' }}>*</span></label>
-                  <input className="input" placeholder="Örn: 14" value={classNumber} onChange={e => setClassNumber(e.target.value)} />
-                </div>
               </div>
 
-              {/* Kurum kodu */}
+              {/* Kurum kodu — okul adı BURADAN otomatik gelir, elle yazılmaz */}
               <div style={{ marginTop: '10px', padding: '12px 14px', borderRadius: '12px', background: 'rgba(217,119,6,0.04)', border: '1.5px solid rgba(217,119,6,0.15)' }}>
                 <div style={{ fontSize: '12px', fontWeight: 600, color: '#d97706', marginBottom: '6px' }}>🏛️ Kurum Kodu (Opsiyonel)</div>
                 <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px', lineHeight: 1.5 }}>
-                  Okulunuz Pratium ile anlaşmalıysa size verilen kodu girin.
+                  Okulunuz Pratium ile anlaşmalıysa size verilen kodu girin — okul bilginiz otomatik eklenir.
                 </div>
                 <input className="input" placeholder="8 haneli kurum kodu"
                   value={institutionCode}
@@ -226,15 +223,34 @@ function ProfileSetupContent() {
                 )}
               </div>
 
+              {/* Okul adı + sınıf numarası: SADECE kurum kodu doğrulandığında
+                  görünür ve zorunludur. Okul adı kurum kaydından otomatik
+                  gelir (salt okunur). İnternetten bireysel kayıtta sorulmaz. */}
+              {institutionName && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+                  <div>
+                    <label className="field-label">Okul Adı</label>
+                    <input className="input" value={institutionName} readOnly disabled
+                      style={{ background: 'var(--bg2)', color: 'var(--text2)', cursor: 'not-allowed' }} />
+                  </div>
+                  <div>
+                    <label className="field-label">Sınıf Numarası <span style={{ color: 'var(--red)' }}>*</span></label>
+                    <input className="input" placeholder="Örn: 14" value={classNumber} onChange={e => setClassNumber(e.target.value)} />
+                  </div>
+                </div>
+              )}
+
               {/* Opsiyonel */}
               <button onClick={() => setShowOptional(v => !v)}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--text2)', marginTop: '10px', padding: '4px 0', fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontSize: '11px' }}>{showOptional ? '▲' : '▼'}</span>
-                Telefon ve sosyal medya (opsiyonel)
+                Veli e-postası, telefon ve sosyal medya (opsiyonel)
               </button>
 
               {showOptional && (
                 <div style={{ marginTop: '8px', padding: '12px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+                  <label className="field-label">Veli E-postası</label>
+                  <input className="input" type="email" placeholder="veli@mail.com" value={parentEmail} onChange={e => setParentEmail(e.target.value)} />
                   <label className="field-label">Telefon</label>
                   <input className="input" type="tel" placeholder="+90 555 000 00 00" value={phone} onChange={e => setPhone(e.target.value)} />
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '4px' }}>

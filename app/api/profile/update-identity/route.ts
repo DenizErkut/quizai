@@ -31,10 +31,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Geçersiz istek.' }, { status: 400 })
   }
 
-  const { fullName, phone, role } = body || {}
+  const { fullName, phone, parentEmail, role } = body || {}
   const updates: Record<string, any> = {}
   if (typeof fullName === 'string' && fullName.trim()) updates.full_name = fullName.trim()
   if (phone !== undefined) updates.phone = phone || null
+  if (parentEmail !== undefined) updates.parent_email = parentEmail || null
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'Güncellenecek alan yok.' }, { status: 400 })
@@ -50,7 +51,10 @@ export async function POST(req: NextRequest) {
         email: user.email || '',
         role: role || 'student',
       })
-      if (updates.phone !== undefined) await updateIdentity(user.id, { phone: updates.phone })
+      const followUp: Record<string, any> = {}
+      if (updates.phone !== undefined) followUp.phone = updates.phone
+      if (updates.parent_email !== undefined) followUp.parent_email = updates.parent_email
+      if (Object.keys(followUp).length > 0) await updateIdentity(user.id, followUp)
     } else {
       await updateIdentity(user.id, updates)
     }

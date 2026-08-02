@@ -36,6 +36,8 @@ export interface PendingRegistration {
   studentSchool?: string
   classNumber?: string
   institutionCode?: string
+  parentEmail?: string
+  phone?: string
   kvkkAydinlatma: boolean
   kvkkAcikRiza: boolean
   veliOnayi: boolean

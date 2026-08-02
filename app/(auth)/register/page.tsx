@@ -81,10 +81,11 @@ function RegisterContent() {
   // Öğrenci alanları
   const [age, setAge] = useState('')
   const [grade, setGrade] = useState('')
-  const [studentSchool, setStudentSchool] = useState('')
   const [classNumber, setClassNumber] = useState('')
   const [institutionCode, setInstitutionCode] = useState(kurumParam.toUpperCase())
   const [institutionName, setInstitutionName] = useState('')
+  const [parentEmail, setParentEmail] = useState('')
+  const [studentPhone, setStudentPhone] = useState('')
   const [kvkkAydinlatma, setKvkkAydinlatma] = useState(false)
   const [kvkkAcikRiza, setKvkkAcikRiza] = useState(false)
   const [veliOnayi, setVeliOnayi] = useState(false)
@@ -151,8 +152,13 @@ function RegisterContent() {
     if (selectedRole === 'student') {
       if (!age || parseInt(age) < 5 || parseInt(age) > 35) { setError('Gecerli bir yas girin (5-35).'); return }
       if (!grade) { setError('Sinif / egitim seviyesi zorunludur.'); return }
-      if (!studentSchool.trim()) { setError('Okul adı zorunludur.'); return }
-      if (!classNumber.trim()) { setError('Sınıf numarası zorunludur.'); return }
+      // Okul adı ve sınıf numarası SADECE kurum kodu üzerinden kayıt olan
+      // (kuruma bağlı) öğrenciler için zorunlu. Kurum kodu yoksa/kod
+      // geçersizse (internetten bireysel kayıt) bu alanlar hiç istenmez —
+      // okul adı zaten kurum kaydından otomatik gelir, elle girilmez.
+      if (institutionName) {
+        if (!classNumber.trim()) { setError('Sınıf numarası zorunludur.'); return }
+      }
     }
 
     setError(''); setLoading(true)
@@ -217,13 +223,16 @@ function RegisterContent() {
         // E-posta onayı ZORUNLU ve henüz onaylanmadı — session yok.
         // Formda toplanan veriyi geçici olarak sakla, onay sonrası
         // /auth/complete-profile bu veriyi okuyup TR-PG kaydını tamamlayacak.
+        // NOT: studentSchool artık kurum kaydından gelen `institutionName` —
+        // kurum kodu yoksa/geçersizse boş kalır (okul bilgisi istenmiyor).
         savePendingRegistration({
           role: selectedRole!,
           email,
           fullName,
           age: age ? parseInt(age) : undefined,
-          grade, studentSchool: studentSchool.trim(), classNumber: classNumber.trim(),
+          grade, studentSchool: institutionName, classNumber: institutionName ? classNumber.trim() : '',
           institutionCode: institutionCode.trim(),
+          parentEmail: parentEmail.trim(), phone: studentPhone.trim(),
           kvkkAydinlatma, kvkkAcikRiza, veliOnayi,
           ref, next,
         })
@@ -237,6 +246,8 @@ function RegisterContent() {
           fullName,
           age: age ? parseInt(age) : undefined,
           role: selectedRole,
+          parentEmail: parentEmail.trim() || undefined,
+          institutionName: institutionName || undefined,
           kvkkAydinlatma, kvkkAcikRiza, veliOnayi,
         }),
       })
@@ -244,15 +255,26 @@ function RegisterContent() {
         setError('Kimlik kaydı oluşturulamadı. Lütfen tekrar deneyin.')
         return
       }
+      // Telefon, create-identity'nin desteklemediği ayrı bir alan — kimlik
+      // oluştuktan sonra ayrı bir güncelleme çağrısıyla yazılır.
+      if (studentPhone.trim()) {
+        await fetch('/api/profile/update-identity', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: studentPhone.trim(), role: selectedRole }),
+        }).catch(() => {})
+      }
 
       if (selectedRole === 'student') {
         // Öğrenci platform verisi (kimlik alanları TR-PG'de).
         // NOT: 'age' burada tutulmuyor — profiles'ta kolon yok, yaş TR-PG'de.
+        // school/class_number SADECE kurum koduyla bağlanan öğrencilerde
+        // dolar — okul adı kurum kaydından (institutionName), elle değil.
         const { error: upsertError } = await supabase.from('profiles').upsert({
           id: data.user.id,
           grade,
-          school: studentSchool.trim(),
-          class_number: classNumber.trim(),
+          school: institutionName || null,
+          class_number: institutionName ? classNumber.trim() : null,
           language: 'Türkçe',
           role: 'student',
         })
@@ -546,28 +568,69 @@ function RegisterContent() {
 
           {/* Öğrenci özel alanlar */}
           {selectedRole === 'student' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div>
-                <label className="field-label">Yaş *</label>
-                <input className="input" type="number" placeholder="16" value={age} onChange={e => setAge(e.target.value)} />
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label className="field-label">Yaş *</label>
+                  <input className="input" type="number" placeholder="16" value={age} onChange={e => setAge(e.target.value)} />
+                </div>
+                <div>
+                  <label className="field-label">Sınıf *</label>
+                  <select className="input" value={grade} onChange={e => setGrade(e.target.value)}
+                    style={{ cursor: 'pointer' }}>
+                    <option value="">Seç...</option>
+                    {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="field-label">Sınıf *</label>
-                <select className="input" value={grade} onChange={e => setGrade(e.target.value)}
-                  style={{ cursor: 'pointer' }}>
-                  <option value="">Seç...</option>
-                  {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
-                </select>
+
+              {/* Kurum kodu — okul adı BURADAN otomatik gelir, elle yazılmaz */}
+              <div style={{ marginTop: '10px', marginBottom: '0.75rem', padding: '12px 14px', borderRadius: '12px', background: 'rgba(217,119,6,0.04)', border: '1.5px solid rgba(217,119,6,0.15)' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#d97706', marginBottom: '6px' }}>🏛️ Kurum Kodu (Opsiyonel)</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px', lineHeight: 1.5 }}>
+                  Okulunuz Pratium ile anlaşmalıysa size verilen kodu girin — okul bilginiz otomatik eklenir.
+                </div>
+                <input className="input" placeholder="8 haneli kurum kodu"
+                  value={institutionCode}
+                  onChange={async e => {
+                    const val = e.target.value.toUpperCase()
+                    setInstitutionCode(val)
+                    await verifyInstitutionCode(val)
+                  }}
+                />
+                {institutionName && <div style={{ fontSize: '12px', color: 'var(--green)', fontWeight: 600, marginTop: '4px' }}>✓ {institutionName} kurumuna bağlanıyor</div>}
               </div>
-              <div>
-                <label className="field-label">Okul Adı *</label>
-                <input className="input" placeholder="Örn: Atatürk Ortaokulu" value={studentSchool} onChange={e => setStudentSchool(e.target.value)} />
+
+              {/* Okul adı + sınıf numarası: SADECE kurum kodu doğrulandığında
+                  görünür ve zorunludur. Okul adı kurum kaydından otomatik
+                  gelir (salt okunur) — elle değiştirilemez. Kurum kodu
+                  yoksa (internetten bireysel kayıt) bu alanlar hiç sorulmaz. */}
+              {institutionName && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label className="field-label">Okul Adı</label>
+                    <input className="input" value={institutionName} readOnly disabled
+                      style={{ background: 'var(--bg2)', color: 'var(--text2)', cursor: 'not-allowed' }} />
+                  </div>
+                  <div>
+                    <label className="field-label">Sınıf Numarası *</label>
+                    <input className="input" placeholder="Örn: 14" value={classNumber} onChange={e => setClassNumber(e.target.value)} />
+                  </div>
+                </div>
+              )}
+
+              {/* Veli e-postası + telefon — her zaman opsiyonel */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+                <div>
+                  <label className="field-label">Veli E-postası (Opsiyonel)</label>
+                  <input className="input" type="email" placeholder="veli@mail.com" value={parentEmail} onChange={e => setParentEmail(e.target.value)} />
+                </div>
+                <div>
+                  <label className="field-label">Telefon (Opsiyonel)</label>
+                  <input className="input" type="tel" placeholder="05xx xxx xx xx" value={studentPhone} onChange={e => setStudentPhone(e.target.value)} />
+                </div>
               </div>
-              <div>
-                <label className="field-label">Sınıf Numarası *</label>
-                <input className="input" placeholder="Örn: 14" value={classNumber} onChange={e => setClassNumber(e.target.value)} />
-              </div>
-            </div>
+            </>
           )}
 
           <label className="field-label">E-posta *</label>
@@ -579,21 +642,7 @@ function RegisterContent() {
             value={pass} onChange={e => setPass(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleRegister()} />
 
-          {/* Kurum kodu - sadece öğrenci */}
-          {selectedRole === 'student' && (
-            <div style={{ marginBottom: '0.75rem', padding: '12px 14px', borderRadius: '12px', background: 'rgba(217,119,6,0.04)', border: '1.5px solid rgba(217,119,6,0.15)' }}>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: '#d97706', marginBottom: '6px' }}>🏛️ Kurum Kodu (Opsiyonel)</div>
-              <input className="input" placeholder="8 haneli kurum kodu"
-                value={institutionCode}
-                onChange={async e => {
-                  const val = e.target.value.toUpperCase()
-                  setInstitutionCode(val)
-                  await verifyInstitutionCode(val)
-                }}
-              />
-              {institutionName && <div style={{ fontSize: '12px', color: 'var(--green)', fontWeight: 600, marginTop: '4px' }}>✓ {institutionName} kurumuna baglaniyor</div>}
-            </div>
-          )}
+          {/* Kurum kodu artık öğrenci alanları içinde (yukarıda) — burada tekrar yok */}
 
           {/* KVKK — Aydınlatma ve Açık Rıza AYRI metinler (KVKK Kurulu İlke Kararı 2026/347) */}
           <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', marginBottom: '8px' }}>
