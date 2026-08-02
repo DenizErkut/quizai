@@ -255,6 +255,19 @@ function RegisterContent() {
         setError('Kimlik kaydı oluşturulamadı. Lütfen tekrar deneyin.')
         return
       }
+      // ÖNEMLİ: signUp()'tan hemen önce çağırdığımız signOut() (bkz. yukarısı,
+      // stale-session düzeltmesi), tarayıcı istemcisinin oturum durumunu NADİREN
+      // signUp()'ın döndürdüğü YENİ session ile tam senkronize bırakmayabiliyor —
+      // bu da sonraki .from('profiles') çağrısının auth.uid()'i bulamayıp RLS'e
+      // takılmasına yol açabiliyor ("new row violates row-level security policy").
+      // Session'ı burada AÇIKÇA set ederek istemciyi kesin olarak doğru duruma
+      // getiriyoruz; sonraki tüm .from() çağrıları bunu kullanır.
+      if (data.session) {
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        })
+      }
       // Telefon, create-identity'nin desteklemediği ayrı bir alan — kimlik
       // oluştuktan sonra ayrı bir güncelleme çağrısıyla yazılır.
       if (studentPhone.trim()) {
