@@ -35,7 +35,7 @@ const GRADES = [
   { value: 'universite 4. sinif', label: 'Üniversite 4. Sınıf' },
 ]
 
-type Phase = 'loading' | 'error' | 'teacher-apply' | 'fallback-form' | 'done'
+type Phase = 'loading' | 'error' | 'teacher-apply' | 'teacher-done' | 'fallback-form' | 'done'
 
 export default function CompleteProfilePage() {
   const router = useRouter()
@@ -247,7 +247,7 @@ export default function CompleteProfilePage() {
         }).catch(() => {})
       }
 
-      router.push('/teacher')
+      setPhase('teacher-done')
     } catch (e: any) {
       console.error('[complete-profile handleTeacherApply] beklenmeyen hata:', e)
       setTeacherError('Beklenmeyen bir hata oluştu (' + (e?.message || 'bilinmeyen') + '). Lütfen tekrar dene.')
@@ -362,6 +362,29 @@ export default function CompleteProfilePage() {
     return (
       <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div className="spinner" style={{ width: 32, height: 32 }} />
+      </main>
+    )
+  }
+
+  if (phase === 'teacher-done') {
+    return (
+      <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
+        <div style={{ width: '100%', maxWidth: '440px' }}>
+          <div className="card anim-up-1" style={{ textAlign: 'center', padding: '2.5rem 2rem' }}>
+            <div style={{ fontSize: '56px', marginBottom: '1rem' }}>✅</div>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '8px' }}>
+              Başvurunuz Alındı!
+            </h2>
+            <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
+              Ekibimiz başvurunuzu inceleyecek ve e-posta ile bildirim gönderecek.
+              Onay süreci genellikle 1-2 iş günü sürmektedir.
+            </p>
+            <button onClick={() => router.push('/teacher')} className="btn btn-primary"
+              style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}>
+              Devam Et
+            </button>
+          </div>
+        </div>
       </main>
     )
   }

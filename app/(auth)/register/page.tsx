@@ -64,7 +64,7 @@ function RegisterContent() {
   const supabase = createClient() as any
 
   // Adım yönetimi
-  const [step, setStep] = useState<'role' | 'info' | 'teacher_info' | 'check-email'>('role')
+  const [step, setStep] = useState<'role' | 'info' | 'teacher_info' | 'teacher_done' | 'check-email'>('role')
   const [selectedRole, setSelectedRole] = useState<'student' | 'teacher' | 'parent' | null>(null)
   const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent'>('idle')
 
@@ -387,8 +387,10 @@ function RegisterContent() {
         }).catch(() => {})
       }
 
-      // Öğretmen onay bekliyor — quiz'e git ama panel kısıtlı
-      router.push('/teacher')
+      // Öğretmen onay bekliyor — sessiz yönlendirme yerine net bir
+      // "Başvurunuz Alındı" ekranı göster (bkz. register/teacher/page.tsx'teki
+      // aynı desen).
+      setStep('teacher_done')
     } catch (e: any) {
       console.error('[handleTeacherApply] beklenmeyen hata:', e)
       setError('Beklenmeyen bir hata oluştu (' + (e?.message || 'bilinmeyen') + '). Lütfen tekrar dene.')
@@ -482,6 +484,30 @@ function RegisterContent() {
           <div style={{ textAlign: 'center', fontSize: '13px', color: 'var(--text3)' }} className="anim-up-2">
             Zaten hesabın var mı?{' '}
             <Link href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'} style={{ color: 'var(--accent)', fontWeight: 600 }}>Giriş yap</Link>
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  // ── ADIM: Öğretmen Başvurusu Alındı ──
+  if (step === 'teacher_done') {
+    return (
+      <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
+        <div style={{ width: '100%', maxWidth: '440px' }}>
+          <div className="card anim-up-1" style={{ textAlign: 'center', padding: '2.5rem 2rem' }}>
+            <div style={{ fontSize: '56px', marginBottom: '1rem' }}>✅</div>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '8px' }}>
+              Başvurunuz Alındı!
+            </h2>
+            <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
+              Ekibimiz başvurunuzu inceleyecek ve e-posta ile bildirim gönderecek.
+              Onay süreci genellikle 1-2 iş günü sürmektedir.
+            </p>
+            <button onClick={() => router.push('/teacher')} className="btn btn-primary"
+              style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}>
+              Devam Et
+            </button>
           </div>
         </div>
       </main>
