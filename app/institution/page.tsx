@@ -9,6 +9,21 @@ import {
   ResponsiveContainer, CartesianGrid, Cell
 } from 'recharts'
 
+const GRADES = [
+  { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
+  { value: 'ilkokul 2. sinif', label: 'İlkokul 2. Sınıf' },
+  { value: 'ilkokul 3. sinif', label: 'İlkokul 3. Sınıf' },
+  { value: 'ilkokul 4. sinif', label: 'İlkokul 4. Sınıf' },
+  { value: 'ortaokul 5. sinif', label: 'Ortaokul 5. Sınıf' },
+  { value: 'ortaokul 6. sinif', label: 'Ortaokul 6. Sınıf' },
+  { value: 'ortaokul 7. sinif', label: 'Ortaokul 7. Sınıf' },
+  { value: 'ortaokul 8. sinif', label: 'Ortaokul 8. Sınıf' },
+  { value: 'lise 9. sinif', label: 'Lise 9. Sınıf' },
+  { value: 'lise 10. sinif', label: 'Lise 10. Sınıf' },
+  { value: 'lise 11. sinif', label: 'Lise 11. Sınıf' },
+  { value: 'lise 12. sinif', label: 'Lise 12. Sınıf' },
+]
+
 export default function InstitutionPage() {
   const [institution, setInstitution] = useState<any>(null)
   const [students, setStudents] = useState<any[]>([])
@@ -21,6 +36,21 @@ export default function InstitutionPage() {
   const [regenerating, setRegenerating] = useState(false)
   const [regenMsg, setRegenMsg] = useState('')
   const [linkCopied, setLinkCopied] = useState(false)
+
+  // Öğrenci kaydı (kurum tarafından dogrudan hesap acma)
+  const [showAddStudent, setShowAddStudent] = useState(false)
+  const [asName, setAsName] = useState('')
+  const [asSurname, setAsSurname] = useState('')
+  const [asEmail, setAsEmail] = useState('')
+  const [asAge, setAsAge] = useState('')
+  const [asGrade, setAsGrade] = useState('')
+  const [asClassNumber, setAsClassNumber] = useState('')
+  const [asParentEmail, setAsParentEmail] = useState('')
+  const [asPhone, setAsPhone] = useState('')
+  const [asLoading, setAsLoading] = useState(false)
+  const [asError, setAsError] = useState('')
+  const [asCreated, setAsCreated] = useState<{ email: string; password: string } | null>(null)
+
   const router = useRouter()
   const supabase = createClient() as any
 
@@ -59,6 +89,45 @@ export default function InstitutionPage() {
       topScorer: [...studentData].sort((a: any, b: any) => (b.avgPct ?? 0) - (a.avgPct ?? 0))[0],
     })
     setLoading(false)
+  }
+
+  async function handleAddStudent() {
+    if (!asName.trim() || !asSurname.trim()) { setAsError('Ad ve soyad zorunludur.'); return }
+    if (!asEmail.trim()) { setAsError('E-posta zorunludur.'); return }
+    if (!asGrade) { setAsError('Sınıf zorunludur.'); return }
+    if (asAge && (parseInt(asAge) < 5 || parseInt(asAge) > 35)) { setAsError('Geçerli bir yaş girin (5-35).'); return }
+
+    setAsError(''); setAsLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/institution/create-student', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          fullName: `${asName.trim()} ${asSurname.trim()}`,
+          email: asEmail.trim(),
+          age: asAge || undefined,
+          grade: asGrade,
+          classNumber: asClassNumber,
+          parentEmail: asParentEmail,
+          phone: asPhone,
+        }),
+      })
+      let data: any = null
+      try { data = await res.json() } catch { /* 5xx bazen JSON degil */ }
+      if (!res.ok) { setAsError(data?.error || 'Kayıt oluşturulamadı. Lütfen tekrar dene.'); return }
+
+      setAsCreated({ email: data.email, password: data.password })
+      // Formu temizle ama basari kartini gostermeye devam et
+      setAsName(''); setAsSurname(''); setAsEmail(''); setAsAge(''); setAsGrade('')
+      setAsClassNumber(''); setAsParentEmail(''); setAsPhone('')
+      load() // ogrenci listesini tazele
+    } catch (e: any) {
+      console.error('[handleAddStudent] beklenmeyen hata:', e)
+      setAsError('Beklenmeyen bir hata oluştu. Lütfen tekrar dene.')
+    } finally {
+      setAsLoading(false)
+    }
   }
 
   async function regenerateCode() {
@@ -239,6 +308,10 @@ export default function InstitutionPage() {
           <div>
             <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
               <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', flex: 1 }}>👥 Öğrenciler</h1>
+              <button onClick={() => { setShowAddStudent(v => !v); setAsCreated(null); setAsError('') }}
+                style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', background: '#6366f1', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap' }}>
+                {showAddStudent ? '✕ Kapat' : '➕ Öğrenci Kaydet'}
+              </button>
               <select value={sortBy} onChange={e => setSortBy(e.target.value as any)}
                 style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '12px', fontFamily: 'var(--font-sans)' }}>
                 <option value="avgPct">Başarıya Göre</option>
@@ -247,6 +320,90 @@ export default function InstitutionPage() {
                 <option value="name">İsme Göre</option>
               </select>
             </div>
+
+            {showAddStudent && (
+              <div className="card" style={{ marginBottom: '1rem' }}>
+                {asCreated ? (
+                  <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+                    <div style={{ fontSize: '40px', marginBottom: '8px' }}>✅</div>
+                    <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--primary)', marginBottom: '4px' }}>
+                      Öğrenci hesabı oluşturuldu!
+                    </div>
+                    <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '14px' }}>
+                      Bu bilgileri öğrenciyle paylaş — giriş yaptıktan sonra şifresini değiştirebilir.
+                    </div>
+                    <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', textAlign: 'left', maxWidth: '320px', margin: '0 auto' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>E-posta</div>
+                      <div style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>{asCreated.email}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>Geçici Şifre</div>
+                      <div style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: 'var(--primary)' }}>{asCreated.password}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '14px' }}>
+                      <button onClick={() => {
+                        navigator.clipboard.writeText(`E-posta: ${asCreated.email}\nŞifre: ${asCreated.password}`)
+                        setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000)
+                      }}
+                        style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                        {linkCopied ? '✓ Kopyalandı' : '📋 Kopyala'}
+                      </button>
+                      <button onClick={() => setAsCreated(null)}
+                        style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#6366f1', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                        + Başka Öğrenci Ekle
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '10px' }}>Yeni Öğrenci Kaydı</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label className="field-label">Ad *</label>
+                        <input className="input" value={asName} onChange={e => setAsName(e.target.value)} placeholder="Ahmet" />
+                      </div>
+                      <div>
+                        <label className="field-label">Soyad *</label>
+                        <input className="input" value={asSurname} onChange={e => setAsSurname(e.target.value)} placeholder="Yılmaz" />
+                      </div>
+                      <div>
+                        <label className="field-label">Yaş</label>
+                        <input className="input" type="number" value={asAge} onChange={e => setAsAge(e.target.value)} placeholder="14" />
+                      </div>
+                      <div>
+                        <label className="field-label">Sınıf *</label>
+                        <select className="input" value={asGrade} onChange={e => setAsGrade(e.target.value)} style={{ cursor: 'pointer' }}>
+                          <option value="">Seç...</option>
+                          {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="field-label">Sınıf Numarası</label>
+                        <input className="input" value={asClassNumber} onChange={e => setAsClassNumber(e.target.value)} placeholder="Örn: 14" />
+                      </div>
+                      <div>
+                        <label className="field-label">E-posta *</label>
+                        <input className="input" type="email" value={asEmail} onChange={e => setAsEmail(e.target.value)} placeholder="ogrenci@mail.com" />
+                      </div>
+                      <div>
+                        <label className="field-label">Veli E-postası (Opsiyonel)</label>
+                        <input className="input" type="email" value={asParentEmail} onChange={e => setAsParentEmail(e.target.value)} placeholder="veli@mail.com" />
+                      </div>
+                      <div>
+                        <label className="field-label">Telefon (Opsiyonel)</label>
+                        <input className="input" type="tel" value={asPhone} onChange={e => setAsPhone(e.target.value)} placeholder="05xx xxx xx xx" />
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text3)', margin: '8px 0 12px' }}>
+                      Hesap otomatik olarak onaylı oluşturulur — öğrencinin e-posta doğrulaması yapmasına gerek yok. Okul adı ({institution?.name}) otomatik atanır.
+                    </div>
+                    {asError && <div style={{ padding: '10px 12px', background: 'var(--red-bg)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)', marginBottom: '10px' }}>{asError}</div>}
+                    <button onClick={handleAddStudent} disabled={asLoading}
+                      style={{ width: '100%', padding: '11px', borderRadius: '10px', border: 'none', background: asLoading ? 'var(--bg2)' : '#6366f1', color: asLoading ? 'var(--text3)' : '#fff', fontSize: '14px', fontWeight: 700, cursor: asLoading ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)' }}>
+                      {asLoading ? 'Oluşturuluyor...' : 'Öğrenci Hesabı Oluştur →'}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
             <input value={search} onChange={e => setSearch(e.target.value)}
               placeholder="🔍 Öğrenci veya sınıf ara..."
               style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box', marginBottom: '1rem' }} />
