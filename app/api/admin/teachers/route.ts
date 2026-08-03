@@ -52,16 +52,27 @@ export async function GET(req: NextRequest) {
   // bir URL'ye çeviriyoruz. Süre dolunca link çalışmaz — admin sayfayı
   // yenileyip tekrar açmalı (bilerek: belgeler süresiz erişilebilir
   // kalmasın).
-  const withDocs = await Promise.all(withIdentity.map(async (t: any) => {
-    if (!t.document_url) return t
-    const marker = '/teacher-documents/'
-    const idx = t.document_url.indexOf(marker)
-    if (idx === -1) return t
-    const path = t.document_url.slice(idx + marker.length)
+  const marker = '/teacher-documents/'
+  async function toSignedUrl(rawUrl: string): Promise<string | null> {
+    const idx = rawUrl.indexOf(marker)
+    if (idx === -1) return null
+    const path = rawUrl.slice(idx + marker.length)
     const { data: signed } = await supabaseAdmin.storage
       .from('teacher-documents')
       .createSignedUrl(path, 300)
-    return { ...t, document_url: signed?.signedUrl || null }
+    return signed?.signedUrl || null
+  }
+
+  const withDocs = await Promise.all(withIdentity.map(async (t: any) => {
+    // Çoklu belge (document_urls) varsa hepsini imzalı URL'e çevir.
+    if (Array.isArray(t.document_urls) && t.document_urls.length > 0) {
+      const signedUrls = (await Promise.all(t.document_urls.map(toSignedUrl))).filter(Boolean)
+      return { ...t, document_url: signedUrls[0] || null, document_urls: signedUrls }
+    }
+    // Geriye dönük uyumluluk: eski kayıtlarda sadece tekil document_url var
+    if (!t.document_url) return t
+    const signed = await toSignedUrl(t.document_url)
+    return { ...t, document_url: signed, document_urls: signed ? [signed] : null }
   }))
 
   return NextResponse.json({ teachers: withDocs })

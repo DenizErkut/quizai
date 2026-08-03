@@ -35,7 +35,7 @@ function RegisterTeacherContent() {
   const [school, setSchool] = useState('')
   const [subject, setSubject] = useState('')
   const [phone, setPhone] = useState('')
-  const [doc, setDoc] = useState<File | null>(null)
+  const [docs, setDocs] = useState<File[]>([])
 
   const [step, setStep] = useState<'account' | 'info' | 'check-email' | 'done'>('account')
   const [loading, setLoading] = useState(false)
@@ -130,15 +130,15 @@ function RegisterTeacherContent() {
       }
       if (!uid) { setError('Oturum bulunamadi. Lutfen once hesap olusturun.'); return }
 
-      let docUrl = ''
-      if (doc) {
-        const ext = doc.name.split('.').pop()
-        const path = `teacher-docs/${uid}-${Date.now()}.${ext}`
-        const { data: uploadData } = await supabase.storage.from('teacher-documents').upload(path, doc, { upsert: true })
-        if (uploadData) {
-          const { data: urlData } = supabase.storage.from('teacher-documents').getPublicUrl(path)
-          docUrl = urlData.publicUrl
-        }
+      const docUrls: string[] = []
+      for (let i = 0; i < docs.length; i++) {
+        const file = docs[i]
+        const ext = file.name.split('.').pop()
+        const path = `teacher-docs/${uid}/${Date.now()}-${i}.${ext}`
+        const { error: uploadErr } = await supabase.storage.from('teacher-documents').upload(path, file, { upsert: true })
+        if (uploadErr) { console.error('[handleApply] belge yukleme hatasi:', file.name, uploadErr); continue }
+        const { data: urlData } = supabase.storage.from('teacher-documents').getPublicUrl(path)
+        docUrls.push(urlData.publicUrl)
       }
 
       // Kimlik (ad-soyad, telefon) TR-PG'ye yazılır — yoksa oluşturulur.
@@ -155,7 +155,8 @@ function RegisterTeacherContent() {
         user_id: uid,
         school: school.trim(),
         subject: subject.trim(),
-        document_url: docUrl || null,
+        document_url: docUrls[0] || null,
+        document_urls: docUrls.length > 0 ? docUrls : null,
         approved: false,
       })
 
@@ -285,10 +286,23 @@ function RegisterTeacherContent() {
             <label className="field-label">Belge Yukle (Opsiyonel)</label>
             <div style={{ marginBottom: '0.75rem' }}>
               <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '9px 16px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', fontSize: '13px', cursor: 'pointer', color: 'var(--text2)', fontFamily: 'var(--font-sans)' }}>
-                📎 {doc ? doc.name : 'Belge sec (PDF, JPG)'}
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: 'none' }}
-                  onChange={e => setDoc(e.target.files?.[0] || null)} />
+                📎 {docs.length > 0 ? `${docs.length} belge secildi` : 'Belge sec (PDF, JPG - birden fazla secebilirsin)'}
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple style={{ display: 'none' }}
+                  onChange={e => setDocs(Array.from(e.target.files || []))} />
               </label>
+              {docs.length > 0 && (
+                <ul style={{ margin: '6px 0 0', paddingLeft: '18px', fontSize: '12px', color: 'var(--text3)' }}>
+                  {docs.map((f, i) => (
+                    <li key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <span>{f.name}</span>
+                      <button type="button" onClick={() => setDocs(docs.filter((_, j) => j !== i))}
+                        style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: '12px', fontFamily: 'var(--font-sans)' }}>
+                        Kaldir
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Ogretmenlik belgesi, diploma vb. (admin inceleyecek)</div>
             </div>
 

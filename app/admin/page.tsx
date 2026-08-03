@@ -19,6 +19,7 @@ interface Teacher {
   id: string; user_id: string; name: string; email: string
   school: string | null; approved: boolean; created_at: string
   document_url?: string | null
+  document_urls?: string[] | null
 }
 
 interface ErrorReport {
@@ -739,11 +740,15 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                         </span>
                       </div>
                       <div style={{ marginLeft: '40px', marginTop: '4px' }}>
-                        {t.document_url ? (
-                          <a href={t.document_url} target="_blank" rel="noopener noreferrer"
-                            style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            📄 Belgeyi Görüntüle
-                          </a>
+                        {t.document_urls && t.document_urls.length > 0 ? (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                            {t.document_urls.map((url, i) => (
+                              <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                                style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                📄 Belge {t.document_urls!.length > 1 ? i + 1 : ''}
+                              </a>
+                            ))}
+                          </div>
                         ) : (
                           <span style={{ fontSize: '12px', color: 'var(--red)', fontWeight: 600 }}>
                             ⚠️ Belge yüklenmemiş

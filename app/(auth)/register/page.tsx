@@ -94,7 +94,7 @@ function RegisterContent() {
   const [school, setSchool] = useState('')
   const [subject, setSubject] = useState('')
   const [phone, setPhone] = useState('')
-  const [doc, setDoc] = useState<File | null>(null)
+  const [docs, setDocs] = useState<File[]>([])
 
   // Kurum davet kodunu doğrular (hem manuel giriş hem de QR/link ile gelen ?kurum= için ortak)
   async function verifyInstitutionCode(val: string) {
@@ -357,15 +357,15 @@ function RegisterContent() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setError('Oturum bulunamadi.'); return }
 
-      let docUrl = ''
-      if (doc) {
-        const ext = doc.name.split('.').pop()
-        const path = `teacher-docs/${user.id}-${Date.now()}.${ext}`
-        const { data: uploadData } = await supabase.storage.from('teacher-documents').upload(path, doc, { upsert: true })
-        if (uploadData) {
-          const { data: urlData } = supabase.storage.from('teacher-documents').getPublicUrl(path)
-          docUrl = urlData.publicUrl
-        }
+      const docUrls: string[] = []
+      for (let i = 0; i < docs.length; i++) {
+        const file = docs[i]
+        const ext = file.name.split('.').pop()
+        const path = `teacher-docs/${user.id}/${Date.now()}-${i}.${ext}`
+        const { error: uploadErr } = await supabase.storage.from('teacher-documents').upload(path, file, { upsert: true })
+        if (uploadErr) { console.error('[handleTeacherApply] belge yukleme hatasi:', file.name, uploadErr); continue }
+        const { data: urlData } = supabase.storage.from('teacher-documents').getPublicUrl(path)
+        docUrls.push(urlData.publicUrl)
       }
 
       // Öğretmenin ad-soyad/e-postası zaten TR-PG kimliğinde (kayıt adımında).
@@ -374,7 +374,8 @@ function RegisterContent() {
         user_id: user.id,
         school: school.trim(),
         subject: subject.trim(),
-        document_url: docUrl || null,
+        document_url: docUrls[0] || null,
+        document_urls: docUrls.length > 0 ? docUrls : null,
         approved: false,
       })
 
@@ -540,10 +541,23 @@ function RegisterContent() {
 
             <label className="field-label">Belge Yükle (Opsiyonel)</label>
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '9px 16px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', fontSize: '13px', cursor: 'pointer', color: 'var(--text2)', fontFamily: 'var(--font-sans)', marginBottom: '4px' }}>
-              📎 {doc ? doc.name : 'Belge seç (PDF, JPG)'}
-              <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: 'none' }}
-                onChange={e => setDoc(e.target.files?.[0] || null)} />
+              📎 {docs.length > 0 ? `${docs.length} belge seçildi` : 'Belge seç (PDF, JPG — birden fazla seçebilirsin)'}
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple style={{ display: 'none' }}
+                onChange={e => setDocs(Array.from(e.target.files || []))} />
             </label>
+            {docs.length > 0 && (
+              <ul style={{ margin: '0 0 8px', paddingLeft: '18px', fontSize: '12px', color: 'var(--text3)' }}>
+                {docs.map((f, i) => (
+                  <li key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <span>{f.name}</span>
+                    <button type="button" onClick={() => setDocs(docs.filter((_, j) => j !== i))}
+                      style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: '12px', fontFamily: 'var(--font-sans)' }}>
+                      Kaldır
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
             <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '1rem' }}>Öğretmenlik belgesi, diploma vb.</div>
 
             {error && <div style={{ padding: '10px 12px', background: 'var(--red-bg)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)', marginBottom: '10px' }}>{error}</div>}
