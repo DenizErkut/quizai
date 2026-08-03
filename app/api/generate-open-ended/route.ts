@@ -51,16 +51,19 @@ export async function POST(req: NextRequest) {
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
     // Ayni gunluk/aylik kota mantigi (bir acik uclu soru = bir 'test' hakki)
+    // — Premium ve Unlimited planlarda HİÇBİR sınır yok.
     const plan = profile.plan || 'free'
     const today = new Date().toISOString().split('T')[0]
-    const DAILY_LIMIT: Record<string, number> = { free: 10, premium: 25, unlimited: 99999 }
-    const MONTHLY_LIMIT: Record<string, number> = { free: 10, premium: 200, unlimited: 99999 }
-    const dailyCount = profile.daily_test_date === today ? (profile.daily_test_count || 0) : 0
-    if (dailyCount >= (DAILY_LIMIT[plan] ?? 10)) {
-      return NextResponse.json({ error: 'daily_limit_reached' }, { status: 429 })
-    }
-    if ((profile.monthly_test_count || 0) >= (MONTHLY_LIMIT[plan] ?? 10)) {
-      return NextResponse.json({ error: 'monthly_limit_reached' }, { status: 429 })
+    if (plan !== 'premium' && plan !== 'unlimited') {
+      const DAILY_LIMIT: Record<string, number> = { free: 10 }
+      const MONTHLY_LIMIT: Record<string, number> = { free: 10 }
+      const dailyCount = profile.daily_test_date === today ? (profile.daily_test_count || 0) : 0
+      if (dailyCount >= (DAILY_LIMIT[plan] ?? 10)) {
+        return NextResponse.json({ error: 'daily_limit_reached' }, { status: 429 })
+      }
+      if ((profile.monthly_test_count || 0) >= (MONTHLY_LIMIT[plan] ?? 10)) {
+        return NextResponse.json({ error: 'monthly_limit_reached' }, { status: 429 })
+      }
     }
 
     const body = await req.json()
