@@ -48,8 +48,9 @@ function maskPhone(phone: string | null | undefined): string {
 }
 
 export async function GET(req: NextRequest) {
+  // institution_id verilmezse TÜM kurumlardaki öğrenciler (kurum adı da
+  // her satıra eklenerek) döner — admin paneldeki üst düzey filtre için.
   const institutionId = req.nextUrl.searchParams.get('institution_id')
-  if (!institutionId) return NextResponse.json({ error: 'institution_id gerekli.' }, { status: 400 })
 
   const cookieStore = await cookies()
   const supabase = createServerClient(
@@ -67,14 +68,18 @@ export async function GET(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  const { data: links } = await adminClient
+  let linksQuery = adminClient
     .from('institution_users')
-    .select('user_id')
-    .eq('institution_id', institutionId)
+    .select('user_id, institution_id, institutions(name)')
     .eq('role', 'student')
+  if (institutionId) linksQuery = linksQuery.eq('institution_id', institutionId)
+  const { data: links } = await linksQuery
 
   const userIds = (links ?? []).map((l: any) => l.user_id)
   if (userIds.length === 0) return NextResponse.json({ students: [] })
+
+  const instNameByUser: Record<string, string> = {}
+  ;(links ?? []).forEach((l: any) => { instNameByUser[l.user_id] = l.institutions?.name || '—' })
 
   const { data: profiles } = await adminClient
     .from('profiles')
@@ -87,6 +92,9 @@ export async function GET(req: NextRequest) {
     .map((p: any) => {
       const id = identities[p.id]
       return {
+        // institution_id filtresi yoksa (tüm kurumlar) hangi kuruma ait
+        // olduğunu da göster
+        institution_name: institutionId ? undefined : instNameByUser[p.id],
         name_masked: maskFullName(id?.full_name),
         email_masked: maskEmail(id?.email),
         phone_masked: maskPhone(id?.phone),

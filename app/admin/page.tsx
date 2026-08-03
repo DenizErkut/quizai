@@ -86,6 +86,11 @@ export default function AdminPage() {
   const [expandedInstId, setExpandedInstId] = useState<string | null>(null)
   const [instStudentsReport, setInstStudentsReport] = useState<Record<string, any[]>>({})
   const [instReportLoading, setInstReportLoading] = useState(false)
+  // Kurum filtreli genel ogrenci raporu (ust duzey, tum kurumlar arasi)
+  const [reportFilterInstId, setReportFilterInstId] = useState<string>('')
+  const [reportStudents, setReportStudents] = useState<any[]>([])
+  const [reportLoading, setReportLoading] = useState(false)
+  const [reportFetched, setReportFetched] = useState(false)
   const [adminNote, setAdminNote] = useState<Record<string, string>>({})
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [pendingTeachers, setPendingTeachers] = useState(0)
@@ -218,6 +223,24 @@ export default function AdminPage() {
       console.error('[toggleInstitutionReport] hata:', e)
     } finally {
       setInstReportLoading(false)
+    }
+  }
+
+  // Ust duzey, kurum filtreli genel rapor - filtre bos ise TUM kurumlar
+  async function fetchStudentReport(instId: string) {
+    setReportLoading(true); setReportFetched(true)
+    try {
+      const { data: { session: s } } = await supabase.auth.getSession()
+      const url = instId
+        ? `/api/admin/institution-students-report?institution_id=${instId}`
+        : '/api/admin/institution-students-report'
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${s?.access_token}` } })
+      const json = await res.json()
+      setReportStudents(json.students || [])
+    } catch (e) {
+      console.error('[fetchStudentReport] hata:', e)
+    } finally {
+      setReportLoading(false)
     }
   }
 
@@ -817,6 +840,67 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         {/* Institutions tab */}
         {tab === 'institutions' && (
           <div>
+            {/* Kurum filtreli genel öğrenci raporu */}
+            <div className="card" style={{ marginBottom: '1.5rem' }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>📋 Öğrenci Raporu</div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '10px' }}>
+                <select value={reportFilterInstId} onChange={e => setReportFilterInstId(e.target.value)}
+                  style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', minWidth: '220px' }}>
+                  <option value="">Tüm Kurumlar</option>
+                  {institutions.map((inst: any) => (
+                    <option key={inst.id} value={inst.id}>{inst.name}</option>
+                  ))}
+                </select>
+                <button onClick={() => fetchStudentReport(reportFilterInstId)} className="btn btn-sm" disabled={reportLoading}>
+                  {reportLoading ? '⏳ Yükleniyor...' : '🔍 Raporu Getir'}
+                </button>
+                {reportFetched && !reportLoading && (
+                  <span style={{ fontSize: '12px', color: 'var(--text3)' }}>{reportStudents.length} öğrenci</span>
+                )}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '10px' }}>
+                🔒 Ad/soyad, e-posta ve telefon KVKK gereği maskelenerek gösterilir.
+              </div>
+
+              {reportFetched && (
+                reportStudents.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text3)', fontSize: '13px' }}>
+                    {reportLoading ? 'Yükleniyor...' : 'Sonuç bulunamadı.'}
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                          {[
+                            ...(!reportFilterInstId ? ['Kurum'] : []),
+                            'Ad Soyad', 'E-posta', 'Telefon', 'Sınıf', 'No', 'Kayıt',
+                          ].map(h => (
+                            <th key={h} style={{ padding: '6px 10px', textAlign: 'left', color: 'var(--text3)', fontWeight: 600, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportStudents.map((st: any, i: number) => (
+                          <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                            {!reportFilterInstId && (
+                              <td style={{ padding: '6px 10px', color: 'var(--primary)', fontWeight: 500 }}>{st.institution_name}</td>
+                            )}
+                            <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>{st.name_masked}</td>
+                            <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>{st.email_masked}</td>
+                            <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>{st.phone_masked}</td>
+                            <td style={{ padding: '6px 10px', color: 'var(--text2)' }}>{st.grade || '—'}</td>
+                            <td style={{ padding: '6px 10px', color: 'var(--text2)' }}>{st.class_number || '—'}</td>
+                            <td style={{ padding: '6px 10px', color: 'var(--text3)', fontSize: '11px' }}>{new Date(st.created_at).toLocaleDateString('tr-TR')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              )}
+            </div>
+
             {/* Kurum oluştur formu */}
             <div className="card" style={{ marginBottom: '1.5rem' }}>
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>🏛️ Yeni Kurum Oluştur</div>
