@@ -83,6 +83,9 @@ export default function AdminPage() {
   const [editInstForm, setEditInstForm] = useState({ name: '', email: '', newPassword: '', discount: '0', active: true })
   const [editInstSaving, setEditInstSaving] = useState(false)
   const [instStudentCounts, setInstStudentCounts] = useState<Record<string, number>>({})
+  const [expandedInstId, setExpandedInstId] = useState<string | null>(null)
+  const [instStudentsReport, setInstStudentsReport] = useState<Record<string, any[]>>({})
+  const [instReportLoading, setInstReportLoading] = useState(false)
   const [adminNote, setAdminNote] = useState<Record<string, string>>({})
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [pendingTeachers, setPendingTeachers] = useState(0)
@@ -197,6 +200,25 @@ export default function AdminPage() {
       body: JSON.stringify({ institution_id: inst.id, name: inst.name, email: inst.admin_email, newPassword: '', discount: String(inst.discount_rate || 0), active: !inst.active }),
     })
     await fetchData()
+  }
+
+  async function toggleInstitutionReport(instId: string) {
+    if (expandedInstId === instId) { setExpandedInstId(null); return }
+    setExpandedInstId(instId)
+    if (instStudentsReport[instId]) return // zaten cekilmis, tekrar sorgulama
+    setInstReportLoading(true)
+    try {
+      const { data: { session: s } } = await supabase.auth.getSession()
+      const res = await fetch(`/api/admin/institution-students-report?institution_id=${instId}`, {
+        headers: { Authorization: `Bearer ${s?.access_token}` },
+      })
+      const json = await res.json()
+      setInstStudentsReport(prev => ({ ...prev, [instId]: json.students || [] }))
+    } catch (e) {
+      console.error('[toggleInstitutionReport] hata:', e)
+    } finally {
+      setInstReportLoading(false)
+    }
   }
 
   async function createInstitution() {
@@ -910,6 +932,9 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                          <button onClick={() => toggleInstitutionReport(inst.id)} className="btn btn-sm" style={{ fontSize: '11px' }}>
+                            {expandedInstId === inst.id ? '▲ Gizle' : '📋 Öğrenci Listesi'}
+                          </button>
                           <button onClick={() => {
                             setEditingInst(inst)
                             setEditInstForm({ name: inst.name, email: inst.admin_email || '', newPassword: '', discount: String(inst.discount_rate || 0), active: inst.active })
@@ -921,6 +946,43 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                           </button>
                         </div>
                       </div>
+
+                      {expandedInstId === inst.id && (
+                        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>
+                            🔒 Ad/soyad, e-posta ve telefon KVKK gereği maskelenerek gösterilir.
+                          </div>
+                          {instReportLoading ? (
+                            <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--text3)', fontSize: '12px' }}>Yükleniyor...</div>
+                          ) : (instStudentsReport[inst.id]?.length ?? 0) === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--text3)', fontSize: '12px' }}>Bu kuruma bağlı öğrenci yok.</div>
+                          ) : (
+                            <div style={{ overflowX: 'auto' }}>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                                <thead>
+                                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                                    {['Ad Soyad', 'E-posta', 'Telefon', 'Sınıf', 'No', 'Kayıt'].map(h => (
+                                      <th key={h} style={{ padding: '6px 10px', textAlign: 'left', color: 'var(--text3)', fontWeight: 600, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {instStudentsReport[inst.id].map((st: any, i: number) => (
+                                    <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                      <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>{st.name_masked}</td>
+                                      <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>{st.email_masked}</td>
+                                      <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>{st.phone_masked}</td>
+                                      <td style={{ padding: '6px 10px', color: 'var(--text2)' }}>{st.grade || '—'}</td>
+                                      <td style={{ padding: '6px 10px', color: 'var(--text2)' }}>{st.class_number || '—'}</td>
+                                      <td style={{ padding: '6px 10px', color: 'var(--text3)', fontSize: '11px' }}>{new Date(st.created_at).toLocaleDateString('tr-TR')}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
