@@ -28,6 +28,7 @@ const DROPDOWN_ITEMS = [
   { label: '📝 Notlarım',        href: '/notes' },
   { label: '🎁 Davet et & kazan', href: '/referral' },
   { label: '💎 Planlar',         href: '/pricing' },
+  { label: '🎓 Öğretmenlik Başvurusu', href: '/apply-teacher' },
   { label: '✏️ Profil Düzenle',  href: '/profile/edit' },
   { label: '🔑 Şifremi Değiştir', href: '/auth/reset-password' },
 ]
@@ -299,6 +300,7 @@ export default function Navbar() {
                     { label: '📝 Notlarım', href: '/notes' },
                     { label: '🎁 Davet et & kazan', href: '/referral' },
                     { label: '💎 Planlar', href: '/pricing' },
+                    { label: '🎓 Öğretmenlik Başvurusu', href: '/apply-teacher' },
                     { label: '✏️ Profil Düzenle', href: '/profile/edit' },
                     { label: '🔑 Şifremi Değiştir', href: '/auth/reset-password' },
                   ].map(item => (
