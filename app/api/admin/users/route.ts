@@ -35,7 +35,23 @@ export async function GET() {
 
   // İsimler TR-PG'den toplu çekilir ve listeye eklenir
   const identities = await getIdentitiesBySupabaseIds((data ?? []).map((u: any) => u.id))
-  const withNames = (data ?? []).map((u: any) => ({ ...u, name: identities[u.id]?.full_name ?? null }))
+
+  // Kurum bilgisi (varsa) — institution_users üzerinden tek sorguda çekilir
+  const { data: instLinks } = await adminClient
+    .from('institution_users')
+    .select('user_id, institutions(name, code)')
+    .in('user_id', (data ?? []).map((u: any) => u.id))
+  const instMap: Record<string, { name: string | null; code: string | null }> = {}
+  ;(instLinks ?? []).forEach((l: any) => {
+    instMap[l.user_id] = { name: l.institutions?.name ?? null, code: l.institutions?.code ?? null }
+  })
+
+  const withNames = (data ?? []).map((u: any) => ({
+    ...u,
+    name: identities[u.id]?.full_name ?? null,
+    institution_name: instMap[u.id]?.name ?? null,
+    institution_code: instMap[u.id]?.code ?? null,
+  }))
 
   return NextResponse.json(withNames)
 }

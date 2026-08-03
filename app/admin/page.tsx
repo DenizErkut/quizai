@@ -8,6 +8,7 @@ interface User {
   id: string; name: string; grade: string; plan: string
   plan_expires_at: string | null; monthly_test_count: number
   is_admin: boolean; created_at: string; total_sessions?: number; avg_pct?: number
+  institution_name?: string | null; institution_code?: string | null
 }
 
 interface Stats {
@@ -576,7 +577,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg2)' }}>
-                      {['Kullanıcı', 'Sınıf', 'Plan', 'Bu ay', 'Test / Ort.', 'Kayıt', 'İşlemler'].map(h => (
+                      {['Kullanıcı', 'Sınıf', 'Kurum', 'Plan', 'Bu ay', 'Test / Ort.', 'Kayıt', 'İşlemler'].map(h => (
                         <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text2)', whiteSpace: 'nowrap', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                       ))}
                     </tr>
@@ -596,6 +597,18 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                           </div>
                         </td>
                         <td style={{ padding: '10px 14px', color: 'var(--text2)' }}>{u.grade}</td>
+                        <td style={{ padding: '10px 14px' }}>
+                          {u.institution_name ? (
+                            <div>
+                              <div style={{ fontWeight: 500, color: 'var(--primary)', fontSize: '12px' }}>{u.institution_name}</div>
+                              {u.institution_code && (
+                                <div style={{ fontFamily: 'monospace', fontSize: '10px', color: 'var(--text3)', letterSpacing: '0.05em' }}>{u.institution_code}</div>
+                              )}
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--text4)', fontSize: '12px' }}>—</span>
+                          )}
+                        </td>
                         <td style={{ padding: '10px 14px' }}>
                           <span style={{
                             fontSize: '11px', padding: '3px 8px', borderRadius: '99px', fontWeight: 600,
