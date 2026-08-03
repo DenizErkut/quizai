@@ -45,5 +45,24 @@ export async function GET(req: NextRequest) {
     return { ...t, name: id?.full_name ?? null, email: id?.email ?? null, phone: id?.phone ?? null }
   })
 
-  return NextResponse.json({ teachers: withIdentity })
+  // NOT: 'teacher-documents' bucket'ı PRIVATE (kişisel belge içerdiği için
+  // bilerek public değil). Kayıt sırasında getPublicUrl() ile üretilip
+  // document_url'e yazılan link bucket private olduğu için AÇILMIYOR —
+  // burada admin'in görüntüleyebilmesi için kısa ömürlü (5 dakika) imzalı
+  // bir URL'ye çeviriyoruz. Süre dolunca link çalışmaz — admin sayfayı
+  // yenileyip tekrar açmalı (bilerek: belgeler süresiz erişilebilir
+  // kalmasın).
+  const withDocs = await Promise.all(withIdentity.map(async (t: any) => {
+    if (!t.document_url) return t
+    const marker = '/teacher-documents/'
+    const idx = t.document_url.indexOf(marker)
+    if (idx === -1) return t
+    const path = t.document_url.slice(idx + marker.length)
+    const { data: signed } = await supabaseAdmin.storage
+      .from('teacher-documents')
+      .createSignedUrl(path, 300)
+    return { ...t, document_url: signed?.signedUrl || null }
+  }))
+
+  return NextResponse.json({ teachers: withDocs })
 }

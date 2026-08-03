@@ -18,6 +18,7 @@ interface Stats {
 interface Teacher {
   id: string; user_id: string; name: string; email: string
   school: string | null; approved: boolean; created_at: string
+  document_url?: string | null
 }
 
 interface ErrorReport {
@@ -736,6 +737,18 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                         <span style={{ fontWeight: 600, color: t.approved ? 'var(--green)' : '#d97706' }}>
                           {t.approved ? '✓ Onaylandı' : '⏳ Bekliyor'}
                         </span>
+                      </div>
+                      <div style={{ marginLeft: '40px', marginTop: '4px' }}>
+                        {t.document_url ? (
+                          <a href={t.document_url} target="_blank" rel="noopener noreferrer"
+                            style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            📄 Belgeyi Görüntüle
+                          </a>
+                        ) : (
+                          <span style={{ fontSize: '12px', color: 'var(--red)', fontWeight: 600 }}>
+                            ⚠️ Belge yüklenmemiş
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
