@@ -54,10 +54,10 @@ export async function POST(req: NextRequest) {
     // — Premium ve Unlimited planlarda HİÇBİR sınır yok.
     const plan = profile.plan || 'free'
     const today = new Date().toISOString().split('T')[0]
+    const dailyCount = profile.daily_test_date === today ? (profile.daily_test_count || 0) : 0
     if (plan !== 'premium' && plan !== 'unlimited') {
       const DAILY_LIMIT: Record<string, number> = { free: 10 }
       const MONTHLY_LIMIT: Record<string, number> = { free: 10 }
-      const dailyCount = profile.daily_test_date === today ? (profile.daily_test_count || 0) : 0
       if (dailyCount >= (DAILY_LIMIT[plan] ?? 10)) {
         return NextResponse.json({ error: 'daily_limit_reached' }, { status: 429 })
       }
