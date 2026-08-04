@@ -14,7 +14,15 @@ export default function TeacherImportGradesPage() {
     async function check() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login/teacher'); return }
-      const { data: t } = await supabase.from('teachers').select('*').eq('user_id', user.id).single()
+      // .single() yerine .maybeSingle() — kayıt yoksa hata FIRLATMAZ, null
+      // döner. Sorgu GEÇİCİ bir sebeple (ağ/oturum senkron sorunu) hata
+      // verirse yanlışlıkla /teacher'a atmadan önce bir kez daha deniyoruz.
+      let { data: t, error } = await supabase.from('teachers').select('*').eq('user_id', user.id).maybeSingle()
+      if (error) {
+        console.error('[teacher/import-grades] teachers sorgusu basarisiz, tekrar deneniyor:', error)
+        await new Promise(r => setTimeout(r, 600))
+        ;({ data: t, error } = await supabase.from('teachers').select('*').eq('user_id', user.id).maybeSingle())
+      }
       if (!t?.approved) { router.push('/teacher'); return }
       setLoading(false)
     }
