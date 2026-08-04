@@ -492,7 +492,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         </div>
 
         {/* Tab */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem' }}>
+        <div className="nav-scroll-x" style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem' }}>
           {([
             { key: 'users', label: '👥 Kullanıcılar' },
             { key: 'stats', label: '📊 İstatistikler' },
@@ -506,11 +506,12 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           ] as const).map(t => (
             <button key={t.key} className={`btn btn-sm ${tab === t.key ? 'btn-primary' : ''}`}
               onClick={() => setTab(t.key)}
-              style={
-                tab !== t.key && t.key === 'errors' && pendingCount > 0 ? { borderColor: 'var(--red)', color: 'var(--red)' } :
+              style={{
+                flexShrink: 0, whiteSpace: 'nowrap',
+                ...(tab !== t.key && t.key === 'errors' && pendingCount > 0 ? { borderColor: 'var(--red)', color: 'var(--red)' } :
                 tab !== t.key && t.key === 'teachers' && pendingTeachers > 0 ? { borderColor: '#fdd31d', color: '#082465' } :
-                {}
-              }>
+                {})
+              }}>
               {t.label}
             </button>
           ))}

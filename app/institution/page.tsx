@@ -218,10 +218,10 @@ export default function InstitutionPage() {
           <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.2)' }} />
           <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 500 }}>🏛️ {institution?.name}</span>
         </div>
-        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', overflowX: 'auto' }}>
+        <div className="nav-scroll-x" style={{ display: 'flex', gap: '4px', alignItems: 'center', flex: 1, minWidth: 0 }}>
           {TABS.map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key as any)}
-              style={{ padding: '6px 10px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap', transition: 'all 0.15s',
+              style={{ padding: '6px 10px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s',
                 background: activeTab === t.key ? 'rgba(255,255,255,0.15)' : 'transparent',
                 color: activeTab === t.key ? '#fff' : 'rgba(255,255,255,0.6)',
               }}>
@@ -229,7 +229,7 @@ export default function InstitutionPage() {
             </button>
           ))}
           <button onClick={() => { supabase.auth.signOut(); router.push('/login') }}
-            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', marginLeft: '4px', whiteSpace: 'nowrap' }}>
+            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', marginLeft: '4px', whiteSpace: 'nowrap', flexShrink: 0 }}>
             Çıkış
           </button>
         </div>

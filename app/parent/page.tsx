@@ -179,13 +179,13 @@ function ParentContent() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       {/* Veli Navbar */}
-      <nav style={{ background: '#082465', padding: '0 1.5rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <nav style={{ background: '#082465', padding: '0 1.5rem', height: '60px', display: 'flex', alignItems: 'center', gap: '12px', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
           <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '32px', filter: 'brightness(0) invert(1)' }} />
           <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.2)' }} />
-          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 500 }}>👨‍👩‍👧 Veli Paneli</span>
+          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap' }}>👨‍👩‍👧 Veli Paneli</span>
         </div>
-        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+        <div className="nav-scroll-x" style={{ display: 'flex', gap: '4px', alignItems: 'center', flex: 1, minWidth: 0 }}>
           {[
             { key: 'dashboard', label: '📊 Durum' },
             { key: 'trend', label: '📈 Trend' },
@@ -195,16 +195,16 @@ function ParentContent() {
             { key: 'add', label: '➕ Çocuk Ekle' },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key as any)}
-              style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
+              style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0,
                 background: activeTab === t.key ? 'rgba(255,255,255,0.15)' : 'transparent',
                 color: activeTab === t.key ? '#fff' : 'rgba(255,255,255,0.6)',
               }}>
               {t.label}
             </button>
           ))}
-          <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+          <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.2)', margin: '0 4px', flexShrink: 0 }} />
           <button onClick={() => { supabase.auth.signOut(); router.push('/login') }}
-            style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+            style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap', flexShrink: 0 }}>
             Çıkış
           </button>
         </div>
