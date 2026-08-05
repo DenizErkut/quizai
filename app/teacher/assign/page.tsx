@@ -51,6 +51,7 @@ export default function TeacherAssignPage() {
   const [oeSaving, setOeSaving] = useState(false)
   const [oeError, setOeError] = useState('')
   const [oeGenerated, setOeGenerated] = useState(false) // AI ile üretildi mi (önizleme aşaması)
+  const [oeUsedMeb, setOeUsedMeb] = useState(false) // uretim gercek MEB kaynagina mi dayandi
   const router = useRouter()
   const supabase = createClient() as any
 
@@ -157,7 +158,7 @@ export default function TeacherAssignPage() {
       { criterion: '', maxPoints: 25, description: '' },
       { criterion: '', maxPoints: 25, description: '' },
     ])
-    setOeGenerated(false); setOeError('')
+    setOeGenerated(false); setOeUsedMeb(false); setOeError('')
   }
 
   async function generateOeWithAI() {
@@ -176,6 +177,7 @@ export default function TeacherAssignPage() {
       // icerik donuyor - once ogretmen onaylasin
       setOeScenario(data.scenario); setOeQuestion(data.question)
       setOeRubric(data.rubric.map((r: any) => ({ criterion: r.criterion, maxPoints: r.maxPoints, description: r.description || '' })))
+      setOeUsedMeb(!!data.usedMebSource)
       setOeGenerated(true)
     } catch (e) {
       console.error('[generateOeWithAI]', e)
@@ -327,8 +329,17 @@ export default function TeacherAssignPage() {
                     {(oeMethod === 'manual' || (oeMethod === 'ai' && oeGenerated)) && (
                       <>
                         {oeMethod === 'ai' && oeGenerated && (
-                          <div style={{ fontSize: '11px', color: 'var(--green)', fontWeight: 600 }}>
-                            ✓ Üretildi — göndermeden önce dilediğin gibi düzenleyebilirsin
+                          <div style={{ fontSize: '11px', color: 'var(--green)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span>✓ Üretildi — göndermeden önce dilediğin gibi düzenleyebilirsin</span>
+                            {oeUsedMeb ? (
+                              <span style={{ padding: '2px 8px', borderRadius: '99px', background: 'rgba(13,148,136,0.1)', color: '#0d9488', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                📚 Gerçek MEB kaynağına dayanıyor
+                              </span>
+                            ) : (
+                              <span style={{ padding: '2px 8px', borderRadius: '99px', background: 'var(--bg2)', color: 'var(--text3)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                ℹ️ Bu konuda yüklü MEB kaynağı bulunamadı — genel bilgiden üretildi
+                              </span>
+                            )}
                           </div>
                         )}
                         <div>

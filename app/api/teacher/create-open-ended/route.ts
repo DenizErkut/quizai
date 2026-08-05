@@ -35,7 +35,14 @@ function getLevel(grade: string): string {
   return 'ortaokul'
 }
 
-function buildPrompt(level: string, grade: string, subject: string, topic: string): string {
+function buildPrompt(level: string, grade: string, subject: string, topic: string, mebContext: string): string {
+  const mebSection = mebContext
+    ? `\n\n⚠️ AŞAĞIDA GERÇEK BİR MEB KAYNAK METNİ VERİLMİŞTİR. Senaryonu ve soruyu MÜMKÜN OLDUĞUNCA bu metindeki gerçek bilgilere, örneklere, olaylara veya kavramlara dayandır — metinde olmayan bilgi uydurma.\n\n` +
+      `🚫 ÖNEMLİ İSTİSNA 1: Eğer bu metin bir MÜFREDAT KAZANIM KODU LİSTESİYSE (örn. "SB.6.4.1..." formatında, öğretmene yönelik öğrenme çıktısı tanımları içeriyorsa) — kazanım kodlarına dayalı soru ÜRETME, sadece işaret ettiği GERÇEK KONUYU kullan.\n\n` +
+      `🚫 ÖNEMLİ İSTİSNA 2: Bu metin gerçek bir sınav kitapçığı olabilir ve "Soru 39'da verilen örneğe göre...", "38 ve 39. soruları bu bilgiye göre cevaplayınız" gibi BAŞKA bir soruya/örneğe atıfta bulunan ifadeler içerebilir. Böyle bir referans görürsen ASLA olduğu gibi kopyalama — öğrenci SADECE senin ürettiğin bu tek soruyu görecek. Ya atıfta bulunulan bilgiyi doğrudan senin senaryonun içine taşı, ya da metindeki tamamen bağımsız başka bir örnek/kavram kullan.\n\n` +
+      `MEB KAYNAK METNİ:\n${mebContext}\n\n`
+    : ''
+
   return `Sen MEB Ölçme, Değerlendirme ve Sınav Hizmetleri Genel Müdürlüğü tarzında soru hazırlayan bir uzmansın.
 2023-2024 eğitim öğretim yılından itibaren ülke geneli ortak sınavlarda kullanılan format şu şekildedir:
 1) Önce kısa bir SENARYO/DURUM verilir (bir görsel tasviri, günlük hayattan bir durum, bir metin parçası — 2-4 cümle).
@@ -45,7 +52,7 @@ function buildPrompt(level: string, grade: string, subject: string, topic: strin
 Seviye: ${level} (${grade})
 Ders: ${subject}
 Konu: ${topic}
-
+${mebSection}
 Bir ÖĞRETMEN, bu soruyu SINIFINA ÖDEV olarak atayacak — birden fazla öğrenci aynı soruyu cevaplayacak. Yukarıdaki konuya uygun, ${grade} seviyesine uygun zorlukta, gerçek bir MEB ortak sınav sorusu gibi bir senaryo+soru+rubrik hazırla.
 
 ÖNEMLİ: Tüm metinleri SADECE TÜRKÇE yaz. Başka hiçbir dilden (İngilizce, Korece, Çince vb.) tek bir kelime bile kullanma.
@@ -61,10 +68,27 @@ SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir açıklama eklem
 Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
 }
 
-async function generateWithAI(subject: string, topic: string, grade: string) {
+async function searchMebContext(origin: string, subject: string, topic: string, grade: string, level: string): Promise<string> {
+  try {
+    const mebRes = await fetch(`${origin}/api/meb-search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
+      body: JSON.stringify({ topic, grade, subject, unit: topic, level, limit: 2 }),
+      signal: AbortSignal.timeout(3000),
+    })
+    if (mebRes.ok) {
+      const mebData = await mebRes.json()
+      if (mebData.found && mebData.context) return mebData.context.slice(0, 6500)
+    }
+  } catch { /* MEB kaynağı opsiyonel — bulunamazsa AI genel bilgiden üretir */ }
+  return ''
+}
+
+async function generateWithAI(subject: string, topic: string, grade: string, origin: string) {
   const effectiveGrade = grade || 'ortaokul 6. sınıf'
   const level = getLevel(effectiveGrade)
-  const prompt = buildPrompt(level, effectiveGrade, subject, topic)
+  const mebContext = await searchMebContext(origin, subject, topic, effectiveGrade, level)
+  const prompt = buildPrompt(level, effectiveGrade, subject, topic, mebContext)
 
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-5',
@@ -93,6 +117,7 @@ async function generateWithAI(subject: string, topic: string, grade: string) {
       maxPoints: Number(r.maxPoints) || 0,
       description: stripForeignScripts(r.description || ''),
     })),
+    usedMebSource: !!mebContext,
   }
 }
 
@@ -121,7 +146,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Ders ve konu zorunlu.' }, { status: 400 })
       }
       try {
-        const result = await generateWithAI(subject, topic, grade || '')
+        const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin)
         return NextResponse.json(result)
       } catch (e: any) {
         return NextResponse.json({ error: e?.message || 'Soru üretilemedi, tekrar dene.' }, { status: 500 })
@@ -151,7 +176,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Yapay zeka için ders ve konu zorunlu.' }, { status: 400 })
       }
       try {
-        const result = await generateWithAI(subject, topic, grade || '')
+        const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin)
         scenario = result.scenario; question = result.question; rubric = result.rubric
       } catch (e: any) {
         return NextResponse.json({ error: e?.message || 'Soru üretilemedi, tekrar dene.' }, { status: 500 })
