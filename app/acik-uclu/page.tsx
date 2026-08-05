@@ -42,6 +42,11 @@ export default function AcikUcluPage() {
   const [overallFeedback, setOverallFeedback] = useState('')
   const [totalEarned, setTotalEarned] = useState(0)
 
+  // Öğretmen tarafından atanmış açık uçlu ödevler
+  const [assignedList, setAssignedList] = useState<any[]>([])
+  const [assignedLoading, setAssignedLoading] = useState(true)
+  const [startingId, setStartingId] = useState('')
+
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -51,7 +56,49 @@ export default function AcikUcluPage() {
       setLoading(false)
     }
     load()
+    loadAssigned()
   }, [])
+
+  async function loadAssigned() {
+    setAssignedLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/student/open-ended-assignments', {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      })
+      const json = await res.json()
+      setAssignedList(json.assignments || [])
+    } catch (e) {
+      console.error('[loadAssigned]', e)
+    } finally {
+      setAssignedLoading(false)
+    }
+  }
+
+  async function startAssignment(assignmentId: string) {
+    setStartingId(assignmentId); setError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/student/start-open-ended-assignment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ assignment_id: assignmentId }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setError(json.error || 'Ödev başlatılamadı.'); return }
+      setSessionId(json.sessionId)
+      setScenario(json.scenario)
+      setQuestion(json.question)
+      setRubric(json.rubric)
+      setTotalPossible(json.totalPossible)
+      setAnswer('')
+      setStep('question')
+    } catch {
+      setError('Bağlantı hatası, tekrar dene.')
+    } finally {
+      setStartingId('')
+    }
+  }
 
   const level = levelFromGrade(grade)
   const subjects = Object.keys(SUBJECT_MAP[level] || {})
@@ -146,9 +193,46 @@ export default function AcikUcluPage() {
           </div>
         )}
 
+        {/* Öğretmen tarafından atanmış ödevler */}
+        {step === 'setup' && !assignedLoading && assignedList.length > 0 && (
+          <div style={{ marginBottom: '1.25rem' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>
+              📋 Sana Atanan Ödevler
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {assignedList.map((a: any) => {
+                const isOverdue = a.due_date && new Date(a.due_date) < new Date()
+                return (
+                  <div key={a.id} className="card" style={{ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', borderLeft: a.completed ? '3px solid var(--green)' : '3px solid #6366f1' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary)' }}>{a.title}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text3)', display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
+                        {a.subject && <span>📚 {a.subject}</span>}
+                        <span>🏫 {a.classrooms?.name}</span>
+                        {a.due_date && <span style={{ color: isOverdue && !a.completed ? 'var(--red)' : 'var(--text3)' }}>🕐 {new Date(a.due_date).toLocaleDateString('tr-TR')}</span>}
+                      </div>
+                    </div>
+                    {a.completed ? (
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--green)', whiteSpace: 'nowrap' }}>
+                        ✓ {a.earned}/{a.possible}
+                      </div>
+                    ) : (
+                      <button onClick={() => startAssignment(a.id)} disabled={startingId === a.id}
+                        style={{ padding: '7px 14px', borderRadius: '8px', border: 'none', background: '#6366f1', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap', opacity: startingId === a.id ? 0.6 : 1 }}>
+                        {startingId === a.id ? '⏳' : 'Başla →'}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* ADIM 1: Ders/Konu seçimi */}
         {step === 'setup' && (
           <div className="card" style={{ padding: '1.5rem' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>✨ Serbest Pratik</div>
             <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)' }}>Ders</label>
             <select className="input" value={subject} onChange={e => { setSubject(e.target.value); setTopic('') }}
               style={{ marginTop: '6px', marginBottom: '1.25rem' }}>

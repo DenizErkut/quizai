@@ -6,7 +6,7 @@ import SectionalReportTable from '@/components/SectionalReportTable'
 
 type ReportKey =
   | 'grades' | 'sectional' | 'progress' | 'weak-topics' | 'assignments'
-  | 'live-quiz' | 'inactivity' | 'reading' | 'open-ended' | 'comparison' | 'classroom-compare'
+  | 'live-quiz' | 'inactivity' | 'reading' | 'open-ended' | 'open-ended-archive' | 'comparison' | 'classroom-compare'
 
 const ALL_TABS: { key: ReportKey; label: string }[] = [
   { key: 'grades',            label: '📋 Öğrenci Raporları' },
@@ -18,6 +18,7 @@ const ALL_TABS: { key: ReportKey; label: string }[] = [
   { key: 'inactivity',        label: '😴 Devamsızlık' },
   { key: 'reading',           label: '📖 Sesli Okuma' },
   { key: 'open-ended',        label: '✍️ Açık Uçlu Sorular' },
+  { key: 'open-ended-archive', label: '🗂️ A.U.S. Arşiv' },
   { key: 'comparison',        label: '⚖️ Not Karşılaştırma' },
   { key: 'classroom-compare', label: '🏫 Sınıf Karşılaştırma' },
 ]
@@ -114,6 +115,7 @@ function GenericReportPanel({ scope, hubEndpoint, report }: { scope: string; hub
       {report === 'inactivity' && <InactivityPanel data={data} />}
       {report === 'reading' && <ReadingPanel data={data} />}
       {report === 'open-ended' && <OpenEndedPanel data={data} />}
+      {report === 'open-ended-archive' && <OpenEndedArchivePanel data={data} />}
       {report === 'comparison' && <ComparisonPanel data={data} />}
       {report === 'classroom-compare' && <ClassroomComparePanel data={data} />}
     </div>
@@ -292,6 +294,82 @@ function OpenEndedPanel({ data }: { data: any }) {
         ))}
       </tbody>
     </table>
+  )
+}
+
+function OpenEndedArchivePanel({ data }: { data: any }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  if (!data.entries?.length) return <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', padding: '2rem 0' }}>Henüz tamamlanmış (puanlanmış) açık uçlu soru yok.</p>
+
+  return (
+    <div>
+      <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px' }}>
+        Tıkla — senaryo, soru ve öğrencinin verdiği cevabın tamamını gör.
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {data.entries.map((e: any) => {
+          const isOpen = expandedId === e.id
+          const pct = e.totalPossible ? Math.round((e.totalEarned / e.totalPossible) * 100) : null
+          return (
+            <div key={e.id} className="card-sm" style={{ padding: 0, overflow: 'hidden' }}>
+              <button onClick={() => setExpandedId(isOpen ? null : e.id)}
+                style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-sans)' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--primary)' }}>{e.studentName}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text3)', display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
+                    {e.subject && <span>📚 {e.subject}</span>}
+                    {e.topic && <span>· {e.topic}</span>}
+                    <span>· {new Date(e.gradedAt).toLocaleDateString('tr-TR')}</span>
+                  </div>
+                </div>
+                <div style={{ fontWeight: 700, fontSize: '13px', color: pct != null && pct < 50 ? 'var(--red)' : 'var(--green)', whiteSpace: 'nowrap' }}>
+                  {e.totalEarned}/{e.totalPossible}
+                </div>
+                <span style={{ fontSize: '11px', color: 'var(--text3)' }}>{isOpen ? '▲' : '▼'}</span>
+              </button>
+
+              {isOpen && (
+                <div style={{ padding: '0 14px 16px', borderTop: '1px solid var(--border)' }}>
+                  <div style={{ marginTop: '12px' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Senaryo</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6, background: 'var(--bg2)', padding: '10px 12px', borderRadius: '8px' }}>{e.scenario}</div>
+                  </div>
+                  <div style={{ marginTop: '10px' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Soru</div>
+                    <div style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600, lineHeight: 1.6 }}>{e.question}</div>
+                  </div>
+                  <div style={{ marginTop: '10px' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Öğrencinin Cevabı</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6, background: 'var(--bg2)', padding: '10px 12px', borderRadius: '8px', whiteSpace: 'pre-wrap' }}>{e.studentAnswer || '—'}</div>
+                  </div>
+                  {Array.isArray(e.criteriaResults) && e.criteriaResults.length > 0 && (
+                    <div style={{ marginTop: '10px' }}>
+                      <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Kriter Kriter Puanlama</div>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                        <tbody>
+                          {e.criteriaResults.map((c: any, i: number) => (
+                            <tr key={i}>
+                              <td style={{ padding: '4px 8px 4px 0', color: 'var(--text2)' }}>{c.criterion}</td>
+                              <td style={{ padding: '4px 8px', fontWeight: 700, color: 'var(--primary)', whiteSpace: 'nowrap' }}>{c.earnedPoints}/{c.maxPoints}</td>
+                              <td style={{ padding: '4px 0', color: 'var(--text3)', fontSize: '11px' }}>{c.feedback}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {e.overallFeedback && (
+                    <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--text2)', fontStyle: 'italic', background: 'rgba(30,207,184,0.06)', padding: '10px 12px', borderRadius: '8px', borderLeft: '3px solid var(--green)' }}>
+                      💬 {e.overallFeedback}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

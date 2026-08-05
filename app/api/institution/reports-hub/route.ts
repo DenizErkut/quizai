@@ -6,6 +6,7 @@ import {
   buildProgressReport, buildWeakTopicsReport, buildAssignmentsReport,
   buildLiveQuizReport, buildInactivityReport, buildReadingReport,
   buildGradeComparisonReport, buildClassroomCompareReport, buildOpenEndedReport,
+  buildOpenEndedArchiveReport,
 } from '@/lib/reports-data'
 
 const supabaseAdmin = createClient(
@@ -40,6 +41,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(await buildClassroomCompareReport(roster, 'grade'))
     case 'open-ended':
       return NextResponse.json(await buildOpenEndedReport(roster))
+    case 'open-ended-archive':
+      return NextResponse.json(await buildOpenEndedArchiveReport(roster))
     case 'assignments':
     case 'live-quiz': {
       // Kuruma bağlı öğretmenlerin sınıfları üzerinden

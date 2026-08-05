@@ -5,6 +5,7 @@ import {
   buildProgressReport, buildWeakTopicsReport, buildAssignmentsReport,
   buildLiveQuizReport, buildInactivityReport, buildReadingReport,
   buildGradeComparisonReport, buildClassroomCompareReport, buildOpenEndedReport,
+  buildOpenEndedArchiveReport,
 } from '@/lib/reports-data'
 
 export async function GET(req: NextRequest) {
@@ -36,6 +37,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ...(await buildClassroomCompareReport(roster, 'classroomName')), classrooms })
     case 'open-ended':
       return NextResponse.json({ ...(await buildOpenEndedReport(roster)), classrooms })
+    case 'open-ended-archive':
+      return NextResponse.json({ ...(await buildOpenEndedArchiveReport(roster)), classrooms })
     case 'assignments':
       return NextResponse.json({ ...(await buildAssignmentsReport(roster, classroomIds)), classrooms })
     case 'live-quiz':

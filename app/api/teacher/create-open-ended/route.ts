@@ -13,6 +13,7 @@ export const maxDuration = 60
 export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
+import { verifyQuestionWithOpenAI } from '@/lib/openai'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -181,6 +182,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "mode 'ai' veya 'manual' olmalı." }, { status: 400 })
     }
 
+    // ── Bağımsız MEB uygunluk kontrolü (OpenAI) ──
+    // Kaynak fark etmeksizin (AI-üretimli VEYA öğretmenin kendi yazdığı),
+    // öğrenciye gitmeden önce SENARYO+SORU MEB müfredatına uygunluk, yaş
+    // grubu uygunluğu ve güvenlik açısından bağımsız bir modelle (Claude'un
+    // kendi ürettiğini yine Claude'a kontrol ettirmek yerine) kontrol
+    // edilir. Sadece onay alırsa kaydedilip öğrenciye gösterilir.
+    const rubricSummary = rubric.map(r => `${r.criterion} (${r.maxPoints}p)`).join(', ')
+    const verifyPrompt = `Bir öğretmen, ${grade || 'belirtilmemiş'} seviyesindeki öğrencilerine "${subject || 'belirtilmemiş'}" dersinde şu açık uçlu soruyu ödev olarak atamak istiyor. Bu içeriği Türkiye MEB müfredatına uygunluk, yaş grubuna uygunluk, bilimsel/faktüel doğruluk ve genel eğitim içeriği güvenliği açısından değerlendir.
+
+SENARYO: "${scenario}"
+SORU: "${question}"
+PUANLAMA KRİTERLERİ: ${rubricSummary}
+
+Bu içerik, belirtilen seviyedeki öğrencilere gösterilmeye uygun mu? Sadece şu JSON formatında yanıt ver:
+{"ok": true veya false, "reason": "Türkçe, kısa (1 cümle) gerekçe — uygun değilse neden, uygunsa boş bırakabilirsin"}`
+
+    const verification = await verifyQuestionWithOpenAI(verifyPrompt)
+    if (verification.ok === false) {
+      return NextResponse.json({
+        error: `İçerik MEB uygunluk kontrolünden geçemedi: ${verification.reason || 'Uygun bulunmadı.'} Lütfen senaryo/soruyu düzenleyip tekrar dene.`,
+      }, { status: 422 })
+    }
+
     const { data: created, error: insErr } = await supabase
       .from('open_ended_assignments')
       .insert({
@@ -195,6 +219,7 @@ export async function POST(req: NextRequest) {
         rubric,
         created_via: createdVia,
         due_date: due_date || null,
+        verified: true,
       })
       .select('*, classrooms(name)')
       .single()

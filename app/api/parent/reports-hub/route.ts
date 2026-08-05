@@ -4,6 +4,7 @@ import { getAuthedUser, buildParentContext } from '@/lib/report-context'
 import {
   buildProgressReport, buildWeakTopicsReport, buildInactivityReport,
   buildReadingReport, buildGradeComparisonReport, buildOpenEndedReport,
+  buildOpenEndedArchiveReport,
 } from '@/lib/reports-data'
 
 export async function GET(req: NextRequest) {
@@ -24,6 +25,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(await buildReadingReport(roster))
     case 'open-ended':
       return NextResponse.json(await buildOpenEndedReport(roster))
+    case 'open-ended-archive':
+      return NextResponse.json(await buildOpenEndedArchiveReport(roster))
     case 'comparison': {
       const importId = req.nextUrl.searchParams.get('importId')
       return NextResponse.json(await buildGradeComparisonReport(roster, importId))

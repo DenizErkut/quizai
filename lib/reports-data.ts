@@ -358,3 +358,40 @@ export async function buildOpenEndedReport(roster: ReportStudentBase[]) {
 
   return { students }
 }
+
+// ────────────────────────────────────────────────────────────────────────
+// 10) A.U.S. ARŞİV — çözülmüş açık uçlu soruların TAM DETAYI (senaryo,
+// soru, öğrencinin verdiği cevap, kriter kriter puanlama, geri bildirim).
+// buildOpenEndedReport'tan farkı: o sadece özet istatistik verirken bu,
+// tıklandığında görülecek TAM içeriği döner.
+// ────────────────────────────────────────────────────────────────────────
+export async function buildOpenEndedArchiveReport(roster: ReportStudentBase[]) {
+  if (!roster.length) return { entries: [] }
+  const { data } = await supabaseAdmin
+    .from('open_ended_sessions')
+    .select('id, user_id, grade, subject, topic, scenario, question, rubric, student_answer, criteria_results, total_earned, total_possible, overall_feedback, graded_at')
+    .in('user_id', ids(roster))
+    .not('graded_at', 'is', null)
+    .order('graded_at', { ascending: false })
+
+  const nameMap = nameOf(roster)
+  const entries = (data ?? []).map((r: any) => ({
+    id: r.id,
+    studentId: r.user_id,
+    studentName: nameMap.get(r.user_id)?.fullName ?? 'Öğrenci',
+    grade: r.grade,
+    subject: r.subject,
+    topic: r.topic,
+    scenario: r.scenario,
+    question: r.question,
+    rubric: r.rubric,
+    studentAnswer: r.student_answer,
+    criteriaResults: r.criteria_results,
+    totalEarned: r.total_earned,
+    totalPossible: r.total_possible,
+    overallFeedback: r.overall_feedback,
+    gradedAt: r.graded_at,
+  }))
+
+  return { entries }
+}
