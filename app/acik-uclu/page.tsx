@@ -3,16 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { SUBJECT_MAP } from '@/lib/subject-map'
-
-function levelFromGrade(grade: string): string {
-  const g = (grade || '').toLowerCase()
-  if (g.includes('ilkokul')) return 'ilkokul'
-  if (g.includes('ortaokul')) return 'ortaokul'
-  if (g.includes('lise')) return 'lise'
-  if (g.includes('universite') || g.includes('üniversite')) return 'universite'
-  return 'ortaokul'
-}
+import { getSubjectsForGrade } from '@/lib/subject-map-grade'
 
 interface RubricItem { criterion: string; maxPoints: number; description: string }
 interface CriteriaResult { criterion: string; maxPoints: number; earnedPoints: number; feedback: string }
@@ -100,9 +91,9 @@ export default function AcikUcluPage() {
     }
   }
 
-  const level = levelFromGrade(grade)
-  const subjects = Object.keys(SUBJECT_MAP[level] || {})
-  const topics = subject ? (SUBJECT_MAP[level]?.[subject] || []) : []
+  const gradeSubjectMap = getSubjectsForGrade(grade)
+  const subjects = Object.keys(gradeSubjectMap)
+  const topics = subject ? (gradeSubjectMap[subject] || []) : []
 
   async function generate() {
     if (!subject || !topic.trim()) { setError('Ders ve konu seçmelisin.'); return }
