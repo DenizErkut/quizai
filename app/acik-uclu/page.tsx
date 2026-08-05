@@ -184,35 +184,29 @@ export default function AcikUcluPage() {
           </div>
         )}
 
-        {/* Öğretmen tarafından atanmış ödevler */}
-        {step === 'setup' && !assignedLoading && assignedList.length > 0 && (
+        {/* Öğretmen tarafından atanmış, HENÜZ ÇÖZÜLMEMİŞ ödevler */}
+        {step === 'setup' && !assignedLoading && assignedList.some((a: any) => !a.completed) && (
           <div style={{ marginBottom: '1.25rem' }}>
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>
               📋 Sana Atanan Ödevler
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {assignedList.map((a: any) => {
+              {assignedList.filter((a: any) => !a.completed).map((a: any) => {
                 const isOverdue = a.due_date && new Date(a.due_date) < new Date()
                 return (
-                  <div key={a.id} className="card" style={{ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', borderLeft: a.completed ? '3px solid var(--green)' : '3px solid #6366f1' }}>
+                  <div key={a.id} className="card" style={{ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', borderLeft: '3px solid #6366f1' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary)' }}>{a.title}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text3)', display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
                         {a.subject && <span>📚 {a.subject}</span>}
                         <span>🏫 {a.classrooms?.name}</span>
-                        {a.due_date && <span style={{ color: isOverdue && !a.completed ? 'var(--red)' : 'var(--text3)' }}>🕐 {new Date(a.due_date).toLocaleDateString('tr-TR')}</span>}
+                        {a.due_date && <span style={{ color: isOverdue ? 'var(--red)' : 'var(--text3)' }}>🕐 {new Date(a.due_date).toLocaleDateString('tr-TR')}</span>}
                       </div>
                     </div>
-                    {a.completed ? (
-                      <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--green)', whiteSpace: 'nowrap' }}>
-                        ✓ {a.earned}/{a.possible}
-                      </div>
-                    ) : (
-                      <button onClick={() => startAssignment(a.id)} disabled={startingId === a.id}
-                        style={{ padding: '7px 14px', borderRadius: '8px', border: 'none', background: '#6366f1', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap', opacity: startingId === a.id ? 0.6 : 1 }}>
-                        {startingId === a.id ? '⏳' : 'Başla →'}
-                      </button>
-                    )}
+                    <button onClick={() => startAssignment(a.id)} disabled={startingId === a.id}
+                      style={{ padding: '7px 14px', borderRadius: '8px', border: 'none', background: '#6366f1', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap', opacity: startingId === a.id ? 0.6 : 1 }}>
+                      {startingId === a.id ? '⏳' : 'Başla →'}
+                    </button>
                   </div>
                 )
               })}
@@ -246,6 +240,32 @@ export default function AcikUcluPage() {
               onClick={generate} disabled={generating || !subject || !topic}>
               {generating ? 'Senaryo hazırlanıyor…' : '✍️ Soruyu Oluştur'}
             </button>
+          </div>
+        )}
+
+        {/* Daha önce çözülmüş (tamamlanmış) AUS ödevleri — Serbest Pratik'in ALTINDA */}
+        {step === 'setup' && !assignedLoading && assignedList.some((a: any) => a.completed) && (
+          <div style={{ marginTop: '1.25rem' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text2)', marginBottom: '8px' }}>
+              ✅ Tamamlanan Ödevler
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {assignedList.filter((a: any) => a.completed).map((a: any) => (
+                <div key={a.id} className="card" style={{ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', borderLeft: '3px solid var(--green)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary)' }}>{a.title}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text3)', display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
+                      {a.subject && <span>📚 {a.subject}</span>}
+                      <span>🏫 {a.classrooms?.name}</span>
+                      {a.due_date && <span>🕐 {new Date(a.due_date).toLocaleDateString('tr-TR')}</span>}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--green)', whiteSpace: 'nowrap' }}>
+                    ✓ {a.earned}/{a.possible}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
