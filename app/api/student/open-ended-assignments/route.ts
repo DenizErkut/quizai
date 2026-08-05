@@ -52,5 +52,10 @@ export async function GET(req: NextRequest) {
     }
   })
 
+  // Tamamlanmamış (bekleyen) ödevler üstte, tamamlanmış olanlar altta —
+  // her grup kendi içinde zaten created_at'e göre (en yeni önce) sıralı
+  // kalıyor (Array.sort stabildir).
+  result.sort((a: any, b: any) => Number(a.completed) - Number(b.completed))
+
   return NextResponse.json({ assignments: result })
 }
