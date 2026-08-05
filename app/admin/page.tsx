@@ -492,7 +492,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         </div>
 
         {/* Tab */}
-        <div className="nav-scroll-x" style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '1.5rem' }}>
           {([
             { key: 'users', label: '👥 Kullanıcılar' },
             { key: 'stats', label: '📊 İstatistikler' },
