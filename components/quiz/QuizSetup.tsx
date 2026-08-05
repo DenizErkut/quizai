@@ -3,7 +3,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import FileUploader, { type UploadedFile } from '@/components/FileUploader'
-import { SUBJECT_MAP, DIFFICULTIES, type QuestionType, type Profile } from '@/lib/quiz-constants'
+import { DIFFICULTIES, type QuestionType, type Profile } from '@/lib/quiz-constants'
+import { getSubjectsForGrade } from '@/lib/subject-map-grade'
 
 interface QuizSetupProps {
   profile: Profile | null
@@ -48,11 +49,13 @@ export default function QuizSetup({
 }: QuizSetupProps) {
   const [openSubject, setOpenSubject] = useState<string | null>(null)
   const [advancedOpen, setAdvancedOpen] = useState(false)
-  const level = profile ? (
-    profile.grade.toLowerCase().includes('üniversite') || profile.grade.toLowerCase().includes('universite') ? 'universite' :
-    profile.grade.toLowerCase().includes('lise') ? 'lise' :
-    profile.grade.toLowerCase().includes('ortaokul') ? 'ortaokul' : 'ilkokul'
-  ) : 'ortaokul'
+  // Önceden sadece geniş seviyeye (ilkokul/ortaokul/lise) göre TÜM
+  // sınıfların (ör. 5-8) ortak bir listesini gösteriyordu — 7. sınıf bir
+  // öğrenci "T.C. İnkılap Tarihi" (sadece 8. sınıf dersi) gibi kendi
+  // müfredatında olmayan dersleri/konuları görebiliyordu. Artık AUS'taki
+  // (Açık Uçlu Sorular) ile aynı, sınıf NUMARASINA göre filtrelenen
+  // kaynak kullanılıyor.
+  const gradeSubjects = getSubjectsForGrade(profile?.grade)
 
   return (
     <>
@@ -144,7 +147,7 @@ export default function QuizSetup({
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
               {(dynamicSubjects.length > 0
                 ? dynamicSubjects
-                : Object.keys(SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul)
+                : Object.keys(gradeSubjects)
               ).map(subj => (
                 <button key={subj} onClick={() => setOpenSubject(openSubject === subj ? null : subj)}
                   style={{
@@ -161,7 +164,7 @@ export default function QuizSetup({
               ))}
             </div>
 
-            {openSubject && (SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul)[openSubject] && (
+            {openSubject && gradeSubjects[openSubject] && (
               <div style={{
                 maxHeight: '240px', overflowY: 'auto', padding: '10px 12px',
                 borderRadius: '12px', border: '1.5px solid var(--accent)',
@@ -203,7 +206,7 @@ export default function QuizSetup({
                     Genel Konular
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
-                    {(SUBJECT_MAP[level] || SUBJECT_MAP.ortaokul)[openSubject].map((topic: string) => (
+                    {gradeSubjects[openSubject].map((topic: string) => (
                       <div key={topic} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                         <button onClick={() => { setSelectedTopic(topic); setCustomTopic(''); setOpenSubject(null) }}
                           style={{
