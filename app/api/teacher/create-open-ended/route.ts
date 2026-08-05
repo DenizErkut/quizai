@@ -49,6 +49,16 @@ function buildPrompt(level: string, grade: string, subject: string, topic: strin
 2) Bu senaryoya dayanan, öğrencinin ELEŞTİRİEL/ANALİTİK DÜŞÜNMESİNİ gerektiren, kendi cümleleriyle cevaplayacağı AÇIK UÇLU bir soru sorulur (şık YOKTUR, çoktan seçmeli DEĞİLDİR).
 3) Sorunun değerlendirilmesi için 3-4 kriterden oluşan DERECELİ PUANLAMA ANAHTARI (rubrik) hazırlanır, toplam 100 puan.
 
+📐 MEB SORU DİLİ VE STİLİ (harici bir MEB uygunluk değerlendirmesiyle doğrulanmış kurallar):
+- Senaryo ASLA çıplak bir işlem talimatı olmasın (ör. "3/4 + 2/3 + 1/2 işlemini yapınız" YANLIŞ). Bunun yerine öğrenciyi günlük yaşam bağlamına yerleştir: alışveriş, yemek tarifi, boya/badana, bahçe, su tüketimi, yol/mesafe, zaman planlama gibi somut, tanıdık durumlar kullan.
+- Senaryoda "...nasıl [işlem yapacağını/çözeceğini] düşünüyor" gibi ifadelerle öğrenciyi bağlamsallaştır — doğrudan sonuca değil, DÜŞÜNME SÜRECİNE yönlendir.
+- Soru kökünde şu üç isteği MÜMKÜN OLDUĞUNCA birlikte kullan (dersin doğasına uymuyorsa uyarlayabilirsin, ama matematik/fen gibi işlem gerektiren derslerde bu kalıp tercih edilir):
+  1. "İşlem basamaklarını gösteriniz." (süreç şeffaflığı)
+  2. Sonucun nasıl sunulması gerektiğini belirt — ör. "Sonucu en sade kesir biçiminde yazınız."
+  3. "Kullandığınız yöntemi gerekçelendiriniz." — ASLA sadece "çözümünü açıklayınız" gibi daha genel/gayri resmî bir ifade kullanma, MEB'in tercih ettiği resmî "gerekçelendiriniz" kalıbını kullan.
+  Örnek MEB tarzı soru kökü: "Ayşe'nin pasta tarifi için gereken malzemelerin toplam ağırlığını hesaplayınız. İşlem basamaklarını gösteriniz. Sonucu en sade kesir biçiminde yazınız ve kullandığınız yöntemi gerekçelendiriniz."
+- Soru, Bloom taksonomisinde en az UYGULAMA + ANALİZ seviyesini hedeflemeli — öğrenci sadece bir işlemi tekrar etmemeli, bir süreci (ör. ortak payda bulma → dönüştürme → işlem → sadeleştirme → gerekçelendirme) tamamlamalı.
+
 Seviye: ${level} (${grade})
 Ders: ${subject}
 Konu: ${topic}
