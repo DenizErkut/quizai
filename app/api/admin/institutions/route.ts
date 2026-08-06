@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   if (!profile?.is_admin) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
 
   const { data: institutions } = await supabaseAdmin
-    .from('institutions').select('*').order('created_at', { ascending: false })
+    .from('institutions').select('*, sellers(full_name, code)').order('created_at', { ascending: false })
 
   // Her kurum için öğrenci sayısı
   const counts: Record<string, number> = {}

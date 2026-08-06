@@ -1089,6 +1089,11 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                             <span>📧 {inst.admin_email || '—'}</span>
                             <span>👥 {instStudentCounts[inst.id] ?? 0} öğrenci</span>
                             {inst.discount_rate > 0 && <span>🏷️ %{inst.discount_rate} indirim</span>}
+                            {inst.sellers && (
+                              <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
+                                🤝 {inst.sellers.full_name} ({inst.sellers.code})
+                              </span>
+                            )}
                             <span>📅 {new Date(inst.created_at).toLocaleDateString('tr-TR')}</span>
                           </div>
                         </div>

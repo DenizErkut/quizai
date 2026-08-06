@@ -30,10 +30,11 @@ export async function GET(req: NextRequest) {
 
   if (!instUser) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
 
-  // Kurum bilgisi
+  // Kurum bilgisi — satıcı bağlıysa SADECE adı+kodu eklenir (komisyon/
+  // iletişim gibi ticari/PII detaylar kuruma gösterilmez)
   const { data: institution } = await supabaseAdmin
     .from('institutions')
-    .select('*')
+    .select('*, sellers(full_name, code)')
     .eq('id', instUser.institution_id)
     .single()
 

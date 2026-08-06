@@ -656,6 +656,7 @@ export default function InstitutionPage() {
                   { label: 'İndirim Oranı', value: institution?.discount_rate ? `%${institution.discount_rate}` : 'Yok' },
                   { label: 'Durum', value: institution?.active ? '✅ Aktif' : '🔴 Pasif' },
                   { label: 'Kayıt Tarihi', value: institution?.created_at ? new Date(institution.created_at).toLocaleDateString('tr-TR') : '—' },
+                  ...(institution?.sellers ? [{ label: 'Satıcı', value: `${institution.sellers.full_name} (${institution.sellers.code})` }] : []),
                 ].map((item, i) => (
                   <div key={i} style={{ padding: '10px 14px', background: 'var(--bg2)', borderRadius: '10px' }}>
                     <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '4px', fontWeight: 600 }}>{item.label}</div>
