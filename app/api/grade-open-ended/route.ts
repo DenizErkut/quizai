@@ -39,6 +39,9 @@ export async function POST(req: NextRequest) {
     if (!sessionId || !studentAnswer?.trim()) {
       return NextResponse.json({ error: 'Cevap boş olamaz.' }, { status: 400 })
     }
+    if (studentAnswer.trim().length < 50) {
+      return NextResponse.json({ error: 'Cevap çok kısa — en az 50 karakter olmalı.' }, { status: 400 })
+    }
 
     // Rubrigi ve soruyu SUNUCUDAN oku - istemciden gelen rubrige guvenilmez
     // (aksi halde biri devtools'tan rubrigi degistirip tam puan alabilirdi)

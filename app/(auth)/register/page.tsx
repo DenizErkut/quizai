@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { savePendingRegistration } from '@/lib/pending-registration'
+import { translateAuthError } from '@/lib/auth-error-messages'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -190,7 +191,7 @@ function RegisterContent() {
         },
       })
 
-      if (err) { setError(err.message); return }
+      if (err) { setError(translateAuthError(err.message)); return }
 
       // ── BİLİNEN @supabase/supabase-js DAVRANIŞI ──
       // GoTrue, e-posta onayı zorunluyken (session yokken) signUp() yanıtında

@@ -321,6 +321,13 @@ export default function GradeImportWizard({
             Excel (.xlsx) veya CSV dosyası yükle. İlk satır sütun başlığı olmalı — örn. <b>Ö.No</b>, <b>Sınıf</b>, <b>İsim</b>,
             sonrasında ders sütunları (<b>Türkçe</b>, <b>Matematik</b>, ... gibi).
           </p>
+          <a href="/templates/not-ice-aktar-sablonu.xlsx" download
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 16px', borderRadius: '9px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontWeight: 600, textDecoration: 'none', marginBottom: '1rem' }}>
+            📥 Excel Şablonunu İndir
+          </a>
+          <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '1rem', marginTop: '-6px' }}>
+            Şablonu indirip kendi öğrenci/not verilerinizle doldurun, ardından aşağıdan yükleyin.
+          </div>
           <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile}
             style={{ fontSize: '13px' }} className="input" />
         </div>

@@ -128,7 +128,9 @@ export default function AcikUcluPage() {
   }
 
   async function submitAnswer() {
-    if (!answer.trim()) { setError('Cevabını yazmadan gönderemezsin.'); return }
+    const trimmed = answer.trim()
+    if (!trimmed) { setError('Cevabını yazmadan gönderemezsin.'); return }
+    if (trimmed.length < 50) { setError(`Cevabın çok kısa — en az 50 karakter yazmalısın (şu an ${trimmed.length}).`); return }
     setGrading(true)
     setError('')
     try {
@@ -285,7 +287,10 @@ export default function AcikUcluPage() {
               <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)' }}>Cevabın</label>
               <textarea className="input" rows={8} value={answer} onChange={e => setAnswer(e.target.value)}
                 placeholder="Kendi cümlelerinle, düşüncelerini gerekçelendirerek yaz…"
-                style={{ marginTop: '8px', marginBottom: '1rem', resize: 'vertical', borderRadius: '12px' }} />
+                style={{ marginTop: '8px', marginBottom: '4px', resize: 'vertical', borderRadius: '12px' }} />
+              <div style={{ fontSize: '11px', color: answer.trim().length >= 50 ? 'var(--green)' : 'var(--text3)', marginBottom: '1rem', textAlign: 'right' }}>
+                {answer.trim().length} / 50 karakter {answer.trim().length >= 50 ? '✓' : ''}
+              </div>
               <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}
                 onClick={submitAnswer} disabled={grading}>
                 {grading ? 'Değerlendiriliyor…' : 'Cevabımı Gönder'}

@@ -3,6 +3,7 @@ import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { translateAuthError } from '@/lib/auth-error-messages'
 
 function RegisterTeacherContent() {
   const router = useRouter()
@@ -68,7 +69,7 @@ function RegisterTeacherContent() {
         password: pass,
         options: { emailRedirectTo: `${window.location.origin}/register/teacher?step=info` },
       })
-      if (err) { setError(err.message); return }
+      if (err) { setError(translateAuthError(err.message)); return }
 
       // Supabase, zaten kayıtlı+onaylı bir e-postayla signUp() çağrılınca
       // hata döndürmez (numaralandırma saldırılarını önlemek için) — boş

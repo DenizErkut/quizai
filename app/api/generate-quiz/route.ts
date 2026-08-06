@@ -102,9 +102,51 @@ const MEB_WHITELIST = new Set([
   'beden egitimi','muzik','gorsel sanatlar','teknoloji tasarim',
 ])
 
-function isInCurriculum(topic: string, plan: string): boolean {
+// Bir konu MEB müfredatında GENEL OLARAK var olsa bile, öğrencinin KENDİ
+// SEVİYESİ için çok ileri olabilir (ör. bir 6. sınıf öğrencisi "termodinamiğin
+// birinci yasası" yazabiliyordu — bu lise/üniversite fiziği, ortaokul değil).
+// Bu liste, her seviye için "bu seviyenin ÜSTÜNDE" sayılan ve REDDEDİLMESİ
+// gereken kavramları tutar.
+const TOO_ADVANCED_FOR_LEVEL: Record<string, string[]> = {
+  ilkokul: [
+    'cebirsel ifade', 'denklem', 'esitsizlik', 'oran', 'oranti', 'yuzde', 'asal sayi',
+    'obeb', 'okek', 'fonksiyon', 'hucre', 'organeller', 'fotosentez', 'solunum sistemi',
+    'sindirim sistemi', 'dolasim sistemi', 'kalitim', 'dna', 'gen', 'evrim', 'ekosistem',
+    'atom', 'element', 'bilesik', 'asit', 'baz', 'kimyasal', 'termodinamik', 'mekanik',
+    'newton', 'momentum', 'elektrik devresi', 'osmanli', 'cumhuriyet', 'inkilap', 'tbmm',
+    'fiilimsi', 'soz sanati', 'divan edebiyati', 'trigonometri', 'logaritma', 'turev',
+    'integral', 'limit', 'vektor', 'matris',
+  ],
+  ortaokul: [
+    'termodinamik', 'logaritma', 'trigonometri', 'turev', 'integral', 'limit',
+    'vektor', 'matris', 'karmasik sayi', 'analitik geometri', 'elektrokimya',
+    'organik kimya', 'hidrokarbon', 'polimer', 'mol kavrami', 'kimyasal denge',
+    'endokrin sistem', 'genetik muhendislik', 'biyoteknoloji',
+    'nukleer fizik', 'atom fizigi', 'modern fizik', 'epistemoloji',
+    'ontoloji', 'servet-i funun', 'tanzimat edebiyati',
+    'fransiz ihtilali', 'soguk savas',
+  ],
+  // lise: mufredati zaten genis (fizik/kimya/biyoloji/felsefe dahil) - ek
+  // bir "cok ileri" kisitlamasi uygulanmiyor, sadece universite-cok-otesi
+  // (aşırı uzmanlasmis) konular icin genel whitelist zaten yetersiz kalip
+  // dogal olarak reddedecektir.
+}
+
+function isTooAdvancedForLevel(topic: string, level: string): boolean {
+  const norm = normalizeTR(topic)
+  const blocked = TOO_ADVANCED_FOR_LEVEL[level] || []
+  return blocked.some(kw => norm.includes(kw))
+}
+
+function isInCurriculum(topic: string, plan: string, grade: string): boolean {
   const norm = normalizeTR(topic.trim())
-  
+  const level = getLevel(grade)
+
+  // ÖNCELİKLİ KONTROL: konu genel MEB müfredatında var olsa bile, bu
+  // öğrencinin SEVİYESİ için çok ileriyse REDDEDİLİR — plan/whitelist
+  // durumundan bağımsız, kesin bir engel.
+  if (isTooAdvancedForLevel(norm, level)) return false
+
   // Whitelist kontrolü — her planda geçerli
   if (MEB_WHITELIST.has(norm)) return true
   
@@ -323,12 +365,13 @@ export async function POST(req: NextRequest) {
     const maxQ = MAX_QCOUNT[plan] ?? 5
     const safeQCount = Math.min(questionCount, maxQ)
 
-    if (!fileContent && !isInCurriculum(topic, plan)) {
+    const grade = profile.grade || 'ortaokul 6. sinif'
+
+    if (!fileContent && !isInCurriculum(topic, plan, grade)) {
       return NextResponse.json({ error: 'out_of_curriculum' }, { status: 403 })
     }
 
     const lang = language || profile.language || 'Turkce'
-    const grade = profile.grade || 'ortaokul 6. sinif'
 
     // Tekrar eden soruları önle
     let previousQuestionsNote = ''
