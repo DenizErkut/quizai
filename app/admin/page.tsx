@@ -40,7 +40,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'meb' | 'exams' | 'curriculum' | 'coaching'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'exams' | 'curriculum' | 'coaching'>('users')
   const [identityMissing, setIdentityMissing] = useState<number | null>(null)
   const [identityScanning, setIdentityScanning] = useState(false)
   const [identityFixing, setIdentityFixing] = useState(false)
@@ -74,13 +74,13 @@ export default function AdminPage() {
   const [mebMsg, setMebMsg] = useState('')
   const [mebFilter, setMebFilter] = useState({ level: '', subject: '' })
 
-  const [instForm, setInstForm] = useState({ name: '', email: '', password: '', code: '', discount: '0' })
+  const [instForm, setInstForm] = useState({ name: '', email: '', password: '', code: '', discount: '0', seller_id: '' })
   const [instSaving, setInstSaving] = useState(false)
   const [instError, setInstError] = useState('')
   const [instSuccess, setInstSuccess] = useState('')
   const [institutions, setInstitutions] = useState<any[]>([])
   const [editingInst, setEditingInst] = useState<any>(null)
-  const [editInstForm, setEditInstForm] = useState({ name: '', email: '', newPassword: '', discount: '0', active: true })
+  const [editInstForm, setEditInstForm] = useState({ name: '', email: '', newPassword: '', discount: '0', active: true, seller_id: '' })
   const [editInstSaving, setEditInstSaving] = useState(false)
   const [instStudentCounts, setInstStudentCounts] = useState<Record<string, number>>({})
   const [expandedInstId, setExpandedInstId] = useState<string | null>(null)
@@ -130,6 +130,65 @@ export default function AdminPage() {
   useEffect(() => {
     if (tab === 'coaching' && isAdmin) loadCoachingLeads()
   }, [tab, isAdmin])
+
+  // ── Satıcılar ──
+  const [sellers, setSellers] = useState<any[]>([])
+  const [sellersLoading, setSellersLoading] = useState(false)
+  const [showAddSeller, setShowAddSeller] = useState(false)
+  const [sellerForm, setSellerForm] = useState({ full_name: '', title: '', email: '', phone: '', address: '', commission_rate: '' })
+  const [sellerSaving, setSellerSaving] = useState(false)
+  const [sellerError, setSellerError] = useState('')
+  const [sellerCreated, setSellerCreated] = useState<any>(null)
+  const [editingSeller, setEditingSeller] = useState<any>(null)
+  const [editSellerForm, setEditSellerForm] = useState({ full_name: '', title: '', email: '', phone: '', address: '', commission_rate: '', active: true })
+
+  async function loadSellers() {
+    setSellersLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin/sellers', { headers: { Authorization: `Bearer ${session?.access_token}` } })
+      const json = await res.json()
+      if (res.ok) setSellers(json.sellers ?? [])
+    } catch { /* no-op */ }
+    setSellersLoading(false)
+  }
+
+  useEffect(() => {
+    if (tab === 'sellers' && isAdmin) loadSellers()
+  }, [tab, isAdmin])
+
+  async function createSeller() {
+    if (!sellerForm.full_name.trim()) { setSellerError('Ad soyad zorunlu.'); return }
+    setSellerError(''); setSellerSaving(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin/create-seller', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify(sellerForm),
+      })
+      const json = await res.json()
+      if (!res.ok) { setSellerError(json.error || 'Satıcı oluşturulamadı.'); return }
+      setSellerCreated(json.seller)
+      setSellerForm({ full_name: '', title: '', email: '', phone: '', address: '', commission_rate: '' })
+      loadSellers()
+    } catch {
+      setSellerError('Beklenmeyen bir hata oluştu.')
+    } finally {
+      setSellerSaving(false)
+    }
+  }
+
+  async function saveSellerEdit() {
+    if (!editingSeller) return
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/admin/update-seller', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ seller_id: editingSeller.id, ...editSellerForm }),
+    })
+    if (res.ok) { setEditingSeller(null); loadSellers() }
+  }
 
   async function updateLeadStatus(id: string, status: string) {
     setCoachingLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l))
@@ -202,7 +261,7 @@ export default function AdminPage() {
     await fetch('/api/admin/update-institution', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${s?.access_token}` },
-      body: JSON.stringify({ institution_id: inst.id, name: inst.name, email: inst.admin_email, newPassword: '', discount: String(inst.discount_rate || 0), active: !inst.active }),
+      body: JSON.stringify({ institution_id: inst.id, name: inst.name, email: inst.admin_email, newPassword: '', discount: String(inst.discount_rate || 0), active: !inst.active, seller_id: inst.seller_id || '' }),
     })
     await fetchData()
   }
@@ -267,7 +326,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
 
     const createdCode = authData?.institution?.code || instForm.code
     setInstSuccess(`Kurum "${instForm.name}" oluşturuldu! Kod: ${createdCode}`)
-    setInstForm({ name: '', email: '', password: '', code: '', discount: '0' })
+    setInstForm({ name: '', email: '', password: '', code: '', discount: '0', seller_id: '' })
     await fetchData()
     setInstSaving(false)
   }
@@ -359,6 +418,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
     }
 
     setLoading(false)
+    loadSellers() // kurum formundaki "Satıcı" dropdown'ı için önceden yükle
   }
 
   async function updateReportStatus(id: string, status: string, note?: string) {
@@ -499,6 +559,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             { key: 'errors', label: `⚠️ Hata Bildirimleri${pendingCount > 0 ? ` (${pendingCount})` : ''}` },
             { key: 'teachers', label: `🎓 Öğretmen Başvuruları${pendingTeachers > 0 ? ` (${pendingTeachers})` : ''}` },
             { key: 'institutions', label: '🏛️ Kurumlar' },
+            { key: 'sellers', label: '🤝 Satıcılar' },
             { key: 'meb', label: '📚 MEB Kaynakları' },
             { key: 'exams', label: '🎯 Sınav Kitapçıkları' },
             { key: 'curriculum', label: '📋 Müfredat Yönetimi' },
@@ -939,10 +1000,19 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                 </div>
               </div>
 
-              <div style={{ marginBottom: '12px', maxWidth: '200px' }}>
-                <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>İndirim Oranı (%)</label>
-                <input className="input" type="number" min={0} max={100} placeholder="0" value={instForm.discount}
-                  onChange={e => setInstForm(p => ({ ...p, discount: e.target.value }))} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>İndirim Oranı (%)</label>
+                  <input className="input" type="number" min={0} max={100} placeholder="0" value={instForm.discount}
+                    onChange={e => setInstForm(p => ({ ...p, discount: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Satıcı (Opsiyonel)</label>
+                  <select className="input" value={instForm.seller_id} onChange={e => setInstForm(p => ({ ...p, seller_id: e.target.value }))}>
+                    <option value="">— Doğrudan/Satıcısız —</option>
+                    {sellers.map((s: any) => <option key={s.id} value={s.id}>{s.full_name} ({s.code})</option>)}
+                  </select>
+                </div>
               </div>
 
               {instError && <div style={{ padding: '10px 12px', background: 'var(--red-bg)', borderRadius: '8px', fontSize: '13px', color: 'var(--red)', marginBottom: '10px' }}>{instError}</div>}
@@ -975,6 +1045,12 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
 
                   <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>İndirim Oranı (%)</label>
                   <input className="input" type="number" min={0} max={100} value={editInstForm.discount} onChange={e => setEditInstForm(p => ({ ...p, discount: e.target.value }))} style={{ marginBottom: '10px' }} />
+
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Satıcı (Opsiyonel)</label>
+                  <select className="input" value={editInstForm.seller_id} onChange={e => setEditInstForm(p => ({ ...p, seller_id: e.target.value }))} style={{ marginBottom: '10px' }}>
+                    <option value="">— Doğrudan/Satıcısız —</option>
+                    {sellers.map((s: any) => <option key={s.id} value={s.id}>{s.full_name} ({s.code})</option>)}
+                  </select>
 
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', cursor: 'pointer' }}>
                     <input type="checkbox" checked={editInstForm.active} onChange={e => setEditInstForm(p => ({ ...p, active: e.target.checked }))} style={{ width: 16, height: 16, accentColor: 'var(--accent)' }} />
@@ -1022,7 +1098,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                           </button>
                           <button onClick={() => {
                             setEditingInst(inst)
-                            setEditInstForm({ name: inst.name, email: inst.admin_email || '', newPassword: '', discount: String(inst.discount_rate || 0), active: inst.active })
+                            setEditInstForm({ name: inst.name, email: inst.admin_email || '', newPassword: '', discount: String(inst.discount_rate || 0), active: inst.active, seller_id: inst.seller_id || '' })
                           }} className="btn btn-sm" style={{ fontSize: '11px' }}>✏️ Düzenle</button>
                           <button onClick={() => toggleInstitutionActive(inst)}
                             className="btn btn-sm"
@@ -1686,6 +1762,124 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {tab === 'sellers' && (
+        <div>
+          {/* Yeni satıcı formu */}
+          <div className="card" style={{ marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showAddSeller ? '1rem' : 0 }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)' }}>🤝 Bağımsız Platform Satıcıları</div>
+              <button className="btn btn-sm" onClick={() => { setShowAddSeller(v => !v); setSellerCreated(null); setSellerError('') }}>
+                {showAddSeller ? '✕ Kapat' : '➕ Yeni Satıcı'}
+              </button>
+            </div>
+
+            {showAddSeller && (
+              sellerCreated ? (
+                <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+                  <div style={{ fontSize: '32px', marginBottom: '8px' }}>✅</div>
+                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '10px' }}>
+                    "{sellerCreated.full_name}" satıcı olarak eklendi
+                  </div>
+                  <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', maxWidth: '420px', margin: '0 auto', textAlign: 'left' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--text3)' }}>Satıcı Kodu</div>
+                    <div style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '16px', color: 'var(--primary)', marginBottom: '10px' }}>{sellerCreated.code}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text3)' }}>Satıcı Linki (bireysel kayıtlar için)</div>
+                    <div style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--accent)', wordBreak: 'break-all' }}>
+                      https://pratium.com/register?satici={sellerCreated.code}
+                    </div>
+                  </div>
+                  <button className="btn btn-sm" style={{ marginTop: '12px' }} onClick={() => setSellerCreated(null)}>+ Başka Satıcı Ekle</button>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <input className="input" placeholder="Ad Soyad *" value={sellerForm.full_name} onChange={e => setSellerForm(p => ({ ...p, full_name: e.target.value }))} />
+                  <input className="input" placeholder="Ünvan (opsiyonel)" value={sellerForm.title} onChange={e => setSellerForm(p => ({ ...p, title: e.target.value }))} />
+                  <input className="input" type="email" placeholder="E-posta" value={sellerForm.email} onChange={e => setSellerForm(p => ({ ...p, email: e.target.value }))} />
+                  <input className="input" placeholder="Telefon" value={sellerForm.phone} onChange={e => setSellerForm(p => ({ ...p, phone: e.target.value }))} />
+                  <input className="input" placeholder="Adres" value={sellerForm.address} onChange={e => setSellerForm(p => ({ ...p, address: e.target.value }))} style={{ gridColumn: '1 / -1' }} />
+                  <input className="input" type="number" step="0.1" placeholder="Komisyon Oranı (%)" value={sellerForm.commission_rate} onChange={e => setSellerForm(p => ({ ...p, commission_rate: e.target.value }))} />
+                  {sellerError && <div style={{ gridColumn: '1 / -1', padding: '10px 12px', background: 'var(--red-bg)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)' }}>{sellerError}</div>}
+                  <button className="btn btn-primary" style={{ gridColumn: '1 / -1' }} onClick={createSeller} disabled={sellerSaving}>
+                    {sellerSaving ? 'Kaydediliyor...' : 'Satıcıyı Oluştur (Kod Otomatik Atanır)'}
+                  </button>
+                </div>
+              )
+            )}
+          </div>
+
+          {/* Satıcı listesi + rapor */}
+          {sellersLoading ? (
+            <div className="spinner" />
+          ) : sellers.length === 0 ? (
+            <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text3)', fontSize: '13px' }}>
+              Henüz satıcı eklenmemiş.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {sellers.map((s: any) => (
+                <div key={s.id} className="card" style={{ padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)' }}>
+                        {s.full_name} {s.title && <span style={{ fontWeight: 400, color: 'var(--text3)', fontSize: '12px' }}>· {s.title}</span>}
+                        {!s.active && <span style={{ marginLeft: '8px', fontSize: '10px', padding: '2px 8px', borderRadius: '99px', background: 'var(--red-bg)', color: 'var(--red)', fontWeight: 700 }}>PASİF</span>}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>
+                        {s.email && <span>✉️ {s.email} · </span>}
+                        {s.phone && <span>📞 {s.phone} · </span>}
+                        💰 Komisyon: %{s.commission_rate}
+                      </div>
+                      <div style={{ fontSize: '12px', fontFamily: 'monospace', color: 'var(--accent)', marginTop: '4px' }}>
+                        Kod: {s.code}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)' }}>{s.institution_count}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text3)' }}>Kurum</div>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)' }}>{s.individual_count}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text3)' }}>Bireysel</div>
+                      </div>
+                      <button className="btn btn-sm" onClick={() => {
+                        setEditingSeller(s)
+                        setEditSellerForm({ full_name: s.full_name, title: s.title || '', email: s.email || '', phone: s.phone || '', address: s.address || '', commission_rate: String(s.commission_rate), active: s.active })
+                      }}>✏️ Düzenle</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Düzenleme modalı */}
+          {editingSeller && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+              <div className="card" style={{ maxWidth: '460px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '1rem' }}>Satıcıyı Düzenle</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                  <input className="input" placeholder="Ad Soyad" value={editSellerForm.full_name} onChange={e => setEditSellerForm(p => ({ ...p, full_name: e.target.value }))} />
+                  <input className="input" placeholder="Ünvan" value={editSellerForm.title} onChange={e => setEditSellerForm(p => ({ ...p, title: e.target.value }))} />
+                  <input className="input" type="email" placeholder="E-posta" value={editSellerForm.email} onChange={e => setEditSellerForm(p => ({ ...p, email: e.target.value }))} />
+                  <input className="input" placeholder="Telefon" value={editSellerForm.phone} onChange={e => setEditSellerForm(p => ({ ...p, phone: e.target.value }))} />
+                  <input className="input" placeholder="Adres" value={editSellerForm.address} onChange={e => setEditSellerForm(p => ({ ...p, address: e.target.value }))} style={{ gridColumn: '1 / -1' }} />
+                  <input className="input" type="number" step="0.1" placeholder="Komisyon Oranı (%)" value={editSellerForm.commission_rate} onChange={e => setEditSellerForm(p => ({ ...p, commission_rate: e.target.value }))} />
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                    <input type="checkbox" checked={editSellerForm.active} onChange={e => setEditSellerForm(p => ({ ...p, active: e.target.checked }))} />
+                    Aktif
+                  </label>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={saveSellerEdit}>Kaydet</button>
+                  <button className="btn" onClick={() => setEditingSeller(null)}>İptal</button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

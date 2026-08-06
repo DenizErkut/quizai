@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   const { data: profile } = await supabaseAdmin.from('profiles').select('is_admin').eq('id', user.id).single()
   if (!profile?.is_admin) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
 
-  const { institution_id, name, email, newPassword, discount, active } = await req.json()
+  const { institution_id, name, email, newPassword, discount, active, seller_id } = await req.json()
   if (!institution_id) return NextResponse.json({ error: 'Kurum ID eksik.' }, { status: 400 })
 
   // Kurumu güncelle
@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
     name: name?.trim(),
     admin_email: email?.trim(),
     discount_rate: parseFloat(discount) || 0,
+    seller_id: seller_id || null,
     active,
   }).eq('id', institution_id)
   if (instErr) return NextResponse.json({ error: instErr.message }, { status: 500 })

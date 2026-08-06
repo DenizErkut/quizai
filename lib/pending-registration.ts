@@ -38,6 +38,7 @@ export interface PendingRegistration {
   institutionCode?: string
   parentEmail?: string
   phone?: string
+  sellerId?: string
   kvkkAydinlatma: boolean
   kvkkAcikRiza: boolean
   veliOnayi: boolean

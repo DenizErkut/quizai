@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   if (!profile?.is_admin) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
 
   const body = await req.json()
-  const { name, email, password, discount } = body
+  const { name, email, password, discount, seller_id } = body
   let { code } = body
 
   if (!name?.trim() || !email?.trim() || !password) {
@@ -90,6 +90,7 @@ export async function POST(req: NextRequest) {
       code, // zaten yukarıda normalize edildi (elle girilmiş ya da otomatik üretilmiş)
       admin_email: email.trim(),
       discount_rate: parseFloat(discount) || 0,
+      seller_id: seller_id || null,
       active: true,
     })
     .select()

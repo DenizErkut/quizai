@@ -60,6 +60,7 @@ function RegisterContent() {
   const searchParams = useSearchParams()
   const ref = searchParams.get('ref') || ''
   const kurumParam = searchParams.get('kurum') || ''
+  const saticiParam = searchParams.get('satici') || ''
   const next = searchParams.get('next') || ''
   const isSafeNext = (n: string) => n.startsWith('/') && !n.startsWith('//') && !n.startsWith('/login')
   const supabase = createClient() as any
@@ -85,6 +86,7 @@ function RegisterContent() {
   const [classNumber, setClassNumber] = useState('')
   const [institutionCode, setInstitutionCode] = useState(kurumParam.toUpperCase())
   const [institutionName, setInstitutionName] = useState('')
+  const [sellerId, setSellerId] = useState('') // ?satici=KOD ile geldiyse çözümlenen satıcı ID'si
   const [parentEmail, setParentEmail] = useState('')
   const [studentPhone, setStudentPhone] = useState('')
   const [kvkkAydinlatma, setKvkkAydinlatma] = useState(false)
@@ -116,6 +118,18 @@ function RegisterContent() {
       setSelectedRole('student')
       setStep('info')
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ?satici=KOD ile gelindiyse — kurum kodundan farklı olarak rol/adım
+  // ZORLANMAZ (bir satıcı öğrenci/öğretmen/veli herhangi birini getirebilir),
+  // sadece hangi hesabın satıcıya ait olduğu arka planda çözülür.
+  useEffect(() => {
+    if (!saticiParam) return
+    fetch(`/api/resolve-seller-code?code=${encodeURIComponent(saticiParam)}`)
+      .then(r => r.json())
+      .then(d => { if (d.seller_id) setSellerId(d.seller_id) })
+      .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -234,6 +248,7 @@ function RegisterContent() {
           grade, studentSchool: institutionName, classNumber: institutionName ? classNumber.trim() : '',
           institutionCode: institutionCode.trim(),
           parentEmail: parentEmail.trim(), phone: studentPhone.trim(),
+          sellerId: sellerId || undefined,
           kvkkAydinlatma, kvkkAcikRiza, veliOnayi,
           ref, next,
         })
@@ -291,6 +306,7 @@ function RegisterContent() {
           class_number: institutionName ? classNumber.trim() : null,
           language: 'Türkçe',
           role: 'student',
+          seller_id: sellerId || null,
         })
         if (upsertError) {
           console.error('profiles upsert hatasi (register):', upsertError)
@@ -328,6 +344,7 @@ function RegisterContent() {
           id: data.user.id,
           language: 'Türkçe',
           role: 'parent',
+          seller_id: sellerId || null,
         })
         router.push('/parent')
 
@@ -337,6 +354,7 @@ function RegisterContent() {
           id: data.user.id,
           language: 'Türkçe',
           role: 'teacher',
+          seller_id: sellerId || null,
         })
         setStep('teacher_info')
       }

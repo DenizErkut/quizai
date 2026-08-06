@@ -168,6 +168,7 @@ export default function CompleteProfilePage() {
         class_number: pending.classNumber,
         language: 'Türkçe',
         role: 'student',
+        seller_id: pending.sellerId || null,
       })
       if (upsertError) {
         setErrorMsg('Profil oluşturulamadı: ' + upsertError.message)
@@ -201,7 +202,7 @@ export default function CompleteProfilePage() {
     }
 
     if (pending.role === 'parent') {
-      await supabase.from('profiles').upsert({ id: uid, language: 'Türkçe', role: 'parent' })
+      await supabase.from('profiles').upsert({ id: uid, language: 'Türkçe', role: 'parent', seller_id: pending.sellerId || null })
       clearPendingRegistration()
       setPhase('done')
       router.push('/parent')
@@ -209,7 +210,7 @@ export default function CompleteProfilePage() {
     }
 
     // teacher — profil oluştur, sonra okul/branş/belge adımını göster
-    await supabase.from('profiles').upsert({ id: uid, language: 'Türkçe', role: 'teacher' })
+    await supabase.from('profiles').upsert({ id: uid, language: 'Türkçe', role: 'teacher', seller_id: pending.sellerId || null })
     clearPendingRegistration()
     setPhase('teacher-apply')
   }
