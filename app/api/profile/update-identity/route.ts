@@ -31,9 +31,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Geçersiz istek.' }, { status: 400 })
   }
 
-  const { fullName, phone, parentEmail, role } = body || {}
+  const { fullName, age, phone, parentEmail, role } = body || {}
   const updates: Record<string, any> = {}
   if (typeof fullName === 'string' && fullName.trim()) updates.full_name = fullName.trim()
+  if (age !== undefined) {
+    const n = typeof age === 'number' ? age : parseInt(age, 10)
+    if (Number.isInteger(n) && n >= 5 && n <= 100) updates.age = n
+    else if (age === null || age === '') updates.age = null
+  }
   if (phone !== undefined) updates.phone = phone || null
   if (parentEmail !== undefined) updates.parent_email = parentEmail || null
 
@@ -49,6 +54,7 @@ export async function POST(req: NextRequest) {
         supabaseUserId: user.id,
         fullName: updates.full_name || (user.email?.split('@')[0] ?? 'Kullanıcı'),
         email: user.email || '',
+        age: updates.age ?? undefined,
         role: role || 'student',
       })
       const followUp: Record<string, any> = {}

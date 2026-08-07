@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { resolveName } from '@/lib/identity/resolve-client'
+import { resolveOwnIdentity } from '@/lib/identity/resolve-client'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -72,8 +72,14 @@ export default function ProfileEditPage() {
         .eq('id', user.id)
         .single()
       if (data) {
-        // İsim TR-PG kimliğinden gelir (profiles'ta artık yok)
-        setName((await resolveName(supabase, user.id)) || '')
+        // İsim ve yaş TR-PG kimliğinden gelir (profiles'ta artık yok).
+        // ÖNEMLİ: /api/identity/me SADECE oturum sahibinin kendi kaydını
+        // döner — sınıf listesi/sıralama gibi başka-kullanıcı senaryolarında
+        // kullanılan resolveIdentities()'ten (sadece full_name+role döner)
+        // bilinçli olarak ayrı tutulur, çünkü yaş burada güvenle okunabilir.
+        const own = await resolveOwnIdentity(supabase)
+        setName(own?.full_name || '')
+        setAge(own?.age != null ? String(own.age) : '')
         setGender(data.gender || '')
         setGrade(data.grade || '')
         setSchool(data.school || '')
@@ -135,14 +141,17 @@ export default function ProfileEditPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    // Ad-soyad kimlik verisidir → TR-PG'ye yazılır
+    // Ad-soyad ve yaş kimlik verisidir → TR-PG'ye yazılır
     const { data: { session } } = await supabase.auth.getSession()
     const idRes = await fetch('/api/profile/update-identity', {
       method: 'POST',
       headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fullName: name.trim() }),
+      body: JSON.stringify({
+        fullName: name.trim(),
+        age: age.trim() ? parseInt(age, 10) : null,
+      }),
     })
-    if (!idRes.ok) { setError('İsim kaydedilemedi. Lütfen tekrar deneyin.'); setSaving(false); return }
+    if (!idRes.ok) { setError('İsim/yaş kaydedilemedi. Lütfen tekrar deneyin.'); setSaving(false); return }
 
     await supabase.from('profiles').upsert({
       id: user.id,
