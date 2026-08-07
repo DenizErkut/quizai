@@ -1,4 +1,6 @@
 // lib/subject-map-grade.ts
+import { SUBJECT_MAP } from './subject-map'
+
 // Açık Uçlu Sorular (AUS) için SINIF BAZINDA (1-12, genel "seviye" değil)
 // ders/konu haritası. lib/subject-map.ts'teki SUBJECT_MAP kasıtlı olarak
 // DEĞİŞTİRİLMEDİ (quiz/generate-quiz/raporlarda hâlâ kullanılıyor, oraya
@@ -123,8 +125,16 @@ export const SUBJECT_MAP_BY_GRADE: Record<string, Record<string, string[]>> = {
 
 // "ortaokul 7. sınıf", "7. Sınıf", "lise 10.sinif" gibi çeşitli yazımlardan
 // sınıf NUMARASINI çıkarır. Bulamazsa null döner (fallback için).
+//
+// ÖNEMLİ: "universite 1. sinif" / "universite 2. sinif" gibi değerler de bu
+// regex ile eşleşir (içlerinde "1. sinif" örüntüsü geçtiği için) — bu da bir
+// üniversite 1. sınıf öğrencisinin yanlışlıkla İLKOKUL 1. sınıf dersleriyle
+// (Matematik/Türkçe/Hayat Bilgisi) eşleşmesine yol açıyordu. Bu yüzden
+// üniversite değerleri regex'e hiç girmeden en başta eleniyor.
 export function extractGradeNumber(grade: string | null | undefined): number | null {
   if (!grade) return null
+  const g = grade.toLowerCase()
+  if (g.includes('universite') || g.includes('üniversite')) return null
   const m = grade.match(/(\d{1,2})\s*\.?\s*s[ıi]n[ıi]f/i)
   if (m) {
     const n = parseInt(m[1], 10)
@@ -136,11 +146,18 @@ export function extractGradeNumber(grade: string | null | undefined): number | n
 // Sınıf numarası hiç çıkarılamazsa (ör. 'universite' gibi bir değer),
 // en yakın makul varsayılana düşer.
 export function getSubjectsForGrade(grade: string | null | undefined): Record<string, string[]> {
+  const g = (grade || '').toLowerCase()
+
+  // Üniversite: K-12 sınıf haritasına hiç girmeden, lib/subject-map.ts'teki
+  // zaten hazır "universite" ders setine (Matematik, Fizik, İktisat, Bilişim
+  // ve Yazılım, Hukuk, İşletme, Psikoloji vb.) yönlendirilir. Önceden buraya
+  // hiç ulaşılamıyordu çünkü extractGradeNumber üniversite string'lerini de
+  // yanlışlıkla bir K-12 sınıf numarası sanıyordu (yukarıdaki not).
+  if (g.includes('universite') || g.includes('üniversite')) return SUBJECT_MAP.universite
+
   const n = extractGradeNumber(grade)
   if (n && SUBJECT_MAP_BY_GRADE[String(n)]) return SUBJECT_MAP_BY_GRADE[String(n)]
 
-  const g = (grade || '').toLowerCase()
-  if (g.includes('universite') || g.includes('üniversite')) return SUBJECT_MAP_BY_GRADE['12']
   if (g.includes('lise')) return SUBJECT_MAP_BY_GRADE['9']
   if (g.includes('ilkokul')) return SUBJECT_MAP_BY_GRADE['4']
   return SUBJECT_MAP_BY_GRADE['6'] // en genel/orta varsayılan
