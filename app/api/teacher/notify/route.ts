@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
 
   try {
     webpush.setVapidDetails(
-      'mailto:info@pratium.com',
+      'mailto:info@pratium.com.tr',
       process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
       process.env.VAPID_PRIVATE_KEY!
     )

@@ -33,7 +33,7 @@ export default function TermsPage() {
           },
           {
             title: '3. Hesap Oluşturma ve Güvenlik',
-            content: 'Platformu kullanmak için kayıt olmanız gerekmektedir. Kayıt sırasında verdiğiniz bilgilerin doğru ve güncel olmasından siz sorumlusunuz. Hesabınızın güvenliğini korumak sizin sorumluluğunuzdadır. Hesabınızın yetkisiz kullanımını fark ettiğinizde derhal info@pratium.com adresine bildirmeniz gerekmektedir. 18 yaşın altındaki kullanıcıların platforma ebeveyn veya yasal vasi onayı ile kayıt olması gerekmektedir.',
+            content: 'Platformu kullanmak için kayıt olmanız gerekmektedir. Kayıt sırasında verdiğiniz bilgilerin doğru ve güncel olmasından siz sorumlusunuz. Hesabınızın güvenliğini korumak sizin sorumluluğunuzdadır. Hesabınızın yetkisiz kullanımını fark ettiğinizde derhal info@pratium.com.tr adresine bildirmeniz gerekmektedir. 18 yaşın altındaki kullanıcıların platforma ebeveyn veya yasal vasi onayı ile kayıt olması gerekmektedir.',
           },
           {
             title: '4. Kullanım Koşulları',
@@ -69,7 +69,7 @@ export default function TermsPage() {
           },
           {
             title: '10. Hesap Askıya Alma ve Sonlandırma',
-            content: 'Pratium, bu Şartları ihlal eden kullanıcıların hesaplarını önceden bildirim yapmaksızın askıya alma veya sonlandırma hakkını saklı tutar. Kullanıcılar istedikleri zaman hesaplarını kapatabilir. Hesap kapatma talebi için info@pratium.com adresine başvurulabilir.',
+            content: 'Pratium, bu Şartları ihlal eden kullanıcıların hesaplarını önceden bildirim yapmaksızın askıya alma veya sonlandırma hakkını saklı tutar. Kullanıcılar istedikleri zaman hesaplarını kapatabilir. Hesap kapatma talebi için info@pratium.com.tr adresine başvurulabilir.',
           },
           {
             title: '11. Değişiklikler',
@@ -81,7 +81,7 @@ export default function TermsPage() {
           },
           {
             title: '13. İletişim',
-            content: 'Bu Şartlarla ilgili sorularınız için: info@pratium.com adresine yazabilirsiniz.',
+            content: 'Bu Şartlarla ilgili sorularınız için: info@pratium.com.tr adresine yazabilirsiniz.',
           },
         ].map((section, i) => (
           <div key={i} className="card" style={{ marginBottom: '1rem' }}>

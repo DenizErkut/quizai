@@ -81,11 +81,11 @@ export default function PrivacyPage() {
           },
           {
             title: '10. Hesap ve Veri Silme',
-            content: 'Hesabınızı ve tüm kişisel verilerinizi silmek için info@pratium.com adresine e-posta gönderebilirsiniz. Talebiniz 30 gün içinde işleme alınacaktır.',
+            content: 'Hesabınızı ve tüm kişisel verilerinizi silmek için info@pratium.com.tr adresine e-posta gönderebilirsiniz. Talebiniz 30 gün içinde işleme alınacaktır.',
           },
           {
             title: '11. İletişim',
-            content: 'KVKK kapsamındaki talepleriniz ve gizlilik ile ilgili sorularınız için: info@pratium.com adresine yazabilirsiniz.',
+            content: 'KVKK kapsamındaki talepleriniz ve gizlilik ile ilgili sorularınız için: info@pratium.com.tr adresine yazabilirsiniz.',
           },
         ].map((section, i) => (
           <div key={i} className="card" style={{ marginBottom: '1rem' }}>

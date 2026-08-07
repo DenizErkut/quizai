@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
     body: JSON.stringify({
-      from: 'Pratium <ozet@pratium.com>',
+      from: 'Pratium <ozet@pratium.com.tr>',
       to: [parentEmail],
       subject: `📊 Haftalık Özet — ${childSummaries.map(c => c.name).join(', ')}`,
       html: emailHtml,

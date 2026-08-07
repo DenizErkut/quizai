@@ -27,7 +27,7 @@ export default function DistanceSalesPage() {
             title: 'Madde 1 — Taraflar',
             content: '',
             list: [
-              'SATICI: Dumerk Elektronik Sanayi ve Ticaret Limited Şirketi — Fulya Mahallesi, Büyükdere Caddesi, Osmanbey Apt. No:52, İç Kapı No:17, Şişli / İstanbul — Ticaret Sicil No: 206257-5 — MERSİS No: 0314 1207 4570 0001 — E-posta: info@pratium.com',
+              'SATICI: Dumerk Elektronik Sanayi ve Ticaret Limited Şirketi — Fulya Mahallesi, Büyükdere Caddesi, Osmanbey Apt. No:52, İç Kapı No:17, Şişli / İstanbul — Ticaret Sicil No: 206257-5 — MERSİS No: 0314 1207 4570 0001 — E-posta: info@pratium.com.tr',
               'ALICI: Pratium platformu üzerinden üyelik satın alan, işlem sırasında kimlik ve iletişim bilgilerini beyan eden gerçek/tüzel kişi ("Kullanıcı").',
             ],
           },

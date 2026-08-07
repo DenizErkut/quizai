@@ -90,7 +90,7 @@ export default function InstitutionLoginPage() {
 
           <div style={{ marginTop: '1rem', padding: '10px 12px', background: 'rgba(217,119,6,0.06)', borderRadius: '10px', fontSize: '12px', color: 'var(--text3)', lineHeight: 1.6 }}>
             🏛️ Kurum anlasmasi ve panel erisimi icin{' '}
-            <a href="mailto:info@pratium.com" style={{ color: '#d97706', fontWeight: 600 }}>info@pratium.com</a>{' '}
+            <a href="mailto:info@pratium.com.tr" style={{ color: '#d97706', fontWeight: 600 }}>info@pratium.com.tr</a>{' '}
             adresine ulasabilirsiniz.
           </div>
         </div>

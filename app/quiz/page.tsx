@@ -913,7 +913,7 @@ function QuizPageContent() {
               className="btn btn-ghost btn-sm"
               onClick={() => {
                 const msg = encodeURIComponent(`Hata kodu: ${quizError.code}\nKonu: ${customTopic || selectedTopic}\nHata: ${quizError.title}`)
-                window.open(`mailto:destek@pratium.com?subject=Hata Bildirimi&body=${msg}`)
+                window.open(`mailto:destek@pratium.com.tr?subject=Hata Bildirimi&body=${msg}`)
               }}
               style={{ justifyContent: 'center', color: 'var(--text3)', fontSize: '12px' }}>
               📧 Hatayı bildir

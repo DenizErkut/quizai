@@ -23,7 +23,7 @@ export default function DeliveryReturnPage() {
           },
           {
             title: '2. Teslimat (Erişimin Başlaması)',
-            content: 'Ödemenizin başarıyla tamamlanmasının ardından, satın aldığınız plana ait özellikler hesabınızda anında ve otomatik olarak aktif hale gelir. Herhangi bir ek işlem veya bekleme süresi gerekmez. Teknik bir aksaklık nedeniyle erişiminizde gecikme yaşarsanız info@pratium.com adresinden bize ulaşabilirsiniz.',
+            content: 'Ödemenizin başarıyla tamamlanmasının ardından, satın aldığınız plana ait özellikler hesabınızda anında ve otomatik olarak aktif hale gelir. Herhangi bir ek işlem veya bekleme süresi gerekmez. Teknik bir aksaklık nedeniyle erişiminizde gecikme yaşarsanız info@pratium.com.tr adresinden bize ulaşabilirsiniz.',
           },
           {
             title: '3. Cayma Hakkı İstisnası',
@@ -40,15 +40,15 @@ export default function DeliveryReturnPage() {
           },
           {
             title: '5. İade Talebi Nasıl Yapılır?',
-            content: 'İade talebinizi, işlem tarihini ve ilgili hususu belirterek info@pratium.com adresine e-posta ile iletebilirsiniz. Talebiniz en geç 14 iş günü içinde değerlendirilip tarafınıza dönüş yapılır. Onaylanan iadeler, ödemenin yapıldığı kart/hesaba, ödeme altyapı sağlayıcımız (iyzico) üzerinden gerçekleştirilir.',
+            content: 'İade talebinizi, işlem tarihini ve ilgili hususu belirterek info@pratium.com.tr adresine e-posta ile iletebilirsiniz. Talebiniz en geç 14 iş günü içinde değerlendirilip tarafınıza dönüş yapılır. Onaylanan iadeler, ödemenin yapıldığı kart/hesaba, ödeme altyapı sağlayıcımız (iyzico) üzerinden gerçekleştirilir.',
           },
           {
             title: '6. Abonelik İptali',
-            content: 'Abonelik iptali, cari dönemin sonuna kadar hizmete erişiminizi etkilemez; iptal sonrası bir sonraki döneme yenileme yapılmaz. İptal işlemini hesap ayarlarınızdan veya info@pratium.com üzerinden talep ederek gerçekleştirebilirsiniz.',
+            content: 'Abonelik iptali, cari dönemin sonuna kadar hizmete erişiminizi etkilemez; iptal sonrası bir sonraki döneme yenileme yapılmaz. İptal işlemini hesap ayarlarınızdan veya info@pratium.com.tr üzerinden talep ederek gerçekleştirebilirsiniz.',
           },
           {
             title: '7. İletişim',
-            content: 'Teslimat ve iade süreçleriyle ilgili tüm sorularınız için: info@pratium.com',
+            content: 'Teslimat ve iade süreçleriyle ilgili tüm sorularınız için: info@pratium.com.tr',
           },
         ].map((section, i) => (
           <div key={i} className="card" style={{ marginBottom: '1rem' }}>

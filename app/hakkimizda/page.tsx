@@ -40,7 +40,7 @@ export default function AboutPage() {
             title: 'İletişim',
             content: 'Sorularınız, geri bildirimleriniz veya iş birliği talepleriniz için bize aşağıdaki kanaldan ulaşabilirsiniz:',
             list: [
-              'E-posta: info@pratium.com',
+              'E-posta: info@pratium.com.tr',
               'Web: pratium.com',
               'Instagram: @pratiumai',
             ],

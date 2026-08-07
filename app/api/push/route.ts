@@ -11,7 +11,7 @@ const supabaseAdmin = createClient(
 export async function POST(req: NextRequest) {
   // VAPID lazy init
   webpush.setVapidDetails(
-    'mailto:info@pratium.com',
+    'mailto:info@pratium.com.tr',
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
     process.env.VAPID_PRIVATE_KEY!
   )
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
 // Günlük hatırlatma gönder (cron job için)
 export async function GET(req: NextRequest) {
   webpush.setVapidDetails(
-    'mailto:info@pratium.com',
+    'mailto:info@pratium.com.tr',
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
     process.env.VAPID_PRIVATE_KEY!
   )

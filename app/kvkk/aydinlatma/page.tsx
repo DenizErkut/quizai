@@ -14,7 +14,7 @@ export default function AydinlatmaPage() {
 
         <Section title="1. Veri Sorumlusu">
           Bu aydınlatma metni, [ŞİRKET UNVANI] ("Pratium") tarafından veri sorumlusu sıfatıyla hazırlanmıştır.
-          Adres: [ADRES] · E-posta: kvkk@pratium.com · MERSİS: [NO]
+          Adres: [ADRES] · E-posta: kvkk@pratium.com.tr · MERSİS: [NO]
         </Section>
 
         <Section title="2. İşlenen Kişisel Veriler">
@@ -47,7 +47,7 @@ export default function AydinlatmaPage() {
           KVKK m.9'daki güvencelere uygun olarak yurt dışında yerleşik hizmet sağlayıcılara aktarılabilmektedir.
           <b> Yapay zeka servislerine gönderilen içeriklerde kimlik bilgileriniz (ad, e-posta, kullanıcı kimliği)
           yer almaz; yalnızca anonimleştirilmiş soru/cevap içeriği iletilir.</b> Aktarım yapılan hizmet
-          sağlayıcılar ve güvence mekanizmaları hakkında detaylı bilgi için kvkk@pratium.com adresine başvurabilirsiniz.
+          sağlayıcılar ve güvence mekanizmaları hakkında detaylı bilgi için kvkk@pratium.com.tr adresine başvurabilirsiniz.
         </Section>
 
         <Section title="6. Saklama Süreleri">
@@ -59,7 +59,7 @@ export default function AydinlatmaPage() {
         <Section title="7. KVKK m.11 Kapsamındaki Haklarınız">
           Kişisel verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, düzeltme, silinmesini isteme,
           aktarıldığı üçüncü kişileri bilme, zarara uğramanız hâlinde tazminat talep etme haklarına sahipsiniz.
-          Başvurularınızı <b>Profil &gt; KVKK Talepleri</b> sayfasından veya kvkk@pratium.com adresine iletebilirsiniz.
+          Başvurularınızı <b>Profil &gt; KVKK Talepleri</b> sayfasından veya kvkk@pratium.com.tr adresine iletebilirsiniz.
           Başvurular en geç 30 gün içinde yanıtlanır.
         </Section>
       </div>

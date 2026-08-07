@@ -15,7 +15,7 @@ async function sendEmail(to: string, subject: string, html: string) {
       'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ from: 'Pratium <info@pratium.com>', to, subject, html }),
+    body: JSON.stringify({ from: 'Pratium <info@pratium.com.tr>', to, subject, html }),
   })
   if (!res.ok) console.error('[sendEmail] failed:', await res.text())
 }
@@ -64,7 +64,7 @@ const REJECT_HTML = (name: string) => `
     <p style="color:#475569;font-size:15px;line-height:1.6;margin:0 0 16px">Merhaba <strong>${name}</strong>,</p>
     <p style="color:#475569;font-size:15px;line-height:1.6;margin:0 0 24px">
       Maalesef öğretmen başvurunuz şu an için onaylanamadı. Daha fazla bilgi için
-      <a href="mailto:info@pratium.com" style="color:#1ECFB8">info@pratium.com</a> adresinden bize ulaşabilirsiniz.
+      <a href="mailto:info@pratium.com.tr" style="color:#1ECFB8">info@pratium.com.tr</a> adresinden bize ulaşabilirsiniz.
     </p>
   </div>
   <div style="background:#f8fafc;padding:16px 32px;text-align:center;border-top:1px solid #e2e8f0">
