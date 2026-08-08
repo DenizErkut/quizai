@@ -13,10 +13,34 @@ const supabase = createClient(
 
 function getLevel(grade: string): string {
   const g = grade?.toLowerCase() || ''
-  if (g.includes('ilkokul') || g.includes('1.') || g.includes('2.') || g.includes('3.') || g.includes('4.')) return 'ilkokul'
-  if (g.includes('ortaokul') || g.includes('5.') || g.includes('6.') || g.includes('7.') || g.includes('8.')) return 'ortaokul'
-  if (g.includes('lise') || g.includes('9.') || g.includes('10.') || g.includes('11.') || g.includes('12.')) return 'lise'
+  // ÖNEMLİ: üniversite kontrolü EN BAŞTA olmalı — bkz. aşağıdaki not.
   if (g.includes('universite') || g.includes('üniversite')) return 'universite'
+
+  // Açık seviye kelimesi varsa en güvenilir sinyal budur.
+  if (g.includes('ilkokul')) return 'ilkokul'
+  if (g.includes('ortaokul')) return 'ortaokul'
+  if (g.includes('lise')) return 'lise'
+
+  // Seviye kelimesi yoksa (ör. sadece "6. sınıf" gibi kısa bir değer),
+  // sınıf NUMARASINI regex ile çıkarıp aralığa göre eşleriz.
+  //
+  // ÖNEMLİ NOT — önceki halinde burada gevşek .includes('1.') /
+  // .includes('2.') gibi alt dize kontrolleri vardı. Bunlar İKİ BASAMAKLI
+  // sınıflarda (10, 11, 12) YANLIŞ eşleşiyordu: "12. sinif" içinde "2."
+  // alt dizesi geçtiği için (12'nin son hanesi + nokta), 12. sınıf
+  // öğrencisi yanlışlıkla "ilkokul" sayılıyordu. Aynı şekilde "11. sinif"
+  // de "1." içerdiği için ilkokul sanılıyordu. Bunun sonucunda 11-12.
+  // sınıf öğrencileri (sınava hazırlık dönemindeki lise son sınıflar)
+  // türev/integral/logaritma/trigonometri gibi KENDİ müfredatlarındaki
+  // konularda "ilkokul için çok ileri" diye REDDEDİLİYORDU. Aynı hata
+  // "universite N. sinif" için de vardı (yukarıda ayrıca düzeltildi).
+  // Regex ile tam sayı çıkarımı bu belirsizliği ortadan kaldırır.
+  const m = g.match(/(\d{1,2})\s*\.?\s*s[ıi]n[ıi]f/)
+  const n = m ? parseInt(m[1], 10) : NaN
+  if (n >= 1 && n <= 4) return 'ilkokul'
+  if (n >= 5 && n <= 8) return 'ortaokul'
+  if (n >= 9 && n <= 12) return 'lise'
+
   return 'ortaokul'
 }
 
@@ -139,8 +163,16 @@ function isTooAdvancedForLevel(topic: string, level: string): boolean {
 }
 
 function isInCurriculum(topic: string, plan: string, grade: string): boolean {
-  const norm = normalizeTR(topic.trim())
   const level = getLevel(grade)
+
+  // Üniversite: MEB müfredatı diye bir şey yok — her üniversite/hoca kendi
+  // ders içeriğini belirler. Bu yüzden MEB whitelist/keyword kontrolüne hiç
+  // sokulmadan doğrudan izin verilir. Aksi halde öğrencinin bölümüne özgü
+  // (ör. "Nesne Yönelimli Programlama", "Mikroekonomi") neredeyse her konu
+  // MEB listesinde olmadığı için yanlışlıkla reddedilirdi.
+  if (level === 'universite') return true
+
+  const norm = normalizeTR(topic.trim())
 
   // ÖNCELİKLİ KONTROL: konu genel MEB müfredatında var olsa bile, bu
   // öğrencinin SEVİYESİ için çok ileriyse REDDEDİLİR — plan/whitelist
@@ -280,16 +312,24 @@ async function generateVisualForQuestion(
   }
 }
 
-function buildPrompt(type: string, topic: string, grade: string, difficulty: string, language: string, count: number, fileContent?: string, gradeCtx?: string, mebCtx?: string): string {
+function buildPrompt(type: string, topic: string, grade: string, difficulty: string, language: string, count: number, fileContent?: string, gradeCtx?: string, mebCtx?: string, department?: string): string {
   const contentNote = fileContent
     ? `Topic: "${topic}". Generate questions from this content:\n${fileContent.slice(0, 3000)}`
     : `Topic: "${topic}".`
+
+  const isUniversity = getLevel(grade) === 'universite'
 
   const mebSection = mebCtx
     ? `\n\n⚠️ KRİTİK TALİMAT: Aşağıdaki MEB kaynak metni verilmiştir. Üreteceğin ${count} sorunun TAMAMI (yalnızca bazıları değil, ${count} sorunun ${count}'ü de) bu metindeki bilgilere, örneklere, olaylara veya kavramlara dayanmalıdır. Her soruyu hazırlarken metnin FARKLI bir bölümünü/paragrafını/örneğini kullan ki sorular birbirini tekrar etmesin ama hepsi metne sadık kalsın. Metinde geçen kişiler, olaylar, örnekler ve bilgilere SADIK KAL. Metinde olmayan bilgileri UYDURMA. Eğer metin bir sorunun tamamını karşılamıyorsa bile, o soruyu yine metindeki en yakın kavram/örnek üzerinden kur — genel/metin dışı bilgiye başvurma.\n\n🚫 ÖNEMLİ İSTİSNA 1: Eğer bu metin bir MÜFREDAT KAZANIM KODU LİSTESİYSE (örn. \"SB.6.4.1. ... a) ... b) ...\" formatında, öğretmene yönelik öğrenme çıktısı tanımları içeriyorsa) — ASLA \"hangi kazanımın hangi alt maddesi X der\" gibi kod/madde numarasına dayalı sorular ÜRETME. Bunun yerine, o kazanımın işaret ettiği GERÇEK KONUYU (örn. \"vatandaşlık haklarının kullanımında dijitalleşme etkileri\" kazanımından yola çıkarak, dijital vatandaşlık kavramının kendisi hakkında) öğrenciye anlamlı bir içerik sorusu sor. Öğrenci kazanım kodlarını asla görmemeli ve bunlar hakkında sorgulanmamalı.\n\n🚫 ÖNEMLİ İSTİSNA 2: Bu metin gerçek bir sınav kitapçığı/soru bankası çıktısı olabilir ve bu tür kaynaklarda "Soru 39'da verilen örneğe göre...", "38 ve 39. soruları aşağıdaki bilgiye göre cevaplayınız" gibi BAŞKA numaralı bir soruya/örneğe atıfta bulunan, çok parçalı bir soru zincirinin sadece bir kısmı yer alabilir. Metinde böyle bir referans görürsen o referansı asla olduğu gibi kopyalama — ya atıf yaptığı bilgiyi/örneği (metinde başka bir yerde varsa) bulup doğrudan senin ürettiğin sorunun metnine dahil et, ya da metindeki tamamen bağımsız (başka soruya atıf yapmayan) başka bir örnek/kavram kullan. Öğrenci SADECE senin ürettiğin tek soruyu görecek; "yukarıda", "az önce", "Soru X'te" dediğin hiçbir şey öğrenciye ayrıca gösterilmeyecek.\n\nMEB KAYNAK METNİ:\n${mebCtx}\n\n`
     : ''
 
-  const base = `Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın.\n\nKESİN KURAL: Yalnızca MEB müfredatında yer alan konularda, MEB kazanımlarına uygun sorular üret. Müfredat dışı, spekülatif veya tartışmalı içerik kesinlikle üretme.\n\n${mebSection}${contentNote}${gradeCtx || ''}\nSeviye: ${grade}. Zorluk: ${difficulty}. Soru dili: ${language}. Soru sayısı: ${count}.\n\nDOĞRULUK KURALLARI:\n1. Matematik: Her soruyu adım adım çöz, cevabın opts dizisinde doğru indexte olduğunu doğrula\n2. Fen/Tarih: Sadece kesin bildiğin gerçekleri yaz\n3. "ans" indexi MUTLAKA doğru cevabı göstermeli\n4. Emin olmadığın sorular yerine daha basit ama kesin sorular yaz\n5. MEB müfredatına uygun kazanım ve konu kapsamında kal\n6. Sadece multiple_choice ve true_false sorularında altı çizili/vurgulu metin için [köşeli parantez] kullan. fill_blank sorularında ASLA kullanma.\n7. MEB kaynak metni verilmişse: Metindeki gerçek kişi, olay ve bilgileri kullan — uydurma.\n8. HER SORU TAMAMEN KENDİ İÇİNDE EKSİKSİZ VE ÇÖZÜLEBİLİR OLMALI. Kaynak metin gerçek bir sınav kitapçığından alınmış olabilir ve orada "Soru 39'da verilen örneğe göre...", "yukarıdaki tabloya göre...", "38 ve 39. soruları bu bilgiye göre cevaplayınız..." gibi BAŞKA bir soruya/örneğe/tabloya/paragrafa atıfta bulunan, bir soru zincirinin parçası olan ifadeler geçebilir. Bu şekilde başka bir soruya bağımlı, kendi başına çözülemeyecek bir soru ASLA üretme — öğrenci sadece bu tek soruyu görecek, referans verdiğin diğer soru/örnek/tablo öğrenciye HİÇ gösterilmeyecek. Böyle bir referans fark edersen: ya o referansı YOK SAY ve gerekli tüm bilgiyi (verileri, örneği, senaryoyu) doğrudan bu sorunun kendi metnine TAŞI, ya da kaynaktaki bambaşka, bağımsız (başka bir soruya atıf yapmayan) bir örnek/kavram seç.\n\nYalnızca geçerli JSON döndür, markdown veya açıklama ekleme.\n\n`
+  // Üniversite: MEB'in aksine tek bir resmi müfredat yok (her üniversite/
+  // hoca kendi ders içeriğini belirler) — bu yüzden "SADECE MEB müfredatı"
+  // kısıtı burada UYGULANMAZ. Bunun yerine bölüm bağlamı (varsa) verilir ve
+  // AI kendi genel akademik bilgisiyle üretim yapar.
+  const base = isUniversity
+    ? `Sen üniversite düzeyinde soru üreten bir eğitim asistanısın. Bu öğrenci${department ? ` "${department}" bölümünde okuyor` : ' bir üniversite öğrencisi'}. MEB K-12 müfredatı kısıtı BURADA GEÇERLİ DEĞİL — kendi genel akademik bilgine dayanarak üniversite seviyesinde${department ? `, ${department} bölümüne uygun` : ''} sorular üret.\n\n${contentNote}${gradeCtx || ''}\nSınıf: ${grade}${department ? ` (${department})` : ''}. Zorluk: ${difficulty}. Soru dili: ${language}. Soru sayısı: ${count}.\n\nDOĞRULUK KURALLARI:\n1. Sayısal/hesaplama gerektiren sorularda: Her soruyu adım adım çöz, cevabın opts dizisinde doğru indexte olduğunu doğrula\n2. Sadece kesin bildiğin, akademik olarak doğru bilgileri yaz\n3. "ans" indexi MUTLAKA doğru cevabı göstermeli\n4. Emin olmadığın sorular yerine daha basit ama kesin sorular yaz\n5. Sadece multiple_choice ve true_false sorularında altı çizili/vurgulu metin için [köşeli parantez] kullan. fill_blank sorularında ASLA kullanma.\n6. HER SORU TAMAMEN KENDİ İÇİNDE EKSİKSİZ VE ÇÖZÜLEBİLİR OLMALI — öğrenci başka bir soruya/örneğe/tabloya atıfta bulunan bir soru görmemeli.\n\nYalnızca geçerli JSON döndür, markdown veya açıklama ekleme.\n\n`
+    : `Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın.\n\nKESİN KURAL: Yalnızca MEB müfredatında yer alan konularda, MEB kazanımlarına uygun sorular üret. Müfredat dışı, spekülatif veya tartışmalı içerik kesinlikle üretme.\n\n${mebSection}${contentNote}${gradeCtx || ''}\nSeviye: ${grade}. Zorluk: ${difficulty}. Soru dili: ${language}. Soru sayısı: ${count}.\n\nDOĞRULUK KURALLARI:\n1. Matematik: Her soruyu adım adım çöz, cevabın opts dizisinde doğru indexte olduğunu doğrula\n2. Fen/Tarih: Sadece kesin bildiğin gerçekleri yaz\n3. "ans" indexi MUTLAKA doğru cevabı göstermeli\n4. Emin olmadığın sorular yerine daha basit ama kesin sorular yaz\n5. MEB müfredatına uygun kazanım ve konu kapsamında kal\n6. Sadece multiple_choice ve true_false sorularında altı çizili/vurgulu metin için [köşeli parantez] kullan. fill_blank sorularında ASLA kullanma.\n7. MEB kaynak metni verilmişse: Metindeki gerçek kişi, olay ve bilgileri kullan — uydurma.\n8. HER SORU TAMAMEN KENDİ İÇİNDE EKSİKSİZ VE ÇÖZÜLEBİLİR OLMALI. Kaynak metin gerçek bir sınav kitapçığından alınmış olabilir ve orada "Soru 39'da verilen örneğe göre...", "yukarıdaki tabloya göre...", "38 ve 39. soruları bu bilgiye göre cevaplayınız..." gibi BAŞKA bir soruya/örneğe/tabloya/paragrafa atıfta bulunan, bir soru zincirinin parçası olan ifadeler geçebilir. Bu şekilde başka bir soruya bağımlı, kendi başına çözülemeyecek bir soru ASLA üretme — öğrenci sadece bu tek soruyu görecek, referans verdiğin diğer soru/örnek/tablo öğrenciye HİÇ gösterilmeyecek. Böyle bir referans fark edersen: ya o referansı YOK SAY ve gerekli tüm bilgiyi (verileri, örneği, senaryoyu) doğrudan bu sorunun kendi metnine TAŞI, ya da kaynaktaki bambaşka, bağımsız (başka bir soruya atıf yapmayan) bir örnek/kavram seç.\n\nYalnızca geçerli JSON döndür, markdown veya açıklama ekleme.\n\n`
 
   if (type === 'fill_blank') return base + `Generate fill-in-the-blank questions. Leave a critical word/concept as blank. Provide 4 options (one correct), write the correct answer in "blank" field too.\n\nCRITICAL RULES:\n1. NEVER put the answer or any hint inside the question text. The blank ___ must be the ONLY clue.\n2. Do NOT use [brackets] in fill_blank questions - brackets reveal the answer!\n3. Do NOT add (verb), (noun), (drink) or any word hints in parentheses.\n4. WRONG: "Normal koşullarda en kararlı karbon formu olan [grafit], kurşun kalemlerinde kullanılır." (REVEALS ANSWER!)\n5. CORRECT: "Normal koşullarda en kararlı karbon formu olan _____, kurşun kalemlerinde kullanılır."\n\n{"questions":[{"type":"fill_blank","q":"_____ is the powerhouse of the cell.","blank":"Mitochondria","opts":["Mitochondria","Ribosome","Nucleus","Lysosome"],"ans":0,"exp":"Mitochondria produces ATP through cellular respiration."}]}`
 
@@ -324,7 +364,7 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('plan, monthly_test_count, daily_test_count, daily_test_date, grade, language')
+      .select('plan, monthly_test_count, daily_test_count, daily_test_date, grade, language, department')
       .eq('id', user.id)
       .single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
@@ -432,24 +472,28 @@ export async function POST(req: NextRequest) {
       }
     } catch { }
 
-    // ✅ MEB search — paralel çalışır, max 3sn bekle
+    // ✅ MEB search — paralel çalışır, max 3sn bekle. Üniversite için MEB
+    // grounding zaten anlamsız (tek resmi müfredat yok), bu yüzden atlanır.
     let mebContext = ''
-    try {
-      const mebRes = await fetch(`${req.nextUrl.origin}/api/meb-search`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
-        body: JSON.stringify({ topic, grade, unit: topic, level: getLevel(grade), limit: 2 }),
-        signal: AbortSignal.timeout(3000), // 3sn — daha agresif timeout
-      })
-      if (mebRes.ok) {
-        const mebData = await mebRes.json()
-        if (mebData.found && mebData.context) {
-          mebContext = mebData.context.slice(0, 6500)
+    const level = getLevel(grade)
+    if (level !== 'universite') {
+      try {
+        const mebRes = await fetch(`${req.nextUrl.origin}/api/meb-search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
+          body: JSON.stringify({ topic, grade, unit: topic, level, limit: 2 }),
+          signal: AbortSignal.timeout(3000), // 3sn — daha agresif timeout
+        })
+        if (mebRes.ok) {
+          const mebData = await mebRes.json()
+          if (mebData.found && mebData.context) {
+            mebContext = mebData.context.slice(0, 6500)
+          }
         }
-      }
-    } catch { /* MEB opsiyonel */ }
+      } catch { /* MEB opsiyonel */ }
+    }
 
-    const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, safeQCount, fileContent || '', gradeContext, mebContext) + previousQuestionsNote
+    const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, safeQCount, fileContent || '', gradeContext, mebContext, profile.department || undefined) + previousQuestionsNote
     promptStr = prompt
     countRef = safeQCount
 
@@ -458,7 +502,9 @@ export async function POST(req: NextRequest) {
     const response = await anthropic.messages.create({
       model: useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5',
       max_tokens: useHaiku ? 2500 : 3500,
-      system: 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca MEB müfredatındaki konularda soru üret. Müfredat dışı, siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.',
+      system: level === 'universite'
+        ? 'Sen üniversite düzeyinde soru üreten bir eğitim asistanısın. MEB K-12 müfredatı kısıtı burada geçerli değil; öğrencinin bölümüne/seviyesine uygun, akademik olarak doğru sorular üret. Siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.'
+        : 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca MEB müfredatındaki konularda soru üret. Müfredat dışı, siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.',
       messages: [{ role: 'user', content: prompt }],
     })
     console.log(`[generate-quiz] model=${useHaiku ? 'haiku' : 'sonnet'} qCount=${safeQCount}`)
