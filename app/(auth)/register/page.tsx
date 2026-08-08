@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { savePendingRegistration } from '@/lib/pending-registration'
 import { translateAuthError } from '@/lib/auth-error-messages'
+import DepartmentSelect, { resolveDepartmentValue } from '@/components/DepartmentSelect'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -83,6 +84,8 @@ function RegisterContent() {
   // Öğrenci alanları
   const [age, setAge] = useState('')
   const [grade, setGrade] = useState('')
+  const [department, setDepartment] = useState('')
+  const [departmentOther, setDepartmentOther] = useState('')
   const [classNumber, setClassNumber] = useState('')
   const [institutionCode, setInstitutionCode] = useState(kurumParam.toUpperCase())
   const [institutionName, setInstitutionName] = useState('')
@@ -167,6 +170,10 @@ function RegisterContent() {
     if (selectedRole === 'student') {
       if (!age || parseInt(age) < 5 || parseInt(age) > 35) { setError('Gecerli bir yas girin (5-35).'); return }
       if (!grade) { setError('Sinif / egitim seviyesi zorunludur.'); return }
+      // Üniversite öğrencisi için bölüm zorunlu ("Diğer" seçildiyse serbest metin dolu olmalı)
+      const isUniversity = grade.toLowerCase().startsWith('universite')
+      const resolvedDepartment = resolveDepartmentValue(department, departmentOther)
+      if (isUniversity && !resolvedDepartment) { setError('Bölüm seçimi zorunludur.'); return }
       // Okul adı ve sınıf numarası SADECE kurum kodu üzerinden kayıt olan
       // (kuruma bağlı) öğrenciler için zorunlu. Kurum kodu yoksa/kod
       // geçersizse (internetten bireysel kayıt) bu alanlar hiç istenmez —
@@ -246,6 +253,7 @@ function RegisterContent() {
           fullName,
           age: age ? parseInt(age) : undefined,
           grade, studentSchool: institutionName, classNumber: institutionName ? classNumber.trim() : '',
+          department: selectedRole === 'student' ? (resolveDepartmentValue(department, departmentOther) || undefined) : undefined,
           institutionCode: institutionCode.trim(),
           parentEmail: parentEmail.trim(), phone: studentPhone.trim(),
           sellerId: sellerId || undefined,
@@ -302,6 +310,7 @@ function RegisterContent() {
         const { error: upsertError } = await supabase.from('profiles').upsert({
           id: data.user.id,
           grade,
+          department: resolveDepartmentValue(department, departmentOther) || null,
           school: institutionName || null,
           class_number: institutionName ? classNumber.trim() : null,
           language: 'Türkçe',
@@ -655,6 +664,17 @@ function RegisterContent() {
                   </select>
                 </div>
               </div>
+
+              {grade.toLowerCase().startsWith('universite') && (
+                <div style={{ marginTop: '10px' }}>
+                  <DepartmentSelect
+                    value={department}
+                    onChange={setDepartment}
+                    otherValue={departmentOther}
+                    onOtherChange={setDepartmentOther}
+                  />
+                </div>
+              )}
 
               {/* Kurum kodu — okul adı BURADAN otomatik gelir, elle yazılmaz */}
               <div style={{ marginTop: '10px', marginBottom: '0.75rem', padding: '12px 14px', borderRadius: '12px', background: 'rgba(217,119,6,0.04)', border: '1.5px solid rgba(217,119,6,0.15)' }}>

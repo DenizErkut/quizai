@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { loadPendingRegistration, clearPendingRegistration, PendingRole } from '@/lib/pending-registration'
+import DepartmentSelect, { resolveDepartmentValue } from '@/components/DepartmentSelect'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -60,6 +61,8 @@ export default function CompleteProfilePage() {
   const [fbName, setFbName] = useState('')
   const [fbAge, setFbAge] = useState('')
   const [fbGrade, setFbGrade] = useState('')
+  const [fbDepartment, setFbDepartment] = useState('')
+  const [fbDepartmentOther, setFbDepartmentOther] = useState('')
   const [fbSchool, setFbSchool] = useState('') // öğretmen: serbest metin okul/kurum adı
   const [fbClassNumber, setFbClassNumber] = useState('')
   const [fbInstitutionCode, setFbInstitutionCode] = useState('')
@@ -164,6 +167,7 @@ export default function CompleteProfilePage() {
       const { error: upsertError } = await supabase.from('profiles').upsert({
         id: uid,
         grade: pending.grade,
+        department: pending.department || null,
         school: pending.studentSchool,
         class_number: pending.classNumber,
         language: 'Türkçe',
@@ -265,6 +269,9 @@ export default function CompleteProfilePage() {
     if (fbRole === 'student') {
       if (!fbAge || parseInt(fbAge) < 5 || parseInt(fbAge) > 35) { setFbError('Geçerli bir yaş girin (5-35).'); return }
       if (!fbGrade) { setFbError('Sınıf zorunludur.'); return }
+      const fbIsUniversity = fbGrade.toLowerCase().startsWith('universite')
+      const fbResolvedDepartment = resolveDepartmentValue(fbDepartment, fbDepartmentOther)
+      if (fbIsUniversity && !fbResolvedDepartment) { setFbError('Bölüm seçimi zorunludur.'); return }
       // Okul adı/sınıf numarası SADECE kurum kodu doğrulandığında zorunlu —
       // internetten bireysel kayıtta hiç istenmiyor (bkz. register/page.tsx
       // ve profile/page.tsx'teki aynı mantık).
@@ -306,6 +313,7 @@ export default function CompleteProfilePage() {
         // elle yazılmış bir okul adı asla kabul edilmez.
         await supabase.from('profiles').upsert({
           id: userId, grade: fbGrade,
+          department: resolveDepartmentValue(fbDepartment, fbDepartmentOther) || null,
           school: fbInstitutionName || null,
           class_number: fbInstitutionName ? fbClassNumber.trim() : null,
           language: 'Türkçe', role: 'student',
@@ -470,6 +478,17 @@ export default function CompleteProfilePage() {
                   </select>
                 </div>
               </div>
+
+              {fbGrade.toLowerCase().startsWith('universite') && (
+                <div style={{ marginTop: '10px' }}>
+                  <DepartmentSelect
+                    value={fbDepartment}
+                    onChange={setFbDepartment}
+                    otherValue={fbDepartmentOther}
+                    onOtherChange={setFbDepartmentOther}
+                  />
+                </div>
+              )}
 
               {/* Kurum kodu — okul adı BURADAN otomatik gelir, elle yazılmaz */}
               <div style={{ marginTop: '10px', padding: '12px 14px', borderRadius: '12px', background: 'rgba(217,119,6,0.04)', border: '1.5px solid rgba(217,119,6,0.15)' }}>

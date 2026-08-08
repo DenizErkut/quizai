@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { resolveOwnIdentity } from '@/lib/identity/resolve-client'
+import DepartmentSelect, { resolveDepartmentValue } from '@/components/DepartmentSelect'
+import { UNIVERSITY_DEPARTMENTS, OTHER_DEPARTMENT_VALUE } from '@/lib/university-departments'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -44,6 +46,8 @@ export default function ProfileEditPage() {
   const [age, setAge] = useState('')
   const [gender, setGender] = useState('')
   const [grade, setGrade] = useState('')
+  const [department, setDepartment] = useState('')
+  const [departmentOther, setDepartmentOther] = useState('')
   const [school, setSchool] = useState('')
   const [lang, setLang] = useState('Türkçe')
   const [plan, setPlan] = useState('free')
@@ -82,6 +86,18 @@ export default function ProfileEditPage() {
         setAge(own?.age != null ? String(own.age) : '')
         setGender(data.gender || '')
         setGrade(data.grade || '')
+        // Kayıtlı bölüm listedeki bir seçenekse doğrudan seçili gösterilir;
+        // listede olmayan bir değerse (ör. eski/serbest metin kayıt) "Diğer"
+        // seçili gösterilip gerçek değer serbest metin alanına yazılır.
+        if (data.department) {
+          const knownDepartments = new Set(UNIVERSITY_DEPARTMENTS.flatMap(g => g.options))
+          if (knownDepartments.has(data.department)) {
+            setDepartment(data.department)
+          } else {
+            setDepartment(OTHER_DEPARTMENT_VALUE)
+            setDepartmentOther(data.department)
+          }
+        }
         setSchool(data.school || '')
         setLang(data.language || 'Türkçe')
         setPlan(data.plan || 'free')
@@ -137,6 +153,9 @@ export default function ProfileEditPage() {
 
   async function handleSave() {
     if (!name.trim() || !grade) { setError('Ad ve sınıf zorunlu.'); return }
+    const isUniversity = grade.toLowerCase().startsWith('universite')
+    const resolvedDepartment = resolveDepartmentValue(department, departmentOther)
+    if (isUniversity && !resolvedDepartment) { setError('Bölüm seçimi zorunlu.'); return }
     setError(''); setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
@@ -157,6 +176,7 @@ export default function ProfileEditPage() {
       id: user.id,
       gender: gender || null,
       grade,
+      department: resolvedDepartment || null,
       school: school || null,
       language: lang,
     })
@@ -274,6 +294,17 @@ export default function ProfileEditPage() {
             <option value="">Seç</option>
             {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
           </select>
+
+          {grade.toLowerCase().startsWith('universite') && (
+            <div style={{ marginTop: '10px' }}>
+              <DepartmentSelect
+                value={department}
+                onChange={setDepartment}
+                otherValue={departmentOther}
+                onOtherChange={setDepartmentOther}
+              />
+            </div>
+          )}
 
           <label className="field-label">Okul (isteğe bağlı)</label>
           <input className="input" placeholder="İzmir Fen Lisesi"

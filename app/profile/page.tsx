@@ -2,6 +2,7 @@
 import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import DepartmentSelect, { resolveDepartmentValue } from '@/components/DepartmentSelect'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -31,6 +32,8 @@ function ProfileSetupContent() {
   const [surname, setSurname] = useState('')
   const [age, setAge] = useState('')
   const [grade, setGrade] = useState('')
+  const [department, setDepartment] = useState('')
+  const [departmentOther, setDepartmentOther] = useState('')
   const [classNumber, setClassNumber] = useState('')
   const [institutionCode, setInstitutionCode] = useState('')
   const [institutionName, setInstitutionName] = useState('')
@@ -66,6 +69,9 @@ function ProfileSetupContent() {
     if (!surname.trim()) { setError('Soyad zorunludur.'); return }
     if (!age || parseInt(age) < 5 || parseInt(age) > 35) { setError('Geçerli bir yaş girin (5-35).'); return }
     if (!grade) { setError('Sınıf / eğitim seviyesi zorunludur.'); return }
+    const isUniversity = grade.toLowerCase().startsWith('universite')
+    const resolvedDepartment = resolveDepartmentValue(department, departmentOther)
+    if (isUniversity && !resolvedDepartment) { setError('Bölüm seçimi zorunludur.'); return }
     // Okul adı ve sınıf numarası SADECE kurum kodu üzerinden bağlanan
     // öğrenciler için zorunlu — okul adı kurum kaydından otomatik gelir.
     if (institutionName) {
@@ -76,17 +82,22 @@ function ProfileSetupContent() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setError('Oturum bulunamadı, lütfen tekrar giriş yapın.'); setLoading(false); router.push(isSafeNext(next) ? `/login?next=${encodeURIComponent(next!)}` : '/login'); return }
 
-    // NOT: 'age' bilerek gönderilmiyor — profiles tablosunda böyle bir kolon
-    // yok (şema: id, name, surname, grade, school, ... ). Yaş formda hâlâ
-    // isteniyor ve doğrulanıyor (5-35 aralığı), ama veritabanına yazılmıyor.
-    // İleride yaş bilgisini kalıcı saklamak istenirse önce Supabase'de
-    // `age INTEGER` kolonu migration ile eklenmeli.
-    // Ad-soyad ve telefon kimlik verisidir → TR-PG'ye yazılır (Supabase'e değil)
+    // Ad-soyad, yaş ve telefon kimlik verisidir → TR-PG'ye yazılır (Supabase'e değil).
+    // NOT: Daha önce 'age' burada bilerek gönderilmiyordu ("profiles'ta kolon
+    // yok" gerekçesiyle) — ama yaş zaten Supabase'e değil TR-PG'ye gitmesi
+    // gerekiyordu, bu route (update-identity) tam da bunun için var. O yüzden
+    // Google ile kayıt olan kullanıcıların yaşı hiçbir zaman kaydedilmiyordu.
     const { data: { session } } = await supabase.auth.getSession()
     const idRes = await fetch('/api/profile/update-identity', {
       method: 'POST',
       headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fullName: `${name.trim()} ${surname.trim()}`, phone: phone || null, parentEmail: parentEmail || null, role: 'student' }),
+      body: JSON.stringify({
+        fullName: `${name.trim()} ${surname.trim()}`,
+        age: parseInt(age, 10),
+        phone: phone || null,
+        parentEmail: parentEmail || null,
+        role: 'student',
+      }),
     })
     if (!idRes.ok) {
       setError('Kimlik bilgileri kaydedilemedi. Lütfen tekrar deneyin.')
@@ -100,6 +111,7 @@ function ProfileSetupContent() {
     const { error: upsertError } = await supabase.from('profiles').upsert({
       id: user.id,
       grade,
+      department: resolvedDepartment || null,
       school: institutionName || null,
       class_number: institutionName ? classNumber.trim() : null,
       language: 'Türkçe',
@@ -198,6 +210,17 @@ function ProfileSetupContent() {
                   </select>
                 </div>
               </div>
+
+              {grade.toLowerCase().startsWith('universite') && (
+                <div style={{ marginTop: '10px' }}>
+                  <DepartmentSelect
+                    value={department}
+                    onChange={setDepartment}
+                    otherValue={departmentOther}
+                    onOtherChange={setDepartmentOther}
+                  />
+                </div>
+              )}
 
               {/* Kurum kodu — okul adı BURADAN otomatik gelir, elle yazılmaz */}
               <div style={{ marginTop: '10px', padding: '12px 14px', borderRadius: '12px', background: 'rgba(217,119,6,0.04)', border: '1.5px solid rgba(217,119,6,0.15)' }}>

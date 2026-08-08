@@ -33,6 +33,7 @@ export interface PendingRegistration {
   fullName: string
   age?: number
   grade?: string
+  department?: string
   studentSchool?: string
   classNumber?: string
   institutionCode?: string
