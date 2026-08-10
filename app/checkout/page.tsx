@@ -42,12 +42,22 @@ function formatTRY(n: number): string {
   return n.toLocaleString('tr-TR', { maximumFractionDigits: 2 })
 }
 
+interface PlanDisplay {
+  name: string
+  price: string
+  period: string
+  badge: string
+  color: string
+  features: string[]
+  originalPrice?: string
+}
+
 // Bir satıcı indirimi varsa, PLANS'ın fiyat alanlarını indirimli hale
 // getirir ve originalPrice ekler (checkout ekranındaki üstü çizili fiyat
 // gösterimi zaten bu alanı destekliyordu, sadece hiç doldurulmuyordu).
-function applyDiscount(discountRate: number) {
-  if (discountRate <= 0) return PLANS
-  const out: typeof PLANS & Record<string, any> = JSON.parse(JSON.stringify(PLANS))
+function applyDiscount(discountRate: number): Record<keyof typeof PLANS, PlanDisplay> {
+  const out = JSON.parse(JSON.stringify(PLANS)) as Record<keyof typeof PLANS, PlanDisplay>
+  if (discountRate <= 0) return out
   ;(Object.keys(BASE_PRICES) as Array<keyof typeof BASE_PRICES>).forEach(key => {
     const base = BASE_PRICES[key]
     const discounted = Math.max(0, base * (1 - discountRate / 100))
@@ -207,7 +217,7 @@ function CheckoutContent() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '1.5rem' }} className="anim-up-1">
-              {(Object.entries(displayPlans) as [string, typeof PLANS.monthly][]).map(([key, plan]) => (
+              {(Object.entries(displayPlans) as [string, PlanDisplay][]).map(([key, plan]) => (
                 <button key={key} onClick={() => setSelectedPlan(key as 'monthly' | 'yearly')}
                   style={{
                     padding: '1.25rem', borderRadius: '14px', textAlign: 'left',
