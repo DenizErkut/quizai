@@ -44,6 +44,29 @@ export async function POST(req: NextRequest) {
   const identity = await getIdentityBySupabaseId(user.id)
   const fullName = identity?.full_name || 'Kullanici'
 
+  // Kullanıcı bir satıcının kodu/linki üzerinden kayıt olduysa (profiles.seller_id),
+  // o satıcının o anki indirim oranını uygula. Oran, satın alma anında
+  // subscriptions'a da kopyalanır — satıcının oranı ileride değişse bile bu
+  // kaydın tarihsel doğruluğu bozulmaz.
+  const { data: buyerProfile } = await supabaseAdmin
+    .from('profiles').select('seller_id').eq('id', user.id).maybeSingle()
+
+  let sellerId: string | null = null
+  let discountRate = 0
+  if (buyerProfile?.seller_id) {
+    const { data: seller } = await supabaseAdmin
+      .from('sellers').select('id, discount_rate, active').eq('id', buyerProfile.seller_id).maybeSingle()
+    if (seller?.active) {
+      sellerId = seller.id
+      discountRate = Number(seller.discount_rate) || 0
+    }
+  }
+
+  const basePrice = parseFloat(plan.price)
+  const finalPrice = discountRate > 0
+    ? Math.max(0, basePrice * (1 - discountRate / 100)).toFixed(2)
+    : plan.price
+
   const conversationId = `${user.id}_${planType}_${Date.now()}`
   const nameParts = fullName.split(' ')
   const firstName = nameParts[0] || 'Kullanici'
@@ -52,8 +75,8 @@ export async function POST(req: NextRequest) {
   const requestBody = {
     locale: 'tr',
     conversationId,
-    price: plan.price,
-    paidPrice: plan.price,
+    price: finalPrice,
+    paidPrice: finalPrice,
     currency: 'TRY',
     basketId: conversationId,
     paymentGroup: 'SUBSCRIPTION',
@@ -86,10 +109,10 @@ export async function POST(req: NextRequest) {
     basketItems: [
       {
         id: `pratium_${planType}`,
-        name: plan.name,
+        name: discountRate > 0 ? `${plan.name} (%${discountRate} indirimli)` : plan.name,
         category1: 'Dijital Ürün',
         itemType: 'VIRTUAL',
-        price: plan.price,
+        price: finalPrice,
       },
     ],
   }
@@ -113,12 +136,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: data.errorMessage || 'Ödeme başlatılamadı.' }, { status: 400 })
     }
 
-    // conversationId'yi Supabase'e kaydet (webhook'ta kullanılacak)
+    // conversationId'yi Supabase'e kaydet (webhook'ta kullanılacak) —
+    // satıcı ve indirim izi de burada saklanır (satın alma anındaki
+    // anlık görüntü olarak, satıcının oranı sonradan değişse bile bozulmaz).
     await supabaseAdmin.from('subscriptions').insert({
       user_id: user.id,
       plan: planType,
       status: 'pending',
       stripe_subscription_id: conversationId, // iyzico conversationId
+      seller_id: sellerId,
+      discount_rate: discountRate,
+      price_paid: parseFloat(finalPrice),
     })
 
     return NextResponse.json({

@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   if (!profile?.is_admin) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
 
   const body = await req.json()
-  const { full_name, title, email, phone, address, commission_rate } = body
+  const { full_name, title, email, phone, address, commission_rate, discount_rate } = body
   if (!full_name?.trim()) {
     return NextResponse.json({ error: 'Ad soyad zorunlu.' }, { status: 400 })
   }
@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
       phone: phone?.trim() || null,
       address: address?.trim() || null,
       commission_rate: parseFloat(commission_rate) || 0,
+      discount_rate: Math.min(100, Math.max(0, parseFloat(discount_rate) || 0)),
       code,
       active: true,
     })

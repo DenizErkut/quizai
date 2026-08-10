@@ -135,12 +135,12 @@ export default function AdminPage() {
   const [sellers, setSellers] = useState<any[]>([])
   const [sellersLoading, setSellersLoading] = useState(false)
   const [showAddSeller, setShowAddSeller] = useState(false)
-  const [sellerForm, setSellerForm] = useState({ full_name: '', title: '', email: '', phone: '', address: '', commission_rate: '' })
+  const [sellerForm, setSellerForm] = useState({ full_name: '', title: '', email: '', phone: '', address: '', commission_rate: '', discount_rate: '' })
   const [sellerSaving, setSellerSaving] = useState(false)
   const [sellerError, setSellerError] = useState('')
   const [sellerCreated, setSellerCreated] = useState<any>(null)
   const [editingSeller, setEditingSeller] = useState<any>(null)
-  const [editSellerForm, setEditSellerForm] = useState({ full_name: '', title: '', email: '', phone: '', address: '', commission_rate: '', active: true })
+  const [editSellerForm, setEditSellerForm] = useState({ full_name: '', title: '', email: '', phone: '', address: '', commission_rate: '', discount_rate: '', active: true })
 
   async function loadSellers() {
     setSellersLoading(true)
@@ -170,7 +170,7 @@ export default function AdminPage() {
       const json = await res.json()
       if (!res.ok) { setSellerError(json.error || 'Satıcı oluşturulamadı.'); return }
       setSellerCreated(json.seller)
-      setSellerForm({ full_name: '', title: '', email: '', phone: '', address: '', commission_rate: '' })
+      setSellerForm({ full_name: '', title: '', email: '', phone: '', address: '', commission_rate: '', discount_rate: '' })
       loadSellers()
     } catch {
       setSellerError('Beklenmeyen bir hata oluştu.')
@@ -1806,6 +1806,10 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   <input className="input" placeholder="Telefon" value={sellerForm.phone} onChange={e => setSellerForm(p => ({ ...p, phone: e.target.value }))} />
                   <input className="input" placeholder="Adres" value={sellerForm.address} onChange={e => setSellerForm(p => ({ ...p, address: e.target.value }))} style={{ gridColumn: '1 / -1' }} />
                   <input className="input" type="number" step="0.1" placeholder="Komisyon Oranı (%)" value={sellerForm.commission_rate} onChange={e => setSellerForm(p => ({ ...p, commission_rate: e.target.value }))} />
+                  <input className="input" type="number" step="0.1" min="0" max="100" placeholder="Müşteri İndirim Oranı (%)" value={sellerForm.discount_rate} onChange={e => setSellerForm(p => ({ ...p, discount_rate: e.target.value }))} />
+                  <p style={{ gridColumn: '1 / -1', fontSize: '12px', color: 'var(--text3)', margin: '-4px 0 4px' }}>
+                    Komisyon = Pratium'un satıcıya ödediği pay. İndirim oranı = bu satıcının linkinden/koduyla gelen müşterilerin ödeme sırasında otomatik göreceği fiyat indirimi.
+                  </p>
                   {sellerError && <div style={{ gridColumn: '1 / -1', padding: '10px 12px', background: 'var(--red-bg)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)' }}>{sellerError}</div>}
                   <button className="btn btn-primary" style={{ gridColumn: '1 / -1' }} onClick={createSeller} disabled={sellerSaving}>
                     {sellerSaving ? 'Kaydediliyor...' : 'Satıcıyı Oluştur (Kod Otomatik Atanır)'}
@@ -1836,6 +1840,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                         {s.email && <span>✉️ {s.email} · </span>}
                         {s.phone && <span>📞 {s.phone} · </span>}
                         💰 Komisyon: %{s.commission_rate}
+                        {s.discount_rate > 0 && <span> · 🎁 Müşteri indirimi: %{s.discount_rate}</span>}
                       </div>
                       <div style={{ fontSize: '12px', fontFamily: 'monospace', color: 'var(--accent)', marginTop: '4px' }}>
                         Kod: {s.code}
@@ -1852,7 +1857,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                       </div>
                       <button className="btn btn-sm" onClick={() => {
                         setEditingSeller(s)
-                        setEditSellerForm({ full_name: s.full_name, title: s.title || '', email: s.email || '', phone: s.phone || '', address: s.address || '', commission_rate: String(s.commission_rate), active: s.active })
+                        setEditSellerForm({ full_name: s.full_name, title: s.title || '', email: s.email || '', phone: s.phone || '', address: s.address || '', commission_rate: String(s.commission_rate), discount_rate: String(s.discount_rate ?? 0), active: s.active })
                       }}>✏️ Düzenle</button>
                     </div>
                   </div>
@@ -1873,6 +1878,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   <input className="input" placeholder="Telefon" value={editSellerForm.phone} onChange={e => setEditSellerForm(p => ({ ...p, phone: e.target.value }))} />
                   <input className="input" placeholder="Adres" value={editSellerForm.address} onChange={e => setEditSellerForm(p => ({ ...p, address: e.target.value }))} style={{ gridColumn: '1 / -1' }} />
                   <input className="input" type="number" step="0.1" placeholder="Komisyon Oranı (%)" value={editSellerForm.commission_rate} onChange={e => setEditSellerForm(p => ({ ...p, commission_rate: e.target.value }))} />
+                  <input className="input" type="number" step="0.1" min="0" max="100" placeholder="Müşteri İndirim Oranı (%)" value={editSellerForm.discount_rate} onChange={e => setEditSellerForm(p => ({ ...p, discount_rate: e.target.value }))} />
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
                     <input type="checkbox" checked={editSellerForm.active} onChange={e => setEditSellerForm(p => ({ ...p, active: e.target.checked }))} />
                     Aktif

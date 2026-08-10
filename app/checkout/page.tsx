@@ -4,6 +4,12 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
+const BASE_PRICES: Record<'monthly' | 'yearly' | 'unlimited', number> = {
+  monthly: 79,
+  yearly: 1200,
+  unlimited: 6000,
+}
+
 const PLANS = {
   monthly: {
     name: 'Aylık Premium',
@@ -31,6 +37,27 @@ const PLANS = {
   },
 }
 
+// TR yerel biçim: 1200 -> "1.200", 1150.5 -> "1.150,5"
+function formatTRY(n: number): string {
+  return n.toLocaleString('tr-TR', { maximumFractionDigits: 2 })
+}
+
+// Bir satıcı indirimi varsa, PLANS'ın fiyat alanlarını indirimli hale
+// getirir ve originalPrice ekler (checkout ekranındaki üstü çizili fiyat
+// gösterimi zaten bu alanı destekliyordu, sadece hiç doldurulmuyordu).
+function applyDiscount(discountRate: number) {
+  if (discountRate <= 0) return PLANS
+  const out: typeof PLANS & Record<string, any> = JSON.parse(JSON.stringify(PLANS))
+  ;(Object.keys(BASE_PRICES) as Array<keyof typeof BASE_PRICES>).forEach(key => {
+    const base = BASE_PRICES[key]
+    const discounted = Math.max(0, base * (1 - discountRate / 100))
+    out[key].price = formatTRY(discounted)
+    out[key].originalPrice = formatTRY(base)
+    out[key].badge = out[key].badge ? `${out[key].badge} · %${discountRate} indirimli` : `%${discountRate} indirimli 🎉`
+  })
+  return out
+}
+
 function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -38,8 +65,10 @@ function CheckoutContent() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [formHtml, setFormHtml] = useState('')
+  const [discountRate, setDiscountRate] = useState(0)
   const formRef = useRef<HTMLDivElement>(null)
   const supabase = createClient() as any
+  const displayPlans = applyDiscount(discountRate)
 
   // Ödeme sonucu kontrol
   const paymentStatus = searchParams.get('payment')
@@ -50,6 +79,23 @@ function CheckoutContent() {
     if (planParam === 'monthly' || planParam === 'yearly' || planParam === 'unlimited') {
       setSelectedPlan(planParam as any)
     }
+    // Satıcı üzerinden gelinmişse (kayıtta ?satici=KOD ile bağlanmış olabilir)
+    // o satıcının o anki indirim oranını çek — girişli değilse veya
+    // bağlı bir satıcı yoksa sessizce 0 döner, hata göstermez.
+    async function loadDiscount() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      try {
+        const res = await fetch('/api/my-discount', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
+        if (res.ok) {
+          const d = await res.json()
+          setDiscountRate(d.discount_rate || 0)
+        }
+      } catch { /* indirim opsiyonel, sessiz geç */ }
+    }
+    loadDiscount()
   }, [])
 
   // iyzico form inject et
@@ -161,7 +207,7 @@ function CheckoutContent() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '1.5rem' }} className="anim-up-1">
-              {(Object.entries(PLANS) as [string, typeof PLANS.monthly][]).map(([key, plan]) => (
+              {(Object.entries(displayPlans) as [string, typeof PLANS.monthly][]).map(([key, plan]) => (
                 <button key={key} onClick={() => setSelectedPlan(key as 'monthly' | 'yearly')}
                   style={{
                     padding: '1.25rem', borderRadius: '14px', textAlign: 'left',
@@ -216,7 +262,7 @@ function CheckoutContent() {
               style={{ width: "100%", justifyContent: "center" }}>
               {loading
                 ? <><span className="spinner" style={{ width: 18, height: 18 }} /> Yükleniyor...</>
-                : `₺${PLANS[selectedPlan].price} — Ödemeye geç →`}
+                : `₺${displayPlans[selectedPlan].price} — Ödemeye geç →`}
             </button>
 
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
@@ -234,7 +280,7 @@ function CheckoutContent() {
             <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
               <h2 className="serif" style={{ fontSize: '24px' }}>Ödeme bilgileri</h2>
               <p style={{ color: 'var(--text2)', fontSize: '13px', marginTop: '4px' }}>
-                {PLANS[selectedPlan].name} — ₺{PLANS[selectedPlan].price}
+                {displayPlans[selectedPlan].name} — ₺{displayPlans[selectedPlan].price}
               </p>
             </div>
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>

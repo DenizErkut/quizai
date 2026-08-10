@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   const { data: profile } = await supabaseAdmin.from('profiles').select('is_admin').eq('id', user.id).single()
   if (!profile?.is_admin) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
 
-  const { seller_id, full_name, title, email, phone, address, commission_rate, active } = await req.json()
+  const { seller_id, full_name, title, email, phone, address, commission_rate, discount_rate, active } = await req.json()
   if (!seller_id) return NextResponse.json({ error: 'Satıcı ID eksik.' }, { status: 400 })
 
   const { error: updErr } = await supabaseAdmin.from('sellers').update({
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     phone: phone?.trim() || null,
     address: address?.trim() || null,
     commission_rate: parseFloat(commission_rate) || 0,
+    discount_rate: Math.min(100, Math.max(0, parseFloat(discount_rate) || 0)),
     active,
   }).eq('id', seller_id)
 
