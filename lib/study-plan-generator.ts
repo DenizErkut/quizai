@@ -65,11 +65,57 @@ export interface StudyPlan {
   motivation: string
 }
 
+export interface GeneratedPlanResult {
+  plan: StudyPlan
+  goals: AutonomousGoal[] // bu planın hedefleri -- study_plans.goals_snapshot'a kaydedilip bir sonraki döngüde karşılaştırma için kullanılır
+}
+
+export interface GoalEffectiveness {
+  topic: string
+  masteryBefore: number
+  masteryNow: number | null // konu artık weak_topics'te yoksa (hiç yanlış yapılmadıysa) null -- bu da bir tür iyileşme sayılır
+  delta: number | null
+  status: 'iyileşti' | 'aynı' | 'gerilerdi' | 'veri yok'
+}
+
+// Faz 7 (Agentic Education Platform) — "sürekli öğrenme döngüsü"nün
+// TEKRAR ÖLÇ + SONUCU DEĞERLENDİR adımı. Önceki bir planın goals_snapshot'ı
+// (o an hedeflenen konular + o anki mastery skorları) ile aynı konuların
+// ŞU ANKİ mastery skorlarını karşılaştırır. Bu, planın gerçekten işe
+// yarayıp yaramadığını ölçen ilk somut adım — önceden hiçbir plan
+// üretildikten sonra etkisi hiç kontrol edilmiyordu.
+export async function evaluatePreviousGoals(
+  supabase: SupabaseClient,
+  userId: string,
+  previousGoals: AutonomousGoal[]
+): Promise<GoalEffectiveness[]> {
+  if (!previousGoals?.length) return []
+
+  const { data: rows } = await supabase
+    .from('weak_topics')
+    .select('topic, wrong_count, total_count, last_seen_at')
+    .eq('user_id', userId)
+    .in('topic', previousGoals.map(g => g.topic))
+
+  const currentByTopic = new Map<string, TopicMastery>()
+  ;(rows ?? []).forEach((r: any) => currentByTopic.set(r.topic, computeTopicMastery(r)))
+
+  return previousGoals.map(g => {
+    const current = currentByTopic.get(g.topic)
+    if (!current || current.totalCount < 2) {
+      return { topic: g.topic, masteryBefore: g.masteryScore, masteryNow: null, delta: null, status: 'veri yok' }
+    }
+    const delta = current.masteryScore - g.masteryScore
+    const status: GoalEffectiveness['status'] = delta >= 10 ? 'iyileşti' : delta <= -10 ? 'gerilerdi' : 'aynı'
+    return { topic: g.topic, masteryBefore: g.masteryScore, masteryNow: current.masteryScore, delta, status }
+  })
+}
+
 export async function generateStudyPlan(
   supabase: SupabaseClient,
   userId: string,
-  opts: { grade?: string; language?: string; displayName?: string }
-): Promise<StudyPlan | null> {
+  opts: { grade?: string; language?: string; displayName?: string; previousGoals?: AutonomousGoal[] }
+): Promise<GeneratedPlanResult | null> {
   const goals = await computeAutonomousGoals(supabase, userId)
 
   const { data: notesData } = await supabase
@@ -87,6 +133,20 @@ export async function generateStudyPlan(
     ? goals.map(g => `- ${g.topic} (mastery: ${g.masteryScore}/100, ${g.reason})`).join('\n')
     : 'Henüz yeterli veri yok — genel bir başlangıç planı hazırla.'
 
+  // Sürekli öğrenme döngüsü: önceki planın hedefleri varsa, onların ne
+  // kadar işe yaradığını (Tekrar Ölç -> Sonucu Değerlendir) yeni planın
+  // bağlamına ekle -- AI, geçen haftanın sonucunu bilerek plan yazsın.
+  let effectivenessText = ''
+  if (opts.previousGoals?.length) {
+    const effectiveness = await evaluatePreviousGoals(supabase, userId, opts.previousGoals)
+    const lines = effectiveness
+      .filter(e => e.status !== 'veri yok')
+      .map(e => `- ${e.topic}: ${e.masteryBefore}/100 -> ${e.masteryNow}/100 (${e.status})`)
+    if (lines.length) {
+      effectivenessText = `\n\nGEÇEN PLANIN SONUCU (bu bilgiyi dikkate al -- iyileşen konulara daha az, gerileyen/aynı kalan konulara daha fazla ağırlık ver):\n${lines.join('\n')}`
+    }
+  }
+
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-5',
     max_tokens: 1500,
@@ -99,6 +159,7 @@ Toplam test: ${sessions?.length || 0}
 
 SISTEM TARAFINDAN BELIRLENEN ONCELIKLI KONULAR (bunlari plana MUTLAKA dahil et, mastery skoru dusuk olan konulara daha fazla hafta ayir):
 ${goalsText}
+${effectivenessText}
 
 Kullanicinin kendi notlari (MUTLAKA dikkate al): ${userNotes || 'Not girilmemis'}
 Dil: ${opts.language || 'Turkce'}
@@ -110,7 +171,8 @@ SADECE JSON don:
 
   try {
     const raw = message.content[0].text.replace(/```json|```/g, '').trim()
-    return JSON.parse(raw)
+    const plan = JSON.parse(raw) as StudyPlan
+    return { plan, goals }
   } catch {
     return null
   }

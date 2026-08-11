@@ -100,6 +100,7 @@ export default function PlanPage() {
       const { data: inserted } = await supabase.from('study_plans').insert({
         user_id: user.id,
         plan: data.plan,
+        goals_snapshot: data.goals || null,
         valid_until: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(),
       }).select().single()
 

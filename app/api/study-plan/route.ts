@@ -29,6 +29,18 @@ export async function POST(req: NextRequest) {
   const identity = await getIdentityBySupabaseId(user.id)
   const displayName = identity?.full_name ?? 'Öğrenci'
 
+  // Sürekli öğrenme döngüsü (Faz 7): varsa BİR ÖNCEKİ planın hedef anlık
+  // görüntüsünü çek -- yeni plan "geçen hafta bu konulara odaklandın,
+  // sonuç şöyleydi" bağlamıyla yazılabilsin (bkz. lib/study-plan-
+  // generator.ts, evaluatePreviousGoals).
+  const { data: previousPlan } = await supabase
+    .from('study_plans')
+    .select('goals_snapshot')
+    .eq('user_id', user.id)
+    .order('generated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
   // NOT: weakTopics/avgPct/totalTests artık client'tan zorunlu değil —
   // generateStudyPlan hedefleri kendi mastery hesabından (lib/mastery.ts)
   // OTONOM olarak belirliyor (bkz. computeAutonomousGoals). Eski client
@@ -36,12 +48,13 @@ export async function POST(req: NextRequest) {
   // kullanılmıyor.
   await req.json().catch(() => ({}))
 
-  const plan = await generateStudyPlan(supabase, user.id, {
+  const result = await generateStudyPlan(supabase, user.id, {
     grade: profile?.grade,
     language: profile?.language,
     displayName,
+    previousGoals: previousPlan?.goals_snapshot || undefined,
   })
 
-  if (!plan) return NextResponse.json({ error: 'Plan olusturulamadi.' }, { status: 500 })
-  return NextResponse.json({ plan })
+  if (!result) return NextResponse.json({ error: 'Plan olusturulamadi.' }, { status: 500 })
+  return NextResponse.json({ plan: result.plan, goals: result.goals })
 }

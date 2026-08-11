@@ -43,13 +43,13 @@ export async function GET(req: NextRequest) {
 
   const { data: existingPlans } = await supabaseAdmin
     .from('study_plans')
-    .select('user_id, valid_until, generated_at')
+    .select('user_id, valid_until, generated_at, goals_snapshot')
     .in('user_id', candidateIds)
     .order('generated_at', { ascending: false })
 
   // Her kullanıcının EN GÜNCEL planını tut (query zaten generated_at DESC
   // sıralı geldiği için ilk görülen satır en yenisi)
-  const latestPlanByUser = new Map<string, { valid_until: string | null }>()
+  const latestPlanByUser = new Map<string, { valid_until: string | null; goals_snapshot: any }>()
   for (const p of existingPlans ?? []) {
     if (!latestPlanByUser.has(p.user_id)) latestPlanByUser.set(p.user_id, p)
   }
@@ -76,16 +76,22 @@ export async function GET(req: NextRequest) {
     try {
       const prof = profileMap.get(uid)
       const identity = (identities as any)[uid]
-      const plan = await generateStudyPlan(supabaseAdmin, uid, {
+      // Faz 7 (sürekli öğrenme döngüsü): önceki planın hedef anlık
+      // görüntüsü varsa, "geçen hafta bu konulara odaklandın, sonuç
+      // şöyleydi" bağlamı yeni plana otomatik ekleniyor.
+      const previousGoals = latestPlanByUser.get(uid)?.goals_snapshot || undefined
+      const result = await generateStudyPlan(supabaseAdmin, uid, {
         grade: prof?.grade,
         language: prof?.language,
         displayName: identity?.full_name,
+        previousGoals,
       })
-      if (!plan) { failed++; continue }
+      if (!result) { failed++; continue }
 
       await supabaseAdmin.from('study_plans').insert({
         user_id: uid,
-        plan,
+        plan: result.plan,
+        goals_snapshot: result.goals,
         valid_until: new Date(now + 28 * 24 * 60 * 60 * 1000).toISOString(),
       })
       await supabaseAdmin.from('notifications').insert({
