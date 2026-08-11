@@ -5,6 +5,10 @@
       "schedule": "0 8 * * 0"
     },
     {
+      "path": "/api/cron/weekly-plan-refresh",
+      "schedule": "0 7 * * 1"
+    },
+    {
       "path": "/api/cron/reconcile-identities",
       "schedule": "0 6 * * *"
     }

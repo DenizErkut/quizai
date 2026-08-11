@@ -1,12 +1,15 @@
+// app/api/study-plan/route.ts
+// Öğrencinin kendi isteğiyle (manuel "Yeni Plan Oluştur" butonu) tetiklenen
+// plan üretimi. Otomatik/haftalık yenileme için bkz.
+// app/api/cron/weekly-plan-refresh — hesaplama ve üretim mantığı
+// lib/study-plan-generator.ts üzerinden paylaşılıyor.
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import Anthropic from '@anthropic-ai/sdk'
 import { getIdentityBySupabaseId } from '@/lib/identity/client'
+import { generateStudyPlan } from '@/lib/study-plan-generator'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -25,41 +28,20 @@ export async function POST(req: NextRequest) {
   const { data: profile } = await supabase.from('profiles').select('grade,language').eq('id', user.id).single()
   const identity = await getIdentityBySupabaseId(user.id)
   const displayName = identity?.full_name ?? 'Öğrenci'
-  const body = await req.json()
-  const { weakTopics, avgPct, totalTests } = body
 
-  // Kullanicinin notlarini cek
-  const { data: notesData } = await supabase
-    .from('user_notes')
-    .select('content')
-    .eq('user_id', user.id)
-    .order('updated_at', { ascending: false })
-    .limit(5)
-  const userNotes = notesData?.map((n: any) => n.content).join('\n---\n') || ''
+  // NOT: weakTopics/avgPct/totalTests artık client'tan zorunlu değil —
+  // generateStudyPlan hedefleri kendi mastery hesabından (lib/mastery.ts)
+  // OTONOM olarak belirliyor (bkz. computeAutonomousGoals). Eski client
+  // sürümleriyle geriye dönük uyum için body okunmaya devam ediyor ama
+  // kullanılmıyor.
+  await req.json().catch(() => ({}))
 
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5',
-    max_tokens: 1500,
-    messages: [{
-      role: 'user',
-      content: `Sen bir egitim kocusun. ${displayName} icin 4 haftalik kisisel calisma plani olustur.
-Profil: ${profile?.grade}
-Ortalama basari: %${avgPct}
-Toplam test: ${totalTests}
-Zayif konular: ${weakTopics || 'Henuz belirlenmedi'}
-Kullanicinin kendi notlari (MUTLAKA dikkate al): ${userNotes || 'Not girilmemis'}
-Dil: ${profile?.language || 'Turkce'}
+  const plan = await generateStudyPlan(supabase, user.id, {
+    grade: profile?.grade,
+    language: profile?.language,
+    displayName,
+  })
 
-SADECE JSON don:
-{"summary":"2-3 cumle","weeks":[{"week":1,"goal":"hedef","topics":["konu1"],"daily_minutes":20,"focus":"odak"}],"motivation":"motivasyon"}`,
-    }],
-  }) as any
-
-  try {
-    const raw = message.content[0].text.replace(/```json|```/g, '').trim()
-    const plan = JSON.parse(raw)
-    return NextResponse.json({ plan })
-  } catch {
-    return NextResponse.json({ error: 'Plan olusturulamadi.' }, { status: 500 })
-  }
+  if (!plan) return NextResponse.json({ error: 'Plan olusturulamadi.' }, { status: 500 })
+  return NextResponse.json({ plan })
 }
