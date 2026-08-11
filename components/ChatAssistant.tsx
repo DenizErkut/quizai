@@ -32,7 +32,7 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
   useEffect(() => {
     if (open && messages.length === 0) {
       const greeting = wrongQuestions.length > 0
-        ? `Merhaba! "${topic}" testini %${pct} başarıyla tamamladın. ${wrongQuestions.length} yanlış sorun var. Yanlış soruları açıklamamı ister misin, yoksa konuyu baştan anlatayım mı?`
+        ? `Merhaba! "${topic}" testini %${pct} ile tamamladın. ${wrongQuestions.length} soruda takıldığın bir nokta olmuş — birlikte gözden geçirelim mi? Hangi soruyla başlayalım, yoksa ilk yanlışından mı başlayayım?`
         : `Merhaba! "${topic}" testini %${pct} ile mükemmel tamamladın 🎉 Konuyla ilgili daha derin soru sormak ister misin?`
       setMessages([{ role: 'assistant', content: greeting }])
     }
@@ -136,8 +136,8 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
           {/* Quick actions */}
           {wrongQuestions.length > 0 && messages.length <= 1 && (
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
-              <button onClick={() => quickAsk('Yanlış sorularımı teker teker açıkla')}
-                style={quickBtnStyle}>🔍 Yanlışlarımı açıkla</button>
+              <button onClick={() => quickAsk('Yanlış sorularımı birlikte gözden geçirelim, ilk sorudan başla')}
+                style={quickBtnStyle}>🔍 Yanlışlarımı birlikte inceleyelim</button>
               <button onClick={() => quickAsk(`"${topic}" konusunu sıfırdan anlat`)}
                 style={quickBtnStyle}>📚 Konuyu anlat</button>
               <button onClick={() => quickAsk('Bana bu konudan 3 yeni soru sor')}
