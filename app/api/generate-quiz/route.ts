@@ -4,6 +4,7 @@ export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
 import { generateQuizFallback } from '@/lib/openai'
 import { createClient } from '@supabase/supabase-js'
+import { getTopicMastery, computeErrorPatterns, buildStudentHistoryContext } from '@/lib/mastery'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -472,28 +473,20 @@ export async function POST(req: NextRequest) {
       }
     } catch { }
 
-    // Bu KONUDA öğrencinin Pratium içi geçmiş performansı (weak_topics) —
-    // grade_notes'tan farklı: bu, okul karnesi değil, öğrencinin bizzat
-    // Pratium'da bu konuda çözdüğü sorulardaki yanlış oranı. Şimdiye kadar
-    // bu tablo generate-quiz tarafından sadece YAZILIYORDU (quiz bitince
-    // güncelleniyordu), hiç OKUNMUYORDU — yani "zayıf konu" verisi toplanıyor
-    // ama hiçbir üretim kararını etkilemiyordu. Bu blok o kopukluğu kapatır:
-    // aynı konuda geçmişte belirgin şekilde zorlanmışsa (>=3 deneme, >=%40
-    // hata oranı), AI'a temel kavramlara ağırlık verme talimatı eklenir.
+    // Bu KONUDA öğrencinin Pratium içi geçmiş performansı — grade_notes'tan
+    // farklı: bu, okul karnesi değil, öğrencinin bizzat Pratium'da bu
+    // konuda çözdüğü sorulardaki performansı. Önceki halde burada sadece
+    // ham wrong/total oranına bakan basit bir eşik kontrolü vardı (bkz.
+    // lib/mastery.ts'in başındaki not) — artık Bayesian-düzeltmeli mastery
+    // skoru + zaman ağırlıklı unutma riski + soru-tipi bazlı hata paterni
+    // (lib/mastery.ts) kullanılıyor.
     try {
-      const { data: wt } = await supabase
-        .from('weak_topics')
-        .select('wrong_count, total_count')
-        .eq('user_id', user.id)
-        .ilike('topic', topic)
-        .maybeSingle()
-      if (wt && wt.total_count >= 3) {
-        const errorRate = Math.round((wt.wrong_count / wt.total_count) * 100)
-        if (errorRate >= 40) {
-          gradeContext += `\n\nSTUDENT HISTORY: This student has previously struggled with "${topic}" specifically — ${errorRate}% wrong (${wt.wrong_count}/${wt.total_count} past questions on this exact topic). This time, emphasize fundamentals more, use a gentler difficulty progression (lean slightly easier/medium), and make explanations (exp field) extra clear and step-by-step.`
-        }
-      }
-    } catch { /* weak_topics opsiyonel bağlam, hata olursa sessiz geç */ }
+      const [mastery, patterns] = await Promise.all([
+        getTopicMastery(supabase, user.id, topic),
+        computeErrorPatterns(supabase, user.id, topic),
+      ])
+      gradeContext += buildStudentHistoryContext(mastery, patterns)
+    } catch { /* öğrenci geçmişi opsiyonel bağlam, hata olursa sessiz geç */ }
 
     // ✅ MEB search — paralel çalışır, max 3sn bekle. Üniversite için MEB
     // grounding zaten anlamsız (tek resmi müfredat yok), bu yüzden atlanır.
