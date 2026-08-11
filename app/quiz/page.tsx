@@ -452,7 +452,16 @@ function QuizPageContent() {
       setSessionId(data.sessionId)
       setResolvedDifficulty((data.resolvedDifficulty || 'normal') as DifficultyValue)
       setDifficulty(data.resolvedDifficulty || 'normal') // QuizQuestion'a giden gösterim rozeti bununla senkron kalsın
-      setChunkBoundary(isAdaptiveEligible ? firstChunkSize : null)
+      // ÖNEMLİ: chunkBoundary, İSTENEN soru sayısına (firstChunkSize) değil
+      // GERÇEKTEN DÖNEN dizi uzunluğuna göre ayarlanmalı — sunucu tarafında
+      // bir soru filtrelenirse (ör. kaynak-kitap-metadata güvenlik ağı,
+      // bkz. generate-quiz/route.ts) dönen dizi istenenden kısa olabilir.
+      // Eskiden firstChunkSize kullanılıyordu; bu durumda "current+1===
+      // chunkBoundary" tetikleyicisi hiç ateşlenmeden "current+1>=
+      // questions.length" (bitti) kontrolü önce tetiklenip quiz ikinci
+      // parça hiç getirilmeden erken bitiyordu.
+      const actualFirstChunkLen = Array.isArray(data.questions) ? data.questions.length : 0
+      setChunkBoundary(isAdaptiveEligible && actualFirstChunkLen >= 2 ? actualFirstChunkLen : null)
       setCurrent(0); setAnswers([]); answersRef.current = []; setChosen(null); setCheckingAnswer(false)
       setScreen('quiz')
     } catch (e: any) {
