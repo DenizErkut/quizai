@@ -75,7 +75,18 @@ export async function GET(req: NextRequest) {
         `📊 Haftalık Özet — ${childSummaries.map(c => c.name).join(', ')}`,
         html
       )
-      if (ok) emailsSent++
+      if (ok) {
+        emailsSent++
+        // Uygulama içi bildirim — veli girişte "özet gönderildi" görsün
+        await supabaseAdmin.from('notifications').insert({
+          user_id: parentId,
+          type: 'weekly_summary',
+          title: '📊 Haftalık özet gönderildi',
+          body: `${childSummaries.length} çocuğun için haftalık özet e-postanı gönderdik.`,
+          read: false,
+          data: { href: '/parent' },
+        })
+      }
       else failed++
     } catch (e: any) {
       console.error('[weekly-parent-summary] parent hatasi:', parentId, e.message)
