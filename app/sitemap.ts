@@ -1,0 +1,23 @@
+// app/sitemap.ts
+// Next.js App Router convention — /sitemap.xml'i otomatik üretir.
+// Sadece GERÇEKTEN herkese açık (giriş gerektirmeyen) sayfalar listelenir —
+// /dashboard, /quiz, /admin gibi kimlik doğrulama arkasındaki sayfalar
+// bilerek dışarıda bırakıldı (bkz. app/robots.ts disallow listesi, aynı
+// mantıkla eşleşiyor).
+import type { MetadataRoute } from 'next'
+
+export default function sitemap(): MetadataRoute.Sitemap {
+  const base = 'https://pratium.com'
+  const now = new Date()
+
+  return [
+    { url: base, lastModified: now, changeFrequency: 'weekly', priority: 1 },
+    { url: `${base}/hakkimizda`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${base}/pricing`, lastModified: now, changeFrequency: 'monthly', priority: 0.9 },
+    { url: `${base}/ozel-kocluk`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
+    { url: `${base}/privacy`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${base}/terms`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${base}/mesafeli-satis`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${base}/teslimat-iade`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
+  ]
+}

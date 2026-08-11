@@ -44,6 +44,52 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Schema.org yapılandırılmış veri — Faz 8 (GEO/AI Discovery) kapsamında
+  // eklendi. Daha önce pratium.com'da hiç JSON-LD yoktu, bu da AI
+  // sistemlerinin (ve arama motorlarının) Pratium'u "ne" olarak anlaması
+  // için hiçbir makine-okunabilir sinyal olmadığı anlamına geliyordu.
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'EducationalOrganization',
+        '@id': 'https://pratium.com/#organization',
+        name: 'Pratium',
+        url: 'https://pratium.com',
+        logo: 'https://pratium.com/pratium-logo.png',
+        description: 'Türkiye K-12 (ilkokul-lise) seviyesinde, MEB müfredatına uygun, yapay zeka destekli sınav hazırlık ve öğrenci gelişim takip platformu.',
+        areaServed: { '@type': 'Country', name: 'Türkiye' },
+        sameAs: ['https://instagram.com/pratiumai'],
+      },
+      {
+        '@type': 'WebSite',
+        '@id': 'https://pratium.com/#website',
+        url: 'https://pratium.com',
+        name: 'Pratium',
+        publisher: { '@id': 'https://pratium.com/#organization' },
+        inLanguage: 'tr-TR',
+      },
+      {
+        '@type': 'SoftwareApplication',
+        name: 'Pratium',
+        applicationCategory: 'EducationalApplication',
+        operatingSystem: 'Web, iOS, Android',
+        description: 'Yapay zeka destekli soru üretimi, gerçek zamanlı analiz ve kişisel gelişim planı sunan K-12 eğitim platformu. İlkokuldan üniversiteye, 6 dilde.',
+        offers: {
+          '@type': 'AggregateOffer',
+          priceCurrency: 'TRY',
+          lowPrice: '0',
+          highPrice: '6000',
+          offerCount: '3',
+        },
+        audience: {
+          '@type': 'EducationalAudience',
+          educationalRole: ['student', 'parent', 'teacher'],
+        },
+      },
+    ],
+  }
+
   return (
     <html lang="tr">
       <head>
@@ -57,6 +103,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Pratium" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       </head>
       <body>
         <PWAInstallBanner />
