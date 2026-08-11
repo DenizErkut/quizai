@@ -14,6 +14,9 @@ export default function TeacherReportPage() {
   const [selectedStudent, setSelectedStudent] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [studentsLoading, setStudentsLoading] = useState(false)
+  // Faz 6 (Teacher Agent) — sınıf bazlı risk gruplama + AI önerisi
+  const [classRisk, setClassRisk] = useState<any>(null)
+  const [riskLoading, setRiskLoading] = useState(false)
   const router = useRouter()
   const supabase = createClient() as any
 
@@ -28,6 +31,7 @@ export default function TeacherReportPage() {
         if (d.classrooms?.length) {
           setSelectedClass(d.classrooms[0].id)
           await loadStudents(d.classrooms[0].id, session.access_token)
+          await loadClassRisk(d.classrooms[0].id, session.access_token)
         }
       }
       setLoading(false)
@@ -43,6 +47,21 @@ export default function TeacherReportPage() {
     })
     if (res.ok) { const d = await res.json(); setStudents(d.students || []) }
     setStudentsLoading(false)
+  }
+
+  // Faz 6: risk dağılımı + AI-üretimli sınıf önerisi. Öğrenci listesinden
+  // ayrı bir çağrı — Faz 1'in mastery skoruna dayanıyor (weak_topics),
+  // basit ortalama başarı yüzdesinden farklı bir sinyal.
+  async function loadClassRisk(classId: string, token?: string) {
+    setRiskLoading(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    try {
+      const res = await fetch(`/api/teacher/class-risk-summary?classroomId=${classId}`, {
+        headers: { Authorization: `Bearer ${token || session?.access_token}` }
+      })
+      if (res.ok) { const d = await res.json(); setClassRisk(d) }
+    } catch { /* opsiyonel bölüm, sessiz geç */ }
+    setRiskLoading(false)
   }
 
   if (loading) return <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></main>
@@ -64,7 +83,7 @@ export default function TeacherReportPage() {
         {classrooms.length > 1 && (
           <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
             {classrooms.map((c: any) => (
-              <button key={c.id} onClick={() => { setSelectedClass(c.id); loadStudents(c.id) }}
+              <button key={c.id} onClick={() => { setSelectedClass(c.id); loadStudents(c.id); loadClassRisk(c.id) }}
                 style={{ padding: '7px 14px', borderRadius: '8px', border: `1px solid ${selectedClass === c.id ? 'var(--accent)' : 'var(--border)'}`, background: selectedClass === c.id ? 'var(--accent-bg)' : 'var(--bg)', color: selectedClass === c.id ? 'var(--accent)' : 'var(--text2)', fontSize: '13px', fontWeight: selectedClass === c.id ? 700 : 400, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
                 {c.name}
               </button>
@@ -134,6 +153,30 @@ export default function TeacherReportPage() {
         ) : (
           /* Sınıf özeti */
           <>
+            {/* Faz 6: AI Sınıf Analizi — risk gruplama + öneri */}
+            {riskLoading ? (
+              <div className="card" style={{ marginBottom: '1.25rem', textAlign: 'center', padding: '1.5rem' }}>
+                <div className="spinner" />
+              </div>
+            ) : classRisk?.summary && classRisk.summary.totalStudents > 0 && (
+              <div className="card" style={{ marginBottom: '1.25rem' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                  🤖 AI Sınıf Analizi
+                </div>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                  <span className="badge badge-red">🔴 Riskli: {classRisk.summary.counts.riskli}</span>
+                  <span className="badge badge-yellow">🟡 Geliştirilmeli: {classRisk.summary.counts.gelistirilmeli}</span>
+                  <span className="badge badge-green">🟢 Yeterli: {classRisk.summary.counts.yeterli}</span>
+                </div>
+                <p style={{ fontSize: '13.5px', lineHeight: 1.7, color: 'var(--text)' }}>{classRisk.insight}</p>
+                {classRisk.summary.topConcernTopics?.length > 0 && (
+                  <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--text3)' }}>
+                    En çok zorlanılan konular: {classRisk.summary.topConcernTopics.map((t: any) => `${t.topic} (${t.studentCount})`).join(' · ')}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Sınıf istatistikleri */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '1.25rem' }}>
               {[
