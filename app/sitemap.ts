@@ -12,6 +12,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   return [
     { url: base, lastModified: now, changeFrequency: 'weekly', priority: 1 },
+    { url: `${base}/for-students`, lastModified: now, changeFrequency: 'monthly', priority: 0.9 },
+    { url: `${base}/for-parents`, lastModified: now, changeFrequency: 'monthly', priority: 0.9 },
+    { url: `${base}/for-teachers`, lastModified: now, changeFrequency: 'monthly', priority: 0.9 },
+    { url: `${base}/methodology`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
+    { url: `${base}/faq`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${base}/hakkimizda`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
     { url: `${base}/pricing`, lastModified: now, changeFrequency: 'monthly', priority: 0.9 },
     { url: `${base}/ozel-kocluk`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
