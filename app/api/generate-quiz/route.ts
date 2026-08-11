@@ -5,6 +5,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { generateQuizFallback } from '@/lib/openai'
 import { createClient } from '@supabase/supabase-js'
 import { getTopicMastery, computeErrorPatterns, buildStudentHistoryContext } from '@/lib/mastery'
+import { startingDifficultyFromMastery } from '@/lib/adaptive-difficulty'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -400,6 +401,8 @@ export async function POST(req: NextRequest) {
       includeVisuals = true,
       questionType = 'multiple_choice',
       dailyChallenge = false,
+      continueSessionId, // adaptif akışta ikinci/sonraki parça — mevcut oturuma eklenir, yeni test sayılmaz
+      excludeQuestionTexts, // aynı oturumda (henüz completed=false) az önce sorulmuş sorular — tekrar önleme
     } = body
 
     const MAX_QCOUNT: Record<string, number> = { free: 5, premium: 20, unlimited: 20 }
@@ -410,6 +413,22 @@ export async function POST(req: NextRequest) {
 
     if (!fileContent && !isInCurriculum(topic, plan, grade)) {
       return NextResponse.json({ error: 'out_of_curriculum' }, { status: 403 })
+    }
+
+    // Adaptif Test Motoru (Faz 2) — zorluk seviyesi artık kullanıcıya
+    // sorulmuyor (UI'dan kaldırıldı). difficulty==='auto' geldiğinde,
+    // bu konudaki mastery skoruna (Faz 1, lib/mastery.ts) bakarak makul bir
+    // başlangıç noktası seçilir. Sonraki parçaların zorluğu ise client
+    // tarafında lib/adaptive-difficulty.ts ile hesaplanıp buraya açıkça
+    // gönderilir (bkz. continueSessionId akışı).
+    let resolvedDifficulty = difficulty
+    if (difficulty === 'auto') {
+      try {
+        const mastery = await getTopicMastery(supabase, user.id, topic)
+        resolvedDifficulty = startingDifficultyFromMastery(mastery?.masteryScore ?? null)
+      } catch {
+        resolvedDifficulty = 'normal'
+      }
     }
 
     const lang = language || profile.language || 'Turkce'
@@ -427,7 +446,7 @@ export async function POST(req: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(10)
 
-      if (recentSessions?.length) {
+      if (recentSessions?.length || (Array.isArray(excludeQuestionTexts) && excludeQuestionTexts.length > 0)) {
         const prevQTexts: string[] = []
         // Anahtar kelimeler çıkar — benzer soruları da yakala
         const prevKeywords = new Set<string>()
@@ -442,6 +461,16 @@ export async function POST(req: NextRequest) {
             })
           })
         })
+
+        // Adaptif akışta (continueSessionId), o anki oturumun ilk parçasında
+        // sorulan sorular henüz completed=true olmadığı için yukarıdaki DB
+        // sorgusunda GÖRÜNMEZ — client bunları excludeQuestionTexts ile
+        // açıkça gönderir, aksi halde chunk 2'de chunk 1'in aynısı sorulabilir.
+        if (Array.isArray(excludeQuestionTexts)) {
+          excludeQuestionTexts.forEach((t: string) => {
+            if (typeof t === 'string' && prevQTexts.length < 50) prevQTexts.push(t.slice(0, 100))
+          })
+        }
 
         if (prevQTexts.length > 0) {
           previousQuestionsNote = `\n\nCRITICAL - GENERATE COMPLETELY DIFFERENT QUESTIONS:\n` +
@@ -509,7 +538,7 @@ export async function POST(req: NextRequest) {
       } catch { /* MEB opsiyonel */ }
     }
 
-    const prompt = buildPrompt(questionType, topic, grade, difficulty, lang, safeQCount, fileContent || '', gradeContext, mebContext, profile.department || undefined) + previousQuestionsNote
+    const prompt = buildPrompt(questionType, topic, grade, resolvedDifficulty, lang, safeQCount, fileContent || '', gradeContext, mebContext, profile.department || undefined) + previousQuestionsNote
     promptStr = prompt
     countRef = safeQCount
 
@@ -623,7 +652,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (!dailyChallenge) {
+    // continueSessionId: adaptif akışta ikinci/sonraki parça — aynı testin
+    // devamı, YENİ bir test değil. Bu yüzden kota (monthly_test_count) TEKRAR
+    // artırılmıyor ve DB'ye ayrı bir session satırı yazılmıyor; mevcut
+    // session'ın questions dizisine EKLENİYOR (append).
+    if (!dailyChallenge && !continueSessionId) {
       await supabase
         .from('profiles')
         .update({
@@ -632,24 +665,47 @@ export async function POST(req: NextRequest) {
         .eq('id', user.id)
     }
 
-    const { data: sessionRow } = await supabase
-      .from('quiz_sessions')
-      .insert({
-        user_id: user.id,
-        topic,
-        grade: profile.grade,
-        language: lang,
-        question_count: questions.length,
-        questions,
-        answers: [],
-        score: 0,
-        completed: false,
-        question_type: questionType,
-      })
-      .select('id')
-      .maybeSingle()
+    let sessionId: string | undefined
 
-    return NextResponse.json({ questions, sessionId: sessionRow?.id })
+    if (continueSessionId) {
+      const { data: existing } = await supabase
+        .from('quiz_sessions')
+        .select('questions, question_count')
+        .eq('id', continueSessionId)
+        .eq('user_id', user.id) // başka kullanıcının oturumuna eklenemez
+        .maybeSingle()
+
+      if (existing) {
+        const mergedQuestions = [...(existing.questions || []), ...questions]
+        await supabase
+          .from('quiz_sessions')
+          .update({ questions: mergedQuestions, question_count: mergedQuestions.length })
+          .eq('id', continueSessionId)
+        sessionId = continueSessionId
+      }
+    }
+
+    if (!sessionId) {
+      const { data: sessionRow } = await supabase
+        .from('quiz_sessions')
+        .insert({
+          user_id: user.id,
+          topic,
+          grade: profile.grade,
+          language: lang,
+          question_count: questions.length,
+          questions,
+          answers: [],
+          score: 0,
+          completed: false,
+          question_type: questionType,
+        })
+        .select('id')
+        .maybeSingle()
+      sessionId = sessionRow?.id
+    }
+
+    return NextResponse.json({ questions, sessionId, resolvedDifficulty })
   } catch (error: any) {
     console.error('Generate quiz error, trying OpenAI fallback:', error?.message)
     // GPT-4o yedek model

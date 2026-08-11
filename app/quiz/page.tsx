@@ -10,6 +10,7 @@ import QuizResult from '@/components/QuizResult'
 import QuizSetup from '@/components/quiz/QuizSetup'
 import QuizQuestion from '@/components/quiz/QuizQuestion'
 import { SUBJECT_MAP } from '@/lib/subject-map'
+import { nextChunkDifficulty, shouldShowIntervention, type DifficultyValue } from '@/lib/adaptive-difficulty'
 
 type QuestionType = 'multiple_choice' | 'fill_blank' | 'matching' | 'true_false' | 'ordering' | 'short_answer' | 'multi_true_false' | 'table_fill' | 'mixed'
 
@@ -199,6 +200,17 @@ function QuizPageContent() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [current, setCurrent] = useState(0)
   const [answers, setAnswers] = useState<{ userAns: number; correct: boolean }[]>([])
+  // ── Adaptif Test Motoru (Faz 2) ──
+  // chunkBoundary: ilk parçanın kaç sorudan oluştuğu (null = adaptif değil
+  // veya ikinci parça zaten getirilmiş). resolvedDifficulty: sunucunun
+  // (mastery skoruna göre) seçtiği o anki zorluk — bir sonraki parça için
+  // referans noktası. showIntervention/interventionInfo: aynı soru tipinde
+  // art arda 2 yanlış yapıldığında gösterilen öğretici ara ekran.
+  const [chunkBoundary, setChunkBoundary] = useState<number | null>(null)
+  const [resolvedDifficulty, setResolvedDifficulty] = useState<DifficultyValue>('normal')
+  const [fetchingNextChunk, setFetchingNextChunk] = useState(false)
+  const [showIntervention, setShowIntervention] = useState(false)
+  const [interventionInfo, setInterventionInfo] = useState<{ exp: string; typeLabel: string } | null>(null)
   // ✅ answersRef: save-quiz için her zaman güncel değeri tut (React state async sorununu çözer)
   const answersRef = useRef<{ userAns: number; correct: boolean }[]>([])
   const isSavingRef = useRef(false) // ✅ Çift save-quiz çağrısını önle
@@ -370,7 +382,7 @@ function QuizPageContent() {
     const msgs = [
       hasFiles ? `${uploadedFiles.length} dosya analiz ediliyor...` : 'Profilin analiz ediliyor...',
       'Müfredat kontrol ediliyor...',
-      `${difficulty.toUpperCase()} zorlukta sorular oluşturuluyor...`,
+      'Senin seviyene uygun sorular hazırlanıyor...',
       includeVisuals ? 'Görsel içerikler hazırlanıyor...' : 'Şıklar karıştırılıyor...',
       'Son kontroller...',
     ]
@@ -379,11 +391,20 @@ function QuizPageContent() {
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
+
+      // Adaptif Test Motoru: kullanıcıya zorluk sorulmuyor. İlk parça,
+      // sunucunun bu konudaki mastery skoruna göre seçtiği zorlukla
+      // ('auto') üretilir. qCount yeterince büyükse (>=4) test 2 parçaya
+      // bölünür — ikinci parçanın zorluğu, ilk parçadaki performansa göre
+      // next() içinde ayarlanır (bkz. lib/adaptive-difficulty.ts).
+      const isAdaptiveEligible = qCount >= 4
+      const firstChunkSize = isAdaptiveEligible ? Math.ceil(qCount / 2) : qCount
+
       const res = await fetch('/api/generate-quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
         body: JSON.stringify({
-          topic, questionCount: qCount, difficulty, language: lang,
+          topic, questionCount: firstChunkSize, difficulty: 'auto', language: lang,
           fileContent: combinedContent || undefined,
           fileType: uploadedFiles[0]?.fileType || undefined,
           includeVisuals,
@@ -429,6 +450,9 @@ function QuizPageContent() {
       fetchProfile()
       setQuestions(data.questions)
       setSessionId(data.sessionId)
+      setResolvedDifficulty((data.resolvedDifficulty || 'normal') as DifficultyValue)
+      setDifficulty(data.resolvedDifficulty || 'normal') // QuizQuestion'a giden gösterim rozeti bununla senkron kalsın
+      setChunkBoundary(isAdaptiveEligible ? firstChunkSize : null)
       setCurrent(0); setAnswers([]); answersRef.current = []; setChosen(null); setCheckingAnswer(false)
       setScreen('quiz')
     } catch (e: any) {
@@ -447,6 +471,9 @@ function QuizPageContent() {
     answersRef.current = []
     setChosen(null)
     setSessionId(null)
+    setChunkBoundary(null) // yanlışları tekrar çözme adaptif değil, sabit bir set
+    setShowIntervention(false)
+    setInterventionInfo(null)
     setScreen('quiz')
   }
 
@@ -463,9 +490,30 @@ function QuizPageContent() {
       correct = idx === q.ans
     }
     setAnswers(prev => {
-      const next = [...prev, { userAns: idx, correct }]
-      answersRef.current = next
-      return next
+      const nextArr = [...prev, { userAns: idx, correct }]
+      answersRef.current = nextArr
+
+      // Öğretici müdahale tespiti (Faz 2): son 2 cevap AYNI soru tipinde
+      // ve ikisi de yanlışsa, "İleri" butonunun bir sonraki basışında
+      // normal ilerleme yerine kısa bir öğretici ara ekran gösterilir.
+      if (current >= 1) {
+        const recentTypes = [questions[current - 1]?.type, q.type]
+        const recentAnswers = nextArr.slice(-2)
+        if (shouldShowIntervention(recentAnswers, recentTypes)) {
+          const typeLabels: Record<string, string> = {
+            multiple_choice: 'çoktan seçmeli', fill_blank: 'boşluk doldurma', true_false: 'doğru/yanlış',
+            multi_true_false: 'çoklu doğru/yanlış', matching: 'eşleştirme', table_fill: 'tablo doldurma',
+            short_answer: 'kısa cevap', ordering: 'sıralama',
+          }
+          setInterventionInfo({
+            exp: q.exp || questions[current - 1]?.exp || '',
+            typeLabel: typeLabels[q.type] || q.type,
+          })
+          setShowIntervention(true)
+        }
+      }
+
+      return nextArr
     })
   }
 
@@ -645,6 +693,60 @@ function QuizPageContent() {
   const [shuffledIndexMap, setShuffledIndexMap] = useState<number[]>([])
 
   async function next() {
+    // Öğretici müdahale ekranı gösteriliyorsa: "İleri"nin bu basışı sadece
+    // kartı kapatır, henüz ilerlemez. Kullanıcı bir daha basınca normal
+    // akış devam eder.
+    if (showIntervention) {
+      setShowIntervention(false)
+      setInterventionInfo(null)
+      return
+    }
+
+    // Adaptif Test Motoru — chunk sınırı: ilk parçanın son sorusundan sonra
+    // (henüz questions.length'e ikinci parça eklenmediği için current+1,
+    // "bitti" kontrolüyle aynı görünür — bu yüzden BU kontrol ondan ÖNCE
+    // çalışmalı). İkinci parça, ilk parçadaki performansa göre ayarlanmış
+    // zorlukla getirilip mevcut soru listesine eklenir.
+    if (chunkBoundary !== null && current + 1 === chunkBoundary) {
+      setFetchingNextChunk(true)
+      try {
+        const chunk1Answers = answersRef.current.slice(0, chunkBoundary)
+        const nextDiff = nextChunkDifficulty(resolvedDifficulty, chunk1Answers)
+        const excludeTexts = questions.slice(0, chunkBoundary).map(q => q.q).filter(Boolean)
+        const topic = customTopic.trim() || selectedTopic
+        const { data: { session } } = await supabase.auth.getSession()
+        const res = await fetch('/api/generate-quiz', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+          body: JSON.stringify({
+            topic,
+            questionCount: qCount - chunkBoundary,
+            difficulty: nextDiff,
+            language: currentLang,
+            questionType,
+            includeVisuals,
+            continueSessionId: sessionId,
+            excludeQuestionTexts: excludeTexts,
+          }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (Array.isArray(data.questions) && data.questions.length > 0) {
+            setQuestions(prev => [...prev, ...data.questions])
+            setResolvedDifficulty(nextDiff)
+            setDifficulty(nextDiff) // gösterim rozeti senkron kalsın
+          }
+        }
+      } catch {
+        // İkinci parça getirilemezse mevcut sorularla devam edilir — test
+        // istenenden kısa biter ama akış kesilmez.
+      }
+      setFetchingNextChunk(false)
+      setChunkBoundary(null) // tek geçişlik — bu v1'de sadece 2 parça var
+      setCurrent(c => c + 1); setChosen(null)
+      return
+    }
+
     if (current + 1 >= questions.length) {
       // ✅ Çift tıklama / çift tetiklenme koruması
       if (isSavingRef.current) return
@@ -966,6 +1068,48 @@ function QuizPageContent() {
 
   // ── QUIZ ── (QuizQuestion component'e delege edildi)
   if (screen === 'quiz' && questions.length > 0) {
+    // Adaptif Test Motoru: bir sonraki parça (performansa göre ayarlanmış
+    // zorlukla) getirilirken kısa bir bekleme ekranı — chunk boyutları
+    // küçük olduğu için (Haiku ile) genelde çok kısa sürer.
+    if (fetchingNextChunk) {
+      return (
+        <main style={{ maxWidth: '520px', margin: '0 auto', padding: '2rem 1rem', textAlign: 'center' }}>
+          <div style={{ padding: '48px 24px', borderRadius: '16px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '32px', marginBottom: '12px' }}>⚡</div>
+            <div style={{ fontSize: '14px', color: 'var(--text2)' }}>Sıradaki sorular hazırlanıyor...</div>
+          </div>
+        </main>
+      )
+    }
+
+    // Öğretici müdahale: son 2 cevap aynı soru tipinde ve ikisi de yanlışsa,
+    // yeni bir soruya geçmeden önce kısa bir ara ekran gösterilir. "İleri"
+    // butonu (QuizQuestion içinde) tekrar basılınca normal akış devam eder
+    // (bkz. next() içindeki showIntervention kontrolü).
+    if (showIntervention && interventionInfo) {
+      return (
+        <main style={{ maxWidth: '560px', margin: '0 auto', padding: '2rem 1rem' }}>
+          <div style={{ padding: '28px 24px', borderRadius: '16px', background: 'var(--bg2)', border: '1.5px solid var(--accent)' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', marginBottom: '10px' }}>
+              💡 Bir dakika, bunu birlikte gözden geçirelim
+            </div>
+            <p style={{ fontSize: '13.5px', color: 'var(--text2)', lineHeight: 1.6, margin: '0 0 16px' }}>
+              Son iki soruda <strong>{interventionInfo.typeLabel}</strong> tipinde benzer bir noktada zorlandın.
+              Devam etmeden önce şunu bir daha okuyalım:
+            </p>
+            {interventionInfo.exp && (
+              <div style={{ padding: '14px 16px', borderRadius: '10px', background: 'var(--bg)', border: '1px solid var(--border)', fontSize: '13.5px', color: 'var(--text)', lineHeight: 1.6, marginBottom: '18px' }}>
+                {interventionInfo.exp}
+              </div>
+            )}
+            <button className="btn btn-primary" onClick={next} style={{ width: '100%', justifyContent: 'center' }}>
+              Anladım, devam et →
+            </button>
+          </div>
+        </main>
+      )
+    }
+
     return (
       <QuizQuestion
         questions={questions}

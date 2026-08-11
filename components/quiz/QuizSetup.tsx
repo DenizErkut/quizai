@@ -3,7 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import FileUploader, { type UploadedFile } from '@/components/FileUploader'
-import { DIFFICULTIES, type QuestionType, type Profile } from '@/lib/quiz-constants'
+import { type QuestionType, type Profile } from '@/lib/quiz-constants'
 import { getSubjectsForGrade } from '@/lib/subject-map-grade'
 
 interface QuizSetupProps {
@@ -318,24 +318,17 @@ export default function QuizSetup({
               cursor: 'pointer', fontFamily: 'var(--font-sans)',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
-            <span>⚙️ Gelişmiş ayarlar {!advancedOpen && <span style={{ fontSize: '11px', color: 'var(--text3)', marginLeft: '6px' }}>(zorluk, soru tipi, sayı, görsel)</span>}</span>
+            <span>⚙️ Gelişmiş ayarlar {!advancedOpen && <span style={{ fontSize: '11px', color: 'var(--text3)', marginLeft: '6px' }}>(soru tipi, sayı, görsel)</span>}</span>
             <span style={{ fontSize: '12px' }}>{advancedOpen ? '▲' : '▼'}</span>
           </button>
 
           {advancedOpen && (
             <div style={{ marginTop: '10px', padding: '14px', borderRadius: '12px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
 
-              {/* Zorluk */}
-              <label className="field-label" style={{ marginTop: 0 }}>Zorluk seviyesi</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginTop: '6px' }}>
-                {DIFFICULTIES.map(d => (
-                  <button key={d.value} onClick={() => setDifficulty(d.value)}
-                    style={{ padding: '10px 8px', borderRadius: '10px', border: `1.5px solid ${difficulty === d.value ? d.border : 'var(--border)'}`, background: difficulty === d.value ? d.bg : 'var(--bg)', color: difficulty === d.value ? d.color : 'var(--text2)', fontSize: '13px', fontWeight: difficulty === d.value ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center' }}>
-                    <div style={{ fontWeight: 600, marginBottom: '2px' }}>{d.label}</div>
-                    <div style={{ fontSize: '11px', opacity: 0.75 }}>{d.desc}</div>
-                  </button>
-                ))}
-              </div>
+              {/* Zorluk seviyesi artık burada seçilmiyor — Adaptif Test Motoru
+                  (Faz 2) öğrencinin bu konudaki geçmiş performansına göre
+                  başlangıç zorluğunu otomatik seçiyor, test sırasında da
+                  performansa göre kendiliğinden ayarlıyor. */}
 
               {/* Soru tipi */}
               <div style={{ marginTop: '14px' }}>
@@ -412,7 +405,7 @@ export default function QuizSetup({
             <span style={{ color: 'var(--accent)' }}>{
               {'multiple_choice':'🔤 Çoktan Seçmeli','fill_blank':'✏️ Boşluk Doldurma','true_false':'✓✗ D/Y','multi_true_false':'📋✓✗ Çoklu D/Y','table_fill':'🗂️ Tablo','matching':'🔗 Eşleştirme','ordering':'📋 Sıralama','short_answer':'💬 Kısa Cevap','mixed':'🎲 Karma'}[questionType]
             }</span>
-            <span style={{ color: DIFFICULTIES.find(d => d.value === difficulty)?.color }}>⚡ {DIFFICULTIES.find(d => d.value === difficulty)?.label}</span>
+            <span style={{ color: 'var(--accent)' }}>🤖 Zorluk: otomatik</span>
             <span>🌐 {currentLang}</span>
             {uploadedFiles.length > 0 && <span style={{ color: 'var(--green)' }}>📎 {uploadedFiles.length} dosya</span>}
             {includeVisuals && <span style={{ color: 'var(--accent)' }}>📊 Görsel</span>}
