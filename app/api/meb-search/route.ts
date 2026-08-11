@@ -25,6 +25,90 @@ async function embedQuery(text: string): Promise<number[] | null> {
   } catch { return null }
 }
 
+// Ders kitaplarının ilk birkaç bin karakteri neredeyse HER ZAMAN gerçek
+// ders içeriği DEĞİLDİR: yazar listesi, "Her hakkı saklıdır" telif notu,
+// ISBN, İstiklal Marşı/Gençliğe Hitabe, İçindekiler, "Kitabımızı
+// Tanıyalım" gibi kullanım kılavuzu sayfaları. Bu bölümlerden AI'a
+// bağlam verilirse "kaç yazar tarafından hazırlanmıştır", "ISBN numarası
+// nedir" gibi konuyla hiç ilgisi olmayan, anlamsız sorular üretiliyor
+// (gerçek bir örnekte tespit edildi: Fen Bilimleri 6. sınıf "Güneş
+// Sistemi ve Tutulmalar" ünitesi istenirken kitabın telif sayfasından
+// soru üretilmişti). Bu, isKazanimListesi'ne benzer ama FARKLI bir kaynak
+// kirliliği türü — kazanım kod listesi öğretmene yönelik özet, bu ise
+// kitabın idari/ön sayfalarıdır.
+function isFrontMatter(text: string): boolean {
+  const t = text.toLowerCase()
+  const signals = [
+    'her hakkı saklıdır',
+    'yayın hakları',
+    'isbn',
+    'gençliğe hitabe',
+    'ey türk gençliği',
+    'içindekiler',
+    'imam hatip ortaokulu',
+    'talim ve terbiye kurulu',
+    'kitabımızı tanıyalım',
+    'güvenlik sembolleri',
+  ]
+  const hitCount = signals.filter(s => t.includes(s)).length
+  // Tek bir sinyal yanlış pozitif olabilir (ör. normal bir cümle içinde
+  // geçen "içindekiler" kelimesi) — en az 2 sinyal aranır.
+  return hitCount >= 2
+}
+
+// İçindekiler bölümleri, gerçek ünite başlıklarını da içerdiği için (ör.
+// "GÜNEŞ SİSTEMİ VE TUTULMALAR" hem İçindekiler'de hem gerçek ünite
+// başlığında geçer) isFrontMatter'ın anahtar kelime taraması tek başına
+// yetersiz kalabiliyor. Bu yüzden yapısal bir sinyal eklendi: İçindekiler
+// satırları "nokta dizisi + sayfa numarası + SATIR SONU" kalıbındadır
+// (ör. "....................18\n") — bu, ders içindeki eşleştirme/dolgu
+// sorularından (ör. "......1. Güneş sisteminin en büyük gezegenidir.")
+// FARKLIDIR, çünkü onlarda rakamdan sonra satır bitmez, metin devam eder.
+function looksLikeTableOfContents(text: string): boolean {
+  const tocLineMatches = text.match(/\.{4,}\s*\d{1,4}\s*(?:\r?\n|$)/g)
+  if (tocLineMatches && tocLineMatches.length >= 3) return true
+  const uniteBolumCount = (text.match(/\b(ÜNİTE|BÖLÜM)\b/g) || []).length
+  return uniteBolumCount >= 6 // yoğun başlık tekrarı = İçindekiler
+}
+
+function isNonContent(text: string): boolean {
+  return isFrontMatter(text) || looksLikeTableOfContents(text)
+}
+
+// meb_resources.raw_text içinde GERÇEK konu anlatımının başladığı noktayı
+// bulmaya çalışır — dosyanın en başından blind slice almak yerine.
+function findContentStart(rawText: string, unitOrTopic: string): number {
+  const FRONTMATTER_SKIP_MIN = 3000 // gözlemlenen ön sayfa bloklarının tipik uzunluğu
+
+  // meb_resources.unit alanı "1. Ünite: Güneş Sistemi ve Tutulmalar" gibi
+  // bir önek taşıyor ama ham metinde konu adı "GÜNEŞ SİSTEMİ VE TUTULMALAR"
+  // (büyük harf, önek yok) şeklinde geçiyor — hem büyük/küçük harf duyarsız
+  // arama hem önek temizliği olmadan eşleşme bulunamıyordu.
+  const cleanedTopic = (unitOrTopic || '').replace(/^\d+\s*\.?\s*ünite\s*:?\s*/i, '').trim()
+  const rawLower = rawText.toLowerCase()
+
+  if (cleanedTopic) {
+    const needle = cleanedTopic.toLowerCase()
+    let searchFrom = 0
+    while (true) {
+      const idx = rawLower.indexOf(needle, searchFrom)
+      if (idx === -1) break
+      const window = rawText.slice(Math.max(0, idx - 200), idx + 1500)
+      if (idx > 500 && !isNonContent(window)) return idx // idx>500: dosya basindaki kapak basligini atla
+      searchFrom = idx + needle.length
+    }
+  }
+
+  // Konu adı bulunamadıysa (ya da hep ön sayfa/İçindekiler bölgesindeyse):
+  // ilk FRONTMATTER_SKIP_MIN karakteri atlayıp, ön-sayfa paterni taşımayan
+  // ilk pencereyi ara. Bazı kitaplarda ön sayfa bloğu çok uzun olabildiği
+  // için (gözlemlenen örnekte >12000 karakter) arama aralığı geniş tutuldu.
+  for (let offset = FRONTMATTER_SKIP_MIN; offset < Math.min(rawText.length, 25000); offset += 2000) {
+    if (!isNonContent(rawText.slice(offset, offset + 3000))) return offset
+  }
+  return 0
+}
+
 export async function POST(req: NextRequest) {
   // Ic route'lardan (orn. generate-quiz) x-internal-secret ile gelen
   // sunucu-sunucu cagrilari icin bypass - diger ic route'larla (verify-
@@ -62,10 +146,15 @@ export async function POST(req: NextRequest) {
       })
 
       if (chunks?.length) {
-        context = chunks.map((c: any, i: number) =>
-          `[MEB Kaynak ${i + 1} - ${c.subject}/${c.unit}]\n${c.content}`
-        ).join('\n\n---\n\n')
-        console.log(`[meb-search] semantic: ${chunks.length} chunks found for "${topic}"`)
+        // Semantic search bazen ön sayfa chunk'larını da (embedding'i
+        // yanlışlıkla konuya yakın çıkabiliyor) döndürebiliyor — filtrele.
+        const cleanChunks = chunks.filter((c: any) => !isNonContent(c.content || ''))
+        if (cleanChunks.length > 0) {
+          context = cleanChunks.map((c: any, i: number) =>
+            `[MEB Kaynak ${i + 1} - ${c.subject}/${c.unit}]\n${c.content}`
+          ).join('\n\n---\n\n')
+          console.log(`[meb-search] semantic: ${cleanChunks.length}/${chunks.length} chunks found for "${topic}" (${chunks.length - cleanChunks.length} ön sayfa olarak elendi)`)
+        }
       }
     }
 
@@ -107,9 +196,14 @@ export async function POST(req: NextRequest) {
           .sort((a: any, b: any) => (b.raw_text?.length || 0) - (a.raw_text?.length || 0))
           .slice(0, 3)
 
-        context = resources.map((r: any, i: number) =>
-          `[MEB Kaynak ${i + 1} - ${r.subject || ''}/${r.unit || ''}]\n${(r.raw_text || '').slice(0, 3000)}`
-        ).join('\n\n---\n\n')
+        context = resources.map((r: any, i: number) => {
+          const raw = r.raw_text || ''
+          // Dosyanın en başından (yazar listesi, telif, İçindekiler vb.
+          // ön sayfalardan) değil, gerçek konu anlatımının başladığı
+          // noktadan itibaren al.
+          const startIdx = findContentStart(raw, unit || subject || topic || '')
+          return `[MEB Kaynak ${i + 1} - ${r.subject || ''}/${r.unit || ''}]\n${raw.slice(startIdx, startIdx + 3000)}`
+        }).join('\n\n---\n\n')
         console.log(`[meb-search] resources: ${resources.length} found (${allResources.length} aday, ${narrative.length} anlatisal)`)
       }
     }
