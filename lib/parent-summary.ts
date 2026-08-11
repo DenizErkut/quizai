@@ -5,6 +5,8 @@
 // Aynı hesaplama/HTML şablonunun iki yerde ayrı ayrı yazılıp zamanla
 // birbirinden sapmasını önlemek için tek kaynağa çıkarıldı.
 import { SupabaseClient } from '@supabase/supabase-js'
+import { getTopicMastery } from './mastery'
+import { generateActionSentence } from './parent-action-sentence'
 
 export interface ChildWeeklySummary {
   name: string
@@ -13,6 +15,7 @@ export interface ChildWeeklySummary {
   avgPct: number | null
   weakestTopic: string | null
   sessions: Array<{ topic: string; pct: number }>
+  actionSentence?: string
 }
 
 export interface QuizSessionRow {
@@ -69,6 +72,7 @@ export function buildParentSummaryEmailHtml(parentName: string, children: ChildW
       </div>
       <div style="margin-top:8px;font-size:13px;color:#64748b">📝 ${child.testCount} test${child.weakestTopic ? ` · ⚠️ Zayıf konu: <strong>${child.weakestTopic}</strong>` : ''}</div>
       ${child.sessions.length ? `<div style="margin-top:6px;font-size:12px;color:#94a3b8">Son testler: ${child.sessions.map(s => `${s.topic} (%${s.pct})`).join(' · ')}</div>` : ''}
+      ${child.actionSentence ? `<div style="margin-top:10px;padding:10px 12px;background:#fef3c7;border-radius:8px;font-size:12.5px;color:#78350f">💡 ${child.actionSentence}</div>` : ''}
     </td></tr>`
   }).join('')
 
@@ -133,9 +137,26 @@ export async function computeParentWeeklySummary(
     sessionsByChild.get(s.user_id)!.push(s)
   })
 
-  return links.map((link: any) => {
+  const childIdByIndex: string[] = []
+  const summaries = links.map((link: any) => {
     const childName = childIdentityNames[link.child_id] || 'Öğrenci'
     const childGrade = link.profiles?.grade ?? null
+    childIdByIndex.push(link.child_id)
     return summarizeChildSessions(childName, childGrade, sessionsByChild.get(link.child_id) ?? [])
   })
+
+  // AI-üretimli aksiyon önerisi (Faz 5) — sadece zayıf konusu olan
+  // çocuklar için, Faz 1'in mastery skoruna dayanarak. Paralel çalıştırılır
+  // (cron'da çok sayıda veli/çocuk olabilir, sıralı AI çağrısı yavaş olurdu).
+  await Promise.all(summaries.map(async (s, i) => {
+    if (!s.weakestTopic) return
+    try {
+      const mastery = await getTopicMastery(adminDb, childIdByIndex[i], s.weakestTopic)
+      if (mastery && mastery.totalCount >= 2) {
+        s.actionSentence = await generateActionSentence(s.name, s.weakestTopic, mastery.masteryScore, mastery.forgettingRisk)
+      }
+    } catch { /* opsiyonel bağlam, hata olursa sessiz geç */ }
+  }))
+
+  return summaries
 }

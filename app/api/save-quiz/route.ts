@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { checkAndNotifyRiskyTopic } from '@/lib/parent-risk-alert'
 // NEXT_PUBLIC_SUPABASE_ANON_KEY used for auth verification
+
+export const maxDuration = 30
 
 export async function POST(req: NextRequest) {
   // Auth kontrolü — userId artık token'dan alınıyor, body'den değil
@@ -117,6 +120,16 @@ export async function POST(req: NextRequest) {
           wrong_count: wrongCount, total_count: answers?.length || 0,
           last_seen_at: new Date().toISOString(),
         })
+      }
+
+      // Faz 5 (Parent Agent) — haftalık özeti beklemeden, bu konu RİSKLİ
+      // hâle geldiyse veliye hemen haber ver. Bildirim başarısız olsa
+      // bile quiz kaydı zaten tamamlandı, bu adım quiz sonucunu etkilemez
+      // (checkAndNotifyRiskyTopic kendi içinde hataları yutuyor).
+      try {
+        await checkAndNotifyRiskyTopic(supabase, userId, session.topic)
+      } catch (e: any) {
+        console.error('[save-quiz] risk bildirimi hatasi (yok sayildi):', e.message)
       }
     }
 
