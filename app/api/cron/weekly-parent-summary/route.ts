@@ -77,12 +77,22 @@ export async function GET(req: NextRequest) {
       )
       if (ok) {
         emailsSent++
-        // Uygulama içi bildirim — veli girişte "özet gönderildi" görsün
+        // Uygulama içi bildirim — veli girişte "özet gönderildi" görsün.
+        // Tek çocuk varsa ve haftalık gelişim verisi hesaplanabildiyse,
+        // bildirim metni bunu doğrudan içerir (örn. "+12 puan gelişim").
+        let notifBody = `${childSummaries.length} çocuğun için haftalık özet e-postanı gönderdik.`
+        if (childSummaries.length === 1) {
+          const g = childSummaries[0].weeklyGrowth
+          if (g?.deltaPoints != null) {
+            const sign = g.deltaPoints > 0 ? '+' : ''
+            notifBody = `${childSummaries[0].name} bu hafta ${sign}${g.deltaPoints} puan ${g.deltaPoints >= 0 ? 'gelişim gösterdi' : 'geriledi'} (geçen hafta %${g.lastWeekAvg} → bu hafta %${g.thisWeekAvg}).`
+          }
+        }
         await supabaseAdmin.from('notifications').insert({
           user_id: parentId,
           type: 'weekly_summary',
           title: '📊 Haftalık özet gönderildi',
-          body: `${childSummaries.length} çocuğun için haftalık özet e-postanı gönderdik.`,
+          body: notifBody,
           read: false,
           data: { href: '/parent' },
         })

@@ -6,6 +6,15 @@ import { resolveIdentities, resolveName } from '@/lib/identity/resolve-client'
 import ReportsHub from '@/components/ReportsHub'
 import { Suspense } from 'react'
 import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import SubjectPerformanceChart from '@/components/SubjectPerformanceChart'
+
+interface WeeklyGrowthData {
+  thisWeekAvg: number | null
+  lastWeekAvg: number | null
+  thisWeekCount: number
+  lastWeekCount: number
+  deltaPoints: number | null
+}
 
 interface ChildData {
   child_id: string
@@ -23,13 +32,14 @@ interface ChildData {
   sessions: any[]
   leaderRank: number | null
   leaderTotal: number | null
+  weeklyGrowth: WeeklyGrowthData | null
 }
 
 function ParentContent() {
   const [children, setChildren] = useState<ChildData[]>([])
   const [selectedChild, setSelectedChild] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'trend' | 'archive' | 'leaderboard' | 'reports' | 'add'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'trend' | 'weekly-growth' | 'archive' | 'leaderboard' | 'reports' | 'add'>('dashboard')
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
   const [addCode, setAddCode] = useState('')
@@ -189,6 +199,7 @@ function ParentContent() {
           {[
             { key: 'dashboard', label: '📊 Durum' },
             { key: 'trend', label: '📈 Trend' },
+            { key: 'weekly-growth', label: '📊 Haftalık Gelişim' },
             { key: 'archive', label: '📦 Arşiv' },
             { key: 'leaderboard', label: '🏆 Sıralama' },
             { key: 'reports', label: '📋 RAPORLAR' },
@@ -430,6 +441,60 @@ function ParentContent() {
                   </div>
                 </div>
               )}
+            </div>
+          )
+        })()}
+
+        {/* HAFTALIK GELİŞİM SEKMESİ */}
+        {activeTab === 'weekly-growth' && selected && (() => {
+          const g = selected.weeklyGrowth
+          if (!g) return null
+          const hasComparison = g.thisWeekAvg != null && g.lastWeekAvg != null
+          const delta = g.deltaPoints
+          const deltaColor = delta == null ? 'var(--text3)' : delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--red)' : 'var(--text3)'
+          const deltaArrow = delta == null ? '' : delta > 0 ? '▲' : delta < 0 ? '▼' : '—'
+          const compareChartData = [
+            { subject: 'Geçen Hafta', avgPct: g.lastWeekAvg ?? 0, testCount: g.lastWeekCount },
+            { subject: 'Bu Hafta', avgPct: g.thisWeekAvg ?? 0, testCount: g.thisWeekCount },
+          ]
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div className="card" style={{ textAlign: 'center', padding: '2rem 1.5rem' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                  Haftalık Gelişim Oranı
+                </div>
+                {hasComparison ? (
+                  <>
+                    <div style={{ fontSize: '40px', fontWeight: 800, color: deltaColor, lineHeight: 1 }}>
+                      {deltaArrow} {delta! > 0 ? '+' : ''}{delta}
+                      <span style={{ fontSize: '20px' }}> puan</span>
+                    </div>
+                    <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '8px' }}>
+                      Geçen hafta %{g.lastWeekAvg} → Bu hafta %{g.thisWeekAvg}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: '14px', color: 'var(--text3)', padding: '1rem 0' }}>
+                    Karşılaştırma için hem bu hafta hem geçen hafta en az bir test çözülmüş olması gerekiyor.
+                  </div>
+                )}
+              </div>
+
+              {hasComparison && (
+                <div className="card">
+                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>Geçen Hafta vs Bu Hafta</div>
+                  <SubjectPerformanceChart data={compareChartData} height={180} />
+                </div>
+              )}
+
+              <div className="card" style={{ background: 'var(--bg2)' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.7 }}>
+                  ℹ️ Hafta, Pazartesi gününden başlar. "Bu hafta" bu Pazartesi'den bugüne, "geçen hafta"
+                  ise önceki Pazartesi-Pazar aralığındaki testlerin ortalamasını gösterir. Bu karşılaştırma,
+                  her pazar günü gönderilen haftalık özet e-postasına da otomatik olarak ekleniyor.
+                </div>
+              </div>
             </div>
           )
         })()}

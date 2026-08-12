@@ -6,6 +6,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { getIdentityBySupabaseId, getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 import { inferSubject } from '@/lib/student-report-topics'
+import { computeWeeklyGrowth } from '@/lib/weekly-growth'
 
 const adminClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -146,6 +147,7 @@ export async function GET(req: NextRequest) {
         const { data: p } = await adminClient.from('profiles').select('grade').eq('id', l.child_id).maybeSingle()
         const childName = childIdentities[l.child_id]?.full_name
         const stats = await getUserStats(l.child_id)
+        const weeklyGrowth = await computeWeeklyGrowth(adminClient, l.child_id)
         const { data: streak } = await adminClient.from('streaks').select('current_streak').eq('user_id', l.child_id).maybeSingle()
         return {
           child_id: l.child_id,
@@ -153,6 +155,7 @@ export async function GET(req: NextRequest) {
           name: childName,
           grade: p?.grade,
           streak: streak?.current_streak ?? 0,
+          weeklyGrowth,
           ...stats,
         }
       }))
@@ -165,9 +168,10 @@ export async function GET(req: NextRequest) {
     const { data: p } = await adminClient.from('profiles').select('grade').eq('id', targetId).maybeSingle()
     const childIdentity = await getIdentityBySupabaseId(targetId)
     const stats = await getUserStats(targetId)
+    const weeklyGrowth = await computeWeeklyGrowth(adminClient, targetId)
     const { data: streak } = await adminClient.from('streaks').select('current_streak, longest_streak, total_points').eq('user_id', targetId).maybeSingle()
     const { data: weakTopics } = await adminClient.from('weak_topics').select('topic, subject, wrong_count, total_count').eq('user_id', targetId).order('wrong_count', { ascending: false }).limit(5)
-    return NextResponse.json({ type: 'parent', name: childIdentity?.full_name, grade: p?.grade, nickname: link.nickname, stats, streak, weakTopics })
+    return NextResponse.json({ type: 'parent', name: childIdentity?.full_name, grade: p?.grade, nickname: link.nickname, stats, weeklyGrowth, streak, weakTopics })
   }
 
   // ── ÖĞRETMEN RAPORU ──

@@ -7,6 +7,7 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { getTopicMastery } from './mastery'
 import { generateActionSentence } from './parent-action-sentence'
+import { computeWeeklyGrowth, WeeklyGrowth } from './weekly-growth'
 
 export interface ChildWeeklySummary {
   name: string
@@ -16,6 +17,7 @@ export interface ChildWeeklySummary {
   weakestTopic: string | null
   sessions: Array<{ topic: string; pct: number }>
   actionSentence?: string
+  weeklyGrowth?: WeeklyGrowth
 }
 
 export interface QuizSessionRow {
@@ -59,6 +61,20 @@ export function summarizeChildSessions(
   }
 }
 
+// Haftalık Gelişim Oranı (Pazartesi-bazlı hafta karşılaştırması) — veli
+// panelindeki "Haftalık Gelişim" sekmesiyle AYNI hesaplama (lib/weekly-
+// growth.ts), buraya küçük bir rozet olarak ekleniyor.
+function buildWeeklyGrowthBadge(g?: WeeklyGrowth): string {
+  if (!g || g.thisWeekAvg == null || g.lastWeekAvg == null) return ''
+  const delta = g.deltaPoints ?? 0
+  const color = delta > 0 ? '#16a34a' : delta < 0 ? '#dc2626' : '#64748b'
+  const arrow = delta > 0 ? '▲' : delta < 0 ? '▼' : '—'
+  const sign = delta > 0 ? '+' : ''
+  return `<div style="margin-top:8px;font-size:12.5px;color:${color};font-weight:700">
+    ${arrow} Haftalık gelişim: ${sign}${delta} puan <span style="font-weight:400;color:#94a3b8">(geçen hafta %${g.lastWeekAvg} → bu hafta %${g.thisWeekAvg})</span>
+  </div>`
+}
+
 export function buildParentSummaryEmailHtml(parentName: string, children: ChildWeeklySummary[]): string {
   const rows = children.map(child => {
     if (child.testCount === 0) {
@@ -72,6 +88,7 @@ export function buildParentSummaryEmailHtml(parentName: string, children: ChildW
       </div>
       <div style="margin-top:8px;font-size:13px;color:#64748b">📝 ${child.testCount} test${child.weakestTopic ? ` · ⚠️ Zayıf konu: <strong>${child.weakestTopic}</strong>` : ''}</div>
       ${child.sessions.length ? `<div style="margin-top:6px;font-size:12px;color:#94a3b8">Son testler: ${child.sessions.map(s => `${s.topic} (%${s.pct})`).join(' · ')}</div>` : ''}
+      ${buildWeeklyGrowthBadge(child.weeklyGrowth)}
       ${child.actionSentence ? `<div style="margin-top:10px;padding:10px 12px;background:#fef3c7;border-radius:8px;font-size:12.5px;color:#78350f">💡 ${child.actionSentence}</div>` : ''}
     </td></tr>`
   }).join('')
@@ -155,6 +172,15 @@ export async function computeParentWeeklySummary(
       if (mastery && mastery.totalCount >= 2) {
         s.actionSentence = await generateActionSentence(s.name, s.weakestTopic, mastery.masteryScore, mastery.forgettingRisk)
       }
+    } catch { /* opsiyonel bağlam, hata olursa sessiz geç */ }
+  }))
+
+  // Haftalık Gelişim Oranı — Pazartesi-bazlı bu hafta / geçen hafta
+  // karşılaştırması (lib/weekly-growth.ts), veli panelindeki yeni sekmeyle
+  // AYNI kaynak. Paralel çalıştırılır.
+  await Promise.all(summaries.map(async (s, i) => {
+    try {
+      s.weeklyGrowth = await computeWeeklyGrowth(adminDb, childIdByIndex[i])
     } catch { /* opsiyonel bağlam, hata olursa sessiz geç */ }
   }))
 
