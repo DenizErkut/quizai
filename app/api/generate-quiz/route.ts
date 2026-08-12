@@ -5,6 +5,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { generateQuizFallback } from '@/lib/openai'
 import { createClient } from '@supabase/supabase-js'
 import { getTopicMastery, computeErrorPatterns, buildStudentHistoryContext } from '@/lib/mastery'
+import { findPrerequisiteGaps, buildPrerequisiteContext } from '@/lib/learning-graph'
 import { startingDifficultyFromMastery } from '@/lib/adaptive-difficulty'
 
 const anthropic = new Anthropic()
@@ -515,6 +516,15 @@ export async function POST(req: NextRequest) {
         computeErrorPatterns(supabase, user.id, topic),
       ])
       gradeContext += buildStudentHistoryContext(mastery, patterns)
+
+      // Faz 10 (Learning Graph) — proof-of-concept: sadece roadmap'in kendi
+      // örneği olan birkaç Matematik konusu için (bkz. lib/learning-graph.ts)
+      // ön koşul kontrolü yapılıyor. Diğer konularda bulunamaması beklenen
+      // ve normal bir durum, hata değil.
+      try {
+        const gaps = await findPrerequisiteGaps(supabase, user.id, topic)
+        gradeContext += buildPrerequisiteContext(gaps)
+      } catch { /* opsiyonel bağlam, hata olursa sessiz geç */ }
     } catch { /* öğrenci geçmişi opsiyonel bağlam, hata olursa sessiz geç */ }
 
     // ✅ MEB search — paralel çalışır, max 3sn bekle. Üniversite için MEB
