@@ -138,6 +138,8 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
               <button onClick={() => quickAsk('Yanlış sorularımı birlikte gözden geçirelim, ilk sorudan başla')}
                 style={quickBtnStyle}>🔍 Yanlışlarımı birlikte inceleyelim</button>
+              <button onClick={() => quickAsk('Sadece doğru cevapları söyle, uzatma')}
+                style={quickBtnStyle}>⚡ Sadece cevabı söyle</button>
               <button onClick={() => quickAsk(`"${topic}" konusunu sıfırdan anlat`)}
                 style={quickBtnStyle}>📚 Konuyu anlat</button>
               <button onClick={() => quickAsk('Bana bu konudan 3 yeni soru sor')}
