@@ -109,7 +109,7 @@ function GenericReportPanel({ scope, hubEndpoint, report }: { scope: string; hub
     <div>
       {classroomSelector}
       {report === 'progress' && <ProgressPanel data={data} />}
-      {report === 'weak-topics' && <WeakTopicsPanel data={data} />}
+      {report === 'weak-topics' && <WeakTopicsPanel data={data} scope={scope} classroomId={classroomId} />}
       {report === 'assignments' && <AssignmentsPanel data={data} />}
       {report === 'live-quiz' && <LiveQuizPanel data={data} />}
       {report === 'inactivity' && <InactivityPanel data={data} />}
@@ -162,23 +162,73 @@ function ProgressPanel({ data }: { data: any }) {
   )
 }
 
-function WeakTopicsPanel({ data }: { data: any }) {
-  if (!data.topics?.length) return empty
+// Faz 6 (Teacher Agent) — sınıf bazlı risk gruplama (🔴🟡🟢) + AI-üretimli
+// sınıf önerisi. Mevcut konu-bazlı tablodan (aşağıda) FARKLI bir sinyal:
+// bu, öğrenci-bazlı ve Faz 1'in mastery skoruna dayanıyor. Sadece
+// scope==='teacher' iken gösterilir — veli tek çocuğunu görüyor, "sınıf
+// geneli risk dağılımı" veli için anlamlı bir kavram değil.
+function ClassRiskInsight({ classroomId }: { classroomId: string }) {
+  const supabase = createClient() as any
+  const [risk, setRisk] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const params = classroomId ? `?classroomId=${classroomId}` : ''
+        const res = await fetch(`/api/teacher/class-risk-summary${params}`, {
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+        })
+        if (res.ok && !cancelled) setRisk(await res.json())
+      } catch { /* opsiyonel bölüm, sessiz geç */ }
+      if (!cancelled) setLoading(false)
+    }
+    load()
+    return () => { cancelled = true }
+  }, [classroomId])
+
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: '1.5rem' }}><div className="spinner" /></div>
+  if (!risk?.summary || risk.summary.totalStudents === 0) return null
+
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-      <thead><tr><th style={th}>Konu</th><th style={th}>Ders</th><th style={th}>Yanlış</th><th style={th}>Hata Oranı</th><th style={th}>Kaç Öğrenci</th></tr></thead>
-      <tbody>
-        {data.topics.map((t: any, i: number) => (
-          <tr key={i}>
-            <td style={{ ...td, fontWeight: 600 }}>{t.topic}</td>
-            <td style={td}>{t.subject}</td>
-            <td style={td}>{t.wrongCount}/{t.totalCount}</td>
-            <td style={{ ...td, color: t.errorRate >= 50 ? 'var(--red)' : 'var(--text2)', fontWeight: 700 }}>%{t.errorRate}</td>
-            <td style={td}>{t.studentCount}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="card" style={{ marginBottom: '1.25rem' }}>
+      <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+        🤖 AI Sınıf Analizi
+      </div>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+        <span className="badge badge-red">🔴 Riskli: {risk.summary.counts.riskli}</span>
+        <span className="badge badge-yellow">🟡 Geliştirilmeli: {risk.summary.counts.gelistirilmeli}</span>
+        <span className="badge badge-green">🟢 Yeterli: {risk.summary.counts.yeterli}</span>
+      </div>
+      <p style={{ fontSize: '13.5px', lineHeight: 1.7, color: 'var(--text)' }}>{risk.insight}</p>
+    </div>
+  )
+}
+
+function WeakTopicsPanel({ data, scope, classroomId }: { data: any; scope: string; classroomId: string }) {
+  return (
+    <div>
+      {scope === 'teacher' && <ClassRiskInsight classroomId={classroomId} />}
+      {!data.topics?.length ? empty : (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+          <thead><tr><th style={th}>Konu</th><th style={th}>Ders</th><th style={th}>Yanlış</th><th style={th}>Hata Oranı</th><th style={th}>Kaç Öğrenci</th></tr></thead>
+          <tbody>
+            {data.topics.map((t: any, i: number) => (
+              <tr key={i}>
+                <td style={{ ...td, fontWeight: 600 }}>{t.topic}</td>
+                <td style={td}>{t.subject}</td>
+                <td style={td}>{t.wrongCount}/{t.totalCount}</td>
+                <td style={{ ...td, color: t.errorRate >= 50 ? 'var(--red)' : 'var(--text2)', fontWeight: 700 }}>%{t.errorRate}</td>
+                <td style={td}>{t.studentCount}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
   )
 }
 
