@@ -17,7 +17,7 @@ const PLANS = {
     period: 'ay',
     badge: '',
     color: '#2563eb',
-    features: ['Günde 25 test', '20 soru/test', 'Tüm soru tipleri', 'Dosya yükleme', '6 dil', 'Öncelikli destek'],
+    features: ['Sınırsız test', '20 soru/test', 'Tüm soru tipleri', 'Dosya/görsel yükleme', '6 dil', 'Öncelikli destek'],
   },
   yearly: {
     name: 'Yıllık Premium',
@@ -25,7 +25,7 @@ const PLANS = {
     period: 'yıl',
     badge: '🏆 En popüler',
     color: '#2563eb',
-    features: ['Günde 25 test', '20 soru/test', 'Tüm soru tipleri', 'Dosya yükleme', '6 dil', 'Öncelikli destek'],
+    features: ['Sınırsız test', '20 soru/test', 'Tüm soru tipleri', 'Dosya/görsel yükleme', '6 dil', 'Öncelikli destek'],
   },
   unlimited: {
     name: 'Yıllık Unlimited',

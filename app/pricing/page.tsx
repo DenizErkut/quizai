@@ -78,7 +78,7 @@ export default function PricingPage() {
       accent: true,
       badge: 'En popüler',
       features: [
-        'Ayda 300 test',
+        'Sınırsız test',
         'Test başına 20 soru',
         'Tüm konular (müfredat dışı dahil)',
         'Tüm Maarif Modeli soru tipleri',

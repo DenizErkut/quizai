@@ -19,9 +19,9 @@ const faqs = [
   { q: 'Maarif Modeli soru tipleri neler?', a: 'Pratiumda 8 farklı soru tipi var: Çoktan Seçmeli, Boşluk Doldurma, Doğru/Yanlış, Eşleştirme, Sıralama, Kısa Cevap ve Maarif Modeline özel Çoklu D/Y (birden fazla ifadeyi değerlendirme) ile Tablo Doldurma. Freemium planda temel tipler, Premium ve üstünde tüm tipler açık.' },
   { q: 'Öğretmen paneli nasıl çalışır?', a: 'Öğretmenler başvuru yapıp onaylandıktan sonra sınıf oluşturabilir, öğrencilere davet kodu gönderebilir, ödev atayabilir ve her öğrencinin performansını takip edebilir. AI, yanlış cevaplar üzerinden öğrenci özelinde analiz hazırlar. Toplu bildirim gönderme özelliği de mevcut.' },
   { q: 'Sınıf sistemine nasıl katılabilirim?', a: 'Öğretmenin sana davet kodu verir. Uygulamada "Sınıflarım" bölümüne gidip kodu girerek katılabilirsin. Premium planda birden fazla sınıfa aynı anda üye olabilirsin.' },
-  { q: 'PDF veya dosyadan soru üretebilir miyim?', a: 'Evet! PDF ve Word dosyası yükleyebilirsin. Yapay zeka o içerikten soru üretir. Bu özellik Premium ve Unlimited planlarda kullanılabilir.' },
+  { q: 'PDF veya dosyadan soru üretebilir miyim?', a: 'Evet! PDF, Word dosyası ya da görsel (fotoğraf) yükleyebilirsin. Yapay zeka o içerikten soru üretir. Bu özellik Premium ve Unlimited planlarda kullanılabilir.' },
   { q: 'Gelişim planı için kaç test çözmem gerekiyor?', a: 'En az 10 test çözdükten sonra yapay zeka test geçmişini analiz ederek 4 haftalık kişisel çalışma planı hazırlar. Daha fazla test çözdükçe plan daha isabetli olur.' },
-  { q: 'Premium ve Unlimited arasındaki fark nedir?', a: 'Premiumda ayda 300 test, test başına 20 soru, tüm soru tipleri, PDF yükleme, sınıf sistemi ve öncelikli destek var (₺1.200/yıl). Unlimitedda ise sınırsız aylık test, tüm özellikler, gelişmiş analiz raporları ve yılda 12 birebir koç görüşmesi bulunuyor (₺6.000/yıl).' },
+  { q: 'Premium ve Unlimited arasındaki fark nedir?', a: 'İkisinde de test/soru sayısında sınır yoktur. Premium\'da test başına 20 soru, tüm soru tipleri, PDF/Word/görsel yükleme, sınıf sistemi ve öncelikli destek var (₺1.200/yıl). Unlimited\'da bunlara ek olarak gelişmiş analiz raporları ve yılda 12 birebir koç görüşmesi bulunuyor (₺6.000/yıl).' },
   { q: 'Kaç dil destekleniyor?', a: 'Türkçe, İngilizce, Almanca, Fransızca, İspanyolca ve Arapça olmak üzere 6 dil destekleniyor. Test arayüzü seçtiğin dilde üretilir.' },
 ]
 
@@ -432,7 +432,7 @@ export default function LandingPage() {
               },
               {
                 label: 'Premium', price: '₺1.200', sub: '/yıl', color: '#2563eb', badge: '🏆 En popüler',
-                features: ['Ayda 300 test', 'Test başına 20 soru', 'Tüm konular (müfredat dışı dahil)', 'Tüm Maarif Modeli soru tipleri', 'PDF & dosyadan soru üret', 'Sınıf sistemi', 'Detaylı analiz & gelişim planı', 'Öncelikli destek'],
+                features: ['Sınırsız test', 'Test başına 20 soru', 'Tüm konular (müfredat dışı dahil)', 'Tüm Maarif Modeli soru tipleri', 'PDF/görselden soru üret', 'Sınıf sistemi', 'Detaylı analiz & gelişim planı', 'Öncelikli destek'],
                 cta: 'Premiuma geç →', href: '/pricing', accent: true,
               },
               {
