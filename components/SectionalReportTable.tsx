@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, Fragment } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import SubjectPerformanceChart from '@/components/SubjectPerformanceChart'
 
 interface SectionalCell {
   importedGrade: string | null
@@ -66,6 +67,24 @@ export default function SectionalReportTable({ fetchEndpoint }: { fetchEndpoint:
   const filtered = data.students.filter(s => !search.trim() || s.fullName.toLocaleLowerCase('tr-TR').includes(search.toLocaleLowerCase('tr-TR')))
   const hasClassroomCol = filtered.some(s => s.classroomName)
 
+  // "Sınıf Performansı" grafiği için — şu an görünen (arama/sınıf filtresine
+  // göre) öğrenci grubunun ders bazlı ORTALAMASI. Tek öğrenci görünüyorsa
+  // (ör. veli tek çocuğunu görüyor) bu doğal olarak o öğrencinin kendi
+  // performansına indirgenir.
+  const classPerformance = data.subjects
+    .map(subj => {
+      const values = filtered
+        .map(s => s.sections[subj]?.pratiumAvgPct)
+        .filter((v): v is number => v != null)
+      if (!values.length) return null
+      return {
+        subject: subj,
+        avgPct: Math.round(values.reduce((a, b) => a + b, 0) / values.length),
+        testCount: values.length,
+      }
+    })
+    .filter((x): x is { subject: string; avgPct: number; testCount: number } => x != null)
+
   return (
     <div>
       <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -92,6 +111,15 @@ export default function SectionalReportTable({ fetchEndpoint }: { fetchEndpoint:
         Her ders başlığı altında: soldaki sütun içe aktarılan okul notu, sağdaki sütun o dersle ilgili
         Pratium'da çözülen testlerin ortalama başarı yüzdesi (parantez içinde test sayısı).
       </p>
+
+      {classPerformance.length > 0 && (
+        <div className="card" style={{ marginBottom: '1.25rem' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+            📊 Sınıf Performansı
+          </div>
+          <SubjectPerformanceChart data={classPerformance} />
+        </div>
+      )}
 
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>

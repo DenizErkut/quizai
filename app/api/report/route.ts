@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { getIdentityBySupabaseId, getIdentitiesBySupabaseIds } from '@/lib/identity/client'
+import { inferSubject } from '@/lib/student-report-topics'
 
 const adminClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,7 +27,7 @@ async function getAuthUser() {
 async function getUserStats(userId: string) {
   const { data: sessions } = await adminClient
     .from('quiz_sessions')
-    .select('id, topic, score, pct, question_count, created_at, question_type, answers, completed')
+    .select('id, topic, grade, score, pct, question_count, created_at, question_type, answers, completed')
     .eq('user_id', userId)
     .eq('completed', true)
     .order('created_at', { ascending: false })
@@ -62,13 +63,28 @@ async function getUserStats(userId: string) {
   const typeCounts: Record<string, number> = {}
   s.forEach((x: any) => { if (x.question_type) typeCounts[x.question_type] = (typeCounts[x.question_type] || 0) + 1 })
 
+  // Ders bazlı ortalama başarı — lib/student-report-topics.ts'teki inferSubject()
+  // ile aynı, KANITLANMIŞ eşleme mantığı kullanılıyor (SectionalReportTable'ın
+  // öğretmen/kurum/veli tarafında zaten kullandığı fonksiyon) — burada ayrı,
+  // tutarsız bir ders eşlemesi icat edilmiyor.
+  const subjectAgg: Record<string, { sum: number; count: number }> = {}
+  s.forEach((x: any) => {
+    const subj = inferSubject(x.topic, x.grade)
+    if (!subjectAgg[subj]) subjectAgg[subj] = { sum: 0, count: 0 }
+    subjectAgg[subj].sum += x.pct || 0
+    subjectAgg[subj].count++
+  })
+  const subjectBreakdown = Object.entries(subjectAgg)
+    .map(([subject, d]) => ({ subject, avgPct: Math.round(d.sum / d.count), testCount: d.count }))
+    .sort((a, b) => b.testCount - a.testCount)
+
   // Son 10 test için trend (pct değerleri)
   const trend = s.slice(0, 10).reverse().map((x: any) => ({ pct: x.pct, topic: x.topic, date: x.created_at }))
 
   return {
     totalTests, totalQuestions, totalCorrect, avgPct,
     perfect, failing, passing, good,
-    weeklyTests, topTopics, typeCounts, trend,
+    weeklyTests, topTopics, typeCounts, trend, subjectBreakdown,
     recentSessions: s.slice(0, 20),
   }
 }

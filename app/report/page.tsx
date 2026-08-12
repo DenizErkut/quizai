@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import SubjectPerformanceChart from '@/components/SubjectPerformanceChart'
 
 const TYPE_LABELS: Record<string, string> = {
   multiple_choice: 'Çoktan Seçmeli', fill_blank: 'Boşluk Doldurma',
@@ -88,6 +89,14 @@ export default function StudentReportPage() {
           <StatCard label="Başarılı" value={stats.good} sub="≥%80" color="var(--green)" />
           <StatCard label="Zayıf" value={stats.failing} sub="&lt;%50" color="var(--red)" />
         </div>
+
+        {/* Ders bazlı performans */}
+        {stats.subjectBreakdown?.length > 0 && (
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Ders Bazlı Performans</div>
+            <SubjectPerformanceChart data={stats.subjectBreakdown} />
+          </div>
+        )}
 
         {/* Başarı dağılımı */}
         <div className="card" style={{ marginBottom: '1rem' }}>

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import SubjectPerformanceChart from '@/components/SubjectPerformanceChart'
 
 function pctColor(p: number) { return p >= 80 ? 'var(--green)' : p >= 50 ? '#f59e0b' : 'var(--red)' }
 
@@ -89,6 +90,14 @@ function DetailReport({ childId, onBack }: { childId: string; onBack: () => void
           </div>
         ))}
       </div>
+
+      {/* Ders bazlı performans */}
+      {stats.subjectBreakdown?.length > 0 && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Ders Bazlı Performans</div>
+          <SubjectPerformanceChart data={stats.subjectBreakdown} height={180} />
+        </div>
+      )}
 
       {/* Trend */}
       {stats.trend.length > 0 && (
