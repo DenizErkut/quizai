@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import SiteFooter from '@/components/SiteFooter'
 
 export default function PrivacyPage() {
   return (
@@ -106,6 +107,7 @@ export default function PrivacyPage() {
           <Link href="/" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}>← Ana sayfaya dön</Link>
         </div>
       </div>
+      <SiteFooter />
     </main>
   )
 }
