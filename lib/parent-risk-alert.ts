@@ -6,6 +6,7 @@
 // bir konu "riskli" hâle gelir gelmez veliye hemen haber verir.
 import { SupabaseClient } from '@supabase/supabase-js'
 import { computeTopicMastery } from './mastery'
+import { analyzeTrend } from './predictive-risk'
 import { generateActionSentence } from './parent-action-sentence'
 import { sendResendEmail } from './parent-summary'
 import { getIdentityBySupabaseId, getIdentitiesBySupabaseIds } from './identity/client'
@@ -13,13 +14,18 @@ import { getIdentityBySupabaseId, getIdentitiesBySupabaseIds } from './identity/
 const RISK_THRESHOLD = 35    // bu mastery skorunun altı "riskli" sayılır
 const RECOVERY_THRESHOLD = 50 // bu skorun üstüne çıkınca "toparlandı" sayılır
 
-// Bir quiz tamamlandıktan sonra çağrılır. Öğrencinin bu konudaki mastery
-// skoru RİSKLİ eşiğin altına düştüyse VE bu risk döneminde veliye daha
-// önce bildirilmediyse (weak_topics.risk_notified), hemen bir e-posta +
-// uygulama içi bildirim gönderir. Skor toparlanırsa risk_notified
-// sıfırlanır — böylece gelecekteki yeni bir gerileme tekrar bildirebilir.
-// Aynı konuda tekrar tekrar bildirim göndermemek için bu "tek seferlik
-// tetikleme, iyileşince sıfırlanma" tasarımı bilinçli olarak seçildi.
+// Bir quiz tamamlandıktan sonra çağrılır. İki AYRI tetikleyici yolu var:
+//
+// 1) REAKTİF (Faz 5): mastery skoru ZATEN riskli eşiğin altına düştü.
+// 2) ÖNGÖRÜCÜ (Faz 11 — Predictive Learning): mastery henüz riskli eşiğe
+//    düşmemiş olsa bile, SON TESTLERİN EĞİLİMİ kötüye gidiyorsa (roadmap:
+//    "Son 10 test → Başarı düşüyor → ... → SYSTEM ALERT") erken uyarılır.
+//    Bu, "zaten kötü" ile "kötüye gidiyor" arasındaki farkı yakalıyor —
+//    ikincisi gerçek bir ÖNGÖRÜ, sorun oluşmadan önce müdahale imkanı verir.
+//
+// İkisi de AYNI risk_notified bayrağını paylaşır (tekrar tekrar bildirim
+// göndermemek için) — öngörücü uyarı zaten gönderildiyse, durum sonradan
+// gerçekten reaktif eşiğe düşse bile ikinci bir bildirim gitmez.
 export async function checkAndNotifyRiskyTopic(
   supabase: SupabaseClient,
   studentId: string,
@@ -44,8 +50,19 @@ export async function checkAndNotifyRiskyTopic(
     return
   }
 
-  // Riskli değil, ya da riskli ama bu dönemde zaten bildirildi
-  if (mastery.masteryScore >= RISK_THRESHOLD || wt.risk_notified) return
+  if (wt.risk_notified) return // bu risk döneminde (reaktif ya da öngörücü) zaten bildirildi
+
+  let alertKind: 'reaktif' | 'ongoru' | null = null
+  if (mastery.masteryScore < RISK_THRESHOLD) {
+    alertKind = 'reaktif'
+  } else {
+    // Faz 11: henüz reaktif eşiğe düşmedi ama TREND kötüye gidiyorsa erken uyar
+    try {
+      const trend = await analyzeTrend(supabase, studentId, topic)
+      if (trend?.decliningTowardRisk) alertKind = 'ongoru'
+    } catch { /* trend analizi opsiyonel, hata olursa sessiz geç */ }
+  }
+  if (!alertKind) return
 
   const { data: links } = await supabase
     .from('parent_children').select('parent_id').eq('child_id', studentId)
@@ -58,6 +75,9 @@ export async function checkAndNotifyRiskyTopic(
     const parentIdentities = await getIdentitiesBySupabaseIds(parentIds)
 
     const actionSentence = await generateActionSentence(childName, topic, mastery.masteryScore, mastery.forgettingRisk)
+    const subject = alertKind === 'ongoru'
+      ? `📉 ${childName} — ${topic} konusunda gidişat kötüleşiyor`
+      : `⚠️ ${childName} — ${topic} konusunda destek zamanı`
 
     let anySent = false
     for (const parentId of parentIds) {
@@ -65,14 +85,14 @@ export async function checkAndNotifyRiskyTopic(
       const parentEmail = parentIdentity?.email
       if (!parentEmail) continue
 
-      const html = buildRiskAlertEmailHtml(childName, topic, actionSentence)
-      const ok = await sendResendEmail(parentEmail, `⚠️ ${childName} — ${topic} konusunda destek zamanı`, html)
+      const html = buildRiskAlertEmailHtml(childName, topic, actionSentence, alertKind)
+      const ok = await sendResendEmail(parentEmail, subject, html)
       if (ok) {
         anySent = true
         await supabase.from('notifications').insert({
           user_id: parentId,
-          type: 'risk_alert',
-          title: `⚠️ ${childName} — ${topic} konusunda destek zamanı`,
+          type: alertKind === 'ongoru' ? 'predictive_alert' : 'risk_alert',
+          title: subject,
           body: actionSentence,
           read: false,
           data: { href: '/parent' },
@@ -93,15 +113,21 @@ export async function checkAndNotifyRiskyTopic(
   }
 }
 
-function buildRiskAlertEmailHtml(childName: string, topic: string, actionSentence: string): string {
+function buildRiskAlertEmailHtml(childName: string, topic: string, actionSentence: string, alertKind: 'reaktif' | 'ongoru'): string {
+  const headline = alertKind === 'ongoru' ? `${childName} İçin Erken Uyarı` : `${childName} İçin Destek Zamanı`
+  const bodyText = alertKind === 'ongoru'
+    ? `<strong>${topic}</strong> konusundaki son test sonuçlarına bakıldığında performansının düşme eğiliminde olduğu görülüyor — henüz kritik seviyede değil, ama gidişat bu şekilde devam ederse önümüzdeki günlerde bu konuda zorlanma riski artabilir.`
+    : `<strong>${topic}</strong> konusunda son çözdüğü sorularda zorlandığı görülüyor.`
+  const icon = alertKind === 'ongoru' ? '📉' : '⚠️'
+
   return `<!DOCTYPE html><html><body style="font-family:-apple-system,'Segoe UI',sans-serif;background:#f8fafc;margin:0;padding:20px">
   <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
     <div style="background:linear-gradient(135deg,#dc2626,#f59e0b);padding:28px 24px;text-align:center">
-      <div style="font-size:28px;margin-bottom:6px">⚠️</div>
-      <div style="font-size:19px;font-weight:800;color:#fff">${childName} İçin Destek Zamanı</div>
+      <div style="font-size:28px;margin-bottom:6px">${icon}</div>
+      <div style="font-size:19px;font-weight:800;color:#fff">${headline}</div>
     </div>
     <div style="padding:24px">
-      <p style="color:#334155;font-size:14.5px;line-height:1.6;margin:0 0 16px"><strong>${topic}</strong> konusunda son çözdüğü sorularda zorlandığı görülüyor.</p>
+      <p style="color:#334155;font-size:14.5px;line-height:1.6;margin:0 0 16px">${bodyText}</p>
       <div style="padding:14px 16px;background:#fef3c7;border-radius:10px;font-size:14px;color:#78350f;margin-bottom:20px">💡 ${actionSentence}</div>
       <a href="https://pratium.com/parent" style="display:inline-block;padding:12px 24px;background:#082465;color:#fff;text-decoration:none;border-radius:10px;font-weight:700;font-size:14px">Detaylı Raporu Gör →</a>
     </div>
