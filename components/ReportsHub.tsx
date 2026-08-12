@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import StudentReportTable from '@/components/StudentReportTable'
 import SectionalReportTable from '@/components/SectionalReportTable'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import SubjectPerformanceChart from '@/components/SubjectPerformanceChart'
 
 type ReportKey =
   | 'grades' | 'sectional' | 'progress' | 'weak-topics' | 'assignments'
@@ -129,18 +131,23 @@ const empty = <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 
 function ProgressPanel({ data }: { data: any }) {
   const { weeklyTrend, students } = data
   if (!weeklyTrend?.length) return empty
-  const maxPct = 100
+  const chartData = weeklyTrend.map((w: any) => ({
+    weekLabel: new Date(w.week).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' }),
+    avgPct: w.avgPct,
+  }))
   return (
     <div>
       <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px' }}>Son 8 haftanın haftalık ortalama başarı yüzdesi.</p>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', height: '140px', marginBottom: '1.5rem', padding: '0 10px' }}>
-        {weeklyTrend.map((w: any) => (
-          <div key={w.week} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
-            <div style={{ fontSize: '11px', color: 'var(--text2)', marginBottom: '4px' }}>{w.avgPct != null ? `%${w.avgPct}` : '—'}</div>
-            <div style={{ width: '100%', maxWidth: '32px', height: `${w.avgPct != null ? (w.avgPct / maxPct) * 100 : 2}px`, background: 'var(--accent)', borderRadius: '4px 4px 0 0' }} />
-            <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '4px' }}>{new Date(w.week).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })}</div>
-          </div>
-        ))}
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <ResponsiveContainer width="100%" height={200}>
+          <LineChart data={chartData} margin={{ top: 8, right: 12, left: -20, bottom: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+            <XAxis dataKey="weekLabel" tick={{ fontSize: 11 }} />
+            <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={(v) => `%${v}`} />
+            <Tooltip formatter={(value: any) => [`%${value}`, 'Ortalama']} />
+            <Line type="monotone" dataKey="avgPct" stroke="var(--accent)" strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
+          </LineChart>
+        </ResponsiveContainer>
       </div>
       <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '8px' }}>Son 4 hafta vs önceki 4 hafta (en çok düşenler önce):</p>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
@@ -209,11 +216,26 @@ function ClassRiskInsight({ classroomId }: { classroomId: string }) {
 }
 
 function WeakTopicsPanel({ data, scope, classroomId }: { data: any; scope: string; classroomId: string }) {
+  // En yüksek hata oranına sahip ilk 8 konu — grafikte çok kalabalık
+  // olmaması için sınırlandırıldı, tablo zaten tüm konuları gösteriyor.
+  const chartTopics = (data.topics ?? [])
+    .slice()
+    .sort((a: any, b: any) => b.errorRate - a.errorRate)
+    .slice(0, 8)
+    .map((t: any) => ({ subject: t.topic, avgPct: 100 - t.errorRate, testCount: t.totalCount }))
+
   return (
     <div>
       {scope === 'teacher' && <ClassRiskInsight classroomId={classroomId} />}
       {!data.topics?.length ? empty : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+        <>
+          <div className="card" style={{ marginBottom: '1.25rem' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+              En Çok Zorlanılan Konular (başarı %)
+            </div>
+            <SubjectPerformanceChart data={chartTopics} />
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
           <thead><tr><th style={th}>Konu</th><th style={th}>Ders</th><th style={th}>Yanlış</th><th style={th}>Hata Oranı</th><th style={th}>Kaç Öğrenci</th></tr></thead>
           <tbody>
             {data.topics.map((t: any, i: number) => (
@@ -226,7 +248,8 @@ function WeakTopicsPanel({ data, scope, classroomId }: { data: any; scope: strin
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        </>
       )}
     </div>
   )
@@ -234,8 +257,19 @@ function WeakTopicsPanel({ data, scope, classroomId }: { data: any; scope: strin
 
 function AssignmentsPanel({ data }: { data: any }) {
   if (!data.assignments?.length) return empty
+  const chartData = data.assignments
+    .filter((a: any) => a.avgPct != null)
+    .map((a: any) => ({ subject: a.title, avgPct: a.avgPct, testCount: a.completedCount }))
   return (
     <div>
+      {chartData.length > 0 && (
+        <div className="card" style={{ marginBottom: '1.25rem' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+            Ödev Bazlı Ortalama Başarı
+          </div>
+          <SubjectPerformanceChart data={chartData} />
+        </div>
+      )}
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', marginBottom: '1.5rem' }}>
         <thead><tr><th style={th}>Ödev</th><th style={th}>Konu</th><th style={th}>Son Tarih</th><th style={th}>Tamamlayan</th><th style={th}>Ort. %</th></tr></thead>
         <tbody>
@@ -451,25 +485,32 @@ function ComparisonPanel({ data }: { data: any }) {
 
 function ClassroomComparePanel({ data }: { data: any }) {
   if (!data.groups?.length) return empty
-  const max = Math.max(...data.groups.map((g: any) => g.avgPct ?? 0), 1)
+  const chartData = data.groups
+    .filter((g: any) => g.avgPct != null)
+    .map((g: any) => ({ subject: g.name, avgPct: g.avgPct, testCount: g.testCount }))
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-      <thead><tr><th style={th}>Grup</th><th style={th}>Öğrenci</th><th style={th}>Test Sayısı</th><th style={th}>Ortalama %</th><th style={th}></th></tr></thead>
-      <tbody>
-        {data.groups.map((g: any) => (
-          <tr key={g.name}>
-            <td style={{ ...td, fontWeight: 600 }}>{g.name}</td>
-            <td style={td}>{g.studentCount}</td>
-            <td style={td}>{g.testCount}</td>
-            <td style={td}>{g.avgPct != null ? `%${g.avgPct}` : '—'}</td>
-            <td style={{ ...td, width: '160px' }}>
-              <div style={{ background: 'var(--border)', borderRadius: '4px', height: '10px', width: '140px' }}>
-                <div style={{ background: 'var(--accent)', height: '10px', borderRadius: '4px', width: `${((g.avgPct ?? 0) / max) * 140}px` }} />
-              </div>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div>
+      {chartData.length > 0 && (
+        <div className="card" style={{ marginBottom: '1.25rem' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+            Sınıf/Grup Karşılaştırması
+          </div>
+          <SubjectPerformanceChart data={chartData} />
+        </div>
+      )}
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+        <thead><tr><th style={th}>Grup</th><th style={th}>Öğrenci</th><th style={th}>Test Sayısı</th><th style={th}>Ortalama %</th></tr></thead>
+        <tbody>
+          {data.groups.map((g: any) => (
+            <tr key={g.name}>
+              <td style={{ ...td, fontWeight: 600 }}>{g.name}</td>
+              <td style={td}>{g.studentCount}</td>
+              <td style={td}>{g.testCount}</td>
+              <td style={td}>{g.avgPct != null ? `%${g.avgPct}` : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
