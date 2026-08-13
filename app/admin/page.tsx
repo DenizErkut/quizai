@@ -27,6 +27,7 @@ interface ErrorReport {
   id: string; user_id: string; question_text: string
   correct_answer: string; user_answer: string; topic: string
   reported_at: string; status: string; admin_note: string | null
+  source?: string; issue_type?: string | null
   profiles?: { name: string }
 }
 
@@ -1189,7 +1190,10 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                           {r.status === 'pending' ? 'Bekliyor' : r.status === 'confirmed' ? 'Onaylandı' : 'Reddedildi'}
                         </span>
                         <span style={{ fontSize: '12px', color: 'var(--text3)' }}>
-                          {(r as any).profiles?.name || 'Kullanıcı'} · {r.topic} · {new Date(r.reported_at).toLocaleDateString('tr-TR')}
+                          {r.source === 'system_scan'
+                            ? <span style={{ color: 'var(--primary)', fontWeight: 600 }}>🔍 Otomatik tarama</span>
+                            : ((r as any).profiles?.name || 'Kullanıcı')} · {r.topic} · {new Date(r.reported_at).toLocaleDateString('tr-TR')}
+                          {r.issue_type && <span style={{ marginLeft: '6px', padding: '1px 6px', borderRadius: '99px', background: 'var(--bg2)', fontSize: '10px' }}>{r.issue_type}</span>}
                         </span>
                       </div>
                     </div>
@@ -1198,8 +1202,14 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                       {r.question_text}
                     </div>
                     <div style={{ fontSize: '12px', marginBottom: '8px', display: 'flex', gap: '16px' }}>
-                      <span><span style={{ color: 'var(--red)' }}>✗ Kullanıcı:</span> {r.user_answer}</span>
-                      <span><span style={{ color: 'var(--green)' }}>✓ Kayıtlı doğru:</span> {r.correct_answer}</span>
+                      {r.source === 'system_scan' ? (
+                        <span style={{ color: 'var(--text2)' }}>💡 Beklenen/açıklama: {r.correct_answer || '—'}</span>
+                      ) : (
+                        <>
+                          <span><span style={{ color: 'var(--red)' }}>✗ Kullanıcı:</span> {r.user_answer}</span>
+                          <span><span style={{ color: 'var(--green)' }}>✓ Kayıtlı doğru:</span> {r.correct_answer}</span>
+                        </>
+                      )}
                     </div>
 
                     {r.admin_note && (
