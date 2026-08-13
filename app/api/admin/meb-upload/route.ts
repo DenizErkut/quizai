@@ -48,6 +48,65 @@ async function embedText(_text: string): Promise<{ values: number[] | null }> {
 }
 
 
+// Ortak çekirdek: metni (gerekirse PDF'ten OCR fallback'iyle) çıkar,
+// chunk'la, veritabanına kaydet. Hem processFromStorage (büyük dosyalar,
+// JSON body) hem POST'un FormData dalı (küçük dosyalar, doğrudan yükleme)
+// BU TEK fonksiyonu çağırır — önceki halde ikisi birbirinden habersiz,
+// KOPYA mantık içeriyordu (processFromStorage düzeltilmiş, FormData dalı
+// hâlâ eski bare pdf-parse'ta kalmıştı; 13 Ağustos 2026'da bir öğretmen
+// "Yükle ve Chunkla" butonuyla — yani FormData dalıyla — test edip hâlâ
+// "0.0K karakter" gördü, çalışma zamanı logları bunu doğruladı).
+async function extractChunkAndSave(params: {
+  fileBytes: Buffer | null
+  rawTextInput: string
+  ext: string | undefined
+  fileUrl: string | null
+  sourceType: string
+  title: string; grade: string; subject: string; unit: string; level: string
+}) {
+  const { fileBytes, ext, fileUrl, sourceType, title, grade, subject, unit, level } = params
+  let rawText = params.rawTextInput || ''
+  let extractEngine = 'none'
+
+  if (!rawText && fileBytes && ext === 'pdf') {
+    const result = await extractPdfText(fileBytes)
+    rawText = result.text
+    extractEngine = result.engine
+    console.log(`[meb-upload] PDF çıkarma motoru: ${extractEngine}, ${rawText.length} karakter, ${result.pageCount} sayfa`)
+  }
+  if (!rawText) rawText = fileUrl ? `[Dosya: ${fileUrl}]` : ''
+
+  const { data: resource, error: resErr } = await adminDb
+    .from('meb_resources')
+    .insert({ title, grade, subject, unit, level, source_type: sourceType, file_url: fileUrl, raw_text: rawText })
+    .select('id').single()
+
+  if (resErr || !resource) {
+    return NextResponse.json({ error: `DB kayıt hatası: ${resErr?.message}` }, { status: 500 })
+  }
+
+  const chunks = chunkText(rawText)
+  let embeddedCount = 0
+  for (let i = 0; i < chunks.length; i++) {
+    const { values: embedding } = await embedText(chunks[i])
+    const { error: insertErr } = await adminDb.from('meb_chunks').insert({
+      resource_id: resource.id, chunk_index: i,
+      content: chunks[i], embedding: embedding ? JSON.stringify(embedding) : null,
+      grade, subject, unit, level,
+    })
+    if (insertErr) console.error(`[meb-upload] chunk ${i} insert hatası:`, insertErr.message)
+    else if (embedding) embeddedCount++
+    if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 200))
+  }
+
+  console.log(`[meb-upload] SUCCESS: ${chunks.length} chunk, ${embeddedCount} embed, motor=${extractEngine}, ${rawText.length} karakter`)
+  return NextResponse.json({
+    success: true, resource_id: resource.id,
+    chunks: chunks.length, embedded: embeddedCount,
+    chars: rawText.length,
+  })
+}
+
 // Base64 PDF'i service role key ile Storage'a yükle ve işle
 async function processFromStorage(body: {
   storage_path: string; file_url: string;
@@ -64,53 +123,12 @@ async function processFromStorage(body: {
     return NextResponse.json({ error: `Storage indirme hatasi: ${dlErr?.message}` }, { status: 500 })
   }
 
-  const fileUrl = file_url
   const ext = storage_path.split('.').pop()
+  const bytes = Buffer.from(await fileData.arrayBuffer())
 
-  // PDF parse — taranmış/görsel PDF'lerde (metin katmanı yoksa) otomatik
-  // olarak Gemini Vision → Claude sırasıyla OCR fallback'i devreye girer
-  // (bkz. lib/pdf-extract.ts). Önceden burada SADECE bare pdf-parse
-  // kullanılıyordu, taranmış PDF'lerde sessizce boş metin üretip
-  // "[Dosya: URL]" yer tutucusu kaydediyordu (13 Ağustos 2026'da bir
-  // öğretmen tarafından "0.0K karakter" olarak bildirildi).
-  let rawText = ''
-  let extractEngine = 'none'
-  if (ext === 'pdf') {
-    const bytes = Buffer.from(await fileData.arrayBuffer())
-    const result = await extractPdfText(bytes)
-    rawText = result.text
-    extractEngine = result.engine
-    console.log(`[meb-upload] PDF çıkarma motoru: ${extractEngine}, ${rawText.length} karakter, ${result.pageCount} sayfa`)
-  }
-  if (!rawText) rawText = `[Dosya: ${fileUrl}]`
-
-  const { data: resource, error: resErr } = await adminDb
-    .from('meb_resources')
-    .insert({ title, grade, subject, unit, level, source_type: 'pdf', file_url: fileUrl, raw_text: rawText })
-    .select('id').single()
-
-  if (resErr || !resource) {
-    return NextResponse.json({ error: `DB kayıt hatası: ${resErr?.message}` }, { status: 500 })
-  }
-
-  const chunks = chunkText(rawText)
-  let embeddedCount = 0
-
-  for (let i = 0; i < chunks.length; i++) {
-    const { values: embedding } = await embedText(chunks[i])
-    await adminDb.from('meb_chunks').insert({
-      resource_id: resource.id, chunk_index: i,
-      content: chunks[i], embedding: embedding ? JSON.stringify(embedding) : null,
-      grade, subject, unit, level,
-    })
-    if (embedding) embeddedCount++
-    if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 200))
-  }
-
-  return NextResponse.json({
-    success: true, resource_id: resource.id,
-    chunks: chunks.length, embedded: embeddedCount,
-    chars: rawText.length, // embedding kaldırıldı
+  return extractChunkAndSave({
+    fileBytes: bytes, rawTextInput: '', ext, fileUrl: file_url, sourceType: 'pdf',
+    title, grade, subject, unit, level,
   })
 }
 
@@ -147,9 +165,12 @@ export async function POST(req: NextRequest) {
 
     let rawText = rawTextInput || ''
     let fileUrl: string | null = null
+    let fileBytesForExtract: Buffer | null = null
+    let fileExt: string | undefined
 
     if (file && file.size > 0) {
       const ext = file.name.split('.').pop()
+      fileExt = ext
       const normTR = (s: string) => s
         .replace(/[çÇ]/g, 'c').replace(/[şŞ]/g, 's')
         .replace(/[ğĞ]/g, 'g').replace(/[ıİ]/g, 'i')
@@ -169,75 +190,24 @@ export async function POST(req: NextRequest) {
 
       const { data: urlData } = adminDb.storage.from('meb-resources').getPublicUrl(path)
       fileUrl = urlData?.publicUrl || null
-
-      if (ext === 'pdf' && !rawText) {
-        try {
-          const pdfParse = require('pdf-parse')
-          const parsed = await pdfParse(Buffer.from(bytes))
-          rawText = parsed.text || ''
-          console.log(`[meb-upload] PDF parsed: ${rawText.length} chars`)
-        } catch (e) {
-          console.warn('[meb-upload] pdf-parse failed')
-        }
-      }
+      fileBytesForExtract = Buffer.from(bytes)
     }
 
     if (!rawText && !fileUrl) {
       return NextResponse.json({ error: 'Dosya veya metin içeriği gerekli' }, { status: 400 })
     }
 
-    // rawText tamamen boşsa dosya yüklendi ama metin çıkarılamadı — yine kaydet
-    if (!rawText && fileUrl) {
-      rawText = `[Dosya yüklendi: ${fileUrl}]`
-    }
-
-    // meb_resources tablosuna kaydet
-    const { data: resource, error: resErr } = await adminDb
-      .from('meb_resources')
-      .insert({ title, grade, subject, unit, level, source_type: file ? 'pdf' : 'text', file_url: fileUrl, raw_text: rawText })
-      .select('id')
-      .single()
-
-    if (resErr || !resource) {
-      return NextResponse.json({ error: `DB kayıt hatası: ${resErr?.message}` }, { status: 500 })
-    }
-
-    // Chunk'lara böl ve embed et
-    const chunks = chunkText(rawText)
-    console.log(`[meb-upload] ${chunks.length} chunks created`)
-
-    let embeddedCount = 0
-
-    // Chunk'ları batch halinde kaydet (tek tek değil — rate limit için)
-    for (let i = 0; i < chunks.length; i++) {
-      const { values: embedding } = await embedText(chunks[i])
-
-      const { error: insertErr } = await adminDb.from('meb_chunks').insert({
-        resource_id: resource.id,
-        chunk_index: i,
-        content: chunks[i],
-        embedding: embedding ? JSON.stringify(embedding) : null,
-        grade, subject, unit, level,
-      })
-
-      if (insertErr) {
-        console.error(`[meb-upload] chunk ${i} insert error:`, insertErr.message)
-      } else {
-        if (embedding) embeddedCount++
-      }
-
-      // Rate limit için kısa bekleme
-      if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 200))
-    }
-
-    console.log(`[meb-upload] SUCCESS: ${chunks.length} chunks, ${embeddedCount} embedded`)
-    return NextResponse.json({
-      success: true,
-      resource_id: resource.id,
-      chunks: chunks.length,
-      embedded: embeddedCount,
-      chars: rawText.length,
-      // embedding kaldırıldı
+    // extractChunkAndSave — taranmış/görsel PDF'lerde (metin katmanı
+    // yoksa) otomatik olarak Gemini Vision → Claude OCR fallback'i
+    // devreye girer (bkz. lib/pdf-extract.ts). ÖNCEDEN bu dal, yukarıdaki
+    // processFromStorage'dan BAĞIMSIZ, kendi bare pdf-parse'ını
+    // kullanıyordu — "Yükle ve Chunkla" butonu (bu dal) taranmış
+    // PDF'lerde sessizce "0.0K karakter" üretiyordu, processFromStorage
+    // düzeltilmiş olsa bile bu dal düzeltmeden habersiz kalmıştı.
+    return extractChunkAndSave({
+      fileBytes: fileBytesForExtract, rawTextInput: rawText, ext: fileExt, fileUrl,
+      sourceType: file ? 'pdf' : 'text',
+      title, grade, subject, unit, level,
     })
   } catch (e: any) {
     console.error('[meb-upload] error:', e.message)
