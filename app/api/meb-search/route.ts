@@ -173,6 +173,27 @@ export async function POST(req: NextRequest) {
       const { data: allResources } = await q
 
       if (allResources?.length) {
+        // Grade formatları veritabanında çok tutarsız ("Ortaokul 6. Sınıf",
+        // "ortaokul 6.sınıf", "Ortaokul 6. SInıf" vb.) — tam metin eşleşmesi
+        // güvenilir değil. Bunun yerine SINIF NUMARASINI regex ile çıkarıp
+        // karşılaştırıyoruz. Bu, 13 Ağustos 2026'da bulunan gerçek bir hatayı
+        // düzeltiyor: `unit` parametresi verildiğinde grade HİÇ kontrol
+        // edilmiyordu (yukarıdaki if/else if zinciri) — bu yüzden 6. sınıf
+        // bir öğrenci, aynı isimli 5. sınıf ünitesinden içerik alabiliyordu.
+        const extractGradeNum = (g: string | null | undefined): number | null => {
+          const m = (g || '').match(/(\d+)\s*\.?\s*s[ıi]n[ıi]f/i)
+          return m ? parseInt(m[1], 10) : null
+        }
+        const requestedGradeNum = extractGradeNum(grade)
+        let gradeFiltered = allResources
+        if (requestedGradeNum !== null) {
+          const matching = allResources.filter((r: any) => extractGradeNum(r.grade) === requestedGradeNum)
+          // Eşleşen varsa SADECE onları kullan; hiç yoksa (ör. o sınıf seviyesi
+          // için hiç kaynak yüklenmemiş) tüm adaylara geri dön — hiç içerik
+          // dönmemesindense yanlış sınıftan da olsa içerik dönmesi tercih edilir.
+          if (matching.length > 0) gradeFiltered = matching
+        }
+
         // Bazı yüklenen kaynaklar sadece MÜFREDAT KAZANIM KODU LİSTESİ
         // (örn. "SB.6.4.1. ... a) ... b) ...") - bunlar ogretmene yonelik
         // ogrenme ciktisi tanimlaridir, ogrenciye sorulacak GERCEK ders
@@ -187,8 +208,8 @@ export async function POST(req: NextRequest) {
           return !!matches && matches.length >= 2 && text.length < 4000
         }
 
-        const narrative = allResources.filter((r: any) => !isKazanimListesi(r.raw_text || ''))
-        const pool = narrative.length > 0 ? narrative : allResources
+        const narrative = gradeFiltered.filter((r: any) => !isKazanimListesi(r.raw_text || ''))
+        const pool = narrative.length > 0 ? narrative : gradeFiltered
 
         // En zengin (en uzun) icerigi one al - daha cok ornek/hikaye/haber
         // demek, sorulari cesitlendirmek icin daha fazla malzeme demek
@@ -204,7 +225,7 @@ export async function POST(req: NextRequest) {
           const startIdx = findContentStart(raw, unit || subject || topic || '')
           return `[MEB Kaynak ${i + 1} - ${r.subject || ''}/${r.unit || ''}]\n${raw.slice(startIdx, startIdx + 3000)}`
         }).join('\n\n---\n\n')
-        console.log(`[meb-search] resources: ${resources.length} found (${allResources.length} aday, ${narrative.length} anlatisal)`)
+        console.log(`[meb-search] resources: ${resources.length} found (${allResources.length} aday, ${gradeFiltered.length} sinif-uyumlu, ${narrative.length} anlatisal)`)
       }
     }
 

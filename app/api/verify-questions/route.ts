@@ -14,7 +14,7 @@ const anthropic = new Anthropic()
 // (Claude'un kendi urettigini yine Claude'a kontrol ettirmek yerine)
 function isMathQuestion(q: any): boolean {
   const text = `${q.q || ''} ${(q.opts || []).join(' ')}`
-  return /[0-9]\s*[+\-*/=]\s*[0-9]|denklem|hesapla|çöz|eşitlik|kaçtır|toplam|fark|çarp|bölüm|equation|solve|calculate/i.test(text)
+  return /[0-9]\s*[+\-*/=]\s*[0-9]|denklem|hesapla|çöz|eşitlik|kaçtır|toplam|fark|çarp|bölüm|equation|solve|calculate|basamak|okunuş|rakam/i.test(text)
 }
 
 // Soru tipine göre doğrulama prompt'u
@@ -98,6 +98,46 @@ function quickMathCheck(q: any): boolean {
   }
 }
 
+// Öğretmen geri bildirimiyle bulunan gerçek bir hata (13 Ağustos 2026):
+// büyük sayılarda (8-10 haneli, "149 597 890" gibi) "X basamağında hangi
+// rakam var" / "X basamağının basamak değeri kaçtır" sorularında AI
+// (Claude) kendi ürettiği açıklamada bile basamak sayarken KAYMA hatası
+// yapıyordu (ör. sondaki "0"ı atlayıp tüm basamak isimlerini bir kaydırma).
+// isMathQuestion() regex'i bu soru kalıbını ("kaçtır" hariç, "hangi rakam
+// bulunmaktadır" gibi ifadeler) YAKALAMADIĞI için bu sorular yanlışlıkla
+// "matematik değil" sayılıp BAĞIMSIZ OpenAI kontrolü yerine Claude'un
+// kendi kendini kontrol etmesine bırakılıyordu — bu da aynı hatayı
+// tekrarlıyordu. Bu fonksiyon, AI'a hiç güvenmeden, KOD İLE (Python/JS
+// aritmetiği ile) basamak hesabını yapıp iddia edilen cevapla karşılaştırır
+// — matematiksel olarak %100 güvenilir, AI'ın hesap hatası riski hiç yok.
+const BASAMAK_ADLARI = ['birler', 'onlar', 'yüzler', 'binler', 'on binler', 'yüz binler', 'milyonlar', 'on milyonlar', 'yüz milyonlar', 'milyarlar', 'on milyarlar', 'yüz milyarlar']
+
+function checkBasamakQuestion(q: any): { ok: boolean; gercekCevap: string } | null {
+  const text = q.q || ''
+  if (!/basamağ/i.test(text)) return null // basamak sorusu değil
+
+  const numMatch = text.match(/\d{1,3}(?:[\s.]\d{3})+/)
+  if (!numMatch) return null
+
+  const digits = numMatch[0].replace(/[\s.]/g, '')
+  const tl = text.toLowerCase()
+  const sortedNames = [...BASAMAK_ADLARI].sort((a, b) => b.length - a.length)
+  const basamakAdi = sortedNames.find(ad => tl.includes(ad + ' basamağ'))
+  if (!basamakAdi) return null
+
+  const basamakIndex = BASAMAK_ADLARI.indexOf(basamakAdi)
+  if (basamakIndex >= digits.length) return null // sayı bu basamağa sahip değil
+
+  const gercekRakam = digits[digits.length - 1 - basamakIndex]
+  const basamakDegeriIsteniyor = /basamak değeri/i.test(text)
+  const dogruCevap = basamakDegeriIsteniyor
+    ? String(parseInt(gercekRakam, 10) * Math.pow(10, basamakIndex))
+    : gercekRakam
+
+  const iddiaEdilenCevap = (q.opts?.[q.ans] || '').replace(/[\s.]/g, '')
+  return { ok: iddiaEdilenCevap === dogruCevap, gercekCevap: dogruCevap }
+}
+
 export async function POST(req: NextRequest) {
   // Internal secret (server-to-server) VEYA Bearer token kabul edilir
   const internalSecret = req.headers.get('x-internal-secret')
@@ -138,6 +178,14 @@ export async function POST(req: NextRequest) {
         if (!quickMathCheck(q)) {
           rejected.push(idx)
           rejectReasons.push(`Q${idx}: local math check failed`)
+          return
+        }
+
+        // 1b. Basamak sorusu ise -- AI'a hiç gitmeden, kod ile kesin kontrol
+        const basamakResult = checkBasamakQuestion(q)
+        if (basamakResult && !basamakResult.ok) {
+          rejected.push(idx)
+          rejectReasons.push(`Q${idx}: basamak hesabı yanlış (doğrusu: ${basamakResult.gercekCevap})`)
           return
         }
 
