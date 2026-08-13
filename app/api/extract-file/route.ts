@@ -34,7 +34,7 @@ async function callGemini(model: string, parts: any[]): Promise<string> {
 // Ses dosyası → Gemini Audio
 async function extractWithGeminiAudio(buffer: Buffer, mimeType: string, filename: string): Promise<string> {
   const base64 = buffer.toString('base64')
-  const text = await callGemini('gemini-1.5-flash', [
+  const text = await callGemini('gemini-2.0-flash', [
     {
       inlineData: {
         mimeType,

@@ -7,8 +7,11 @@ import { cookies } from 'next/headers'
 import { extractPdfText } from '@/lib/pdf-extract'
 
 // OCR fallback'i (Gemini Vision / Claude) birkaç saniye sürebilir,
-// varsayılan süre yetersiz kalabilir.
-export const maxDuration = 90
+// varsayılan süre yetersiz kalabilir. 90sn'de gerçek bir zaman aşımı
+// yaşandı (Gemini başarısız olup Claude'a düşen senaryoda) — 180'e
+// çıkarıldı (Vercel Pro planında fonksiyon başına izin verilen üst
+// sınırın altında, güvenli bir marj).
+export const maxDuration = 180
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
