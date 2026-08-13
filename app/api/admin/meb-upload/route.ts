@@ -1,9 +1,14 @@
 // app/api/admin/meb-upload/route.ts
-// MEB kaynağı yükle — PDF parse + chunk + embed + Supabase kaydet
+// MEB kaynağı yükle — PDF parse (+ taranmış PDF'ler için OCR fallback) + chunk + embed + Supabase kaydet
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { extractPdfText } from '@/lib/pdf-extract'
+
+// OCR fallback'i (Gemini Vision / Claude) birkaç saniye sürebilir,
+// varsayılan süre yetersiz kalabilir.
+export const maxDuration = 90
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -62,18 +67,20 @@ async function processFromStorage(body: {
   const fileUrl = file_url
   const ext = storage_path.split('.').pop()
 
-  // PDF parse
+  // PDF parse — taranmış/görsel PDF'lerde (metin katmanı yoksa) otomatik
+  // olarak Gemini Vision → Claude sırasıyla OCR fallback'i devreye girer
+  // (bkz. lib/pdf-extract.ts). Önceden burada SADECE bare pdf-parse
+  // kullanılıyordu, taranmış PDF'lerde sessizce boş metin üretip
+  // "[Dosya: URL]" yer tutucusu kaydediyordu (13 Ağustos 2026'da bir
+  // öğretmen tarafından "0.0K karakter" olarak bildirildi).
   let rawText = ''
+  let extractEngine = 'none'
   if (ext === 'pdf') {
-    try {
-      const pdfParse = require('pdf-parse')
-      const bytes = Buffer.from(await fileData.arrayBuffer())
-      const parsed = await pdfParse(bytes)
-      rawText = parsed.text || ''
-      console.log(`[meb-upload] PDF parsed: ${rawText.length} chars`)
-    } catch (e: any) {
-      console.warn('[meb-upload] pdf-parse failed:', e.message)
-    }
+    const bytes = Buffer.from(await fileData.arrayBuffer())
+    const result = await extractPdfText(bytes)
+    rawText = result.text
+    extractEngine = result.engine
+    console.log(`[meb-upload] PDF çıkarma motoru: ${extractEngine}, ${rawText.length} karakter, ${result.pageCount} sayfa`)
   }
   if (!rawText) rawText = `[Dosya: ${fileUrl}]`
 

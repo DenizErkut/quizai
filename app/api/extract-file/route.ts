@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { extractPdfText } from '@/lib/pdf-extract'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
@@ -28,23 +29,6 @@ async function callGemini(model: string, parts: any[]): Promise<string> {
   }
   const data = await res.json()
   return data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
-}
-
-// Görsel PDF → Gemini Vision
-async function extractWithGeminiVision(buffer: Buffer, filename: string): Promise<string> {
-  const base64 = buffer.toString('base64')
-  const text = await callGemini('gemini-1.5-flash', [
-    {
-      inlineData: {
-        mimeType: 'application/pdf',
-        data: base64,
-      }
-    },
-    {
-      text: 'Bu PDF dosyasının tüm metin içeriğini Türkçe olarak çıkar. Başlıkları, paragrafları ve listeleri koru. Sadece metni döndür, açıklama yapma.'
-    }
-  ])
-  return text.trim()
 }
 
 // Ses dosyası → Gemini Audio
@@ -122,71 +106,25 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
   // ── PDF ──
   if (ext === 'pdf') {
     try {
-      const { default: pdfParse } = await import('pdf-parse') as any
-      let pdfData: any = null
-      let parsedText = ''
+      const result = await extractPdfText(buffer)
 
-      try {
-        pdfData = await pdfParse(buffer, { max: 0 })
-        parsedText = (pdfData?.text || '').trim()
-      } catch (parseErr) {
-        console.warn('[extract-file] pdf-parse failed:', parseErr)
-      }
-
-      // Metin yeterliyse direkt döndür
-      if (parsedText.length >= 200) {
+      if (!result.text) {
         return {
-          content: parsedText.slice(0, 30000),
+          error: 'pdf_image_only',
+          content: '',
           type: 'pdf',
           filename,
-          pageCount: pdfData?.numpages || 0,
+          message: 'Bu PDF tamamen taranmış görsel içeriyor ve metin çıkarılamadı.',
         }
-      }
-
-      // Taranmış PDF → Gemini Vision'ı dene
-      if (process.env.GEMINI_API_KEY) {
-        try {
-          console.log('[extract-file] Taranmış PDF — Gemini Vision deneniyor...')
-          const geminiText = await extractWithGeminiVision(buffer, filename)
-          if (geminiText.length >= 100) {
-            return {
-              content: geminiText.slice(0, 30000),
-              type: 'pdf',
-              filename,
-              pageCount: pdfData?.numpages || 0,
-              note: '🤖 Gemini Vision ile taranmış PDF okundu',
-              engine: 'gemini-vision',
-            }
-          }
-        } catch (geminiErr) {
-          console.warn('[extract-file] Gemini Vision failed, falling back to Claude:', geminiErr)
-        }
-      }
-
-      // Gemini yoksa veya başarısız → Claude fallback
-      const totalPages = pdfData?.numpages || 0
-      if (buffer.length <= 15 * 1024 * 1024 && totalPages <= 90) {
-        const base64 = buffer.toString('base64')
-        const message = await anthropic.messages.create({
-          model: 'claude-sonnet-4-5',
-          max_tokens: 3000,
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } } as any,
-              { type: 'text', text: 'Bu PDF dosyasinin tum metin icerigini cikar. Sadece metni dondur.' },
-            ],
-          }],
-        }) as any
-        return { content: message.content[0].text, type: 'pdf', filename, pageCount: totalPages, engine: 'claude' }
       }
 
       return {
-        error: 'pdf_image_only',
-        content: '',
+        content: result.text.slice(0, 30000),
         type: 'pdf',
         filename,
-        message: 'Bu PDF tamamen taranmış görsel içeriyor ve metin çıkarılamadı.',
+        pageCount: result.pageCount,
+        ...(result.engine === 'gemini-vision' ? { note: '🤖 Gemini Vision ile taranmış PDF okundu', engine: 'gemini-vision' } : {}),
+        ...(result.engine === 'claude' ? { engine: 'claude' } : {}),
       }
 
     } catch (pdfErr: any) {
