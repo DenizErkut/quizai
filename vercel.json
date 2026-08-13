@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/content-quality-scan",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/disengagement-check",
+      "schedule": "0 9 * * 3"
     }
   ]
 }
