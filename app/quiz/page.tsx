@@ -199,7 +199,7 @@ function QuizPageContent() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [current, setCurrent] = useState(0)
-  const [answers, setAnswers] = useState<{ userAns: number; correct: boolean }[]>([])
+  const [answers, setAnswers] = useState<{ userAns: number; correct: boolean; timeMs?: number }[]>([])
   // ── Adaptif Test Motoru (Faz 2) ──
   // chunkBoundary: ilk parçanın kaç sorudan oluştuğu (null = adaptif değil
   // veya ikinci parça zaten getirilmiş). resolvedDifficulty: sunucunun
@@ -212,7 +212,17 @@ function QuizPageContent() {
   const [showIntervention, setShowIntervention] = useState(false)
   const [interventionInfo, setInterventionInfo] = useState<{ exp: string; typeLabel: string } | null>(null)
   // ✅ answersRef: save-quiz için her zaman güncel değeri tut (React state async sorununu çözer)
-  const answersRef = useRef<{ userAns: number; correct: boolean }[]>([])
+  const answersRef = useRef<{ userAns: number; correct: boolean; timeMs?: number }[]>([])
+  // Faz 11 (kalan tahmin modeli — uygun çalışma süresi): her soru
+  // gösterildiğinde bu referans güncellenir, cevap gönderilirken
+  // "bu soruda ne kadar zaman geçirildi" hesaplanabilsin diye. Tek bir
+  // useEffect ile güncelleniyor — 4 ayrı cevap işleyicisinin (çoktan
+  // seçmeli/doğru-yanlış, boşluk doldurma, eşleştirme, sıralama) her
+  // biri aynı referansı okur, kopya zamanlama mantığı yazılmaz.
+  const questionShownAtRef = useRef<number>(Date.now())
+  useEffect(() => {
+    questionShownAtRef.current = Date.now()
+  }, [current, questions.length])
   const isSavingRef = useRef(false) // ✅ Çift save-quiz çağrısını önle
   const [chosen, setChosen] = useState<number | null>(null)
   const searchParams = useSearchParams()
@@ -499,7 +509,7 @@ function QuizPageContent() {
       correct = idx === q.ans
     }
     setAnswers(prev => {
-      const nextArr = [...prev, { userAns: idx, correct }]
+      const nextArr = [...prev, { userAns: idx, correct, timeMs: Date.now() - questionShownAtRef.current }]
       answersRef.current = nextArr
 
       // Öğretici müdahale tespiti (Faz 2): son 2 cevap AYNI soru tipinde
@@ -612,7 +622,7 @@ function QuizPageContent() {
 
     setChosen(correct ? q.ans : -1)
     setAnswers(prev => {
-      const next = [...prev, { userAns: correct ? q.ans : -1, correct }]
+      const next = [...prev, { userAns: correct ? q.ans : -1, correct, timeMs: Date.now() - questionShownAtRef.current }]
       answersRef.current = next
       return next
     })
@@ -650,7 +660,7 @@ function QuizPageContent() {
     const correct = correctCount === pairs.length
     setChosen(correct ? q.ans : -1)
     setAnswers(prev => {
-      const next = [...prev, { userAns: correct ? q.ans : -1, correct }]
+      const next = [...prev, { userAns: correct ? q.ans : -1, correct, timeMs: Date.now() - questionShownAtRef.current }]
       answersRef.current = next
       return next
     })
@@ -662,7 +672,7 @@ function QuizPageContent() {
     const correct = orderItems.every((item, i) => item === items[q.correctOrder?.[i] ?? i])
     setChosen(correct ? 0 : -1)
     setAnswers(prev => {
-      const next = [...prev, { userAns: correct ? 0 : -1, correct }]
+      const next = [...prev, { userAns: correct ? 0 : -1, correct, timeMs: Date.now() - questionShownAtRef.current }]
       answersRef.current = next
       return next
     })

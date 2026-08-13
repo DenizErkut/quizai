@@ -10,6 +10,7 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
 import { computeTopicMastery, TopicMastery } from './mastery'
+import { analyzeStudyDuration } from './study-duration-model'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
@@ -147,6 +148,19 @@ export async function generateStudyPlan(
     }
   }
 
+  // Faz 11'in 3. tahmin modeli: uygun çalışma süresi. Yeterli veri
+  // (en az 5 zamanlı oturum) birikmişse, AI'a günlük süre önerisini
+  // (daily_minutes) öğrencinin GERÇEK yorgunluk paternine göre
+  // kalibre etmesi için bir ipucu veriliyor. Veri yoksa (yeni özellik,
+  // henüz birikmemiş) sessizce atlanır -- bu normal, hata değil.
+  let durationText = ''
+  try {
+    const duration = await analyzeStudyDuration(supabase, userId)
+    if (duration.hasEnoughData && duration.fatigueDetected && duration.recommendedSessionLength) {
+      durationText = `\n\nÇALIŞMA SÜRESİ İÇGÖRÜSÜ: Bu öğrencinin geçmiş testlerinde, bir oturumda yaklaşık ${duration.fatiguePointEstimate}. sorudan sonra doğruluk oranının belirgin şekilde düştüğü gözlemleniyor (dikkat dağılması paterni). Günlük çalışma önerini (daily_minutes) buna göre, daha KISA ama daha SIK oturumlar önerecek şekilde kalibre et.`
+    }
+  } catch { /* opsiyonel içgörü, hata olursa sessiz geç */ }
+
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-5',
     max_tokens: 1500,
@@ -159,7 +173,7 @@ Toplam test: ${sessions?.length || 0}
 
 SISTEM TARAFINDAN BELIRLENEN ONCELIKLI KONULAR (bunlari plana MUTLAKA dahil et, mastery skoru dusuk olan konulara daha fazla hafta ayir):
 ${goalsText}
-${effectivenessText}
+${effectivenessText}${durationText}
 
 Kullanicinin kendi notlari (MUTLAKA dikkate al): ${userNotes || 'Not girilmemis'}
 Dil: ${opts.language || 'Turkce'}
