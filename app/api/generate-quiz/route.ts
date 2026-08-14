@@ -356,6 +356,47 @@ MEB KAYNAK METNİ:\n${mebCtx}\n\n`
   return base + `Generate multiple choice questions with 4 options (A/B/C/D), correct answer index, and explanation.\n\nCRITICAL FOR MATH/SCIENCE:\n- Solve every calculation step by step BEFORE writing\n- Verify the correct answer is at the specified ans index\n\n{"questions":[{"type":"multiple_choice","q":"Question text","opts":["Option A","Option B","Option C","Option D"],"ans":0,"exp":"Explanation"}]}`
 }
 
+// Öğretmen geri bildirimleriyle bulunan 4 ayrı içerik kalitesi hatasına
+// karşı TEK, paylaşılan filtre fonksiyonu (hem ana üretim hem eksik-soru
+// tamamlama turu bunu kullanır — kopya mantık yok).
+function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
+  // 1) Kaynağın kendisi (yazar, ISBN, İçindekiler) hakkında soru
+  const bookMetadataPattern = /\bISBN\b|yazar kadrosu|kaç yazar (tarafından|kişi)|kitab(ı|ın)[ıi]n yazarlarından|(ders kitab|kaynağ[ıi]n yer ald[ıi]ğ[ıi] kitab).{0,30}(hazırlanmıştır|hazırlamıştır)|kitab[ıi]n künye|İçindekiler/i
+  let result = qs.filter((q: any) => !bookMetadataPattern.test(q.q || ''))
+
+  // 2) Görünmeyen metne/parçaya atıf (14 Ağustos 2026'da genişletildi:
+  // "metinde/metne/parçada" kelimesinin genel kullanımı yakalanır;
+  // sorunun içinde gerçekten anlamlı uzunlukta (40+ karakter) tırnaklı
+  // bir alıntı varsa kaynağın gömülü olduğu kabul edilip güvenli sayılır.
+  const unseenPassagePattern = /\bmetinde\b|\bmetne göre\b|\bmetnin\b|\bparçada\b|\bparçaya göre\b|\byukarıdaki (metin|parça)|\bhikayede\b/i
+  const hasEmbeddedQuote = (text: string) => /["“][^"”]{40,}["”]/.test(text)
+  result = result.filter((q: any) => {
+    const text = q.q || ''
+    return !(unseenPassagePattern.test(text) && !hasEmbeddedQuote(text))
+  })
+
+  // 3) Kaynakta hiç geçmeyen, isimlendirilmiş bir esere/yazara kaçış
+  // (ör. Gençliğe Hitabesi, İstiklal Marşı) — kaynakta GERÇEKTEN geçiyorsa
+  // (konu bizzat o eser ise) filtrelenmez.
+  const namedWorks = ['Gençliğe Hitabesi', 'İstiklal Marşı', 'Onuncu Yıl Nutku', 'Nutuk', 'Ersoy']
+  result = result.filter((q: any) => {
+    const text = (q.q || '').toLowerCase()
+    for (const work of namedWorks) {
+      const w = work.toLowerCase()
+      if (text.includes(w) && !mebContext.toLowerCase().includes(w)) return false
+    }
+    return true
+  })
+
+  // 4) Müfredat çerçeve dokümanının kendi pedagojik/idari bölüm başlıkları
+  // (Köprü Kurma, Performans Görevi vb.) hakkında soru — öğretmene
+  // yönelik metodoloji, öğrenciye sorulacak konu içeriği değil.
+  const curriculumMetaPattern = /Öğrenme Kanıtları|Performans Görevi|Köprü Kurma|Öğrenme-Öğretme Yaşantıları|Ön Değerlendirme Süreci|Beceriler Arası İlişkiler|Disiplinler Arası İlişkiler|Öğrenme Çıktıları ve Süreç Bileşenleri/
+  result = result.filter((q: any) => !curriculumMetaPattern.test(q.q || ''))
+
+  return result
+}
+
 export async function POST(req: NextRequest) {
   let promptStr = ''
   let countRef = 5
@@ -669,78 +710,47 @@ export async function POST(req: NextRequest) {
     // talimatlara %100 uymayabiliyor. Bu yüzden ek bir kod-seviyesi güvenlik
     // ağı: bu paterne uyan bir soru sızarsa listeden çıkarılır. (Öğrenci
     // için eksik bir soru, hatalı/anlamsız bir sorudan daha iyidir.)
-    const bookMetadataPattern = /\bISBN\b|yazar kadrosu|kaç yazar (tarafından|kişi)|kitab(ı|ın)[ıi]n yazarlarından|(ders kitab|kaynağ[ıi]n yer ald[ıi]ğ[ıi] kitab).{0,30}(hazırlanmıştır|hazırlamıştır)|kitab[ıi]n künye|İçindekiler/i
     const beforeFilterCount = questions.length
-    questions = questions.filter((q: any) => !bookMetadataPattern.test(q.q || ''))
+    questions = applyContentQualityFilters(questions, mebContext)
     if (questions.length < beforeFilterCount) {
-      console.warn(`[generate-quiz] ${beforeFilterCount - questions.length} soru kaynak-kitap-metadata paterni nedeniyle filtrelendi`)
+      console.warn(`[generate-quiz] filtreler sonrası ${beforeFilterCount - questions.length} soru elendi (${beforeFilterCount} -> ${questions.length})`)
     }
 
-    // Öğretmen geri bildirimiyle bulunan gerçek bir hata: bazı sorular
-    // "Metinde anlatılan Aynur Onur örneğinde..." gibi, öğrencinin HİÇ
-    // GÖRMEDİĞİ bir okuma parçasına/örneğe atıfta bulunuyor ama o parçayı
-    // ÖZETLEMİYORDU — öğrenci için cevaplanamaz bir soru. Prompt'a talimat
-    // eklendi (bkz. yukarı, kural 9b) ama yine tek başına yeterli
-    // olmayabilir; bu yüzden aynı desende bir kod-seviyesi güvenlik ağı
-    // daha eklendi. 14 Ağustos 2026'da bulunan GENİŞLETME: önceki regex
-    // sadece birkaç sabit kalıbı ("verilen metne göre" vb.) yakalıyordu —
-    // "verilen istatistiklere göre", "sıralanan cevaplar arasında",
-    // "\"teknoloji diyeti\" tavsiye edilmesi" gibi FARKLI ifadelerle aynı
-    // hata sızmaya devam etti. Artık "metinde/metne/parçada" kelimesinin
-    // GENEL kullanımı yakalanıyor; sadece sorunun içinde GERÇEKTEN anlamlı
-    // uzunlukta (40+ karakter) tırnaklı bir alıntı VARSA (kaynağın gömülü
-    // olduğunun işareti) güvenli sayılıyor.
-    const unseenPassagePattern = /\bmetinde\b|\bmetne göre\b|\bmetnin\b|\bparçada\b|\bparçaya göre\b|\byukarıdaki (metin|parça)|\bhikayede\b/i
-    const hasEmbeddedQuote = (text: string) => /["“][^"”]{40,}["”]/.test(text)
-    const beforePassageFilterCount = questions.length
-    questions = questions.filter((q: any) => {
-      const text = q.q || ''
-      return !(unseenPassagePattern.test(text) && !hasEmbeddedQuote(text))
-    })
-    if (questions.length < beforePassageFilterCount) {
-      console.warn(`[generate-quiz] ${beforePassageFilterCount - questions.length} soru "görünmeyen metne atıf" paterni nedeniyle filtrelendi`)
-    }
-
-    // Öğretmen geri bildirimiyle bulunan ikinci bir kaçış deseni: soru
-    // metnini kendi içine gömdüğü için yukarıdaki filtreyi atlatan, ama
-    // AI'ın kendi genel bilgisinden (kaynakta HİÇ olmayan) tanınmış bir
-    // esere/yazara kaçtığı sorular (ör. "Gençliğe Hitabesi'nde Atatürk'ün
-    // ... ifadesi" gibi, alıntıyı sorunun içine alarak "unseenPassage"
-    // filtresini atlatan ama yine de yanlış kaynaktan gelen sorular).
-    // Kaynakta GERÇEKTEN geçiyorsa (ör. konu bizzat İstiklal Marşı ise)
-    // filtrelenmez -- sadece kaynakta YOKSA filtrelenir.
-    const namedWorks = ['Gençliğe Hitabesi', 'İstiklal Marşı', 'Onuncu Yıl Nutku', 'Nutuk', 'Ersoy']
-    const beforeNamedWorkFilterCount = questions.length
-    questions = questions.filter((q: any) => {
-      const text = (q.q || '').toLowerCase()
-      for (const work of namedWorks) {
-        const w = work.toLowerCase()
-        if (text.includes(w) && !mebContext.toLowerCase().includes(w)) {
-          return false
+    // 14 Ağustos 2026'da öğretmen geri bildirimiyle bulunan ayrı bir hata:
+    // istenen soru sayısı ile üretilen soru sayısı SIK SIK uyuşmuyordu
+    // (ör. 5 istenince 9 ya da 1 dönüyordu). Kök neden: (a) AI'ın kendisi
+    // "count" talimatına güvenilir uymuyor, (b) yukarıdaki filtreler
+    // soruları elediğinde YERİNE YENİSİ ÜRETİLMİYORDU. Şimdi: fazlaysa
+    // kırpılır, eksikse TEK bir ek üretim turuyla tamamlanır (sonsuz
+    // döngüye girmemesi için sadece 1 deneme, hâlâ eksikse elde olanla
+    // devam edilir — eksik bir test, hiç test olmamasından iyidir).
+    if (questions.length > safeQCount) {
+      questions = questions.slice(0, safeQCount)
+    } else if (questions.length < safeQCount && questions.length > 0) {
+      const missing = safeQCount - questions.length
+      try {
+        const topupPrompt = `${prompt}\n\nÖNEMLİ: Bu sefer TAM OLARAK ${missing} adet YENİ ve BİRBİRİNDEN FARKLI soru üret (ne bir eksik ne bir fazla). Daha önce üretilenlerle aynı/benzer soru üretme.`
+        const topupResponse = await anthropic.messages.create({
+          model: useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5',
+          max_tokens: useHaiku ? 1500 : 2000,
+          messages: [{ role: 'user', content: topupPrompt }],
+        })
+        const topupText = topupResponse.content[0].type === 'text' ? topupResponse.content[0].text : ''
+        const topupClean = topupText.replace(/```json|```/g, '').trim()
+        let topupParsed: any
+        try {
+          topupParsed = JSON.parse(topupClean)
+        } catch {
+          const m = topupClean.match(/\{[\s\S]*\}/)
+          if (m) topupParsed = JSON.parse(m[0])
         }
+        let topupQuestions = topupParsed?.questions || []
+        topupQuestions = applyContentQualityFilters(topupQuestions, mebContext)
+        questions = [...questions, ...topupQuestions].slice(0, safeQCount)
+        console.log(`[generate-quiz] eksik soru tamamlama: ${missing} istendi, ${topupQuestions.length} eklendi (toplam ${questions.length})`)
+      } catch (e) {
+        console.warn('[generate-quiz] eksik soru tamamlama başarısız, mevcut sayıyla devam:', e)
       }
-      return true
-    })
-    if (questions.length < beforeNamedWorkFilterCount) {
-      console.warn(`[generate-quiz] ${beforeNamedWorkFilterCount - questions.length} soru "kaynakta olmayan isimlendirilmiş esere kaçış" paterni nedeniyle filtrelendi`)
-    }
-
-    // Müfredat çerçeve dokümanının KENDİ pedagojik/idari bölüm başlıkları
-    // ("Köprü Kurma", "Performans Görevi", "Öğrenme Kanıtları" vb.)
-    // hakkında soru üretimi — kaynağın künyesi/İçindekiler'i değil ama
-    // AYNI KATEGORİDE bir hata: bunlar öğretmene yönelik öğretim
-    // metodolojisi planlaması, öğrenciye sorulacak konu içeriği DEĞİL.
-    // (Not: "isimlendirilmiş tarihi metne kaçış" — Gençliğe Hitabesi vb. —
-    // için ayrı bir kod filtresi zaten yukarıda, mebContext'e göre
-    // bağlam-duyarlı şekilde çalışıyor; burada tekrar edilmiyor.)
-    const curriculumMetaPattern = /Öğrenme Kanıtları|Performans Görevi|Köprü Kurma|Öğrenme-Öğretme Yaşantıları|Ön Değerlendirme Süreci|Beceriler Arası İlişkiler|Disiplinler Arası İlişkiler|Öğrenme Çıktıları ve Süreç Bileşenleri/
-    const beforeDriftFilterCount = questions.length
-    questions = questions.filter((q: any) => {
-      const text = q.q || ''
-      return !curriculumMetaPattern.test(text)
-    })
-    if (questions.length < beforeDriftFilterCount) {
-      console.warn(`[generate-quiz] ${beforeDriftFilterCount - questions.length} soru "müfredat-meta" paterni nedeniyle filtrelendi`)
     }
 
     // continueSessionId: adaptif akışta ikinci/sonraki parça — aynı testin
