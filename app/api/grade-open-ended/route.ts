@@ -35,7 +35,12 @@ const FOREIGN_LANGUAGE_SUBJECTS = new Set([
   'japonca', 'korece',
 ])
 function isForeignLanguageSubject(subject: string): boolean {
-  return FOREIGN_LANGUAGE_SUBJECTS.has((subject || '').trim().toLowerCase())
+  // .toLowerCase() (locale'siz) KULLANMA: JS'de 'İ'.toLowerCase() -> 'i̇'
+  // (nokta ayrı bir combining karakter olarak kalır) üretir, düz 'i' ile
+  // ASLA eşleşmez — "İngilizce" gibi büyük noktalı İ ile başlayan tüm ders
+  // adları bu yüzden hiç tanınmıyordu (bkz. app/api/generate-quiz/route.ts
+  // içindeki aynı düzeltme — kod tabanında zaten bilinen bir sorun).
+  return FOREIGN_LANGUAGE_SUBJECTS.has((subject || '').trim().toLocaleLowerCase('tr'))
 }
 
 export async function POST(req: NextRequest) {
