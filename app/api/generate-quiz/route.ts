@@ -375,15 +375,32 @@ function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
     return !(unseenPassagePattern.test(text) && !hasEmbeddedQuote(text))
   })
 
-  // 3) Kaynakta hiç geçmeyen, isimlendirilmiş bir esere/yazara kaçış
-  // (ör. Gençliğe Hitabesi, İstiklal Marşı) — kaynakta GERÇEKTEN geçiyorsa
-  // (konu bizzat o eser ise) filtrelenmez.
-  const namedWorks = ['Gençliğe Hitabesi', 'İstiklal Marşı', 'Onuncu Yıl Nutku', 'Nutuk', 'Ersoy']
+  // 3) Kaynakta gerçekten OLMAYAN, isimlendirilmiş bir esere kaçış
+  // (ör. Gençliğe Hitabesi, İstiklal Marşı). 15 Ağustos 2026'da bulunan
+  // İKİ ayrı hata düzeltildi:
+  //  a) Önceki liste tam "Gençliğe Hitabesi" (iyelik ekiyle) string'i
+  //     arıyordu, ama AI çoğunlukla "Gençliğe Hitabe" (eksiz) ya da
+  //     "Hitabe'sinde"/"Hitabe metninde" yazıyordu -- alt dize hiç
+  //     eşleşmiyordu. Artık YAZAR/ESER ADI yerine, o esere özgü NADİR
+  //     kelime/ifadeler aranıyor (izmihlal, hürriyyet, müstevli, "ey
+  //     türk gençliği") -- bunlar hangi ek/çekimle yazılırsa yazılsın
+  //     hep aynı kalır.
+  //  b) "Ersoy" gibi bir YAZAR ADI kaynakta geçmesi, o yazarın ESERİNİN
+  //     TAM METNİNİN de kaynakta olduğu anlamına gelmez (ör. yazar
+  //     biyografisi başka bir bağlamda geçebilir) -- yazar adı kontrolü
+  //     tamamen kaldırıldı, sadece gerçek metin parçaları aranıyor.
+  //  c) KRİTİK: JS'in standart .toLowerCase() metodu Türkçe büyük "İ"
+  //     harfini YANLIŞ karaktere çevirir (Unicode'un "Turkish I problem"i
+  //     -- "İ" -> "i̇" [i + kombine nokta, 2 kod noktası], "i" değil).
+  //     Bu yüzden "GENÇLİĞE HİTABE" gibi büyük harfli başlıklar
+  //     .toLowerCase() sonrası aranan küçük harfli string ile HİÇ
+  //     eşleşmiyordu. .toLocaleLowerCase('tr') kullanılarak düzeltildi.
+  const namedWorkMarkers = ['gençliğe hitabe', 'izmihlal', 'izmihlâl', 'hürriyyet', 'müstevli', 'ey türk gençliği', 'istiklal marşı', 'istiklâl marşı']
   result = result.filter((q: any) => {
-    const text = (q.q || '').toLowerCase()
-    for (const work of namedWorks) {
-      const w = work.toLowerCase()
-      if (text.includes(w) && !mebContext.toLowerCase().includes(w)) return false
+    const text = (q.q || '').toLocaleLowerCase('tr')
+    const ctx = mebContext.toLocaleLowerCase('tr')
+    for (const marker of namedWorkMarkers) {
+      if (text.includes(marker) && !ctx.includes(marker)) return false
     }
     return true
   })
