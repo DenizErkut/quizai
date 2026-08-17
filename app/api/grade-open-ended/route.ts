@@ -25,6 +25,19 @@ function stripForeignScripts(text: string): string {
   return text.replace(/[\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]/g, '').replace(/\s{2,}/g, ' ').trim()
 }
 
+// Bir "ders" alanı yabancı dil dersi mi? (İngilizce, Almanca, vb.)
+// generate-open-ended/route.ts'teki AYNI mantık — bu derslerde öğrencinin
+// cevabının hedef dilde olması BEKLENEN/DOĞRU davranıştır, "yanlış dil"
+// diye reddedilmemeli. (Bkz. o dosyadaki uzun açıklama.)
+const FOREIGN_LANGUAGE_SUBJECTS = new Set([
+  'ingilizce', 'almanca', 'fransızca', 'fransizca', 'ispanyolca',
+  'arapça', 'arapca', 'rusça', 'rusca', 'italyanca', 'çince', 'cince',
+  'japonca', 'korece',
+])
+function isForeignLanguageSubject(subject: string): boolean {
+  return FOREIGN_LANGUAGE_SUBJECTS.has((subject || '').trim().toLowerCase())
+}
+
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('Authorization')
@@ -76,7 +89,7 @@ ${studentAnswer.trim()}
 Her kriteri ayrı ayrı değerlendir, kaç puan hak ettiğini belirle (0 ile o kriterin maxPoints'i arasında, tam sayı) ve öğrenciye yönelik kısa, yapıcı bir geri bildirim yaz (1-2 cümle, doğrudan öğrenciye hitaben "sen" dilinde).
 Ayrıca genel bir değerlendirme cümlesi yaz.
 
-ÖNEMLİ: Tüm metinleri SADECE TÜRKÇE yaz. Başka hiçbir dilden (İngilizce, Korece, Çince vb.) tek bir kelime bile kullanma.
+${isForeignLanguageSubject(session.subject) ? `ÖNEMLİ (DİL): Bu bir "${session.subject}" dersi sorusu. ÖĞRENCİNİN CEVABININ "${session.subject}" DİLİNDE OLMASI BEKLENEN VE DOĞRU davranıştır — öğrenci "${session.subject}" dilinde yazdıysa bunu SEBEP GÖSTEREREK ASLA puan kırma veya "yanlış dil" deme; tam tersine cevabın o dildeki dilbilgisi/kullanım açısından doğruluğunu değerlendir. SADECE senin yazacağın feedback ve overallFeedback metinleri Türkçe olsun (senin değerlendirme dilin Türkçe, öğrencinin cevap dili "${session.subject}").` : `ÖNEMLİ: Tüm metinleri SADECE TÜRKÇE yaz. Başka hiçbir dilden (İngilizce, Korece, Çince vb.) tek bir kelime bile kullanma.`}
 
 SADECE aşağıdaki JSON formatında yanıt ver:
 {

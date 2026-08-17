@@ -25,6 +25,23 @@ function stripForeignScripts(text: string): string {
   return text.replace(/[\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]/g, '').replace(/\s{2,}/g, ' ').trim()
 }
 
+// Bir "ders" alanı yabancı dil dersi mi? (İngilizce, Almanca, vb.)
+// Bu derslerde öğrencinin CEVABI hedef dilde yazılmalı — senaryo/soru
+// kökü yine Türkçe kalabilir (Türkçe eğitim ortamı bağlamı) ama soru
+// öğrenciden AÇIKÇA hedef dilde yanıt istemeli, aksi halde AI hem soruyu
+// hem beklenen cevabı yanlışlıkla tamamen Türkçeleştiriyor — bir
+// "Future tense (will/going to)" konusunda öğrenci İngilizce (doğru
+// şekilde will/going to kullanarak) cevap verse bile grade-open-ended
+// tarafında "yanlış dil" diye 0 puan almasına yol açıyordu.
+const FOREIGN_LANGUAGE_SUBJECTS = new Set([
+  'ingilizce', 'almanca', 'fransızca', 'fransizca', 'ispanyolca',
+  'arapça', 'arapca', 'rusça', 'rusca', 'italyanca', 'çince', 'cince',
+  'japonca', 'korece',
+])
+function isForeignLanguageSubject(subject: string): boolean {
+  return FOREIGN_LANGUAGE_SUBJECTS.has(subject.trim().toLowerCase())
+}
+
 function getLevel(grade: string): string {
   const g = grade?.toLowerCase() || ''
   if (g.includes('ilkokul')) return 'ilkokul'
@@ -87,7 +104,7 @@ Konu: ${topic}
 
 Yukarıdaki konuya uygun, ${grade} seviyesine uygun zorlukta, gerçek bir MEB ortak sınav sorusu gibi bir senaryo+soru+rubrik hazırla.
 
-ÖNEMLİ: Tüm metinleri SADECE TÜRKÇE yaz. Başka hiçbir dilden (İngilizce, Korece, Çince vb.) tek bir kelime bile kullanma.
+${isForeignLanguageSubject(subject) ? `ÖNEMLİ (DİL): Bu bir YABANCI DİL dersi sorusu (${subject}). Senaryo metnini ve soru kökünü yine TÜRKÇE yaz (bağlam Türkçe bir eğitim ortamı). AMA sorunun EN SONUNA, öğrenciden cevabını mutlaka "${subject}" dilinde yazmasını isteyen açık ve net bir cümle EKLEMEYİ UNUTMA — örnek kalıp: "Cevabınızı ${subject.toUpperCase()} yazınız." Bu cümleyi mutlaka ekle. Rubrik kriterlerinin adı ve açıklamaları Türkçe kalsın, ama açıklamalarda öğrencinin "${subject}" dilinde ve "${topic}" konusundaki hedef yapıyı doğru kullanıp kullanmadığının değerlendirileceği net olsun — bu derste öğrencinin Türkçe cevap vermesi YANLIŞ kabul edilmeli, "${subject}" cevap vermesi ise BEKLENEN ve DOĞRU davranıştır.` : `ÖNEMLİ: Tüm metinleri SADECE TÜRKÇE yaz. Başka hiçbir dilden (İngilizce, Korece, Çince vb.) tek bir kelime bile kullanma.`}
 
 SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir açıklama ekleme:
 {
