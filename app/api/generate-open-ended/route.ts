@@ -104,14 +104,14 @@ Konu: ${topic}
 
 Yukarıdaki konuya uygun, ${grade} seviyesine uygun zorlukta, gerçek bir MEB ortak sınav sorusu gibi bir senaryo+soru+rubrik hazırla.
 
-${isForeignLanguageSubject(subject) ? `ÖNEMLİ (DİL): Bu bir YABANCI DİL dersi sorusu (${subject}). Senaryo metnini ve soru kökünü yine TÜRKÇE yaz (bağlam Türkçe bir eğitim ortamı). AMA sorunun EN SONUNA, öğrenciden cevabını mutlaka "${subject}" dilinde yazmasını isteyen açık ve net bir cümle EKLEMEYİ UNUTMA — örnek kalıp: "Cevabınızı ${subject.toUpperCase()} yazınız." Bu cümleyi mutlaka ekle. Rubrik kriterlerinin adı ve açıklamaları Türkçe kalsın, ama açıklamalarda öğrencinin "${subject}" dilinde ve "${topic}" konusundaki hedef yapıyı doğru kullanıp kullanmadığının değerlendirileceği net olsun — bu derste öğrencinin Türkçe cevap vermesi YANLIŞ kabul edilmeli, "${subject}" cevap vermesi ise BEKLENEN ve DOĞRU davranıştır.` : `ÖNEMLİ: Tüm metinleri SADECE TÜRKÇE yaz. Başka hiçbir dilden (İngilizce, Korece, Çince vb.) tek bir kelime bile kullanma.`}
+${isForeignLanguageSubject(subject) ? `ÖNEMLİ (DİL): Bu bir YABANCI DİL dersi sorusu (${subject}) — gerçek bir ${subject} sınavında olduğu gibi davran. SENARYOYU ve SORUYU TAMAMEN "${subject}" DİLİNDE yaz (Türkçe DEĞİL) — öğrenci o dilde okuduğunu anlayıp yine o dilde cevap verecek, bu yüzden Türkçe tek cümle bile olmamalı senaryo/soru metninde. "${topic}" konusundaki hedef dil yapısının kullanılmasını gerektiren bir soru kur. SADECE rubrikteki "criterion" (kriter adı) ve "description" (açıklama) alanlarını TÜRKÇE yaz — bunlar öğretmenin/velinin okuyacağı değerlendirme ölçütleridir, ama açıklamalarda öğrencinin "${subject}" dilinde doğru yazıp yazmadığının değerlendirileceği net olsun.` : `ÖNEMLİ: Tüm metinleri SADECE TÜRKÇE yaz. Başka hiçbir dilden (İngilizce, Korece, Çince vb.) tek bir kelime bile kullanma.`}
 
 SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir açıklama ekleme:
 {
-  "scenario": "Senaryo/durum metni (2-4 cümle, Türkçe)",
-  "question": "Senaryoya dayanan açık uçlu soru (Türkçe)",
+  "scenario": "Senaryo/durum metni (2-4 cümle, ${isForeignLanguageSubject(subject) ? subject : 'Türkçe'})",
+  "question": "Senaryoya dayanan açık uçlu soru (${isForeignLanguageSubject(subject) ? subject : 'Türkçe'})",
   "rubric": [
-    { "criterion": "Kriter adı (kısa)", "maxPoints": 30, "description": "Bu kriterden tam puan almak için cevapta ne olmalı (1 cümle)" }
+    { "criterion": "Kriter adı (kısa, Türkçe)", "maxPoints": 30, "description": "Bu kriterden tam puan almak için cevapta ne olmalı (1 cümle, Türkçe)" }
   ]
 }
 Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
@@ -137,9 +137,16 @@ Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
       return NextResponse.json({ error: 'Soru üretilemedi, tekrar dene.' }, { status: 500 })
     }
 
-    // Guvenlik agi: yabanci alfabe karakterlerini temizle
-    parsed.scenario = stripForeignScripts(parsed.scenario)
-    parsed.question = stripForeignScripts(parsed.question)
+    // Guvenlik agi: yabanci alfabe karakterlerini temizle — SADECE senaryo/soru
+    // TURKCE olmasi gereken derslerde uygulanir. Ders Cince/Japonca/Korece ise
+    // senaryo/soru bilerek o alfabede uretiliyor (yukarida istendigi gibi),
+    // bu durumda stripForeignScripts calisirsa hedef dilin kendisini silerdi.
+    // Rubrik (criterion/description) her zaman Turkce kalmasi gerektigi icin
+    // orada temizlik degismeden uygulanmaya devam eder.
+    if (!isForeignLanguageSubject(subject)) {
+      parsed.scenario = stripForeignScripts(parsed.scenario)
+      parsed.question = stripForeignScripts(parsed.question)
+    }
     parsed.rubric = parsed.rubric.map((r: any) => ({
       ...r,
       criterion: stripForeignScripts(r.criterion || ''),
