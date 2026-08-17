@@ -7,6 +7,7 @@ import ReportsHub from '@/components/ReportsHub'
 import { Suspense } from 'react'
 import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import SubjectPerformanceChart from '@/components/SubjectPerformanceChart'
+import { computeWeeklyGrowth } from '@/lib/weekly-growth'
 
 interface WeeklyGrowthData {
   thisWeekAvg: number | null
@@ -74,12 +75,16 @@ function ParentContent() {
     const childIdentities = await resolveIdentities(supabase, childIds)
 
     const childData = await Promise.all(childIds.map(async (cid: string) => {
-      const [profileRes, streakRes, sessionsRes, completionsRes, weakRes] = await Promise.all([
+      const [profileRes, streakRes, sessionsRes, completionsRes, weakRes, weeklyGrowth] = await Promise.all([
         supabase.from('profiles').select('grade').eq('id', cid).maybeSingle(),
         supabase.from('streaks').select('current_streak').eq('user_id', cid).maybeSingle(),
         supabase.from('quiz_sessions').select('id, pct, topic, question_count, score, created_at, question_type').eq('user_id', cid).eq('completed', true).order('created_at', { ascending: false }).limit(50),
         supabase.from('assignment_completions').select('id').eq('student_id', cid),
         supabase.from('weak_topics').select('topic').eq('user_id', cid).order('wrong_count', { ascending: false }).limit(3),
+        // "Gelişim Oranı" (Durum sekmesindeki kart) ve "Haftalık Gelişim" sekmesi
+        // AYNI kaynağı kullanır — lib/weekly-growth.ts (e-posta özetiyle de paylaşılıyor).
+        // Daha önce bu alan hiç çağrılmıyordu; kart ve sekme bu yüzden boş kalıyordu.
+        computeWeeklyGrowth(supabase, cid),
       ])
       const sessions = sessionsRes.data ?? []
       const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
@@ -102,6 +107,7 @@ function ParentContent() {
         sessions,
         leaderRank: null,
         leaderTotal: null,
+        weeklyGrowth,
       }
     }))
 
@@ -265,21 +271,34 @@ function ParentContent() {
             </div>
 
             {/* Özet kartlar */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginBottom: '1.5rem' }}>
-              {[
-                { icon: '🔥', label: 'Günlük Seri', value: `${selected.streak} gün`, color: selected.streak >= 7 ? 'var(--green)' : 'var(--text)' },
-                { icon: '📊', label: 'Genel Ortalama', value: selected.avgPct !== null ? `%${selected.avgPct}` : '—', color: pctColor(selected.avgPct) },
-                { icon: '📅', label: 'Bu Hafta', value: `${selected.weeklyTests} test`, color: 'var(--text)' },
-                { icon: '✅', label: 'Ödev', value: `${selected.assignmentsDone} tamamlandı`, color: 'var(--text)' },
-                { icon: '🏆', label: 'Genel Sıra', value: selected.leaderRank ? `#${selected.leaderRank}` : '—', color: selected.leaderRank && selected.leaderRank <= 10 ? 'var(--green)' : 'var(--text)' },
-              ].map((s, i) => (
-                <div key={i} className="card" style={{ textAlign: 'center', padding: '14px 10px' }}>
-                  <div style={{ fontSize: '20px', marginBottom: '4px' }}>{s.icon}</div>
-                  <div style={{ fontWeight: 800, fontSize: '18px', color: s.color }}>{s.value}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{s.label}</div>
+            {(() => {
+              // Gelişim Oranı — bu haftanın ortalaması geçen haftaya göre kaç puan
+              // değişmiş (lib/weekly-growth.ts, Haftalık Gelişim sekmesiyle aynı kaynak).
+              const wg = selected.weeklyGrowth
+              const growthDelta = wg?.deltaPoints ?? null
+              const growthHasData = wg?.thisWeekAvg != null && wg?.lastWeekAvg != null
+              const growthColor = !growthHasData ? 'var(--text4)' : growthDelta! > 0 ? 'var(--green)' : growthDelta! < 0 ? 'var(--red)' : 'var(--text)'
+              const growthValue = !growthHasData ? '—' : `${growthDelta! > 0 ? '+' : ''}${growthDelta} puan`
+
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginBottom: '1.5rem' }}>
+                  {[
+                    { icon: '🔥', label: 'Günlük Seri', value: `${selected.streak} gün`, color: selected.streak >= 7 ? 'var(--green)' : 'var(--text)' },
+                    { icon: '📊', label: 'Genel Ortalama', value: selected.avgPct !== null ? `%${selected.avgPct}` : '—', color: pctColor(selected.avgPct) },
+                    { icon: '📅', label: 'Bu Hafta', value: `${selected.weeklyTests} test`, color: 'var(--text)' },
+                    { icon: '✅', label: 'Ödev', value: `${selected.assignmentsDone} tamamlandı`, color: 'var(--text)' },
+                    { icon: '🏆', label: 'Genel Sıra', value: selected.leaderRank ? `#${selected.leaderRank}` : '—', color: selected.leaderRank && selected.leaderRank <= 10 ? 'var(--green)' : 'var(--text)' },
+                    { icon: '📈', label: 'Gelişim Oranı', value: growthValue, color: growthColor, onClick: () => setActiveTab('weekly-growth') },
+                  ].map((s, i) => (
+                    <div key={i} className="card" onClick={s.onClick} style={{ textAlign: 'center', padding: '14px 10px', cursor: s.onClick ? 'pointer' : 'default' }}>
+                      <div style={{ fontSize: '20px', marginBottom: '4px' }}>{s.icon}</div>
+                      <div style={{ fontWeight: 800, fontSize: '18px', color: s.color }}>{s.value}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{s.label}</div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )
+            })()}
 
             {/* Son çalışılan konular + Zayıf konular */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '1.5rem' }}>
