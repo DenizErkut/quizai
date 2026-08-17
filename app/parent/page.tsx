@@ -11,7 +11,15 @@ import { computeWeeklyGrowth } from '@/lib/weekly-growth'
 import { computeTopicMastery, TopicMastery } from '@/lib/mastery'
 import { analyzeTrend } from '@/lib/predictive-risk'
 import { analyzeStudyDuration, StudyDurationInsight } from '@/lib/study-duration-model'
-import { RISK_THRESHOLD } from '@/lib/parent-risk-alert'
+
+// lib/parent-risk-alert.ts'teki AYNI eşik (35) — o dosyayı buraya import
+// ETMİYORUZ bilerek: server-only bir zincire bağlanıyor (identity/client.ts
+// → 'pg' Node Postgres sürücüsü, parent-action-sentence.ts → Anthropic SDK),
+// bu 'use client' sayfasına eklenince Turbopack tarayıcı paketi için 'dns',
+// 'fs', 'net', 'tls' gibi Node çekirdek modüllerini çözemiyor ve build
+// patlıyor. Sabit burada bilinçli olarak kopyalanmıştır; RISK_THRESHOLD
+// değişirse iki dosyada birden güncellenmeli.
+const RISK_THRESHOLD = 35
 
 interface WeeklyGrowthData {
   thisWeekAvg: number | null
