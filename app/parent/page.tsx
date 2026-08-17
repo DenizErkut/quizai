@@ -8,6 +8,10 @@ import { Suspense } from 'react'
 import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import SubjectPerformanceChart from '@/components/SubjectPerformanceChart'
 import { computeWeeklyGrowth } from '@/lib/weekly-growth'
+import { computeTopicMastery, TopicMastery } from '@/lib/mastery'
+import { analyzeTrend } from '@/lib/predictive-risk'
+import { analyzeStudyDuration, StudyDurationInsight } from '@/lib/study-duration-model'
+import { RISK_THRESHOLD } from '@/lib/parent-risk-alert'
 
 interface WeeklyGrowthData {
   thisWeekAvg: number | null
@@ -15,6 +19,21 @@ interface WeeklyGrowthData {
   thisWeekCount: number
   lastWeekCount: number
   deltaPoints: number | null
+}
+
+interface WeakTopicRow {
+  topic: string
+  wrong_count: number
+  total_count: number
+  last_seen_at: string | null
+}
+
+// Konu Ustalık Haritası + Erken Uyarılar sekmesi için: her zayıf konunun
+// mastery skoru (lib/mastery.ts) + varsa risk sınıflandırması (lib/parent-
+// risk-alert.ts'teki checkAndNotifyRiskyTopic ile AYNI mantık — reaktif/
+// öngörü) — e-postayla sınırlı kalmasın, panelde her zaman görülebilsin diye.
+interface TopicRisk extends TopicMastery {
+  riskKind: 'reaktif' | 'ongoru' | null
 }
 
 interface ChildData {
@@ -29,6 +48,9 @@ interface ChildData {
   recentTopics: string[]
   assignmentsDone: number
   weakTopics: string[]
+  weakTopicsRaw: WeakTopicRow[]
+  topicRisks: TopicRisk[]
+  studyDuration: StudyDurationInsight | null
   lastActive: string | null
   sessions: any[]
   leaderRank: number | null
@@ -40,9 +62,10 @@ function ParentContent() {
   const [children, setChildren] = useState<ChildData[]>([])
   const [selectedChild, setSelectedChild] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'trend' | 'weekly-growth' | 'archive' | 'leaderboard' | 'reports' | 'add'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'trend' | 'weekly-growth' | 'mastery' | 'archive' | 'leaderboard' | 'reports' | 'add'>('dashboard')
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [addCode, setAddCode] = useState('')
   const [adding, setAdding] = useState(false)
   const [addError, setAddError] = useState('')
@@ -75,22 +98,52 @@ function ParentContent() {
     const childIdentities = await resolveIdentities(supabase, childIds)
 
     const childData = await Promise.all(childIds.map(async (cid: string) => {
-      const [profileRes, streakRes, sessionsRes, completionsRes, weakRes, weeklyGrowth] = await Promise.all([
+      const [profileRes, streakRes, sessionsRes, completionsRes, weakRes, weeklyGrowth, studyDuration] = await Promise.all([
         supabase.from('profiles').select('grade').eq('id', cid).maybeSingle(),
         supabase.from('streaks').select('current_streak').eq('user_id', cid).maybeSingle(),
         supabase.from('quiz_sessions').select('id, pct, topic, question_count, score, created_at, question_type').eq('user_id', cid).eq('completed', true).order('created_at', { ascending: false }).limit(50),
         supabase.from('assignment_completions').select('id').eq('student_id', cid),
-        supabase.from('weak_topics').select('topic').eq('user_id', cid).order('wrong_count', { ascending: false }).limit(3),
+        // Önceden sadece 'topic' + limit 3 çekiliyordu (Durum kartındaki "Gelişim
+        // Alanları" listesi için yeterliydi). Ustalık Haritası + Erken Uyarılar
+        // sekmesi mastery hesaplamak için wrong_count/total_count/last_seen_at'e
+        // de ihtiyaç duyuyor — limit 20'ye çıkarıldı, en zayıf 3'ü göstermeye
+        // devam eden eski davranış aşağıda weakTopics ile korunuyor.
+        supabase.from('weak_topics').select('topic, wrong_count, total_count, last_seen_at').eq('user_id', cid).order('wrong_count', { ascending: false }).limit(20),
         // "Gelişim Oranı" (Durum sekmesindeki kart) ve "Haftalık Gelişim" sekmesi
         // AYNI kaynağı kullanır — lib/weekly-growth.ts (e-posta özetiyle de paylaşılıyor).
         // Daha önce bu alan hiç çağrılmıyordu; kart ve sekme bu yüzden boş kalıyordu.
         computeWeeklyGrowth(supabase, cid),
+        // Verimli Çalışma Süresi (Faz 11 — yorgunluk/dikkat modeli). Daha önce
+        // hiçbir yerde çağrılmıyordu; sadece lib/study-duration-model.ts'te
+        // yazılıydı. Yeterli veri (soru-başına-süre) birikene kadar
+        // hasEnoughData:false döner, bu beklenen bir durum.
+        analyzeStudyDuration(supabase, cid),
       ])
       const sessions = sessionsRes.data ?? []
       const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
       const weeklyTests = sessions.filter((s: any) => new Date(s.created_at) > weekAgo).length
       const avgPct = sessions.length ? Math.round(sessions.reduce((a: number, s: any) => a + s.pct, 0) / sessions.length) : null
       const recentTopics = [...new Set(sessions.slice(0, 5).map((s: any) => s.topic))].slice(0, 3) as string[]
+
+      const weakTopicsRaw: WeakTopicRow[] = weakRes.data ?? []
+      const weakTopics = weakTopicsRaw.slice(0, 3).map(w => w.topic)
+
+      // Konu Ustalık Haritası + Erken Uyarılar — lib/parent-risk-alert.ts'teki
+      // checkAndNotifyRiskyTopic ile AYNI sınıflandırma: mastery skoru zaten
+      // eşiğin altındaysa "reaktif"; henüz altına düşmediyse ama SON
+      // testlerin eğilimi kötüye gidiyorsa "öngörü" (erken uyarı). E-posta
+      // bildirimiyle sınırlı kalmasın diye panelde canlı gösteriliyor.
+      const topicRisks: TopicRisk[] = await Promise.all(weakTopicsRaw.map(async (row) => {
+        const mastery = computeTopicMastery(row)
+        if (mastery.totalCount < 3) return { ...mastery, riskKind: null }
+        if (mastery.masteryScore < RISK_THRESHOLD) return { ...mastery, riskKind: 'reaktif' }
+        try {
+          const trend = await analyzeTrend(supabase, cid, row.topic)
+          if (trend?.decliningTowardRisk) return { ...mastery, riskKind: 'ongoru' }
+        } catch { /* trend analizi opsiyonel, hata olursa risksiz say */ }
+        return { ...mastery, riskKind: null }
+      }))
+
       return {
         child_id: cid,
         nickname: nicknameMap[cid] || childIdentities[cid]?.full_name || 'Çocuğum',
@@ -102,7 +155,10 @@ function ParentContent() {
         weeklyTests,
         recentTopics,
         assignmentsDone: completionsRes.data?.length ?? 0,
-        weakTopics: weakRes.data?.map((w: any) => w.topic) ?? [],
+        weakTopics,
+        weakTopicsRaw,
+        topicRisks,
+        studyDuration,
         lastActive: sessions[0]?.created_at ?? null,
         sessions,
         leaderRank: null,
@@ -110,6 +166,16 @@ function ParentContent() {
         weeklyGrowth,
       }
     }))
+
+    // Bildirim zili (RAPORLAR'ın yanına eklenen 🔔) — /notifications sayfası
+    // zaten vardı ama veli paneli navbar'ından hiç bağlanmıyordu, riskli konu
+    // uyarıları oraya düşse bile kimse fark etmiyordu.
+    const { count: unreadCount } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('read', false)
+    setUnreadNotifications(unreadCount ?? 0)
 
     // Leaderboard (isimler TR-PG'den, grade Supabase'den)
     const { data: lbData } = await supabase
@@ -206,6 +272,7 @@ function ParentContent() {
             { key: 'dashboard', label: '📊 Durum' },
             { key: 'trend', label: '📈 Trend' },
             { key: 'weekly-growth', label: '📊 Haftalık Gelişim' },
+            { key: 'mastery', label: '🧠 Ustalık & Uyarılar' },
             { key: 'archive', label: '📦 Arşiv' },
             { key: 'leaderboard', label: '🏆 Sıralama' },
             { key: 'reports', label: '📋 RAPORLAR' },
@@ -220,6 +287,16 @@ function ParentContent() {
             </button>
           ))}
           <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.2)', margin: '0 4px', flexShrink: 0 }} />
+          {/* Bildirim zili — /notifications zaten vardı, navbar'dan hiç bağlanmıyordu */}
+          <button onClick={() => router.push('/notifications')} title="Bildirimler"
+            style={{ position: 'relative', padding: '6px 10px', borderRadius: '8px', border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.7)', fontSize: '15px', cursor: 'pointer', flexShrink: 0 }}>
+            🔔
+            {unreadNotifications > 0 && (
+              <span style={{ position: 'absolute', top: '2px', right: '2px', minWidth: '15px', height: '15px', padding: '0 3px', borderRadius: '999px', background: 'var(--red)', color: '#fff', fontSize: '9px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
+                {unreadNotifications > 9 ? '9+' : unreadNotifications}
+              </span>
+            )}
+          </button>
           <button onClick={() => { supabase.auth.signOut(); router.push('/login') }}
             style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap', flexShrink: 0 }}>
             Çıkış
@@ -513,6 +590,99 @@ function ParentContent() {
                   ise önceki Pazartesi-Pazar aralığındaki testlerin ortalamasını gösterir. Bu karşılaştırma,
                   her pazar günü gönderilen haftalık özet e-postasına da otomatik olarak ekleniyor.
                 </div>
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* USTALIK HARİTASI + ERKEN UYARILAR + ÇALIŞMA SÜRESİ SEKMESİ */}
+        {activeTab === 'mastery' && selected && (() => {
+          const masteryColor = (score: number) => score >= 70 ? 'var(--green)' : score >= 45 ? '#f59e0b' : 'var(--red)'
+          const riskColor = { yüksek: 'var(--red)', orta: '#f59e0b', düşük: 'var(--green)' } as Record<string, string>
+          const atRisk = selected.topicRisks.filter(t => t.riskKind !== null)
+          const sd = selected.studyDuration
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+              {/* Erken Uyarılar */}
+              <div className="card">
+                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>🚨 Erken Uyarılar</div>
+                <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '12px' }}>
+                  Bu liste, riskli konu oluştuğu anda gönderilen e-posta uyarılarıyla AYNI kaynaktan besleniyor — e-postayı kaçırsanız bile burada görebilirsiniz.
+                </div>
+                {atRisk.length === 0 ? (
+                  <div style={{ fontSize: '13px', color: 'var(--green)' }}>✓ Şu an aktif bir erken uyarı yok</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {atRisk.map((t, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderRadius: '10px', background: t.riskKind === 'reaktif' ? 'rgba(239,68,68,0.06)' : 'rgba(245,158,11,0.06)', border: `1px solid ${t.riskKind === 'reaktif' ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.25)'}` }}>
+                        <div style={{ fontSize: '18px', flexShrink: 0 }}>{t.riskKind === 'reaktif' ? '⚠️' : '📉'}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: '13px', color: t.riskKind === 'reaktif' ? '#dc2626' : '#b45309' }}>{t.topic}</div>
+                          <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>
+                            {t.riskKind === 'reaktif'
+                              ? `Şu anki ustalık skoru %${t.masteryScore} — destek zamanı`
+                              : `Ustalık skoru şu an %${t.masteryScore} ama son testlerin gidişatı kötüleşiyor — henüz kritik değil, erken uyarı`}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Konu Ustalık Haritası */}
+              <div className="card">
+                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>🧠 Konu Ustalık Haritası</div>
+                <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '12px' }}>
+                  En az bir kez zorlanılan konular için — deneme sayısına göre ağırlıklandırılmış ustalık skoru ve unutma riski.
+                </div>
+                {selected.topicRisks.length === 0 ? (
+                  <div style={{ fontSize: '13px', color: 'var(--green)' }}>✓ Henüz zorlanılan bir konu yok</div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
+                    {selected.topicRisks.map((t, i) => (
+                      <div key={i} style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.topic}</div>
+                        <div style={{ fontWeight: 800, fontSize: '22px', color: masteryColor(t.masteryScore) }}>%{t.masteryScore}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                          <span>Güven: {t.confidence}</span>
+                          <span>·</span>
+                          <span style={{ color: riskColor[t.forgettingRisk] }}>Unutma riski: {t.forgettingRisk}</span>
+                        </div>
+                        <div style={{ fontSize: '10px', color: 'var(--text4)', marginTop: '4px' }}>
+                          {t.wrongCount}/{t.totalCount} yanlış · {timeAgo(selected.weakTopicsRaw[i]?.last_seen_at ?? null)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Verimli Çalışma Süresi */}
+              <div className="card">
+                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>⏱️ Verimli Çalışma Süresi</div>
+                {!sd || !sd.hasEnoughData ? (
+                  <div style={{ fontSize: '13px', color: 'var(--text3)', lineHeight: 1.6 }}>
+                    Henüz yeterli veri yok ({sd?.sessionsAnalyzed ?? 0} test analiz edildi). {selected.name} yeni testler çözdükçe,
+                    kaçıncı sorudan sonra dikkatinin dağılmaya başladığı burada görünecek.
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '10px' }}>
+                      Son {sd.sessionsAnalyzed} test incelendi · ortalama soru başına <strong>{sd.avgTimePerQuestionSec} sn</strong>
+                    </div>
+                    {sd.fatigueDetected ? (
+                      <div style={{ padding: '10px 12px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: '10px', fontSize: '12.5px', color: '#78350f' }}>
+                        📉 Testler genelde <strong>{sd.fatiguePointEstimate}. sorudan</strong> sonra doğruluk düşüyor.
+                        {sd.recommendedSessionLength && <> Önerilen: tek seferde <strong>{sd.recommendedSessionLength} soruluk</strong> testler.</>}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '13px', color: 'var(--green)' }}>✓ Belirgin bir yorgunluk paterni tespit edilmedi</div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )

@@ -11,8 +11,11 @@ import { generateActionSentence } from './parent-action-sentence'
 import { sendResendEmail } from './parent-summary'
 import { getIdentityBySupabaseId, getIdentitiesBySupabaseIds } from './identity/client'
 
-const RISK_THRESHOLD = 35    // bu mastery skorunun altı "riskli" sayılır
-const RECOVERY_THRESHOLD = 50 // bu skorun üstüne çıkınca "toparlandı" sayılır
+// export edildi: veli panelindeki "Erken Uyarılar" sekmesi (app/parent/page.tsx)
+// aynı eşikleri kullanarak AYNI risk sınıflandırmasını (reaktif/öngörü) canlı
+// gösteriyor — e-posta/bildirimle sınırlı kalmasın diye, tek kaynaktan.
+export const RISK_THRESHOLD = 35    // bu mastery skorunun altı "riskli" sayılır
+export const RECOVERY_THRESHOLD = 50 // bu skorun üstüne çıkınca "toparlandı" sayılır
 
 // Bir quiz tamamlandıktan sonra çağrılır. İki AYRI tetikleyici yolu var:
 //
