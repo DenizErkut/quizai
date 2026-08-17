@@ -64,7 +64,15 @@ function QuizPageContent() {
   const [screen, setScreen] = useState<Screen>('topic')
   const [selectedTopic, setSelectedTopic] = useState('')
   const [customTopic, setCustomTopic] = useState('')
-  const [openSubject, setOpenSubject] = useState<string | null>(null) // Accordion
+  // 17 Ağustos 2026: eski "openSubject" burada tanımlıydı ama HİÇBİR YERDE
+  // set edilmiyordu (components/quiz/QuizSetup.tsx'in KENDİ ayrı/yerel
+  // openSubject'i vardı, akordiyon durumunu yönetiyordu, page.tsx'e hiç
+  // aktarılmıyordu) -- yani subject BİLGİSİ HER ZAMAN undefined
+  // gönderiliyordu, İngilizce dersinde AI'ın konu dışına (Türkçe okuma-
+  // anlama sorularına) kaymasına yol açan kök nedenlerden biriydi.
+  // Artık QuizSetup, konu seçildiği ANDA (akordiyon kapanmadan HEMEN
+  // ÖNCE) doğru ders adını buraya "yukarı taşıyor" (state lifting).
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null)
   const [advancedOpen, setAdvancedOpen] = useState(false) // Gelişmiş ayarlar
   const [favorites, setFavorites] = useState<string[]>([]) // Favori konular
   const [mebTopics, setMebTopics] = useState<Record<string, string[]>>({}) // subject -> units (grade filtreli)
@@ -321,7 +329,7 @@ function QuizPageContent() {
             difficulty: diff,
             language: lang,
             questionType: qtype,
-            subject: openSubject || undefined,
+            subject: selectedSubject || undefined,
             unit: topicDecoded || undefined,
           }),
         })
@@ -419,7 +427,7 @@ function QuizPageContent() {
           fileType: uploadedFiles[0]?.fileType || undefined,
           includeVisuals,
           questionType,
-          subject: openSubject || undefined,
+          subject: selectedSubject || undefined,
           unit: topic || undefined,
         }),
       })
@@ -745,6 +753,7 @@ function QuizPageContent() {
             questionType,
             includeVisuals,
             continueSessionId: sessionId,
+            subject: selectedSubject || undefined,
             excludeQuestionTexts: excludeTexts,
           }),
         })
@@ -970,6 +979,8 @@ function QuizPageContent() {
         dailyLeft={dailyLeft}
         maxQCount={maxQCount}
         dynamicSubjects={dynamicSubjects}
+        selectedSubject={selectedSubject}
+        setSelectedSubject={setSelectedSubject}
       />
     </>
   )

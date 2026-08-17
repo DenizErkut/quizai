@@ -37,6 +37,8 @@ interface QuizSetupProps {
   maxQCount: number
   topicErr?: string
   dynamicSubjects?: string[]
+  selectedSubject: string | null
+  setSelectedSubject: (v: string | null) => void
 }
 
 export default function QuizSetup({
@@ -46,6 +48,7 @@ export default function QuizSetup({
   favorites, mebTopics, topicSummary, summaryLoading, showSummary, setShowSummary,
   onFetchSummary, onToggleFavorite, onStartQuiz,
   testsLeft, dailyLeft, maxQCount, topicErr, dynamicSubjects = [],
+  selectedSubject, setSelectedSubject,
 }: QuizSetupProps) {
   const [openSubject, setOpenSubject] = useState<string | null>(null)
   const [advancedOpen, setAdvancedOpen] = useState(false)
@@ -125,7 +128,7 @@ export default function QuizSetup({
               <label className="field-label">⭐ Favori Konularım</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', marginTop: '6px' }}>
                 {favorites.map(fav => (
-                  <button key={fav} onClick={() => { setSelectedTopic(fav); setCustomTopic('') }}
+                  <button key={fav} onClick={() => { setSelectedTopic(fav); setCustomTopic(''); setSelectedSubject(null) }}
                     style={{
                       padding: '5px 12px', borderRadius: '99px', fontSize: '12px', fontWeight: 500,
                       cursor: 'pointer', fontFamily: 'var(--font-sans)',
@@ -180,7 +183,7 @@ export default function QuizSetup({
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
                       {mebTopics[openSubject].map((unit: string) => (
                         <div key={unit} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <button onClick={() => { setSelectedTopic(unit); setCustomTopic(''); setOpenSubject(null) }}
+                          <button onClick={() => { setSelectedTopic(unit); setCustomTopic(''); setSelectedSubject(openSubject); setOpenSubject(null) }}
                             style={{
                               padding: '5px 10px', borderRadius: '99px', fontSize: '12px', fontWeight: 600,
                               cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
@@ -208,7 +211,7 @@ export default function QuizSetup({
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
                     {gradeSubjects[openSubject].map((topic: string) => (
                       <div key={topic} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                        <button onClick={() => { setSelectedTopic(topic); setCustomTopic(''); setOpenSubject(null) }}
+                        <button onClick={() => { setSelectedTopic(topic); setCustomTopic(''); setSelectedSubject(openSubject); setOpenSubject(null) }}
                           style={{
                             padding: '5px 10px', borderRadius: '99px', fontSize: '12px', fontWeight: 500,
                             cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
@@ -238,7 +241,7 @@ export default function QuizSetup({
                   style={{ padding: '4px 10px', borderRadius: '8px', border: '1.5px solid rgba(99,102,241,0.4)', background: 'rgba(99,102,241,0.08)', color: '#6366f1', fontSize: '11px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   📖 Konuya Hızlı Bak
                 </button>
-                <button onClick={() => setSelectedTopic('')} style={{ fontSize: '11px', color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕</button>
+                <button onClick={() => { setSelectedTopic(''); setSelectedSubject(null) }} style={{ fontSize: '11px', color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕</button>
               </div>
             )}
 
@@ -295,7 +298,7 @@ export default function QuizSetup({
           <label className="field-label">Veya kendi konunu yaz</label>
           <textarea className="input" rows={2}
             placeholder="Örn: Güneş sistemi, Osmanlı kuruluşu, Fotosentez..."
-            value={customTopic} onChange={e => { setCustomTopic(e.target.value); setSelectedTopic('') }}
+            value={customTopic} onChange={e => { setCustomTopic(e.target.value); setSelectedTopic(''); setSelectedSubject(null) }}
             style={{ resize: 'none' }} />
 
           {/* Dosya yükleme */}
