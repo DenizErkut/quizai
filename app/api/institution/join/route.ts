@@ -41,16 +41,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Geçersiz kurum kodu.' }, { status: 404 })
   }
 
-  // Zaten kayıtlı mı?
+  // Zaten bu kuruma (herhangi bir rolle) bağlı mı?
+  // ÖNEMLİ: institution_users'ta (institution_id, user_id) çifti üzerinde
+  // TEKİL satır kısıtı var (institution_users_institution_id_user_id_key) —
+  // yani bir kullanıcı aynı kuruma hem yönetici hem öğrenci olarak kayıtlı
+  // OLAMAZ. Önceden buradaki kontrol satırın rolünü hiç bakmadan var olan
+  // HERHANGİ bir satırı "zaten öğrencisin, başarılı" sayıyordu — bir kurum
+  // yöneticisi kendi kurum koduyla "öğrenci olarak katıl" akışını
+  // denediğinde arayüze sahte bir "✅ kaydoldunuz" dönüyor ama hiçbir satır
+  // eklenmiyordu (zaten kısıt buna izin vermez); sayfa yenilenince
+  // (profile/edit ve veli panelinin ilgili sorguları role='student'
+  // filtresi kullandığı için) öğrenci kaydı bulunamıyor, arayüz sessizce
+  // "kayıtlı değilsin" durumuna geri dönüyordu.
   const { data: existing } = await supabaseAdmin
     .from('institution_users')
-    .select('id')
+    .select('id, role')
     .eq('institution_id', inst.id)
     .eq('user_id', user_id)
     .maybeSingle()
 
   if (existing) {
-    return NextResponse.json({ success: true, already_member: true, institution_name: inst.name })
+    if (existing.role === 'student') {
+      return NextResponse.json({ success: true, already_member: true, institution_name: inst.name })
+    }
+    // Yönetici (veya ileride eklenebilecek başka bir rol) — aynı kuruma
+    // öğrenci olarak da katılamaz, DB'deki tekil kısıt buna izin vermiyor.
+    const roleLabel = existing.role === 'admin' ? 'yönetici' : existing.role
+    return NextResponse.json(
+      { error: `Bu kuruma zaten "${roleLabel}" olarak bağlısınız. Aynı hesapla öğrenci olarak katılamazsınız — farklı bir hesap kullanmanız gerekir.` },
+      { status: 409 }
+    )
   }
 
   // Bir öğrenci aynı anda sadece TEK kuruma üye olabilir (DB'de de
