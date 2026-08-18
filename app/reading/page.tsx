@@ -5,7 +5,14 @@ import { createClient } from '@/lib/supabase/client'
 
 const QUESTION_INTERVAL_SECONDS = 90 // dikkat sorusu aralığı
 
-type Phase = 'upload' | 'ready' | 'playing' | 'question' | 'finished'
+// 18 Ağustos 2026 — "Sesli Kitap: uzun metinler için özet/tam-metin dinleme
+// seçimi". "Birkaç sayfa üzeri" için ~2000 karakter/sayfa (Türkçe, kitap
+// formatı) kabaca bir tahminle 3 sayfa ≈ 6000 karakter eşiği seçildi — bunun
+// altındaki kısa metinlerde (örn. tek bir sayfa, kısa bir makale) özet/tam
+// metin seçimi gereksiz bir sürtünme olurdu, doğrudan okumaya geçilir.
+const SUMMARY_CHOICE_THRESHOLD_CHARS = 6000
+
+type Phase = 'upload' | 'choose' | 'ready' | 'playing' | 'question' | 'finished'
 
 interface Question {
   question: string
@@ -32,6 +39,21 @@ export default function ReadingPage() {
   const [title, setTitle] = useState('')
   const [chunks, setChunks] = useState<string[]>([])
   const [sessionId, setSessionId] = useState<string>('')
+
+  // Özet/tam-metin seçimi — "choose" fazında kullanılır. fullChunks her
+  // zaman ORİJİNAL (yükleme sırasında dönen) parçaları tutar; "chunks" ise
+  // o an OKUMA İÇİN AKTİF olan parçalardır (kullanıcı özeti seçerse bunlar
+  // yerine geçer). readMode sadece UI'da hangi modun aktif olduğunu göstermek
+  // ve "ready" fazından geri "choose"a dönebilmek için tutulur.
+  const [fullChunks, setFullChunks] = useState<string[]>([])
+  const [readMode, setReadMode] = useState<'full' | 'summary' | null>(null)
+  const [summarizing, setSummarizing] = useState(false)
+  const [summarizeError, setSummarizeError] = useState('')
+  // Sadece eşiği (SUMMARY_CHOICE_THRESHOLD_CHARS) gerçekten aşan metinlerde
+  // "ready" ekranında özet/tam-metin geçiş linkini göstermek için — kısa bir
+  // metinde (örn. tek sayfalık bir duyuru) bu seçenek gereksiz görsel gürültü
+  // olurdu, otomatik seçim ekranı zaten hiç çıkmıyor bu metinlerde.
+  const [longEnoughForChoice, setLongEnoughForChoice] = useState(false)
 
   // Oynatıcı
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -134,9 +156,10 @@ export default function ReadingPage() {
       setUploadProgress(100)
       setMaterialId(data.material_id)
       setTitle(data.title)
-      setChunks(data.chunks)
+      setFullChunks(data.chunks)
 
-      // Okuma oturumu oluştur
+      // Okuma oturumu oluştur — total_chunks başlangıçta tam metne göre
+      // kaydedilir; kullanıcı özeti seçerse aşağıda (chooseSummary) güncellenir.
       const { data: sessionRow } = await supabase.from('reading_sessions').insert({
         user_id: user.id,
         material_id: data.material_id,
@@ -144,13 +167,67 @@ export default function ReadingPage() {
       }).select('id').single()
 
       setSessionId(sessionRow?.id || '')
-      setPhase('ready')
       loadLibrary()
+
+      // Uzun metinlerde ("birkaç sayfa üzeri") kullanıcıya otomatik olarak
+      // tam metin mi özet mi dinlemek istediğini sor; kısa metinlerde bu
+      // sürtünmeye gerek yok, doğrudan okuma alanına geç.
+      const isLong = (data.char_count || 0) > SUMMARY_CHOICE_THRESHOLD_CHARS
+      setLongEnoughForChoice(isLong)
+      if (isLong) {
+        setPhase('choose')
+      } else {
+        setChunks(data.chunks)
+        setReadMode('full')
+        setPhase('ready')
+      }
     } catch (e: any) {
       setUploadError(e.message || 'Dosya yüklenemedi.')
     } finally {
       setUploading(false)
       setProcessingText(false)
+    }
+  }
+
+  // ── Özet/tam-metin seçimi ("choose" fazı) ──
+  function chooseFullText() {
+    setChunks(fullChunks)
+    setReadMode('full')
+    setPhase('ready')
+  }
+
+  async function chooseSummary() {
+    setSummarizing(true)
+    setSummarizeError('')
+    try {
+      const headers = await authHeader()
+      // fullChunks zaten cümle sınırlarında bölünmüş — aralarına boşluk
+      // koyarak birleştirmek orijinal metni (küçük biçimlendirme farkları
+      // dışında) yeniden oluşturur. Ham metin hiçbir yerde saklanmadığı için
+      // elimizdeki tek kaynak bu.
+      const fullText = fullChunks.join(' ')
+      const res = await fetch('/api/reading/summarize', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: fullText, title }),
+      })
+      const data = await res.json()
+      if (!res.ok || !Array.isArray(data.summary_chunks) || data.summary_chunks.length === 0) {
+        throw new Error(data?.error || 'Özet üretilemedi.')
+      }
+      setChunks(data.summary_chunks)
+      setReadMode('summary')
+      setPhase('ready')
+
+      // Oturum kaydını özet parça sayısına göre güncelle (dinleme
+      // ilerlemesi/tahmini süre artık özete göre hesaplanacağı için).
+      if (sessionId) {
+        supabase.from('reading_sessions').update({ total_chunks: data.summary_chunks.length }).eq('id', sessionId).then(() => {})
+      }
+    } catch (e: any) {
+      setSummarizeError(e.message || 'Özet üretilemedi, lütfen tekrar dene.')
+    } finally {
+      setSummarizing(false)
     }
   }
 
@@ -353,6 +430,7 @@ export default function ReadingPage() {
     audioCache.current.clear()
     setPhase('upload')
     setMaterialId(''); setTitle(''); setChunks([]); setSessionId('')
+    setFullChunks([]); setReadMode(null); setSummarizing(false); setSummarizeError(''); setLongEnoughForChoice(false)
     setCurrentIndex(0); setIsPlaying(false); setQuestions([]); setQuestionIdx(0); setChosenIndex(null); setQuestionError(false)
     setScore({ correct: 0, total: 0 })
     accumulatedSeconds.current = 0
@@ -360,9 +438,11 @@ export default function ReadingPage() {
     questionRequestInFlight.current = false
   }
 
-  const estMinutes = chunks.length > 0
-    ? Math.max(1, Math.round(chunks.reduce((sum, c) => sum + c.split(/\s+/).length, 0) / 150))
+  const estMinutesOf = (list: string[]) => list.length > 0
+    ? Math.max(1, Math.round(list.reduce((sum, c) => sum + c.split(/\s+/).length, 0) / 150))
     : 0
+  const estMinutes = estMinutesOf(chunks)
+  const fullEstMinutes = estMinutesOf(fullChunks)
   const progressPct = chunks.length > 0 ? Math.round((currentIndex / chunks.length) * 100) : 0
 
   return (
@@ -454,11 +534,62 @@ export default function ReadingPage() {
           </div>
         )}
 
+        {/* ── ÖZET / TAM METİN SEÇİMİ (birkaç sayfa üzeri metinlerde otomatik çıkar) ── */}
+        {phase === 'choose' && (
+          <div className="card anim-up" style={{ padding: '1.5rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '36px', marginBottom: '10px' }}>📚</div>
+            <div style={{ fontWeight: 700, fontSize: '17px', color: 'var(--primary)', marginBottom: '6px' }}>{title}</div>
+            <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '1.5rem' }}>
+              Bu, birkaç sayfadan uzun bir metin (~{fullEstMinutes} dk tam dinleme). Nasıl dinlemek istersin?
+            </div>
+
+            {summarizeError && (
+              <div style={{ marginBottom: '1rem', fontSize: '13px', color: 'var(--red)' }}>{summarizeError}</div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button
+                className="btn btn-primary"
+                onClick={chooseFullText}
+                disabled={summarizing}
+                style={{ width: '100%', justifyContent: 'center', padding: '14px', opacity: summarizing ? 0.5 : 1 }}>
+                📖 Tam Metni Dinle <span style={{ opacity: 0.75, fontWeight: 400 }}>· ~{fullEstMinutes} dk</span>
+              </button>
+              <button
+                className="btn"
+                onClick={chooseSummary}
+                disabled={summarizing}
+                style={{ width: '100%', justifyContent: 'center', padding: '14px', border: '1.5px solid var(--accent)', color: 'var(--accent)' }}>
+                {summarizing ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="spinner" style={{ width: 16, height: 16 }} /> Özet hazırlanıyor...
+                  </span>
+                ) : (
+                  <>✨ Özetini Dinle <span style={{ opacity: 0.75, fontWeight: 400 }}>· daha kısa</span></>
+                )}
+              </button>
+            </div>
+
+            <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '1rem' }}>
+              Özet, ana olay örgüsünü/önemli noktaları korur ama tam metnin yerini tutmaz — istersen sonra tam metne de geçebilirsin.
+            </div>
+          </div>
+        )}
+
         {/* ── HAZIR ── */}
         {phase === 'ready' && (
           <div className="card anim-up" style={{ padding: '1.5rem', textAlign: 'center' }}>
             <div style={{ fontSize: '36px', marginBottom: '10px' }}>📖</div>
             <div style={{ fontWeight: 700, fontSize: '17px', color: 'var(--primary)', marginBottom: '6px' }}>{title}</div>
+            {readMode && (
+              <div style={{
+                display: 'inline-block', fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '99px',
+                background: readMode === 'summary' ? 'rgba(99,102,241,0.1)' : 'var(--bg2)',
+                color: readMode === 'summary' ? '#6366f1' : 'var(--text3)', marginBottom: '10px',
+              }}>
+                {readMode === 'summary' ? '✨ Özet modu' : '📖 Tam metin'}
+              </div>
+            )}
             <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '1.5rem' }}>
               Tahmini süre: ~{estMinutes} dk · {chunks.length} bölüm
             </div>
@@ -471,7 +602,12 @@ export default function ReadingPage() {
             <button className="btn btn-primary" onClick={startReading} style={{ width: '100%', justifyContent: 'center' }}>
               ▶️ Okumaya Başla
             </button>
-            <button onClick={resetAll} style={{ marginTop: '10px', background: 'none', border: 'none', color: 'var(--text3)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+            {longEnoughForChoice && (
+              <button onClick={() => setPhase('choose')} style={{ marginTop: '10px', background: 'none', border: 'none', color: 'var(--accent)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', display: 'block', width: '100%' }}>
+                {readMode === 'summary' ? '📖 Bunun yerine tam metni dinle' : '✨ Bunun yerine özetini dinle'}
+              </button>
+            )}
+            <button onClick={resetAll} style={{ marginTop: '8px', background: 'none', border: 'none', color: 'var(--text3)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
               Farklı bir dosya yükle
             </button>
           </div>
