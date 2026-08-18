@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
+import { checkMinorConsentBlock } from '@/lib/identity/client'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -140,6 +141,13 @@ export async function POST(req: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser(token)
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+
+  // Madde 7 — veli onayı enforcement'ı (sınav simülasyonu, generate-open-ended
+  // ile aynı gerekçe/kapsam: bkz. lib/identity/client.ts'teki yorum).
+  const consentCheck = await checkMinorConsentBlock(user.id).catch(() => ({ blocked: false as const }))
+  if (consentCheck.blocked) {
+    return NextResponse.json({ error: consentCheck.reason }, { status: 403 })
+  }
 
   const { data: profile } = await supabase
     .from('profiles').select('plan, grade').eq('id', user.id).single()

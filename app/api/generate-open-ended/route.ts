@@ -9,6 +9,7 @@ export const maxDuration = 60
 export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
+import { checkMinorConsentBlock } from '@/lib/identity/client'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -64,6 +65,15 @@ export async function POST(req: NextRequest) {
 
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // Madde 7 (pratium-bekleyen-isler-uygulama-plani.md) — veli onayı
+    // enforcement'ı. Açık uçlu soru "veri-yoğun" bir özellik olarak
+    // planda açıkça işaretlenmişti. Sadece veli AÇIKÇA "hayır" dediyse
+    // engellenir (bkz. checkMinorConsentBlock yorumu — dar kapsam, bilinçli).
+    const consentCheck = await checkMinorConsentBlock(user.id).catch(() => ({ blocked: false as const }))
+    if (consentCheck.blocked) {
+      return NextResponse.json({ error: consentCheck.reason }, { status: 403 })
+    }
 
     const { data: profile } = await supabase
       .from('profiles')

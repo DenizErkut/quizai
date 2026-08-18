@@ -5,6 +5,7 @@ import ThemeToggleFloating from '@/components/ThemeToggleFloating'
 import { UserProvider } from '@/lib/user-context'
 import AIChatBot from '@/components/AIChatBot'
 import PWAInstallBanner from '@/components/PWAInstallBanner'
+import ConsentGate from '@/components/ConsentGate'
 
 export const metadata: Metadata = {
   title: 'Pratium — Öğren. Test Et. Geliş.',
@@ -125,6 +126,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Navbar />
           <ThemeToggleFloating />
           {children}
+          {/* Madde 7: sözleşme/rıza versiyonu değiştiğinde yeniden-onay modalı */}
+          <ConsentGate />
         </UserProvider>
         <AIChatBot />
       </body>

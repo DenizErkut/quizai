@@ -108,6 +108,80 @@ export async function recordConsent(params: {
   )
 }
 
+// ─── Madde 7 (pratium-bekleyen-isler-uygulama-plani.md) — rıza versiyonlama,
+// yeniden-onay akışı ve enforcement. Önceden rıza sadece kayıt anında
+// alınıyordu, versiyon değişikliğinde yeniden onay istenmiyordu, ve
+// veli_onayi=false olan bir kullanıcı hiçbir şekilde engellenmiyordu.
+
+// Sözleşme/aydınlatma metni her değiştiğinde bu sabit güncellenir — kodun
+// TEK kaynağı. app/api/auth/create-identity/route.ts (ilk kayıt) ve
+// app/api/auth/consent-status/route.ts (yeniden-onay) İKİSİ DE buradan okur.
+export const CURRENT_CONSENT_VERSIONS: Record<string, string> = {
+  aydinlatma: 'v1.0',
+  acik_riza_analiz: 'v1.0',
+  veli_onayi: 'v1.0',
+}
+
+export interface ConsentStatusItem {
+  consentType: string
+  currentVersion: string
+  latestGrantedVersion: string | null
+  latestGranted: boolean | null
+  needsReconsent: boolean
+}
+
+// Bir kimliğin, verilen her rıza türü için EN SON verdiği onayı güncel
+// versiyonla karşılaştırır. needsReconsent=true olan herhangi bir tür
+// varsa, istemci tarafında (components/ConsentGate.tsx) kullanıcıya
+// yeniden onay ekranı gösterilir.
+export async function getConsentStatus(identityId: string, applicableTypes: string[]): Promise<ConsentStatusItem[]> {
+  if (applicableTypes.length === 0) return []
+  const { rows } = await trPool.query(
+    `SELECT DISTINCT ON (consent_type) consent_type, consent_version, granted, created_at
+     FROM consent_records
+     WHERE identity_id = $1
+     ORDER BY consent_type, created_at DESC`,
+    [identityId]
+  )
+  const latestByType = new Map(rows.map((r: any) => [r.consent_type, r]))
+  return applicableTypes.map(type => {
+    const latest = latestByType.get(type) as any
+    const currentVersion = CURRENT_CONSENT_VERSIONS[type] || 'v1.0'
+    return {
+      consentType: type,
+      currentVersion,
+      latestGrantedVersion: latest?.consent_version ?? null,
+      latestGranted: latest ? !!latest.granted : null,
+      needsReconsent: !latest || latest.consent_version !== currentVersion,
+    }
+  })
+}
+
+// Enforcement — 18 yaş altı bir öğrenci için veli AÇIKÇA onay VERMEDİYSE
+// (granted:false kaydı varsa) veri-yoğun özellikler (açık uçlu soru, sınav
+// simülasyonu) engellenir. KAPSAM BİLİNÇLİ OLARAK DAR: hiç consent kaydı
+// OLMAYAN (consent takibinden önce kayıt olmuş) kullanıcılar ENGELLENMEZ —
+// aksi halde geriye dönük, migration'sız bir kesinti/regresyon riski
+// olurdu. Bu, planın "minimum enforcement" hedefinin güvenli bir okuması.
+export async function checkMinorConsentBlock(supabaseUserId: string): Promise<{ blocked: boolean; reason?: string }> {
+  const identity = await getIdentityBySupabaseId(supabaseUserId)
+  if (!identity || identity.age == null || identity.age >= 18) return { blocked: false }
+
+  const { rows } = await trPool.query(
+    `SELECT granted FROM consent_records
+     WHERE identity_id = $1 AND consent_type = 'veli_onayi'
+     ORDER BY created_at DESC LIMIT 1`,
+    [identity.id]
+  )
+  if (rows.length > 0 && rows[0].granted === false) {
+    return {
+      blocked: true,
+      reason: 'Veliniz bu özelliğe henüz onay vermemiş görünüyor. Lütfen veli hesabınızdan onayı güncelleyin ya da destek ekibiyle iletişime geçin.',
+    }
+  }
+  return { blocked: false }
+}
+
 // Veli-çocuk bağlantısı oluştur
 export async function linkParentChild(parentIdentityId: string, childIdentityId: string): Promise<void> {
   await trPool.query(

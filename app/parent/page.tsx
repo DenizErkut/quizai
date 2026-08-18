@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities, resolveName } from '@/lib/identity/resolve-client'
 import ReportsHub from '@/components/ReportsHub'
+import ChildConsentStatus from '@/components/ChildConsentStatus'
 import { Suspense } from 'react'
 import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import SubjectPerformanceChart from '@/components/SubjectPerformanceChart'
@@ -421,6 +422,9 @@ function ParentContent() {
                 </button>
               </div>
             )}
+
+            {/* Madde 7: rıza durumu görünürlüğü (salt-okunur) */}
+            <ChildConsentStatus childId={selected.child_id} />
 
             {/* Çocuğu kaldır */}
             <div style={{ marginTop: '1rem', textAlign: 'right' }}>

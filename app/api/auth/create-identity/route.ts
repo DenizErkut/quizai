@@ -7,7 +7,7 @@
 // oluşturabilir (userId istemciden alınmaz, token'dan gelir).
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { createIdentity, getIdentityBySupabaseId, recordConsent } from '@/lib/identity/client'
+import { createIdentity, getIdentityBySupabaseId, recordConsent, CURRENT_CONSENT_VERSIONS } from '@/lib/identity/client'
 
 export const runtime = 'nodejs'
 
@@ -61,15 +61,18 @@ export async function POST(req: NextRequest) {
         institutionName,
       })
 
-      // KVKK rıza kayıtları — kimlikle birlikte TR-PG'de (ispat yükümlülüğü)
+      // KVKK rıza kayıtları — kimlikle birlikte TR-PG'de (ispat yükümlülüğü).
+      // Versiyon artık CURRENT_CONSENT_VERSIONS'tan okunuyor (Madde 7) — sabit
+      // 'v1.0' yerine TEK bir kaynaktan, yeniden-onay akışıyla (bkz.
+      // app/api/auth/consent-status/route.ts) aynı sabitten besleniyor.
       if (kvkkAydinlatma !== undefined) {
-        await recordConsent({ identityId: identity.id, consentType: 'aydinlatma', version: 'v1.0', granted: !!kvkkAydinlatma, ipAddress: ip })
+        await recordConsent({ identityId: identity.id, consentType: 'aydinlatma', version: CURRENT_CONSENT_VERSIONS.aydinlatma, granted: !!kvkkAydinlatma, ipAddress: ip })
       }
       if (kvkkAcikRiza !== undefined) {
-        await recordConsent({ identityId: identity.id, consentType: 'acik_riza_analiz', version: 'v1.0', granted: !!kvkkAcikRiza, ipAddress: ip })
+        await recordConsent({ identityId: identity.id, consentType: 'acik_riza_analiz', version: CURRENT_CONSENT_VERSIONS.acik_riza_analiz, granted: !!kvkkAcikRiza, ipAddress: ip })
       }
       if (numericAge != null && numericAge < 18 && veliOnayi !== undefined) {
-        await recordConsent({ identityId: identity.id, consentType: 'veli_onayi', version: 'v1.0', granted: !!veliOnayi, ipAddress: ip })
+        await recordConsent({ identityId: identity.id, consentType: 'veli_onayi', version: CURRENT_CONSENT_VERSIONS.veli_onayi, granted: !!veliOnayi, ipAddress: ip })
       }
     }
 
