@@ -16,6 +16,20 @@ AYNIDIR (ardışık 12+ kısa/≤3 karakter satır = "harf harf ayrılmış" bir
 başlık bloğu) — TypeScript ve Python tarafında iki ayrı ama birbirini
 doğrulayan uygulama.
 
+⚠️⚠️⚠️ 18 AĞUSTOS 2026 — BU SCRIPT ŞU AN GÜVENLİ DEĞİL, ÇALIŞTIRMAYIN. ⚠️⚠️⚠️
+Aşağıdaki tespit mantığı (find_noise_line_ranges / MIN_RUN_DEFAULT=12),
+gerçek exam_chunks verisine karşı bir dry-run ile (Supabase MCP üzerinden,
+hiçbir satır yazılmadan) doğrulandığında ortaya çıktı ki "ardışık 12+ kısa
+satır" kalıbı bu projede dekoratif başlık gürültüsünü DEĞİL, çoğunlukla
+GERÇEK sınav içeriğini yakalıyor: kimya formülleri, DNA dizileri, çoktan
+seçmeli şık listeleri, açı/derece listeleri, matematik üs kuralları. 57
+aday chunk'ın dry-run'ı incelendi, neredeyse hiçbiri gerçek "harf harf
+ayrılmış başlık" değildi — --apply ile çalıştırılsaydı bu gerçek içeriği
+kalıcı olarak silerdi. Aynı tespit mantığını kullanan lib/content-
+filters.ts'teki hasOcrLetterSplitNoise() de bu yüzden meb-search ve
+content-quality-scan cron'undan KALDIRILDI (bkz. o dosyadaki yorum).
+Bu script YENİDEN TASARLANMADAN ve YENİDEN DOĞRULANMADAN çalıştırılmamalı.
+
 GÜVENLİK KURALLARI (bu oturumda öğrenilen derslerin doğrudan sonucu):
   1. VARSAYILAN ÇALIŞMA MODU DRY-RUN'DIR. Hiçbir şey yazılmaz, sadece
      hangi chunk'ların değişeceği ve NASIL değişeceği (öncesi/sonrası)
@@ -183,7 +197,21 @@ def main():
     parser.add_argument("--limit", type=int, default=None, help="Bu çalıştırmada işlenecek TOPLAM chunk sayısı üst sınırı (varsayılan: hepsi, parti parti)")
     parser.add_argument("--offset", type=int, default=0, help="Nereden başlanacağı (kaldığın yerden devam etmek için)")
     parser.add_argument("--min-run", type=int, default=MIN_RUN_DEFAULT, help="Gürültü sayılacak ardışık kısa satır eşiği")
+    parser.add_argument("--i-have-redesigned-the-heuristic", action="store_true",
+                         help="Bu bayrak olmadan --apply çalışmaz — bkz. dosya başındaki 18 Ağustos uyarısı.")
     args = parser.parse_args()
+
+    if args.apply and not args.i_have_redesigned_the_heuristic:
+        print(
+            "\n🛑 DURDURULDU: Bu script'in tespit mantığı 18 Ağustos 2026'da gerçek "
+            "exam_chunks verisine karşı dry-run ile test edildiğinde GERÇEK sınav "
+            "içeriğini (kimya formülleri, DNA dizileri, çoktan seçmeli şıklar) "
+            "yanlış 'gürültü' olarak işaretlediği görüldü. Dosya başındaki uyarıyı "
+            "okuyun. Heuristik yeniden tasarlanıp yeniden doğrulanmadan --apply "
+            "çalıştırılamaz. (Bilerek geçmek için: --i-have-redesigned-the-heuristic)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     db = SupabaseRest()
     mode = "APPLY (gerçekten yazılacak)" if args.apply else "DRY-RUN (hiçbir şey yazılmayacak)"

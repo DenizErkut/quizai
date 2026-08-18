@@ -26,7 +26,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { scanQuestionsForQualityIssues, QualityIssue } from '@/lib/content-quality-scan'
-import { isNonContent, isKazanimListesi, hasOcrLetterSplitNoise } from '@/lib/content-filters'
+import { isNonContent, isKazanimListesi } from '@/lib/content-filters'
 
 export const maxDuration = 120
 export const runtime = 'nodejs'
@@ -149,9 +149,13 @@ export async function GET(req: NextRequest) {
       sourceFlagSummary.push(`${r.title}: ${r.health_flag}`)
     }
 
-    // (b) exam_chunks'tan rastgele bir örneklem — Madde 4'teki filtrelerle
-    // (isNonContent, isKazanimListesi, hasOcrLetterSplitNoise) taranır.
-    // exam_chunks'ta bir created_at kolonu güvenilir şekilde kullanılamadığı
+    // (b) exam_chunks'tan rastgele bir örneklem — isNonContent/
+    // isKazanimListesi filtreleriyle taranır. hasOcrLetterSplitNoise
+    // BİLEREK burada YOK — 18 Ağustos 2026'da (aynı gün ikinci kontrol)
+    // gerçek exam_chunks verisine karşı dry-run ile doğrulanınca kimya
+    // formülü/DNA dizisi/çoktan seçmeli şık gibi GERÇEK içeriği yanlış
+    // işaretlediği görüldü (detay: lib/content-filters.ts). exam_chunks'ta
+    // bir created_at kolonu güvenilir şekilde kullanılamadığı
     // için (quiz_sessions'taki "son 24 saat" mantığının aksine) her
     // çalıştırmada TÜM tablodan rastgele bir örneklem alınır — zamanla
     // tüm tabloyu kademeli olarak kapsar.
@@ -167,7 +171,6 @@ export async function GET(req: NextRequest) {
         const flags: string[] = []
         if (isNonContent(content)) flags.push('front_matter_or_toc')
         if (isKazanimListesi(content)) flags.push('kazanim_listesi_only')
-        if (hasOcrLetterSplitNoise(content)) flags.push('ocr_letter_split_noise')
         if (flags.length === 0) continue
 
         await supabaseAdmin.from('error_reports').insert({
@@ -179,7 +182,7 @@ export async function GET(req: NextRequest) {
           status: 'pending',
           source: 'system_scan',
           issue_type: 'exam_chunk_quality',
-          admin_note: `exam_chunks.id: ${c.id} (exam_resource_id: ${c.exam_resource_id}) — sinyaller: ${flags.join(', ')}. Madde 10'daki temizlik scripti (scripts/clean_exam_chunks_ocr_noise.py) ile OCR gürültüsü giderilebilir.`,
+          admin_note: `exam_chunks.id: ${c.id} (exam_resource_id: ${c.exam_resource_id}) — sinyaller: ${flags.join(', ')}.`,
         })
         sourceFlagged++
         sourceFlagSummary.push(`exam_chunk ${c.id}: ${flags.join(', ')}`)

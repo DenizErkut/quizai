@@ -6,7 +6,6 @@ import {
   isNonContent,
   isKazanimListesi,
   findContentStart,
-  hasOcrLetterSplitNoise,
 } from '@/lib/content-filters'
 
 const adminDb = createClient(
@@ -172,10 +171,17 @@ export async function POST(req: NextRequest) {
         // artık MEB kaynaklarıyla AYNI kalite filtreleri uygulanıyor —
         // önceden bu sorgu hiçbir front-matter/kazanım-listesi/OCR-gürültü
         // filtresi içermiyordu (bare .ilike + .limit(3)).
+        // NOT: hasOcrLetterSplitNoise() buradan KALDIRILDI (18 Ağustos 2026,
+        // aynı gün ikinci kontrol) — gerçek veriye karşı dry-run ile
+        // doğrulanınca kimya formülü/DNA dizisi/çoktan seçmeli şık gibi
+        // GERÇEK içeriği yanlış eleyerek arama kalitesini düşürdüğü
+        // görüldü. Detay: lib/content-filters.ts'teki fonksiyonun başındaki
+        // yorum. isNonContent/isKazanimListesi (anahtar kelime/yapısal
+        // desenli, daha hedefli) olduğu gibi kalıyor.
         const examChunks = examChunksRaw
           .filter((c: any) => {
             const content = c.content || ''
-            return !isNonContent(content) && !isKazanimListesi(content) && !hasOcrLetterSplitNoise(content)
+            return !isNonContent(content) && !isKazanimListesi(content)
           })
           .slice(0, 3)
 

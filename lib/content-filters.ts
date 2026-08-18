@@ -86,12 +86,31 @@ export function findContentStart(rawText: string, unitOrTopic: string): number {
   return 0
 }
 
-// YENİ (Madde 4/10) — exam_chunks'ta bulunan, dikey/dekoratif PDF
-// başlıklarının OCR sırasında harf harf ayrılması sorunu (ör.
-// "Ç\nI\nK\nM\nI\nŞ\n..."). scripts/clean_exam_chunks_ocr_noise.py'deki
-// Python temizlik algoritmasıyla AYNI tespit mantığı: ardışık 12+ kısa
-// (≤3 karakter) satır, "harf harf ayrılmış" bir başlık bloğu sayılır —
-// gerçek içerikte satırlar bu kadar kısa ve bu kadar uzun art arda olmaz.
+// ⚠️ 18 Ağustos 2026 (aynı gün, ileriki bir kontrol) — GÜVENLİ DEĞİL,
+// KULLANILMIYOR. Bu fonksiyon "ardışık 12+ kısa satır = dekoratif harf-
+// harf-ayrılmış başlık gürültüsü" varsayımıyla yazılmıştı. Gerçek veriye
+// (exam_chunks) karşı ÇALIŞTIRILMADAN ÖNCE bir dry-run ile doğrulandığında
+// (Supabase MCP ile doğrudan sorgulanarak, hiçbir satır silinmeden) ortaya
+// çıktı ki bu kalıp exam_chunks'ta neredeyse HİÇ dekoratif başlık
+// yakalamıyor — bunun yerine GERÇEK sınav içeriğini yanlış işaretliyor:
+// kimya formülleri (CH2OHCCH3...), DNA dizileri (ATTAATCTCTTAGAGA...),
+// çoktan seçmeli şık listeleri (A)317 B)319 C)320...), açı/derece
+// listeleri (15°15°15°30°...), matematik üs kuralları (an.am=an+m...).
+// meb_resources.raw_text üzerinde de aday oranı %39 (53/137) çıktı — aynı
+// şüpheli genişlik, örnek eşleşmelerden biri DKAB kitaplarındaki gerçek
+// Kur'an alıntıları (Arapça diakritik karakterler) idi.
+//
+// Bu bulgu üzerine: (1) scripts/clean_exam_chunks_ocr_noise.py'nin
+// --apply modu ÇALIŞTIRILMADI (Python o an kullanıcının makinesinde kurulu
+// değildi — kazara veri kaybı önlendi), (2) bu fonksiyonun app/api/meb-
+// search/route.ts ve app/api/cron/content-quality-scan/route.ts'teki
+// çağrıları KALDIRILDI (aşağıya bakın, fonksiyon artık hiçbir yerden
+// çağrılmıyor). Fonksiyonun kendisi ileride daha temkinli bir tasarımla
+// (ör. sadece metnin ilk ~500 karakterinde, VE run'daki tüm karakterler
+// harf — rakam/sembol YOK, VE ideal olarak birleştirildiğinde tanınabilir
+// bir kelime oluşturuyor) yeniden değerlendirilebilir — ama önce yine
+// gerçek veriye karşı dry-run ile doğrulanmadan HİÇBİR yerde
+// kullanılmamalı.
 export function hasOcrLetterSplitNoise(text: string): boolean {
   const lines = text.split(/\r?\n/)
   let run = 0
