@@ -1708,7 +1708,10 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   data = await res.json()
                   if (res.ok) {
                     const warn = data.warning ? ` ⚠️ ${data.warning}` : ''
-                    setMebMsg(`✅ Yüklendi! ${data.chunks} chunk, ${data.embedded} embedding, ${(data.chars/1000).toFixed(1)}K karakter${warn}`)
+                    // Madde 8: yükleme sağlık kontrolü bir şey işaretlediyse hemen göster —
+                    // "sonradan bulma" döngüsünü baştan kesmek buna hizmet ediyor.
+                    const healthWarn = data.health_flags?.length ? ` ⚠️ Sağlık kontrolü: ${data.health_flags.join(', ')} — kaynağı kontrol et.` : ''
+                    setMebMsg(`✅ Yüklendi! ${data.chunks} chunk, ${data.embedded} embedding, ${(data.chars/1000).toFixed(1)}K karakter${warn}${healthWarn}`)
                     setMebForm({ title: '', grade: '', subject: '', unit: '', level: mebForm.level, raw_text: '' })
                     setMebFile(null)
                     // Listeyi yenile
@@ -1776,7 +1779,14 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   <div key={r.id} style={{ padding: '12px 14px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '3px' }}>{r.title}</div>
+                        <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {r.title}
+                          {r.health_flag && (
+                            <span title={`Sağlık kontrolü uyarısı: ${r.health_flag}`} style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '99px', background: 'rgba(217,119,6,0.12)', color: '#d97706', fontWeight: 700 }}>
+                              ⚠️ {r.health_flag.split(',').length} uyarı
+                            </span>
+                          )}
+                        </div>
                         <div style={{ fontSize: '11px', color: 'var(--text3)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                           <span>📚 {r.subject}</span>
                           <span>📖 {r.unit}</span>
