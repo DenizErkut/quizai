@@ -72,7 +72,12 @@ export async function PATCH(req: NextRequest) {
     ? editedPrerequisiteTopic.trim() : draft.prerequisite_topic
 
   if (action === 'approve') {
+    // topic_prerequisites tablosunda subject NOT NULL — draft'ın kendi
+    // subject'ini taşıyoruz (gerçek tabloda grade/level kolonu yok,
+    // sadece subject/topic/prerequisite_topic; bkz. 20260812104651
+    // create_topic_prerequisites migration'ı).
     const { error: insErr } = await adminDb.from('topic_prerequisites').insert({
+      subject: draft.subject,
       topic: finalTopic,
       prerequisite_topic: finalPrereq,
     })
