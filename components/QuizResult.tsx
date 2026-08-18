@@ -245,6 +245,10 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
         user_answer: q.opts[a?.userAns],
         topic,
         status: 'pending',
+        // Madde 2: reporter_role artık kaydediliyor — öğretmenin yeni genel
+        // bildirim formundan (components/ContentIssueReporter.tsx) ayırt
+        // edilebilsin diye.
+        reporter_role: 'student',
       })
       setReportedIdx(prev => new Set([...prev, idx]))
     } catch (e) {

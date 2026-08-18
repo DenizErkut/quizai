@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities, resolveName } from '@/lib/identity/resolve-client'
+import ContentIssueReporter from '@/components/ContentIssueReporter'
 
 export default function TeacherDashboard() {
   const [teacher, setTeacher] = useState<any>(null)
@@ -11,7 +12,7 @@ export default function TeacherDashboard() {
   const [assignments, setAssignments] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'students' | 'assign' | 'performance' | 'notify'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'students' | 'assign' | 'performance' | 'notify' | 'report'>('dashboard')
   const [selectedClass, setSelectedClass] = useState<string>('all')
   const [notifyClass, setNotifyClass] = useState<string>('')
   const [notifyMsg, setNotifyMsg] = useState('')
@@ -177,6 +178,7 @@ export default function TeacherDashboard() {
             { key: 'assign', label: '📝 Ödev Ata' },
             { key: 'performance', label: '📈 Analiz' },
             { key: 'notify', label: '🔔 Bildirim' },
+            { key: 'report', label: '🔧 Hata Bildir' },
             { key: 'reports', label: '📋 RAPORLAR', href: '/teacher/reports' },
             { key: 'import', label: '📥 Not İçe Aktar', href: '/teacher/import-grades' },
             { key: 'live', label: '🎯 Canlı Test', href: '/teacher/live' },
@@ -526,6 +528,14 @@ export default function TeacherDashboard() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* HATA BİLDİR (Madde 2) */}
+        {activeTab === 'report' && (
+          <div>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1.5rem' }}>🔧 İçerik Hatası Bildir</h2>
+            <ContentIssueReporter reporterRole="teacher" />
           </div>
         )}
 

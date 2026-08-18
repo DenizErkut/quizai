@@ -28,6 +28,7 @@ interface ErrorReport {
   correct_answer: string; user_answer: string; topic: string
   reported_at: string; status: string; admin_note: string | null
   source?: string; issue_type?: string | null
+  root_cause?: string | null; reporter_role?: string | null // Madde 2
   profiles?: { name: string }
 }
 
@@ -101,6 +102,7 @@ export default function AdminPage() {
   const [reportLoading, setReportLoading] = useState(false)
   const [reportFetched, setReportFetched] = useState(false)
   const [adminNote, setAdminNote] = useState<Record<string, string>>({})
+  const [rootCause, setRootCause] = useState<Record<string, string>>({}) // Madde 2
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [pendingTeachers, setPendingTeachers] = useState(0)
   const [teacherUpdating, setTeacherUpdating] = useState<string | null>(null)
@@ -430,10 +432,29 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
     loadSellers() // kurum formundaki "Satıcı" dropdown'ı için önceden yükle
   }
 
-  async function updateReportStatus(id: string, status: string, note?: string) {
-    await supabase.from('error_reports').update({ status, admin_note: note || null }).eq('id', id)
-    setErrorReports(prev => prev.map(r => r.id === id ? { ...r, status, admin_note: note || null } : r))
+  async function updateReportStatus(id: string, status: string, note?: string, rootCauseText?: string) {
+    await supabase.from('error_reports').update({ status, admin_note: note || null, root_cause: rootCauseText || null }).eq('id', id)
+    setErrorReports(prev => prev.map(r => r.id === id ? { ...r, status, admin_note: note || null, root_cause: rootCauseText || null } : r))
     if (status !== 'pending') setPendingCount(prev => Math.max(0, prev - 1))
+
+    // Madde 2 — öğretmen/öğrenci geri bildirim döngüsü: raporu açan kullanıcıya
+    // (varsa) "bildirdiğin incelendi" bildirimi bırak. system_scan kaynaklı
+    // (user_id yok) satırlarda kimseye bildirim gitmez.
+    const report = errorReports.find(r => r.id === id)
+    if (report?.user_id && status !== 'pending') {
+      const title = status === 'confirmed' ? '✅ Bildirdiğin hata onaylandı' : '📋 Bildirdiğin bildirim incelendi'
+      const body = status === 'confirmed'
+        ? `"${report.topic}" ile ilgili bildirimin onaylandı${rootCauseText ? ` — kök neden: ${rootCauseText}` : ''}. Düzeltiliyor/düzeltildi, teşekkürler!`
+        : `"${report.topic}" ile ilgili bildirimin incelendi, bir sorun bulunmadı.`
+      await supabase.from('notifications').insert({
+        user_id: report.user_id,
+        type: 'error_report_status',
+        title,
+        body,
+        read: false,
+        data: { href: '/profile/edit' },
+      })
+    }
   }
 
   async function updatePlan(userId: string, plan: 'free' | 'premium', months?: number) {
@@ -1202,6 +1223,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                             ? <span style={{ color: 'var(--primary)', fontWeight: 600 }}>🔍 Otomatik tarama</span>
                             : ((r as any).profiles?.name || 'Kullanıcı')} · {r.topic} · {new Date(r.reported_at).toLocaleDateString('tr-TR')}
                           {r.issue_type && <span style={{ marginLeft: '6px', padding: '1px 6px', borderRadius: '99px', background: 'var(--bg2)', fontSize: '10px' }}>{r.issue_type}</span>}
+                          {r.reporter_role === 'teacher' && <span style={{ marginLeft: '6px', padding: '1px 6px', borderRadius: '99px', background: 'rgba(99,102,241,0.1)', color: '#6366f1', fontSize: '10px', fontWeight: 700 }}>👩‍🏫 Öğretmen</span>}
                         </span>
                       </div>
                     </div>
@@ -1225,23 +1247,38 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                         Not: {r.admin_note}
                       </div>
                     )}
+                    {r.root_cause && (
+                      <div style={{ fontSize: '12px', color: 'var(--text2)', padding: '8px', background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '6px', marginBottom: '8px' }}>
+                        🔍 Kök neden: {r.root_cause} <span style={{ fontSize: '10px', color: 'var(--text3)' }}>(raporu açana bildirim olarak gönderildi)</span>
+                      </div>
+                    )}
 
                     {r.status === 'pending' && (
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <input
-                          placeholder="Admin notu (opsiyonel)"
-                          value={adminNote[r.id] || ''}
-                          onChange={e => setAdminNote(prev => ({ ...prev, [r.id]: e.target.value }))}
-                          style={{ flex: 1, fontSize: '12px', padding: '5px 8px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-sans)', minWidth: '150px' }}
-                        />
-                        <button onClick={() => updateReportStatus(r.id, 'confirmed', adminNote[r.id])}
-                          style={{ fontSize: '11px', padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(217,119,6,0.3)', background: 'rgba(217,119,6,0.1)', color: 'var(--amber)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                          ✓ Hata onaylandı
-                        </button>
-                        <button onClick={() => updateReportStatus(r.id, 'rejected', adminNote[r.id])}
-                          style={{ fontSize: '11px', padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(22,163,74,0.3)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                          ✗ Ret (soru doğru)
-                        </button>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          <input
+                            placeholder="Admin notu (opsiyonel)"
+                            value={adminNote[r.id] || ''}
+                            onChange={e => setAdminNote(prev => ({ ...prev, [r.id]: e.target.value }))}
+                            style={{ flex: 1, fontSize: '12px', padding: '5px 8px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-sans)', minWidth: '150px' }}
+                          />
+                          <input
+                            placeholder="Kök neden (opsiyonel — raporu açana bildirim olarak gider)"
+                            value={rootCause[r.id] || ''}
+                            onChange={e => setRootCause(prev => ({ ...prev, [r.id]: e.target.value }))}
+                            style={{ flex: 1, fontSize: '12px', padding: '5px 8px', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '6px', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-sans)', minWidth: '150px' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                          <button onClick={() => updateReportStatus(r.id, 'confirmed', adminNote[r.id], rootCause[r.id])}
+                            style={{ fontSize: '11px', padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(217,119,6,0.3)', background: 'rgba(217,119,6,0.1)', color: 'var(--amber)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                            ✓ Hata onaylandı
+                          </button>
+                          <button onClick={() => updateReportStatus(r.id, 'rejected', adminNote[r.id], rootCause[r.id])}
+                            style={{ fontSize: '11px', padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(22,163,74,0.3)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                            ✗ Ret (soru doğru)
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1708,7 +1745,10 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   data = await res.json()
                   if (res.ok) {
                     const warn = data.warning ? ` ⚠️ ${data.warning}` : ''
-                    setMebMsg(`✅ Yüklendi! ${data.chunks} chunk, ${data.embedded} embedding, ${(data.chars/1000).toFixed(1)}K karakter${warn}`)
+                    // Madde 8: yükleme sağlık kontrolü bir şey işaretlediyse hemen göster —
+                    // "sonradan bulma" döngüsünü baştan kesmek buna hizmet ediyor.
+                    const healthWarn = data.health_flags?.length ? ` ⚠️ Sağlık kontrolü: ${data.health_flags.join(', ')} — kaynağı kontrol et.` : ''
+                    setMebMsg(`✅ Yüklendi! ${data.chunks} chunk, ${data.embedded} embedding, ${(data.chars/1000).toFixed(1)}K karakter${warn}${healthWarn}`)
                     setMebForm({ title: '', grade: '', subject: '', unit: '', level: mebForm.level, raw_text: '' })
                     setMebFile(null)
                     // Listeyi yenile
@@ -1776,7 +1816,14 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   <div key={r.id} style={{ padding: '12px 14px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '3px' }}>{r.title}</div>
+                        <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {r.title}
+                          {r.health_flag && (
+                            <span title={`Sağlık kontrolü uyarısı: ${r.health_flag}`} style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '99px', background: 'rgba(217,119,6,0.12)', color: '#d97706', fontWeight: 700 }}>
+                              ⚠️ {r.health_flag.split(',').length} uyarı
+                            </span>
+                          )}
+                        </div>
                         <div style={{ fontSize: '11px', color: 'var(--text3)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                           <span>📚 {r.subject}</span>
                           <span>📖 {r.unit}</span>

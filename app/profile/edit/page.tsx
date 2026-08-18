@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { resolveOwnIdentity } from '@/lib/identity/resolve-client'
 import DepartmentSelect, { resolveDepartmentValue } from '@/components/DepartmentSelect'
 import { UNIVERSITY_DEPARTMENTS, OTHER_DEPARTMENT_VALUE } from '@/lib/university-departments'
+import ContentIssueReporter from '@/components/ContentIssueReporter'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -41,6 +42,8 @@ export default function ProfileEditPage() {
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+  // Madde 2: "Bildirdiklerim" — profil sayfasında katlanabilir bir bölüm
+  const [showIssueReporter, setShowIssueReporter] = useState(false)
 
   const [name, setName] = useState('')
   const [age, setAge] = useState('')
@@ -505,6 +508,19 @@ export default function ProfileEditPage() {
           style={{ width: '100%', justifyContent: 'center' }}>
           {saving ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Kaydet'}
         </button>
+
+        {/* Madde 2: İçerik hatası bildirme + "Bildirdiklerim" — katlanabilir,
+            profil sayfasını kalabalıklaştırmasın diye varsayılan kapalı. */}
+        <div style={{ marginTop: '1.5rem' }}>
+          <button className="btn" onClick={() => setShowIssueReporter(v => !v)} style={{ width: '100%', justifyContent: 'center' }}>
+            🔧 Bildirdiğim İçerik Hataları {showIssueReporter ? '▲' : '▼'}
+          </button>
+          {showIssueReporter && (
+            <div style={{ marginTop: '1rem' }}>
+              <ContentIssueReporter reporterRole="student" />
+            </div>
+          )}
+        </div>
       </div>
     </main>
   )
