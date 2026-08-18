@@ -35,6 +35,15 @@ function getLevel(grade: string): string {
   return 'ortaokul'
 }
 
+// Öğrenci tarafındaki app/api/generate-open-ended/route.ts'te 18 Ağustos
+// 2026'da bulunan ve düzeltilen AYNI hata burada da vardı: öğretmen bir
+// İngilizce açık uçlu ödevi oluştururken senaryo+soru tamamen Türkçe
+// üretiliyordu. Aynı çözüm.
+const FOREIGN_LANGUAGE_SUBJECTS = ['ingilizce', 'almanca', 'fransızca', 'fransizca', 'ispanyolca', 'arapça', 'arapca', 'rusça', 'rusca', 'italyanca', 'çince', 'cince', 'japonca', 'korece']
+function isForeignLanguageSubject(subject: string): boolean {
+  return FOREIGN_LANGUAGE_SUBJECTS.includes(subject.trim().toLocaleLowerCase('tr'))
+}
+
 function buildPrompt(level: string, grade: string, subject: string, topic: string, mebContext: string): string {
   const mebSection = mebContext
     ? `\n\n⚠️ AŞAĞIDA GERÇEK BİR MEB KAYNAK METNİ VERİLMİŞTİR. Senaryonu ve soruyu MÜMKÜN OLDUĞUNCA bu metindeki gerçek bilgilere, örneklere, olaylara veya kavramlara dayandır — metinde olmayan bilgi uydurma.\n\n` +
@@ -65,14 +74,14 @@ Konu: ${topic}
 ${mebSection}
 Bir ÖĞRETMEN, bu soruyu SINIFINA ÖDEV olarak atayacak — birden fazla öğrenci aynı soruyu cevaplayacak. Yukarıdaki konuya uygun, ${grade} seviyesine uygun zorlukta, gerçek bir MEB ortak sınav sorusu gibi bir senaryo+soru+rubrik hazırla.
 
-ÖNEMLİ: Tüm metinleri SADECE TÜRKÇE yaz. Başka hiçbir dilden (İngilizce, Korece, Çince vb.) tek bir kelime bile kullanma.
+${isForeignLanguageSubject(subject) ? `ÖNEMLİ (DİL): Bu bir YABANCI DİL dersi sorusu (${subject}) — gerçek bir ${subject} sınavında olduğu gibi davran. SENARYOYU ve SORUYU TAMAMEN "${subject}" DİLİNDE yaz (Türkçe DEĞİL) — öğrenci o dilde okuduğunu anlayıp yine o dilde cevap verecek, Türkçe tek cümle bile olmamalı. SADECE rubrikteki "criterion" ve "description" alanlarını TÜRKÇE yaz (öğretmenin okuyacağı değerlendirme ölçütleri).` : `ÖNEMLİ: Tüm metinleri SADECE TÜRKÇE yaz. Başka hiçbir dilden (İngilizce, Korece, Çince vb.) tek bir kelime bile kullanma.`}
 
 SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir açıklama ekleme:
 {
-  "scenario": "Senaryo/durum metni (2-4 cümle, Türkçe)",
-  "question": "Senaryoya dayanan açık uçlu soru (Türkçe)",
+  "scenario": "Senaryo/durum metni (2-4 cümle, ${isForeignLanguageSubject(subject) ? subject : 'Türkçe'})",
+  "question": "Senaryoya dayanan açık uçlu soru (${isForeignLanguageSubject(subject) ? subject : 'Türkçe'})",
   "rubric": [
-    { "criterion": "Kriter adı (kısa)", "maxPoints": 30, "description": "Bu kriterden tam puan almak için cevapta ne olmalı (1 cümle)" }
+    { "criterion": "Kriter adı (kısa, Türkçe)", "maxPoints": 30, "description": "Bu kriterden tam puan almak için cevapta ne olmalı (1 cümle, Türkçe)" }
   ]
 }
 Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
@@ -119,9 +128,12 @@ async function generateWithAI(subject: string, topic: string, grade: string, ori
   if (!parsed?.scenario || !parsed?.question || !Array.isArray(parsed?.rubric)) {
     throw new Error('Soru üretilemedi.')
   }
+  // Ders Çince/Japonca/Korece ise senaryo/soru bilerek o alfabede üretiliyor
+  // — stripForeignScripts çalışırsa hedef dilin kendisini silerdi.
+  const skipStrip = isForeignLanguageSubject(subject)
   return {
-    scenario: stripForeignScripts(parsed.scenario),
-    question: stripForeignScripts(parsed.question),
+    scenario: skipStrip ? parsed.scenario : stripForeignScripts(parsed.scenario),
+    question: skipStrip ? parsed.question : stripForeignScripts(parsed.question),
     rubric: parsed.rubric.map((r: any) => ({
       criterion: stripForeignScripts(r.criterion || ''),
       maxPoints: Number(r.maxPoints) || 0,

@@ -92,7 +92,25 @@ export const EXAM_FORMATS = {
 
 type ExamKey = keyof typeof EXAM_FORMATS
 
+// 18 Ağustos 2026'da bulundu: generate-quiz/route.ts'te ("Serbest Pratik"
+// testleri) İngilizce dersi için önce eklenen dil kuralı, bu dosyadaki
+// (LGS/TYT/AYT/KPSS sınav SİMÜLASYONU) soru üretimine HİÇ uygulanmamıştı —
+// buradaki prompt tamamen ayrı ve dil farkındalığı sıfırdı, LGS'nin
+// "İngilizce" bölümü dahil her şey doğrudan Türkçe üretiliyordu. Kullanıcı
+// geri bildirimiyle bulundu, aynı kural burada da uygulanıyor.
+const FOREIGN_LANGUAGE_SUBJECTS = ['ingilizce', 'almanca', 'fransızca', 'fransizca', 'ispanyolca', 'arapça', 'arapca', 'rusça', 'rusca', 'italyanca', 'çince', 'cince', 'japonca', 'korece']
+function isForeignLanguageSubject(subject: string): boolean {
+  // .toLowerCase() (locale'siz) KULLANMA: JS'de 'İ'.toLowerCase() -> 'i̇'
+  // üretir, düz 'i' ile eşleşmez — "İngilizce" hiç tanınmazdı.
+  return FOREIGN_LANGUAGE_SUBJECTS.includes(subject.trim().toLocaleLowerCase('tr'))
+}
+
 function buildSectionPrompt(subject: string, grade: string, count: number, examType: string): string {
+  const isLanguageSection = isForeignLanguageSubject(subject)
+  const languageNote = isLanguageSection
+    ? `\n\n🌐 YABANCI DİL BÖLÜMÜ KURALI: Bu bir ${subject} bölümü — gerçek bir ${examType} ${subject} sınavı gibi davran. Soru kökü (q alanı) DAHİL HER ŞEY -- soru metni, şıklar (opts), örnek cümleler, kelimeler, gramer yapıları -- TAMAMEN ${subject} DİLİNDE olmalı, soru/şık metninde TEK BİR TÜRKÇE CÜMLE bile olmamalı. SADECE "exp" (açıklama) alanını öğrenci anlayışı için TÜRKÇE yaz.`
+    : ''
+
   return `Sen ${examType} sınavı için soru hazırlayan bir eğitim uzmanısın.
 Ders: ${subject}
 Seviye: ${grade}
@@ -103,7 +121,7 @@ KURALLAR:
 - 4 şık (A/B/C/D), tek doğru cevap
 - Zorluk dağılımı: %30 kolay, %50 orta, %20 zor
 - Güncel ve doğru bilgi içeren sorular
-- Kısa açıklama ekle
+- Kısa açıklama ekle${languageNote}
 
 SADECE geçerli JSON döndür, markdown yok:
 {"questions":[{"q":"Soru metni","opts":["A şıkkı","B şıkkı","C şıkkı","D şıkkı"],"ans":0,"exp":"Kısa açıklama","difficulty":"easy"}]}`

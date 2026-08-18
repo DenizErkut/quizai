@@ -328,9 +328,17 @@ function buildPrompt(type: string, topic: string, grade: string, difficulty: str
   // dersinde SADECE açıklamalar için geçerli -- örnek cümleler/kelimeler/
   // gramer yapıları o dilde (İngilizce) kalmalı, Türkçe'ye çevrilmemeli.
   const subjectLine = subject ? `Ders: ${subject}.` : ''
-  const isLanguageCourse = !!subject && ['ingilizce', 'almanca', 'fransızca'].some(l => subject.toLocaleLowerCase('tr').includes(l))
+  const FOREIGN_LANGUAGE_SUBJECTS = ['ingilizce', 'almanca', 'fransızca', 'fransizca', 'ispanyolca', 'arapça', 'arapca', 'rusça', 'rusca', 'italyanca', 'çince', 'cince', 'japonca', 'korece']
+  const isLanguageCourse = !!subject && FOREIGN_LANGUAGE_SUBJECTS.includes(subject.trim().toLocaleLowerCase('tr'))
+  // 18 Ağustos 2026'da güçlendirildi: eski metin sadece "örnek cümleler
+  // İngilizce kalsın" diyordu, soru KÖKÜNÜN (q alanı) ve ŞIKLARIN kendisinin
+  // Türkçe kalmasına hiçbir engel koymuyordu (öğrenci geri bildirimi: "Aşağıdaki
+  // cümlelerden hangisi..." Türkçe kök + İngilizce şıklar çıkıyordu). Artık
+  // çağıran taraf (POST handler) zaten "language" parametresini bu derste
+  // hedef dile (subject) çeviriyor, bu not SADECE bunu pekiştirip "exp"
+  // alanının Türkçe kalması gerektiğini netleştiriyor.
   const languageCourseNote = isLanguageCourse
-    ? `\n\n🌐 YABANCI DİL DERSİ KURALI: Bu bir ${subject} dersi sorusu. "Soru dili: ${language}" talimatı SADECE açıklama/yönerge metinleri içindir -- örnek cümleler, kelimeler, gramer yapıları MUTLAKA ${subject} dilinde kalmalı, Türkçe'ye çevrilmemeli. SORULARIN TAMAMI (${count} sorunun ${count}'ü de) konu olarak "${topic}" ile SIKI SIKIYA ilgili kalmalı -- konudan sapıp alakasız bir dilde/temada (ör. Türkçe okuma-anlama, edebiyat, iletişim etiği gibi bambaşka bir konu) soru üretme. Yeterli çeşitlilik bulamıyorsan, aynı gramer/kelime konusunu FARKLI örnek cümlelerle/kelimelerle tekrar işle -- asla konu dışına çıkma.`
+    ? `\n\n🌐 YABANCI DİL DERSİ KURALI: Bu bir ${subject} dersi sorusu — gerçek bir ${subject} sınavı gibi davran. Soru kökü (q alanı) DAHİL HER ŞEY -- soru metni, şıklar (opts), örnek cümleler, kelimeler, gramer yapıları -- TAMAMEN ${subject} DİLİNDE olmalı, soru/şık metninde TEK BİR TÜRKÇE CÜMLE bile olmamalı. SADECE "exp" (açıklama/doğru cevap gerekçesi) alanını öğrenci/veli anlayışı için TÜRKÇE yaz. SORULARIN TAMAMI (${count} sorunun ${count}'ü de) konu olarak "${topic}" ile SIKI SIKIYA ilgili kalmalı -- konudan sapıp alakasız bir dilde/temada (ör. Türkçe okuma-anlama, edebiyat, iletişim etiği gibi bambaşka bir konu) soru üretme. Yeterli çeşitlilik bulamıyorsan, aynı gramer/kelime konusunu FARKLI örnek cümlelerle/kelimelerle tekrar işle -- asla konu dışına çıkma.`
     : ''
 
   const isUniversity = getLevel(grade) === 'universite'
@@ -516,6 +524,26 @@ export async function POST(req: NextRequest) {
 
     const lang = language || profile.language || 'Turkce'
 
+    // 18 Ağustos 2026'da bulundu: İngilizce (ve diğer yabancı dil) dersinde
+    // "isLanguageCourse" notu SADECE örnek cümlelerin İngilizce kalmasını
+    // istiyordu, ama "Soru dili: ${lang}" talimatı hâlâ öğrencinin genel
+    // arayüz dilini (çoğunlukla Türkçe) taşıyordu — AI soru KÖKÜNÜ ve
+    // şıkları Türkçe üretmeye devam ediyordu (kullanıcının paylaştığı PDF:
+    // "Aşağıdaki cümlelerden hangisi..." Türkçe kök + İngilizce şıklar).
+    // Kullanıcı talimatı: "Türkçe olacak" varsayılan kuralı, İngilizce
+    // (ve diğer yabancı dil) dersleri İÇİN İSTİSNA tutulmalı — o derste
+    // TÜM soru hedef dilde sorulmalı. Bunu TEK bir noktada (burada) çözüp
+    // aşağı akışın (prompt, doğrulama, DB kaydı/PDF etiketi) HEPSİNİN aynı
+    // doğru dili kullanmasını sağlıyoruz — aksi halde test kaydında/PDF
+    // çıktısında "Dil: Türkçe" yazıp öğrenciyi/veliyi yanıltmaya devam eder.
+    const FOREIGN_LANGUAGE_SUBJECTS_SET = new Set([
+      'ingilizce', 'almanca', 'fransızca', 'fransizca', 'ispanyolca',
+      'arapça', 'arapca', 'rusça', 'rusca', 'italyanca', 'çince', 'cince',
+      'japonca', 'korece',
+    ])
+    const isLanguageCourseSubject = !!subject && FOREIGN_LANGUAGE_SUBJECTS_SET.has(subject.trim().toLocaleLowerCase('tr'))
+    const effectiveLang = isLanguageCourseSubject ? subject : lang
+
     // Tekrar eden soruları önle
     let previousQuestionsNote = ''
     try {
@@ -630,7 +658,7 @@ export async function POST(req: NextRequest) {
       } catch { /* MEB opsiyonel */ }
     }
 
-    const prompt = buildPrompt(questionType, topic, grade, resolvedDifficulty, lang, safeQCount, fileContent || '', gradeContext, mebContext, profile.department || undefined, subject) + previousQuestionsNote
+    const prompt = buildPrompt(questionType, topic, grade, resolvedDifficulty, effectiveLang, safeQCount, fileContent || '', gradeContext, mebContext, profile.department || undefined, subject) + previousQuestionsNote
     promptStr = prompt
     countRef = safeQCount
 
@@ -712,7 +740,7 @@ export async function POST(req: NextRequest) {
         ? fetch(`${req.nextUrl.origin}/api/verify-questions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
-            body: JSON.stringify({ questions, topic, grade, language: lang, questionType }),
+            body: JSON.stringify({ questions, topic, grade, language: effectiveLang, questionType }),
             signal: AbortSignal.timeout(40000), // 40sn - asilmasin, generate-quiz kendi butcesini korusun
           }).then(r => r.ok ? r.json() : null).catch(() => null)
         : Promise.resolve(null),
@@ -832,7 +860,7 @@ export async function POST(req: NextRequest) {
           user_id: user.id,
           topic,
           grade: profile.grade,
-          language: lang,
+          language: effectiveLang,
           question_count: questions.length,
           questions,
           answers: [],
