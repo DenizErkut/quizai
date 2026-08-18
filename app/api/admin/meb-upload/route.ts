@@ -5,7 +5,6 @@ import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { extractPdfText } from '@/lib/pdf-extract'
-import { runHealthCheck } from '@/lib/content-filters'
 
 // OCR fallback'i (Gemini Vision / Claude) birkaç saniye sürebilir,
 // varsayılan süre yetersiz kalabilir. 90sn'de gerçek bir zaman aşımı
@@ -80,23 +79,9 @@ async function extractChunkAndSave(params: {
   }
   if (!rawText) rawText = fileUrl ? `[Dosya: ${fileUrl}]` : ''
 
-  // Madde 8 (pratium-bekleyen-isler-uygulama-plani.md) — "sağlık kontrolü":
-  // insert'ten HEMEN ÖNCE üç şüpheli sinyali kontrol et. Hiçbiri yüklemeyi
-  // ENGELLEMEZ (bugüne kadar bulunan gerçek kaynaklardan hiçbiri baştan
-  // reddedilmemeliydi, hepsi yüklendikten sonra manuel bulundu/düzeltildi)
-  // — sadece meb_resources.health_flag'e işaretlenir, admin panelinde bir
-  // rozet olarak görünür, karar admin'e kalır.
-  const health = runHealthCheck(rawText)
-  if (health.flags.length > 0) {
-    console.warn(`[meb-upload] sağlık kontrolü uyarısı (${title}): ${health.flags.join(', ')}`)
-  }
-
   const { data: resource, error: resErr } = await adminDb
     .from('meb_resources')
-    .insert({
-      title, grade, subject, unit, level, source_type: sourceType, file_url: fileUrl, raw_text: rawText,
-      health_flag: health.flags.length > 0 ? health.flags.join(',') : null,
-    })
+    .insert({ title, grade, subject, unit, level, source_type: sourceType, file_url: fileUrl, raw_text: rawText })
     .select('id').single()
 
   if (resErr || !resource) {
@@ -122,7 +107,6 @@ async function extractChunkAndSave(params: {
     success: true, resource_id: resource.id,
     chunks: chunks.length, embedded: embeddedCount,
     chars: rawText.length,
-    health_flags: health.flags, // boşsa [] — admin yükleme sonucunda hemen görebilsin
   })
 }
 
@@ -267,7 +251,7 @@ export async function GET(req: NextRequest) {
     if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     const { data, error } = await adminDb
       .from('meb_resources')
-      .select('id, title, grade, subject, unit, level, source_type, created_at, raw_text, health_flag')
+      .select('id, title, grade, subject, unit, level, source_type, created_at, raw_text')
       .eq('id', id).single()
     if (error || !data) return NextResponse.json({ error: 'Bulunamadı' }, { status: 404 })
     return NextResponse.json({ resource: { ...data, char_count: data.raw_text?.length || 0 } })
@@ -282,7 +266,7 @@ export async function GET(req: NextRequest) {
   const sortAsc = searchParams.get('sort') === 'asc'
   let query = adminDb
     .from('meb_resources')
-    .select('id, title, grade, subject, unit, level, source_type, created_at, raw_text, health_flag')
+    .select('id, title, grade, subject, unit, level, source_type, created_at, raw_text')
     .order('created_at', { ascending: sortAsc })
 
   if (level) query = query.eq('level', level)
