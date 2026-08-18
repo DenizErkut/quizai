@@ -57,6 +57,14 @@ export default function AdminPage() {
   const [newItem, setNewItem] = useState({ level: 'ortaokul', grade: '6. sınıf', subject: '' })
   const [currMsg, setCurrMsg] = useState('')
 
+  // Madde 3: Kazanım-taksonomisi (Learning Graph) yarı-otomatik pipeline
+  const [lgSelectedCurriculumId, setLgSelectedCurriculumId] = useState('')
+  const [lgSuggesting, setLgSuggesting] = useState(false)
+  const [lgMsg, setLgMsg] = useState('')
+  const [lgDrafts, setLgDrafts] = useState<any[]>([])
+  const [lgDraftsLoading, setLgDraftsLoading] = useState(false)
+  const [lgEdits, setLgEdits] = useState<Record<string, { topic: string; prerequisite_topic: string }>>({})
+
   // Sınav Kitapçıkları state
   const [examUploading, setExamUploading] = useState(false)
   const [examMsg, setExamMsg] = useState('')
@@ -72,6 +80,10 @@ export default function AdminPage() {
     kind: 'meb' | 'exam'; id: string; title: string; content: string; loading: boolean
   } | null>(null)
   const [deleteConfirming, setDeleteConfirming] = useState(false)
+
+  // Madde 6: MEB kaynakları geriye dönük sağlık taraması
+  const [healthScan, setHealthScan] = useState<any | null>(null)
+  const [healthScanLoading, setHealthScanLoading] = useState(false)
 
   // MEB Kaynakları state
   const [mebResources, setMebResources] = useState<any[]>([])
@@ -1416,6 +1428,124 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               </div>
             )}
           </div>
+
+          {/* Madde 3: Kazanım-taksonomisi (Learning Graph) yarı-otomatik
+              pipeline — bkz. pratium-bekleyen-isler-uygulama-plani.md.
+              lib/learning-graph.ts bugüne kadar sadece Kesirler/Ondalık
+              Sayılar ile sınırlıydı; bu bölüm AI'dan seçili müfredat
+              kaydındaki konular için ön koşul TASLAKLARI üretmesini ister
+              — hiçbir şey admin onayı olmadan gerçek tabloya yazılmaz. */}
+          <div className="card">
+            <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>
+              🧠 Öğrenme Grafiği — Kazanım Ön Koşulları (Taslak Üretici)
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '1rem' }}>
+              Seçtiğiniz müfredat kaydındaki konular arasında AI ön koşul ilişkileri önerir. Hiçbir öneri onaylanmadan gerçek ön koşul listesine eklenmez.
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1rem' }}>
+              <select value={lgSelectedCurriculumId} onChange={e => setLgSelectedCurriculumId(e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', flex: 1, minWidth: '220px' }}>
+                <option value="">— Müfredat kaydı seçin (önce yukarıda "Yükle" ile listeleyin) —</option>
+                {curriculum.map((c: any) => (
+                  <option key={c.id} value={c.id}>
+                    {c.level} / {c.grade} / {c.subject} ({Array.isArray(c.topics) ? c.topics.length : 0} konu)
+                  </option>
+                ))}
+              </select>
+              <button disabled={!lgSelectedCurriculumId || lgSuggesting} onClick={async () => {
+                setLgSuggesting(true)
+                setLgMsg('')
+                try {
+                  const res = await fetch('/api/admin/learning-graph-suggest', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ curriculumId: lgSelectedCurriculumId })
+                  })
+                  const data = await res.json()
+                  if (res.ok) {
+                    setLgMsg(`✅ ${data.inserted} taslak üretildi${data.dropped ? ` (${data.dropped} öneri listede olmayan konu içerdiği için elendi)` : ''}.`)
+                    // Yeni taslaklar otomatik görünsün
+                    const dRes = await fetch('/api/admin/learning-graph-drafts?status=pending')
+                    const dData = await dRes.json()
+                    setLgDrafts(dData.drafts || [])
+                  } else setLgMsg('❌ ' + data.error)
+                } catch (e: any) {
+                  setLgMsg('❌ ' + (e?.message || 'Hata'))
+                } finally {
+                  setLgSuggesting(false)
+                }
+              }} className="btn btn-primary" style={{ padding: '8px 16px', opacity: (!lgSelectedCurriculumId || lgSuggesting) ? 0.5 : 1 }}>
+                {lgSuggesting ? '⏳ Üretiliyor...' : '✨ AI Taslak Üret'}
+              </button>
+              <button onClick={async () => {
+                setLgDraftsLoading(true)
+                const res = await fetch('/api/admin/learning-graph-drafts?status=pending')
+                const data = await res.json()
+                setLgDrafts(data.drafts || [])
+                setLgDraftsLoading(false)
+              }} className="btn btn-sm">
+                🔄 Bekleyen Taslakları Yükle
+              </button>
+            </div>
+
+            {lgMsg && <div style={{ fontSize: '13px', color: lgMsg.startsWith('✅') ? '#16a34a' : '#dc2626', marginBottom: '1rem' }}>{lgMsg}</div>}
+
+            {lgDraftsLoading ? (
+              <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text3)' }}>Yükleniyor...</div>
+            ) : lgDrafts.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {lgDrafts.map((d: any) => {
+                  const edit = lgEdits[d.id] || { topic: d.topic, prerequisite_topic: d.prerequisite_topic }
+                  const confColor = d.confidence === 'high' ? '#16a34a' : d.confidence === 'low' ? '#dc2626' : '#d97706'
+                  return (
+                    <div key={d.id} style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: confColor, textTransform: 'uppercase' }}>{d.confidence}</span>
+                        <span style={{ fontSize: '12px', color: 'var(--text3)' }}>{d.subject} · {d.grade}. sınıf</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '6px' }}>
+                        <input value={edit.topic} onChange={e => setLgEdits(p => ({ ...p, [d.id]: { ...edit, topic: e.target.value } }))}
+                          style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--primary)', fontSize: '12px', fontFamily: 'var(--font-sans)', flex: 1, minWidth: '160px' }} />
+                        <span style={{ fontSize: '12px', color: 'var(--text3)' }}>← ön koşulu</span>
+                        <input value={edit.prerequisite_topic} onChange={e => setLgEdits(p => ({ ...p, [d.id]: { ...edit, prerequisite_topic: e.target.value } }))}
+                          style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--primary)', fontSize: '12px', fontFamily: 'var(--font-sans)', flex: 1, minWidth: '160px' }} />
+                      </div>
+                      {d.rationale && <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '8px' }}>💬 {d.rationale}</div>}
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button onClick={async () => {
+                          const res = await fetch('/api/admin/learning-graph-drafts', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: d.id, action: 'approve', editedTopic: edit.topic, editedPrerequisiteTopic: edit.prerequisite_topic })
+                          })
+                          if (res.ok) setLgDrafts(p => p.filter(x => x.id !== d.id))
+                          else alert('Onaylama başarısız')
+                        }} className="btn btn-sm" style={{ background: '#16a34a', color: '#fff', border: 'none' }}>
+                          ✓ Onayla
+                        </button>
+                        <button onClick={async () => {
+                          const res = await fetch('/api/admin/learning-graph-drafts', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: d.id, action: 'reject' })
+                          })
+                          if (res.ok) setLgDrafts(p => p.filter(x => x.id !== d.id))
+                          else alert('Reddetme başarısız')
+                        }} className="btn btn-sm" style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text2)' }}>
+                          ✕ Reddet
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', padding: '1rem' }}>
+                Bekleyen taslak yok. Bir müfredat kaydı seçip "AI Taslak Üret"e tıklayın ya da "Bekleyen Taslakları Yükle"yi deneyin.
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -1588,6 +1718,73 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
 
       {tab === 'meb' && (
         <div>
+          {/* Madde 6: Sistematik sağlık taraması — content-quality-playbook.md'nin
+              pilot adımı için ("en riskli 2-3 dersi seç") nesnel bir girdi. */}
+          <div className="card" style={{ marginBottom: '1.5rem', border: '1px solid rgba(99,102,241,0.25)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: healthScan ? '12px' : 0 }}>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)' }}>🩺 Sağlık Taraması</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
+                  TÜM mevcut MEB kaynaklarını geriye dönük tarar (Madde 8'in health check'i sadece yeni yüklemelerde çalışıyor) — en riskli kaynakları ve ders bazlı dağılımı gösterir.
+                </div>
+              </div>
+              <button
+                disabled={healthScanLoading}
+                onClick={async () => {
+                  setHealthScanLoading(true)
+                  try {
+                    const { data: { session } } = await supabase.auth.getSession()
+                    const res = await fetch('/api/admin/meb-health-scan?limit=20', {
+                      headers: { Authorization: `Bearer ${session?.access_token}` },
+                    })
+                    const data = await res.json()
+                    setHealthScan(res.ok ? data : { error: data.error })
+                  } catch (e: any) {
+                    setHealthScan({ error: e.message })
+                  } finally {
+                    setHealthScanLoading(false)
+                  }
+                }}
+                className="btn btn-sm" style={{ flexShrink: 0, marginLeft: '12px' }}>
+                {healthScanLoading ? '⏳ Taranıyor...' : '🩺 Taramayı Çalıştır'}
+              </button>
+            </div>
+
+            {healthScan?.error && (
+              <div style={{ fontSize: '12px', color: 'var(--red)', marginTop: '10px' }}>Hata: {healthScan.error}</div>
+            )}
+
+            {healthScan && !healthScan.error && (
+              <div style={{ marginTop: '12px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '10px' }}>
+                  {healthScan.scanned}/{healthScan.totalInDb} kaynak tarandı{healthScan.truncated ? ' (tabloda daha fazlası var, üst sınıra takıldı)' : ''} —
+                  {' '}<b>{healthScan.riskyCount}</b> kaynakta en az bir sinyal bulundu.
+                </div>
+
+                {Object.keys(healthScan.bySubject || {}).length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+                    {Object.entries(healthScan.bySubject).sort((a: any, b: any) => b[1] - a[1]).map(([subj, cnt]: any) => (
+                      <span key={subj} style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '99px', background: 'rgba(217,119,6,0.1)', color: '#d97706', fontWeight: 600 }}>
+                        {subj}: {cnt}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {healthScan.top?.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {healthScan.top.map((r: any) => (
+                      <div key={r.id} style={{ fontSize: '12px', padding: '8px 10px', borderRadius: '8px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+                        <b>{r.title}</b> — {r.subject} / {r.grade} · {(r.char_count / 1000).toFixed(1)}K karakter
+                        <div style={{ color: '#d97706', marginTop: '2px' }}>⚠️ {r.flags.join(', ')}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Yükleme formu */}
           <div className="card" style={{ marginBottom: '1.5rem' }}>
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>
