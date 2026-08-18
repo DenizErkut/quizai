@@ -74,7 +74,17 @@ export async function DELETE(req: NextRequest) {
   const user = await getAdminUser()
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { id } = await req.json()
+  const { id, confirmed } = await req.json()
+  if (!id) return NextResponse.json({ error: 'ID gerekli' }, { status: 400 })
+
+  // "Önce gör, sonra sil" kontrol listesi (bkz. pratium-bekleyen-isler-
+  // uygulama-plani.md Madde 5) — curriculum satırları (konu listesi)
+  // zaten ekranda tam görünür durumda olduğu için ayrı bir önizleme
+  // endpoint'i gerekmiyor, ama açık bir onay adımı yine de zorunlu.
+  if (!confirmed) {
+    return NextResponse.json({ error: 'Silme onayı gerekli (confirmed:true olmadan silme çalışmaz).' }, { status: 400 })
+  }
+
   const { error } = await adminDb.from('curriculum').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })

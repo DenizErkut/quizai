@@ -64,6 +64,14 @@ export default function AdminPage() {
   const [examList, setExamList] = useState<any[]>([])
   const [examListLoading, setExamListLoading] = useState(false)
 
+  // "Önce gör, sonra sil" kontrol listesi state'i (bkz.
+  // pratium-bekleyen-isler-uygulama-plani.md Madde 5) — meb/exam
+  // silmelerinin ikisi de bu tek modal'ı paylaşıyor.
+  const [deletePreview, setDeletePreview] = useState<{
+    kind: 'meb' | 'exam'; id: string; title: string; content: string; loading: boolean
+  } | null>(null)
+  const [deleteConfirming, setDeleteConfirming] = useState(false)
+
   // MEB Kaynakları state
   const [mebResources, setMebResources] = useState<any[]>([])
   const [mebLoading, setMebLoading] = useState(false)
@@ -1341,13 +1349,19 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                             </button>
                             {/* Sil */}
                             <button onClick={async () => {
-                              if (!confirm(`"${item.subject}" dersini silmek istediğinize emin misiniz?`)) return
+                              // Konu listesi (topics) burada zaten tam görünür olduğu için
+                              // ayrı bir önizleme modal'ı gerekmiyor — ama açık onay (confirmed:true)
+                              // yine de zorunlu, bkz. Madde 5.
+                              const topicsPreview = Array.isArray(item.topics) && item.topics.length
+                                ? `\n\nKonular:\n- ${item.topics.join('\n- ')}` : ''
+                              if (!confirm(`"${item.subject}" dersini silmek istediğinize emin misiniz?${topicsPreview}`)) return
                               const res = await fetch('/api/admin/curriculum', {
                                 method: 'DELETE',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ id: item.id })
+                                body: JSON.stringify({ id: item.id, confirmed: true })
                               })
                               if (res.ok) setCurriculum(p => p.filter(c => c.id !== item.id))
+                              else alert('Silme başarısız')
                             }} title="Sil"
                               style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: '#dc2626', padding: '0 2px', opacity: 0.7 }}>
                               ✕
@@ -1513,6 +1527,20 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                       <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{ex.exam_type} · {ex.year}{ex.subject ? ` · ${ex.subject}` : ''} · {ex.chunk_count || 0} chunk</div>
                     </div>
                     <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '99px', background: 'rgba(99,102,241,0.1)', color: '#6366f1', fontWeight: 600 }}>{ex.exam_type}</span>
+                    <button onClick={async () => {
+                      // "Önce gör, sonra sil" — exam_chunks için ilk defa buradan
+                      // silinebiliyor (önceden repo dışı, elle SQL ile yapılıyordu).
+                      setDeletePreview({ kind: 'exam', id: ex.id, title: ex.title, content: '', loading: true })
+                      try {
+                        const res = await fetch(`/api/admin/exam-upload?id=${ex.id}`)
+                        const data = await res.json()
+                        setDeletePreview({ kind: 'exam', id: ex.id, title: ex.title, content: res.ok ? (data.exam?.raw_text || '(içerik boş)') : `Hata: ${data.error}`, loading: false })
+                      } catch (e: any) {
+                        setDeletePreview({ kind: 'exam', id: ex.id, title: ex.title, content: `Hata: ${e.message}`, loading: false })
+                      }
+                    }} style={{ padding: '5px 10px', borderRadius: '7px', border: '1px solid rgba(220,38,38,0.3)', background: 'var(--red-bg)', color: 'var(--red)', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>
+                      🗑️ Sil
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1680,7 +1708,10 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   data = await res.json()
                   if (res.ok) {
                     const warn = data.warning ? ` ⚠️ ${data.warning}` : ''
-                    setMebMsg(`✅ Yüklendi! ${data.chunks} chunk, ${data.embedded} embedding, ${(data.chars/1000).toFixed(1)}K karakter${warn}`)
+                    // Madde 8: yükleme sağlık kontrolü bir şey işaretlediyse hemen göster —
+                    // "sonradan bulma" döngüsünü baştan kesmek buna hizmet ediyor.
+                    const healthWarn = data.health_flags?.length ? ` ⚠️ Sağlık kontrolü: ${data.health_flags.join(', ')} — kaynağı kontrol et.` : ''
+                    setMebMsg(`✅ Yüklendi! ${data.chunks} chunk, ${data.embedded} embedding, ${(data.chars/1000).toFixed(1)}K karakter${warn}${healthWarn}`)
                     setMebForm({ title: '', grade: '', subject: '', unit: '', level: mebForm.level, raw_text: '' })
                     setMebFile(null)
                     // Listeyi yenile
@@ -1748,7 +1779,14 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   <div key={r.id} style={{ padding: '12px 14px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '3px' }}>{r.title}</div>
+                        <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {r.title}
+                          {r.health_flag && (
+                            <span title={`Sağlık kontrolü uyarısı: ${r.health_flag}`} style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '99px', background: 'rgba(217,119,6,0.12)', color: '#d97706', fontWeight: 700 }}>
+                              ⚠️ {r.health_flag.split(',').length} uyarı
+                            </span>
+                          )}
+                        </div>
                         <div style={{ fontSize: '11px', color: 'var(--text3)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                           <span>📚 {r.subject}</span>
                           <span>📖 {r.unit}</span>
@@ -1764,10 +1802,16 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                         )}
                       </div>
                       <button onClick={async () => {
-                        if (!confirm(`"${r.title}" kaynağını silmek istediğine emin misin? Tüm chunk'lar da silinecek.`)) return
-                        const res = await fetch('/api/admin/meb-upload', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: r.id }) })
-                        if (res.ok) setMebResources(prev => prev.filter((x: any) => x.id !== r.id))
-                        else alert('Silme başarısız')
+                        // "Önce gör, sonra sil": window.confirm(title) yerine artık
+                        // TAM raw_text içeriğini çekip modal'da gösteriyoruz.
+                        setDeletePreview({ kind: 'meb', id: r.id, title: r.title, content: '', loading: true })
+                        try {
+                          const res = await fetch(`/api/admin/meb-upload?id=${r.id}`)
+                          const data = await res.json()
+                          setDeletePreview({ kind: 'meb', id: r.id, title: r.title, content: res.ok ? (data.resource?.raw_text || '(içerik boş)') : `Hata: ${data.error}`, loading: false })
+                        } catch (e: any) {
+                          setDeletePreview({ kind: 'meb', id: r.id, title: r.title, content: `Hata: ${e.message}`, loading: false })
+                        }
                       }} style={{ padding: '5px 10px', borderRadius: '7px', border: '1px solid rgba(220,38,38,0.3)', background: 'var(--red-bg)', color: 'var(--red)', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0, marginLeft: '12px' }}>
                         🗑️ Sil
                       </button>
@@ -1945,6 +1989,64 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* "Önce gör, sonra sil" kontrol listesi — meb/exam ortak silme modalı.
+          Bkz. pratium-bekleyen-isler-uygulama-plani.md Madde 5: hiçbir DELETE
+          isteği, TAM içerik (sadece ilk 50-70 karakter değil) görülmeden ve
+          açık onay verilmeden gönderilmez. */}
+      {deletePreview && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem' }}>
+          <div className="card" style={{ maxWidth: '640px', width: '100%', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontWeight: 700, fontSize: '14px', color: '#dc2626', marginBottom: '4px' }}>
+              🗑️ Silmeden önce tam içeriği kontrol et
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '10px' }}>
+              "{deletePreview.title}" {deletePreview.kind === 'exam' ? '(sınav kitapçığı, tüm chunk\'ları dahil)' : '(kaynak, tüm chunk\'ları dahil)'} kalıcı olarak silinecek. Bu işlem geri alınamaz.
+            </div>
+            <div style={{
+              flex: 1, overflowY: 'auto', background: 'var(--bg2)', border: '1px solid var(--border)',
+              borderRadius: '10px', padding: '12px', fontSize: '12px', lineHeight: 1.6,
+              whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--text)', marginBottom: '14px', minHeight: '120px',
+            }}>
+              {deletePreview.loading ? 'Yükleniyor...' : deletePreview.content}
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                disabled={deletePreview.loading || deleteConfirming}
+                onClick={async () => {
+                  setDeleteConfirming(true)
+                  try {
+                    const endpoint = deletePreview.kind === 'meb' ? '/api/admin/meb-upload' : '/api/admin/exam-upload'
+                    const res = await fetch(endpoint, {
+                      method: 'DELETE',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ id: deletePreview.id, confirmed: true }),
+                    })
+                    if (res.ok) {
+                      if (deletePreview.kind === 'meb') setMebResources(prev => prev.filter((x: any) => x.id !== deletePreview.id))
+                      else setExamList(prev => prev.filter((x: any) => x.id !== deletePreview.id))
+                      setDeletePreview(null)
+                    } else {
+                      const data = await res.json().catch(() => ({}))
+                      alert('Silme başarısız: ' + (data.error || res.status))
+                    }
+                  } catch (e: any) {
+                    alert('Silme başarısız: ' + e.message)
+                  } finally {
+                    setDeleteConfirming(false)
+                  }
+                }}
+                style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: deletePreview.loading || deleteConfirming ? 'var(--bg2)' : '#dc2626', color: deletePreview.loading || deleteConfirming ? 'var(--text3)' : '#fff', fontWeight: 700, fontSize: '13px', cursor: deletePreview.loading || deleteConfirming ? 'default' : 'pointer', fontFamily: 'var(--font-sans)' }}>
+                {deleteConfirming ? 'Siliniyor...' : '✅ İçeriği gördüm, kalıcı olarak sil'}
+              </button>
+              <button onClick={() => setDeletePreview(null)} disabled={deleteConfirming}
+                style={{ padding: '10px 18px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                İptal
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

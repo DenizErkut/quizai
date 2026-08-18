@@ -51,21 +51,10 @@ function chunkText(text: string, size = 800): string[] {
   return chunks.length > 0 ? chunks : [text.slice(0, size)]
 }
 
-async function embedText(text: string): Promise<number[] | null> {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) return null
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'models/text-embedding-004', content: { parts: [{ text: text.slice(0, 2000) }] } })
-      }
-    )
-    const data = await res.json()
-    return data?.embedding?.values || null
-  } catch { return null }
+// Embedding devre dışı
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function embedText(_text: string): Promise<number[] | null> {
+  return null
 }
 
 async function processExam(params: {
@@ -107,24 +96,10 @@ async function processExam(params: {
   return { resource_id: examRow.id, chunks: chunks.length, embedded: embeddedCount, chars: rawText.length }
 }
 
-// GET: kitapçıkları listele (ya da ?id= ile TEK kitapçığın TAM içeriğini
-// görüntüle — "önce gör, sonra sil" kontrol listesi için, bkz.
-// pratium-bekleyen-isler-uygulama-plani.md Madde 5)
-export async function GET(req: NextRequest) {
+// GET: kitapçıkları listele
+export async function GET() {
   const user = await getAdminUser()
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
-  const { searchParams } = new URL(req.url)
-  const id = searchParams.get('id')
-
-  if (id) {
-    const { data, error } = await adminDb
-      .from('exam_resources')
-      .select('id, title, exam_type, year, subject, answer_key, file_url, raw_text, created_at')
-      .eq('id', id).single()
-    if (error || !data) return NextResponse.json({ error: 'Bulunamadı' }, { status: 404 })
-    return NextResponse.json({ exam: { ...data, char_count: data.raw_text?.length || 0 } })
-  }
 
   const { data: exams } = await adminDb
     .from('exam_resources')
@@ -224,35 +199,4 @@ export async function POST(req: NextRequest) {
     const msg = e?.message || 'Bilinmeyen hata'
     return NextResponse.json({ error: msg }, { status: 500 })
   }
-}
-
-// DELETE: kitapçık sil. Bu tablolar için repoda bir FK/migration
-// tanımı bulunamadığından exam_chunks CASCADE ile silineceği garanti
-// değil — önce exam_chunks satırları, sonra exam_resources satırı elle
-// silinir. "confirmed:true" olmadan (önce tam içerik görülmeden)
-// çalışmaz (bkz. pratium-bekleyen-isler-uygulama-plani.md Madde 5).
-// Bu endpoint'ten ÖNCE exam_chunks silmeleri tamamen repo dışı, elle
-// SQL ile yapılıyordu (bir kez kontrol karakteri içeren bir chunk'ta
-// hataya yol açmıştı, transaction rollback ile kurtarılmıştı) — artık
-// güvenli, tekrar kullanılabilir, kayıtlı bir yol var.
-export async function DELETE(req: NextRequest) {
-  const user = await getAdminUser()
-  if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
-  const { id, confirmed } = await req.json()
-  if (!id) return NextResponse.json({ error: 'ID gerekli' }, { status: 400 })
-  if (!confirmed) {
-    return NextResponse.json(
-      { error: 'Silme onayı gerekli — önce tam içeriği görüntüleyin (confirmed:true olmadan silme çalışmaz).' },
-      { status: 400 }
-    )
-  }
-
-  const { error: chunkErr } = await adminDb.from('exam_chunks').delete().eq('exam_resource_id', id)
-  if (chunkErr) return NextResponse.json({ error: `Chunk silme hatası: ${chunkErr.message}` }, { status: 500 })
-
-  const { error } = await adminDb.from('exam_resources').delete().eq('id', id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  return NextResponse.json({ success: true })
 }
