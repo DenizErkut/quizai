@@ -86,6 +86,21 @@ export default function QuizQuestion({
             </div>
           )}
 
+          {/* 26 Ağustos 2026 — "Metinde, ..." tarzı sorularda öğretmen geri
+              bildirimiyle bulunan hata: kaynak metin öğrenciye hiç
+              gösterilmiyordu. Artık generate-quiz'in kullandığı GERÇEK metin
+              (MEB kaynağı veya öğrencinin yüklediği dosya) burada gösteriliyor. */}
+          {q.passage && (
+            <details open style={{ marginBottom: '1.25rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', padding: '10px 14px' }}>
+              <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 700, color: 'var(--primary)', userSelect: 'none' }}>
+                📖 Kaynak Metin
+              </summary>
+              <div style={{ marginTop: '10px', maxHeight: '240px', overflowY: 'auto', fontSize: '13px', lineHeight: 1.6, color: 'var(--text2)', whiteSpace: 'pre-wrap' }}>
+                {q.passage}
+              </div>
+            </details>
+          )}
+
           <p style={{ fontSize: '17px', fontWeight: 500, lineHeight: 1.55, marginBottom: '1.5rem' }}>
             {q.q.split(/(\[[^\]]+\])/).map((part: string, idx: number) =>
               part.startsWith('[') && part.endsWith(']')

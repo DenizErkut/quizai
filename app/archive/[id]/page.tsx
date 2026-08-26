@@ -71,7 +71,7 @@ export default function SessionDetailPage() {
   )
 
   // questions: {q, opts, ans, exp} formatı
-  const questions: { q: string; opts: string[]; ans: number; exp?: string }[] = session.questions || []
+  const questions: { q: string; opts: string[]; ans: number; exp?: string; passage?: string }[] = session.questions || []
   const rawAnswers = session.answers || []
 
   const getAnswer = (i: number): number => {
@@ -142,6 +142,16 @@ export default function SessionDetailPage() {
                       {i + 1}. {q.q}
                     </p>
                   </div>
+                  {q.passage && (
+                    <details style={{ marginBottom: '10px', marginLeft: '26px', borderRadius: '9px', border: '1px solid var(--border)', background: 'var(--bg)', padding: '8px 12px' }}>
+                      <summary style={{ cursor: 'pointer', fontSize: '11px', fontWeight: 700, color: 'var(--primary)', userSelect: 'none' }}>
+                        📖 Kaynak Metin
+                      </summary>
+                      <div style={{ marginTop: '8px', maxHeight: '200px', overflowY: 'auto', fontSize: '12px', lineHeight: 1.6, color: 'var(--text3)', whiteSpace: 'pre-wrap' }}>
+                        {q.passage}
+                      </div>
+                    </details>
+                  )}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '26px' }}>
                     {(q.opts || []).map((opt, j) => {
                       const isUser = j === userAns

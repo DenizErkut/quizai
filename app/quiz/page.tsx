@@ -27,6 +27,7 @@ interface Question {
   statements?: {text: string; correct: boolean}[]  // çoklu D/Y (Maarif)
   tableData?: {headers: string[]; rows: {cells: string[]; blanks: number[]}[]} // tablo (Maarif)
   tableAnswers?: string[] // tablo: doğru cevaplar sırayla
+  passage?: string        // kaynak metin (MEB/dosya) — öğrenciye gösterilir
 }
 interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number; daily_test_count?: number; daily_test_date?: string; onboarding_completed?: boolean }
 

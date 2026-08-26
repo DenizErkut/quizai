@@ -14,6 +14,10 @@ export interface Question {
   statements?: {text: string; correct: boolean}[]
   tableData?: {headers: string[]; rows: {cells: string[]; blanks: number[]}[]}
   tableAnswers?: string[]
+  // 26 Ağustos 2026 — "Metinde, ..." tarzı sorularda öğrenciye gösterilecek
+  // GERÇEK kaynak metin (MEB kaynağı veya öğrencinin yüklediği dosya).
+  // AI'ın ürettiği bir özet değil, generate-quiz'in kendi kullandığı ham metin.
+  passage?: string
 }
 
 export interface Profile {

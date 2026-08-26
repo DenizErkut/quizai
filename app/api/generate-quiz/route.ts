@@ -438,6 +438,13 @@ function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
 export async function POST(req: NextRequest) {
   let promptStr = ''
   let countRef = 5
+  // 26 Ağustos 2026 — öğretmen geri bildirimi: "Metinde, ..." tarzı sorularda
+  // öğrenciye kaynak metnin KENDİSİ hiç gösterilmiyordu. mebContext/fileContent
+  // yalnızca AI'ın prompt'una gidiyordu, response'a hiç eklenmiyordu — AI'ın
+  // soru köküne gömdüğü özet/alıntı da her zaman yeterli olmuyordu. Fallback
+  // (catch) bloğunun da erişebilmesi için promptStr/countRef ile aynı yerde,
+  // try bloğunun DIŞINDA tanımlandı.
+  let sourcePassage = ''
   try {
     const authHeader = req.headers.get('Authorization')
     const token = authHeader?.replace('Bearer ', '')
@@ -820,6 +827,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 26 Ağustos 2026 — kaynak metni öğrenciye de gönder (yukarıdaki nota bkz.).
+    // Öncelik: öğrencinin kendi yüklediği dosya varsa o (fileContent), yoksa
+    // MEB kaynak metni (mebContext) — ikisi de AI'ın prompt'unda kullanılan
+    // GERÇEK metin, AI'ın ürettiği bir özet değil. "q" metninde "metinde/
+    // parçada" gibi bir ifade geçmese bile her soru aynı kaynağa dayandığı
+    // için tüm sorulara ekleniyor (öğrenci istediğinde açıp bakabilir).
+    sourcePassage = (fileContent && fileContent.trim())
+      ? fileContent.trim().slice(0, 4000)
+      : (mebContext && mebContext.trim())
+        ? mebContext.trim()
+        : ''
+    if (sourcePassage) {
+      questions = questions.map((q: any) => ({ ...q, passage: sourcePassage }))
+    }
+
     // continueSessionId: adaptif akışta ikinci/sonraki parça — aynı testin
     // devamı, YENİ bir test değil. Bu yüzden kota (monthly_test_count) TEKRAR
     // artırılmıyor ve DB'ye ayrı bir session satırı yazılmıyor; mevcut
@@ -885,7 +907,10 @@ export async function POST(req: NextRequest) {
       const fbQuestions = parsed.questions || parsed
       if (Array.isArray(fbQuestions) && fbQuestions.length > 0) {
         console.log('[generate-quiz] OpenAI fallback success:', fbQuestions.length, 'questions')
-        return NextResponse.json({ questions: fbQuestions, sessionId: crypto.randomUUID() })
+        const fbFinal = sourcePassage
+          ? fbQuestions.map((q: any) => ({ ...q, passage: sourcePassage }))
+          : fbQuestions
+        return NextResponse.json({ questions: fbFinal, sessionId: crypto.randomUUID() })
       }
     } catch (fe: any) {
       console.error('[generate-quiz] OpenAI fallback failed:', fe?.message)
