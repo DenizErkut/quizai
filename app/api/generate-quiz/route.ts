@@ -449,13 +449,31 @@ function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
 // eder. (b) iç etiketleri temizler. (c) makul bir uzunlığa (paragraf
 // sınırında) kırpar -- fileContent zaten 4000 karaktere kırpılıyordu,
 // mebContext hiç kırpılmıyordu, bu tutarsızlık da giderildi.
+// 28 Ağustos 2026 (ikinci bulgu, aynı gün) — Deniz'in bildirdiği başka bir
+// örnek: passage GERÇEKTEN doğru MEB kaynağından geliyordu (soru kaynakla
+// birebir örtüşüyordu) ama başında "ALLAH İNANCI\n13\nÜnite\nPdf Dosyası\n
+// Ünite \nSunusu\nBaşlarken" gibi anlamsız bir META VERİ/SAYFA ÜSTBİLGİSİ
+// bloğu vardı -- muhtemelen raw_text içinde HER SAYFADA tekrarlanan bir
+// üstbilgi (tıpkı sınav kitapçıklarındaki "Ortaöğretim Genel Müdürlüğü..."
+// tekrarına benzer), findContentStart() konu adını ararken TESADÜFEN bu
+// üstbilgiye denk gelmiş. Özel bir kelime listesi yerine GENEL bir yapısal
+// desen: art arda ≥3 KISA (< 20 karakter) satır, gerçek (uzun) bir paragraf
+// satırından hemen önce geliyorsa üstbilgi sayılır ve atlanır.
+function stripLeadingShortLineHeader(text: string): string {
+  const lines = text.split('\n')
+  let i = 0
+  while (i < lines.length && lines[i].trim().length > 0 && lines[i].trim().length < 20) i++
+  if (i >= 3 && i <= 12) return lines.slice(i).join('\n').replace(/^\n+/, '')
+  return text
+}
+
 function cleanPassageForDisplay(raw: string): string {
   if (!raw) return ''
   const blocks = raw.split(/\n\n---\n\n/)
   const mebBlocks = blocks.filter(b => /^\[MEB Kaynak/.test(b.trim()))
   if (mebBlocks.length === 0) return ''
   const combined = mebBlocks
-    .map(b => b.replace(/^\[[^\]]+\]\n/, '').trim())
+    .map(b => stripLeadingShortLineHeader(b.replace(/^\[[^\]]+\]\n/, '').trim()))
     .join('\n\n')
   const MAX = 3000
   if (combined.length <= MAX) return combined
