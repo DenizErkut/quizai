@@ -482,6 +482,30 @@ function cleanPassageForDisplay(raw: string): string {
   return (lastPara > MAX * 0.5 ? cut.slice(0, lastPara) : cut).trim() + '…'
 }
 
+// 28 Ağustos 2026 (üçüncü bulgu, aynı gün) — Deniz'in bildirdiği hata:
+// AYNI kaynak metin, o metne HİÇ dayanmayan (genel bilgi) sorulara da
+// gösteriliyordu (ör. "Allah'ın varlığını ve birliğini ifade eden temel
+// inanç ilkesine ne ad verilir?" — cevabı "Tevhid", ama bu kelime
+// pasajda hiç geçmiyor, öğrenci pasajı okuyup cevap bulamaz, kafası
+// karışır). Kod, sourcePassage'ı TÜM sorulara körlemesine uyguluyordu.
+// Artık her soru için, sorunun kendi metninin (q+exp) pasajla GERÇEKTEN
+// kelime düzeyinde örtüşüp örtüşmediği kontrol ediliyor -- örtüşmüyorsa
+// passage o soruya eklenmiyor. Basit ama etkili bir yöntem: stopword'ler
+// hariç, 4+ harfli kelimelerin kesişim sayısı. Gerçek 6 örnekle (3'ü
+// pasaja dayalı, 3'ü genel bilgi) test edildi, eşik>=2 ile 6/6 doğru
+// sınıflandı (bkz. commit mesajı).
+const PASSAGE_OVERLAP_STOPWORDS = new Set(['bir','bu','şey','için','göre','olan','olarak','ile','de','da','ve','ya','ki','mi','mı','mu','mü','değil','hangisi','aşağıdaki','nedir','hangisidir','allah','eden','olduğu','olduğunu'])
+function extractMeaningfulWords(text: string): Set<string> {
+  const matches = text.toLocaleLowerCase('tr').match(/[a-zçğıöşüâî]{4,}/g) || []
+  return new Set(matches.filter(w => !PASSAGE_OVERLAP_STOPWORDS.has(w)))
+}
+function questionReferencesPassage(q: any, passage: string, passageWords: Set<string>): boolean {
+  const qWords = extractMeaningfulWords(`${q.q || ''} ${q.exp || ''}`)
+  let overlap = 0
+  for (const w of qWords) if (passageWords.has(w)) overlap++
+  return overlap >= 2
+}
+
 export async function POST(req: NextRequest) {
   let promptStr = ''
   let countRef = 5
@@ -848,29 +872,41 @@ export async function POST(req: NextRequest) {
     if (questions.length > safeQCount) {
       questions = questions.slice(0, safeQCount)
     } else if (questions.length < safeQCount && questions.length > 0) {
-      const missing = safeQCount - questions.length
-      try {
-        const topupPrompt = `${prompt}\n\nÖNEMLİ: Bu sefer TAM OLARAK ${missing} adet YENİ ve BİRBİRİNDEN FARKLI soru üret (ne bir eksik ne bir fazla). Daha önce üretilenlerle aynı/benzer soru üretme.`
-        const topupResponse = await anthropic.messages.create({
-          model: useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5',
-          max_tokens: useHaiku ? 1500 : 2000,
-          messages: [{ role: 'user', content: topupPrompt }],
-        })
-        const topupText = topupResponse.content[0].type === 'text' ? topupResponse.content[0].text : ''
-        const topupClean = topupText.replace(/```json|```/g, '').trim()
-        let topupParsed: any
+      // 28 Ağustos 2026 — Deniz'in bildirdiği hata: 10 soru istenip 6-8 soru
+      // üretiliyordu (adaptif akışta hem 1. hem 2. parça, ayrı ayrı, kendi
+      // topup turunda YİNE eksik kalabiliyordu — TEK turluk tamamlama bazen
+      // yetersizdi). Artık en fazla 2 ek tur deneniyor (toplamda ilk üretim +
+      // 2 tamamlama = 3 deneme), her turda hâlâ eksik kalan miktar isteniyor.
+      // Sonsuz döngü riski yok (maxRounds sabit), ve hiçbir turda ilerleme
+      // olmazsa (questions.length hiç artmazsa) döngü erken kesiliyor.
+      const maxTopupRounds = 2
+      for (let round = 0; round < maxTopupRounds && questions.length < safeQCount; round++) {
+        const missing = safeQCount - questions.length
+        const beforeRoundCount = questions.length
         try {
-          topupParsed = JSON.parse(topupClean)
-        } catch {
-          const m = topupClean.match(/\{[\s\S]*\}/)
-          if (m) topupParsed = JSON.parse(m[0])
+          const topupPrompt = `${prompt}\n\nÖNEMLİ: Bu sefer TAM OLARAK ${missing} adet YENİ ve BİRBİRİNDEN FARKLI soru üret (ne bir eksik ne bir fazla). Daha önce üretilenlerle aynı/benzer soru üretme.`
+          const topupResponse = await anthropic.messages.create({
+            model: useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5',
+            max_tokens: useHaiku ? 1500 : 2000,
+            messages: [{ role: 'user', content: topupPrompt }],
+          })
+          const topupText = topupResponse.content[0].type === 'text' ? topupResponse.content[0].text : ''
+          const topupClean = topupText.replace(/```json|```/g, '').trim()
+          let topupParsed: any
+          try {
+            topupParsed = JSON.parse(topupClean)
+          } catch {
+            const m = topupClean.match(/\{[\s\S]*\}/)
+            if (m) topupParsed = JSON.parse(m[0])
+          }
+          let topupQuestions = topupParsed?.questions || []
+          topupQuestions = applyContentQualityFilters(topupQuestions, mebContext)
+          questions = [...questions, ...topupQuestions].slice(0, safeQCount)
+          console.log(`[generate-quiz] eksik soru tamamlama (tur ${round + 1}/${maxTopupRounds}): ${missing} istendi, ${topupQuestions.length} eklendi (toplam ${questions.length})`)
+        } catch (e) {
+          console.warn(`[generate-quiz] eksik soru tamamlama (tur ${round + 1}) başarısız:`, e)
         }
-        let topupQuestions = topupParsed?.questions || []
-        topupQuestions = applyContentQualityFilters(topupQuestions, mebContext)
-        questions = [...questions, ...topupQuestions].slice(0, safeQCount)
-        console.log(`[generate-quiz] eksik soru tamamlama: ${missing} istendi, ${topupQuestions.length} eklendi (toplam ${questions.length})`)
-      } catch (e) {
-        console.warn('[generate-quiz] eksik soru tamamlama başarısız, mevcut sayıyla devam:', e)
+        if (questions.length === beforeRoundCount) break // bu turda hiç ilerleme olmadı, tekrar denemenin faydası yok
       }
     }
 
@@ -887,7 +923,12 @@ export async function POST(req: NextRequest) {
       ? fileContent.trim().slice(0, 4000)
       : cleanPassageForDisplay(mebContext || '')
     if (sourcePassage) {
-      questions = questions.map((q: any) => ({ ...q, passage: sourcePassage }))
+      const passageWords = extractMeaningfulWords(sourcePassage)
+      questions = questions.map((q: any) =>
+        questionReferencesPassage(q, sourcePassage, passageWords)
+          ? { ...q, passage: sourcePassage }
+          : q
+      )
     }
 
     // continueSessionId: adaptif akışta ikinci/sonraki parça — aynı testin
@@ -956,7 +997,10 @@ export async function POST(req: NextRequest) {
       if (Array.isArray(fbQuestions) && fbQuestions.length > 0) {
         console.log('[generate-quiz] OpenAI fallback success:', fbQuestions.length, 'questions')
         const fbFinal = sourcePassage
-          ? fbQuestions.map((q: any) => ({ ...q, passage: sourcePassage }))
+          ? fbQuestions.map((q: any) => {
+              const passageWords = extractMeaningfulWords(sourcePassage)
+              return questionReferencesPassage(q, sourcePassage, passageWords) ? { ...q, passage: sourcePassage } : q
+            })
           : fbQuestions
         return NextResponse.json({ questions: fbFinal, sessionId: crypto.randomUUID() })
       }
