@@ -48,7 +48,7 @@ function getLevel(grade: string): string {
 }
 
 function normalizeTR(s: string): string {
-  return s.toLowerCase()
+  return s.toLocaleLowerCase('tr')
     .replace(/ğ/g,'g').replace(/ü/g,'u').replace(/ş/g,'s')
     .replace(/ı/g,'i').replace(/ö/g,'o').replace(/ç/g,'c')
 }
@@ -433,6 +433,35 @@ function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
   result = result.filter((q: any) => !curriculumMetaPattern.test(q.q || ''))
 
   return result
+}
+
+// 28 Ağustos 2026 — Deniz'in bildirdiği hata: 26 Ağustos'ta eklenen
+// "öğrenciye kaynak metni göster" özelliği, mebContext'in HAM HÂLİNİ
+// (meb-search'ün kendi iç etiketleriyle -- "[MEB Kaynak N - ...]",
+// "[Sınav Sorusu N - ...]", "---" ayraçları -- ve HİÇ KIRPMADAN) doğrudan
+// "passage" alanına koyuyordu. Sonuç: öğrenciye LGS sınav kapak sayfası
+// ("SINAVLA ÖĞRENCİ ALACAK ORTAÖĞRETİM KURUMLARINA...") gibi tamamen
+// alakasız, dev bir metin "Kaynak Metin" diye gösteriliyordu. Bu fonksiyon:
+// (a) SADECE gerçek "[MEB Kaynak ...]" bloklarını tutar -- "[Sınav Sorusu
+// ...]" blokları (farklı derslerin LGS sorularını, kapak sayfasını
+// içerebilir) öğrenciye "kaynak metin" olarak ASLA gösterilmemeli, sadece
+// AI'ın soru üretirken referans alması için mebContext'te kalmaya devam
+// eder. (b) iç etiketleri temizler. (c) makul bir uzunlığa (paragraf
+// sınırında) kırpar -- fileContent zaten 4000 karaktere kırpılıyordu,
+// mebContext hiç kırpılmıyordu, bu tutarsızlık da giderildi.
+function cleanPassageForDisplay(raw: string): string {
+  if (!raw) return ''
+  const blocks = raw.split(/\n\n---\n\n/)
+  const mebBlocks = blocks.filter(b => /^\[MEB Kaynak/.test(b.trim()))
+  if (mebBlocks.length === 0) return ''
+  const combined = mebBlocks
+    .map(b => b.replace(/^\[[^\]]+\]\n/, '').trim())
+    .join('\n\n')
+  const MAX = 3000
+  if (combined.length <= MAX) return combined
+  const cut = combined.slice(0, MAX)
+  const lastPara = cut.lastIndexOf('\n\n')
+  return (lastPara > MAX * 0.5 ? cut.slice(0, lastPara) : cut).trim() + '…'
 }
 
 export async function POST(req: NextRequest) {
@@ -833,11 +862,12 @@ export async function POST(req: NextRequest) {
     // GERÇEK metin, AI'ın ürettiği bir özet değil. "q" metninde "metinde/
     // parçada" gibi bir ifade geçmese bile her soru aynı kaynağa dayandığı
     // için tüm sorulara ekleniyor (öğrenci istediğinde açıp bakabilir).
+    // 28 Ağustos 2026: mebContext artık HAM DEĞİL, cleanPassageForDisplay
+    // ile temizlenip (sınav sorusu blokları çıkarılıp, etiketler silinip,
+    // kırpılıp) kullanılıyor -- bkz. fonksiyon tanımının üstündeki not.
     sourcePassage = (fileContent && fileContent.trim())
       ? fileContent.trim().slice(0, 4000)
-      : (mebContext && mebContext.trim())
-        ? mebContext.trim()
-        : ''
+      : cleanPassageForDisplay(mebContext || '')
     if (sourcePassage) {
       questions = questions.map((q: any) => ({ ...q, passage: sourcePassage }))
     }

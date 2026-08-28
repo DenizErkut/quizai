@@ -17,7 +17,7 @@
 // bağlam verilirse "kaç yazar tarafından hazırlanmıştır", "ISBN numarası
 // nedir" gibi konuyla hiç ilgisi olmayan, anlamsız sorular üretiliyor.
 export function isFrontMatter(text: string): boolean {
-  const t = text.toLowerCase()
+  const t = text.toLocaleLowerCase('tr')
   const signals = [
     'her hakkı saklıdır',
     'yayın hakları',
@@ -29,6 +29,17 @@ export function isFrontMatter(text: string): boolean {
     'talim ve terbiye kurulu',
     'kitabımızı tanıyalım',
     'güvenlik sembolleri',
+    // 28 Ağustos 2026 — Deniz'in bildirdiği hata: exam_chunks'taki LGS/
+    // merkezi sınav KAPAK SAYFASI ("SINAVLA ÖĞRENCİ ALACAK ORTAÖĞRETİM
+    // KURUMLARINA İLİŞKİN MERKEZÎ SINAV" gibi) hiçbir sinyale uymadığı için
+    // isNonContent() bunu YAKALAMIYORDU — öğrenciye "Kaynak Metin" olarak
+    // gösterilen mebContext'e sızıp, tamamen alakasız (Din Kültürü sorusu
+    // için LGS Türkçe/Tarih kapak sayfası gibi) devasa bir blok ekliyordu.
+    'sınavla öğrenci alacak',
+    'öğrencilerin dikkatine',
+    'ölçme, değerlendirme ve sınav hizmetleri',
+    'kitapçık türü',
+    'cevap kâğıdı',
   ]
   const hitCount = signals.filter(s => t.includes(s)).length
   // Tek bir sinyal yanlış pozitif olabilir (ör. normal bir cümle içinde
@@ -66,10 +77,10 @@ export function findContentStart(rawText: string, unitOrTopic: string): number {
   const FRONTMATTER_SKIP_MIN = 3000 // gözlemlenen ön sayfa bloklarının tipik uzunluğu
 
   const cleanedTopic = (unitOrTopic || '').replace(/^\d+\s*\.?\s*ünite\s*:?\s*/i, '').trim()
-  const rawLower = rawText.toLowerCase()
+  const rawLower = rawText.toLocaleLowerCase('tr')
 
   if (cleanedTopic) {
-    const needle = cleanedTopic.toLowerCase()
+    const needle = cleanedTopic.toLocaleLowerCase('tr')
     let searchFrom = 0
     while (true) {
       const idx = rawLower.indexOf(needle, searchFrom)
