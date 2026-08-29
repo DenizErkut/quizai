@@ -42,6 +42,25 @@ export default function QuizQuestion({
   const progPct = Math.round((current / questions.length) * 100)
   const diff = DIFFICULTIES.find(d => d.value === difficulty)!
 
+  // 29 Ağustos 2026 — Deniz'in bildirdiği kafa karışıklığı: aynı kaynak
+  // metin (mebContext'ten türetilen tek bir passage) birden fazla soruya
+  // eklenebiliyor (questionReferencesPassage() kasıtlı olarak böyle
+  // çalışıyor), ama önceden HER soru öncesinde bu metin baştan sona
+  // otomatik açık (<details open>) gösteriliyordu — öğrenci aynı uzun
+  // metni 6-8 kez art arda görüyordu. Bunun yerine: bu oturumdaki (questions
+  // dizisindeki) HER FARKLI passage metni için sadece İLK geçtiği soruda
+  // otomatik açık gösterilsin; aynı metin (karakter karakter aynıysa)
+  // tekrar eden sonraki sorularda kutu VARLIĞINI korusun (öğrenci isterse
+  // tekrar okuyabilsin) ama kapalı gelsin ve "Soru X'te gösterildi" notu
+  // düşsün — böylece öğrenci her seferinde aynı duvar metni okumak zorunda
+  // kalmıyor ama kaynağa erişimi de kaybetmiyor.
+  const passageFirstIndex = new Map<string, number>()
+  questions.forEach((qq, i) => {
+    if (qq.passage && !passageFirstIndex.has(qq.passage)) passageFirstIndex.set(qq.passage, i)
+  })
+  const passageOrigin = q.passage ? passageFirstIndex.get(q.passage) : undefined
+  const isFirstPassageOccurrence = passageOrigin === current
+
   return (
     <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', position: 'relative' }}>
       <div style={{ position: 'fixed', top: '-120px', right: '-80px', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,207,184,0.07) 0%, transparent 65%)', pointerEvents: 'none', zIndex: 0 }} />
@@ -91,9 +110,9 @@ export default function QuizQuestion({
               gösterilmiyordu. Artık generate-quiz'in kullandığı GERÇEK metin
               (MEB kaynağı veya öğrencinin yüklediği dosya) burada gösteriliyor. */}
           {q.passage && (
-            <details open style={{ marginBottom: '1.25rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', padding: '10px 14px' }}>
+            <details open={isFirstPassageOccurrence} style={{ marginBottom: '1.25rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', padding: '10px 14px' }}>
               <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 700, color: 'var(--primary)', userSelect: 'none' }}>
-                📖 Kaynak Metin
+                📖 Kaynak Metin{!isFirstPassageOccurrence && passageOrigin !== undefined && ` (Soru ${passageOrigin + 1}'de gösterildi — tekrar okumak için aç)`}
               </summary>
               <div style={{ marginTop: '10px', maxHeight: '240px', overflowY: 'auto', fontSize: '13px', lineHeight: 1.6, color: 'var(--text2)', whiteSpace: 'pre-wrap' }}>
                 {q.passage}
