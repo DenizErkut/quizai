@@ -55,6 +55,51 @@ function getActiveLang(profileLang?: string): string {
 
 type Screen = 'topic' | 'loading' | 'quiz' | 'result' | 'limit' | 'error'
 
+// 29 Ağustos 2026 — Deniz'in "ne eksik ne fazla" talebiyle eklendi: backend
+// (generate-quiz/route.ts) artık kendi içinde 4 tur tamamlama deniyor ama
+// nadir uç durumlarda (ör. çok az MEB kaynağı olan bir konu, ya da zaman
+// bütçesi dolduğu için erken kesilmesi) yine de eksik dönebilir. Bu, o son
+// güvenlik ağı: sunucudan istenenden AZ soru dönerse, İSTEMCİ TARAFINDA da
+// (aynı sessionId'ye continueSessionId ile eklenerek — kota/oturum
+// tekrarına yol AÇMADAN) eksik kalan miktar için sınırlı sayıda (en fazla 2)
+// ek istek daha atılır. İlerleme olmazsa (0 yeni soru dönerse) döngü hemen
+// durur — sonsuz bekleme riski yok.
+async function fetchQuizTopup(params: {
+  topic: string
+  subject?: string
+  language: string
+  questionType: string
+  includeVisuals: boolean
+  sessionId: string
+  missing: number
+  existingTexts: string[]
+  accessToken?: string
+}): Promise<any[]> {
+  try {
+    const res = await fetch('/api/generate-quiz', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${params.accessToken}` },
+      body: JSON.stringify({
+        topic: params.topic,
+        questionCount: params.missing,
+        difficulty: 'auto',
+        language: params.language,
+        questionType: params.questionType,
+        includeVisuals: params.includeVisuals,
+        subject: params.subject || undefined,
+        unit: params.topic || undefined,
+        continueSessionId: params.sessionId, // kota/yeni-session tekrarını önler
+        excludeQuestionTexts: params.existingTexts,
+      }),
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return Array.isArray(data.questions) ? data.questions : []
+  } catch {
+    return []
+  }
+}
+
 function QuizPageContent() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -467,10 +512,6 @@ function QuizPageContent() {
       }
 
       fetchProfile()
-      setQuestions(data.questions)
-      setSessionId(data.sessionId)
-      setResolvedDifficulty((data.resolvedDifficulty || 'normal') as DifficultyValue)
-      setDifficulty(data.resolvedDifficulty || 'normal') // QuizQuestion'a giden gösterim rozeti bununla senkron kalsın
       // ÖNEMLİ: chunkBoundary, İSTENEN soru sayısına (firstChunkSize) değil
       // GERÇEKTEN DÖNEN dizi uzunluğuna göre ayarlanmalı — sunucu tarafında
       // bir soru filtrelenirse (ör. kaynak-kitap-metadata güvenlik ağı,
@@ -479,7 +520,36 @@ function QuizPageContent() {
       // chunkBoundary" tetikleyicisi hiç ateşlenmeden "current+1>=
       // questions.length" (bitti) kontrolü önce tetiklenip quiz ikinci
       // parça hiç getirilmeden erken bitiyordu.
-      const actualFirstChunkLen = Array.isArray(data.questions) ? data.questions.length : 0
+      //
+      // 29 Ağustos 2026 — istemci-taraflı son güvenlik ağı: backend kendi
+      // içinde 4 tur dener ama yine de kısa dönebilir. Burada, dönen sayı
+      // bu parçanın hedefinden (firstChunkSize) azsa, AYNI session'a
+      // (continueSessionId ile — kota tekrar SAYILMAZ) en fazla 2 ek istek
+      // daha atılır. Eskiden actualFirstChunkLen<2 durumunda adaptif akış
+      // TAMAMEN terk edilip (chunkBoundary=null) ikinci parça HİÇ
+      // getirilmiyordu — bu da testi sessizce çok kısa bitiriyordu; artık
+      // bu döngü sayesinde o uç durum da telafi ediliyor.
+      let collected: any[] = Array.isArray(data.questions) ? data.questions : []
+      if (collected.length < firstChunkSize && data.sessionId) {
+        let topupAttempts = 0
+        while (collected.length < firstChunkSize && topupAttempts < 2) {
+          topupAttempts++
+          const { data: { session: freshSession } } = await supabase.auth.getSession()
+          const extra = await fetchQuizTopup({
+            topic, subject: selectedSubject || undefined, language: lang, questionType, includeVisuals,
+            sessionId: data.sessionId, missing: firstChunkSize - collected.length,
+            existingTexts: collected.map((q: any) => q.q).filter(Boolean),
+            accessToken: freshSession?.access_token,
+          })
+          if (extra.length === 0) break // ilerleme yok, tekrar denemenin faydası yok
+          collected = [...collected, ...extra].slice(0, firstChunkSize)
+        }
+      }
+      setQuestions(collected)
+      setSessionId(data.sessionId)
+      setResolvedDifficulty((data.resolvedDifficulty || 'normal') as DifficultyValue)
+      setDifficulty(data.resolvedDifficulty || 'normal') // QuizQuestion'a giden gösterim rozeti bununla senkron kalsın
+      const actualFirstChunkLen = collected.length
       setChunkBoundary(isAdaptiveEligible && actualFirstChunkLen >= 2 ? actualFirstChunkLen : null)
       setCurrent(0); setAnswers([]); answersRef.current = []; setChosen(null); setCheckingAnswer(false)
       setScreen('quiz')
@@ -742,13 +812,14 @@ function QuizPageContent() {
         const nextDiff = nextChunkDifficulty(resolvedDifficulty, chunk1Answers)
         const excludeTexts = questions.slice(0, chunkBoundary).map(q => q.q).filter(Boolean)
         const topic = customTopic.trim() || selectedTopic
+        const targetSecondChunk = qCount - chunkBoundary
         const { data: { session } } = await supabase.auth.getSession()
         const res = await fetch('/api/generate-quiz', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
           body: JSON.stringify({
             topic,
-            questionCount: qCount - chunkBoundary,
+            questionCount: targetSecondChunk,
             difficulty: nextDiff,
             language: currentLang,
             questionType,
@@ -758,17 +829,41 @@ function QuizPageContent() {
             excludeQuestionTexts: excludeTexts,
           }),
         })
+        let secondChunk: any[] = []
         if (res.ok) {
           const data = await res.json()
-          if (Array.isArray(data.questions) && data.questions.length > 0) {
-            setQuestions(prev => [...prev, ...data.questions])
-            setResolvedDifficulty(nextDiff)
-            setDifficulty(nextDiff) // gösterim rozeti senkron kalsın
+          if (Array.isArray(data.questions)) secondChunk = data.questions
+        }
+        // 29 Ağustos 2026 — istemci-taraflı son güvenlik ağı: chunk 2 de
+        // istenenden az dönebilir (ya da fetch tamamen başarısız olabilir —
+        // res.ok false). Eskiden bu durumda sessizce "test istenenden kısa
+        // biter" diye pes ediliyordu. Artık aynı sessionId'ye (kota tekrar
+        // SAYILMAZ) en fazla 2 ek istek daha atılıp hedefe (targetSecondChunk)
+        // ulaşılmaya çalışılıyor.
+        if (secondChunk.length < targetSecondChunk && sessionId) {
+          let topupAttempts = 0
+          while (secondChunk.length < targetSecondChunk && topupAttempts < 2) {
+            topupAttempts++
+            const { data: { session: freshSession } } = await supabase.auth.getSession()
+            const extra = await fetchQuizTopup({
+              topic, subject: selectedSubject || undefined, language: currentLang, questionType, includeVisuals,
+              sessionId, missing: targetSecondChunk - secondChunk.length,
+              existingTexts: [...excludeTexts, ...secondChunk.map((q: any) => q.q).filter(Boolean)],
+              accessToken: freshSession?.access_token,
+            })
+            if (extra.length === 0) break
+            secondChunk = [...secondChunk, ...extra].slice(0, targetSecondChunk)
           }
         }
+        if (secondChunk.length > 0) {
+          setQuestions(prev => [...prev, ...secondChunk])
+          setResolvedDifficulty(nextDiff)
+          setDifficulty(nextDiff) // gösterim rozeti senkron kalsın
+        }
       } catch {
-        // İkinci parça getirilemezse mevcut sorularla devam edilir — test
-        // istenenden kısa biter ama akış kesilmez.
+        // İkinci parça tamamen getirilemezse (ağ hatası vb.) mevcut
+        // sorularla devam edilir — bu artık son çare, çünkü yukarıdaki
+        // güvenlik ağı normal şartlarda hedefe ulaşmayı garantiliyor.
       }
       setFetchingNextChunk(false)
       setChunkBoundary(null) // tek geçişlik — bu v1'de sadece 2 parça var

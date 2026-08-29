@@ -507,6 +507,14 @@ function questionReferencesPassage(q: any, passage: string, passageWords: Set<st
 }
 
 export async function POST(req: NextRequest) {
+  // 29 Ağustos 2026 — soru sayısı tamamlama turları (aşağıda) 4 tura
+  // çıkarıldı; her tur birkaç saniye sürebildiği için, Vercel'in
+  // maxDuration=120sn sınırına TAM OTURMASI riski var — fonksiyon
+  // zaman aşımına uğrarsa öğrenci HİÇ soru alamaz (elindeki kısmi sonuç
+  // bile kaybolur). Bu yüzden topup döngüsü, kalan süre bütçesini kontrol
+  // edip güvenli marj kalmadığında (DB yazımı + response için pay bırakarak)
+  // erken durur — az sayıda soru eksik dönmek, hiç dönmemekten iyidir.
+  const requestStartTime = Date.now()
   let promptStr = ''
   let countRef = 5
   // 26 Ağustos 2026 — öğretmen geri bildirimi: "Metinde, ..." tarzı sorularda
@@ -865,29 +873,49 @@ export async function POST(req: NextRequest) {
     // istenen soru sayısı ile üretilen soru sayısı SIK SIK uyuşmuyordu
     // (ör. 5 istenince 9 ya da 1 dönüyordu). Kök neden: (a) AI'ın kendisi
     // "count" talimatına güvenilir uymuyor, (b) yukarıdaki filtreler
-    // soruları elediğinde YERİNE YENİSİ ÜRETİLMİYORDU. Şimdi: fazlaysa
-    // kırpılır, eksikse TEK bir ek üretim turuyla tamamlanır (sonsuz
-    // döngüye girmemesi için sadece 1 deneme, hâlâ eksikse elde olanla
-    // devam edilir — eksik bir test, hiç test olmamasından iyidir).
+    // soruları elediğinde YERİNE YENİSİ ÜRETİLMİYORDU.
+    //
+    // 29 Ağustos 2026 — Deniz'in "kesin çöz" talebiyle GÜÇLENDİRİLDİ:
+    // önceki hâl (max 2 tur, Haiku/Sonnet karışık, sabit 1500-2000 token)
+    // hâlâ kısa kalabiliyordu. Kök nedenler kod okunarak doğrulandı:
+    //  a) Topup max_tokens'ı SABİTTİ (missing sayısından bağımsız) — 5+
+    //     eksik soru gerektiğinde (uzun mebContext + açıklama alanları ile)
+    //     JSON çoğu zaman YARIDA KESİLİYOR, parse başarısız oluyor, o tur
+    //     SIFIR soru ekliyordu (0 ilerleme → döngü erken kesiliyordu).
+    //  b) Topup, orijinal üretimde Haiku seçildiyse (safeQCount<=7) YİNE
+    //     Haiku kullanıyordu — Haiku "TAM OLARAK N adet" talimatına Sonnet
+    //     kadar güvenilir uymuyor, bu da ilk turdan itibaren açığı büyütüyordu.
+    //  c) questions.length===0 (ilk üretim TAMAMEN başarısız) durumunda
+    //     topup hiç ÇALIŞMIYORDU (eski `> 0` koşulu) — sıfırdan telafi şansı
+    //     hiç verilmiyordu.
+    //  d) Tek bir turda ilerleme olmaması döngüyü hemen kesiyordu — geçici
+    //     bir JSON-parse hatası bile telafi şansı bulamadan pes ediyordu.
+    // Düzeltme: 4 tura çıkarıldı, topup HER ZAMAN Sonnet kullanıyor (daha
+    // güvenilir sayı takibi), max_tokens eksik soru sayısına göre ölçekleniyor
+    // (~600 token/soru, taban 2000), 0 sorudan da başlayabiliyor, ve döngü
+    // sadece ART ARDA 2 turda hiç ilerleme olmazsa erken kesiliyor (tek
+    // seferlik bir parse/format hatasına tolerans tanınıyor).
     if (questions.length > safeQCount) {
       questions = questions.slice(0, safeQCount)
-    } else if (questions.length < safeQCount && questions.length > 0) {
-      // 28 Ağustos 2026 — Deniz'in bildirdiği hata: 10 soru istenip 6-8 soru
-      // üretiliyordu (adaptif akışta hem 1. hem 2. parça, ayrı ayrı, kendi
-      // topup turunda YİNE eksik kalabiliyordu — TEK turluk tamamlama bazen
-      // yetersizdi). Artık en fazla 2 ek tur deneniyor (toplamda ilk üretim +
-      // 2 tamamlama = 3 deneme), her turda hâlâ eksik kalan miktar isteniyor.
-      // Sonsuz döngü riski yok (maxRounds sabit), ve hiçbir turda ilerleme
-      // olmazsa (questions.length hiç artmazsa) döngü erken kesiliyor.
-      const maxTopupRounds = 2
+    } else if (questions.length < safeQCount) {
+      const maxTopupRounds = 4
+      const TOPUP_TIME_BUDGET_MS = 95000 // 120sn'lik toplam bütçeden DB yazımı/response için pay bırak
+      let consecutiveNoProgress = 0
       for (let round = 0; round < maxTopupRounds && questions.length < safeQCount; round++) {
+        if (Date.now() - requestStartTime > TOPUP_TIME_BUDGET_MS) {
+          console.warn(`[generate-quiz] zaman bütçesi doldu, topup turu ${round + 1} atlanıyor (elde olan: ${questions.length}/${safeQCount})`)
+          break
+        }
         const missing = safeQCount - questions.length
         const beforeRoundCount = questions.length
         try {
-          const topupPrompt = `${prompt}\n\nÖNEMLİ: Bu sefer TAM OLARAK ${missing} adet YENİ ve BİRBİRİNDEN FARKLI soru üret (ne bir eksik ne bir fazla). Daha önce üretilenlerle aynı/benzer soru üretme.`
+          const topupPrompt = `${prompt}\n\nÖNEMLİ: Bu sefer TAM OLARAK ${missing} adet YENİ ve BİRBİRİNDEN FARKLI soru üret (ne bir eksik ne bir fazla). Daha önce üretilenlerle aynı/benzer soru üretme. Yanıtın SADECE geçerli, TAMAMLANMIŞ (yarıda kesilmemiş) JSON olmalı.`
           const topupResponse = await anthropic.messages.create({
-            model: useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5',
-            max_tokens: useHaiku ? 1500 : 2000,
+            // Eksik soru tamamlama, sayıya SADIK KALMA konusunda Haiku'dan
+            // daha güvenilir olan Sonnet ile yapılır — burada hız değil
+            // doğru sayıya ulaşmak öncelikli.
+            model: 'claude-sonnet-4-5',
+            max_tokens: Math.min(4000, Math.max(2000, missing * 600)),
             messages: [{ role: 'user', content: topupPrompt }],
           })
           const topupText = topupResponse.content[0].type === 'text' ? topupResponse.content[0].text : ''
@@ -897,7 +925,9 @@ export async function POST(req: NextRequest) {
             topupParsed = JSON.parse(topupClean)
           } catch {
             const m = topupClean.match(/\{[\s\S]*\}/)
-            if (m) topupParsed = JSON.parse(m[0])
+            if (m) {
+              try { topupParsed = JSON.parse(m[0]) } catch { topupParsed = null }
+            }
           }
           let topupQuestions = topupParsed?.questions || []
           topupQuestions = applyContentQualityFilters(topupQuestions, mebContext)
@@ -906,7 +936,12 @@ export async function POST(req: NextRequest) {
         } catch (e) {
           console.warn(`[generate-quiz] eksik soru tamamlama (tur ${round + 1}) başarısız:`, e)
         }
-        if (questions.length === beforeRoundCount) break // bu turda hiç ilerleme olmadı, tekrar denemenin faydası yok
+        if (questions.length === beforeRoundCount) {
+          consecutiveNoProgress++
+          if (consecutiveNoProgress >= 2) break // 2 tur üst üste hiç ilerleme yoksa devam etmenin faydası yok
+        } else {
+          consecutiveNoProgress = 0
+        }
       }
     }
 
