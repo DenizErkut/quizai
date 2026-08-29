@@ -381,19 +381,69 @@ MEB KAYNAK METNİ:\n${mebCtx}\n\n`
 // karşı TEK, paylaşılan filtre fonksiyonu (hem ana üretim hem eksik-soru
 // tamamlama turu bunu kullanır — kopya mantık yok).
 function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
+  // 29 Ağustos 2026 — Deniz'in gerçek log karşılaştırmasıyla bulunan sorun:
+  // bu filtreler bazı çağrılarda üretilen soruların %60-100'ünü eliyordu
+  // (log: "5 -> 2", "2 -> 0", "5 -> 2") ama HANGİ filtrenin HANGİ soruyu
+  // hangi gerekçeyle elediği hiçbir yerde görünmüyordu — bu da kör bir
+  // şekilde topup turlarını tetikleyip (AI aynı sınırlı pasajdan tekrar
+  // tekrar üretmek zorunda kalıyor), dolaylı olarak soru TEKRARINI
+  // artırıyordu. Artık her filtre, elediği soruyu (ilk 70 karakter) ve
+  // gerekçesini greplenebilir bir etiketle logluyor — bir sonraki
+  // yoğun-eleme olayında kör tahmin yerine gerçek kanıt olacak.
+  const logRejected = (stage: string, q: any, reason: string) => {
+    console.warn(`[content-filter-reject] stage=${stage} reason="${reason}" q="${(q.q || '').slice(0, 70)}"`)
+  }
+
   // 1) Kaynağın kendisi (yazar, ISBN, İçindekiler) hakkında soru
   const bookMetadataPattern = /\bISBN\b|yazar kadrosu|kaç yazar (tarafından|kişi)|kitab(ı|ın)[ıi]n yazarlarından|(ders kitab|kaynağ[ıi]n yer ald[ıi]ğ[ıi] kitab).{0,30}(hazırlanmıştır|hazırlamıştır)|kitab[ıi]n künye|İçindekiler/i
-  let result = qs.filter((q: any) => !bookMetadataPattern.test(q.q || ''))
+  let result = qs.filter((q: any) => {
+    const ok = !bookMetadataPattern.test(q.q || '')
+    if (!ok) logRejected('book-metadata', q, 'kaynağın kendisi hakkında soru')
+    return ok
+  })
 
   // 2) Görünmeyen metne/parçaya atıf (14 Ağustos 2026'da genişletildi:
   // "metinde/metne/parçada" kelimesinin genel kullanımı yakalanır;
   // sorunun içinde gerçekten anlamlı uzunlukta (40+ karakter) tırnaklı
   // bir alıntı varsa kaynağın gömülü olduğu kabul edilip güvenli sayılır.
+  //
+  // 29 Ağustos 2026 — İSTİSNA eklendi: bir önceki oturumda eklenen "SORU
+  // DERİNLİĞİ KURALI" AI'ı özellikle "Bir öğrenci ... diye düşünüyor — bu
+  // düşüncedeki eksiklik nedir?" kalıbındaki misconception-tarzı sorular
+  // üretmeye teşvik ediyor. Bu kalıptaki sorular KENDİ İÇİNDE eksiksizdir
+  // (öğrencinin YANLIŞ düşüncesi sorunun kendi metninde zaten yazılı) —
+  // pasajdan ayrıca 40+ karakterlik BİREBİR bir alıntıya ihtiyaç duymazlar,
+  // çünkü test edilen şey pasajın kendisi değil, o düşüncedeki mantık
+  // hatasıdır. Eski filtre bu kalıbı da "görünmeyen metne atıf" sayıp
+  // gereksiz yere eliyordu (muhtemelen "5 -> 2" gibi ağır elemelerin bir
+  // parçası). Artık "Bir öğrenci"/"öğrenci" kelimesiyle başlayan ve tırnak
+  // içinde bir düşünce/söylem içeren sorular bu filtreden muaf tutuluyor.
   const unseenPassagePattern = /\bmetinde\b|\bmetne göre\b|\bmetnin\b|\bparçada\b|\bparçaya göre\b|\byukarıdaki (metin|parça)|\bhikayede\b/i
-  const hasEmbeddedQuote = (text: string) => /["“][^"”]{40,}["”]/.test(text)
+  // Tırnak tespiti: düz çift tırnak ("), Türkçe/İngilizce eğik çift tırnak
+  // (" "), VE düz/eğik TEK tırnak (apostrof) hepsi kapsanmalı — gerçek
+  // AI çıktısı öğrenci sözünü çoğunlukla 'böyle' tek tırnakla aktarıyor
+  // (çift tırnak değil). İlk sürümde bu unutulmuş, test edilince (bir
+  // düzeltmeyi asla test etmeden bırakma prensibi) hemen yakalanıp
+  // düzeltildi — aksi hâlde bu "düzeltme" gerçek veride hiç tetiklenmeyip
+  // sorunu çözmemiş olacaktı.
+  const QUOTE_PATTERN = /["“‘']([^"”’']{15,})["”’']/
+  const hasEmbeddedQuote = (text: string) => {
+    const m = text.match(QUOTE_PATTERN)
+    return !!m && m[1].length >= 40
+  }
+  const isSelfContainedMisconceptionQuestion = (text: string) =>
+    // NOT: baştaki \b kasıtlı olarak YOK — "öğrenci" gibi Türkçe özel
+    // karakterle (ö) başlayan kelimelerde JS'in varsayılan \w sınıfı
+    // Türkçe harfleri içermediği için \böğrenci hiç eşleşmiyordu (bu
+    // dosyada tekrar eden "Turkish karakter" hata ailesinin bir üyesi
+    // daha — bkz. .toLocaleLowerCase('tr') notları). Sondaki \b sorun
+    // değil çünkü "si"/"nin" ekleri ASCII harfle bitiyor.
+    /öğrenci(nin|si)?\b/i.test(text) && QUOTE_PATTERN.test(text)
   result = result.filter((q: any) => {
     const text = q.q || ''
-    return !(unseenPassagePattern.test(text) && !hasEmbeddedQuote(text))
+    const flagged = unseenPassagePattern.test(text) && !hasEmbeddedQuote(text) && !isSelfContainedMisconceptionQuestion(text)
+    if (flagged) logRejected('unseen-passage-reference', q, 'metne/parçaya atıf var ama alıntı/self-contained değil')
+    return !flagged
   })
 
   // 3) Kaynakta gerçekten OLMAYAN, isimlendirilmiş bir esere kaçış
@@ -421,7 +471,10 @@ function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
     const text = (q.q || '').toLocaleLowerCase('tr')
     const ctx = mebContext.toLocaleLowerCase('tr')
     for (const marker of namedWorkMarkers) {
-      if (text.includes(marker) && !ctx.includes(marker)) return false
+      if (text.includes(marker) && !ctx.includes(marker)) {
+        logRejected('named-work-escape', q, `kaynakta olmayan esere kaçış: "${marker}"`)
+        return false
+      }
     }
     return true
   })
@@ -430,7 +483,11 @@ function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
   // (Köprü Kurma, Performans Görevi vb.) hakkında soru — öğretmene
   // yönelik metodoloji, öğrenciye sorulacak konu içeriği değil.
   const curriculumMetaPattern = /Öğrenme Kanıtları|Performans Görevi|Köprü Kurma|Öğrenme-Öğretme Yaşantıları|Ön Değerlendirme Süreci|Beceriler Arası İlişkiler|Disiplinler Arası İlişkiler|Öğrenme Çıktıları ve Süreç Bileşenleri/
-  result = result.filter((q: any) => !curriculumMetaPattern.test(q.q || ''))
+  result = result.filter((q: any) => {
+    const ok = !curriculumMetaPattern.test(q.q || '')
+    if (!ok) logRejected('curriculum-meta', q, 'müfredat dokümanının idari başlığı')
+    return ok
+  })
 
   return result
 }
