@@ -492,7 +492,61 @@ function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
   return result
 }
 
-// 28 Ağustos 2026 — Deniz'in bildirdiği hata: 26 Ağustos'ta eklenen
+// 31 Ağustos 2026 — Deniz'in gerçek test karşılaştırmasıyla bulunan sorun:
+// önceki oturumda eklenen "önceki parçanın cümlelerini tekrar hedefleme"
+// talimatı (previousQuestionsNote'a eklenen KAYNAK METİN SÜREKLİLİĞİ notu)
+// sadece PROMPT SEVİYESİNDE bir uyarıydı — ve AI bunu güvenilir şekilde
+// takip etmedi: gerçek bir testte chunk1'deki "İslam'da Allah'ın kaç ismi
+// var?" sorusu, chunk2'de neredeyse birebir aynı kelimelerle ("Esma-ül
+// Hüsna" eklenerek) TEKRAR üretildi — talimata rağmen. Ders: LLM'e "tekrar
+// etme" demek yeterli bir garanti DEĞİL, promptlar kalabalıklaştıkça bu
+// tür talimatlar güvenilirliğini kaybediyor. Bu yüzden artık deterministik
+// bir kod-seviyesi kontrolü var: her yeni soru, DAHA ÖNCE SORULMUŞ (bu
+// oturumun önceki parçası + bu çağrının kendi içinde önce üretilmiş)
+// sorularla kelime-örtüşümü (Jaccard benzerliği) açısından karşılaştırılır;
+// eşik aşılırsa soru silinir ve zaten var olan topup mekanizması (yukarıda)
+// boşluğu otomatik doldurur — talimata güvenmek yerine kod garantisi.
+const DUP_STOPWORDS = new Set([
+  'metinde', 'metne', 'metnin', 'göre', 'hangi', 'aşağıdakilerden', 'olduğu',
+  'olarak', 'için', 'ile', 'nedir', 'bir', 'bu', 'şu', 'ne', 'gibi', 'kadar',
+  'olan', 'olduğunu', 'olması', 'diye', 'diyor', 'düşünüyor', 'öğrenci',
+  'öğrencinin', 'öğrencisi', 'soruyor', 'aşağıdaki', 'işaret', 'belirtilen',
+  'edilmiştir', 'edilmektedir', 'göstermektedir', 've', 'ya', 'da', 'de',
+])
+function normalizeWordsForDupCheck(text: string): Set<string> {
+  const words = (text || '')
+    .toLocaleLowerCase('tr')
+    .replace(/[^\p{L}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 3 && !DUP_STOPWORDS.has(w))
+  return new Set(words)
+}
+function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0
+  let overlap = 0
+  a.forEach((w) => { if (b.has(w)) overlap++ })
+  const union = new Set([...a, ...b]).size
+  return union === 0 ? 0 : overlap / union
+}
+const DUP_SIMILARITY_THRESHOLD = 0.4
+function filterOutNearDuplicates(qs: any[], alreadyAskedTexts: string[]): any[] {
+  const alreadyAskedWordSets = alreadyAskedTexts.map(normalizeWordsForDupCheck)
+  const acceptedWordSets: Set<string>[] = []
+  const result: any[] = []
+  for (const q of qs) {
+    const qWords = normalizeWordsForDupCheck(q.q || '')
+    const isDup =
+      alreadyAskedWordSets.some((prev) => jaccardSimilarity(qWords, prev) >= DUP_SIMILARITY_THRESHOLD) ||
+      acceptedWordSets.some((prev) => jaccardSimilarity(qWords, prev) >= DUP_SIMILARITY_THRESHOLD)
+    if (isDup) {
+      console.warn(`[content-filter-reject] stage=near-duplicate reason="daha önce sorulan bir soruyla yüksek kelime örtüşümü" q="${(q.q || '').slice(0, 70)}"`)
+      continue
+    }
+    acceptedWordSets.push(qWords)
+    result.push(q)
+  }
+  return result
+}
 // "öğrenciye kaynak metni göster" özelliği, mebContext'in HAM HÂLİNİ
 // (meb-search'ün kendi iç etiketleriyle -- "[MEB Kaynak N - ...]",
 // "[Sınav Sorusu N - ...]", "---" ayraçları -- ve HİÇ KIRPMADAN) doğrudan
@@ -946,6 +1000,16 @@ export async function POST(req: NextRequest) {
       console.warn(`[generate-quiz] filtreler sonrası ${beforeFilterCount - questions.length} soru elendi (${beforeFilterCount} -> ${questions.length})`)
     }
 
+    // 31 Ağustos 2026 — deterministik tekrar kontrolü (bkz. yukarıdaki
+    // filterOutNearDuplicates tanımı). excludeQuestionTexts, adaptif akışın
+    // önceki parçasında (chunk1) sorulmuş soruları içerir — bu çağrının
+    // ürettiği sorular onlarla yüksek kelime örtüşümü gösteriyorsa silinir.
+    const beforeDupCount = questions.length
+    questions = filterOutNearDuplicates(questions, Array.isArray(excludeQuestionTexts) ? excludeQuestionTexts : [])
+    if (questions.length < beforeDupCount) {
+      console.warn(`[generate-quiz] yakın-tekrar kontrolü sonrası ${beforeDupCount - questions.length} soru elendi (${beforeDupCount} -> ${questions.length})`)
+    }
+
     // 14 Ağustos 2026'da öğretmen geri bildirimiyle bulunan ayrı bir hata:
     // istenen soru sayısı ile üretilen soru sayısı SIK SIK uyuşmuyordu
     // (ör. 5 istenince 9 ya da 1 dönüyordu). Kök neden: (a) AI'ın kendisi
@@ -1008,6 +1072,13 @@ export async function POST(req: NextRequest) {
           }
           let topupQuestions = topupParsed?.questions || []
           topupQuestions = applyContentQualityFilters(topupQuestions, mebContext)
+          // Yakın-tekrar kontrolü: hem önceki parçanın sorularına (excludeQuestionTexts)
+          // hem de bu çağrıda ŞİMDİYE KADAR kabul edilmiş sorulara (questions) karşı.
+          const alreadyAsked = [
+            ...(Array.isArray(excludeQuestionTexts) ? excludeQuestionTexts : []),
+            ...questions.map((q: any) => q.q).filter(Boolean),
+          ]
+          topupQuestions = filterOutNearDuplicates(topupQuestions, alreadyAsked)
           questions = [...questions, ...topupQuestions].slice(0, safeQCount)
           console.log(`[generate-quiz] eksik soru tamamlama (tur ${round + 1}/${maxTopupRounds}): ${missing} istendi, ${topupQuestions.length} eklendi (toplam ${questions.length})`)
         } catch (e) {
