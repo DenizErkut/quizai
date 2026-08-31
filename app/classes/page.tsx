@@ -167,7 +167,7 @@ export default function ClassesPage() {
     const students = selectedClass.students || []
 
     return (
-      <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'linear-gradient(160deg, #f0f9ff 0%, #ffffff 40%, #fff8e8 100%)' }}>
+      <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'linear-gradient(160deg, #eef5f1 0%, #fffaf4 42%, #fff1d6 100%)' }}>
         <div style={{ maxWidth: '640px', margin: '0 auto' }}>
           <button onClick={() => setSelectedClass(null)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', fontSize: '14px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'inherit' }}>
@@ -245,7 +245,7 @@ export default function ClassesPage() {
 
   // ── ANA LİSTE ──
   return (
-    <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'linear-gradient(160deg, #f0f9ff 0%, #ffffff 40%, #fff8e8 100%)' }}>
+    <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'linear-gradient(160deg, #eef5f1 0%, #fffaf4 42%, #fff1d6 100%)' }}>
       <div style={{ maxWidth: '640px', margin: '0 auto' }}>
 
         <div className="anim-up" style={{ marginBottom: '1.75rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>

@@ -154,7 +154,7 @@ export default function Navbar() {
   // Premium rozet tipi
   const planBadge =
     profile.plan === 'unlimited' ? { emoji: '⭐', color: '#0d9488', title: 'Unlimited' } :
-    profile.plan === 'premium'   ? { emoji: '★',  color: '#fdd31d', title: 'Premium' } :
+    profile.plan === 'premium'   ? { emoji: '★',  color: '#f2b94b', title: 'Premium' } :
     null
 
   return (
@@ -168,7 +168,7 @@ export default function Navbar() {
       {/* ── MOBILE TOP BAR ── */}
       <div className="mobile-only" style={{
         position: 'fixed', top: 0, left: 0, right: 0, height: '58px',
-        background: '#082465', zIndex: 1000,
+        background: '#29483d', zIndex: 1000,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 14px',
         boxShadow: '0 2px 12px rgba(8,36,101,0.3)',
@@ -197,10 +197,10 @@ export default function Navbar() {
               <span style={{
                 position: 'absolute', top: -4, right: -4,
                 width: 17, height: 17, borderRadius: '50%',
-                background: '#fdd31d', color: '#082465',
+                background: '#f2b94b', color: '#29483d',
                 fontSize: '9px', fontWeight: 800,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                border: '2px solid #082465',
+                border: '2px solid #29483d',
               }}>
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
@@ -233,9 +233,9 @@ export default function Navbar() {
             <button onClick={() => { setShowMenu(v => !v); setShowLang(false) }}
               style={{
                 width: 40, height: 40, borderRadius: '50%',
-                background: profile.avatar_url ? 'transparent' : '#fdd31d',
-                border: profile.avatar_url ? '2.5px solid #fdd31d' : 'none',
-                color: '#082465', fontWeight: 800, fontSize: '13px',
+                background: profile.avatar_url ? 'transparent' : '#f2b94b',
+                border: profile.avatar_url ? '2.5px solid #f2b94b' : 'none',
+                color: '#29483d', fontWeight: 800, fontSize: '13px',
                 cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontFamily: 'inherit', overflow: 'hidden', padding: 0,
                 boxShadow: profile.avatar_url ? '0 2px 10px rgba(8,36,101,0.25)' : '0 2px 8px rgba(253,211,29,0.4)',
@@ -255,7 +255,7 @@ export default function Navbar() {
                 <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setShowMenu(false)} />
                 <div style={{ position: 'fixed', top: '64px', right: '12px', zIndex: 9999, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '8px', minWidth: '220px', boxShadow: '0 8px 40px rgba(8,36,101,0.25)', maxHeight: 'calc(100vh - 80px)', overflowY: 'auto' }}>
                   <div style={{ padding: '10px 14px', marginBottom: '6px', borderBottom: '1px solid #f0f4f8' }}>
-                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#082465' }}>{profile.name}</div>
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#29483d' }}>{profile.name}</div>
                     <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
                       {profile.plan === 'premium'
                         ? <span style={{ color: '#0a9e90', fontWeight: 600 }}>★ Premium</span>
@@ -328,15 +328,17 @@ export default function Navbar() {
       {/* ── DESKTOP NAV ── */}
       <nav className="desktop-only" style={{
         position: 'fixed', top: 0, left: 0, right: 0, height: '90px',
-        background: '#082465',
-        boxShadow: '0 2px 16px rgba(8,36,101,0.3)',
+        background: 'rgba(255,250,244,0.94)',
+        borderBottom: '1px solid #e8dcd0',
+        boxShadow: '0 8px 30px rgba(91,63,38,0.08)',
+        backdropFilter: 'blur(16px)',
         display: 'flex', alignItems: 'center', zIndex: 1000,
       }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%', padding: '0 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
 
           {/* Logo */}
           <Link href="/home" style={{ flexShrink: 0 }}>
-            <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '76px', width: 'auto', filter: 'brightness(0) invert(1)' }} />
+            <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '68px', width: 'auto' }} />
           </Link>
 
           {/* Ana nav linkleri — sadece Test | Günlük | Sıralama */}
@@ -345,12 +347,12 @@ export default function Navbar() {
               <Link key={item.href} href={item.href} style={{
                 padding: '8px 18px', borderRadius: '8px', fontSize: '15px',
                 fontWeight: 600, whiteSpace: 'nowrap', transition: 'all 0.15s',
-                color: pathname === item.href ? '#fdd31d' : 'rgba(255,255,255,0.7)',
-                background: pathname === item.href ? 'rgba(253,211,29,0.1)' : 'transparent',
-                borderBottom: pathname === item.href ? '2px solid #fdd31d' : '2px solid transparent',
+                color: pathname === item.href ? '#df5c3f' : '#62574e',
+                background: pathname === item.href ? 'rgba(223,92,63,0.08)' : 'transparent',
+                borderBottom: pathname === item.href ? '2px solid #df5c3f' : '2px solid transparent',
               }}
-                onMouseEnter={e => { if (pathname !== item.href) { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255,255,255,0.08)' } }}
-                onMouseLeave={e => { if (pathname !== item.href) { e.currentTarget.style.color = 'rgba(255,255,255,0.7)'; e.currentTarget.style.background = 'transparent' } }}
+                onMouseEnter={e => { if (pathname !== item.href) { e.currentTarget.style.color = '#df5c3f'; e.currentTarget.style.background = 'rgba(223,92,63,0.06)' } }}
+                onMouseLeave={e => { if (pathname !== item.href) { e.currentTarget.style.color = '#62574e'; e.currentTarget.style.background = 'transparent' } }}
               >
                 {item.label}
               </Link>
@@ -534,7 +536,7 @@ export default function Navbar() {
       {/* ── MOBILE BOTTOM NAV — role bazlı ── */}
       <div className="mobile-only" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 999,
-        background: '#082465',
+        background: '#29483d',
         borderTop: '1px solid rgba(253,211,29,0.2)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-around',
         padding: '8px 0 max(8px, env(safe-area-inset-bottom))',
@@ -565,10 +567,10 @@ export default function Navbar() {
           <Link key={item.href} href={item.href} style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
             textDecoration: 'none', padding: '6px 4px', borderRadius: '10px', minWidth: '44px', flex: 1,
-            background: pathname === item.href ? 'rgba(253,211,29,0.12)' : 'transparent',
+            background: pathname === item.href ? 'rgba(242,185,75,0.16)' : 'transparent',
           }}>
             <span style={{ fontSize: '19px', lineHeight: 1 }}>{item.icon}</span>
-            <span style={{ fontSize: '9px', fontWeight: pathname === item.href ? 700 : 400, color: pathname === item.href ? '#fdd31d' : 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '9px', fontWeight: pathname === item.href ? 700 : 400, color: pathname === item.href ? '#f2b94b' : 'rgba(255,255,255,0.62)', whiteSpace: 'nowrap' }}>
               {item.label}
             </span>
           </Link>

@@ -20,13 +20,13 @@ export default function PageHeader({
   title, subtitle, icon, backHref, backLabel,
   color, badge, badgeColor, action, stats,
 }: PageHeaderProps) {
-  const gradFrom = '#082465'
-  const gradTo   = color || '#1ECFB8'
+  const gradFrom = '#29483d'
+  const gradTo   = color || '#4c7d6b'
 
   return (
     <div style={{
       background: `linear-gradient(135deg, ${gradFrom} 0%, ${gradTo} 100%)`,
-      padding: '1.25rem 1.5rem 2rem',
+      padding: '1.75rem 1.5rem 2.5rem',
       position: 'relative', overflow: 'hidden',
       marginBottom: '0',
     }}>
@@ -34,7 +34,7 @@ export default function PageHeader({
       <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', bottom: -20, left: -20, width: 90, height: 90, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
 
-      <div style={{ maxWidth: '680px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+      <div style={{ maxWidth: '1040px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
         {/* Geri linki */}
         {backHref && (
           <Link href={backHref} style={{
@@ -53,14 +53,14 @@ export default function PageHeader({
               {icon && <span style={{ fontSize: '24px' }}>{icon}</span>}
               <h1 style={{
                 fontFamily: 'var(--font-display)',
-                fontSize: '20px', fontWeight: 800, color: '#fff', lineHeight: 1.2,
+                fontSize: 'clamp(22px, 3vw, 30px)', fontWeight: 800, color: '#fff', lineHeight: 1.2,
               }}>{title}</h1>
               {badge && (
                 <span style={{
                   fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px',
-                  background: badgeColor || 'rgba(253,211,29,0.25)',
-                  color: badgeColor ? '#fff' : '#fdd31d',
-                  border: '1px solid rgba(253,211,29,0.4)',
+                  background: badgeColor || 'rgba(242,185,75,0.22)',
+                  color: badgeColor ? '#fff' : '#ffd77f',
+                  border: '1px solid rgba(242,185,75,0.4)',
                 }}>
                   {badge}
                 </span>

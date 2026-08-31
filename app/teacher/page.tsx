@@ -163,7 +163,7 @@ export default function TeacherDashboard() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       {/* Öğretmen Navbar */}
-      <nav style={{ background: '#082465', padding: '0 1.5rem', height: '60px', display: 'flex', alignItems: 'center', gap: '12px', position: 'sticky', top: 0, zIndex: 100 }}>
+      <nav style={{ background: '#29483d', padding: '0 1.5rem', height: '68px', display: 'flex', alignItems: 'center', gap: '12px', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 8px 24px rgba(41,72,61,0.15)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
           <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '32px', filter: 'brightness(0) invert(1)' }} />
           <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.2)' }} />

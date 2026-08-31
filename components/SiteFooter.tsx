@@ -23,7 +23,7 @@ export default function SiteFooter() {
     { href: '/teslimat-iade', label: 'Teslimat ve İade' },
   ]
   return (
-    <footer style={{ background: '#082465', padding: '2rem 1.5rem', marginTop: '3rem' }}>
+    <footer style={{ background: '#203a32', padding: '3rem 1.5rem 2rem', marginTop: '3rem' }}>
       <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '1.25rem' }}>
           <Link href="/">
@@ -31,7 +31,7 @@ export default function SiteFooter() {
           </Link>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px 20px' }}>
             {links.map(l => (
-              <Link key={l.href} href={l.href} style={{ fontSize: '13px', color: 'rgba(255,255,255,0.55)', textDecoration: 'none' }}>
+              <Link key={l.href} href={l.href} style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', textDecoration: 'none' }}>
                 {l.label}
               </Link>
             ))}

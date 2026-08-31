@@ -83,8 +83,8 @@ export default function DashboardPage() {
   }, [])
 
   if (loading) return (
-    <main style={{ minHeight: '100vh', background: '#082465', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="spinner" style={{ borderTopColor: '#fdd31d', borderColor: 'rgba(253,211,29,0.2)' }} />
+    <main style={{ minHeight: '100vh', background: '#fffaf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="spinner" style={{ borderTopColor: '#df5c3f', borderColor: 'rgba(223,92,63,0.2)' }} />
     </main>
   )
 
@@ -93,11 +93,11 @@ export default function DashboardPage() {
   const initials = profile?.name?.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase() || 'U'
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: '80px' }}>
+    <main className="warm-dashboard" style={{ minHeight: '100vh', background: '#f7f0e8', paddingBottom: '80px' }}>
 
       {/* ── HERO HEADER (Okulyo stili) ── */}
       <div style={{
-        background: 'linear-gradient(135deg, #082465 0%, #0d3b8e 60%, #1ECFB8 100%)',
+        background: 'linear-gradient(135deg, #29483d 0%, #386455 70%, #4d7968 100%)',
         padding: '2rem 1.5rem 3.5rem',
         position: 'relative', overflow: 'hidden',
       }}>
@@ -106,13 +106,13 @@ export default function DashboardPage() {
         <div style={{ position: 'absolute', bottom: -20, left: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(30,207,184,0.15)' }} />
         <div style={{ position: 'absolute', top: 20, right: 80, width: 60, height: 60, borderRadius: '50%', background: 'rgba(253,211,29,0.1)' }} />
 
-        <div style={{ maxWidth: '480px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+        <div style={{ maxWidth: '1040px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               {/* Avatar */}
               <div style={{
                 width: 52, height: 52, borderRadius: '50%',
-                background: 'linear-gradient(135deg, #fdd31d, #f5a623)',
+                background: 'linear-gradient(135deg, #f2b94b, #e8a335)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: '18px', fontWeight: 800, color: '#082465',
                 border: '3px solid rgba(255,255,255,0.3)',
@@ -139,8 +139,8 @@ export default function DashboardPage() {
                 </div>
               )}
               <Link href="/quiz" style={{
-                padding: '8px 16px', borderRadius: '99px',
-                background: '#fdd31d', color: '#082465',
+                padding: '10px 18px', borderRadius: '14px',
+                background: '#df5c3f', color: '#fff',
                 fontSize: '12px', fontWeight: 800,
                 display: 'flex', alignItems: 'center', gap: '4px',
                 boxShadow: '0 4px 12px rgba(253,211,29,0.4)',
@@ -173,9 +173,9 @@ export default function DashboardPage() {
       </div>
 
       {/* ── MENÜ GRİD (Okulyo stili) ── */}
-      <div style={{ maxWidth: '480px', margin: '-1.5rem auto 0', padding: '0 1.25rem', position: 'relative', zIndex: 2 }}>
+      <div style={{ maxWidth: '1040px', margin: '-1.5rem auto 0', padding: '0 1.25rem', position: 'relative', zIndex: 2 }}>
         <div style={{
-          background: 'var(--bg)',
+          background: '#fffaf4',
           borderRadius: '24px 24px 0 0',
           padding: '1.5rem 1.25rem',
           boxShadow: '0 -4px 24px rgba(8,36,101,0.08)',

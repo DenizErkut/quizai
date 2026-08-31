@@ -1161,7 +1161,7 @@ function QuizPageContent() {
 
   // ── LOADING ──
   if (screen === 'loading') return (
-    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg, #f0f9ff 0%, #ffffff 40%, #fff8e8 100%)' }}>
+    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg, #eef5f1 0%, #fffaf4 42%, #fff1d6 100%)' }}>
       <div style={{ position: 'fixed', top: '-120px', right: '-80px', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,207,184,0.08) 0%, transparent 65%)', pointerEvents: 'none' }} />
       <div style={{ textAlign: 'center', position: 'relative', zIndex: 1 }}>
         <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--gradient)', margin: '0 auto 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--shadow-accent)' }}>
@@ -1269,7 +1269,7 @@ function QuizPageContent() {
   if (screen === 'result') {
     const topic = customTopic.trim() || selectedTopic
     return (
-      <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', background: 'linear-gradient(160deg, #f0f9ff 0%, #ffffff 40%, #fff8e8 100%)' }}>
+      <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', background: 'linear-gradient(160deg, #eef5f1 0%, #fffaf4 42%, #fff1d6 100%)' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
           <QuizResult
             questions={questions}

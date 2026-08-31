@@ -6,12 +6,12 @@ import { useSearchParams } from 'next/navigation'
 const ROLES = [
   {
     key: 'student',
-    icon: '⚡',
+    icon: '🎒',
     title: 'Öğrenci Girişi',
     desc: 'Test çöz, gelişimini takip et, sıralamada yüksel',
-    color: '#082465',
-    bg: 'rgba(8,36,101,0.06)',
-    border: 'rgba(8,36,101,0.2)',
+    color: '#29483d',
+    bg: '#e5f0eb',
+    border: '#c6ddd3',
     href: '/login/student',
   },
   {
@@ -19,9 +19,9 @@ const ROLES = [
     icon: '👨‍👩‍👧',
     title: 'Veli Girişi',
     desc: 'Çocuğunun performansını, streak ve ödev durumunu takip et',
-    color: '#1ECFB8',
-    bg: 'rgba(30,207,184,0.06)',
-    border: 'rgba(30,207,184,0.3)',
+    color: '#a14b36',
+    bg: '#fae4da',
+    border: '#efc8b8',
     href: '/login/parent',
   },
   {
@@ -29,9 +29,9 @@ const ROLES = [
     icon: '🎓',
     title: 'Öğretmen Girişi',
     desc: 'Sınıf yönetimi, ödev atama, öğrenci analizi ve raporlar',
-    color: '#7c3aed',
-    bg: 'rgba(124,58,237,0.06)',
-    border: 'rgba(124,58,237,0.25)',
+    color: '#78531b',
+    bg: '#fff0c8',
+    border: '#eddaa3',
     href: '/login/teacher',
   },
   {
@@ -39,9 +39,9 @@ const ROLES = [
     icon: '🏛️',
     title: 'Kurum Girişi',
     desc: 'Kurumunuza bağlı öğrencilerin genel durumunu izleyin',
-    color: '#d97706',
-    bg: 'rgba(217,119,6,0.06)',
-    border: 'rgba(217,119,6,0.25)',
+    color: '#55506b',
+    bg: '#eceaf3',
+    border: '#d8d3e6',
     href: '/login/institution',
   },
 ]
@@ -51,21 +51,23 @@ function LoginSelectContent() {
   const next = searchParams.get('next')
   const withNext = (href: string) => next ? `${href}?next=${encodeURIComponent(next)}` : href
   return (
-    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
-      <div style={{ width: '100%', maxWidth: '440px' }}>
+    <main className="auth-select-page">
+      <div className="auth-select-shell">
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }} className="anim-up">
           <Link href="/" style={{ textDecoration: 'none', display: 'inline-block' }}>
             <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '72px', width: 'auto' }} />
           </Link>
+          <div className="warm-badge" style={{ marginTop: '18px' }}>Tekrar hoş geldin</div>
+          <h1>Nasıl devam etmek istersin?</h1>
           <p style={{ fontSize: '14px', color: 'var(--text3)', marginTop: '8px' }}>
-            Nasıl giriş yapmak istersiniz?
+            Sana uygun çalışma alanını seç.
           </p>
         </div>
 
         {/* Rol kartları */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }} className="anim-up-1">
+        <div className="auth-role-grid anim-up-1">
           {ROLES.map(role => (
             <Link key={role.key} href={withNext(role.href)}
               style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 20px', borderRadius: '16px', border: `1.5px solid ${role.border}`, background: role.bg, textDecoration: 'none', transition: 'all 0.15s' }}
