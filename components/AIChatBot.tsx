@@ -341,6 +341,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
 
       {/* FAB */}
       <button
+        className={`prati-launcher${open ? ' is-open' : ''}`}
         onClick={() => { setOpen(v => !v); setUnread(0); setBubbleDismissed(true) }}
         style={{
           position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999,
@@ -359,7 +360,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
       >
         {open
           ? <span style={{ fontSize: '28px', color: '#fff' }}>×</span>
-          : <img src="/mascot-prati.svg" alt="Prati" style={{ width: '100%', height: '100%', animation: 'botFloat 2.6s ease-in-out infinite' }} />
+          : <span className="prati-mascot-live"><img src="/mascot-prati-cute.svg" alt="Prati" /></span>
         }
         {!open && unread > 0 && (
           <span style={{ position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#FDD31D', color: '#082465', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
@@ -381,6 +382,19 @@ export default function AIChatBot({ isGuest = false }: Props) {
           0%, 100% { transform: translateY(0) rotate(0deg); }
           50% { transform: translateY(-5px) rotate(-3deg); }
         }
+        .prati-launcher:not(.is-open)::before,
+        .prati-launcher:not(.is-open)::after {
+          content: ''; position: absolute; inset: -7px; border: 2px solid rgba(30,207,184,.34);
+          border-radius: 50%; pointer-events: none; animation: pratiPulse 2.8s ease-out infinite;
+        }
+        .prati-launcher:not(.is-open)::after { animation-delay: 1.4s; }
+        .prati-mascot-live { width: 100%; height: 100%; display: grid; place-items: center; animation: pratiFloat 3.2s ease-in-out infinite; transform-origin: 50% 88%; }
+        .prati-mascot-live img { width: 100%; height: 100%; object-fit: contain; }
+        .prati-launcher:hover .prati-mascot-live { animation: pratiHello .72s ease-in-out; }
+        @keyframes pratiFloat { 0%,100%{transform:translateY(1px) rotate(-1deg)} 45%{transform:translateY(-7px) rotate(2deg)} 55%{transform:translateY(-7px) rotate(1deg)} }
+        @keyframes pratiHello { 0%,100%{transform:translateY(0) rotate(0) scale(1)} 30%{transform:translateY(-7px) rotate(-7deg) scale(1.06)} 60%{transform:translateY(-4px) rotate(7deg) scale(1.04)} }
+        @keyframes pratiPulse { 0%{opacity:.72;transform:scale(.88)} 75%,100%{opacity:0;transform:scale(1.18)} }
+        @media (prefers-reduced-motion: reduce) { .prati-mascot-live,.prati-launcher::before,.prati-launcher::after{animation:none!important} }
       `}</style>
     </>
   )
