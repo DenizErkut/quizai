@@ -15,7 +15,7 @@ export interface SubjectPerformanceDatum {
 }
 
 function pctColor(p: number): string {
-  return p >= 80 ? '#10b981' : p >= 50 ? '#f59e0b' : '#ef4444'
+  return p >= 80 ? '#3f725f' : p >= 50 ? '#f2b94b' : '#df5c3f'
 }
 
 export default function SubjectPerformanceChart({
@@ -28,17 +28,17 @@ export default function SubjectPerformanceChart({
   if (!data.length) return null
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={data} margin={{ top: 8, right: 12, left: -20, bottom: 8 }}>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-        <XAxis dataKey="subject" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={50} />
-        <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={(v) => `%${v}`} />
+      <BarChart data={data} margin={{ top: 12, right: 12, left: -20, bottom: 8 }}>
+        <CartesianGrid strokeDasharray="4 5" vertical={false} stroke="var(--border)" />
+        <XAxis dataKey="subject" tick={{ fontSize: 11, fill: 'var(--text3)' }} axisLine={false} tickLine={false} interval={0} angle={-15} textAnchor="end" height={50} />
+        <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--text3)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `%${v}`} />
         <Tooltip
           formatter={(value: any, _name: any, props: any) => [
             `%${value}${props?.payload?.testCount ? ` (${props.payload.testCount} test)` : ''}`,
             'Ortalama',
           ]}
         />
-        <Bar dataKey="avgPct" radius={[6, 6, 0, 0]}>
+        <Bar dataKey="avgPct" radius={[9, 9, 2, 2]} maxBarSize={48}>
           {data.map((d, i) => <Cell key={i} fill={pctColor(d.avgPct)} />)}
         </Bar>
       </BarChart>
