@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { printPage } from '@/lib/print-page'
 
 interface ReportStudent {
   id: string
@@ -63,8 +64,8 @@ export default function StudentReportTable({ fetchEndpoint }: { fetchEndpoint: s
   const hasClassroomCol = filtered.some(s => s.classroomName)
 
   return (
-    <div>
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+    <div data-print-content data-print-title="Öğrenci Raporları" className="print-report-surface">
+      <div className="print-controls" style={{ display: 'flex', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
         {data.imports.length > 0 && (
           <select className="input" style={{ maxWidth: '260px' }} value={importId}
             onChange={e => { setImportId(e.target.value); load({ importId: e.target.value }) }}>
@@ -83,7 +84,7 @@ export default function StudentReportTable({ fetchEndpoint }: { fetchEndpoint: s
           </select>
         )}
         <input className="input" placeholder="İsimle ara…" value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: '200px' }} />
-        <button className="btn btn-sm" style={{ marginLeft: 'auto' }} onClick={() => window.print()}>🖨️ Yazdır</button>
+        <button className="btn btn-sm" style={{ marginLeft: 'auto' }} onClick={() => printPage()}>🖨️ Yazdır</button>
       </div>
 
       {data.imports.length === 0 && (
@@ -92,7 +93,7 @@ export default function StudentReportTable({ fetchEndpoint }: { fetchEndpoint: s
         </p>
       )}
 
-      <div style={{ overflowX: 'auto' }}>
+      <div className="print-table-wrap" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
           <thead>
             <tr style={{ background: 'var(--bg2)' }}>

@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import SubjectPerformanceChart from '@/components/SubjectPerformanceChart'
+import { printPage } from '@/lib/print-page'
 
 interface SectionalCell {
   importedGrade: string | null
@@ -86,8 +87,8 @@ export default function SectionalReportTable({ fetchEndpoint }: { fetchEndpoint:
     .filter((x): x is { subject: string; avgPct: number; testCount: number } => x != null)
 
   return (
-    <div>
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+    <div data-print-content data-print-title="Ders Bazlı Rapor" className="print-report-surface">
+      <div className="print-controls" style={{ display: 'flex', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
         {data.imports.length > 0 && (
           <select className="input" style={{ maxWidth: '260px' }} value={importId}
             onChange={e => { setImportId(e.target.value); load({ importId: e.target.value }) }}>
@@ -104,7 +105,7 @@ export default function SectionalReportTable({ fetchEndpoint }: { fetchEndpoint:
           </select>
         )}
         <input className="input" placeholder="İsimle ara…" value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: '200px' }} />
-        <button className="btn btn-sm" style={{ marginLeft: 'auto' }} onClick={() => window.print()}>🖨️ Yazdır</button>
+        <button className="btn btn-sm" style={{ marginLeft: 'auto' }} onClick={() => printPage()}>🖨️ Yazdır</button>
       </div>
 
       <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px' }}>
@@ -121,7 +122,7 @@ export default function SectionalReportTable({ fetchEndpoint }: { fetchEndpoint:
         </div>
       )}
 
-      <div style={{ overflowX: 'auto' }}>
+      <div className="print-table-wrap" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
           <thead>
             <tr style={{ background: 'var(--bg2)' }}>

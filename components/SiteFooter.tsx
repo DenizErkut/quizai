@@ -18,6 +18,7 @@ export default function SiteFooter() {
     { href: '/ozel-kocluk', label: 'Özel Koçluk' },
     { href: '/pricing', label: 'Planlar' },
     { href: '/privacy', label: 'Gizlilik' },
+    { href: '/cookie-policy', label: 'Çerez Politikası' },
     { href: '/terms', label: 'Kullanım Şartları' },
     { href: '/mesafeli-satis', label: 'Mesafeli Satış Sözleşmesi' },
     { href: '/teslimat-iade', label: 'Teslimat ve İade' },

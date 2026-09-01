@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { resolveName } from '@/lib/identity/resolve-client'
+import { printPage } from '@/lib/print-page'
 
 interface PlanWeek {
   week: number
@@ -415,7 +416,7 @@ export default function PlanPage() {
             </button>
           </div>
         ) : (
-          <div className="anim-up-2">
+          <div className="anim-up-2 print-plan-surface" data-print-content data-print-title="4 Haftalık Çalışma Planı">
             {/* Plan özeti */}
             <div className="card" style={{ marginBottom: '1rem', borderLeft: '3px solid var(--accent)' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
@@ -494,7 +495,7 @@ export default function PlanPage() {
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '8px', marginTop: '1rem' }}>
+            <div className="print-controls" style={{ display: 'flex', gap: '8px', marginTop: '1rem' }}>
               <button className="btn btn-sm" onClick={generatePlan} disabled={generating}
                 style={{ flex: 1, justifyContent: 'center' }}>
                 {generating ? 'Yenileniyor...' : '↺ Planı yenile'}
@@ -503,7 +504,7 @@ export default function PlanPage() {
                 style={{ flex: 1, justifyContent: 'center', color: 'var(--accent)', borderColor: 'rgba(91,76,245,0.3)' }}>
                 📄 PDF indir
               </button>
-              <button className="btn btn-sm" onClick={() => window.print()}
+              <button className="btn btn-sm" onClick={() => printPage({ orientation: 'portrait' })}
                 style={{ justifyContent: 'center', color: 'var(--text2)' }}>
                 🖨️
               </button>

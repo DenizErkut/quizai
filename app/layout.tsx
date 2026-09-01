@@ -6,6 +6,7 @@ import { UserProvider } from '@/lib/user-context'
 import AIChatBot from '@/components/AIChatBot'
 import PWAInstallBanner from '@/components/PWAInstallBanner'
 import ConsentGate from '@/components/ConsentGate'
+import CookieConsent from '@/components/CookieConsent'
 
 export const metadata: Metadata = {
   title: 'Pratium — Öğren. Test Et. Geliş.',
@@ -128,6 +129,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
           {/* Madde 7: sözleşme/rıza versiyonu değiştiğinde yeniden-onay modalı */}
           <ConsentGate />
+          <CookieConsent />
         </UserProvider>
         <AIChatBot />
       </body>

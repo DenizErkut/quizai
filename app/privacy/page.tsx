@@ -74,7 +74,7 @@ export default function PrivacyPage() {
           },
           {
             title: '8. Çerez (Cookie) Politikası',
-            content: 'Pratium, platform işlevselliği için zorunlu oturum çerezleri kullanmaktadır. Üçüncü taraf izleme veya reklam çerezleri kullanılmamaktadır.',
+            content: 'Pratium, platform işlevselliği için zorunlu oturum çerezleri kullanmaktadır. Analiz ve kişiselleştirme teknolojileri yalnızca tercihinize bağlı olarak kullanılabilir. Ayrıntılar ve tercih yönetimi için Çerez Politikası sayfasını inceleyebilirsiniz.',
           },
           {
             title: '9. Veri Güvenliği',

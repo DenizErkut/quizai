@@ -21,6 +21,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/pricing`, lastModified: now, changeFrequency: 'monthly', priority: 0.9 },
     { url: `${base}/ozel-kocluk`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${base}/privacy`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${base}/cookie-policy`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
     { url: `${base}/terms`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
     { url: `${base}/mesafeli-satis`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
     { url: `${base}/teslimat-iade`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
