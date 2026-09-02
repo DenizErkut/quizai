@@ -825,12 +825,10 @@ export async function POST(req: NextRequest) {
       ])
       gradeContext += buildStudentHistoryContext(mastery, patterns)
 
-      // Faz 10 (Learning Graph) — proof-of-concept: sadece roadmap'in kendi
-      // örneği olan birkaç Matematik konusu için (bkz. lib/learning-graph.ts)
-      // ön koşul kontrolü yapılıyor. Diğer konularda bulunamaması beklenen
-      // ve normal bir durum, hata değil.
+      // Learning Graph v1: yalnızca admin tarafından doğrulanmış ön koşul
+      // ilişkileri öğrenci mastery sinyaliyle birlikte prompt'a eklenir.
       try {
-        const gaps = await findPrerequisiteGaps(supabase, user.id, topic)
+        const gaps = await findPrerequisiteGaps(supabase, user.id, topic, subject)
         gradeContext += buildPrerequisiteContext(gaps)
       } catch { /* opsiyonel bağlam, hata olursa sessiz geç */ }
     } catch { /* öğrenci geçmişi opsiyonel bağlam, hata olursa sessiz geç */ }

@@ -72,20 +72,20 @@ export async function PATCH(req: NextRequest) {
     ? editedPrerequisiteTopic.trim() : draft.prerequisite_topic
 
   if (action === 'approve') {
-    // topic_prerequisites tablosunda subject NOT NULL — draft'ın kendi
-    // subject'ini taşıyoruz (gerçek tabloda grade/level kolonu yok,
-    // sadece subject/topic/prerequisite_topic; bkz. 20260812104651
-    // create_topic_prerequisites migration'ı).
-    const { error: insErr } = await adminDb.from('topic_prerequisites').insert({
-      subject: draft.subject,
-      topic: finalTopic,
-      prerequisite_topic: finalPrereq,
+    // Draft durumu, typed graph edge'i ve legacy uyumluluk satırı tek bir
+    // veritabanı transaction'ında yayınlanır; yarım onay oluşamaz.
+    const { data: edgeId, error: approveErr } = await adminDb.rpc('approve_learning_graph_draft', {
+      p_draft_id: id,
+      p_reviewer_id: user.id,
+      p_topic: finalTopic,
+      p_prerequisite_topic: finalPrereq,
     })
-    if (insErr) return NextResponse.json({ error: `topic_prerequisites yazma hatası: ${insErr.message}` }, { status: 500 })
+    if (approveErr) return NextResponse.json({ error: approveErr.message }, { status: 500 })
+    return NextResponse.json({ success: true, edgeId })
   }
 
   const { error: updErr } = await adminDb.from('topic_prerequisites_draft').update({
-    status: action === 'approve' ? 'approved' : 'rejected',
+    status: 'rejected',
     topic: finalTopic,
     prerequisite_topic: finalPrereq,
     reviewed_by: user.id,

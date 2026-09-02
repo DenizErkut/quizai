@@ -1,18 +1,10 @@
 // lib/learning-graph.ts
-// Faz 10 (Learning Graph) — roadmap karşılaştırma raporunun istediği
-// dönüşüm: "Bu soruyu yanlış yaptı" demekten çıkıp "Bu öğrencinin bu
-// kazanımı öğrenebilmesi için önce şu ön koşul kazanımını güçlendirmesi
-// gerekiyor" diyebilmek.
-//
-// ÖNEMLİ KAPSAM NOTU: Bu, TÜM MEB müfredatını kapsayan bir taksonomi
-// DEĞİL — böyle bir taksonomi gerçek eğitim uzmanlığı gerektiren, ayrı
-// ve çok daha büyük bir içerik projesi (meb-search'ün kurulumuna benzer
-// ölçekte). Burada sadece roadmap dokümanının kendi örnek diyagramındaki
-// (Kesirler/Ondalık Sayılar) ilişkiler, PROOF-OF-CONCEPT olarak
-// `topic_prerequisites` tablosuna girildi. Bu konular dışında bir konu
-// için hiçbir ön koşul bulunamayacak (bu beklenen bir durum, hata değil).
+// Learning Graph v1: onaylı ön koşul ilişkilerini typed node/edge grafından
+// okuyup öğrencinin event-tabanlı mastery durumuyla birleştirir. Şema bütün
+// aktif müfredat konularını düğüm olarak taşır; ilişkiler ise eğitim uzmanı /
+// admin onayı olmadan yayımlanmaz.
 import { SupabaseClient } from '@supabase/supabase-js'
-import { computeTopicMastery, TopicMastery } from './mastery'
+import { getTopicMastery, TopicMastery } from './mastery'
 
 export interface PrerequisiteGap {
   topic: string
@@ -20,32 +12,52 @@ export interface PrerequisiteGap {
   prerequisiteMastery: TopicMastery | null // null: öğrenci bu ön koşulu hiç denememiş
 }
 
-// Bir konudaki performansa bakmadan önce, o konunun KAYITLI ön koşullarında
-// (topic_prerequisites) da öğrencinin zayıf olup olmadığını kontrol eder.
+interface GraphNodeId { id: string }
+interface GraphEdgeSource { source_node_id: string }
+interface GraphNodeLabel { label: string }
+interface LegacyPrerequisite { prerequisite_topic: string }
+
+// Bir konudaki performansa bakmadan önce, o konunun doğrulanmış ön
+// koşullarında öğrencinin zayıf olup olmadığını kontrol eder.
 export async function findPrerequisiteGaps(
   supabase: SupabaseClient,
   userId: string,
-  topic: string
+  topic: string,
+  subject?: string
 ): Promise<PrerequisiteGap[]> {
-  const { data: prereqRows } = await supabase
-    .from('topic_prerequisites')
-    .select('prerequisite_topic')
-    .ilike('topic', topic)
+  let nodeQuery = supabase.from('learning_graph_nodes')
+    .select('id').eq('node_type', 'topic').ilike('label', topic).eq('is_active', true)
+  if (subject) nodeQuery = nodeQuery.ilike('subject', subject)
+  const { data: targetNodes } = await nodeQuery
 
-  if (!prereqRows?.length) return []
+  let prereqTopics: string[] = []
+  if (targetNodes?.length) {
+    const { data: edges } = await supabase.from('learning_graph_edges')
+      .select('source_node_id').eq('edge_type', 'prerequisite_of').eq('is_verified', true)
+      .in('target_node_id', (targetNodes as GraphNodeId[]).map(n => n.id))
+    if (edges?.length) {
+      const { data: nodes } = await supabase.from('learning_graph_nodes')
+        .select('label').in('id', (edges as GraphEdgeSource[]).map(e => e.source_node_id)).eq('is_active', true)
+      prereqTopics = [...new Set(((nodes ?? []) as GraphNodeLabel[]).map(n => n.label))]
+    }
+  }
 
-  const prereqTopics = [...new Set(prereqRows.map((r: any) => r.prerequisite_topic))] as string[]
-  const { data: masteryRows } = await supabase
-    .from('weak_topics')
-    .select('topic, wrong_count, total_count, last_seen_at')
-    .eq('user_id', userId)
-    .in('topic', prereqTopics)
+  // Migration henüz ulaşmamış ortamlarda eski davranışı koru.
+  if (!prereqTopics.length) {
+    let legacyQuery = supabase.from('topic_prerequisites')
+      .select('prerequisite_topic').ilike('topic', topic)
+    if (subject) legacyQuery = legacyQuery.ilike('subject', subject)
+    const { data: legacyRows } = await legacyQuery
+    prereqTopics = [...new Set(((legacyRows ?? []) as LegacyPrerequisite[]).map(r => r.prerequisite_topic))]
+  }
 
-  const masteryByTopic = new Map<string, TopicMastery>()
-  ;(masteryRows ?? []).forEach((r: any) => masteryByTopic.set(r.topic, computeTopicMastery(r)))
+  if (!prereqTopics.length) return []
+  const masteryValues = await Promise.all(
+    prereqTopics.map(prerequisiteTopic => getTopicMastery(supabase, userId, prerequisiteTopic))
+  )
 
   return prereqTopics
-    .map((pt: string) => ({ topic, prerequisiteTopic: pt, prerequisiteMastery: masteryByTopic.get(pt) || null }))
+    .map((pt: string, index: number) => ({ topic, prerequisiteTopic: pt, prerequisiteMastery: masteryValues[index] }))
     // Ön koşulda hiç veri yoksa (öğrenci hiç denememiş) ya da mastery
     // düşükse (<60) bunu bir "boşluk" olarak işaretle.
     .filter((g: PrerequisiteGap) => !g.prerequisiteMastery || g.prerequisiteMastery.masteryScore < 60)
