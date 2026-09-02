@@ -76,6 +76,46 @@ export async function getTopicMastery(
   userId: string,
   topic: string
 ): Promise<TopicMastery | null> {
+  // Faz 1 rollout: prefer the event-backed materialized state. If migration
+  // 012 has not reached an environment yet (or no event exists for this
+  // topic), preserve existing behavior by falling back to weak_topics.
+  const { data: eventMastery } = await supabase
+    .from('student_mastery')
+    .select('topic, mastery_score, confidence_score, retention_score, attempt_count, correct_count, last_practiced_at')
+    .eq('student_id', userId)
+    .eq('learning_objective_key', '')
+    .ilike('topic', topic)
+    .order('last_mastery_update', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (eventMastery) {
+    const row = eventMastery as any
+    const confidence: Confidence = row.confidence_score < 0.3
+      ? 'düşük'
+      : row.confidence_score < 0.65 ? 'orta' : 'yüksek'
+    const daysSinceLastSeen = row.last_practiced_at
+      ? Math.max(0, Math.floor((Date.now() - new Date(row.last_practiced_at).getTime()) / 86_400_000))
+      : null
+    const masteryScore = Math.round(Number(row.mastery_score))
+    const decayThresholdDays = masteryScore >= 80 ? 30 : masteryScore >= 50 ? 14 : 7
+    const forgettingRisk: Risk = daysSinceLastSeen === null
+      ? 'düşük'
+      : daysSinceLastSeen > decayThresholdDays * 2
+        ? 'yüksek'
+        : daysSinceLastSeen > decayThresholdDays ? 'orta' : 'düşük'
+
+    return {
+      topic: row.topic,
+      masteryScore,
+      confidence,
+      forgettingRisk,
+      daysSinceLastSeen,
+      wrongCount: Math.max(0, row.attempt_count - row.correct_count),
+      totalCount: row.attempt_count,
+    }
+  }
+
   const { data } = await supabase
     .from('weak_topics')
     .select('topic, wrong_count, total_count, last_seen_at')

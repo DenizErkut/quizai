@@ -5,6 +5,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { generateQuizFallback } from '@/lib/openai'
 import { createClient } from '@supabase/supabase-js'
 import { getTopicMastery, computeErrorPatterns, buildStudentHistoryContext } from '@/lib/mastery'
+import { recordQuizLearningEvents } from '@/lib/learning-events'
 import { findPrerequisiteGaps, buildPrerequisiteContext } from '@/lib/learning-graph'
 import { startingDifficultyFromMastery } from '@/lib/adaptive-difficulty'
 
@@ -1223,6 +1224,10 @@ export async function PATCH(req: NextRequest) {
       .update({ answers, score, pct, completed: true })
       .eq('id', sessionId)
       .eq('user_id', user.id)
+
+    // Legacy PATCH clients feed the same idempotent Faz 1 projection as the
+    // canonical save route, so both completion paths produce identical data.
+    await recordQuizLearningEvents(supabase, user.id, sessionId)
 
     const today = new Date().toISOString().split('T')[0]
     const { data: streak } = await supabase.from('streaks').select('*').eq('user_id', user.id).single()

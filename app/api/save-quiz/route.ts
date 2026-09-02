@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { checkAndNotifyRiskyTopic } from '@/lib/parent-risk-alert'
+import { recordQuizLearningEvents } from '@/lib/learning-events'
 // NEXT_PUBLIC_SUPABASE_ANON_KEY used for auth verification
 
 export const maxDuration = 30
@@ -42,6 +43,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 })
     }
 
+    if (session.user_id !== userId) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+    }
+
     const pct = session.question_count > 0
       ? Math.round((score / session.question_count) * 100) : 0
 
@@ -58,6 +63,11 @@ export async function POST(req: NextRequest) {
       console.error('[save-quiz] update ERROR:', updateError.message, updateError.code)
       return NextResponse.json({ error: 'DB update failed', detail: updateError.message }, { status: 500 })
     }
+
+    // Faz 1 dual-write: immutable events + rebuildable mastery state. The RPC
+    // is idempotent, and rollout failures must not make an already-completed
+    // quiz look failed to the student.
+    await recordQuizLearningEvents(supabase, userId, sessionId)
 
     // Streak güncelle
     const today = new Date().toISOString().split('T')[0]

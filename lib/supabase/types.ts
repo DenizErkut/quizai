@@ -204,6 +204,61 @@ export type Database = {
           last_seen_at?: string
         }
       }
+      learning_events: {
+        Row: {
+          id: string
+          student_id: string
+          institution_id: string | null
+          class_id: string | null
+          subject: string
+          grade: string | null
+          topic: string
+          learning_objective_id: string | null
+          question_id: string | null
+          question_index: number
+          question_type: string | null
+          difficulty: string | null
+          difficulty_weight: number
+          result: 'correct' | 'incorrect' | 'skipped'
+          score: number
+          max_score: number
+          response_time_ms: number | null
+          attempt_count: number
+          hint_used: boolean
+          misconception_id: string | null
+          confidence: number | null
+          source_type: string
+          source_id: string
+          assignment_id: string | null
+          occurred_at: string
+          created_at: string
+          metadata: Json
+        }
+        Insert: Record<string, never>
+        Update: Record<string, never>
+      }
+      student_mastery: {
+        Row: {
+          id: string
+          student_id: string
+          subject: string
+          topic: string
+          learning_objective_id: string | null
+          learning_objective_key: string
+          mastery_score: number
+          confidence_score: number
+          retention_score: number
+          attempt_count: number
+          correct_count: number
+          trend: 'improving' | 'stable' | 'declining'
+          last_practiced_at: string | null
+          last_mastery_update: string
+          primary_misconception_id: string | null
+          algorithm_version: string
+        }
+        Insert: Record<string, never>
+        Update: Record<string, never>
+      }
       api_rate_limits: {
         Row: {
           id: string
@@ -410,6 +465,10 @@ export type Database = {
       get_dashboard_stats: {
         Args: { p_user_id: string }
         Returns: Json
+      }
+      record_quiz_learning_events: {
+        Args: { p_student_id: string; p_session_id: string }
+        Returns: { inserted_events: number; updated_mastery_rows: number }[]
       }
     }
     Enums: Record<string, never>
