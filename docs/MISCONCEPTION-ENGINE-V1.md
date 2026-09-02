@@ -22,6 +22,11 @@ Pratium artık yanlış cevabı yalnızca konu istatistiği olarak değil, yanl�
 5. Mastery son sinyali alır; Student Learning Profile'ın `known` listesine
    yalnızca doğrulanma eşiğine ulaşmış yanılgılar girer.
 
+Model tek `null` işaretini yanlış indekse koyarsa ve doğru seçenek üzerinde
+bir etiket bırakırsa, üretim ve kayıt katmanları bu iki alanı güvenli biçimde
+yer değiştirir. Daha karmaşık bozuk metadata'da doğru seçenek her koşulda
+temizlenir; çıkarılamayan yanlış seçenek için kanıt üretilmez.
+
 ## Sınırlar
 
 Bu sürüm davranışsal bir hipotez üretir; psikolojik veya klinik teşhis üretmez.

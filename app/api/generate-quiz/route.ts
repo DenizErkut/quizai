@@ -7,7 +7,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getTopicMastery, computeErrorPatterns, buildStudentHistoryContext } from '@/lib/mastery'
 import { recordQuizLearningEvents } from '@/lib/learning-events'
 import { findPrerequisiteGaps, buildPrerequisiteContext } from '@/lib/learning-graph'
-import { misconceptionMetadataInstruction } from '@/lib/misconceptions'
+import { misconceptionMetadataInstruction, normalizeQuestionMisconceptions } from '@/lib/misconceptions'
 import { startingDifficultyFromMastery } from '@/lib/adaptive-difficulty'
 
 const anthropic = new Anthropic()
@@ -1124,7 +1124,7 @@ export async function POST(req: NextRequest) {
       ? subject.trim()
       : 'Genel'
     questions = questions.map((q: any) => ({
-      ...q,
+      ...normalizeQuestionMisconceptions(q),
       subject: canonicalSubject,
       difficulty: resolvedDifficulty,
     }))
