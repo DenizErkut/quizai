@@ -71,3 +71,25 @@ olmayan “tercih edilen anlatım biçimi” gibi alanlar tahmin edilmez.
 - Canlı veritabanı şeması bu repoda tam migration geçmişi olarak tutulmuyor.
   UUID foreign key'leri ve `quiz_sessions` kolonları staging şemasıyla
   doğrulanmadan production'a uygulanmamalıdır.
+
+## Aşama 0.5 — Historical Data Migration & Taxonomy Normalization
+
+Ana roadmap'teki **Sprint 0.4 — Backfill Strategy**, uygulanabilir bir teslimat
+olarak bu aşamada tamamlanır:
+
+1. Konu adları boşluk ve harf büyüklüğünden bağımsız bir alias anahtarıyla
+   eşleştirilir; anlamsal olarak farklı konular otomatik birleştirilmez.
+2. Ders eşlemesi yalnızca açık veya incelenmiş alias kayıtlarından alınır.
+3. Eski `quiz_sessions` satırları küçük partiler hâlinde `learning_events`e
+   aktarılır; kaynak test ve cevap JSON'u değiştirilmez.
+4. Event benzersizlik kısıtı yeniden çalıştırmayı güvenli kılar.
+5. Tarihsel olayların `occurred_at` değeri testin `created_at` zamanıdır;
+   aktarım zamanı değildir.
+6. Backfill sonrasında mastery, learning profile ve recommendation türetilmiş
+   verileri olay günlüğünden yeniden hesaplanır.
+7. Her parti; beklenen soru sayısı, üretilen event sayısı, doğru/yanlış toplamı
+   ve eşleşmeyen oturumlar açısından doğrulanır.
+
+Uygulama: `scripts/019_historical_learning_event_backfill_taxonomy.sql`.
+Taksonomi tablosundaki `candidate` kayıtlar içerik ekibi onayı olmadan müfredat
+otoritesi olarak kabul edilmemelidir.
