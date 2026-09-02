@@ -5,6 +5,15 @@ yeni katman ekler:
 
 - `learning_events`: Öğrencinin soru bazındaki ham ve değişmez öğrenme kanıtı.
 - `student_mastery`: Bu kanıttan tekrar üretilebilen güncel öğrenci durumu.
+- `student_learning_profiles`: Mastery ve event kanıtından otomatik türeyen,
+  PII içermeyen merkezi akademik profil.
+
+## Student Learning Profile v1
+
+Her mastery güncellemesinden sonra profil otomatik yenilenir. Profil; güçlü,
+zayıf ve tekrar zamanı gelmiş konuları, ders özetlerini, bilinen misconception
+kimliklerini, genel trendi ve kanıta dayalı öğrenme hızını içerir. Henüz ölçümü
+olmayan “tercih edilen anlatım biçimi” gibi alanlar tahmin edilmez.
 
 ## Veri akışı
 

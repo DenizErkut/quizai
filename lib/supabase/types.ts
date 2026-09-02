@@ -259,6 +259,25 @@ export type Database = {
         Insert: Record<string, never>
         Update: Record<string, never>
       }
+      student_learning_profiles: {
+        Row: {
+          student_id: string
+          grade: string | null
+          strong_topics: Json
+          weak_topics: Json
+          review_topics: Json
+          known_misconceptions: Json
+          subject_summary: Json
+          learning_pace: 'unknown' | 'fast' | 'medium' | 'deliberate'
+          recent_trend: 'improving' | 'stable' | 'declining'
+          evidence_event_count: number
+          mastery_dimension_count: number
+          profile_version: string
+          updated_at: string
+        }
+        Insert: Record<string, never>
+        Update: Record<string, never>
+      }
       api_rate_limits: {
         Row: {
           id: string
@@ -469,6 +488,10 @@ export type Database = {
       record_quiz_learning_events: {
         Args: { p_student_id: string; p_session_id: string }
         Returns: { inserted_events: number; updated_mastery_rows: number }[]
+      }
+      refresh_student_learning_profile: {
+        Args: { p_student_id: string }
+        Returns: undefined
       }
     }
     Enums: Record<string, never>
