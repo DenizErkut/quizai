@@ -50,6 +50,11 @@ yeni katman ekler:
   Bu nedenle v1 konu düzeyinde çalışır; alanlar gelecekteki taksonomi için hazırdır.
 - `institution_id`, `class_id`, `assignment_id`, ipucu ve misconception alanları
   mevcut quiz payload'ında bulunmadığında boş kalır.
+- Quiz üretimi her soruya sunucu tarafından doğrulanmış `subject` ve o adaptif
+  parçanın gerçek `resolvedDifficulty` değerini yazar. Böylece farklı zorlukta
+  iki parça içeren tek oturum doğru ağırlıklarla eventlere dönüşür.
+- Mevcut `curriculum` modeli yalnızca konu adı dizileri tutar; güvenilir MEB
+  kazanım kodu bulunmadığı için `learning_objective_id` uydurulmaz ve boş kalır.
 - Geçmiş oturumlar otomatik backfill edilmez. Ayrı, gözlemlenebilir ve parti
   bazlı bir backfill yapılmalıdır; canlı migration içinde uzun tarama yapılmaz.
 - `weak_topics` tekrar kayıtta çift sayılmaya açıktır. Yeni veri idempotenttir;

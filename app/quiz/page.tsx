@@ -70,6 +70,7 @@ async function fetchQuizTopup(params: {
   language: string
   questionType: string
   includeVisuals: boolean
+  difficulty: DifficultyValue
   sessionId: string
   missing: number
   existingTexts: string[]
@@ -82,7 +83,7 @@ async function fetchQuizTopup(params: {
       body: JSON.stringify({
         topic: params.topic,
         questionCount: params.missing,
-        difficulty: 'auto',
+        difficulty: params.difficulty,
         language: params.language,
         questionType: params.questionType,
         includeVisuals: params.includeVisuals,
@@ -537,6 +538,7 @@ function QuizPageContent() {
           const { data: { session: freshSession } } = await supabase.auth.getSession()
           const extra = await fetchQuizTopup({
             topic, subject: selectedSubject || undefined, language: lang, questionType, includeVisuals,
+            difficulty: (data.resolvedDifficulty || 'normal') as DifficultyValue,
             sessionId: data.sessionId, missing: firstChunkSize - collected.length,
             existingTexts: collected.map((q: any) => q.q).filter(Boolean),
             accessToken: freshSession?.access_token,
@@ -847,6 +849,7 @@ function QuizPageContent() {
             const { data: { session: freshSession } } = await supabase.auth.getSession()
             const extra = await fetchQuizTopup({
               topic, subject: selectedSubject || undefined, language: currentLang, questionType, includeVisuals,
+              difficulty: nextDiff,
               sessionId, missing: targetSecondChunk - secondChunk.length,
               existingTexts: [...excludeTexts, ...secondChunk.map((q: any) => q.q).filter(Boolean)],
               accessToken: freshSession?.access_token,

@@ -1115,6 +1115,19 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Learning Data Standard: these fields come from trusted request/session
+    // context, not from the model. Persist them per question because adaptive
+    // sessions may contain chunks at different difficulty levels. The event
+    // projection reads this metadata when the completed quiz is recorded.
+    const canonicalSubject = typeof subject === 'string' && subject.trim()
+      ? subject.trim()
+      : 'Genel'
+    questions = questions.map((q: any) => ({
+      ...q,
+      subject: canonicalSubject,
+      difficulty: resolvedDifficulty,
+    }))
+
     // continueSessionId: adaptif akışta ikinci/sonraki parça — aynı testin
     // devamı, YENİ bir test değil. Bu yüzden kota (monthly_test_count) TEKRAR
     // artırılmıyor ve DB'ye ayrı bir session satırı yazılmıyor; mevcut
