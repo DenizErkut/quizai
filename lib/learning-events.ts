@@ -39,6 +39,14 @@ export async function recordQuizLearningEvents(
   }
   const misconceptionRow = Array.isArray(misconceptionData) ? misconceptionData[0] : misconceptionData
 
+  const { error: recommendationError } = await supabase.rpc(
+    'refresh_student_recommendations',
+    { p_student_id: studentId }
+  )
+  if (recommendationError && recommendationError.code !== 'PGRST202') {
+    console.error('[recommendations] refresh failed:', recommendationError.message)
+  }
+
   return {
     insertedEvents: Number(row?.inserted_events ?? 0),
     updatedMasteryRows: Number(row?.updated_mastery_rows ?? 0),

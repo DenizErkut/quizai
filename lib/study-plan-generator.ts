@@ -19,6 +19,7 @@ export interface AutonomousGoal {
   masteryScore: number
   forgettingRisk: string
   reason: string
+  actionType?: string
 }
 
 // weak_topics'teki TÜM konuları mastery skoruna göre değerlendirip en
@@ -28,6 +29,27 @@ export async function computeAutonomousGoals(
   userId: string,
   maxGoals = 4
 ): Promise<AutonomousGoal[]> {
+  // Recommendation Engine v1 is the primary decision source. Environments
+  // where migration 017 is not live continue through the weak_topics fallback.
+  const { data: recommendations } = await supabase
+    .from('student_recommendations')
+    .select('topic, action_type, reason, evidence, priority_score')
+    .eq('student_id', userId)
+    .eq('status', 'active')
+    .gt('valid_until', new Date().toISOString())
+    .order('priority_score', { ascending: false })
+    .limit(maxGoals)
+
+  if (recommendations?.length) {
+    return recommendations.map((row: any) => ({
+      topic: row.topic,
+      masteryScore: Number(row.evidence?.masteryScore ?? row.evidence?.prerequisiteMastery ?? 0),
+      forgettingRisk: row.action_type === 'spaced_review' ? 'yüksek' : 'düşük',
+      reason: row.reason,
+      actionType: row.action_type,
+    }))
+  }
+
   const { data: rows } = await supabase
     .from('weak_topics')
     .select('topic, wrong_count, total_count, last_seen_at')
