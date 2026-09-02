@@ -278,6 +278,37 @@ export type Database = {
         Insert: Record<string, never>
         Update: Record<string, never>
       }
+      misconception_catalog: {
+        Row: {
+          id: string
+          subject: string
+          topic: string
+          label: string
+          source_type: string
+          verification_status: 'candidate' | 'verified' | 'rejected'
+          evidence_count: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: Record<string, never>
+        Update: Record<string, never>
+      }
+      student_misconceptions: {
+        Row: {
+          student_id: string
+          misconception_id: string
+          subject: string
+          topic: string
+          evidence_count: number
+          confidence_score: number
+          status: 'suspected' | 'confirmed' | 'resolved'
+          first_seen_at: string
+          last_seen_at: string
+          updated_at: string
+        }
+        Insert: Record<string, never>
+        Update: Record<string, never>
+      }
       api_rate_limits: {
         Row: {
           id: string
@@ -492,6 +523,10 @@ export type Database = {
       refresh_student_learning_profile: {
         Args: { p_student_id: string }
         Returns: undefined
+      }
+      refresh_quiz_misconceptions: {
+        Args: { p_student_id: string; p_session_id: string }
+        Returns: { updated_rows: number }[]
       }
     }
     Enums: Record<string, never>

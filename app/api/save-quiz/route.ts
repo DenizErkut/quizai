@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { checkAndNotifyRiskyTopic } from '@/lib/parent-risk-alert'
 import { recordQuizLearningEvents } from '@/lib/learning-events'
+import { enrichAnswersWithMisconceptions } from '@/lib/misconceptions'
 // NEXT_PUBLIC_SUPABASE_ANON_KEY used for auth verification
 
 export const maxDuration = 30
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
     // Get session
     const { data: session, error: sessionErr } = await supabase
       .from('quiz_sessions')
-      .select('question_count, topic, user_id')
+      .select('question_count, topic, user_id, questions')
       .eq('id', sessionId)
       .maybeSingle()
 
@@ -50,10 +51,20 @@ export async function POST(req: NextRequest) {
     const pct = session.question_count > 0
       ? Math.round((score / session.question_count) * 100) : 0
 
+    const sessionQuestions = Array.isArray(session.questions) ? session.questions : []
+    const safeAnswers = Array.isArray(answers)
+      ? enrichAnswersWithMisconceptions(
+          sessionQuestions,
+          answers,
+          String(sessionQuestions[0]?.subject || 'Genel'),
+          session.topic || 'Genel'
+        )
+      : []
+
     // Mark completed
     const { error: updateError, data: updateData } = await supabase
       .from('quiz_sessions')
-      .update({ answers, score, completed: true }) // pct: generated column, DB otomatik hesaplıyor
+      .update({ answers: safeAnswers, score, completed: true }) // pct: generated column, DB otomatik hesaplıyor
       .eq('id', sessionId)
       .select('id, pct, score, completed')
 
@@ -109,11 +120,7 @@ export async function POST(req: NextRequest) {
 
     // Weak topics
     let wrongCount = 0
-    const totalCount = answers?.length || 0
-
-    if (Array.isArray(answers)) {
-      wrongCount = answers.filter((a: any) => !a.correct).length
-    }
+    wrongCount = safeAnswers.filter(a => !a.correct).length
 
     if (wrongCount > 0 && session.topic) {
       const { data: wt } = await supabase.from('weak_topics')
@@ -121,13 +128,13 @@ export async function POST(req: NextRequest) {
       if (wt) {
         await supabase.from('weak_topics').update({
           wrong_count: (wt.wrong_count || 0) + wrongCount,
-          total_count: (wt.total_count || 0) + (answers?.length || 0),
+          total_count: (wt.total_count || 0) + safeAnswers.length,
           last_seen_at: new Date().toISOString(),
         }).eq('id', wt.id)
       } else {
         await supabase.from('weak_topics').insert({
           user_id: userId, topic: session.topic, subject: 'Genel',
-          wrong_count: wrongCount, total_count: answers?.length || 0,
+          wrong_count: wrongCount, total_count: safeAnswers.length,
           last_seen_at: new Date().toISOString(),
         })
       }

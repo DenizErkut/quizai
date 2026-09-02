@@ -7,6 +7,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getTopicMastery, computeErrorPatterns, buildStudentHistoryContext } from '@/lib/mastery'
 import { recordQuizLearningEvents } from '@/lib/learning-events'
 import { findPrerequisiteGaps, buildPrerequisiteContext } from '@/lib/learning-graph'
+import { misconceptionMetadataInstruction } from '@/lib/misconceptions'
 import { startingDifficultyFromMastery } from '@/lib/adaptive-difficulty'
 
 const anthropic = new Anthropic()
@@ -874,7 +875,9 @@ export async function POST(req: NextRequest) {
       previousQuestionsNote += `\n\n⚠️ KAYNAK METİN SÜREKLİLİĞİ: Bu, aynı kaynak metne dayanan bir testin İKİNCİ (veya sonraki) parçası. Yukarıda listelenen önceki sorular, kaynak metnin BELİRLİ cümlelerini/olgularını zaten kullandı. Bu parçada o AYNI cümleleri/olguları FARKLI bir ifadeyle, farklı bir soru formatıyla, ya da "doğru mu yanlış mı" gibi tersinden bile olsa TEKRAR HEDEFLEME — bu, öğretmen tarafından "aynı bilgi 6-7 kez soruldu" diye eleştirilen bilinen bir hata deseni. Bunun yerine: (a) kaynak metnin önceki parçada HİÇ değinilmemiş başka bir cümlesini/paragrafını kullan, VEYA (b) konunun (topic) kendisi hakkında, kaynak metne dayanmayan, genel kavramsal bir soru sor (ör. temel itikat/tanım sorusu) — bu ikinci seçenek özellikle kaynak metin kısaysa ve tüm cümleleri önceki parçada tükenmişse tercih edilmeli.`
     }
 
-    const prompt = buildPrompt(questionType, topic, grade, resolvedDifficulty, effectiveLang, safeQCount, fileContent || '', gradeContext, mebContext, profile.department || undefined, subject) + previousQuestionsNote
+    const prompt = buildPrompt(questionType, topic, grade, resolvedDifficulty, effectiveLang, safeQCount, fileContent || '', gradeContext, mebContext, profile.department || undefined, subject)
+      + misconceptionMetadataInstruction(questionType)
+      + previousQuestionsNote
     promptStr = prompt
     countRef = safeQCount
 

@@ -18,6 +18,7 @@ export interface Question {
   // GERÇEK kaynak metin (MEB kaynağı veya öğrencinin yüklediği dosya).
   // AI'ın ürettiği bir özet değil, generate-quiz'in kendi kullandığı ham metin.
   passage?: string
+  distractorMisconceptions?: Array<string | null>
 }
 
 export interface Profile {

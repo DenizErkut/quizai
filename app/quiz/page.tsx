@@ -28,6 +28,7 @@ interface Question {
   tableData?: {headers: string[]; rows: {cells: string[]; blanks: number[]}[]} // tablo (Maarif)
   tableAnswers?: string[] // tablo: doğru cevaplar sırayla
   passage?: string        // kaynak metin (MEB/dosya) — öğrenciye gösterilir
+  distractorMisconceptions?: Array<string | null> // yanlış şıkların olası kavramsal hata etiketi
 }
 interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number; daily_test_count?: number; daily_test_date?: string; onboarding_completed?: boolean }
 

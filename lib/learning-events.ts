@@ -3,6 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 export interface LearningEventProjectionResult {
   insertedEvents: number
   updatedMasteryRows: number
+  updatedMisconceptionRows?: number
 }
 
 /**
@@ -29,8 +30,18 @@ export async function recordQuizLearningEvents(
   }
 
   const row = Array.isArray(data) ? data[0] : data
+  const { data: misconceptionData, error: misconceptionError } = await supabase.rpc(
+    'refresh_quiz_misconceptions',
+    { p_student_id: studentId, p_session_id: sessionId }
+  )
+  if (misconceptionError && misconceptionError.code !== 'PGRST202') {
+    console.error('[misconceptions] projection failed:', misconceptionError.message)
+  }
+  const misconceptionRow = Array.isArray(misconceptionData) ? misconceptionData[0] : misconceptionData
+
   return {
     insertedEvents: Number(row?.inserted_events ?? 0),
     updatedMasteryRows: Number(row?.updated_mastery_rows ?? 0),
+    updatedMisconceptionRows: Number(misconceptionRow?.updated_rows ?? 0),
   }
 }
