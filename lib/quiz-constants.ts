@@ -19,6 +19,10 @@ export interface Question {
   // AI'ın ürettiği bir özet değil, generate-quiz'in kendi kullandığı ham metin.
   passage?: string
   distractorMisconceptions?: Array<string | null>
+  adaptivePolicyVersion?: string
+  adaptiveFocus?: string
+  adaptiveReasonCode?: string
+  adaptiveRecommendationId?: string | null
 }
 
 export interface Profile {

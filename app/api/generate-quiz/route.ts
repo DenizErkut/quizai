@@ -8,6 +8,7 @@ import { getTopicMastery, computeErrorPatterns, buildStudentHistoryContext } fro
 import { recordQuizLearningEvents } from '@/lib/learning-events'
 import { findPrerequisiteGaps, buildPrerequisiteContext } from '@/lib/learning-graph'
 import { misconceptionMetadataInstruction, normalizeQuestionMisconceptions } from '@/lib/misconceptions'
+import { resolveAdaptiveLearningPolicy } from '@/lib/adaptive-learning'
 import { startingDifficultyFromMastery } from '@/lib/adaptive-difficulty'
 
 const anthropic = new Anthropic()
@@ -711,11 +712,14 @@ export async function POST(req: NextRequest) {
     // başlangıç noktası seçilir. Sonraki parçaların zorluğu ise client
     // tarafında lib/adaptive-difficulty.ts ile hesaplanıp buraya açıkça
     // gönderilir (bkz. continueSessionId akışı).
+    const adaptivePolicy = await resolveAdaptiveLearningPolicy(supabase, user.id, topic, subject)
+      .catch(() => null)
     let resolvedDifficulty = difficulty
     if (difficulty === 'auto') {
       try {
         const mastery = await getTopicMastery(supabase, user.id, topic)
-        resolvedDifficulty = startingDifficultyFromMastery(mastery?.masteryScore ?? null)
+        resolvedDifficulty = adaptivePolicy?.startingDifficulty
+          || startingDifficultyFromMastery(mastery?.masteryScore ?? null)
       } catch {
         resolvedDifficulty = 'normal'
       }
@@ -876,6 +880,7 @@ export async function POST(req: NextRequest) {
     }
 
     const prompt = buildPrompt(questionType, topic, grade, resolvedDifficulty, effectiveLang, safeQCount, fileContent || '', gradeContext, mebContext, profile.department || undefined, subject)
+      + (adaptivePolicy?.promptContext || '')
       + misconceptionMetadataInstruction(questionType)
       + previousQuestionsNote
     promptStr = prompt
@@ -1127,6 +1132,10 @@ export async function POST(req: NextRequest) {
       ...normalizeQuestionMisconceptions(q),
       subject: canonicalSubject,
       difficulty: resolvedDifficulty,
+      adaptivePolicyVersion: adaptivePolicy?.version || 'v2',
+      adaptiveFocus: adaptivePolicy?.focus || 'standard',
+      adaptiveReasonCode: adaptivePolicy?.reasonCode || 'NO_ACTIVE_SIGNAL',
+      adaptiveRecommendationId: adaptivePolicy?.recommendationId || null,
     }))
 
     // continueSessionId: adaptif akışta ikinci/sonraki parça — aynı testin
@@ -1182,7 +1191,7 @@ export async function POST(req: NextRequest) {
       sessionId = sessionRow?.id
     }
 
-    return NextResponse.json({ questions, sessionId, resolvedDifficulty })
+    return NextResponse.json({ questions, sessionId, resolvedDifficulty, adaptivePolicy: adaptivePolicy || undefined })
   } catch (error: any) {
     console.error('Generate quiz error, trying OpenAI fallback:', error?.message)
     // GPT-4o yedek model
