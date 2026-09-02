@@ -42,3 +42,13 @@ ilişkileri içerik incelemesinden sonra eklenir.
   önceliklendirilir.
 
 Migration: `scripts/022_canonical_learning_catalog_pipeline_v1.sql`.
+
+## Admin inceleme akışı
+
+`scripts/025_learning_catalog_review_workflow.sql` ve
+`/api/admin/learning-catalog-review` birlikte çalışır. Admin tek-sınıflı bir
+adayı doğrulanmış MEB ünitesine bağladığında alias, topic node, `topic → unit`
+edge'i ve kaynak mapping'i tek transaction içinde yayınlanır. Etkilenen event
+boyutları kanonikleştirilir; mastery, profil ve öneriler yeniden hesaplanır.
+Birden fazla sınıfta gözlenen başlıklar yanlış eşleştirmeyi önlemek için bu
+sürümde onaylanamaz.
