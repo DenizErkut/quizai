@@ -30,3 +30,12 @@ dışa aktarılmalıdır.
 Bu şema MEB grafının teknik temelidir; bütün ön koşul ilişkilerinin doğruluğunu
 tek başına garanti etmez. Ders/sınıf bazlı kazanım kodları ve ilişkiler eğitim
 uzmanı incelemesiyle, küçük paketler halinde yayınlanmalıdır.
+
+## Kanonik katalog pipeline'ı
+
+`scripts/022_canonical_learning_catalog_pipeline_v1.sql`, bu sonraki içerik
+işinin ilk somut sürümüdür. Aktif curriculum derslerini, sağlıklı MEB
+ünitelerini ve incelenmiş konu alias'larını graph düğümlerine dönüştürür;
+MEB ünitelerini ilgili ders düğümüne doğrulanmış `part_of` ilişkisiyle bağlar.
+Gerçek kod kaynağı bulunmayan kazanımlar üretilmez. Eşleşmeyen öğrenci konu
+başlıkları insan incelemesi için ayrı kuyruğa alınır.
