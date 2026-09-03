@@ -72,7 +72,7 @@ export default function PricingPage() {
     {
       id: 'premium',
       label: 'Premium',
-      price: '₺1.200',
+      price: '₺4.490',
       sub: 'yıllık',
       color: '#2563eb',
       accent: true,
@@ -94,7 +94,7 @@ export default function PricingPage() {
     {
       id: 'unlimited',
       label: 'Unlimited',
-      price: '₺6.000',
+      price: '₺19.990',
       sub: 'yıllık',
       color: '#0d9488',
       accent: false,

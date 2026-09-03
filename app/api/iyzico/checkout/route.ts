@@ -14,9 +14,9 @@ const supabaseAdmin = createClient(
 const IYZICO_CHECKOUT_URI_PATH = '/payment/iyzipos/checkoutform/initialize/auth/ecom'
 
 const PLANS = {
-  monthly:   { price: '79.0',    name: 'Pratium Premium - Aylık',    months: 1,  plan: 'premium'   },
-  yearly:    { price: '1200.0',  name: 'Pratium Premium - Yıllık',   months: 12, plan: 'premium'   },
-  unlimited: { price: '6000.0',  name: 'Pratium Unlimited - Yıllık', months: 12, plan: 'unlimited' },
+  monthly:   { price: '499.0',   name: 'Pratium Premium - Aylık',    months: 1,  plan: 'premium'   },
+  yearly:    { price: '4490.0',  name: 'Pratium Premium - Yıllık',   months: 12, plan: 'premium'   },
+  unlimited: { price: '19990.0', name: 'Pratium Unlimited - Yıllık', months: 12, plan: 'unlimited' },
 }
 
 export async function POST(req: NextRequest) {

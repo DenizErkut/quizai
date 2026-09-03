@@ -36,8 +36,8 @@ PREMIUM ÖNERİ KURALLARI:
 
 PLATFORM BİLGİSİ:
 - Freemium: Ayda 10 test, 5 soru/test, temel özellikler
-- Premium (₺1.200/yıl): Sınırsız test, 20 soru/test, tüm soru tipleri, PDF/Word/görsel yükleme, sınıf sistemi, kişisel analiz
-- Unlimited (₺6.000/yıl): Sınırsız test, koç görüşmesi, gelişmiş analiz raporları, tüm özellikler
+- Premium (aylık ₺499 / yıllık ₺4.490): Sınırsız test, 20 soru/test, tüm soru tipleri, PDF/Word/görsel yükleme, sınıf sistemi, kişisel analiz
+- Unlimited (₺19.990/yıl): Sınırsız test, koç görüşmesi, gelişmiş analiz raporları, tüm özellikler
 - Özellikler: 8 soru tipi, 6 dil, 4 haftalık gelişim planı, spaced repetition, sınav simülasyonu (LGS/TYT/AYT/KPSS), canlı quiz, challenge, konu özeti
 - Öğretmen: sınıf oluşturma, ödev atama, canlı quiz, öğrenci performans takibi
 - Veli: çocuk takibi, haftalık özet e-postası
@@ -70,7 +70,7 @@ YANIT TARZI:
 
 PLATFORM BİLGİSİ:
 - Ücretsiz: Ayda 10 test, 5 soru/test
-- Premium (₺1.200/yıl): Sınırsız test, 20 soru, PDF/görsel yükleme, analiz, sınıf sistemi
+- Premium (aylık ₺499 / yıllık ₺4.490): Sınırsız test, 20 soru, PDF/görsel yükleme, analiz, sınıf sistemi
 - Özellikler: LGS/YKS/KPSS sınav simülasyonu, 8 soru tipi, 6 dil, 4 haftalık plan, öğretmen paneli, veli takibi
 - Test oluşturma: hazır ders/konu listesinden seçebilir, kendi konunu yazabilir YA DA PDF/döküman yükleyebilirsin — üçü de mevcut, sadece yazmak zorunda değilsin
 

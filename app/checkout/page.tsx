@@ -5,15 +5,15 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 const BASE_PRICES: Record<'monthly' | 'yearly' | 'unlimited', number> = {
-  monthly: 79,
-  yearly: 1200,
-  unlimited: 6000,
+  monthly: 499,
+  yearly: 4490,
+  unlimited: 19990,
 }
 
 const PLANS = {
   monthly: {
     name: 'Aylık Premium',
-    price: '79',
+    price: '499',
     period: 'ay',
     badge: '',
     color: '#2563eb',
@@ -21,7 +21,7 @@ const PLANS = {
   },
   yearly: {
     name: 'Yıllık Premium',
-    price: '1.200',
+    price: '4.490',
     period: 'yıl',
     badge: '🏆 En popüler',
     color: '#2563eb',
@@ -29,7 +29,7 @@ const PLANS = {
   },
   unlimited: {
     name: 'Yıllık Unlimited',
-    price: '6.000',
+    price: '19.990',
     period: 'yıl',
     badge: '👑 Tüm özellikler',
     color: '#0d9488',
