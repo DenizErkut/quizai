@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
+import { logAnthropicUsage } from '@/lib/ai-usage'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -42,6 +43,7 @@ SADECE geçerli JSON döndür:
     system: 'Sadece geçerli JSON döndür, markdown kullanma.',
     messages: [{ role: 'user', content: prompt }],
   })
+    logAnthropicUsage('live-quiz', 'claude-sonnet-4-5', response)
 
   const text = response.content[0].type === 'text' ? response.content[0].text : ''
   let questions: any[] = []

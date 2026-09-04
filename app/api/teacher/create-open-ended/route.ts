@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 60
 export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
+import { logAnthropicUsage } from '@/lib/ai-usage'
 import { createClient } from '@supabase/supabase-js'
 import { verifyQuestionWithOpenAI } from '@/lib/openai'
 
@@ -114,6 +115,7 @@ async function generateWithAI(subject: string, topic: string, grade: string, ori
     max_tokens: 1500,
     messages: [{ role: 'user', content: prompt }],
   })
+    logAnthropicUsage('teacher:create-open-ended', 'claude-sonnet-4-5', response)
 
   const text = response.content[0].type === 'text' ? response.content[0].text : ''
   let parsed

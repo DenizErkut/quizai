@@ -3,6 +3,7 @@ export const maxDuration = 120
 export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
 import { generateQuizFallback } from '@/lib/openai'
+import { logAnthropicUsage } from '@/lib/ai-usage'
 import { createClient } from '@supabase/supabase-js'
 import { getTopicMastery, computeErrorPatterns, buildStudentHistoryContext } from '@/lib/mastery'
 import { recordQuizLearningEvents } from '@/lib/learning-events'
@@ -897,6 +898,9 @@ export async function POST(req: NextRequest) {
       messages: [{ role: 'user', content: prompt }],
     })
     console.log(`[generate-quiz] model=${useHaiku ? 'haiku' : 'sonnet'} qCount=${safeQCount}`)
+    logAnthropicUsage('generate-quiz', useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5', response, {
+      meta: { qCount: safeQCount, topic, hasMebContext: !!mebContext },
+    })
 
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
     const clean = text.replace(/```json|```/g, '').trim()
@@ -1065,6 +1069,9 @@ export async function POST(req: NextRequest) {
             model: 'claude-sonnet-4-5',
             max_tokens: Math.min(4000, Math.max(2000, missing * 600)),
             messages: [{ role: 'user', content: topupPrompt }],
+          })
+          logAnthropicUsage('generate-quiz:topup', 'claude-sonnet-4-5', topupResponse, {
+            meta: { round: round + 1, missing },
           })
           const topupText = topupResponse.content[0].type === 'text' ? topupResponse.content[0].text : ''
           const topupClean = topupText.replace(/```json|```/g, '').trim()

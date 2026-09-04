@@ -4,6 +4,7 @@
 // tek-öğrenci-tek-ödev analizi) ile KARIŞTIRILMAMALI — bu, tüm sınıfın
 // genel durumuna bakan, ayrı bir öneri katmanı.
 import Anthropic from '@anthropic-ai/sdk'
+import { logAnthropicUsage } from '@/lib/ai-usage'
 import { ClassRiskSummary } from './class-risk'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
@@ -50,6 +51,7 @@ ${topicsText}
 Öğretmene bu veriye dayanarak 2-3 cümlelik, somut ve aksiyona dönük bir öneri yaz (ör. hangi konuyu tekrar işlemeli, hangi öğrenci grubuna bireysel destek gerekebilir). Sadece öneriyi yaz, başlık veya açıklama ekleme.`,
       }],
     }) as any
+    logAnthropicUsage('teacher-class-insight', 'claude-haiku-4-5-20251001', msg)
     const text = msg.content?.[0]?.text?.trim()
     return text || defaultInsight(summary)
   } catch {

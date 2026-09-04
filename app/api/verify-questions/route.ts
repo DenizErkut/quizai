@@ -7,6 +7,7 @@ export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
 import { verifyQuestionWithOpenAI } from '@/lib/openai'
 import { verifyQuestionWithGemini } from '@/lib/verify-gemini'
+import { logAnthropicUsage, logOpenAIUsage, logGeminiUsage } from '@/lib/ai-usage'
 
 const anthropic = new Anthropic()
 
@@ -216,6 +217,7 @@ export async function POST(req: NextRequest) {
                     max_tokens: 150,
                     messages: [{ role: 'user', content: verifyPrompt }],
                   })
+                  logAnthropicUsage('verify-questions:claude', 'claude-sonnet-4-5', res)
                   const text = res.content[0].type === 'text' ? res.content[0].text.trim() : ''
                   const match = text.match(/\{[\s\S]*\}/)
                   return match ? JSON.parse(match[0]) : { ok: true }
@@ -259,6 +261,9 @@ Return ONLY valid JSON:
           model: 'claude-sonnet-4-5',
           max_tokens: 2000,
           messages: [{ role: 'user', content: replacePrompt }],
+        })
+        logAnthropicUsage('verify-questions:replace', 'claude-sonnet-4-5', replaceRes, {
+          meta: { rejectedCount: rejected.length },
         })
 
         const rText = replaceRes.content[0].type === 'text' ? replaceRes.content[0].text : ''

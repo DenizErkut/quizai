@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 30
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
+import { logAnthropicUsage } from '@/lib/ai-usage'
 
 const anthropic = new Anthropic()
 
@@ -89,6 +90,7 @@ Respond with ONLY: {"correct": true} or {"correct": false}`
       }]
     })
 
+    logAnthropicUsage('check-answer', 'claude-sonnet-4-5', response)
     const text = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
     const result = JSON.parse(text)
     return NextResponse.json(result)

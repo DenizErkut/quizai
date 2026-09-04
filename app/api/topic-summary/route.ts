@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 30
 import Anthropic from '@anthropic-ai/sdk'
+import { logAnthropicUsage } from '@/lib/ai-usage'
 import { createClient } from '@supabase/supabase-js'
 
 const anthropic = new Anthropic()
@@ -53,6 +54,7 @@ SADECE JSON döndür:
       system: 'Sadece geçerli JSON döndür, markdown kullanma.',
       messages: [{ role: 'user', content: prompt }],
     })
+    logAnthropicUsage('topic-summary', 'claude-sonnet-4-5', response)
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
     const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
     return NextResponse.json(parsed)

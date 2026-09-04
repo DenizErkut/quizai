@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
+import { logAnthropicUsage } from '@/lib/ai-usage'
 import { getIdentityBySupabaseId } from '@/lib/identity/client'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
@@ -42,6 +43,7 @@ Zayıf konular: ${weakTopics}
 Kısa ve motive edici yaz. Maksimum 200 kelime.`,
     }],
   }) as any
+    logAnthropicUsage('ai-analysis', 'claude-sonnet-4-5', message)
 
   return NextResponse.json({ analysis: message.content[0].text })
 }

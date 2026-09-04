@@ -5,6 +5,7 @@
 // alert.ts) bu tek fonksiyonu kullanır — aynı promptun iki yerde ayrı
 // yazılıp sapmasını önlemek için.
 import Anthropic from '@anthropic-ai/sdk'
+import { logAnthropicUsage } from '@/lib/ai-usage'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
@@ -30,6 +31,7 @@ export async function generateActionSentence(
         content: `${childName} adlı öğrencinin "${topic}" konusundaki mastery skoru ${masteryScore}/100 (${forgettingRisk === 'yüksek' ? 'uzun süredir tekrar edilmemiş' : 'yakın zamanda çalışılmış'}). Veliye, bu hafta bu konuya nasıl destek olabileceğine dair TEK CÜMLELİK, sıcak ve somut bir öneri yaz. Sadece cümleyi yaz, başka açıklama ekleme, tırnak işareti kullanma.`,
       }],
     }) as any
+    logAnthropicUsage('parent-action-sentence', 'claude-haiku-4-5-20251001', msg)
     const text = msg.content?.[0]?.text?.trim()
     return text || defaultSentence(topic)
   } catch {

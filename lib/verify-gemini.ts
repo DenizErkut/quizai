@@ -6,6 +6,8 @@
 // GEMINI_API_KEY henüz Vercel'e eklenmediği sürece bu fonksiyon sessizce
 // null döner (üretim akışını KIRMAZ) — anahtar eklenince otomatik aktif olur.
 
+import { logGeminiUsage } from '@/lib/ai-usage'
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 
 export async function verifyQuestionWithGemini(prompt: string): Promise<{ ok: boolean; reason?: string } | null> {
@@ -27,6 +29,7 @@ export async function verifyQuestionWithGemini(prompt: string): Promise<{ ok: bo
     if (!res.ok) return null // Gemini hatası — soruyu reddetme, sadece bu katmanı atla
 
     const data = await res.json()
+    logGeminiUsage('verify-questions:gemini', 'gemini-2.0-flash', data?.usageMetadata)
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
     const clean = text.replace(/```json|```/g, '').trim()
     const match = clean.match(/\{[\s\S]*\}/)

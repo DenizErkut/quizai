@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { logAnthropicUsage } from '@/lib/ai-usage'
 import { createClient } from '@supabase/supabase-js'
 import { checkMinorConsentBlock } from '@/lib/identity/client'
 
@@ -194,6 +195,7 @@ export async function POST(req: NextRequest) {
             system: 'Sen Türk eğitim sisteminde sınav soruları hazırlayan bir uzmansın. Sadece geçerli JSON döndür, markdown kullanma.',
             messages: [{ role: 'user', content: prompt }],
           })
+    logAnthropicUsage('generate-exam', 'claude-sonnet-4-5', response)
 
           const text = response.content[0].type === 'text' ? response.content[0].text : ''
           const clean = text.replace(/```json|```/g, '').trim()

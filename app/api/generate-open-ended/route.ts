@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 60
 export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
+import { logAnthropicUsage } from '@/lib/ai-usage'
 import { createClient } from '@supabase/supabase-js'
 import { checkMinorConsentBlock } from '@/lib/identity/client'
 
@@ -136,6 +137,7 @@ Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
       max_tokens: 1500,
       messages: [{ role: 'user', content: prompt }],
     })
+    logAnthropicUsage('generate-open-ended', 'claude-sonnet-4-5', response)
 
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
     let parsed

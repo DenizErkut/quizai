@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 30
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
+import { logAnthropicUsage } from '@/lib/ai-usage'
 
 const anthropic = new Anthropic()
 
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
       messages: messages.map((m: any) => ({ role: m.role, content: m.content })),
     })
 
+    logAnthropicUsage('bot', 'claude-sonnet-4-5', response)
     const reply = response.content[0].type === 'text' ? response.content[0].text : ''
     return NextResponse.json({ reply })
   } catch {

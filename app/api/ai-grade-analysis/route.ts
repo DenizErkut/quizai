@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
+import { logAnthropicUsage } from '@/lib/ai-usage'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -53,6 +54,7 @@ Lütfen şu formatta Türkçe analiz yaz:
 Kısa ve motive edici tut, maksimum 250 kelime.`
     }],
   })
+    logAnthropicUsage('ai-grade-analysis', 'claude-sonnet-4-5', response)
 
   const analysis = response.content[0].type === 'text' ? response.content[0].text : ''
   return NextResponse.json({ analysis })

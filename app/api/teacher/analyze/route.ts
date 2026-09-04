@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
+import { logAnthropicUsage } from '@/lib/ai-usage'
 import { getIdentityBySupabaseId } from '@/lib/identity/client'
 
 const supabaseAdmin = createClient(
@@ -149,6 +150,7 @@ Lütfen şu formatta kısa ve öz bir analiz yaz (Türkçe):
     max_tokens: 1000,
     messages: [{ role: 'user', content: prompt }],
   })
+    logAnthropicUsage('teacher:analyze', 'claude-sonnet-4-5', response)
 
   const analysis = response.content[0].type === 'text' ? response.content[0].text : ''
 

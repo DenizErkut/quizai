@@ -8,6 +8,7 @@
 // olarak (Faz 1'in mastery skoruna göre) sistem tarafından seçer, AI'a
 // sadece bu hedefler etrafında bir anlatı/haftalık program yazdırır.
 import { SupabaseClient } from '@supabase/supabase-js'
+import { logAnthropicUsage } from '@/lib/ai-usage'
 import Anthropic from '@anthropic-ai/sdk'
 import { computeTopicMastery, TopicMastery } from './mastery'
 import { analyzeStudyDuration } from './study-duration-model'
@@ -204,6 +205,7 @@ SADECE JSON don:
 {"summary":"2-3 cumle","weeks":[{"week":1,"goal":"hedef","topics":["konu1"],"daily_minutes":20,"focus":"odak"}],"motivation":"motivasyon"}`,
     }],
   }) as any
+    logAnthropicUsage('study-plan-generator', 'claude-sonnet-4-5', message)
 
   try {
     const raw = message.content[0].text.replace(/```json|```/g, '').trim()

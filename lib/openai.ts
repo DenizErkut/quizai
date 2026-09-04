@@ -1,5 +1,7 @@
 // lib/openai.ts — OpenAI yardımcı fonksiyonları
 
+import { logOpenAIUsage } from '@/lib/ai-usage'
+
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY!
 
 async function callOpenAI(messages: {role: string, content: any}[], options: {
@@ -7,7 +9,9 @@ async function callOpenAI(messages: {role: string, content: any}[], options: {
   max_tokens?: number
   temperature?: number
   json?: boolean
+  operation?: string   // 3 Eylül 2026 — token loglaması için işlem etiketi
 } = {}) {
+  const model = options.model || 'gpt-4o-mini'
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -15,7 +19,7 @@ async function callOpenAI(messages: {role: string, content: any}[], options: {
       'Authorization': `Bearer ${OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: options.model || 'gpt-4o-mini',
+      model,
       max_tokens: options.max_tokens || 1000,
       temperature: options.temperature ?? 0.3,
       response_format: options.json ? { type: 'json_object' } : undefined,
@@ -24,6 +28,8 @@ async function callOpenAI(messages: {role: string, content: any}[], options: {
   })
   if (!res.ok) throw new Error(`OpenAI ${res.status}: ${await res.text()}`)
   const data = await res.json()
+  // Gerçek token tüketimini logla (best-effort, ana akışı bozmaz)
+  logOpenAIUsage(options.operation || 'openai', model, data)
   return data.choices[0].message.content as string
 }
 
@@ -32,7 +38,7 @@ export async function generateQuizFallback(prompt: string, count: number): Promi
   return callOpenAI([
     { role: 'system', content: 'You are an expert quiz generator. Return only valid JSON.' },
     { role: 'user', content: prompt }
-  ], { model: 'gpt-4o-mini', max_tokens: 4000, json: true })
+  ], { model: 'gpt-4o-mini', max_tokens: 4000, json: true, operation: 'generate-quiz:fallback' })
 }
 
 // 2. Görsel soru açıklama — GPT-4o Vision ile SVG/resim analizi
@@ -42,7 +48,7 @@ export async function explainVisualQuestion(imageBase64: string, question: strin
       { type: 'image_url', image_url: { url: `data:image/png;base64,${imageBase64}` } },
       { type: 'text', text: `Bu görseli ${lang} dilinde analiz et ve şu soruya cevap ver: ${question}. Kısa ve net açıkla (2-3 cümle).` }
     ]}
-  ], { model: 'gpt-4o', max_tokens: 500 })
+  ], { model: 'gpt-4o', max_tokens: 500, operation: 'explain-visual' })
 }
 
 // 3. Matematik doğrulama — GPT-4o ile çapraz kontrol
@@ -50,7 +56,7 @@ export async function verifyMathWithOpenAI(question: string, answer: string, lan
   const result = await callOpenAI([
     { role: 'system', content: `You are a math verification assistant. Return JSON: {"correct": boolean, "explanation": "string"}` },
     { role: 'user', content: `Soru: ${question}\nVerilen cevap: ${answer}\nBu cevap doğru mu? Dil: ${lang}` }
-  ], { model: 'gpt-4o-mini', max_tokens: 300, json: true })
+  ], { model: 'gpt-4o-mini', max_tokens: 300, json: true, operation: 'verify-math' })
   try { return JSON.parse(result) } catch { return { correct: false, explanation: result } }
 }
 
@@ -62,7 +68,7 @@ export async function verifyQuestionWithOpenAI(prompt: string): Promise<{ ok: bo
     const result = await callOpenAI([
       { role: 'system', content: 'You are a strict educational content verifier. Respond only with valid JSON.' },
       { role: 'user', content: prompt },
-    ], { model: 'gpt-4o', max_tokens: 250, json: true })
+    ], { model: 'gpt-4o', max_tokens: 250, json: true, operation: 'verify-questions:gpt4o' })
     return JSON.parse(result)
   } catch {
     return { ok: true } // Doğrulama başarısız olursa soruyu reddetme, geç
