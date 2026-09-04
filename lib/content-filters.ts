@@ -51,8 +51,26 @@ export function isFrontMatter(text: string): boolean {
 // isFrontMatter'ın anahtar kelime taraması tek başına yetersiz kalabiliyor.
 // Yapısal bir sinyal: İçindekiler satırları "nokta dizisi + sayfa numarası +
 // SATIR SONU" kalıbındadır (ör. "....................18\n").
+//
+// 4 Eylül 2026 — Deniz'in gerçek kaynaklarla bulduğu YANLIŞ POZİTİF: eski
+// eşik (4+ nokta) sadece iki FARKLI, tamamen meşru içerik türüyle de
+// çakışıyordu:
+//  (a) öğrenci çalışma kağıdı doldurma satırları (ör. "....................
+//      ..\n2\n" — boş bırakılan cevap alanı, ardından bir sonraki soru
+//      numarası), gerçek örnek: "6. Sınıf Sosyal Bilgiler - Hayatımızdaki
+//      Ekonomi" (health-scan'de front_matter_heavy diye işaretlenmişti).
+//  (b) matematikte üç nokta/elips gösterimi bir sayı dizisi tablosunda
+//      (ör. "1\n5\n1\n.........\n125\n1\n" — "1, 1/5, 1/25, ..." dizisi),
+//      gerçek örnek: "8. Sınıf Matematik - Üslü İfadeler".
+// Gerçek İçindekiler'deki nokta dizisi (dot leader) tipografik olarak çok
+// daha UZUNDUR (genelde 15-40+ nokta, sayfa genişliğini doldurmak için) —
+// doldurma çizgileri (genelde 20-40 nokta AMA kısa/tek karakterlik boşluk
+// alanları için de kullanılabiliyor) ve matematik elipsi (tipik 3-9 nokta)
+// ile ayırt etmek için eşik 4'ten 10'a çıkarıldı. Bu, gerçek İçindekiler
+// sayfalarını hâlâ yakalar (dot leader'lar neredeyse her zaman 10+ nokta)
+// ama yukarıdaki iki yanlış-pozitif türünü büyük ölçüde eler.
 export function looksLikeTableOfContents(text: string): boolean {
-  const tocLineMatches = text.match(/\.{4,}\s*\d{1,4}\s*(?:\r?\n|$)/g)
+  const tocLineMatches = text.match(/\.{10,}\s*\d{1,4}\s*(?:\r?\n|$)/g)
   if (tocLineMatches && tocLineMatches.length >= 3) return true
   const uniteBolumCount = (text.match(/\b(ÜNİTE|BÖLÜM)\b/g) || []).length
   return uniteBolumCount >= 6 // yoğun başlık tekrarı = İçindekiler
@@ -146,6 +164,26 @@ export function hasOcrLetterSplitNoise(text: string): boolean {
 // yakalamak için tasarlandı.
 const ROUND_CUTOFF_POINTS = [50000, 40000, 30000, 20000, 10000, 5000]
 
+// 4 Eylül 2026 — Deniz'in gerçek kaynaklarla bulduğu YANLIŞ POZİTİF: eski
+// suspiciousCutoff SADECE uzunluğa bakıyordu — ama bir kaynağın uzunluğu
+// TESADÜFEN yuvarlak bir sayıya yakın olabilir, bu gerçek bir kesilmeyle
+// KARIŞTIRILMAMALI. Gerçek bir kesilme (extraction/yükleme sırasında) genelde
+// kelimenin/cümlenin ORTASINDA biter; gerçek bir bölüm/ünite sonu ise doğal
+// olarak nokta/soru işareti/ünlemle biter. Kanıt: 5 gerçek kaynak incelendi
+// (Olasılık, Cebirsel İfadeler, Sosyal Bilgiler, Matematik, DKAB) — hepsi
+// uzunluk olarak "şüpheli" ama içerik olarak TAM ve düzgün bitiyordu (tam
+// bir soru "?" ile, ya da kitabın standart bölüm-sonu ifadesiyle "...
+// karekodu okutunuz." gibi). Artık HER İKİ sinyal de gerekli: uzunluk VE
+// son ~100 karakterin düzgün noktalamayla bitmemesi.
+function endsWithoutProperPunctuation(text: string): boolean {
+  const tail = text.trimEnd().slice(-100).trim()
+  if (!tail) return true // içerik yoksa şüpheli kabul et
+  const lastChar = tail.slice(-1)
+  // Türkçe içerikte cümle/soru/ünlem sonu, ya da kapanış parantezi/tırnağı
+  // (ör. "...örneği." gibi bir alıntının hemen ardından gelebilir).
+  return !/[.?!"'”’)\]]$/.test(lastChar)
+}
+
 export interface HealthCheckResult {
   suspiciousCutoff: boolean
   frontMatterHeavy: boolean
@@ -157,10 +195,11 @@ export function runHealthCheck(rawText: string): HealthCheckResult {
   const len = rawText.length
 
   // (a) karakter sayısı şüpheli bir yuvarlak kesme noktasında mı bitiyor
-  // (±%1 tolerans — tam 50.000'de kesilen bir kaynak muhtemelen yükleme/
-  // extraction sırasında kesilmiş, gerçek bir kitabın tam o sayıda
-  // karakterle bitmesi istatistiksel olarak çok düşük olasılık).
-  const suspiciousCutoff = len > 0 && ROUND_CUTOFF_POINTS.some(p => Math.abs(len - p) <= p * 0.01)
+  // (±%1 tolerans) VE son ~100 karakter düzgün bir noktalamayla bitmiyor mu.
+  // Tek başına uzunluk artık YETERLİ DEĞİL — gerçek bölüm sonları da
+  // tesadüfen yuvarlak bir uzunlukta bitebilir (bkz. yukarıdaki not).
+  const lengthLooksSuspicious = len > 0 && ROUND_CUTOFF_POINTS.some(p => Math.abs(len - p) <= p * 0.01)
+  const suspiciousCutoff = lengthLooksSuspicious && endsWithoutProperPunctuation(rawText)
 
   // (b) ön sayfa/kapak/İçindekiler oranı anormal yüksek mi — ilk 3000
   // karakter zaten front-matter/ToC paterni taşıyorsa şüpheli.
