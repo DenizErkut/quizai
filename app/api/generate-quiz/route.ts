@@ -395,6 +395,204 @@ MEB KAYNAK METNİ:\n${mebCtx}\n\n`
   return base + `Generate multiple choice questions with 4 options (A/B/C/D), correct answer index, and explanation.\n\nCRITICAL FOR MATH/SCIENCE:\n- Solve every calculation step by step BEFORE writing\n- Verify the correct answer is at the specified ans index\n\n{"questions":[{"type":"multiple_choice","q":"Question text","opts":["Option A","Option B","Option C","Option D"],"ans":0,"exp":"Explanation"}]}`
 }
 
+// 5 Eylül 2026 — P0: Prompt caching (Deniz'in "token tüketimini nasıl
+// düşürebiliriz" sorusuna gerçek ai_usage_logs verisiyle yanıt). Bulgu:
+// generate-quiz (ana üretim + topup) TÜM AI harcamasının ~%75'ini
+// oluşturuyor, ve bunun ~%84'ü INPUT token — yani asıl maliyet HER ÇAĞRIDA
+// BİREBİR AYNI gönderilen sabit talimat metninde (DOĞRULUK KURALLARI +
+// İSTİSNA 1-3 + tip şemaları), konu/kaynak farklı olsa bile.
+//
+// Bu bloklar (K12/MEB yolu için) TEK PARÇA halinde derlenip Anthropic'in
+// cache_control (ephemeral, ~5dk TTL) ile işaretleniyor — cache-read fiyatı
+// normal input'un ~%10'u. buildPrompt()'un KENDİSİNE dokunulmadı (regresyon
+// riskini sıfırlamak için) — bunun yerine onun ürettiği TAM metinden bu
+// bilinen statik alt-dizeler .replace() ile çıkarılıp (bkz.
+// stripStaticPartsForCaching) geri kalan küçük DİNAMİK kısım user mesajı
+// olarak, bu fonksiyonun ürettiği metin de system dizisinde AYRI, cache'li
+// bir blok olarak gönderiliyor.
+//
+// ÖNEMLİ EŞİK NOTU: Anthropic'te modele göre minimum cache'lenebilir uzunluk
+// var — altında kalan içerik SESSİZCE (hatasız) cache'lenmeden geçer:
+//   Sonnet 4.5: 2048 token   |   Haiku 4.5: 4096 token
+// Bu bloklar gerçek Anthropic tokenizer'ıyla ölçüldü: ~4211 token (K12/
+// multiple_choice varsayılan kombinasyonu) — Haiku eşiğini ~115 token gibi
+// DAR bir marjla geçiyor. Diğer type kombinasyonları biraz farklı
+// uzunlukta olabilir. Kesin doğrulama ancak deploy sonrası ai_usage_logs
+// tablosundaki cache_read_tokens/cache_creation_input_tokens alanlarıyla
+// yapılabilir (bu alanlar zaten loglanıyor, bkz. lib/ai-usage.ts) — bu
+// yüzden garanti değil, ÖLÇÜLECEK bir hipotez olarak işaretleniyor.
+//
+// KAPSAM KARARI: Sadece K12/MEB yolu (isUniversity=false) için uygulandı.
+// Üniversite yolu (ayrı, department-özel intro metni içerdiği için tam
+// statik değil) DEĞİŞTİRİLMEDİ — gerçek kullanım verisi zaten tamamen K12
+// ağırlıklı olduğu için bu, riski düşürüp faydanın neredeyse tamamını
+// yakalıyor.
+//
+// DAVRANIŞ NOTU: İSTİSNA 1-3 önceden SADECE mebCtx (yüklü kaynak) varken
+// gönderiliyordu. Şimdi HER K12 çağrısında (kaynak olsun olmasın) statik
+// blokta yer alıyor — zararsız çünkü kurallar doğal dilde "eğer bu metin
+// X ise" diye kendi kendini koşullandırıyor.
+// 5 Eylül 2026 — P0: Prompt caching (Deniz'in "token tüketimini nasıl
+// düşürebiliriz" sorusuna gerçek ai_usage_logs verisiyle yanıt). Bulgu:
+// generate-quiz (ana üretim + topup) TÜM AI harcamasının ~%75'ini
+// oluşturuyor, ve bunun ~%84'ü INPUT token — yani asıl maliyet HER ÇAĞRIDA
+// BİREBİR AYNI gönderilen sabit talimat metninde (DOĞRULUK KURALLARI +
+// İSTİSNA 1-3 + tip şemaları), konu/kaynak farklı olsa bile.
+//
+// Bu bloklar (K12/MEB yolu için) TEK PARÇA halinde derlenip Anthropic'in
+// cache_control (ephemeral, ~5dk TTL) ile işaretleniyor — cache-read fiyatı
+// normal input'un ~%10'u. buildPrompt()'un KENDİSİNE dokunulmadı (regresyon
+// riskini sıfırlamak için) — bunun yerine onun ürettiği TAM metinden bu
+// bilinen statik alt-dizeler .replace() ile çıkarılıp (bkz.
+// stripStaticPartsForCaching) geri kalan küçük DİNAMİK kısım user mesajı
+// olarak, bu fonksiyonun ürettiği metin de system dizisinde AYRI, cache'li
+// bir blok olarak gönderiliyor.
+//
+// ⚠️ KRİTİK UYGULAMA NOTU: Bu metinler kaynak dosyadan çıkarılırken, orijinal
+// template literal'daki "\n" (2 karakterlik escape dizisi) GERÇEK satır
+// sonuna çevrildi (normalize edildi) — aksi hâlde runtime'da buildPrompt()'un
+// ÜRETTİĞİ metin (kendi \n'lerini gerçek satır sonuna yorumlar) ile buradaki
+// sabit string'ler ASLA birebir eşleşmez, ve stripStaticPartsForCaching
+// hiçbir şeyi çıkaramaz (ilk denemede yaşanan ve build+izole testle
+// yakalanan gerçek bir hataydı).
+//
+// ÖNEMLİ EŞİK NOTU: Anthropic'te modele göre minimum cache'lenebilir uzunluk
+// var — altında kalan içerik SESSİZCE (hatasız) cache'lenmeden geçer:
+//   Sonnet 4.5: 2048 token   |   Haiku 4.5: 4096 token
+// Gerçek Anthropic tokenizer'ıyla ölçüldü: multiple_choice/mixed/fill_blank/
+// true_false (misconception kuralını alan 4 tip, en yaygın kullanılanlar)
+// ~4200-4450 token ile Haiku eşiğini gerçek marjla geçiyor. table_fill/
+// multi_true_false/matching/ordering/short_answer (misconception kuralı
+// almayan 5 nadir Maarif-Model tipi) ~93-152 token KISA KALIYOR — bu tipler
+// için Haiku çağrılarında cache devreye girmeyebilir (hata vermez, sadece
+// indirim uygulanmaz). Kesin doğrulama ancak deploy sonrası ai_usage_logs
+// tablosundaki cache_read_tokens/cache_creation_input_tokens alanlarıyla
+// yapılabilir (bu alanlar zaten loglanıyor, bkz. lib/ai-usage.ts).
+//
+// KAPSAM KARARI: Sadece K12/MEB yolu (isUniversity=false) için uygulandı.
+// Üniversite yolu (ayrı, department-özel intro metni içerdiği için tam
+// statik değil) DEĞİŞTİRİLMEDİ — gerçek kullanım verisi zaten tamamen K12
+// ağırlıklı olduğu için bu, riski düşürüp faydanın neredeyse tamamını
+// yakalıyor.
+//
+// DAVRANIŞ NOTU: İSTİSNA 1-3 önceden SADECE mebCtx (yüklü kaynak) varken
+// gönderiliyordu. Şimdi HER K12 çağrısında (kaynak olsun olmasın) statik
+// blokta yer alıyor — zararsız çünkü kurallar doğal dilde "eğer bu metin
+// X ise" diye kendi kendini koşullandırıyor.
+// 5 Eylül 2026 — P0: Prompt caching (Deniz'in "token tüketimini nasıl
+// düşürebiliriz" sorusuna gerçek ai_usage_logs verisiyle yanıt). Bulgu:
+// generate-quiz (ana üretim + topup) TÜM AI harcamasının ~%75'ini
+// oluşturuyor, ve bunun ~%84'ü INPUT token — yani asıl maliyet HER ÇAĞRIDA
+// BİREBİR AYNI gönderilen sabit talimat metninde (DOĞRULUK KURALLARI +
+// İSTİSNA 1-3 + tip şemaları), konu/kaynak farklı olsa bile.
+//
+// Bu bloklar (K12/MEB yolu için) TEK PARÇA halinde derlenip Anthropic'in
+// cache_control (ephemeral, ~5dk TTL) ile işaretleniyor — cache-read fiyatı
+// normal input'un ~%10'u. buildPrompt()'un KENDİSİNE dokunulmadı (regresyon
+// riskini sıfırlamak için) — bunun yerine onun ürettiği TAM metinden bu
+// bilinen statik alt-dizeler .replace() ile çıkarılıp (bkz.
+// stripStaticPartsForCaching) geri kalan küçük DİNAMİK kısım user mesajı
+// olarak, bu fonksiyonun ürettiği metin de system dizisinde AYRI, cache'li
+// bir blok olarak gönderiliyor.
+//
+// ⚠️ KRİTİK UYGULAMA NOTLARI (izole testle bulunup düzeltilen 2 gerçek hata):
+//  1) Kaynak dosyadan metin çıkarılırken orijinal template literal'daki "\n"
+//     (2 karakterlik escape dizisi) GERÇEK satır sonuna çevrildi (normalize
+//     edildi) — aksi hâlde runtime'da buildPrompt()'un ÜRETTİĞİ metin (kendi
+//     \n'lerini gerçek satır sonuna yorumlar) ile buradaki sabit string'ler
+//     ASLA birebir eşleşmez.
+//  2) DOĞRULUK KURALLARI'nın 10. maddesi "${grade}" değişkeni içeriyordu —
+//     "tamamen statik" varsayımım YANLIŞTI. Statik blokta bu madde sınıf
+//     seviyesine genel bir ifadeyle ("öğrencinin sınıf seviyesine uygun")
+//     yeniden yazıldı (grade zaten dinamik kısımdaki "Seviye: X." satırında
+//     ayrıca belirtiliyor, bilgi kaybı yok). Dinamik promptan çıkarmak için
+//     ise sabit .replace() yerine REGEX kullanılıyor (before-anchor + herhangi
+//     bir grade değeri + after-anchor) — böylece HANGİ sınıf seviyesi
+//     gönderilirse gönderilsin doğru şekilde çıkarılabiliyor.
+//
+// ÖNEMLİ EŞİK NOTU: Anthropic'te modele göre minimum cache'lenebilir uzunluk
+// var — altında kalan içerik SESSİZCE (hatasız) cache'lenmeden geçer:
+//   Sonnet 4.5: 2048 token   |   Haiku 4.5: 4096 token
+// Gerçek Anthropic tokenizer'ıyla ölçüldü: multiple_choice/mixed/fill_blank/
+// true_false (misconception kuralını alan 4 tip, en yaygın kullanılanlar)
+// ~4200-4450 token ile Haiku eşiğini gerçek marjla geçiyor. table_fill/
+// multi_true_false/matching/ordering/short_answer (misconception kuralı
+// almayan 5 nadir Maarif-Model tipi) ~93-152 token KISA KALIYOR — bu tipler
+// için Haiku çağrılarında cache devreye girmeyebilir (hata vermez, sadece
+// indirim uygulanmaz). Kesin doğrulama ancak deploy sonrası ai_usage_logs
+// tablosundaki cache_read_tokens/cache_creation_input_tokens alanlarıyla
+// yapılabilir (bu alanlar zaten loglanıyor, bkz. lib/ai-usage.ts).
+//
+// KAPSAM KARARI: Sadece K12/MEB yolu (isUniversity=false) için uygulandı.
+// Üniversite yolu (ayrı, department-özel intro metni içerdiği için tam
+// statik değil) DEĞİŞTİRİLMEDİ.
+//
+// DAVRANIŞ NOTU: İSTİSNA 1-3 önceden SADECE mebCtx (yüklü kaynak) varken
+// gönderiliyordu. Şimdi HER K12 çağrısında (kaynak olsun olmasın) statik
+// blokta yer alıyor — zararsız çünkü kurallar doğal dilde "eğer bu metin
+// X ise" diye kendi kendini koşullandırıyor.
+const K12_STATIC_INTRO = "Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın.\n\nKESİN KURAL: Yalnızca MEB müfredatında yer alan konularda, MEB kazanımlarına uygun sorular üret. Müfredat dışı, spekülatif veya tartışmalı içerik kesinlikle üretme."
+const K12_STATIC_ISTISNA_BLOCK = "🚫 ÖNEMLİ İSTİSNA 1: Eğer bu metin bir MÜFREDAT KAZANIM KODU LİSTESİYSE (örn. \"SB.6.4.1. ... a) ... b) ...\" formatında, öğretmene yönelik öğrenme çıktısı tanımları içeriyorsa) — ASLA \"hangi kazanımın hangi alt maddesi X der\" gibi kod/madde numarasına dayalı sorular ÜRETME. Bunun yerine, o kazanımın işaret ettiği GERÇEK KONUYU (örn. \"vatandaşlık haklarının kullanımında dijitalleşme etkileri\" kazanımından yola çıkarak, dijital vatandaşlık kavramının kendisi hakkında) öğrenciye anlamlı bir içerik sorusu sor. Öğrenci kazanım kodlarını asla görmemeli ve bunlar hakkında sorgulanmamalı. KRİTİK SINIR: kazanım metni kısa/yetersiz olsa bile, ASLA kendi genel bilgine dayanarak BAŞKA, İSİMLENDİRİLMİŞ bir tarihi metne/esere/konuşmaya (ör. Gençliğe Hitabesi, İstiklal Marşı, Nutuk, belirli bir yazarın belirli bir eseri) atlama ve o metinden alıntı/soru üretme — BU METİNLER SANA VERİLMEDİYSE ONLAR HAKKINDA SORU ÜRETMEK KESİNLİKLE YASAK, kazanımla ne kadar tematik olarak yakın görünürse görünsün. Bunun yerine SADECE kazanımın kendi tanımladığı KAVRAM/BECERİ üzerinden, somut ama İSİMSİZ bir senaryo/örnek kurgula (ör. \"Bir yerleşim biriminde alınan bir kararı etkileyen unsurları düşünelim...\" gibi, gerçek bir kişi/eser/tarihi olaya atıfta bulunmayan, kendi kurguladığın bir örnek). SOMUT ÖRNEK — YANLIŞ: kazanım \"toplumsal düzenin sürdürülmesinde temel hak ve sorumlulukların önemi\" iken \"Gençliğe Hitabesi'nde Atatürk'ün ... ifadesi hangi tutumu hedeflemiştir?\" gibi bir soru üretmek (kazanımla ilgisi olmayan, sana verilmeyen bir kaynağa kaçış). DOĞRU: aynı kazanım için \"Bir toplumda bireylerin hem haklarını kullanıp hem sorumluluklarını yerine getirmesi, toplumsal düzenin sürdürülmesi açısından neden önemlidir?\" gibi kazanımın kendi kavramına sadık, kurgusal bir soru.\n\n🚫 ÖNEMLİ İSTİSNA 2: Bu metin gerçek bir sınav kitapçığı/soru bankası çıktısı olabilir ve bu tür kaynaklarda \"Soru 39'da verilen örneğe göre...\", \"38 ve 39. soruları aşağıdaki bilgiye göre cevaplayınız\" gibi BAŞKA numaralı bir soruya/örneğe atıfta bulunan, çok parçalı bir soru zincirinin sadece bir kısmı yer alabilir. Metinde böyle bir referans görürsen o referansı asla olduğu gibi kopyalama — ya atıf yaptığı bilgiyi/örneği (metinde başka bir yerde varsa) bulup doğrudan senin ürettiğin sorunun metnine dahil et, ya da metindeki tamamen bağımsız (başka soruya atıf yapmayan) başka bir örnek/kavram kullan. Öğrenci SADECE senin ürettiğin tek soruyu görecek; \"yukarıda\", \"az önce\", \"Soru X'te\" dediğin hiçbir şey öğrenciye ayrıca gösterilmeyecek.\n\n🚫 ÖNEMLİ İSTİSNA 3: Kaynak metinde İSTATİSTİK, ANKET SONUCU, TABLO veya SAYISAL VERİ (ör. \"kişiler günde ortalama 6 saat TV izliyor, 1 dakika kitap okuyor\" gibi) varsa ve bu veriye dayalı bir soru üretmek istiyorsan, \"metinde verilen istatistiklere göre\" gibi bir ifadeyle veriye SADECE ATIFTA BULUNMA — o veriyi/sayıları/istatistikleri DOĞRUDAN sorunun kendi metnine TAŞI. Öğrenci o istatistiği görmeden soruyu cevaplayamaz. SOMUT ÖRNEK — YANLIŞ: \"Metinde verilen istatistiklere göre, Türkiye'de bir kişi günde kitap okumaya ayrılan zaman ile TV izlemeye ayrılan zaman arasında kaç saat fark vardır?\" (sayılar hiç verilmemiş, cevaplanamaz). DOĞRU: \"Yapılan bir araştırmaya göre Türkiye'de bir kişi günde ortalama 6 saat televizyon izlerken, kitap okumaya sadece 1 dakika ayırmaktadır. Bu bilgiye göre, TV izlemeye ayrılan süre kitap okumaya ayrılan süreden kaç saat fazladır?\" (gerekli sayılar sorunun içinde). Aynı kural, metinde geçen alıntılanmış CÜMLELER/CEVAPLAR için de geçerlidir — \"metinde sıralanan cevaplara göre\" demek yerine, o cevapları/alıntıları KISACA sorunun içine al."
+const K12_STATIC_DOGRULUK_KURALLARI = "DOĞRULUK KURALLARI:\n1. Matematik: Her soruyu adım adım çöz, cevabın opts dizisinde doğru indexte olduğunu doğrula\n2. Fen/Tarih: Sadece kesin bildiğin gerçekleri yaz\n3. \"ans\" indexi MUTLAKA doğru cevabı göstermeli\n4. Emin olmadığın sorular yerine daha basit ama kesin sorular yaz\n5. MEB müfredatına uygun kazanım ve konu kapsamında kal\n6. Sadece multiple_choice ve true_false sorularında altı çizili/vurgulu metin için [köşeli parantez] kullan. fill_blank sorularında ASLA kullanma.\n7. MEB kaynak metni verilmişse: KAYNAK KULLANIM ORANI kuralına (~%30 kaynağa dayalı / ~%70 genel bilgiye dayalı) göre üret — kaynağa dayalı sorularda metindeki gerçek kişi/olay/bilgiyi kullan (uydurma), genel-bilgiye-dayalı sorularda kaynağa bağlı kalmadan ama MEB müfredatına doğru şekilde üret.\n8. HER SORU TAMAMEN KENDİ İÇİNDE EKSİKSİZ VE ÇÖZÜLEBİLİR OLMALI. Kaynak metin gerçek bir sınav kitapçığından alınmış olabilir ve orada \"Soru 39'da verilen örneğe göre...\", \"yukarıdaki tabloya göre...\", \"38 ve 39. soruları bu bilgiye göre cevaplayınız...\" gibi BAŞKA bir soruya/örneğe/tabloya/paragrafa atıfta bulunan, bir soru zincirinin parçası olan ifadeler geçebilir. Bu şekilde başka bir soruya bağımlı, kendi başına çözülemeyecek bir soru ASLA üretme — öğrenci sadece bu tek soruyu görecek, referans verdiğin diğer soru/örnek/tablo öğrenciye HİÇ gösterilmeyecek. Böyle bir referans fark edersen: ya o referansı YOK SAY ve gerekli tüm bilgiyi (verileri, örneği, senaryoyu) doğrudan bu sorunun kendi metnine TAŞI, ya da kaynaktaki bambaşka, bağımsız (başka bir soruya atıf yapmayan) bir örnek/kavram seç.\n9. KAYNAK METNİN KENDİSİ (kitabın yazarları, ISBN'i, kaç sayfa olduğu, hangi yayınevi bastığı, kapak/İçindekiler bilgisi vb.) HAKKINDA ASLA SORU ÜRETME — bunlar kitabın idari/künye bilgisidir, ders içeriği/kazanım DEĞİLDİR. Öğrenci bu kitabı hiç görmedi ve göremeyecek, sadece senin ürettiğin tek bir soruyu görecek. Bu yüzden: (a) \"verilen ders kitabının yazarı kimdir\", \"ISBN numarası nedir\", \"kaç yazar tarafından hazırlanmıştır\" gibi sorular KESİNLİKLE YASAK; (b) BİR OKUMA PARÇASINA/GERÇEK KİŞİ ÖRNEĞİNE/VAKAYA dayalı soru üretiyorsan (ör. \"Metinde anlatılan Ahmet Bey örneğinde...\", \"verilen metne göre\", \"parçada anlatılan olayda\") o metnin/örneğin/kişinin/olayın ÖZETİNİ (2-3 cümle, kim/ne/nerede/nasıl) MUTLAKA sorunun kendi \"q\" alanının BAŞINA yaz, sonra soruyu sor. SOMUT ÖRNEK — YANLIŞ: {\"q\":\"Metinde anlatılan Ahmet Bey örneğinde, hangi amaçla ekonomik faaliyet gerçekleştirilmiştir?\"} (öğrenci metni hiç görmedi, cevaplayamaz!). DOĞRU: {\"q\":\"Ahmet Bey, şehirdeki işini bırakıp köyüne dönmüş ve dedesinden kalan tarlalarda organik tarım yapmaya başlamıştır. Bu örnekte Ahmet Bey'in ekonomik faaliyeti hangi amaca yöneliktir?\"} (gerekli bilgi sorunun içinde). ASLA öğrencinin görmediği bir metne/örneğe atıfta bulunup o metni özetlemeyen bir soru üretme.\n10. KELİME SEVİYESİ: Kullandığın dil, öğrencinin sınıf seviyesine uygun, günlük hayatta bildiği kelimelerle sınırlı kalmalı. Bu yaş grubunun bilmeyeceği akademik, soyut veya üniversite düzeyinde kelimeler ASLA kullanma — gerekiyorsa daha basit eş anlamlısını tercih et.\n11. MÜFREDAT ÇERÇEVE DOKÜMANININ KENDİ YAPISI HAKKINDA SORU ÜRETME: Kaynak metin bazen (tymm.meb.gov.tr gibi resmi bir portaldan alınmış) bir MÜFREDAT ÇERÇEVE DOKÜMANI olabilir — bu dokümanlar \"Öğrenme Kanıtları\", \"Performans Görevi\", \"Köprü Kurma\", \"Öğrenme-Öğretme Yaşantıları\", \"Ön Değerlendirme Süreci\", \"Zenginleştirme\", \"Destekleme\" gibi ÖĞRETMENE yönelik pedagojik planlama bölümleri içerir. Bu bölüm başlıklarının KENDİSİ hakkında (\"X bölümünde hangi yöntem kullanılabilir?\", \"Y aşamasında öğretmenlerin ne yapması öngörülmektedir?\" gibi) SORU ÜRETME — bunlar öğretmenin nasıl öğreteceğine dair idari bilgidir, öğrencinin öğrenmesi gereken KONU İÇERİĞİ değildir (tıpkı kitabın İçindekiler sayfası gibi). Bunun yerine bu bölümlerin İÇİNDE GEÇEN somut örnek/senaryoyu (ör. \"Köprü Kurma\" bölümünde \"STK'ların MEB destekli proje örnekleri incelenir\" yazıyorsa, STK'ların demokrasideki rolü hakkında bir soru sor — \"Köprü Kurma aşamasında ne inceleniyor\" diye sorma) gerçek konu sorusuna dönüştür.\n\n"
+const K12_STATIC_JSON_ONLY_NOTE = "Yalnızca geçerli JSON döndür, markdown veya açıklama ekleme."
+
+// stripStaticPartsForCaching içinde ${grade}'i regex ile atlamak için:
+const K12_DK_STRIP_BEFORE_GRADE = "DOĞRULUK KURALLARI:\n1. Matematik: Her soruyu adım adım çöz, cevabın opts dizisinde doğru indexte olduğunu doğrula\n2. Fen/Tarih: Sadece kesin bildiğin gerçekleri yaz\n3. \"ans\" indexi MUTLAKA doğru cevabı göstermeli\n4. Emin olmadığın sorular yerine daha basit ama kesin sorular yaz\n5. MEB müfredatına uygun kazanım ve konu kapsamında kal\n6. Sadece multiple_choice ve true_false sorularında altı çizili/vurgulu metin için [köşeli parantez] kullan. fill_blank sorularında ASLA kullanma.\n7. MEB kaynak metni verilmişse: yukarıdaki KAYNAK KULLANIM ORANI kuralına göre üret — ~%30 kaynağa dayalı sorularda metindeki gerçek kişi/olay/bilgiyi kullan (uydurma), ~%70 genel-bilgiye-dayalı sorularda kaynağa bağlı kalmadan ama MEB müfredatına doğru şekilde üret.\n8. HER SORU TAMAMEN KENDİ İÇİNDE EKSİKSİZ VE ÇÖZÜLEBİLİR OLMALI. Kaynak metin gerçek bir sınav kitapçığından alınmış olabilir ve orada \"Soru 39'da verilen örneğe göre...\", \"yukarıdaki tabloya göre...\", \"38 ve 39. soruları bu bilgiye göre cevaplayınız...\" gibi BAŞKA bir soruya/örneğe/tabloya/paragrafa atıfta bulunan, bir soru zincirinin parçası olan ifadeler geçebilir. Bu şekilde başka bir soruya bağımlı, kendi başına çözülemeyecek bir soru ASLA üretme — öğrenci sadece bu tek soruyu görecek, referans verdiğin diğer soru/örnek/tablo öğrenciye HİÇ gösterilmeyecek. Böyle bir referans fark edersen: ya o referansı YOK SAY ve gerekli tüm bilgiyi (verileri, örneği, senaryoyu) doğrudan bu sorunun kendi metnine TAŞI, ya da kaynaktaki bambaşka, bağımsız (başka bir soruya atıf yapmayan) bir örnek/kavram seç.\n9. KAYNAK METNİN KENDİSİ (kitabın yazarları, ISBN'i, kaç sayfa olduğu, hangi yayınevi bastığı, kapak/İçindekiler bilgisi vb.) HAKKINDA ASLA SORU ÜRETME — bunlar kitabın idari/künye bilgisidir, ders içeriği/kazanım DEĞİLDİR. Öğrenci bu kitabı hiç görmedi ve göremeyecek, sadece senin ürettiğin tek bir soruyu görecek. Bu yüzden: (a) \"verilen ders kitabının yazarı kimdir\", \"ISBN numarası nedir\", \"kaç yazar tarafından hazırlanmıştır\" gibi sorular KESİNLİKLE YASAK; (b) BİR OKUMA PARÇASINA/GERÇEK KİŞİ ÖRNEĞİNE/VAKAYA dayalı soru üretiyorsan (ör. \"Metinde anlatılan Ahmet Bey örneğinde...\", \"verilen metne göre\", \"parçada anlatılan olayda\") o metnin/örneğin/kişinin/olayın ÖZETİNİ (2-3 cümle, kim/ne/nerede/nasıl) MUTLAKA sorunun kendi \"q\" alanının BAŞINA yaz, sonra soruyu sor. SOMUT ÖRNEK — YANLIŞ: {\"q\":\"Metinde anlatılan Ahmet Bey örneğinde, hangi amaçla ekonomik faaliyet gerçekleştirilmiştir?\"} (öğrenci metni hiç görmedi, cevaplayamaz!). DOĞRU: {\"q\":\"Ahmet Bey, şehirdeki işini bırakıp köyüne dönmüş ve dedesinden kalan tarlalarda organik tarım yapmaya başlamıştır. Bu örnekte Ahmet Bey'in ekonomik faaliyeti hangi amaca yöneliktir?\"} (gerekli bilgi sorunun içinde). ASLA öğrencinin görmediği bir metne/örneğe atıfta bulunup o metni özetlemeyen bir soru üretme.\n10. KELİME SEVİYESİ: Kullandığın dil, "
+const K12_DK_STRIP_AFTER_GRADE = " seviyesindeki bir öğrencinin günlük hayatta bildiği kelimelerle sınırlı kalmalı. Bu yaş grubunun bilmeyeceği akademik, soyut veya üniversite düzeyinde kelimeler ASLA kullanma — gerekiyorsa daha basit eş anlamlısını tercih et.\n11. MÜFREDAT ÇERÇEVE DOKÜMANININ KENDİ YAPISI HAKKINDA SORU ÜRETME: Kaynak metin bazen (tymm.meb.gov.tr gibi resmi bir portaldan alınmış) bir MÜFREDAT ÇERÇEVE DOKÜMANI olabilir — bu dokümanlar \"Öğrenme Kanıtları\", \"Performans Görevi\", \"Köprü Kurma\", \"Öğrenme-Öğretme Yaşantıları\", \"Ön Değerlendirme Süreci\", \"Zenginleştirme\", \"Destekleme\" gibi ÖĞRETMENE yönelik pedagojik planlama bölümleri içerir. Bu bölüm başlıklarının KENDİSİ hakkında (\"X bölümünde hangi yöntem kullanılabilir?\", \"Y aşamasında öğretmenlerin ne yapması öngörülmektedir?\" gibi) SORU ÜRETME — bunlar öğretmenin nasıl öğreteceğine dair idari bilgidir, öğrencinin öğrenmesi gereken KONU İÇERİĞİ değildir (tıpkı kitabın İçindekiler sayfası gibi). Bunun yerine bu bölümlerin İÇİNDE GEÇEN somut örnek/senaryoyu (ör. \"Köprü Kurma\" bölümünde \"STK'ların MEB destekli proje örnekleri incelenir\" yazıyorsa, STK'ların demokrasideki rolü hakkında bir soru sor — \"Köprü Kurma aşamasında ne inceleniyor\" diye sorma) gerçek konu sorusuna dönüştür.\n\n"
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+const K12_STATIC_TYPE_SCHEMAS: Record<string, string> = {
+  fill_blank: "Generate fill-in-the-blank questions. Leave a critical word/concept as blank. Provide 4 options (one correct), write the correct answer in \"blank\" field too.\n\nCRITICAL RULES:\n1. NEVER put the answer or any hint inside the question text. The blank ___ must be the ONLY clue.\n2. Do NOT use [brackets] in fill_blank questions - brackets reveal the answer!\n3. Do NOT add (verb), (noun), (drink) or any word hints in parentheses.\n4. WRONG: \"Normal koşullarda en kararlı karbon formu olan [grafit], kurşun kalemlerinde kullanılır.\" (REVEALS ANSWER!)\n5. CORRECT: \"Normal koşullarda en kararlı karbon formu olan _____, kurşun kalemlerinde kullanılır.\"\n\n{\"questions\":[{\"type\":\"fill_blank\",\"q\":\"_____ is the powerhouse of the cell.\",\"blank\":\"Mitochondria\",\"opts\":[\"Mitochondria\",\"Ribosome\",\"Nucleus\",\"Lysosome\"],\"ans\":0,\"exp\":\"Mitochondria produces ATP through cellular respiration.\"}]}",
+  multi_true_false: "Generate Maarif Model multi-statement true/false questions. Each question has 4-5 statements.\n\n{\"questions\":[{\"type\":\"multi_true_false\",\"q\":\"Aşağıdaki ifadeleri Doğru (D) ya da Yanlış (Y) olarak değerlendirin.\",\"statements\":[{\"text\":\"Mitokondri hücrenin enerji merkezidir.\",\"correct\":true},{\"text\":\"Ribozom DNA saklar.\",\"correct\":false}],\"opts\":[\"D\",\"Y\"],\"ans\":0,\"exp\":\"Açıklama...\"}]}",
+  table_fill: "Generate Maarif Model table-fill questions.\n\n{\"questions\":[{\"type\":\"table_fill\",\"q\":\"Aşağıdaki tabloyu tamamlayın.\",\"tableData\":{\"headers\":[\"Organel\",\"Görevi\"],\"rows\":[{\"cells\":[\"Mitokondri\",\"___\"],\"blanks\":[1]},{\"cells\":[\"Ribozom\",\"___\"],\"blanks\":[1]}]},\"tableAnswers\":[\"ATP üretimi\",\"Protein sentezi\"],\"opts\":[\"A\",\"B\"],\"ans\":0,\"exp\":\"...\"}]}",
+  matching: "Generate matching questions with exactly 4 unique concept-definition pairs.\n\n{\"questions\":[{\"type\":\"matching\",\"q\":\"Match organelles with functions.\",\"pairs\":[{\"left\":\"Mitochondria\",\"right\":\"Energy production\"},{\"left\":\"Ribosome\",\"right\":\"Protein synthesis\"},{\"left\":\"Nucleus\",\"right\":\"DNA storage\"},{\"left\":\"Lysosome\",\"right\":\"Waste digestion\"}],\"opts\":[\"A\",\"B\",\"C\",\"D\"],\"ans\":0,\"exp\":\"...\"}]}",
+  ordering: "Generate ordering/sequencing questions with 4-5 items.\n\n{\"questions\":[{\"type\":\"ordering\",\"q\":\"Order these events chronologically.\",\"items\":[\"Event B\",\"Event A\",\"Event D\",\"Event C\"],\"correctOrder\":[1,0,3,2],\"opts\":[\"1st\",\"2nd\",\"3rd\",\"4th\"],\"ans\":0,\"exp\":\"...\"}]}",
+  short_answer: "Generate short answer questions.\n\n{\"questions\":[{\"type\":\"short_answer\",\"q\":\"What is photosynthesis?\",\"opts\":[\"Photosynthesis is the process by which plants convert CO2 and water into glucose using sunlight.\"],\"ans\":0,\"exp\":\"Equation: 6CO2 + 6H2O + light → C6H12O6 + 6O2\"}]}",
+  mixed: "Generate MIXED questions combining multiple_choice, fill_blank, true_false. IMPORTANT: Never add hints like (verb), (noun) in parentheses in fill_blank questions., multi_true_false, matching, ordering types evenly.\n\n{\"questions\":[{\"type\":\"multiple_choice\",\"q\":\"...\",\"opts\":[\"A\",\"B\",\"C\",\"D\"],\"ans\":0,\"exp\":\"...\"},{\"type\":\"fill_blank\",\"q\":\"___ is the powerhouse\",\"blank\":\"Mitochondria\",\"opts\":[\"Mitochondria\",\"Ribosome\",\"Nucleus\",\"Lysosome\"],\"ans\":0,\"exp\":\"...\"},{\"type\":\"true_false\",\"q\":\"...\",\"opts\":[\"Doğru\",\"Yanlış\"],\"ans\":0,\"exp\":\"...\"},{\"type\":\"multi_true_false\",\"q\":\"...\",\"statements\":[{\"text\":\"...\",\"correct\":true}],\"opts\":[\"D\",\"Y\"],\"ans\":0,\"exp\":\"...\"},{\"type\":\"matching\",\"q\":\"...\",\"pairs\":[{\"left\":\"...\",\"right\":\"...\"}],\"opts\":[\"A\",\"B\",\"C\",\"D\"],\"ans\":0,\"exp\":\"...\"},{\"type\":\"ordering\",\"q\":\"...\",\"items\":[\"B\",\"A\",\"D\",\"C\"],\"correctOrder\":[1,0,3,2],\"opts\":[\"1.\",\"2.\",\"3.\",\"4.\"],\"ans\":0,\"exp\":\"...\"}]}",
+  multiple_choice: "Generate multiple choice questions with 4 options (A/B/C/D), correct answer index, and explanation.\n\nCRITICAL FOR MATH/SCIENCE:\n- Solve every calculation step by step BEFORE writing\n- Verify the correct answer is at the specified ans index\n\n{\"questions\":[{\"type\":\"multiple_choice\",\"q\":\"Question text\",\"opts\":[\"Option A\",\"Option B\",\"Option C\",\"Option D\"],\"ans\":0,\"exp\":\"Explanation\"}]}",
+}
+
+function getK12TypeSchema(type: string, language: string): string {
+  if (type === 'true_false') {
+    // Tek istisna: bu şablon ${language} enterpole ediyor, bu yüzden tam
+    // statik değil — ama (type, language) ikilisi sabitse yine cache'e
+    // uygun kalır (aynı dil için tekrar tekrar aynı metin üretilir).
+    return "Generate true/false questions with reasoning. ans:0 means True, ans:1 means False. opts must always be [\"True\",\"False\"] but translated to ${language}.\n\n{\"questions\":[{\"type\":\"true_false\",\"q\":\"Photosynthesis only occurs during daytime.\",\"opts\":[\"True\",\"False\"],\"ans\":0,\"exp\":\"Photosynthesis requires light energy so it occurs during daytime.\"}]}"
+  }
+  return K12_STATIC_TYPE_SCHEMAS[type] || K12_STATIC_TYPE_SCHEMAS['multiple_choice']
+}
+
+// Bu, system dizisinde cache_control ile işaretlenip gönderilecek TEK,
+// BİRLEŞİK statik metin. type+language değişmediği sürece BİREBİR AYNI
+// metni üretir — cache hit'in gerçekleşmesi için bu şart.
+function getStaticSystemBlock(type: string, language: string): string {
+  return `${K12_STATIC_INTRO}\n\n${K12_STATIC_ISTISNA_BLOCK}\n\n${K12_STATIC_DOGRULUK_KURALLARI}\n\n${K12_STATIC_JSON_ONLY_NOTE}\n\n${getK12TypeSchema(type, language)}${misconceptionMetadataInstruction(type)}`
+}
+
+// buildPrompt()'un ÜRETTİĞİ TAM metinden yukarıdaki statik alt-dizeleri
+// çıkarır — buildPrompt()'un kendi iç mantığına HİÇ dokunulmadı (regresyon
+// riski sıfır), sadece çıktısı post-process ediliyor. Üniversite yolu için
+// çağrılmaz (isUniversity kontrolü çağıran tarafta yapılır).
+function stripStaticPartsForCaching(fullPrompt: string, type: string, language: string): string {
+  let result = fullPrompt
+  result = result.replace("Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın.\n\nKESİN KURAL: Yalnızca MEB müfredatında yer alan konularda, MEB kazanımlarına uygun sorular üret. Müfredat dışı, spekülatif veya tartışmalı içerik kesinlikle üretme.", '')
+  result = result.replace("🚫 ÖNEMLİ İSTİSNA 1: Eğer bu metin bir MÜFREDAT KAZANIM KODU LİSTESİYSE (örn. \"SB.6.4.1. ... a) ... b) ...\" formatında, öğretmene yönelik öğrenme çıktısı tanımları içeriyorsa) — ASLA \"hangi kazanımın hangi alt maddesi X der\" gibi kod/madde numarasına dayalı sorular ÜRETME. Bunun yerine, o kazanımın işaret ettiği GERÇEK KONUYU (örn. \"vatandaşlık haklarının kullanımında dijitalleşme etkileri\" kazanımından yola çıkarak, dijital vatandaşlık kavramının kendisi hakkında) öğrenciye anlamlı bir içerik sorusu sor. Öğrenci kazanım kodlarını asla görmemeli ve bunlar hakkında sorgulanmamalı. KRİTİK SINIR: kazanım metni kısa/yetersiz olsa bile, ASLA kendi genel bilgine dayanarak BAŞKA, İSİMLENDİRİLMİŞ bir tarihi metne/esere/konuşmaya (ör. Gençliğe Hitabesi, İstiklal Marşı, Nutuk, belirli bir yazarın belirli bir eseri) atlama ve o metinden alıntı/soru üretme — BU METİNLER SANA VERİLMEDİYSE ONLAR HAKKINDA SORU ÜRETMEK KESİNLİKLE YASAK, kazanımla ne kadar tematik olarak yakın görünürse görünsün. Bunun yerine SADECE kazanımın kendi tanımladığı KAVRAM/BECERİ üzerinden, somut ama İSİMSİZ bir senaryo/örnek kurgula (ör. \"Bir yerleşim biriminde alınan bir kararı etkileyen unsurları düşünelim...\" gibi, gerçek bir kişi/eser/tarihi olaya atıfta bulunmayan, kendi kurguladığın bir örnek). SOMUT ÖRNEK — YANLIŞ: kazanım \"toplumsal düzenin sürdürülmesinde temel hak ve sorumlulukların önemi\" iken \"Gençliğe Hitabesi'nde Atatürk'ün ... ifadesi hangi tutumu hedeflemiştir?\" gibi bir soru üretmek (kazanımla ilgisi olmayan, sana verilmeyen bir kaynağa kaçış). DOĞRU: aynı kazanım için \"Bir toplumda bireylerin hem haklarını kullanıp hem sorumluluklarını yerine getirmesi, toplumsal düzenin sürdürülmesi açısından neden önemlidir?\" gibi kazanımın kendi kavramına sadık, kurgusal bir soru.\n\n🚫 ÖNEMLİ İSTİSNA 2: Bu metin gerçek bir sınav kitapçığı/soru bankası çıktısı olabilir ve bu tür kaynaklarda \"Soru 39'da verilen örneğe göre...\", \"38 ve 39. soruları aşağıdaki bilgiye göre cevaplayınız\" gibi BAŞKA numaralı bir soruya/örneğe atıfta bulunan, çok parçalı bir soru zincirinin sadece bir kısmı yer alabilir. Metinde böyle bir referans görürsen o referansı asla olduğu gibi kopyalama — ya atıf yaptığı bilgiyi/örneği (metinde başka bir yerde varsa) bulup doğrudan senin ürettiğin sorunun metnine dahil et, ya da metindeki tamamen bağımsız (başka soruya atıf yapmayan) başka bir örnek/kavram kullan. Öğrenci SADECE senin ürettiğin tek soruyu görecek; \"yukarıda\", \"az önce\", \"Soru X'te\" dediğin hiçbir şey öğrenciye ayrıca gösterilmeyecek.\n\n🚫 ÖNEMLİ İSTİSNA 3: Kaynak metinde İSTATİSTİK, ANKET SONUCU, TABLO veya SAYISAL VERİ (ör. \"kişiler günde ortalama 6 saat TV izliyor, 1 dakika kitap okuyor\" gibi) varsa ve bu veriye dayalı bir soru üretmek istiyorsan, \"metinde verilen istatistiklere göre\" gibi bir ifadeyle veriye SADECE ATIFTA BULUNMA — o veriyi/sayıları/istatistikleri DOĞRUDAN sorunun kendi metnine TAŞI. Öğrenci o istatistiği görmeden soruyu cevaplayamaz. SOMUT ÖRNEK — YANLIŞ: \"Metinde verilen istatistiklere göre, Türkiye'de bir kişi günde kitap okumaya ayrılan zaman ile TV izlemeye ayrılan zaman arasında kaç saat fark vardır?\" (sayılar hiç verilmemiş, cevaplanamaz). DOĞRU: \"Yapılan bir araştırmaya göre Türkiye'de bir kişi günde ortalama 6 saat televizyon izlerken, kitap okumaya sadece 1 dakika ayırmaktadır. Bu bilgiye göre, TV izlemeye ayrılan süre kitap okumaya ayrılan süreden kaç saat fazladır?\" (gerekli sayılar sorunun içinde). Aynı kural, metinde geçen alıntılanmış CÜMLELER/CEVAPLAR için de geçerlidir — \"metinde sıralanan cevaplara göre\" demek yerine, o cevapları/alıntıları KISACA sorunun içine al.", '')
+  // DOĞRULUK KURALLARI: içindeki ${grade} (10. madde) yüzünden sabit
+  // .replace() kullanılamıyor — regex ile ARADAKİ değeri (hangi sınıf
+  // seviyesi olursa olsun) atlayarak çıkarıyoruz.
+  const dkRegex = new RegExp(escapeRegExp(K12_DK_STRIP_BEFORE_GRADE) + '[^\\n]*?' + escapeRegExp(K12_DK_STRIP_AFTER_GRADE))
+  result = result.replace(dkRegex, '')
+  result = result.replace(K12_STATIC_JSON_ONLY_NOTE, '')
+  result = result.replace(getK12TypeSchema(type, language), '')
+  result = result.replace(misconceptionMetadataInstruction(type), '')
+  // Ardışık boş satırların birikmesini temizle (kozmetik, token'ı da azaltır)
+  result = result.replace(/\n{3,}/g, '\n\n').trim()
+  return result
+}
+
 // Öğretmen geri bildirimleriyle bulunan 4 ayrı içerik kalitesi hatasına
 // karşı TEK, paylaşılan filtre fonksiyonu (hem ana üretim hem eksik-soru
 // tamamlama turu bunu kullanır — kopya mantık yok).
@@ -906,11 +1104,27 @@ export async function POST(req: NextRequest) {
       previousQuestionsNote += `\n\n⚠️ KAYNAK METİN SÜREKLİLİĞİ: Bu, aynı kaynak metne dayanan bir testin İKİNCİ (veya sonraki) parçası. Yukarıda listelenen önceki sorular, kaynak metnin BELİRLİ cümlelerini/olgularını zaten kullandı. Bu parçada o AYNI cümleleri/olguları FARKLI bir ifadeyle, farklı bir soru formatıyla, ya da "doğru mu yanlış mı" gibi tersinden bile olsa TEKRAR HEDEFLEME — bu, öğretmen tarafından "aynı bilgi 6-7 kez soruldu" diye eleştirilen bilinen bir hata deseni. Bunun yerine: (a) kaynak metnin önceki parçada HİÇ değinilmemiş başka bir cümlesini/paragrafını kullan, VEYA (b) konunun (topic) kendisi hakkında, kaynak metne dayanmayan, genel kavramsal bir soru sor (ör. temel itikat/tanım sorusu) — bu ikinci seçenek özellikle kaynak metin kısaysa ve tüm cümleleri önceki parçada tükenmişse tercih edilmeli.`
     }
 
-    const prompt = buildPrompt(questionType, topic, grade, resolvedDifficulty, effectiveLang, safeQCount, fileContent || '', gradeContext, mebContext, profile.department || undefined, subject)
+    const fullPrompt = buildPrompt(questionType, topic, grade, resolvedDifficulty, effectiveLang, safeQCount, fileContent || '', gradeContext, mebContext, profile.department || undefined, subject)
+    const isUniversityLevel = level === 'universite'
+
+    // 5 Eylül 2026 — P0 prompt caching (bkz. K12_STATIC_* tanımları ve
+    // getStaticSystemBlock/stripStaticPartsForCaching yukarıda). Sadece K12/
+    // MEB yolu için: statik talimat bloğu (DOĞRULUK KURALLARI + İSTİSNA 1-3 +
+    // tip şeması + kavram yanılgısı kuralı) artık `system` dizisinde AYRI,
+    // cache_control ile işaretli bir blok olarak gönderiliyor; dinamik kısım
+    // (konu/kaynak/oran metni) çok daha küçük bir user mesajı olarak kalıyor.
+    // Üniversite yolu DEĞİŞTİRİLMEDİ (department-özel intro tam statik değil,
+    // ayrıca gerçek kullanım verisi zaten tamamen K12 ağırlıklı olduğu için
+    // bu, riski düşürüp faydanın neredeyse tamamını yakalıyor).
+    const dynamicPrompt = isUniversityLevel
+      ? fullPrompt
+      : stripStaticPartsForCaching(fullPrompt, questionType, effectiveLang)
+
+    const prompt = dynamicPrompt
       + (adaptivePolicy?.promptContext || '')
-      + misconceptionMetadataInstruction(questionType)
+      + (isUniversityLevel ? misconceptionMetadataInstruction(questionType) : '') // K12'de artık statik blokta
       + previousQuestionsNote
-    promptStr = prompt
+    promptStr = fullPrompt + (adaptivePolicy?.promptContext || '') + misconceptionMetadataInstruction(questionType) + previousQuestionsNote // hata loglaması için TAM metin saklanır
     countRef = safeQCount
 
     // Hız optimizasyonu: az soru → Haiku (3x hızlı), çok soru → Sonnet
@@ -918,9 +1132,12 @@ export async function POST(req: NextRequest) {
     const response = await anthropic.messages.create({
       model: useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5',
       max_tokens: useHaiku ? 2500 : 3500,
-      system: level === 'universite'
+      system: isUniversityLevel
         ? 'Sen üniversite düzeyinde soru üreten bir eğitim asistanısın. MEB K-12 müfredatı kısıtı burada geçerli değil; öğrencinin bölümüne/seviyesine uygun, akademik olarak doğru sorular üret. Siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.'
-        : 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca MEB müfredatındaki konularda soru üret. Müfredat dışı, siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.',
+        : [
+            { type: 'text' as const, text: 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca MEB müfredatındaki konularda soru üret. Müfredat dışı, siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.' },
+            { type: 'text' as const, text: getStaticSystemBlock(questionType, effectiveLang), cache_control: { type: 'ephemeral' as const } },
+          ],
       messages: [{ role: 'user', content: prompt }],
     })
     console.log(`[generate-quiz] model=${useHaiku ? 'haiku' : 'sonnet'} qCount=${safeQCount}`)
@@ -1126,6 +1343,16 @@ export async function POST(req: NextRequest) {
             // doğru sayıya ulaşmak öncelikli.
             model: 'claude-sonnet-4-5',
             max_tokens: Math.min(4000, Math.max(2000, missing * 600)),
+            // 5 Eylül 2026 — P0 prompt caching: `prompt` değişkeni artık K12
+            // yolunda zaten SIKIŞTIRILMIŞ (statik kısımlar çıkarılmış) hâlde,
+            // bu yüzden topupPrompt de otomatik olarak küçük kalıyor. Aynı
+            // statik bloğu (ana çağrıyla BİREBİR AYNI metin — cache hit için
+            // şart) burada da system'e ekliyoruz. Gerçek veride topup en
+            // pahalı kalemdi (çağrı başına ~$0.038) çünkü tüm promptu tekrar
+            // gönderiyordu — artık hem daha küçük hem cache'den okunabilir.
+            system: isUniversityLevel
+              ? undefined
+              : [{ type: 'text' as const, text: getStaticSystemBlock(questionType, effectiveLang), cache_control: { type: 'ephemeral' as const } }],
             messages: [{ role: 'user', content: topupPrompt }],
           })
           logAnthropicUsage('generate-quiz:topup', 'claude-sonnet-4-5', topupResponse, {
