@@ -45,6 +45,27 @@ const GROUP_LABELS: Record<string, string> = {
   universite: 'Üniversite',
 }
 
+// 5 Eylül 2026 — Deniz'in talebiyle: liderlik tablosunda diğer öğrencilerin
+// tam adı/soyadı gösterilmemeli (gizlilik). Her kelimenin ilk 2 harfi
+// korunur, ortası sabit "***" ile maskelenir; SADECE SON kelimenin (soyadın)
+// son harfi de görünür kalır — örnek: "Selin Kunter" -> "Se*** Ku***r".
+// 2 karakter veya daha kısa kelimeler (ör. "G.", tek harfli baş harfler)
+// anlamlı şekilde maskelenemeyeceği için olduğu gibi bırakılır. Kullanıcının
+// KENDİ satırı bu maskelemeden muaf tutulur (bkz. çağrıldığı yer — sadece
+// e.id !== user.id olan kayıtlara uygulanır).
+function maskNamePart(part: string, keepLastChar: boolean): string {
+  if (part.length <= 2) return part
+  const start = part.slice(0, 2)
+  const end = keepLastChar ? part.slice(-1) : ''
+  return `${start}***${end}`
+}
+
+function maskFullName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return fullName
+  return parts.map((p, i) => maskNamePart(p, i === parts.length - 1)).join(' ')
+}
+
 export default function LeaderboardPage() {
   const router = useRouter()
   const [entries, setEntries] = useState<LeaderEntry[]>([])
@@ -69,7 +90,15 @@ export default function LeaderboardPage() {
 
       // İsimler TR-PG'den çözülür; leaderboard view'i yalnızca id/grade/puan sağlar
       const identities = await resolveIdentities(supabase, (lb || []).map((e: any) => e.id))
-      const allEntries = (lb || []).map((e: any) => ({ ...e, name: identities[e.id]?.full_name || 'İsimsiz' }))
+      const allEntries = (lb || []).map((e: any) => {
+        const resolvedName = identities[e.id]?.full_name
+        // Kendi satırın hariç, gerçek bir isim bulunduysa maskelenir.
+        // "İsimsiz" yer tutucusu bir isim DEĞİL — maskelenmemeli.
+        const name = e.id === user.id
+          ? (resolvedName || 'İsimsiz')
+          : (resolvedName ? maskFullName(resolvedName) : 'İsimsiz')
+        return { ...e, name }
+      })
       setEntries(allEntries)
       setMyEntry(allEntries.find((e: LeaderEntry) => e.id === user.id) || null)
       setMyGrade(profile?.grade || '')
