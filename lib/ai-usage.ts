@@ -30,8 +30,21 @@ const PRICES: Record<string, Price> = {
   'claude-sonnet-4-5':          { input: 3.0,  output: 15.0, cacheRead: 0.30, cacheWrite: 3.75 },
   'claude-haiku-4-5-20251001':  { input: 1.0,  output: 5.0,  cacheRead: 0.10, cacheWrite: 1.25 },
   // OpenAI
-  'gpt-4o':                     { input: 5.0,  output: 20.0, cacheRead: 2.50, cacheWrite: 0 },
-  'gpt-4o-mini':                { input: 0.15, output: 0.60, cacheRead: 0.075, cacheWrite: 0 },
+  // 5 Eylül 2026 — fiyatlar web'den doğrulanarak güncellendi. Eski GPT-4o
+  // fiyatı ($5/$20) GÜNCEL DEĞİLDİ — gerçek güncel fiyat $2.50/$10
+  // (cache'li input $1.25). Bu, o zamana kadarki TÜM GPT-4o maliyet
+  // takibini (verify-questions:gpt4o) yaklaşık 2 KAT ŞİŞİRMİŞTİ. Ayrıca
+  // OpenAI'nin GPT-4o'yu "legacy" ilan edip GPT-4.1/GPT-5 ailesini önerdiği
+  // ve bunların HEM daha ucuz HEM daha yüksek cache indirimi (%75-90)
+  // sunduğu görüldü — bu modeller ileride karşılaştırma/geçiş
+  // değerlendirmesi için tabloya eklendi.
+  'gpt-4o':                     { input: 2.50, output: 10.00, cacheRead: 1.25,  cacheWrite: 0 },
+  'gpt-4o-mini':                { input: 0.15, output: 0.60,  cacheRead: 0.075, cacheWrite: 0 },
+  'gpt-4.1':                    { input: 2.00, output: 8.00,  cacheRead: 0.50,  cacheWrite: 0 },
+  'gpt-4.1-mini':               { input: 0.40, output: 1.60,  cacheRead: 0.10,  cacheWrite: 0 },
+  'gpt-4.1-nano':               { input: 0.10, output: 0.40,  cacheRead: 0.025, cacheWrite: 0 },
+  'gpt-5':                      { input: 1.25, output: 10.00, cacheRead: 0.125, cacheWrite: 0 },
+  'gpt-5-mini':                 { input: 0.25, output: 2.00,  cacheRead: 0.025, cacheWrite: 0 },
   // Google
   'gemini-2.0-flash':           { input: 0.10, output: 0.40, cacheRead: 0.025, cacheWrite: 0 },
 }

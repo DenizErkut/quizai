@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 120
 export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
-import { generateQuizFallback } from '@/lib/openai'
+import { generateQuizFallback, callOpenAI } from '@/lib/openai'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { createClient } from '@supabase/supabase-js'
 import { getTopicMastery, computeErrorPatterns, buildStudentHistoryContext } from '@/lib/mastery'
@@ -856,6 +856,11 @@ export async function POST(req: NextRequest) {
   const requestStartTime = Date.now()
   let promptStr = ''
   let countRef = 5
+  // 5 Eylül 2026 — GPT-4.1-mini pilotu: bu istekte ana üretim için hangi
+  // motor kullanıldı (quiz_sessions.gen_engine'e yazılacak, kalite/maliyet
+  // karşılaştırması için). Varsayılan 'claude-sonnet' — pilot rastgele
+  // seçilmezse ya da erken bir hata ile karşılaşılırsa bu güvenli varsayılan.
+  let genEngineUsed = 'claude-sonnet'
   // 26 Ağustos 2026 — öğretmen geri bildirimi: "Metinde, ..." tarzı sorularda
   // öğrenciye kaynak metnin KENDİSİ hiç gösterilmiyordu. mebContext/fileContent
   // yalnızca AI'ın prompt'una gidiyordu, response'a hiç eklenmiyordu — AI'ın
@@ -1129,23 +1134,58 @@ export async function POST(req: NextRequest) {
 
     // Hız optimizasyonu: az soru → Haiku (3x hızlı), çok soru → Sonnet
     const useHaiku = safeQCount <= 7
-    const response = await anthropic.messages.create({
-      model: useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5',
-      max_tokens: useHaiku ? 2500 : 3500,
-      system: isUniversityLevel
-        ? 'Sen üniversite düzeyinde soru üreten bir eğitim asistanısın. MEB K-12 müfredatı kısıtı burada geçerli değil; öğrencinin bölümüne/seviyesine uygun, akademik olarak doğru sorular üret. Siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.'
-        : [
-            { type: 'text' as const, text: 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca MEB müfredatındaki konularda soru üret. Müfredat dışı, siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.' },
-            { type: 'text' as const, text: getStaticSystemBlock(questionType, effectiveLang), cache_control: { type: 'ephemeral' as const } },
-          ],
-      messages: [{ role: 'user', content: prompt }],
-    })
-    console.log(`[generate-quiz] model=${useHaiku ? 'haiku' : 'sonnet'} qCount=${safeQCount}`)
-    logAnthropicUsage('generate-quiz', useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5', response, {
-      meta: { qCount: safeQCount, topic, hasMebContext: !!mebContext },
-    })
 
-    const text = response.content[0].type === 'text' ? response.content[0].text : ''
+    // 5 Eylül 2026 — Deniz'in talebiyle: KÜÇÜK, KONTROLLÜ bir pilot.
+    // "Ana üretimi (en yüksek hacim, en yüksek tasarruf potansiyeli)
+    // GPT-4.1-mini'ye geçirip bir hafta gerçek veriyle karşılaştıralım,
+    // topup'a hiç dokunmadan." Bu yüzden:
+    //  - SADECE ana üretim çağrısı (bu blok) etkileniyor — topup (aşağıda,
+    //    ayrı bir bölüm) tamamen dokunulmadan Sonnet'te kalıyor.
+    //  - SADECE K12/MEB yolu (üniversite hariç — orada sourceBased/statik
+    //    blok mimarisi yok, pilot için hazır değil).
+    //  - Rastgele bir YÜZDE (varsayılan %30 — GPT_PILOT_FRACTION ile
+    //    ayarlanabilir, env değişkenine gerek yok, kod içinde sabit) Claude
+    //    yerine GPT-4.1-mini kullanıyor; kalanı mevcut davranışta (Haiku/
+    //    Sonnet) kalıyor — böylece AYNI hafta içinde HER İKİ motorun da
+    //    gerçek verisi birikip doğrudan karşılaştırılabiliyor (A/B).
+    //  - Hangi motorun kullanıldığı hem ai_usage_logs'a (operation etiketi
+    //    farklı: 'generate-quiz' vs 'generate-quiz:pilot-gpt41mini') hem de
+    //    quiz_sessions.gen_engine sütununa (bkz. aşağıda insert) kaydediliyor
+    //    — bir hafta sonra hem MALİYET hem KALİTE (skor, tamamlanma oranı,
+    //    topup'a düşme sıklığı) karşılaştırması yapılabilsin diye.
+    const GPT_PILOT_FRACTION = 0.30
+    const useGptPilot = !isUniversityLevel && Math.random() < GPT_PILOT_FRACTION
+    genEngineUsed = useGptPilot ? 'gpt-4.1-mini' : (useHaiku ? 'claude-haiku' : 'claude-sonnet')
+
+    let text: string
+    if (useGptPilot) {
+      const gptResult = await callOpenAI(
+        [
+          { role: 'system', content: 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca MEB müfredatındaki konularda soru üret. Müfredat dışı, siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.\n\n' + getStaticSystemBlock(questionType, effectiveLang) },
+          { role: 'user', content: prompt },
+        ],
+        { model: 'gpt-4.1-mini', max_tokens: useHaiku ? 2500 : 3500, json: true, operation: 'generate-quiz:pilot-gpt41mini' }
+      )
+      text = gptResult
+      console.log(`[generate-quiz] PILOT model=gpt-4.1-mini qCount=${safeQCount}`)
+    } else {
+      const response = await anthropic.messages.create({
+        model: useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5',
+        max_tokens: useHaiku ? 2500 : 3500,
+        system: isUniversityLevel
+          ? 'Sen üniversite düzeyinde soru üreten bir eğitim asistanısın. MEB K-12 müfredatı kısıtı burada geçerli değil; öğrencinin bölümüne/seviyesine uygun, akademik olarak doğru sorular üret. Siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.'
+          : [
+              { type: 'text' as const, text: 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca MEB müfredatındaki konularda soru üret. Müfredat dışı, siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.' },
+              { type: 'text' as const, text: getStaticSystemBlock(questionType, effectiveLang), cache_control: { type: 'ephemeral' as const } },
+            ],
+        messages: [{ role: 'user', content: prompt }],
+      })
+      console.log(`[generate-quiz] model=${useHaiku ? 'haiku' : 'sonnet'} qCount=${safeQCount}`)
+      logAnthropicUsage('generate-quiz', useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5', response, {
+        meta: { qCount: safeQCount, topic, hasMebContext: !!mebContext },
+      })
+      text = response.content[0].type === 'text' ? response.content[0].text : ''
+    }
     const clean = text.replace(/```json|```/g, '').trim()
 
     // 4 Eylül 2026 — Deniz'in gerçek loglarla bulduğu hata: "JSON parse failed
@@ -1487,6 +1527,7 @@ export async function POST(req: NextRequest) {
           score: 0,
           completed: false,
           question_type: questionType,
+          gen_engine: genEngineUsed,
         })
         .select('id')
         .maybeSingle()
