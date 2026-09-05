@@ -931,11 +931,61 @@ export async function POST(req: NextRequest) {
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
     const clean = text.replace(/```json|```/g, '').trim()
 
+    // 4 Eylül 2026 — Deniz'in gerçek loglarla bulduğu hata: "JSON parse failed
+    // completely: Could not recover questions" (özellikle qCount=7, Haiku).
+    // Kök neden koddan doğrulandı: eski kurtarma mekanizması İKİ AYRI hatalı
+    // regex kullanıyordu:
+    //  (a) `"questions"\s*:\s*(\[[\s\S]*?\](?=\s*[},]))` — TEMBEL (lazy) eşleşme,
+    //      "questions" dizisinin kapanışını değil, İLK SORUNUN "opts" dizisinin
+    //      kapanışını (ki o da "," ile takip ediliyor) yakalayıp orada duruyordu
+    //      — yani gerçek diziyi hiç yakalayamıyordu (izole test: 7 soruluk
+    //      gerçek bir JSON'da bu regex sadece İLK sorunun opts dizisini
+    //      döndürüyordu, gerisi tamamen kayboluyordu).
+    //  (b) `\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}` — iç içe (nested) obje içeren soru
+    //      tiplerinde (ör. table_fill'in "tableData":{...}) YAPISAL OLARAK
+    //      ÇALIŞAMAZ, sadece tek seviye nested'i destekliyor.
+    // Bu ikisi birleşince, JSON'un normal geçerli-parse'ı başarısız olduğu HER
+    // durumda (ör. token limiti nedeniyle sonun kesilmesi) kurtarma neredeyse
+    // hiç işe yaramıyor, tüm soru kaybediliyor ve öğrenciye 500 hatası dönüyordu.
+    // Yeni extractQuestionObjects(): karakter-karakter { }/[] denge takibi yapan,
+    // string içindeki kaçışlı tırnak/parantezleri doğru ele alan, iç içe objeyi
+    // destekleyen VE JSON sonda kesilmiş olsa bile TAMAMLANMIŞ soruları kurtarıp
+    // sadece yarım kalan son soruyu atlayan sağlam bir çözümleyici. 5 senaryoyla
+    // izole test edildi (tam JSON, nested obje, kesilmiş JSON, kaçışlı karakter,
+    // gerçek hataya yol açan 7-soru senaryosu) — hepsi doğru sonuç verdi.
+    function extractQuestionObjects(raw: string): any[] {
+      const key = raw.indexOf('"questions"')
+      if (key === -1) return []
+      const arrStart = raw.indexOf('[', key)
+      if (arrStart === -1) return []
+      const results: any[] = []
+      let i = arrStart + 1
+      while (i < raw.length) {
+        while (i < raw.length && /[\s,]/.test(raw[i])) i++
+        if (raw[i] !== '{') break
+        const objStart = i
+        let depth = 0, inStr = false, esc = false
+        for (; i < raw.length; i++) {
+          const c = raw[i]
+          if (esc) { esc = false; continue }
+          if (c === '\\') { esc = true; continue }
+          if (c === '"') { inStr = !inStr; continue }
+          if (inStr) continue
+          if (c === '{') depth++
+          else if (c === '}') { depth--; if (depth === 0) { i++; break } }
+        }
+        if (depth !== 0) break // son obje token limiti yüzünden kesilmiş — dahil etme
+        const candidate = raw.slice(objStart, i)
+        try { results.push(JSON.parse(candidate)) } catch { /* bozuk tekil obje, atla */ }
+      }
+      return results
+    }
+
     let parsed: any
     try {
       parsed = JSON.parse(clean)
     } catch {
-      // JSON bozuksa — questions array'ini direkt çıkar
+      // JSON bozuksa — önce doğrudan tam obje olarak dene
       try {
         const match = clean.match(/\{[\s\S]*\}/)
         if (match) {
@@ -944,31 +994,13 @@ export async function POST(req: NextRequest) {
           throw new Error('No JSON object found')
         }
       } catch {
-        // Son çare: questions array'ini regex ile çıkar
-        try {
-          const arrMatch = clean.match(/"questions"\s*:\s*(\[[\s\S]*?\](?=\s*[},]))/)
-          if (arrMatch) {
-            // Her soruyu ayrı ayrı parse et
-            const questionsStr = arrMatch[1]
-            const safeQuestions: any[] = []
-            // Basit soru nesnelerini bul
-            const questionMatches = questionsStr.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g)
-            if (questionMatches) {
-              for (const qStr of questionMatches) {
-                try { safeQuestions.push(JSON.parse(qStr)) } catch {}
-              }
-            }
-            if (safeQuestions.length > 0) {
-              parsed = { questions: safeQuestions }
-              console.warn('[generate-quiz] JSON recovered via regex, got', safeQuestions.length, 'questions')
-            } else {
-              throw new Error('Could not recover questions')
-            }
-          } else {
-            throw new Error('Invalid JSON - no questions array')
-          }
-        } catch(e2) {
-          console.error('[generate-quiz] JSON parse failed completely:', e2)
+        // Son çare: dengeli-parantez çözümleyiciyle tek tek soru objelerini kurtar
+        const safeQuestions = extractQuestionObjects(clean)
+        if (safeQuestions.length > 0) {
+          parsed = { questions: safeQuestions }
+          console.warn(`[generate-quiz] JSON recovered via balanced-brace parser, got ${safeQuestions.length} questions`)
+        } else {
+          console.error(`[generate-quiz] JSON parse failed completely. Raw text (ilk 500 + son 500 karakter): ${clean.slice(0, 500)} ...[KESİLDİ]... ${clean.slice(-500)}`)
           return NextResponse.json({ error: 'Quiz generation failed - invalid response' }, { status: 500 })
         }
       }
@@ -1108,6 +1140,16 @@ export async function POST(req: NextRequest) {
             const m = topupClean.match(/\{[\s\S]*\}/)
             if (m) {
               try { topupParsed = JSON.parse(m[0]) } catch { topupParsed = null }
+            }
+            // 4 Eylül 2026 — ana üretimdeki aynı sağlam kurtarma burada da: JSON
+            // token limiti yüzünden ortada kesilse bile TAMAMLANMIŞ soruları
+            // kurtarır (bkz. yukarıdaki extractQuestionObjects tanımı ve notu).
+            if (!topupParsed?.questions?.length) {
+              const recovered = extractQuestionObjects(topupClean)
+              if (recovered.length > 0) {
+                topupParsed = { questions: recovered }
+                console.warn(`[generate-quiz] topup JSON recovered via balanced-brace parser, got ${recovered.length} questions`)
+              }
             }
           }
           let topupQuestions = topupParsed?.questions || []
