@@ -46,7 +46,13 @@ const PRICES: Record<string, Price> = {
   'gpt-5':                      { input: 1.25, output: 10.00, cacheRead: 0.125, cacheWrite: 0 },
   'gpt-5-mini':                 { input: 0.25, output: 2.00,  cacheRead: 0.025, cacheWrite: 0 },
   // Google
-  'gemini-2.0-flash':           { input: 0.10, output: 0.40, cacheRead: 0.025, cacheWrite: 0 },
+  // Google — 6 Eylül 2026: 'gemini-2.0-flash' Google tarafından KALDIRILDI
+  // (404 "no longer available"), tüm çağrı noktaları 'gemini-3.6-flash'e
+  // güncellendi. Eski kayıt, geçmiş log satırlarını doğru fiyatlandırmak
+  // için (model adı geriye dönük değişmez) korunuyor — yeni çağrılar hiç
+  // bu anahtarı kullanmayacak.
+  'gemini-2.0-flash':           { input: 0.10, output: 0.40, cacheRead: 0.025, cacheWrite: 0 }, // ESKİ/KALDIRILDI, sadece geçmiş kayıtlar için
+  'gemini-3.6-flash':           { input: 1.50, output: 7.50, cacheRead: 0.15, cacheWrite: 0 },
 }
 
 // Fiyat listesinde olmayan bir model gelirse maliyeti 0 loglanır ama token

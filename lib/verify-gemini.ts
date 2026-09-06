@@ -25,7 +25,12 @@ export async function verifyQuestionWithGemini(prompt: string): Promise<{ ok: bo
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      // 6 Eylül 2026 — Deniz'in kredi yüklemesi sonrası eklediğimiz teşhis
+      // logu (bkz. aşağıdaki catch) gerçek nedeni ortaya çıkardı: kredi/kota
+      // sorunu DEĞİLMİŞ — 'gemini-2.0-flash' modeli Google tarafından
+      // TAMAMEN KALDIRILMIŞ (404: "no longer available"). Model adı
+      // 'gemini-3.6-flash' olarak güncellendi.
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -49,7 +54,7 @@ export async function verifyQuestionWithGemini(prompt: string): Promise<{ ok: bo
     }
 
     const data = await res.json()
-    logGeminiUsage('verify-questions:gemini', 'gemini-2.0-flash', data?.usageMetadata)
+    logGeminiUsage('verify-questions:gemini', 'gemini-3.6-flash', data?.usageMetadata)
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
     const clean = text.replace(/```json|```/g, '').trim()
     const match = clean.match(/\{[\s\S]*\}/)
