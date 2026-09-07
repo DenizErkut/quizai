@@ -509,7 +509,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
   }
 
   async function makeAllPremium(months: number) {
-    if (!confirm(`Tüm free kullanıcıları ${months} ay premium yapılsın mı?`)) return
+    if (!confirm(`Tüm free kullanıcıları ${months} ay Altın yapılsın mı?`)) return
     setLoading(true)
     const expires = new Date(Date.now() + months * 30 * 24 * 60 * 60 * 1000).toISOString()
     await supabase.from('profiles')
@@ -627,7 +627,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '1.5rem' }}>
               {[
                 { label: 'Toplam kullanıcı', value: stats.total_users, color: 'var(--accent)' },
-                { label: 'Premium', value: stats.premium_users, color: 'var(--green)' },
+                { label: 'Altın', value: stats.premium_users, color: 'var(--green)' },
                 { label: 'Ücretsiz', value: stats.free_users, color: 'var(--text2)' },
                 { label: 'Toplam test', value: stats.total_sessions, color: 'var(--accent)' },
                 { label: 'Bugün test', value: stats.sessions_today, color: 'var(--amber)' },
@@ -648,7 +648,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   <div style={{ width: `${(stats.premium_users / Math.max(stats.total_users, 1)) * 100}%`, background: 'var(--accent)', transition: 'width 0.5s' }} />
                 </div>
                 <div style={{ fontSize: '13px', color: 'var(--text2)', whiteSpace: 'nowrap' }}>
-                  <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{stats.premium_users} Premium</span>
+                  <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{stats.premium_users} Altın</span>
                   {' / '}
                   <span>{stats.free_users} Ücretsiz</span>
                 </div>
@@ -702,17 +702,20 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               <select className="input" value={planFilter} onChange={e => setPlanFilter(e.target.value)}
                 style={{ maxWidth: '140px' }}>
                 <option value="all">Tüm planlar</option>
-                <option value="free">Ücretsiz</option>
-                <option value="premium">Premium</option>
+                <option value="none">Plan seçilmedi</option>
+                <option value="free">Ücretsiz (eski)</option>
+                <option value="silver">Gümüş</option>
+                <option value="premium">Altın</option>
+                <option value="unlimited">Platin</option>
               </select>
               <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
                 <button className="btn btn-sm" style={{ color: 'var(--green)', borderColor: 'rgba(22,163,74,0.3)' }}
                   onClick={() => makeAllPremium(1)}>
-                  ★ Hepsini 1 ay premium yap
+                  ★ Hepsini 1 ay Altın yap
                 </button>
                 <button className="btn btn-sm" style={{ color: 'var(--accent)', borderColor: 'rgba(91,76,245,0.3)' }}
                   onClick={() => makeAllPremium(12)}>
-                  ★ Hepsini 1 yıl premium yap
+                  ★ Hepsini 1 yıl Altın yap
                 </button>
               </div>
             </div>
@@ -762,11 +765,11 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                         <td style={{ padding: '10px 14px' }}>
                           <span style={{
                             fontSize: '11px', padding: '3px 8px', borderRadius: '99px', fontWeight: 600,
-                            background: u.plan === 'premium' ? 'var(--accent-bg)' : 'var(--bg2)',
-                            color: u.plan === 'premium' ? 'var(--accent)' : 'var(--text3)',
-                            border: `1px solid ${u.plan === 'premium' ? 'rgba(91,76,245,0.2)' : 'var(--border)'}`,
+                            background: u.plan === 'premium' ? 'var(--accent-bg)' : u.plan === 'unlimited' ? 'rgba(30,207,184,0.1)' : u.plan === 'silver' ? 'rgba(148,163,184,0.15)' : 'var(--bg2)',
+                            color: u.plan === 'premium' ? 'var(--accent)' : u.plan === 'unlimited' ? '#0d9488' : u.plan === 'silver' ? '#64748b' : 'var(--text3)',
+                            border: `1px solid ${u.plan === 'premium' ? 'rgba(91,76,245,0.2)' : u.plan === 'unlimited' ? 'rgba(30,207,184,0.3)' : 'var(--border)'}`,
                           }}>
-                            {u.plan === 'premium' ? '★ Premium' : 'Ücretsiz'}
+                            {u.plan === 'premium' ? '★ Altın' : u.plan === 'unlimited' ? '⭐ Platin' : u.plan === 'silver' ? '🥈 Gümüş' : u.plan === 'free' ? 'Ücretsiz (eski)' : 'Plan seçilmedi'}
                           </span>
                           {u.plan_expires_at && (
                             <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '2px' }}>
@@ -776,7 +779,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                         </td>
                         <td style={{ padding: '10px 14px' }}>
                           <span style={{ fontSize: '12px', color: u.monthly_test_count >= 8 ? 'var(--red)' : 'var(--text2)' }}>
-                            {u.monthly_test_count}/10
+                            {(u.plan === 'premium' || u.plan === 'unlimited') ? `${u.monthly_test_count}/∞` : `${u.monthly_test_count}/${u.plan === 'silver' ? 30 : u.plan === 'free' ? 10 : 0}`}
                           </span>
                         </td>
                         <td style={{ padding: '10px 14px', color: 'var(--text2)' }}>

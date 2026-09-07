@@ -50,11 +50,11 @@ export default function TermsPage() {
           },
           {
             title: '5. Abonelik ve Ödeme',
-            content: 'Platform ücretsiz ve premium olmak üzere iki plan sunar. Ücretsiz planda aylık 10 test hakkı bulunmaktadır. Premium plan aylık ücrete tabidir ve sınırsız test hakkı sunar. Ödeme işlemleri güvenli ödeme altyapısı üzerinden gerçekleştirilir. Abonelik iptal edilmediği sürece otomatik olarak yenilenir. İptal işlemleri bir sonraki fatura döneminden önce yapılmalıdır. Tamamlanan ödemeler için iade yapılmamaktadır.',
+            content: 'Platform Gümüş, Altın ve Platin olmak üzere üç ücretli plan sunar. Gümüş planda aylık 30 test hakkı bulunmaktadır. Altın ve Platin planlar sınırsız test hakkı sunar. Tüm planlar aylık veya yıllık ücrete tabidir. Ödeme işlemleri güvenli ödeme altyapısı üzerinden gerçekleştirilir. Abonelik iptal edilmediği sürece otomatik olarak yenilenir. İptal işlemleri bir sonraki fatura döneminden önce yapılmalıdır. Tamamlanan ödemeler için iade yapılmamaktadır.',
           },
           {
             title: '6. Davet ve Referral Sistemi',
-            content: 'Platforma yeni kullanıcı davet ederek ödül kazanabilirsiniz. Davet sistemi kapsamında 10 kişiyi davet eden kullanıcılara 1 yıl ücretsiz Premium üyelik verilmektedir. Pratium, program koşullarını önceden bildirmek kaydıyla değiştirme hakkını saklı tutar. Sahte veya tekrarlanan hesaplarla yapılan davetler geçersiz sayılır.',
+            content: 'Platforma yeni kullanıcı davet ederek ödül kazanabilirsiniz. Davet sistemi kapsamında 10 kişiyi davet eden kullanıcılara 1 yıl ücretsiz Altın üyelik verilmektedir. Pratium, program koşullarını önceden bildirmek kaydıyla değiştirme hakkını saklı tutar. Sahte veya tekrarlanan hesaplarla yapılan davetler geçersiz sayılır.',
           },
           {
             title: '7. Fikri Mülkiyet',

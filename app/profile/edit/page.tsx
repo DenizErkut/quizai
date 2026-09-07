@@ -357,14 +357,17 @@ export default function ProfileEditPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontWeight: 500 }}>
-                {plan === 'premium' ? '★ Premium üye' : 'Ücretsiz plan'}
+                {plan === 'premium' ? '★ Altın üye' : plan === 'unlimited' ? '👑 Platin üye' : plan === 'silver' ? '🥈 Gümüş üye' : plan === 'free' ? 'Ücretsiz plan' : 'Plan seçilmedi'}
               </div>
               <div style={{ fontSize: '13px', color: 'var(--text2)', marginTop: '2px' }}>
-                {plan === 'free' ? 'Ayda 10 test · Sınırsız için yükselt' : 'Sınırsız test · Tüm özellikler aktif'}
+                {(plan === 'premium' || plan === 'unlimited') ? 'Sınırsız test · Tüm özellikler aktif'
+                  : plan === 'silver' ? 'Ayda 30 test · Sınırsız için yükselt'
+                  : plan === 'free' ? 'Ayda 10 test · Sınırsız için yükselt'
+                  : 'Devam etmek için bir plan seç'}
               </div>
             </div>
-            <Link href="/pricing" className={`btn btn-sm ${plan === 'premium' ? '' : 'btn-primary'}`}>
-              {plan === 'premium' ? 'Planı gör' : 'Yükselt →'}
+            <Link href="/pricing" className={`btn btn-sm ${(plan === 'premium' || plan === 'unlimited') ? '' : 'btn-primary'}`}>
+              {(plan === 'premium' || plan === 'unlimited') ? 'Planı gör' : 'Yükselt →'}
             </Link>
           </div>
         </div>

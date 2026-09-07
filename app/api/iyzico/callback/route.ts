@@ -13,6 +13,7 @@ const supabaseAdmin = createClient(
 const IYZICO_DETAIL_URI_PATH = '/payment/iyzipos/checkoutform/auth/ecom/detail'
 
 const PLAN_META: Record<string, { months: number; plan: string }> = {
+  silver:    { months: 12, plan: 'silver'    },
   monthly:   { months: 1,  plan: 'premium'   },
   yearly:    { months: 12, plan: 'premium'   },
   unlimited: { months: 12, plan: 'unlimited' },
@@ -53,10 +54,10 @@ export async function POST(req: NextRequest) {
     const conversationId = result.conversationId as string
     const parts = conversationId.split('_')
     const userId = parts[0]
-    const planType = parts[1] as 'monthly' | 'yearly' | 'unlimited'
+    const planType = parts[1] as 'silver' | 'monthly' | 'yearly' | 'unlimited'
     const meta = PLAN_META[planType] || { months: 1, plan: 'premium' }
 
-    // Plan aktive et (premium veya unlimited)
+    // Plan aktive et (silver, premium veya unlimited)
     const expiresAt = new Date()
     expiresAt.setMonth(expiresAt.getMonth() + meta.months)
 
@@ -67,12 +68,16 @@ export async function POST(req: NextRequest) {
       daily_test_count: 0,
     }).eq('id', userId)
 
-    // Aktivasyon bildirimi gönder
+    // Aktivasyon bildirimi gönder — plan görünen adları: silver=Gümüş,
+    // premium=Altın, unlimited=Platin (6 Eylül 2026 isim değişikliği;
+    // veritabanı değerleri (plan sütunu) DEĞİŞMEDİ, sadece görünen isim).
+    const displayName = meta.plan === 'unlimited' ? 'Platin' : meta.plan === 'silver' ? 'Gümüş' : 'Altın'
+    const emoji = meta.plan === 'unlimited' ? '👑' : meta.plan === 'silver' ? '🥈' : '⭐'
     await supabaseAdmin.from('notifications').insert({
       user_id: userId,
       type: 'system',
-      title: meta.plan === 'unlimited' ? '👑 Unlimited aktif!' : '⭐ Premium aktif!',
-      body: `${meta.plan === 'unlimited' ? 'Unlimited' : 'Premium'} planın başarıyla aktive edildi. İyi çalışmalar!`,
+      title: `${emoji} ${displayName} aktif!`,
+      body: `${displayName} planın başarıyla aktive edildi. İyi çalışmalar!`,
       read: false,
       data: { href: '/pricing' },
     })

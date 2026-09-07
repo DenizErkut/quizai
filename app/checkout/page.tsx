@@ -4,15 +4,24 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
-const BASE_PRICES: Record<'monthly' | 'yearly' | 'unlimited', number> = {
+const BASE_PRICES: Record<'silver' | 'monthly' | 'yearly' | 'unlimited', number> = {
+  silver: 2490,
   monthly: 499,
   yearly: 4490,
   unlimited: 19990,
 }
 
 const PLANS = {
+  silver: {
+    name: 'Yıllık Gümüş',
+    price: '2.490',
+    period: 'yıl',
+    badge: '',
+    color: '#94a3b8',
+    features: ['Ayda 30 test', '10 soru/test', 'Temel soru tipleri', '6 dil'],
+  },
   monthly: {
-    name: 'Aylık Premium',
+    name: 'Aylık Altın',
     price: '499',
     period: 'ay',
     badge: '',
@@ -20,7 +29,7 @@ const PLANS = {
     features: ['Sınırsız test', '20 soru/test', 'Tüm soru tipleri', 'Dosya/görsel yükleme', '6 dil', 'Öncelikli destek'],
   },
   yearly: {
-    name: 'Yıllık Premium',
+    name: 'Yıllık Altın',
     price: '4.490',
     period: 'yıl',
     badge: '🏆 En popüler',
@@ -28,7 +37,7 @@ const PLANS = {
     features: ['Sınırsız test', '20 soru/test', 'Tüm soru tipleri', 'Dosya/görsel yükleme', '6 dil', 'Öncelikli destek'],
   },
   unlimited: {
-    name: 'Yıllık Unlimited',
+    name: 'Yıllık Platin',
     price: '19.990',
     period: 'yıl',
     badge: '👑 Tüm özellikler',
@@ -71,7 +80,7 @@ function applyDiscount(discountRate: number): Record<keyof typeof PLANS, PlanDis
 function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly' | 'unlimited'>('yearly')
+  const [selectedPlan, setSelectedPlan] = useState<'silver' | 'monthly' | 'yearly' | 'unlimited'>('yearly')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [formHtml, setFormHtml] = useState('')
@@ -86,7 +95,7 @@ function CheckoutContent() {
   useEffect(() => {
     // URL'den plan al
     const planParam = searchParams.get('plan')
-    if (planParam === 'monthly' || planParam === 'yearly' || planParam === 'unlimited') {
+    if (planParam === 'silver' || planParam === 'monthly' || planParam === 'yearly' || planParam === 'unlimited') {
       setSelectedPlan(planParam as any)
     }
     // Satıcı üzerinden gelinmişse (kayıtta ?satici=KOD ile bağlanmış olabilir)
@@ -163,9 +172,9 @@ function CheckoutContent() {
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: '1.5rem' }}>
       <div style={{ maxWidth: '440px', textAlign: 'center' }} className="anim-up">
         <div style={{ fontSize: '64px', marginBottom: '1rem' }}>🎉</div>
-        <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>Premium aktif!</h2>
+        <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>Ödemen alındı! 🎉</h2>
         <p style={{ color: 'var(--text2)', fontSize: '15px', marginBottom: '2rem', lineHeight: 1.7 }}>
-          Ödemen başarıyla alındı. Artık sınırsız test çözebilirsin.
+          Planın aktive edildi. Hemen teste başlayabilirsin.
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '280px', margin: '0 auto' }}>
           <Link href="/quiz" className="btn btn-primary btn-lg" style={{ justifyContent: 'center' }}>
@@ -212,13 +221,13 @@ function CheckoutContent() {
           <>
             {/* Plan seçimi */}
             <div className="anim-up" style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>Premium</div>
+              <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>Üyelik</div>
               <h1 className="serif" style={{ fontSize: '30px' }}>Plan seç</h1>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '1.5rem' }} className="anim-up-1">
               {(Object.entries(displayPlans) as [string, PlanDisplay][]).map(([key, plan]) => (
-                <button key={key} onClick={() => setSelectedPlan(key as 'monthly' | 'yearly')}
+                <button key={key} onClick={() => setSelectedPlan(key as 'silver' | 'monthly' | 'yearly' | 'unlimited')}
                   style={{
                     padding: '1.25rem', borderRadius: '14px', textAlign: 'left',
                     border: `2px solid ${selectedPlan === key ? 'var(--accent)' : 'var(--border)'}`,

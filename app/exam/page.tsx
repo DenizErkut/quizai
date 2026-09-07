@@ -340,30 +340,39 @@ export default function ExamPage() {
 
       <div style={{ maxWidth: '680px', margin: '0 auto', padding: '0 1rem' }}>
 
-        {profile?.plan === 'free' && (
-          <div style={{ padding: '14px 16px', borderRadius: '14px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: '14px', color: '#6366f1' }}>Freemium: Demo modu</div>
-              <div style={{ fontSize: '12px', color: 'var(--text2)', marginTop: '2px' }}>Her sınav türünün demosunu (alanda 1 soru) deneyebilirsin. Tam sınav için Premium'a geç.</div>
+        {(() => {
+          // 6 Eylül 2026 — sunucu tarafındaki (generate-exam/route.ts) aynı
+          // düzeltmeyle tutarlı: 'silver' dahil ödenmiş HER plan tam sınava
+          // erişebilir; 'free' (mevcut kullanıcılar) ve yeni 'none' (henüz
+          // plan seçmemiş) kullanıcılar demo-only kalır.
+          const isRestricted = profile?.plan !== 'premium' && profile?.plan !== 'unlimited' && profile?.plan !== 'silver'
+          return isRestricted && (
+            <div style={{ padding: '14px 16px', borderRadius: '14px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '14px', color: '#6366f1' }}>Demo modu</div>
+                <div style={{ fontSize: '12px', color: 'var(--text2)', marginTop: '2px' }}>Her sınav türünün demosunu (alanda 1 soru) deneyebilirsin. Tam sınav için bir plana geç.</div>
+              </div>
+              <button onClick={() => router.push('/pricing')} style={{ padding: '8px 16px', borderRadius: '8px', background: '#6366f1', color: '#fff', border: 'none', fontWeight: 600, fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--font-sans)' }}>
+                Yükselt
+              </button>
             </div>
-            <button onClick={() => router.push('/pricing')} style={{ padding: '8px 16px', borderRadius: '8px', background: '#6366f1', color: '#fff', border: 'none', fontWeight: 600, fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--font-sans)' }}>
-              Yükselt
-            </button>
-          </div>
-        )}
+          )
+        })()}
 
-        {/* Demo / Tam mod — Freemium'da sadece Demo seçilebilir, alanda 1 soru */}
+        {/* Demo / Tam mod — ödenmemiş planlarda sadece Demo seçilebilir, alanda 1 soru */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-          {[
-            { val: true, label: '⚡ Demo', desc: profile?.plan === 'free' ? 'Her alanda 1 soru, hızlı önizleme' : 'Her bölümden ~4 soru, kısa süre' },
-            { val: false, label: '📋 Tam Sınav', desc: 'Gerçek soru sayısı ve süre' },
-          ].map(opt => {
-            const isFreeLocked = profile?.plan === 'free' && opt.val === false
+          {(() => {
+            const isRestricted = profile?.plan !== 'premium' && profile?.plan !== 'unlimited' && profile?.plan !== 'silver'
+            return [
+              { val: true, label: '⚡ Demo', desc: isRestricted ? 'Her alanda 1 soru, hızlı önizleme' : 'Her bölümden ~4 soru, kısa süre' },
+              { val: false, label: '📋 Tam Sınav', desc: 'Gerçek soru sayısı ve süre' },
+            ].map(opt => {
+            const isFreeLocked = isRestricted && opt.val === false
             return (
               <button key={String(opt.val)}
                 onClick={() => { if (!isFreeLocked) setDemoMode(opt.val) }}
                 disabled={isFreeLocked}
-                title={isFreeLocked ? 'Tam sınav için Premium/Unlimited gerekir' : undefined}
+                title={isFreeLocked ? 'Tam sınav için bir plana geçmen gerekir' : undefined}
                 style={{
                   flex: 1, padding: '12px', borderRadius: '12px', border: `2px solid ${demoMode === opt.val ? '#6366f1' : 'var(--border)'}`,
                   background: demoMode === opt.val ? 'rgba(99,102,241,0.08)' : 'var(--bg2)',
@@ -374,10 +383,11 @@ export default function ExamPage() {
                 <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{opt.desc}</div>
               </button>
             )
-          })}
+            })
+          })()}
         </div>
 
-        {/* Sınav kartları — Freemium'da da SEÇİLEBİLİR (sadece demo/1 soru ile) */}
+        {/* Sınav kartları — Gümüş'te de SEÇİLEBİLİR (sadece demo/1 soru ile) */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: '12px' }}>
           {Object.entries(EXAM_META).map(([key, meta]) => {
             const fmt = formats[key]

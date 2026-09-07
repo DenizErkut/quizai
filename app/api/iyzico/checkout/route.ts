@@ -14,9 +14,10 @@ const supabaseAdmin = createClient(
 const IYZICO_CHECKOUT_URI_PATH = '/payment/iyzipos/checkoutform/initialize/auth/ecom'
 
 const PLANS = {
-  monthly:   { price: '499.0',   name: 'Pratium Premium - Aylık',    months: 1,  plan: 'premium'   },
-  yearly:    { price: '4490.0',  name: 'Pratium Premium - Yıllık',   months: 12, plan: 'premium'   },
-  unlimited: { price: '19990.0', name: 'Pratium Unlimited - Yıllık', months: 12, plan: 'unlimited' },
+  silver:    { price: '2490.0',  name: 'Pratium Gümüş - Yıllık',     months: 12, plan: 'silver'    },
+  monthly:   { price: '499.0',   name: 'Pratium Altın - Aylık',      months: 1,  plan: 'premium'   },
+  yearly:    { price: '4490.0',  name: 'Pratium Altın - Yıllık',     months: 12, plan: 'premium'   },
+  unlimited: { price: '19990.0', name: 'Pratium Platin - Yıllık',    months: 12, plan: 'unlimited' },
 }
 
 export async function POST(req: NextRequest) {
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Oturum geçersiz.' }, { status: 401 })
 
   const body = await req.json()
-  const planType = body.plan as 'monthly' | 'yearly' | 'unlimited'
+  const planType = body.plan as 'silver' | 'monthly' | 'yearly' | 'unlimited'
   const plan = PLANS[planType]
   if (!plan) return NextResponse.json({ error: 'Geçersiz plan.' }, { status: 400 })
 

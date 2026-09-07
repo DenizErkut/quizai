@@ -293,8 +293,8 @@ function QuizPageContent() {
   const supabase = createClient() as any
 
   // Plan limitleri
-  const PLAN_DAILY_LIMIT: Record<string, number> = { free: 10, premium: 25, unlimited: 9999 }
-  const PLAN_MAX_QCOUNT: Record<string, number> = { free: 5, premium: 20, unlimited: 20 }
+  const PLAN_DAILY_LIMIT: Record<string, number> = { free: 10, silver: 10, premium: 25, unlimited: 9999 }
+  const PLAN_MAX_QCOUNT: Record<string, number> = { free: 5, silver: 10, premium: 20, unlimited: 20 }
 
   const fetchProfile = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -430,9 +430,9 @@ function QuizPageContent() {
 
   // ── HATA MESAJLARI ──
   function getErrorInfo(errorCode: string, status?: number): {code: string; title: string; desc: string; retry: boolean} {
-    if (status === 429 || errorCode === 'daily_limit_reached') return { code: 'daily_limit', title: "⏰ Günlük limit doldu", desc: "Bugünkü test hakkını kullandın. Yarın yenilenir ya da Premium'a geçerek sınırsız test çöz.", retry: false }
-    if (errorCode === 'limit_reached') return { code: 'monthly_limit', title: "📚 Aylık limit doldu", desc: "Bu ay için test hakkın bitti. Sınırsız test için Premium'a geç.", retry: false }
-    if (errorCode === 'out_of_curriculum') return { code: 'curriculum', title: "📖 Müfredat dışı konu", desc: "Bu konu MEB müfredatında yer almıyor. Başka bir konu dene ya da Premium ile tüm konulara eriş.", retry: false }
+    if (status === 429 || errorCode === 'daily_limit_reached') return { code: 'daily_limit', title: "⏰ Günlük limit doldu", desc: "Bugünkü test hakkını kullandın. Yarın yenilenir ya da Altın'a geçerek sınırsız test çöz.", retry: false }
+    if (errorCode === 'limit_reached') return { code: 'monthly_limit', title: "📚 Aylık limit doldu", desc: "Bu ay için test hakkın bitti. Sınırsız test için Altın'a geç.", retry: false }
+    if (errorCode === 'out_of_curriculum') return { code: 'curriculum', title: "📖 Müfredat dışı konu", desc: "Bu konu MEB müfredatında yer almıyor. Başka bir konu dene ya da Altın ile tüm konulara eriş.", retry: false }
     if (errorCode === 'pdf_too_long') return { code: 'pdf', title: "📄 PDF çok uzun", desc: "PDF dosyan 100 sayfadan fazla. Daha kısa bir bölüm yükle ya da metni kopyalayıp yapıştır.", retry: false }
     if (errorCode === 'pdf_image_only') return { code: 'pdf', title: "🖼️ PDF okunemiyor", desc: "Bu PDF taranmış görsel içeriyor, metin çıkarılamıyor. Word veya metin dosyası yükle.", retry: false }
     if (status === 503 || status === 502 || status === 504) return { code: 'server', title: "🔧 Sunucu meşgul", desc: "Sunucularımız şu an yoğun. Birkaç saniye bekleyip tekrar dene.", retry: true }
@@ -963,12 +963,24 @@ function QuizPageContent() {
   const level = profile ? getLevel(profile.grade) : 'ortaokul'
   const suggestions = TOPIC_MAP[level] || TOPIC_MAP.ortaokul
   const plan = profile?.plan || 'free'
-  const dailyLimit = PLAN_DAILY_LIMIT[plan] ?? 10
-  const maxQCount = PLAN_MAX_QCOUNT[plan] ?? 5
+  // 6 Eylül 2026 — GÜVENLİK DÜZELTMESİ: eski `?? 10`/`?? 5` varsayılanları,
+  // plan tablosunda YER ALMAYAN her durumda (ör. yeni kayıtların varsayılan
+  // planı 'none') yanlışlıkla premium'a yakın haklar veriyordu. Artık `?? 0`
+  // — bir plan satın alınmadan test/soru hakkı verilmiyor.
+  const dailyLimit = PLAN_DAILY_LIMIT[plan] ?? 0
+  const maxQCount = PLAN_MAX_QCOUNT[plan] ?? 0
   const today = new Date().toISOString().split('T')[0]
   const dailyUsed = profile?.daily_test_date === today ? (profile?.daily_test_count || 0) : 0
   const dailyLeft = plan === 'unlimited' ? null : Math.max(0, dailyLimit - dailyUsed)
-  const testsLeft = profile?.plan === 'free' ? Math.max(0, 10 - (profile?.monthly_test_count || 0)) : null
+  // Aylık kalan test: 'free' (mevcut kullanıcılar, eski 10 hak) ve 'silver'
+  // (yeni ücretli giriş planı, 30 hak) için hesaplanır. ÖNEMLİ: premium/
+  // unlimited DIŞINDAKİ her diğer durum (ör. yeni 'none' kullanıcıları)
+  // ARTIK "sınırsız" (null) DEĞİL, 0 olarak gösteriliyor — eski kod bu
+  // durumları `null` (sınırsızmış gibi) dönüyordu, yanlış bilgi veriyordu.
+  const MONTHLY_TOTAL: Record<string, number> = { free: 10, silver: 30 }
+  const testsLeft = (plan === 'premium' || plan === 'unlimited')
+    ? null
+    : Math.max(0, (MONTHLY_TOTAL[plan] ?? 0) - (profile?.monthly_test_count || 0))
   const activeDiff = DIFFICULTIES.find(d => d.value === difficulty)!
 
   // ── PAYWALL MODAL ──
@@ -981,21 +993,21 @@ function QuizPageContent() {
             {reason === 'qcount' ? '🎯' : reason === 'daily' ? '⏰' : '🔒'}
           </div>
           <h3 className="serif" style={{ fontSize: '22px', marginBottom: '0.5rem' }}>
-            {reason === 'qcount' ? 'Daha fazla soru için Premium' :
+            {reason === 'qcount' ? 'Daha fazla soru için Altın' :
              reason === 'daily' ? 'Günlük test limitin doldu' :
              'Bu konu müfredat dışı'}
           </h3>
           <p style={{ color: 'var(--text2)', fontSize: '13px', lineHeight: 1.7 }}>
-            {reason === 'qcount' ? 'Ücretsiz planda en fazla 5 soru oluşturabilirsin. Premium veya Unlimited üyelikle 20 soruya kadar test oluştur.' :
-             reason === 'daily' ? `Bugün ${dailyLimit} test hakkını kullandın. Yarın yenilenir ya da Unlimited'a geç.` :
-             'Bu konu Türkiye Millî Eğitim müfredatında bulunmuyor. Unlimited planda müfredat dışı konularda da test oluşturabilirsin.'}
+            {reason === 'qcount' ? 'Gümüş planda en fazla 10 soru oluşturabilirsin. Altın veya Platin üyelikle 20 soruya kadar test oluştur.' :
+             reason === 'daily' ? `Bugün ${dailyLimit} test hakkını kullandın. Yarın yenilenir ya da Altın/Platin'e geç.` :
+             'Bu konu Türkiye Millî Eğitim müfredatında bulunmuyor. Altın veya Platin planda müfredat dışı konularda da test oluşturabilirsin.'}
           </p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {[
-            { plan: 'Freemium', price: 'Ücretsiz', features: ['5 soru/test', 'Günde 10 test', 'Sadece müfredat konuları'], color: '#64748b', highlight: false },
-            { plan: 'Premium', price: '4.490₺/yıl', features: ['20 soru/test', 'Sınırsız test', 'Tüm konular', 'Koç desteği yok'], color: '#2563eb', highlight: false },
-            { plan: 'Unlimited', price: '19.990₺/yıl', features: ['20 soru/test', 'Sınırsız test', 'Müfredat dışı konular', '12× koça danışma'], color: 'var(--accent)', highlight: true },
+            { plan: 'Gümüş', price: '2.490₺/yıl', features: ['10 soru/test', 'Ayda 30 test', 'Sadece müfredat konuları'], color: '#64748b', highlight: false },
+            { plan: 'Altın', price: '4.490₺/yıl', features: ['20 soru/test', 'Sınırsız test', 'Tüm konular', 'Koç desteği yok'], color: '#2563eb', highlight: false },
+            { plan: 'Platin', price: '19.990₺/yıl', features: ['20 soru/test', 'Sınırsız test', 'Müfredat dışı konular', '12× koça danışma'], color: 'var(--accent)', highlight: true },
           ].map(p => (
             <div key={p.plan} style={{ padding: '14px 16px', borderRadius: '12px', border: `2px solid ${p.highlight ? p.color : 'var(--border)'}`, background: p.highlight ? 'var(--accent-bg)' : 'var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
               <div>
@@ -1004,9 +1016,7 @@ function QuizPageContent() {
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: '14px', color: p.color }}>{p.price}</div>
-                {p.plan !== 'Freemium' && (
-                  <a href="/pricing" style={{ fontSize: '11px', color: p.color, textDecoration: 'none', fontWeight: 600 }}>Satın al →</a>
-                )}
+                <a href="/pricing" style={{ fontSize: '11px', color: p.color, textDecoration: 'none', fontWeight: 600 }}>Satın al →</a>
               </div>
             </div>
           ))}
@@ -1022,12 +1032,12 @@ function QuizPageContent() {
         <div style={{ fontSize: '56px', marginBottom: '1.25rem' }}>📚</div>
         <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>Bu ayki test hakkın doldu</h2>
         <p style={{ color: 'var(--text2)', fontSize: '15px', marginBottom: '2rem', lineHeight: 1.7 }}>
-          Ücretsiz planda ayda <strong>10 test</strong> hakkın var.<br />
-          Sınırsız test için Premium'a geç veya <strong>10 arkadaşını davet ederek</strong> 1 yıl ücretsiz premium kazan.
+          {profile?.plan === 'silver' ? <>Gümüş planda ayda <strong>30 test</strong> hakkın var.</> : <>Ücretsiz planda ayda <strong>10 test</strong> hakkın var.</>}<br />
+          Sınırsız test için Altın'a geç veya <strong>10 arkadaşını davet ederek</strong> 1 yıl ücretsiz Altın kazan.
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '320px', margin: '0 auto' }}>
           <Link href="/pricing" className="btn btn-primary btn-lg" style={{ justifyContent: 'center' }}>
-            💎 Premium'a geç
+            💎 Altın'a geç
           </Link>
           <Link href="/pricing#referral" className="btn btn-lg" style={{ justifyContent: 'center' }}>
             🎁 Arkadaşını davet et (ücretsiz)
@@ -1125,13 +1135,13 @@ function QuizPageContent() {
           {/* Plana göre CTA */}
           {(quizError.code === 'daily_limit' || quizError.code === 'monthly_limit') && (
             <a href="/pricing" className="btn btn-primary btn-lg" style={{ justifyContent: 'center', textDecoration: 'none' }}>
-              💎 Premium'a geç
+              💎 Altın'a geç
             </a>
           )}
 
           {quizError.code === 'curriculum' && (
             <a href="/pricing" className="btn btn-lg" style={{ justifyContent: 'center', textDecoration: 'none' }}>
-              🔓 Tüm konular için Premium
+              🔓 Tüm konular için Altın
             </a>
           )}
 

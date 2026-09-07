@@ -887,17 +887,26 @@ export async function POST(req: NextRequest) {
     const today = new Date().toISOString().split('T')[0]
 
     // Premium ve Unlimited planlarda HİÇBİR soru/test sınırı yok — sadece
-    // freemium için günlük/aylık limit uygulanır.
+    // freemium/silver için günlük/aylık limit uygulanır.
     if (plan !== 'premium' && plan !== 'unlimited') {
-      const DAILY_LIMIT: Record<string, number> = { free: 10 }
-      const dailyLimit = DAILY_LIMIT[plan] ?? 10
+      // 6 Eylül 2026 — Deniz'in talebiyle: "free" plan artık YENİ kayıtlara
+      // verilmiyor (bkz. profiles.plan kolon varsayılanı artık 'none').
+      // Mevcut 'free' kullanıcılar dokunulmadan eski haklarında (10/gün,
+      // 10/ay) kalıyor. Yeni kayıtlar 'none' ile başlıyor — bu, bir plan
+      // SATIN ALINANA kadar 0 test hakkı demek (aşağıdaki DAILY_LIMIT/
+      // MONTHLY_LIMIT tablosunda 'none' yok, bu yüzden ?? 0 varsayılanına
+      // düşer — eski `?? 10` YANLIŞ bir güvenlik açığıydı, yeni kullanıcı
+      // hiç ödeme yapmadan sınırsız gibi 10 hak alıyordu; şimdi düzeltildi).
+      // 'silver' (Gümüş, 2490 TL/yıl) ise yeni, ücretli giriş planı: 30/ay.
+      const DAILY_LIMIT: Record<string, number> = { free: 10, silver: 10 }
+      const dailyLimit = DAILY_LIMIT[plan] ?? 0
       const dailyCount = profile.daily_test_date === today ? (profile.daily_test_count || 0) : 0
       if (dailyCount >= dailyLimit) {
         return NextResponse.json({ error: 'daily_limit_reached' }, { status: 429 })
       }
 
-      const MONTHLY_LIMIT: Record<string, number> = { free: 10 }
-      const monthlyLimit = MONTHLY_LIMIT[plan] ?? 10
+      const MONTHLY_LIMIT: Record<string, number> = { free: 10, silver: 30 }
+      const monthlyLimit = MONTHLY_LIMIT[plan] ?? 0
       if ((profile.monthly_test_count || 0) >= monthlyLimit) {
         return NextResponse.json({ error: 'limit_reached' }, { status: 429 })
       }

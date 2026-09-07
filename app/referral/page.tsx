@@ -100,8 +100,8 @@ export default function ReferralPage() {
             Arkadaşlarını davet et
           </h1>
           <p style={{ color: 'var(--text2)', fontSize: '14px', lineHeight: 1.6 }}>
-            Her 10 kişiyi davet ettiğinde <strong>1 yıl ücretsiz premium</strong> kazanırsın.
-            Premium üyeliğin birikiyor — ne kadar çok davet, o kadar çok premium!
+            Her 10 kişiyi davet ettiğinde <strong>1 yıl ücretsiz Altın</strong> kazanırsın.
+            Altın üyeliğin birikiyor — ne kadar çok davet, o kadar çok Altın!
           </p>
         </div>
 
@@ -115,7 +115,7 @@ export default function ReferralPage() {
                 <span style={{ fontSize: '18px', color: 'var(--text2)' }}>/10</span>
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '4px' }}>
-                {10 - currentProgress} kişi daha → 1 yıl premium
+                {10 - currentProgress} kişi daha → 1 yıl Altın
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -129,7 +129,7 @@ export default function ReferralPage() {
               </div>
               {profile?.plan === 'premium' && profile.plan_expires_at && (
                 <div style={{ fontSize: '11px', color: 'var(--green)', marginTop: '4px' }}>
-                  Premium: {new Date(profile.plan_expires_at).toLocaleDateString('tr-TR')} kadar
+                  Altın: {new Date(profile.plan_expires_at).toLocaleDateString('tr-TR')} kadar
                 </div>
               )}
             </div>

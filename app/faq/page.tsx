@@ -17,7 +17,7 @@ const faqs = [
   },
   {
     q: 'Pratium ücretsiz mi?',
-    a: 'Ücretsiz bir başlangıç planı vardır. Sınırsız test ve gelişmiş özellikler için Premium (aylık veya yıllık) ve Unlimited planları bulunur.',
+    a: 'Hayır, Pratium ücretli bir platformdur. Gümüş, Altın ve Platin olmak üzere üç plan bulunur. Gümüş girişe uygun temel plan, Altın ve Platin ise sınırsız test ve gelişmiş özellikler sunar.',
   },
   {
     q: 'Sorular nasıl üretiliyor, güvenilir mi?',

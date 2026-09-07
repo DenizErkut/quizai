@@ -151,10 +151,11 @@ export default function Navbar() {
     { href: '/leaderboard', label: '🏆 Sıralama' },
   ]
 
-  // Premium rozet tipi
+  // Plan rozet tipi (6 Eylül 2026: Premium->Altın, Unlimited->Platin, yeni Gümüş)
   const planBadge =
-    profile.plan === 'unlimited' ? { emoji: '⭐', color: '#0d9488', title: 'Unlimited' } :
-    profile.plan === 'premium'   ? { emoji: '★',  color: '#f2b94b', title: 'Premium' } :
+    profile.plan === 'unlimited' ? { emoji: '⭐', color: '#0d9488', title: 'Platin' } :
+    profile.plan === 'premium'   ? { emoji: '★',  color: '#f2b94b', title: 'Altın' } :
+    profile.plan === 'silver'    ? { emoji: '🥈', color: '#64748b', title: 'Gümüş' } :
     null
 
   return (
@@ -258,8 +259,14 @@ export default function Navbar() {
                     <div style={{ fontWeight: 700, fontSize: '14px', color: '#29483d' }}>{profile.name}</div>
                     <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
                       {profile.plan === 'premium'
-                        ? <span style={{ color: '#0a9e90', fontWeight: 600 }}>★ Premium</span>
-                        : 'Ücretsiz'}
+                        ? <span style={{ color: '#0a9e90', fontWeight: 600 }}>★ Altın</span>
+                        : profile.plan === 'unlimited'
+                        ? <span style={{ color: '#0d9488', fontWeight: 600 }}>⭐ Platin</span>
+                        : profile.plan === 'silver'
+                        ? <span style={{ color: '#64748b', fontWeight: 600 }}>🥈 Gümüş</span>
+                        : profile.plan === 'free'
+                        ? 'Ücretsiz'
+                        : 'Plan seçilmedi'}
                       {streak > 0 && <span style={{ marginLeft: '6px' }}>🔥 {streak} gün</span>}
                     </div>
                     {testsLeft !== null && (
@@ -416,9 +423,9 @@ export default function Navbar() {
               )}
             </div>
 
-            {/* Avatar + Premium badge + Dropdown */}
+            {/* Avatar + plan rozeti + Dropdown */}
             <div style={{ position: 'relative' }}>
-              {/* Premium / Unlimited küçük rozet */}
+              {/* Gümüş / Altın / Platin küçük rozet */}
               {planBadge && (
                 <span title={planBadge.title} style={{
                   position: 'absolute', top: -6, right: -4,

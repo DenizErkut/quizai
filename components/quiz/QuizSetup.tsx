@@ -96,11 +96,14 @@ export default function QuizSetup({
                     {dailyLeft === 0 ? '⏰ Günlük limit doldu' : `Bugün ${dailyLeft} test kaldı`}
                   </span>
                 )}
+                {profile?.plan === 'silver' && (
+                  <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '11px', background: 'rgba(100,116,139,0.1)', color: '#64748b', border: '1px solid rgba(100,116,139,0.3)', fontWeight: 600 }}>🥈 Gümüş</span>
+                )}
                 {profile?.plan === 'premium' && (
-                  <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '11px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid rgba(91,76,245,0.2)', fontWeight: 600 }}>★ Premium</span>
+                  <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '11px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid rgba(91,76,245,0.2)', fontWeight: 600 }}>★ Altın</span>
                 )}
                 {profile?.plan === 'unlimited' && (
-                  <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '11px', background: 'rgba(30,207,184,0.1)', color: '#0d9488', border: '1px solid rgba(30,207,184,0.3)', fontWeight: 600 }}>⭐ Unlimited</span>
+                  <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '11px', background: 'rgba(30,207,184,0.1)', color: '#0d9488', border: '1px solid rgba(30,207,184,0.3)', fontWeight: 600 }}>⭐ Platin</span>
                 )}
               </div>
             </div>
@@ -389,7 +392,9 @@ export default function QuizSetup({
                       )
                     })}
                   </div>
-                  {profile?.plan === 'free' && <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Freemium'da max 5 soru · <a href="/pricing" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Premium'a geç</a></div>}
+                  {profile?.plan === 'free' && <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Ücretsiz planda max 5 soru · <a href="/pricing" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Altın'a geç</a></div>}
+                  {profile?.plan === 'silver' && <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Gümüş'te max 10 soru · <a href="/pricing" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Altın'a geç</a></div>}
+                  {(!profile?.plan || profile.plan === 'none') && <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Test oluşturmak için <a href="/pricing" style={{ color: 'var(--accent)', textDecoration: 'none' }}>bir plan seç</a></div>}
                 </div>
                 <div>
                   <label className="field-label" style={{ marginTop: 0 }}>Görsel sorular</label>

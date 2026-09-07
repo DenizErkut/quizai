@@ -89,12 +89,18 @@ export async function POST(req: NextRequest) {
     const today = new Date().toISOString().split('T')[0]
     const dailyCount = profile.daily_test_date === today ? (profile.daily_test_count || 0) : 0
     if (plan !== 'premium' && plan !== 'unlimited') {
-      const DAILY_LIMIT: Record<string, number> = { free: 10 }
-      const MONTHLY_LIMIT: Record<string, number> = { free: 10 }
-      if (dailyCount >= (DAILY_LIMIT[plan] ?? 10)) {
+      // 6 Eylül 2026 — bkz. generate-quiz/route.ts'teki aynı düzeltmenin notu:
+      // eski `?? 10` varsayılanı, plan tablosunda YER ALMAYAN her durumda
+      // (ör. yeni 'none' kullanıcıları) yanlışlıkla 10 hak veriyordu. Artık
+      // `?? 0` — bir plan (silver/premium/unlimited) satın alınmadan hiç
+      // hak verilmiyor. 'free' (mevcut kullanıcılar, dokunulmadı) ve
+      // 'silver' (yeni ücretli giriş planı, 30/ay) tabloda açıkça tanımlı.
+      const DAILY_LIMIT: Record<string, number> = { free: 10, silver: 10 }
+      const MONTHLY_LIMIT: Record<string, number> = { free: 10, silver: 30 }
+      if (dailyCount >= (DAILY_LIMIT[plan] ?? 0)) {
         return NextResponse.json({ error: 'daily_limit_reached' }, { status: 429 })
       }
-      if ((profile.monthly_test_count || 0) >= (MONTHLY_LIMIT[plan] ?? 10)) {
+      if ((profile.monthly_test_count || 0) >= (MONTHLY_LIMIT[plan] ?? 0)) {
         return NextResponse.json({ error: 'monthly_limit_reached' }, { status: 429 })
       }
     }

@@ -33,7 +33,7 @@ export default function DistanceSalesPage() {
           },
           {
             title: 'Madde 2 — Sözleşmenin Konusu',
-            content: 'İşbu sözleşmenin konusu, ALICI\'nın SATICI\'ya ait pratium.com platformu üzerinden elektronik ortamda satın aldığı dijital abonelik hizmetinin (Premium/Unlimited üyelik) satışı ve ifasına ilişkin olarak, 6502 sayılı Tüketicinin Korunması Hakkında Kanun ve Mesafeli Sözleşmeler Yönetmeliği hükümleri uyarınca tarafların hak ve yükümlülüklerinin belirlenmesidir.',
+            content: 'İşbu sözleşmenin konusu, ALICI\'nın SATICI\'ya ait pratium.com platformu üzerinden elektronik ortamda satın aldığı dijital abonelik hizmetinin (Gümüş/Altın/Platin üyelik) satışı ve ifasına ilişkin olarak, 6502 sayılı Tüketicinin Korunması Hakkında Kanun ve Mesafeli Sözleşmeler Yönetmeliği hükümleri uyarınca tarafların hak ve yükümlülüklerinin belirlenmesidir.',
           },
           {
             title: 'Madde 3 — Sözleşme Konusu Hizmet Bilgileri',

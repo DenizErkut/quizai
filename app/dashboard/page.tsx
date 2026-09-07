@@ -135,7 +135,17 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', gap: '8px' }}>
               {profile?.plan === 'premium' && (
                 <div style={{ padding: '4px 10px', borderRadius: '99px', background: 'rgba(253,211,29,0.2)', border: '1px solid rgba(253,211,29,0.4)', fontSize: '11px', fontWeight: 700, color: '#fdd31d' }}>
-                  ★ Premium
+                  ★ Altın
+                </div>
+              )}
+              {profile?.plan === 'unlimited' && (
+                <div style={{ padding: '4px 10px', borderRadius: '99px', background: 'rgba(30,207,184,0.2)', border: '1px solid rgba(30,207,184,0.4)', fontSize: '11px', fontWeight: 700, color: '#1ecfb8' }}>
+                  ⭐ Platin
+                </div>
+              )}
+              {profile?.plan === 'silver' && (
+                <div style={{ padding: '4px 10px', borderRadius: '99px', background: 'rgba(148,163,184,0.2)', border: '1px solid rgba(148,163,184,0.4)', fontSize: '11px', fontWeight: 700, color: '#94a3b8' }}>
+                  🥈 Gümüş
                 </div>
               )}
               <Link href="/quiz" style={{

@@ -222,8 +222,9 @@ export default function ClassesPage() {
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '1px' }}>
                       {s.grade}
-                      {s.plan === 'premium' && <span style={{ marginLeft: '6px', color: 'var(--accent)' }}>★ Premium</span>}
-                      {s.plan === 'unlimited' && <span style={{ marginLeft: '6px', color: '#0d9488' }}>⭐ Unlimited</span>}
+                      {s.plan === 'premium' && <span style={{ marginLeft: '6px', color: 'var(--accent)' }}>★ Altın</span>}
+                      {s.plan === 'unlimited' && <span style={{ marginLeft: '6px', color: '#0d9488' }}>⭐ Platin</span>}
+                      {s.plan === 'silver' && <span style={{ marginLeft: '6px', color: '#64748b' }}>🥈 Gümüş</span>}
                     </div>
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text3)', flexShrink: 0 }}>

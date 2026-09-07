@@ -16,7 +16,7 @@ interface Profile {
 }
 
 export default function PricingPage() {
-  const { variant, track } = useABTest('pricing_cta')
+  const { track } = useABTest('pricing_cta')
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [referralCount, setReferralCount] = useState(0)
@@ -52,26 +52,26 @@ export default function PricingPage() {
 
   const PLANS = [
     {
-      id: 'free',
-      label: 'Freemium',
-      price: '₺0',
-      sub: 'Sonsuza kadar',
+      id: 'silver',
+      label: 'Gümüş',
+      price: '₺2.490',
+      sub: 'yıllık',
       color: '#64748b',
       accent: false,
       features: [
-        'Ayda 10 test',
-        'Test başına 5 soru',
+        'Ayda 30 test',
+        'Test başına 10 soru',
         'Sadece müfredat konuları',
         'Temel soru tipleri',
         'Temel arşiv & dashboard',
-        'Davet ile premium kazan',
+        'Davet ile Altın kazan',
       ],
-      cta: variant === 'treatment' ? 'Hemen Başla — Ücretsiz 🚀' : 'Ücretsiz başla',
-      ctaHref: '/register',
+      cta: 'Gümüş\'e geç →',
+      ctaHref: '/checkout?plan=silver',
     },
     {
       id: 'premium',
-      label: 'Premium',
+      label: 'Altın',
       price: '₺4.490',
       sub: 'yıllık',
       color: '#2563eb',
@@ -88,12 +88,12 @@ export default function PricingPage() {
         'Sınıf sistemi — birden fazla sınıf',
         'Öncelikli destek',
       ],
-      cta: 'Premium\'a geç →',
+      cta: 'Altın\'a geç →',
       ctaHref: '/checkout?plan=premium',
     },
     {
       id: 'unlimited',
-      label: 'Unlimited',
+      label: 'Platin',
       price: '₺19.990',
       sub: 'yıllık',
       color: '#0d9488',
@@ -109,7 +109,7 @@ export default function PricingPage() {
         '12× birebir koç görüşmesi',
         'Öncelikli & telefon desteği',
       ],
-      cta: 'Unlimited\'a geç →',
+      cta: 'Platin\'e geç →',
       ctaHref: '/checkout?plan=unlimited',
     },
   ]
@@ -125,7 +125,7 @@ export default function PricingPage() {
             Öğrenmek için doğru plan
           </h1>
           <p style={{ color: 'var(--text2)', fontSize: '16px' }}>
-            Ücretsiz başla, ihtiyacın artınca yükselt.
+            İhtiyacına uygun planı seç, hemen başla.
           </p>
         </div>
 
@@ -163,8 +163,6 @@ export default function PricingPage() {
                       </div>
                     )}
                   </div>
-                ) : p.id === 'free' ? (
-                  <Link href={p.ctaHref} className="btn" style={{ width: '100%', justifyContent: 'center', display: 'flex' }}>{p.cta}</Link>
                 ) : (
                   <Link href={p.ctaHref} className="btn btn-primary" onClick={() => track('click')} style={{ width: '100%', justifyContent: 'center', display: 'flex', background: p.color, borderColor: p.color }}>{p.cta}</Link>
                 )}
@@ -186,16 +184,19 @@ export default function PricingPage() {
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>Bugün</div>
-              <div style={{ fontWeight: 600 }}>{dailyUsed} test · {
-                profile.plan === 'unlimited' ? 'Sınırsız' :
-                profile.plan === 'premium' ? `${Math.max(0, 25 - dailyUsed)} kaldı` :
-                `${Math.max(0, 10 - dailyUsed)} kaldı`
-              }</div>
+              <div style={{ fontWeight: 600 }}>{dailyUsed} test · {(() => {
+                // 6 Eylül 2026 — 'none' (yeni, henüz plan seçmemiş kullanıcı)
+                // için eski kod yanlışlıkla "10 kaldı" gösteriyordu (aslında
+                // 0 hakkı var). DAILY_LIMIT tablosuna açıkça bakıyoruz.
+                const DAILY_LIMIT: Record<string, number> = { free: 10, silver: 10, premium: 25 }
+                if (profile.plan === 'unlimited') return 'Sınırsız'
+                return `${Math.max(0, (DAILY_LIMIT[profile.plan] ?? 0) - dailyUsed)} kaldı`
+              })()}</div>
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>Plan</div>
               <div style={{ fontWeight: 600, textTransform: 'capitalize', color: profile.plan === 'unlimited' ? '#0d9488' : profile.plan === 'premium' ? '#2563eb' : 'var(--text)' }}>
-                {profile.plan === 'free' ? 'Freemium' : profile.plan.charAt(0).toUpperCase() + profile.plan.slice(1)}
+                {profile.plan === 'silver' ? 'Gümüş' : profile.plan === 'premium' ? 'Altın' : profile.plan === 'unlimited' ? 'Platin' : profile.plan === 'free' ? 'Ücretsiz (eski)' : 'Plan seçilmedi'}
               </div>
             </div>
           </div>
@@ -208,7 +209,7 @@ export default function PricingPage() {
               <div>
                 <h2 style={{ fontSize: '18px', fontWeight: 500, marginBottom: '4px' }}>🎁 Arkadaşlarını davet et</h2>
                 <p style={{ fontSize: '13px', color: 'var(--text2)' }}>
-                  Her 10 kişiyi davet ettiğinde <strong>1 yıl ücretsiz Premium</strong> kazanırsın.
+                  Her 10 kişiyi davet ettiğinde <strong>1 yıl ücretsiz Altın</strong> kazanırsın.
                 </p>
               </div>
               <div className="badge badge-purple">{referralCount} / {nextMilestone} davet</div>
@@ -226,7 +227,7 @@ export default function PricingPage() {
             </div>
             {referralCount > 0 && (
               <p style={{ fontSize: '12px', color: 'var(--green)', marginTop: '8px' }}>
-                {referralCount} kişi davet ettin — {10 - (referralCount % 10)} kişi daha, 1 yıl Premium kazan!
+                {referralCount} kişi davet ettin — {10 - (referralCount % 10)} kişi daha, 1 yıl Altın kazan!
               </p>
             )}
           </div>
@@ -237,11 +238,11 @@ export default function PricingPage() {
           <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Sık sorulan sorular</div>
           {[
             { q: 'Ödeme güvenli mi?', a: 'Evet. Tüm ödemeler iyzico altyapısıyla SSL koruması altında işlenir. Kart bilgileriniz sitemizde saklanmaz.' },
-            { q: 'İptal edebilir miyim?', a: 'Evet, istediğin zaman iptal edebilirsin. Premium veya Unlimited süren dolana kadar özelliklerden yararlanmaya devam edersin.' },
+            { q: 'İptal edebilir miyim?', a: 'Evet, istediğin zaman iptal edebilirsin. Gümüş, Altın veya Platin süren dolana kadar özelliklerden yararlanmaya devam edersin.' },
             { q: 'Birden fazla sınıfa katılabilir miyim?', a: 'Evet! Matematik, Türkçe, Fen gibi farklı dersler için öğretmenlerinden farklı davet kodları alarak birden fazla sınıfa aynı anda üye olabilirsin.' },
             { q: 'Analiz için kaç test çözmem gerekiyor?', a: 'Analiz ve gelişim planı için en az 10 test çözmen gerekiyor. Daha fazla test çözdükçe analiz daha isabetli olur.' },
-            { q: 'Unlimited\'daki koç görüşmesi nedir?', a: 'Yılda 12 kez birebir eğitim koçuyla online görüşme yapabilirsin. Çalışma planın, zayıf konuların ve hedefin üzerine kişisel rehberlik alırsın.' },
-            { q: 'Davet ile premium nasıl çalışır?', a: 'Davet linkini paylaş, 10 kişi kayıt olursa 1 yıl ücretsiz Premium kazanırsın. Her 10 davette tekrar kazanırsın.' },
+            { q: 'Platin\'deki koç görüşmesi nedir?', a: 'Yılda 12 kez birebir eğitim koçuyla online görüşme yapabilirsin. Çalışma planın, zayıf konuların ve hedefin üzerine kişisel rehberlik alırsın.' },
+            { q: 'Davet ile Altın nasıl çalışır?', a: 'Davet linkini paylaş, 10 kişi kayıt olursa 1 yıl ücretsiz Altın kazanırsın. Her 10 davette tekrar kazanırsın.' },
           ].map((item, i) => (
             <div key={i} style={{ padding: '12px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
               <div style={{ fontWeight: 500, fontSize: '14px', marginBottom: '4px' }}>{item.q}</div>

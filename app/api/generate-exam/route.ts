@@ -154,7 +154,13 @@ export async function POST(req: NextRequest) {
     .from('profiles').select('plan, grade').eq('id', user.id).single()
 
   if (!profile) return NextResponse.json({ error: 'Profil bulunamadı.' }, { status: 404 })
-  const isFree = profile.plan === 'free'
+  // 6 Eylül 2026 — GÜVENLİK DÜZELTMESİ: eski kontrol sadece plan==='free'
+  // bakıyordu. Yeni kayıtların varsayılan planı artık 'none' (bkz.
+  // profiles.plan kolon varsayılanı) — bu kullanıcılar 'free' değil, bu
+  // yüzden eski kontrolü ATLATIP tam (demo olmayan) sınav üretebiliyorlardı.
+  // Artık: 'silver' (yeni ücretli giriş planı) hariç, ödeme yapılmamış HER
+  // durum (free/none/boş) demo-only kabul ediliyor.
+  const isFree = profile.plan !== 'premium' && profile.plan !== 'unlimited' && profile.plan !== 'silver'
 
   const body = await req.json()
   const { examType, sectionIds, demo: demoParam } = body as { examType: ExamKey; sectionIds?: string[]; demo?: boolean }
