@@ -52,3 +52,11 @@ edge'i ve kaynak mapping'i tek transaction içinde yayınlanır. Etkilenen event
 boyutları kanonikleştirilir; mastery, profil ve öneriler yeniden hesaplanır.
 Birden fazla sınıfta gözlenen başlıklar yanlış eşleştirmeyi önlemek için bu
 sürümde onaylanamaz.
+
+## Kazanım import staging
+
+`scripts/027_learning_objective_import_staging.sql`, resmî kazanım paketlerini
+500 satıra kadar denetlenebilir partiler hâlinde ara alana yükler. Yapısal
+doğrulamadan geçen kayıtlar dahi otomatik yayımlanmaz; `validated` durumu
+pedagojik onay anlamına gelmez. Import biçimi ve güvenlik sınırları
+`docs/LEARNING-OBJECTIVE-IMPORT-STAGING.md` içinde tanımlanmıştır.

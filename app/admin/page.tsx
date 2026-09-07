@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities } from '@/lib/identity/resolve-client'
 import LearningCatalogReview from '@/components/admin/LearningCatalogReview'
+import LearningObjectiveImport from '@/components/admin/LearningObjectiveImport'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -1551,6 +1552,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             )}
           </div>
           <LearningCatalogReview />
+          <LearningObjectiveImport />
         </div>
       )}
 
