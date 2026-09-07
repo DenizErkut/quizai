@@ -10,6 +10,9 @@ async function callOpenAI(messages: {role: string, content: any}[], options: {
   temperature?: number
   json?: boolean
   operation?: string   // 3 Eylül 2026 — token loglaması için işlem etiketi
+  userId?: string
+  quizSessionId?: string
+  requestId?: string
 } = {}) {
   const model = options.model || 'gpt-4o-mini'
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -29,16 +32,20 @@ async function callOpenAI(messages: {role: string, content: any}[], options: {
   if (!res.ok) throw new Error(`OpenAI ${res.status}: ${await res.text()}`)
   const data = await res.json()
   // Gerçek token tüketimini logla (best-effort, ana akışı bozmaz)
-  logOpenAIUsage(options.operation || 'openai', model, data)
+  await logOpenAIUsage(options.operation || 'openai', model, data, {
+    userId: options.userId,
+    quizSessionId: options.quizSessionId,
+    requestId: options.requestId,
+  })
   return data.choices[0].message.content as string
 }
 
 // 1. Yedek model — Claude hata verirse GPT-4o devreye girer
-export async function generateQuizFallback(prompt: string, count: number): Promise<string> {
+export async function generateQuizFallback(prompt: string, count: number, context?: { userId?: string; quizSessionId?: string; requestId?: string }): Promise<string> {
   return callOpenAI([
     { role: 'system', content: 'You are an expert quiz generator. Return only valid JSON.' },
     { role: 'user', content: prompt }
-  ], { model: 'gpt-4o-mini', max_tokens: 4000, json: true, operation: 'generate-quiz:fallback' })
+  ], { model: 'gpt-4o-mini', max_tokens: 4000, json: true, operation: 'generate-quiz:fallback', ...context })
 }
 
 // 2. Görsel soru açıklama — GPT-4o Vision ile SVG/resim analizi

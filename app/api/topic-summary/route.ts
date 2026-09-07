@@ -54,7 +54,7 @@ SADECE JSON döndür:
       system: 'Sadece geçerli JSON döndür, markdown kullanma.',
       messages: [{ role: 'user', content: prompt }],
     })
-    logAnthropicUsage('topic-summary', 'claude-sonnet-4-5', response)
+    await logAnthropicUsage('topic-summary', 'claude-sonnet-4-5', response, { userId: user.id })
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
     const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
     return NextResponse.json(parsed)

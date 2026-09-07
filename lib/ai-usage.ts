@@ -24,6 +24,7 @@ import { createClient } from '@supabase/supabase-js'
 // cacheRead: cache'den okunan input token fiyatı (~standart input'un %10'u).
 // ─────────────────────────────────────────────────────────────────────────
 type Price = { input: number; output: number; cacheRead: number; cacheWrite: number }
+type PricePeriod = Price & { version: string; from: string; until?: string }
 
 const PRICES: Record<string, Price> = {
   // Anthropic
@@ -52,13 +53,27 @@ const PRICES: Record<string, Price> = {
   // için (model adı geriye dönük değişmez) korunuyor — yeni çağrılar hiç
   // bu anahtarı kullanmayacak.
   'gemini-2.0-flash':           { input: 0.10, output: 0.40, cacheRead: 0.025, cacheWrite: 0 }, // ESKİ/KALDIRILDI, sadece geçmiş kayıtlar için
-  'gemini-3.6-flash':           { input: 1.50, output: 7.50, cacheRead: 0.15, cacheWrite: 0 },
+}
+
+// Bazı sağlayıcılar geçici/promosyon fiyat uygular. Sabit bir fiyatı geçmişe
+// ve geleceğe taşımak yerine çağrının gerçekleştiği tarihe göre fiyat seçilir.
+const PERIOD_PRICES: Record<string, PricePeriod[]> = {
+  'gemini-3.6-flash': [
+    { version: 'google-promo-through-2026-12-31', from: '2026-01-01T00:00:00.000Z', until: '2027-01-01T00:00:00.000Z', input: 0.75, output: 3.75, cacheRead: 0.075, cacheWrite: 0 },
+    { version: 'google-standard-from-2027-01-01', from: '2027-01-01T00:00:00.000Z', input: 1.50, output: 7.50, cacheRead: 0.15, cacheWrite: 0 },
+  ],
 }
 
 // Fiyat listesinde olmayan bir model gelirse maliyeti 0 loglanır ama token
 // yine kaydedilir (sonradan fiyat eklenip yeniden hesaplanabilir).
-function priceFor(model: string): Price | null {
-  return PRICES[model] || null
+function priceFor(model: string, occurredAt: Date): { price: Price; version: string } | null {
+  const timestamp = occurredAt.getTime()
+  const period = PERIOD_PRICES[model]?.find(p =>
+    timestamp >= new Date(p.from).getTime() && (!p.until || timestamp < new Date(p.until).getTime())
+  )
+  if (period) return { price: period, version: period.version }
+  const price = PRICES[model]
+  return price ? { price, version: 'static-2026-09' } : null
 }
 
 export interface AIUsageInput {
@@ -71,14 +86,17 @@ export interface AIUsageInput {
   cacheWriteTokens?: number
   userId?: string | null
   quizSessionId?: string | null
+  requestId?: string | null
+  occurredAt?: Date
   durationMs?: number
   meta?: Record<string, any>
 }
 
 // Maliyeti USD olarak hesapla (token sayısı / 1e6 * fiyat)
 export function computeCostUsd(u: AIUsageInput): number {
-  const p = priceFor(u.model)
-  if (!p) return 0
+  const resolved = priceFor(u.model, u.occurredAt || new Date())
+  if (!resolved) return 0
+  const p = resolved.price
   const cacheRead = u.cacheReadTokens || 0
   const cacheWrite = u.cacheWriteTokens || 0
   // Not: input_tokens genellikle cache-read/write'ı İÇERMEZ (sağlayıcı ayrı
@@ -95,6 +113,7 @@ export function computeCostUsd(u: AIUsageInput): number {
 // DB yazımı best-effort'tur; hata olursa yutulur ve sadece console'a düşer.
 export async function logAIUsage(u: AIUsageInput): Promise<void> {
   const cost = computeCostUsd(u)
+  const pricingVersion = priceFor(u.model, u.occurredAt || new Date())?.version || 'unknown'
 
   // 1) Her zaman Vercel loguna yaz — DB olmasa bile greplenebilir kanıt.
   //    Tek satır, kolay parse edilir bir format.
@@ -110,7 +129,7 @@ export async function logAIUsage(u: AIUsageInput): Promise<void> {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (!url || !key) return
     const sb = createClient(url, key)
-    await sb.from('ai_usage_logs').insert({
+    const { error } = await sb.from('ai_usage_logs').insert({
       operation: u.operation,
       provider: u.provider,
       model: u.model,
@@ -121,9 +140,12 @@ export async function logAIUsage(u: AIUsageInput): Promise<void> {
       cost_usd: cost,
       user_id: u.userId || null,
       quiz_session_id: u.quizSessionId || null,
+      request_id: u.requestId || null,
+      pricing_version: pricingVersion,
       duration_ms: u.durationMs ?? null,
       meta: u.meta || null,
     })
+    if (error) console.warn(`[ai-usage] DB log başarısız (yutuldu): ${error.message}`)
   } catch (e: any) {
     // Loglama ASLA ana akışı bozmamalı. Sadece uyar, yut.
     console.warn(`[ai-usage] DB log başarısız (yutuldu): ${e?.message || e}`)

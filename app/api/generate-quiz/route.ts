@@ -607,7 +607,7 @@ function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
   // gerekçesini greplenebilir bir etiketle logluyor — bir sonraki
   // yoğun-eleme olayında kör tahmin yerine gerçek kanıt olacak.
   const logRejected = (stage: string, q: any, reason: string) => {
-    console.warn(`[content-filter-reject] stage=${stage} reason="${reason}" q="${(q.q || '').slice(0, 70)}"`)
+    console.warn(`[content-filter-reject] stage=${stage} reason="${reason}" question_length=${String(q.q || '').length}`)
   }
 
   // 1) Kaynağın kendisi (yazar, ISBN, İçindekiler) hakkında soru
@@ -755,7 +755,7 @@ function filterOutNearDuplicates(qs: any[], alreadyAskedTexts: string[]): any[] 
       alreadyAskedWordSets.some((prev) => jaccardSimilarity(qWords, prev) >= DUP_SIMILARITY_THRESHOLD) ||
       acceptedWordSets.some((prev) => jaccardSimilarity(qWords, prev) >= DUP_SIMILARITY_THRESHOLD)
     if (isDup) {
-      console.warn(`[content-filter-reject] stage=near-duplicate reason="daha önce sorulan bir soruyla yüksek kelime örtüşümü" q="${(q.q || '').slice(0, 70)}"`)
+      console.warn(`[content-filter-reject] stage=near-duplicate reason="daha önce sorulan bir soruyla yüksek kelime örtüşümü" question_length=${String(q.q || '').length}`)
       continue
     }
     acceptedWordSets.push(qWords)
@@ -858,9 +858,14 @@ export async function POST(req: NextRequest) {
   let countRef = 5
   // 5 Eylül 2026 — GPT-4.1-mini pilotu: bu istekte ana üretim için hangi
   // motor kullanıldı (quiz_sessions.gen_engine'e yazılacak, kalite/maliyet
-  // karşılaştırması için). Varsayılan 'claude-sonnet' — pilot rastgele
-  // seçilmezse ya da erken bir hata ile karşılaşılırsa bu güvenli varsayılan.
+  // karşılaştırması için). Varsayılan 'claude-sonnet' — kontrol varyantı
+  // seçilirse ya da erken bir hata ile karşılaşılırsa bu güvenli varsayılan.
   let genEngineUsed = 'claude-sonnet'
+  let usageUserId: string | undefined
+  let usageRequestId: string | undefined
+  let usageSessionId: string | undefined
+  let experimentBucket: number | null = null
+  let experimentVariant: 'gpt-4.1-mini' | 'control' | null = null
   // 26 Ağustos 2026 — öğretmen geri bildirimi: "Metinde, ..." tarzı sorularda
   // öğrenciye kaynak metnin KENDİSİ hiç gösterilmiyordu. mebContext/fileContent
   // yalnızca AI'ın prompt'una gidiyordu, response'a hiç eklenmiyordu — AI'ın
@@ -875,6 +880,7 @@ export async function POST(req: NextRequest) {
 
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    usageUserId = user.id
 
     const { data: profile } = await supabase
       .from('profiles')
@@ -935,9 +941,13 @@ export async function POST(req: NextRequest) {
       // hiç ilgisi olmayan Türkçe edebiyat/iletişim sorularıydı).
     } = body
 
-    const MAX_QCOUNT: Record<string, number> = { free: 5, premium: 20, unlimited: 20 }
-    const maxQ = MAX_QCOUNT[plan] ?? 5
+    const MAX_QCOUNT: Record<string, number> = { free: 5, silver: 10, premium: 20, unlimited: 20 }
+    const maxQ = MAX_QCOUNT[plan] ?? 0
     const safeQCount = Math.min(questionCount, maxQ)
+    usageRequestId = crypto.randomUUID()
+    // Yeni oturumun kimliği üretimden önce bilinir; böylece AI maliyet kaydı
+    // kullanıcı ve oturumla atomik olmayan bir sonradan eşleştirmeye ihtiyaç duymaz.
+    usageSessionId = continueSessionId ? undefined : crypto.randomUUID()
 
     const grade = profile.grade || 'ortaokul 6. sinif'
 
@@ -1162,8 +1172,22 @@ export async function POST(req: NextRequest) {
     //    quiz_sessions.gen_engine sütununa (bkz. aşağıda insert) kaydediliyor
     //    — bir hafta sonra hem MALİYET hem KALİTE (skor, tamamlanma oranı,
     //    topup'a düşme sıklığı) karşılaştırması yapılabilsin diye.
-    const GPT_PILOT_FRACTION = 0.30
-    const useGptPilot = !isUniversityLevel && Math.random() < GPT_PILOT_FRACTION
+    const configuredFraction = Number(process.env.GPT_PILOT_FRACTION ?? '0.30')
+    const GPT_PILOT_FRACTION = Number.isFinite(configuredFraction)
+      ? Math.min(1, Math.max(0, configuredFraction))
+      : 0.30
+    // Kullanıcıyı deney boyunca aynı grupta tutan deterministik FNV-1a kovası.
+    // Devam parçaları pilot dışında kalır; yalnızca ilk K12 üretimi ölçülür.
+    const experimentKey = `quiz-generation-v1:${user.id}`
+    let hash = 2166136261
+    for (let i = 0; i < experimentKey.length; i++) {
+      hash ^= experimentKey.charCodeAt(i)
+      hash = Math.imul(hash, 16777619)
+    }
+    experimentBucket = Math.abs(hash >>> 0) % 10000
+    const pilotEligible = !isUniversityLevel && !continueSessionId
+    const useGptPilot = pilotEligible && experimentBucket < Math.round(GPT_PILOT_FRACTION * 10000)
+    experimentVariant = pilotEligible ? (useGptPilot ? 'gpt-4.1-mini' : 'control') : null
     genEngineUsed = useGptPilot ? 'gpt-4.1-mini' : (useHaiku ? 'claude-haiku' : 'claude-sonnet')
 
     let text: string
@@ -1173,7 +1197,7 @@ export async function POST(req: NextRequest) {
           { role: 'system', content: 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca MEB müfredatındaki konularda soru üret. Müfredat dışı, siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.\n\n' + getStaticSystemBlock(questionType, effectiveLang) },
           { role: 'user', content: prompt },
         ],
-        { model: 'gpt-4.1-mini', max_tokens: useHaiku ? 2500 : 3500, json: true, operation: 'generate-quiz:pilot-gpt41mini' }
+        { model: 'gpt-4.1-mini', max_tokens: useHaiku ? 2500 : 3500, json: true, operation: 'generate-quiz:pilot-gpt41mini', userId: user.id, quizSessionId: usageSessionId, requestId: usageRequestId }
       )
       text = gptResult
       console.log(`[generate-quiz] PILOT model=gpt-4.1-mini qCount=${safeQCount}`)
@@ -1190,7 +1214,10 @@ export async function POST(req: NextRequest) {
         messages: [{ role: 'user', content: prompt }],
       })
       console.log(`[generate-quiz] model=${useHaiku ? 'haiku' : 'sonnet'} qCount=${safeQCount}`)
-      logAnthropicUsage('generate-quiz', useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5', response, {
+      await logAnthropicUsage('generate-quiz', useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5', response, {
+        userId: user.id,
+        quizSessionId: usageSessionId,
+        requestId: usageRequestId,
         meta: { qCount: safeQCount, topic, hasMebContext: !!mebContext },
       })
       text = response.content[0].type === 'text' ? response.content[0].text : ''
@@ -1266,7 +1293,7 @@ export async function POST(req: NextRequest) {
           parsed = { questions: safeQuestions }
           console.warn(`[generate-quiz] JSON recovered via balanced-brace parser, got ${safeQuestions.length} questions`)
         } else {
-          console.error(`[generate-quiz] JSON parse failed completely. Raw text (ilk 500 + son 500 karakter): ${clean.slice(0, 500)} ...[KESİLDİ]... ${clean.slice(-500)}`)
+          console.error(`[generate-quiz] JSON parse failed completely. response_length=${clean.length} recovered_questions=0`)
           return NextResponse.json({ error: 'Quiz generation failed - invalid response' }, { status: 500 })
         }
       }
@@ -1404,7 +1431,10 @@ export async function POST(req: NextRequest) {
               : [{ type: 'text' as const, text: getStaticSystemBlock(questionType, effectiveLang), cache_control: { type: 'ephemeral' as const } }],
             messages: [{ role: 'user', content: topupPrompt }],
           })
-          logAnthropicUsage('generate-quiz:topup', 'claude-sonnet-4-5', topupResponse, {
+          await logAnthropicUsage('generate-quiz:topup', 'claude-sonnet-4-5', topupResponse, {
+            userId: user.id,
+            quizSessionId: usageSessionId,
+            requestId: usageRequestId,
             meta: { round: round + 1, missing },
           })
           const topupText = topupResponse.content[0].type === 'text' ? topupResponse.content[0].text : ''
@@ -1526,6 +1556,7 @@ export async function POST(req: NextRequest) {
       const { data: sessionRow } = await supabase
         .from('quiz_sessions')
         .insert({
+          id: usageSessionId,
           user_id: user.id,
           topic,
           grade: profile.grade,
@@ -1537,6 +1568,10 @@ export async function POST(req: NextRequest) {
           completed: false,
           question_type: questionType,
           gen_engine: genEngineUsed,
+          gen_request_id: usageRequestId,
+          gen_experiment: experimentVariant ? 'quiz-generation-v1' : null,
+          gen_experiment_variant: experimentVariant,
+          gen_experiment_bucket: experimentVariant ? experimentBucket : null,
         })
         .select('id')
         .maybeSingle()
@@ -1549,7 +1584,11 @@ export async function POST(req: NextRequest) {
     // GPT-4o yedek model
     try {
       if (!promptStr) throw new Error('No prompt')
-      const fallbackText = await generateQuizFallback(promptStr, countRef)
+      const fallbackText = await generateQuizFallback(promptStr, countRef, {
+        userId: usageUserId,
+        quizSessionId: usageSessionId,
+        requestId: usageRequestId,
+      })
       const clean = fallbackText.replace(/```json|```/g, '').trim()
       const parsed = JSON.parse(clean)
       const fbQuestions = parsed.questions || parsed

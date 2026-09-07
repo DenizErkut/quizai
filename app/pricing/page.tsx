@@ -61,6 +61,7 @@ export default function PricingPage() {
       features: [
         'Ayda 30 test',
         'Test başına 10 soru',
+        'Sınav simülasyonu (demo)',
         'Sadece müfredat konuları',
         'Temel soru tipleri',
         'Temel arşiv & dashboard',

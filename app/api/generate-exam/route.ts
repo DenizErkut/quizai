@@ -158,21 +158,20 @@ export async function POST(req: NextRequest) {
   // bakıyordu. Yeni kayıtların varsayılan planı artık 'none' (bkz.
   // profiles.plan kolon varsayılanı) — bu kullanıcılar 'free' değil, bu
   // yüzden eski kontrolü ATLATIP tam (demo olmayan) sınav üretebiliyorlardı.
-  // Artık: 'silver' (yeni ücretli giriş planı) hariç, ödeme yapılmamış HER
-  // durum (free/none/boş) demo-only kabul ediliyor.
-  const isFree = profile.plan !== 'premium' && profile.plan !== 'unlimited' && profile.plan !== 'silver'
+  // Gümüş dahil Altın/Platin dışındaki her plan demo-only kabul edilir.
+  const isDemoOnly = profile.plan !== 'premium' && profile.plan !== 'unlimited'
 
   const body = await req.json()
   const { examType, sectionIds, demo: demoParam } = body as { examType: ExamKey; sectionIds?: string[]; demo?: boolean }
 
-  // Freemium: SADECE demo modu — tam sınav (demo=false) isteği reddedilir.
+  // Gümüş/free/none: SADECE demo modu — tam sınav isteği reddedilir.
   // Bu kontrol istemci tarafındaki (disabled buton) kontrolden BAĞIMSIZ —
   // istemci atlatılsa bile sunucu asla freemium'a tam sınav üretmez.
-  if (isFree && demoParam === false) {
+  if (isDemoOnly && demoParam === false) {
     return NextResponse.json({ error: 'premium_required' }, { status: 403 })
   }
-  // Defense-in-depth: freemium için demo her koşulda true kabul edilir.
-  const demo = isFree ? true : !!demoParam
+  // Defense-in-depth: kısıtlı planlar için demo her koşulda true kabul edilir.
+  const demo = isDemoOnly ? true : !!demoParam
 
   const format = EXAM_FORMATS[examType]
   if (!format) return NextResponse.json({ error: 'Geçersiz sınav türü.' }, { status: 400 })
@@ -191,7 +190,7 @@ export async function POST(req: NextRequest) {
     for (let i = 0; i < sectionsToGenerate.length; i += CHUNK) {
       const chunk = sectionsToGenerate.slice(i, i + CHUNK)
       await Promise.all(chunk.map(async (section: any) => {
-        const sectionCount = isFree ? 1 : Math.max(4, Math.round(section.count * countMultiplier))
+        const sectionCount = isDemoOnly ? 1 : Math.max(4, Math.round(section.count * countMultiplier))
         const prompt = buildSectionPrompt(section.subject, section.grade, sectionCount, format.label)
 
         try {
@@ -201,7 +200,7 @@ export async function POST(req: NextRequest) {
             system: 'Sen Türk eğitim sisteminde sınav soruları hazırlayan bir uzmansın. Sadece geçerli JSON döndür, markdown kullanma.',
             messages: [{ role: 'user', content: prompt }],
           })
-    logAnthropicUsage('generate-exam', 'claude-sonnet-4-5', response)
+          await logAnthropicUsage('generate-exam', 'claude-sonnet-4-5', response, { userId: user.id })
 
           const text = response.content[0].type === 'text' ? response.content[0].text : ''
           const clean = text.replace(/```json|```/g, '').trim()

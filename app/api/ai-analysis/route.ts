@@ -43,7 +43,7 @@ Zayıf konular: ${weakTopics}
 Kısa ve motive edici yaz. Maksimum 200 kelime.`,
     }],
   }) as any
-    logAnthropicUsage('ai-analysis', 'claude-sonnet-4-5', message)
+    await logAnthropicUsage('ai-analysis', 'claude-sonnet-4-5', message, { userId: user.id })
 
   return NextResponse.json({ analysis: message.content[0].text })
 }

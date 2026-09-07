@@ -54,7 +54,7 @@ Lütfen şu formatta Türkçe analiz yaz:
 Kısa ve motive edici tut, maksimum 250 kelime.`
     }],
   })
-    logAnthropicUsage('ai-grade-analysis', 'claude-sonnet-4-5', response)
+    await logAnthropicUsage('ai-grade-analysis', 'claude-sonnet-4-5', response, { userId: user.id })
 
   const analysis = response.content[0].type === 'text' ? response.content[0].text : ''
   return NextResponse.json({ analysis })

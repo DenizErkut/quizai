@@ -90,7 +90,7 @@ Respond with ONLY: {"correct": true} or {"correct": false}`
       }]
     })
 
-    logAnthropicUsage('check-answer', 'claude-sonnet-4-5', response)
+    await logAnthropicUsage('check-answer', 'claude-sonnet-4-5', response, { userId: user.id })
     const text = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
     const result = JSON.parse(text)
     return NextResponse.json(result)

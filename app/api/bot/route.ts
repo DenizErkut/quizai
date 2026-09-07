@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       messages: messages.map((m: any) => ({ role: m.role, content: m.content })),
     })
 
-    logAnthropicUsage('bot', 'claude-sonnet-4-5', response)
+    await logAnthropicUsage('bot', 'claude-sonnet-4-5', response, { userId: botUserId })
     const reply = response.content[0].type === 'text' ? response.content[0].text : ''
     return NextResponse.json({ reply })
   } catch {

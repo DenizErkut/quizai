@@ -150,7 +150,7 @@ Lütfen şu formatta kısa ve öz bir analiz yaz (Türkçe):
     max_tokens: 1000,
     messages: [{ role: 'user', content: prompt }],
   })
-    logAnthropicUsage('teacher:analyze', 'claude-sonnet-4-5', response)
+    await logAnthropicUsage('teacher:analyze', 'claude-sonnet-4-5', response, { userId: user.id })
 
   const analysis = response.content[0].type === 'text' ? response.content[0].text : ''
 

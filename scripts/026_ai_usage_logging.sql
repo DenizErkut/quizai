@@ -66,3 +66,9 @@ SELECT
   avg(duration_ms)::int AS avg_duration_ms
 FROM ai_usage_logs
 GROUP BY 1, 2, 3;
+
+ALTER VIEW ai_usage_daily_summary SET (security_invoker = true);
+REVOKE ALL ON TABLE ai_usage_logs FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE ai_usage_daily_summary FROM PUBLIC, anon, authenticated;
+GRANT ALL ON TABLE ai_usage_logs TO service_role;
+GRANT SELECT ON TABLE ai_usage_daily_summary TO service_role;

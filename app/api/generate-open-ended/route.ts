@@ -143,7 +143,7 @@ Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
       max_tokens: 1500,
       messages: [{ role: 'user', content: prompt }],
     })
-    logAnthropicUsage('generate-open-ended', 'claude-sonnet-4-5', response)
+    await logAnthropicUsage('generate-open-ended', 'claude-sonnet-4-5', response, { userId: user.id })
 
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
     let parsed

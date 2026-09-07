@@ -18,7 +18,7 @@ const PLANS = {
     period: 'yıl',
     badge: '',
     color: '#94a3b8',
-    features: ['Ayda 30 test', '10 soru/test', 'Temel soru tipleri', '6 dil'],
+    features: ['Ayda 30 test', '10 soru/test', 'Sınav simülasyonu (demo)', 'Temel soru tipleri', '6 dil'],
   },
   monthly: {
     name: 'Aylık Altın',

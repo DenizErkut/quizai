@@ -43,7 +43,7 @@ SADECE geçerli JSON döndür:
     system: 'Sadece geçerli JSON döndür, markdown kullanma.',
     messages: [{ role: 'user', content: prompt }],
   })
-    logAnthropicUsage('live-quiz', 'claude-sonnet-4-5', response)
+    await logAnthropicUsage('live-quiz', 'claude-sonnet-4-5', response, { userId: user.id })
 
   const text = response.content[0].type === 'text' ? response.content[0].text : ''
   let questions: any[] = []

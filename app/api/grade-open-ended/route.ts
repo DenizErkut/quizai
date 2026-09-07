@@ -110,7 +110,7 @@ SADECE aşağıdaki JSON formatında yanıt ver:
       max_tokens: 1500,
       messages: [{ role: 'user', content: prompt }],
     })
-    logAnthropicUsage('grade-open-ended', 'claude-sonnet-4-5', response)
+    await logAnthropicUsage('grade-open-ended', 'claude-sonnet-4-5', response, { userId: user.id })
 
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
     let parsed

@@ -345,7 +345,7 @@ export default function ExamPage() {
           // düzeltmeyle tutarlı: 'silver' dahil ödenmiş HER plan tam sınava
           // erişebilir; 'free' (mevcut kullanıcılar) ve yeni 'none' (henüz
           // plan seçmemiş) kullanıcılar demo-only kalır.
-          const isRestricted = profile?.plan !== 'premium' && profile?.plan !== 'unlimited' && profile?.plan !== 'silver'
+          const isRestricted = profile?.plan !== 'premium' && profile?.plan !== 'unlimited'
           return isRestricted && (
             <div style={{ padding: '14px 16px', borderRadius: '14px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
               <div>
@@ -362,7 +362,7 @@ export default function ExamPage() {
         {/* Demo / Tam mod — ödenmemiş planlarda sadece Demo seçilebilir, alanda 1 soru */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
           {(() => {
-            const isRestricted = profile?.plan !== 'premium' && profile?.plan !== 'unlimited' && profile?.plan !== 'silver'
+            const isRestricted = profile?.plan !== 'premium' && profile?.plan !== 'unlimited'
             return [
               { val: true, label: '⚡ Demo', desc: isRestricted ? 'Her alanda 1 soru, hızlı önizleme' : 'Her bölümden ~4 soru, kısa süre' },
               { val: false, label: '📋 Tam Sınav', desc: 'Gerçek soru sayısı ve süre' },
@@ -387,7 +387,7 @@ export default function ExamPage() {
           })()}
         </div>
 
-        {/* Sınav kartları — Gümüş'te de SEÇİLEBİLİR (sadece demo/1 soru ile) */}
+        {/* Sınav kartları — Gümüş'te seçilebilir; sunucu demo/1 soru sınırını zorunlu tutar. */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: '12px' }}>
           {Object.entries(EXAM_META).map(([key, meta]) => {
             const fmt = formats[key]
