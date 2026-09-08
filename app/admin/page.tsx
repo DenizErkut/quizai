@@ -7,6 +7,7 @@ import LearningCatalogReview from '@/components/admin/LearningCatalogReview'
 import LearningObjectiveImport from '@/components/admin/LearningObjectiveImport'
 import CurriculumLifecycleManager from '@/components/admin/CurriculumLifecycleManager'
 import LearningGraphQuality from '@/components/admin/LearningGraphQuality'
+import LearningGraphRelations from '@/components/admin/LearningGraphRelations'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -1557,6 +1558,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           <LearningObjectiveImport />
           <CurriculumLifecycleManager />
           <LearningGraphQuality />
+          <LearningGraphRelations />
         </div>
       )}
 
