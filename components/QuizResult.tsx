@@ -3,11 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import ChatAssistant from '@/components/ChatAssistant'
-
-interface Question {
-  q: string; opts: string[]; ans: number; exp: string
-  svg?: string | null; qtype?: 'text' | 'svg'
-}
+import type { Question } from '@/lib/quiz-constants'
 
 interface YouTubeLink {
   url: string; title: string; channel: string; thumbnail: string
@@ -67,13 +63,45 @@ const SOCIAL_LINKS = [
   },
 ]
 
+function correctAnswerText(q: Question): string {
+  if (q.type === 'ordering' && q.items?.length) {
+    return (q.correctOrder || q.items.map((_, i) => i))
+      .map(i => q.items?.[i])
+      .filter(Boolean)
+      .join(' → ')
+  }
+  if (q.type === 'matching' && q.pairs?.length) {
+    return q.pairs.map(pair => `${pair.left} → ${pair.right}`).join(' · ')
+  }
+  if (q.type === 'multi_true_false' && q.statements?.length) {
+    return q.statements.map(s => `${s.text}: ${s.correct ? 'Doğru' : 'Yanlış'}`).join(' · ')
+  }
+  if (q.type === 'table_fill' && q.tableAnswers?.length) return q.tableAnswers.join(' · ')
+  if (q.type === 'fill_blank' && q.blank) return q.blank
+  const option = q.opts?.[q.ans]
+  if (option != null) return String(option)
+  if (q.type === 'true_false') return q.ans === 0 ? 'Doğru' : 'Yanlış'
+  return 'Cevap bilgisi bulunamadı'
+}
+
+function userAnswerText(q: Question, userAns: number | undefined): string {
+  if (userAns == null) return 'Cevap verilmedi'
+  const option = q.opts?.[userAns]
+  if (option != null) return String(option)
+  if (q.type === 'true_false') return userAns === 0 ? 'Doğru' : 'Yanlış'
+  if (['ordering', 'matching', 'multi_true_false', 'table_fill', 'fill_blank', 'short_answer'].includes(q.type || '')) {
+    return 'Verilen yanıt'
+  }
+  return String(userAns)
+}
+
 export default function QuizResult({ questions, answers, topic, difficulty, language, onNewTest, onRetryWrong, youtubeLinks = {} }: Props) {
   const [reportedIdx, setReportedIdx] = useState<Set<number>>(new Set())
   const [reportingIdx, setReportingIdx] = useState<number | null>(null)
   const supabase = createClient() as any
 
   const finalScore = answers.filter(a => a.correct).length
-  const finalPct = Math.round((finalScore / questions.length) * 100)
+  const finalPct = questions.length > 0 ? Math.round((finalScore / questions.length) * 100) : 0
   const diff = DIFFICULTIES[difficulty] || DIFFICULTIES.normal
   const wrongQuestions = questions.filter((_, i) => !answers[i]?.correct)
 
@@ -241,8 +269,8 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
       await supabase.from('error_reports').insert({
         user_id: user?.id || null,
         question_text: q.q,
-        correct_answer: q.opts[q.ans],
-        user_answer: q.opts[a?.userAns],
+        correct_answer: correctAnswerText(q),
+        user_answer: userAnswerText(q, a?.userAns),
         topic,
         status: 'pending',
         // Madde 2: reporter_role artık kaydediliyor — öğretmenin yeni genel
@@ -341,7 +369,8 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
       addText(`Soru ${i + 1}`, 10, true, [91, 76, 245])
       y -= 2; addText(q.q, 10, false, [20,20,20]); y += 2
       const letters = ['A','B','C','D']
-      q.opts.forEach((opt, oi) => {
+      const printableOptions = q.opts?.length ? q.opts : [correctAnswerText(q)]
+      printableOptions.forEach((opt, oi) => {
         addText(`${letters[oi]}. ${opt}`, 9, false, [60,60,60], 4)
       })
       y += 4; addLine()
@@ -440,9 +469,9 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
               <div key={i} style={{ padding: '12px 14px', borderRadius: '10px', background: 'var(--red-bg)', border: '1px solid rgba(220,38,38,0.15)', marginBottom: '10px' }}>
                 <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>Soru {i + 1}: {q.q}</div>
                 <div style={{ fontSize: '12px', marginBottom: '4px' }}>
-                  <span style={{ color: 'var(--red)' }}>✗ Cevabın: {q.opts[answers[i]?.userAns]}</span>
+                  <span style={{ color: 'var(--red)' }}>✗ Cevabın: {userAnswerText(q, answers[i]?.userAns)}</span>
                   {'  ·  '}
-                  <span style={{ color: 'var(--green)' }}>✓ Doğru: {q.opts[q.ans]}</span>
+                  <span style={{ color: 'var(--green)' }}>✓ Doğru: {correctAnswerText(q)}</span>
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--text2)', lineHeight: 1.6, marginBottom: '8px' }}>💡 {q.exp}</div>
                 {yt && (
@@ -475,7 +504,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '3px' }}>{q.q}</div>
                 <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px' }}>
-                  Doğru: {String.fromCharCode(65 + q.ans)}. {q.opts[q.ans]}
+                  Doğru: {correctAnswerText(q)}
                 </div>
                 {/* HATA BİLDİR butonu */}
                 {reportedIdx.has(i) ? (

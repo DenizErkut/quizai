@@ -632,10 +632,6 @@ function QuizPageContent() {
   const [orderItems, setOrderItems] = useState<string[]>([])
   const [fillInput, setFillInput] = useState('')
   const [checkingAnswer, setCheckingAnswer] = useState(false)
-  const [orderAnswer, setOrderAnswer] = useState<string[]>([])
-  const [matchAnswer, setMatchAnswer] = useState<Record<number, number>>({})
-  const [multiTFAnswer, setMultiTFAnswer] = useState<Record<number, boolean | null>>({})
-  const [tableFillAnswer, setTableFillAnswer] = useState<string[]>([])
   const [mTFAnswers, setMTFAnswers] = useState<Record<number, boolean | null>>({})
   const [tInputs, setTInputs] = useState<string[]>([])
 
@@ -1270,19 +1266,19 @@ function QuizPageContent() {
         fillInput={fillInput}
         shortInput={shortInput}
         chosen={chosen}
-        orderAnswer={orderAnswer}
-        matchAnswer={matchAnswer}
-        multiTFAnswer={multiTFAnswer}
-        tableFillAnswer={tableFillAnswer}
+        orderAnswer={orderItems}
+        matchAnswer={matchSelections}
+        multiTFAnswer={mTFAnswers}
+        tableFillAnswer={tInputs}
         onSelectAnswer={choose}
         onFillSubmit={submitShortAnswer}
         onNext={next}
         setFillInput={setFillInput}
         setShortInput={setShortInput}
-        setOrderAnswer={setOrderAnswer}
-        setMatchAnswer={setMatchAnswer}
-        setMultiTFAnswer={setMultiTFAnswer}
-        setTableFillAnswer={setTableFillAnswer}
+        setOrderAnswer={setOrderItems}
+        setMatchAnswer={setMatchSelections}
+        setMultiTFAnswer={setMTFAnswers}
+        setTableFillAnswer={setTInputs}
         onFinish={() => setScreen('result')}
         shuffledPairs={shuffledPairs}
         shuffledIndexMap={shuffledIndexMap}

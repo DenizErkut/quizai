@@ -709,6 +709,32 @@ function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
   return result
 }
 
+// Model/provider çıktısı UI'ya ulaşmadan önce soru tiplerinin zorunlu alanlarını
+// tek biçime getirir. Prompt talimatları tek başına şema garantisi değildir;
+// özellikle true_false sorularında opts'un atlanması sonuç ekranını çökertebilir.
+function normalizeInteractiveQuestionShape(q: any, language: string): any {
+  const normalized = { ...q }
+  if (normalized.type === 'true_false' && (!Array.isArray(normalized.opts) || normalized.opts.length < 2)) {
+    const lang = String(language || '').toLocaleLowerCase('tr')
+    normalized.opts = lang.includes('türk') ? ['Doğru', 'Yanlış'] : ['True', 'False']
+  }
+  if (normalized.type === 'ordering') {
+    const items = Array.isArray(normalized.items) && normalized.items.length >= 2
+      ? normalized.items.map(String)
+      : Array.isArray(normalized.opts) && normalized.opts.length >= 2
+        ? normalized.opts.map(String)
+        : []
+    normalized.items = items
+    const order = Array.isArray(normalized.correctOrder) ? normalized.correctOrder.map(Number) : []
+    const isPermutation = order.length === items.length
+      && new Set(order).size === items.length
+      && order.every((index: number) => Number.isInteger(index) && index >= 0 && index < items.length)
+    normalized.correctOrder = isPermutation ? order : items.map((_: string, index: number) => index)
+  }
+  if (!Array.isArray(normalized.opts)) normalized.opts = []
+  return normalized
+}
+
 // 31 Ağustos 2026 — Deniz'in gerçek test karşılaştırmasıyla bulunan sorun:
 // önceki oturumda eklenen "önceki parçanın cümlelerini tekrar hedefleme"
 // talimatı (previousQuestionsNote'a eklenen KAYNAK METİN SÜREKLİLİĞİ notu)
@@ -1315,7 +1341,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    let questions = parsed.questions || []
+    let questions = (parsed.questions || []).map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
 
     // Soru doğrulama + SVG üretimi — PARALEL çalışır (timeout optimizasyonu)
     const visualCategory = detectVisualCategory(topic)
@@ -1347,7 +1373,7 @@ export async function POST(req: NextRequest) {
 
     // Verify sonucunu uygula
     if (verifyResult.status === 'fulfilled' && verifyResult.value?.questions?.length > 0) {
-      questions = verifyResult.value.questions
+      questions = verifyResult.value.questions.map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
     }
 
     // SVG sonuçlarını uygula
@@ -1467,7 +1493,7 @@ export async function POST(req: NextRequest) {
               }
             }
           }
-          let topupQuestions = topupParsed?.questions || []
+          let topupQuestions = (topupParsed?.questions || []).map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
           topupQuestions = applyContentQualityFilters(topupQuestions, mebContext)
           // Yakın-tekrar kontrolü: hem önceki parçanın sorularına (excludeQuestionTexts)
           // hem de bu çağrıda ŞİMDİYE KADAR kabul edilmiş sorulara (questions) karşı.
