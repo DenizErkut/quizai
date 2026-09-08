@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 120
 export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
@@ -12,6 +12,7 @@ import { misconceptionMetadataInstruction, normalizeQuestionMisconceptions } fro
 import { resolveAdaptiveLearningPolicy } from '@/lib/adaptive-learning'
 import { startingDifficultyFromMastery } from '@/lib/adaptive-difficulty'
 import { applyCanonicalObjectiveMappings, learningObjectivePrompt, loadCanonicalObjectiveCandidates } from '@/lib/learning-objective-mapping'
+import { runMistralShadowComparison } from '@/lib/ai-gateway'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -1627,6 +1628,61 @@ export async function POST(req: NextRequest) {
         .select('id')
         .maybeSingle()
       sessionId = sessionRow?.id
+    }
+
+    // Multi-AI Gateway v3 shadow pilot. Varsayılan oran 0'dır; açıkça
+    // etkinleştirilmeden ek sağlayıcı çağrısı/maliyet oluşmaz. Kullanıcı dosyası
+    // içeren, üniversite veya adaptif devam istekleri gölge pilota alınmaz.
+    const configuredShadowFraction = Number(process.env.MISTRAL_SHADOW_FRACTION || '0')
+    const shadowFraction = Number.isFinite(configuredShadowFraction)
+      ? Math.min(1, Math.max(0, configuredShadowFraction))
+      : 0
+    let shadowHash = 2166136261
+    for (const character of usageRequestId) {
+      shadowHash ^= character.charCodeAt(0)
+      shadowHash = Math.imul(shadowHash, 16777619)
+    }
+    const shadowBucket = Math.abs(shadowHash >>> 0) % 10000
+    const shadowEligible = shadowFraction > 0
+      && Boolean(process.env.MISTRAL_API_KEY)
+      && !isUniversityLevel
+      && !continueSessionId
+      && !(fileContent && fileContent.trim())
+      && shadowBucket < Math.round(shadowFraction * 10000)
+
+    if (shadowEligible && sessionId) {
+      const shadowSystemPrompt = 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca geçerli JSON üret.\n\n'
+        + getStaticSystemBlock(questionType, effectiveLang)
+      after(async () => {
+        const metrics = await runMistralShadowComparison({
+          systemPrompt: shadowSystemPrompt,
+          userPrompt: prompt,
+          expectedCount: safeQCount,
+          userId: user.id,
+          sessionId,
+          requestId: usageRequestId,
+        })
+        const { error } = await supabase.from('ai_shadow_evaluations').insert({
+          request_id: usageRequestId,
+          quiz_session_id: sessionId,
+          user_id: user.id,
+          policy_version: 'multi-ai-gateway-v3-p0',
+          task: 'quiz_generation',
+          control_provider: genEngineUsed.startsWith('gpt') ? 'openai' : 'anthropic',
+          control_model: genEngineUsed,
+          shadow_provider: metrics.provider,
+          shadow_model: metrics.model,
+          expected_count: metrics.expectedCount,
+          delivered_count: metrics.deliveredCount,
+          structurally_valid_count: metrics.structurallyValidCount,
+          duplicate_count: metrics.duplicateCount,
+          duration_ms: metrics.durationMs,
+          input_tokens: metrics.inputTokens,
+          output_tokens: metrics.outputTokens,
+          error_code: metrics.errorCode || null,
+        })
+        if (error) console.warn(`[ai-shadow] metric insert failed code=${error.code || 'unknown'}`)
+      })
     }
 
     return NextResponse.json({ questions, sessionId, resolvedDifficulty, adaptivePolicy: adaptivePolicy || undefined })

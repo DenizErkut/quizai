@@ -48,4 +48,14 @@ Bu belge, `PRATIUM_MULTI_AI_GATEWAY_V3_CANONICAL_ARCHITECTURE.md` referansının
 
 ## Sonraki somut teslimat
 
-`generate-quiz` için Mistral adapter + shadow comparison pipeline: öğrenciye mevcut güvenli çıktı verilirken Mistral çıktısı sınırlı pilot örneklemde çevrimdışı karşılaştırılır ve ham içerik saklanmadan ölçüm sonuçları kaydedilir.
+`generate-quiz` için Mistral adapter + shadow comparison pipeline hazırlandı:
+
+- `MISTRAL_SHADOW_FRACTION=0` varsayılanıyla kapalıdır.
+- Yalnızca K12, ilk test parçası ve kullanıcı dosyası içermeyen istekler uygundur.
+- Gölge çağrı kullanıcı yanıtını bekletmeden response sonrasında çalışır.
+- Veritabanına yalnızca adet, yapısal geçerlilik, tekrar, süre ve token metrikleri yazılır.
+- Ham prompt, soru veya model yanıtı saklanmaz.
+
+Sıradaki somut teslimat: 034 migrasyonunu kontrollü uygulamak, Mistral anahtarını
+tanımlamak, `%1–5` gölge örneklemle en az 100 üretim toplamak ve eşikler
+geçilmeden öğrenci trafiğini Mistral'a çevirmemek.

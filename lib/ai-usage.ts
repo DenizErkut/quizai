@@ -46,6 +46,8 @@ const PRICES: Record<string, Price> = {
   'gpt-4.1-nano':               { input: 0.10, output: 0.40,  cacheRead: 0.025, cacheWrite: 0 },
   'gpt-5':                      { input: 1.25, output: 10.00, cacheRead: 0.125, cacheWrite: 0 },
   'gpt-5-mini':                 { input: 0.25, output: 2.00,  cacheRead: 0.025, cacheWrite: 0 },
+  // Mistral Large 3 — resmi Mistral API fiyatı, 8 Eylül 2026.
+  'mistral-large-latest':       { input: 0.50, output: 1.50, cacheRead: 0.05, cacheWrite: 0 },
   // Google
   // Google — 6 Eylül 2026: 'gemini-2.0-flash' Google tarafından KALDIRILDI
   // (404 "no longer available"), tüm çağrı noktaları 'gemini-3.6-flash'e
@@ -78,7 +80,7 @@ function priceFor(model: string, occurredAt: Date): { price: Price; version: str
 
 export interface AIUsageInput {
   operation: string            // 'generate-quiz', 'verify-questions:gpt4o' vb.
-  provider: 'anthropic' | 'openai' | 'google'
+  provider: 'anthropic' | 'openai' | 'google' | 'mistral'
   model: string
   inputTokens: number
   outputTokens: number

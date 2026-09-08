@@ -1,3 +1,4 @@
 export * from './contracts'
 export * from './model-registry'
 export * from './router'
+export * from './shadow-comparison'
