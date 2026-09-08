@@ -23,6 +23,11 @@ export interface Question {
   adaptiveFocus?: string
   adaptiveReasonCode?: string
   adaptiveRecommendationId?: string | null
+  learningObjectiveRef?: string | null
+  learningObjectiveId?: string | null
+  learningObjectiveCode?: string | null
+  objectiveMappingStatus?: 'mapped' | 'unmapped' | 'no_candidates'
+  objectiveMappingVersion?: 'v1'
 }
 
 export interface Profile {

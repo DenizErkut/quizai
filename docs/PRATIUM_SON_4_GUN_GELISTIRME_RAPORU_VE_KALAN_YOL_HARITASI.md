@@ -198,8 +198,8 @@ Bu 108 konu eğitimsel doğruluk açısından otomatik onaylanmadı; insan incel
 - [ ] Resmî MEB kazanım kodları ve açıklamaları için kontrollü import formatı hazırlamak.
 - [ ] `learning_objective_catalog` tablosunu doğrulanmış kazanım verileriyle doldurmak.
 - [ ] `objective → topic → unit → subject` ilişkilerini Learning Graph içinde yayınlamak.
-- [ ] Soru üretiminden gelen her soruyu mümkün olduğunda kanonik `learning_objective_id` ile ilişkilendirmek.
-- [ ] Kazanım bulunamadığında uydurma kod üretmeyen mevcut güvenlik kuralını korumak.
+- [x] Soru üretiminden gelen her soruyu mümkün olduğunda kanonik `learning_objective_id` ile ilişkilendirmek.
+- [x] Kazanım bulunamadığında uydurma kod üretmeyen mevcut güvenlik kuralını korumak.
 - [ ] Kazanım sürümleme ve müfredat yılı değişiklik yönetimini eklemek.
 
 **Tamamlanma ölçütü:** Pilot ders/sınıflarda soruların en az `%90`ının doğrulanmış bir kazanıma bağlanması.

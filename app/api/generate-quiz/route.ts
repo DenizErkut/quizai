@@ -11,6 +11,7 @@ import { findPrerequisiteGaps, buildPrerequisiteContext } from '@/lib/learning-g
 import { misconceptionMetadataInstruction, normalizeQuestionMisconceptions } from '@/lib/misconceptions'
 import { resolveAdaptiveLearningPolicy } from '@/lib/adaptive-learning'
 import { startingDifficultyFromMastery } from '@/lib/adaptive-difficulty'
+import { applyCanonicalObjectiveMappings, learningObjectivePrompt, loadCanonicalObjectiveCandidates } from '@/lib/learning-objective-mapping'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -1130,6 +1131,13 @@ export async function POST(req: NextRequest) {
 
     const fullPrompt = buildPrompt(questionType, topic, grade, resolvedDifficulty, effectiveLang, safeQCount, fileContent || '', gradeContext, mebContext, profile.department || undefined, subject)
     const isUniversityLevel = level === 'universite'
+    const objectiveCandidates = await loadCanonicalObjectiveCandidates(supabase, {
+      subject, grade, topic,
+    }).catch(error => {
+      console.warn('[generate-quiz] canonical objective candidates unavailable:', error?.message || 'unknown')
+      return []
+    })
+    const objectiveInstruction = learningObjectivePrompt(objectiveCandidates)
 
     // 5 Eylül 2026 — P0 prompt caching (bkz. K12_STATIC_* tanımları ve
     // getStaticSystemBlock/stripStaticPartsForCaching yukarıda). Sadece K12/
@@ -1147,8 +1155,9 @@ export async function POST(req: NextRequest) {
     const prompt = dynamicPrompt
       + (adaptivePolicy?.promptContext || '')
       + (isUniversityLevel ? misconceptionMetadataInstruction(questionType) : '') // K12'de artık statik blokta
+      + objectiveInstruction
       + previousQuestionsNote
-    promptStr = fullPrompt + (adaptivePolicy?.promptContext || '') + misconceptionMetadataInstruction(questionType) + previousQuestionsNote // hata loglaması için TAM metin saklanır
+    promptStr = fullPrompt + (adaptivePolicy?.promptContext || '') + misconceptionMetadataInstruction(questionType) + objectiveInstruction + previousQuestionsNote // fallback için TAM metin saklanır
     countRef = safeQCount
 
     // Hız optimizasyonu: az soru → Haiku (3x hızlı), çok soru → Sonnet
@@ -1518,6 +1527,8 @@ export async function POST(req: NextRequest) {
       adaptiveReasonCode: adaptivePolicy?.reasonCode || 'NO_ACTIVE_SIGNAL',
       adaptiveRecommendationId: adaptivePolicy?.recommendationId || null,
     }))
+    const objectiveMapping = applyCanonicalObjectiveMappings(questions, objectiveCandidates)
+    questions = objectiveMapping.questions
 
     // continueSessionId: adaptif akışta ikinci/sonraki parça — aynı testin
     // devamı, YENİ bir test değil. Bu yüzden kota (monthly_test_count) TEKRAR
@@ -1544,9 +1555,16 @@ export async function POST(req: NextRequest) {
 
       if (existing) {
         const mergedQuestions = [...(existing.questions || []), ...questions]
+        const mergedObjectiveMappedCount = mergedQuestions.filter((question: any) => question?.objectiveMappingStatus === 'mapped').length
         await supabase
           .from('quiz_sessions')
-          .update({ questions: mergedQuestions, question_count: mergedQuestions.length })
+          .update({
+            questions: mergedQuestions,
+            question_count: mergedQuestions.length,
+            objective_mapping_version: 'v1',
+            objective_candidate_count: objectiveCandidates.length,
+            objective_mapped_count: mergedObjectiveMappedCount,
+          })
           .eq('id', continueSessionId)
         sessionId = continueSessionId
       }
@@ -1572,6 +1590,9 @@ export async function POST(req: NextRequest) {
           gen_experiment: experimentVariant ? 'quiz-generation-v1' : null,
           gen_experiment_variant: experimentVariant,
           gen_experiment_bucket: experimentVariant ? experimentBucket : null,
+          objective_mapping_version: 'v1',
+          objective_candidate_count: objectiveCandidates.length,
+          objective_mapped_count: objectiveMapping.mappedCount,
         })
         .select('id')
         .maybeSingle()

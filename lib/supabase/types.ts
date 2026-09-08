@@ -94,6 +94,9 @@ export type Database = {
           completed: boolean
           is_daily: boolean
           question_type: string
+          objective_mapping_version: string | null
+          objective_candidate_count: number
+          objective_mapped_count: number
           created_at: string
         }
         Insert: {
@@ -110,6 +113,9 @@ export type Database = {
           completed?: boolean
           is_daily?: boolean
           question_type?: string
+          objective_mapping_version?: string | null
+          objective_candidate_count?: number
+          objective_mapped_count?: number
           created_at?: string
         }
         Update: {
@@ -124,6 +130,9 @@ export type Database = {
           completed?: boolean
           is_daily?: boolean
           question_type?: string
+          objective_mapping_version?: string | null
+          objective_candidate_count?: number
+          objective_mapped_count?: number
         }
       }
       daily_challenges: {

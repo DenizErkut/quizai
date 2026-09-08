@@ -33,6 +33,11 @@ interface Question {
   adaptiveFocus?: string
   adaptiveReasonCode?: string
   adaptiveRecommendationId?: string | null
+  learningObjectiveRef?: string | null
+  learningObjectiveId?: string | null
+  learningObjectiveCode?: string | null
+  objectiveMappingStatus?: 'mapped' | 'unmapped' | 'no_candidates'
+  objectiveMappingVersion?: 'v1'
 }
 interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number; daily_test_count?: number; daily_test_date?: string; onboarding_completed?: boolean }
 
