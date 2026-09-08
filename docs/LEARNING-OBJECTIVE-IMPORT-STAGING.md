@@ -34,7 +34,16 @@ işaretlenir. Sınıf adı mevcut kanonik sınıf kuralıyla normalize edilir.
   yayımlanamaz.
 - `validated` yalnızca yapısal doğrulamayı ifade eder; pedagojik doğrulama
   değildir.
-- Kazanımın `learning_objective_catalog` içine alınması ve graph bağlantılarının
-  kurulması sonraki açık admin onayıyla yapılacaktır.
+- Her geçerli satır admin tarafından ayrı ayrı incelenir; başlığı düzeltilebilir,
+  doğrulanmış bir `topic → unit → subject` zincirine bağlanabilir veya gerekçeli
+  olarak reddedilebilir.
+- Satır onayı yayın değildir. İkinci ve açık bir “kontrollü yayımla” adımı
+  `learning_objective_catalog` kaydını, `learning_objective` düğümünü ve
+  doğrulanmış `objective → topic` kenarını tek transaction içinde oluşturur.
+- Seçilen üst zincir sonradan geçersiz hâle gelirse yayın durur ve kısmi kayıt
+  bırakılmaz. Yayımlanan satırlar staging ekranından silinmez; audit tablosuyla
+  inceleme geçmişi korunur.
 
 Migration: `scripts/027_learning_objective_import_staging.sql`.
+Satır inceleme ve yayın migration'ı:
+`scripts/029_learning_objective_review_publish.sql`.

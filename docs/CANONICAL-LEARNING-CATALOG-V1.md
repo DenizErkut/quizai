@@ -60,3 +60,10 @@ sürümde onaylanamaz.
 doğrulamadan geçen kayıtlar dahi otomatik yayımlanmaz; `validated` durumu
 pedagojik onay anlamına gelmez. Import biçimi ve güvenlik sınırları
 `docs/LEARNING-OBJECTIVE-IMPORT-STAGING.md` içinde tanımlanmıştır.
+
+## Satır bazlı kazanım yayını
+
+`scripts/029_learning_objective_review_publish.sql` ile her satır `pending →
+approved → published` veya `pending → rejected` durum zincirinde ilerler.
+Yayın yalnızca önceden doğrulanmış `topic → unit → subject` hedeflerinden
+birine yapılabilir ve `objective → topic` kenarı katalog kaydıyla atomik oluşur.
