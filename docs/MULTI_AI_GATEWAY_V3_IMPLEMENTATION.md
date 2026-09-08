@@ -59,3 +59,15 @@ Bu belge, `PRATIUM_MULTI_AI_GATEWAY_V3_CANONICAL_ARCHITECTURE.md` referansının
 Sıradaki somut teslimat: 034 migrasyonunu kontrollü uygulamak, Mistral anahtarını
 tanımlamak, `%1–5` gölge örneklemle en az 100 üretim toplamak ve eşikler
 geçilmeden öğrenci trafiğini Mistral'a çevirmemek.
+
+## Quality Engine v1
+
+- Tüm soru tipleri için sağlayıcıdan bağımsız deterministik yapı kontrolü eklendi.
+- OpenAI/Anthropic ve Gemini sonuçları tek `accept/reject/unavailable` kararında birleştirildi.
+- Opsiyonel validator kullanılamazsa mevcut fail-open davranışı korunur.
+- Her karar `quality-engine-v1` politika sürümü ve makinece okunabilir neden kodu taşır.
+- Mixed testler pahalı ikinci AI çağrısı yapmadan aynı yapısal kontrolden geçer.
+- Gemini hata yanıtı gövdesi loglardan kaldırıldı; yalnızca HTTP durum kodu tutulur.
+
+Mistral kredisi hazırlanırken sıradaki iş Approved Content/Cache L1 ve circuit
+breaker altyapısıdır. Mistral gölge örneklemi kredi yüklenmeden açılmamalıdır.

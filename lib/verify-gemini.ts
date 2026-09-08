@@ -47,9 +47,9 @@ export async function verifyQuestionWithGemini(prompt: string): Promise<{ ok: bo
       // artık NEDENİ görünür kılıyoruz — aksi hâlde bu tamamen sessiz kalır
       // ve "Gemini aktif değil" ile "Gemini kotası bitti" birbirinden ayırt
       // edilemez (tam da bu karışıklığı yaşadık).
-      let bodySnippet = ''
-      try { bodySnippet = (await res.text()).slice(0, 200) } catch { /* yok say */ }
-      console.warn(`[verify-gemini] API hata döndü, bu katman atlandı — status=${res.status} body="${bodySnippet}"`)
+      // Ham sağlayıcı yanıtı loglanmaz: hata gövdesi prompt/model çıktısı veya
+      // hassas ayrıntı içerebilir. Operasyon için durum kodu yeterlidir.
+      console.warn(`[verify-gemini] API hata döndü, bu katman atlandı — status=${res.status}`)
       return null
     }
 

@@ -7,7 +7,8 @@ export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
 import { verifyQuestionWithOpenAI } from '@/lib/openai'
 import { verifyQuestionWithGemini } from '@/lib/verify-gemini'
-import { logAnthropicUsage, logOpenAIUsage, logGeminiUsage } from '@/lib/ai-usage'
+import { logAnthropicUsage } from '@/lib/ai-usage'
+import { decideQuestionQuality, evaluateQuestionStructure, providerQualitySignal } from '@/lib/ai-gateway'
 
 const anthropic = new Anthropic()
 
@@ -157,9 +158,11 @@ export async function POST(req: NextRequest) {
     const { questions, topic, grade, language, questionType } = await req.json()
     if (!questions?.length) return NextResponse.json({ questions: [] })
 
-    // mixed tipte her sorunun kendi type'ı var — ikinci AI doğrulama gerekmiyor
+    // Mixed tipte pahalı ikinci AI doğrulama yapılmaz; fakat tüm tipler merkezi
+    // deterministik şema kontrolünden geçer.
     if (questionType === 'mixed') {
-      return NextResponse.json({ questions, stats: { original: questions.length, verified: questions.length, rejected: 0, replacements: 0, final: questions.length } })
+      const accepted = questions.filter((question: any) => evaluateQuestionStructure(question).verdict === 'accept')
+      return NextResponse.json({ questions: accepted, stats: { policyVersion: 'quality-engine-v1', original: questions.length, verified: accepted.length, rejected: questions.length - accepted.length, replacements: 0, final: accepted.length } })
     }
 
     const lang = language || 'Türkçe'
@@ -174,6 +177,13 @@ export async function POST(req: NextRequest) {
 
       await Promise.all(batch.map(async (q: any, bIdx: number) => {
         const idx = i + bIdx
+
+        const structuralDecision = decideQuestionQuality([evaluateQuestionStructure(q)])
+        if (structuralDecision.verdict === 'reject') {
+          rejected.push(idx)
+          rejectReasons.push(`Q${idx}: ${structuralDecision.reasonCode}`)
+          return
+        }
 
         // 1. Yerel matematik kontrolü (hızlı)
         if (!quickMathCheck(q)) {
@@ -225,14 +235,15 @@ export async function POST(req: NextRequest) {
             verifyQuestionWithGemini(verifyPrompt),
           ])
 
-          if (!primaryCheck.ok) {
+          const providerDecision = decideQuestionQuality([
+            providerQualitySignal(isMathQuestion(q) ? 'openai-validator' : 'anthropic-validator', primaryCheck),
+            providerQualitySignal('gemini-validator', geminiCheck),
+          ])
+
+          if (providerDecision.verdict === 'reject') {
             rejected.push(idx)
-            rejectReasons.push(`Q${idx} (${q.type}): ${primaryCheck.reason || 'failed'}`)
-            return
-          }
-          if (geminiCheck && !geminiCheck.ok) {
-            rejected.push(idx)
-            rejectReasons.push(`Q${idx} (${q.type}) [gemini]: ${geminiCheck.reason || 'failed'}`)
+            const rejectedSignal = providerDecision.signals.find(signal => signal.verdict === 'reject')
+            rejectReasons.push(`Q${idx} (${q.type}): ${rejectedSignal?.source || 'validator'} ${rejectedSignal?.detail || providerDecision.reasonCode}`)
             return
           }
 
@@ -282,6 +293,7 @@ Return ONLY valid JSON:
     return NextResponse.json({
       questions: final,
       stats: {
+        policyVersion: 'quality-engine-v1',
         original: questions.length,
         verified: verified.length,
         rejected: rejected.length,
