@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import mathematicsGrade5 from '@/data/curriculum/meb-2024-mathematics-grade-5.json'
 
 interface Batch {
   id: string
@@ -55,6 +56,8 @@ const example = `[
     "source_reference": "Belge ve sayfa"
   }
 ]`
+
+const mathematicsGrade5Source = 'MEB Türkiye Yüzyılı Maarif Modeli · Ortaokul Matematik Dersi Öğretim Programı (2024) · https://tymm.meb.gov.tr/ogretim-programlari/ortaokul-matematik-dersi/6'
 
 export default function LearningObjectiveImport() {
   const [sourceType, setSourceType] = useState('meb')
@@ -146,6 +149,13 @@ export default function LearningObjectiveImport() {
     } finally { setBusy(false) }
   }
 
+  function loadMathematicsGrade5Package() {
+    setSourceType('meb')
+    setSourceReference(mathematicsGrade5Source)
+    setPayload(JSON.stringify(mathematicsGrade5, null, 2))
+    setMessage('✅ Resmî 5. sınıf Matematik paketi yüklendi: 22 yeni kazanım. MAT.5.1.1 zaten yayında olduğu için tekrar eklenmedi. “Doğrula ve Hazırla” ile bekleme alanına alabilirsiniz.')
+  }
+
   return (
     <div className="card" style={{ marginTop: '16px' }}>
       <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>
@@ -153,6 +163,15 @@ export default function LearningObjectiveImport() {
       </div>
       <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '12px' }}>
         Resmî kazanım paketini doğrulama alanına alın. Yapısal kontrolden geçen kayıtlar bile ayrıca onaylanana kadar öğrenciye açılmaz.
+      </div>
+      <div style={{ padding: '10px', marginBottom: '10px', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--bg2)' }}>
+        <div style={{ fontWeight: 700, fontSize: '12px', marginBottom: '5px' }}>Hazır resmî paket</div>
+        <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>
+          5. sınıf Matematik: MEB 2024 programındaki 23 kazanımın 1&apos;i yayında, kalan 22 kazanım incelemeye hazırdır.
+        </div>
+        <button className="btn btn-sm" disabled={busy} onClick={loadMathematicsGrade5Package}>
+          5. Sınıf Matematik paketini yükle
+        </button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '160px minmax(210px, 1fr) minmax(240px, 1fr)', gap: '8px', marginBottom: '8px' }}>
         <select value={sourceType} onChange={event => setSourceType(event.target.value)} aria-label="Kaynak türü">
