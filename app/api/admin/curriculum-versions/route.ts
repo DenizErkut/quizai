@@ -52,6 +52,13 @@ export async function PATCH(req: NextRequest) {
   const { data, error } = await adminDb.rpc('activate_curriculum_version_v1', {
     p_version_id: body.versionId, p_actor_id: user.id,
   })
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (error) {
+    const missingMatch = error.message.match(/(\d+) active objectives have no prepared revision/)
+    return NextResponse.json({
+      error: missingMatch
+        ? `Bu sürüm etkinleştirilemez: ${missingMatch[1]} aktif kazanımın bu sürüm için hazırlanmış revizyonu eksik.`
+        : error.message,
+    }, { status: 400 })
+  }
   return NextResponse.json({ success: true, result: data })
 }

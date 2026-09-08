@@ -18,7 +18,7 @@ async function getAdminUser() {
 export async function GET() {
   const user = await getAdminUser()
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  const [objectivesResult, versionsResult, targetsResult] = await Promise.all([
+  const [objectivesResult, versionsResult, targetsResult, revisionsResult] = await Promise.all([
     adminDb.from('learning_objective_catalog')
       .select('id,objective_code,title,subject,grade,topic,lifecycle_status,is_active,curriculum_version_id,current_revision_id,replaced_by_objective_id,updated_at')
       .order('subject').order('grade').order('objective_code').limit(500),
@@ -26,10 +26,15 @@ export async function GET() {
       .order('academic_year_start', { ascending: false }),
     adminDb.from('learning_objective_publish_targets')
       .select('topic_node_id,topic,grade,level,unit,subject').order('subject').order('grade').order('unit').order('topic'),
+    adminDb.from('learning_objective_revisions')
+      .select('objective_id,curriculum_version_id,revision_status').eq('revision_status', 'draft'),
   ])
-  const error = objectivesResult.error || versionsResult.error || targetsResult.error
+  const error = objectivesResult.error || versionsResult.error || targetsResult.error || revisionsResult.error
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ objectives: objectivesResult.data || [], versions: versionsResult.data || [], targets: targetsResult.data || [] })
+  return NextResponse.json({
+    objectives: objectivesResult.data || [], versions: versionsResult.data || [], targets: targetsResult.data || [],
+    preparedRevisions: revisionsResult.data || [],
+  })
 }
 
 export async function PATCH(req: NextRequest) {
@@ -58,6 +63,19 @@ export async function POST(req: NextRequest) {
       || typeof body?.title !== 'string' || body.title.trim().length < 3
       || typeof body?.topicNodeId !== 'string' || typeof body?.reason !== 'string' || body.reason.trim().length < 3) {
     return NextResponse.json({ error: 'Sürüm, başlık, yayın hedefi ve gerekçe gerekli.' }, { status: 400 })
+  }
+
+  const [objectiveResult, targetResult] = await Promise.all([
+    adminDb.from('learning_objective_catalog').select('subject,grade').eq('id', body.objectiveId).maybeSingle(),
+    adminDb.from('learning_objective_publish_targets').select('subject,grade').eq('topic_node_id', body.topicNodeId).maybeSingle(),
+  ])
+  if (objectiveResult.error || targetResult.error || !objectiveResult.data || !targetResult.data) {
+    return NextResponse.json({ error: 'Kazanım veya doğrulanmış konu zinciri bulunamadı.' }, { status: 400 })
+  }
+  const normalize = (value: string) => value.toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ').trim()
+  if (normalize(objectiveResult.data.subject) !== normalize(targetResult.data.subject)
+      || normalize(objectiveResult.data.grade) !== normalize(targetResult.data.grade)) {
+    return NextResponse.json({ error: 'Kazanım yalnızca aynı ders ve sınıftaki doğrulanmış konu zincirine bağlanabilir.' }, { status: 400 })
   }
   const { data, error } = await adminDb.rpc('create_learning_objective_revision_v1', {
     p_objective_id: body.objectiveId, p_curriculum_version_id: body.curriculumVersionId,
