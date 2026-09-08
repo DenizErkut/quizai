@@ -28,6 +28,7 @@ export interface Question {
   learningObjectiveCode?: string | null
   curriculumVersionId?: string | null
   learningObjectiveRevisionId?: string | null
+  objectiveCandidateBasis?: 'topic_exact' | 'unit_exact' | 'reviewed_alias' | null
   objectiveMappingStatus?: 'mapped' | 'unmapped' | 'no_candidates'
   objectiveMappingVersion?: 'v1'
 }

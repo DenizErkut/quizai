@@ -11,6 +11,7 @@ export interface CanonicalObjectiveCandidate {
   topic: string | null
   curriculumVersionId: string
   revisionId: string
+  matchBasis: 'topic_exact' | 'unit_exact' | 'reviewed_alias'
 }
 
 interface ObjectiveRow {
@@ -23,6 +24,7 @@ interface ObjectiveRow {
   topic: string | null
   curriculum_version_id: string
   current_revision_id: string
+  match_basis: 'topic_exact' | 'unit_exact' | 'reviewed_alias'
 }
 
 function dimensionKey(value: unknown): string {
@@ -46,27 +48,15 @@ export async function loadCanonicalObjectiveCandidates(
 ): Promise<CanonicalObjectiveCandidate[]> {
   if (!context.subject || !context.grade || !context.topic) return []
 
-  const { data, error } = await supabase
-    .from('learning_objective_catalog')
-    .select('id,objective_code,title,subject,grade,unit,topic,curriculum_version_id,current_revision_id,curriculum_versions!inner(status)')
-    .eq('verification_status', 'verified')
-    .eq('is_active', true)
-    .eq('lifecycle_status', 'active')
-    .eq('curriculum_versions.status', 'active')
-    .not('current_revision_id', 'is', null)
-    .eq('subject', context.subject.trim())
-    .eq('grade', gradeKey(context.grade))
-    .eq('topic', context.topic.trim())
-    .limit(50)
+  const { data, error } = await supabase.rpc('find_learning_objective_candidates_v2', {
+    p_subject: context.subject.trim(),
+    p_grade: gradeKey(context.grade),
+    p_topic: context.topic.trim(),
+    p_limit: Math.max(1, Math.min(50, maxCandidates)),
+  })
   if (error) throw error
 
-  const subject = dimensionKey(context.subject)
-  const grade = gradeKey(context.grade)
-  const topic = dimensionKey(context.topic)
   return ((data || []) as ObjectiveRow[])
-    .filter(row => dimensionKey(row.subject) === subject
-      && gradeKey(row.grade) === grade
-      && dimensionKey(row.topic) === topic)
     .sort((a, b) => a.objective_code.localeCompare(b.objective_code, 'tr'))
     .slice(0, Math.max(1, Math.min(50, maxCandidates)))
     .map((row, index) => ({
@@ -80,6 +70,7 @@ export async function loadCanonicalObjectiveCandidates(
       topic: row.topic,
       curriculumVersionId: row.curriculum_version_id,
       revisionId: row.current_revision_id,
+      matchBasis: row.match_basis,
     }))
 }
 
@@ -104,8 +95,9 @@ export function applyCanonicalObjectiveMappings(
     // Modelden gelebilecek doğrudan kimlikleri hiçbir zaman güvenilir kabul etme.
     const { learningObjectiveId: _id, learning_objective_id: _snakeId,
       learningObjectiveCode: _code, curriculumVersionId: _versionId,
-      learningObjectiveRevisionId: _revisionId, ...safeQuestion } = question
-    void _id; void _snakeId; void _code; void _versionId; void _revisionId
+      learningObjectiveRevisionId: _revisionId, objectiveCandidateBasis: _basis,
+      ...safeQuestion } = question
+    void _id; void _snakeId; void _code; void _versionId; void _revisionId; void _basis
     const rawRef = typeof question.learningObjectiveRef === 'string'
       ? question.learningObjectiveRef.trim().toUpperCase()
       : ''
@@ -118,6 +110,7 @@ export function applyCanonicalObjectiveMappings(
         learningObjectiveCode: null,
         curriculumVersionId: null,
         learningObjectiveRevisionId: null,
+        objectiveCandidateBasis: null,
         objectiveMappingStatus: candidates.length ? 'unmapped' : 'no_candidates',
         objectiveMappingVersion: 'v1',
       }
@@ -130,6 +123,7 @@ export function applyCanonicalObjectiveMappings(
       learningObjectiveCode: candidate.objectiveCode,
       curriculumVersionId: candidate.curriculumVersionId,
       learningObjectiveRevisionId: candidate.revisionId,
+      objectiveCandidateBasis: candidate.matchBasis,
       objectiveMappingStatus: 'mapped',
       objectiveMappingVersion: 'v1',
     }
