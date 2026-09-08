@@ -9,6 +9,8 @@ export interface CanonicalObjectiveCandidate {
   grade: string
   unit: string | null
   topic: string | null
+  curriculumVersionId: string
+  revisionId: string
 }
 
 interface ObjectiveRow {
@@ -19,6 +21,8 @@ interface ObjectiveRow {
   grade: string
   unit: string | null
   topic: string | null
+  curriculum_version_id: string
+  current_revision_id: string
 }
 
 function dimensionKey(value: unknown): string {
@@ -44,9 +48,12 @@ export async function loadCanonicalObjectiveCandidates(
 
   const { data, error } = await supabase
     .from('learning_objective_catalog')
-    .select('id,objective_code,title,subject,grade,unit,topic')
+    .select('id,objective_code,title,subject,grade,unit,topic,curriculum_version_id,current_revision_id,curriculum_versions!inner(status)')
     .eq('verification_status', 'verified')
     .eq('is_active', true)
+    .eq('lifecycle_status', 'active')
+    .eq('curriculum_versions.status', 'active')
+    .not('current_revision_id', 'is', null)
     .eq('subject', context.subject.trim())
     .eq('grade', gradeKey(context.grade))
     .eq('topic', context.topic.trim())
@@ -71,6 +78,8 @@ export async function loadCanonicalObjectiveCandidates(
       grade: row.grade,
       unit: row.unit,
       topic: row.topic,
+      curriculumVersionId: row.curriculum_version_id,
+      revisionId: row.current_revision_id,
     }))
 }
 
@@ -94,8 +103,9 @@ export function applyCanonicalObjectiveMappings(
   const mappedQuestions = questions.map(question => {
     // Modelden gelebilecek doğrudan kimlikleri hiçbir zaman güvenilir kabul etme.
     const { learningObjectiveId: _id, learning_objective_id: _snakeId,
-      learningObjectiveCode: _code, ...safeQuestion } = question
-    void _id; void _snakeId; void _code
+      learningObjectiveCode: _code, curriculumVersionId: _versionId,
+      learningObjectiveRevisionId: _revisionId, ...safeQuestion } = question
+    void _id; void _snakeId; void _code; void _versionId; void _revisionId
     const rawRef = typeof question.learningObjectiveRef === 'string'
       ? question.learningObjectiveRef.trim().toUpperCase()
       : ''
@@ -106,6 +116,8 @@ export function applyCanonicalObjectiveMappings(
         learningObjectiveRef: null,
         learningObjectiveId: null,
         learningObjectiveCode: null,
+        curriculumVersionId: null,
+        learningObjectiveRevisionId: null,
         objectiveMappingStatus: candidates.length ? 'unmapped' : 'no_candidates',
         objectiveMappingVersion: 'v1',
       }
@@ -116,6 +128,8 @@ export function applyCanonicalObjectiveMappings(
       learningObjectiveRef: candidate.ref,
       learningObjectiveId: candidate.id,
       learningObjectiveCode: candidate.objectiveCode,
+      curriculumVersionId: candidate.curriculumVersionId,
+      learningObjectiveRevisionId: candidate.revisionId,
       objectiveMappingStatus: 'mapped',
       objectiveMappingVersion: 'v1',
     }

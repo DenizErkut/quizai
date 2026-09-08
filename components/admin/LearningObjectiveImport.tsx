@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 interface Batch {
   id: string
@@ -11,6 +11,12 @@ interface Batch {
   valid_count: number
   invalid_count: number
   created_at: string
+  curriculum_version_id: string
+}
+
+interface CurriculumVersion {
+  id: string; code: string; title: string; status: 'draft' | 'active' | 'retired'
+  academic_year_start: number; academic_year_end: number
 }
 
 interface ImportItem {
@@ -62,6 +68,13 @@ export default function LearningObjectiveImport() {
   const [targets, setTargets] = useState<PublishTarget[]>([])
   const [edits, setEdits] = useState<Record<string, ItemEdit>>({})
   const [updatingItem, setUpdatingItem] = useState<string | null>(null)
+  const [curriculumVersions, setCurriculumVersions] = useState<CurriculumVersion[]>([])
+  const [curriculumVersionId, setCurriculumVersionId] = useState('')
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadBatches() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   async function loadBatches(clearMessage = true) {
     setBusy(true)
@@ -71,6 +84,9 @@ export default function LearningObjectiveImport() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Import geçmişi yüklenemedi.')
       setBatches(data.batches || [])
+      const versions = (data.curriculumVersions || []) as CurriculumVersion[]
+      setCurriculumVersions(versions)
+      setCurriculumVersionId(current => current || versions.find(version => version.status === 'active')?.id || versions[0]?.id || '')
     } catch (error) {
       setMessage(`❌ ${error instanceof Error ? error.message : 'Beklenmeyen hata'}`)
     } finally { setBusy(false) }
@@ -118,7 +134,7 @@ export default function LearningObjectiveImport() {
       if (!Array.isArray(rows)) throw new Error('İçerik bir JSON dizisi olmalıdır.')
       const response = await fetch('/api/admin/learning-objective-import', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sourceType, sourceReference, rows }),
+        body: JSON.stringify({ sourceType, sourceReference, curriculumVersionId, rows }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Kazanımlar doğrulanamadı.')
@@ -138,9 +154,15 @@ export default function LearningObjectiveImport() {
       <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '12px' }}>
         Resmî kazanım paketini doğrulama alanına alın. Yapısal kontrolden geçen kayıtlar bile ayrıca onaylanana kadar öğrenciye açılmaz.
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '160px minmax(240px, 1fr)', gap: '8px', marginBottom: '8px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '160px minmax(210px, 1fr) minmax(240px, 1fr)', gap: '8px', marginBottom: '8px' }}>
         <select value={sourceType} onChange={event => setSourceType(event.target.value)} aria-label="Kaynak türü">
           <option value="meb">MEB</option><option value="manual">Manuel</option><option value="import">Kontrollü import</option>
+        </select>
+        <select value={curriculumVersionId} onChange={event => setCurriculumVersionId(event.target.value)} aria-label="Müfredat sürümü">
+          <option value="">— Müfredat sürümü —</option>
+          {curriculumVersions.map(version => <option key={version.id} value={version.id}>
+            {version.title} · {version.status === 'active' ? 'aktif' : 'taslak'}
+          </option>)}
         </select>
         <input value={sourceReference} onChange={event => setSourceReference(event.target.value)}
           placeholder="Kaynak belge, URL veya sayfa referansı" aria-label="Kaynak referansı" />
@@ -148,14 +170,14 @@ export default function LearningObjectiveImport() {
       <textarea value={payload} onChange={event => setPayload(event.target.value)} aria-label="Kazanım JSON verisi"
         rows={12} spellCheck={false} style={{ width: '100%', fontFamily: 'monospace', fontSize: '12px', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--primary)', resize: 'vertical' }} />
       <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-        <button className="btn btn-sm" disabled={busy || sourceReference.trim().length < 3} onClick={stageImport}>Doğrula ve Hazırla</button>
+        <button className="btn btn-sm" disabled={busy || !curriculumVersionId || sourceReference.trim().length < 3} onClick={stageImport}>Doğrula ve Hazırla</button>
         <button className="btn btn-sm" disabled={busy} onClick={() => loadBatches()}>Import Geçmişini Yükle</button>
       </div>
       {message && <div style={{ marginTop: '10px', fontSize: '12px', color: message.startsWith('✅') ? '#16a34a' : '#dc2626' }}>{message}</div>}
       {batches.length > 0 && <div style={{ marginTop: '12px', display: 'grid', gap: '6px' }}>
         {batches.map(batch => <button key={batch.id} onClick={() => loadBatch(batch.id)}
           style={{ padding: '8px', border: selectedBatchId === batch.id ? '2px solid #6366f1' : '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', textAlign: 'left', background: 'var(--bg2)', color: 'var(--primary)', cursor: 'pointer' }}>
-          <strong>{batch.source_reference}</strong> · {batch.status} · {batch.valid_count}/{batch.total_count} geçerli{batch.invalid_count > 0 ? ` · ${batch.invalid_count} hatalı` : ''}
+          <strong>{batch.source_reference}</strong> · {curriculumVersions.find(version => version.id === batch.curriculum_version_id)?.code || 'sürüm belirtilmemiş'} · {batch.status} · {batch.valid_count}/{batch.total_count} geçerli{batch.invalid_count > 0 ? ` · ${batch.invalid_count} hatalı` : ''}
         </button>)}
       </div>}
       {selectedBatchId && <div style={{ marginTop: '16px', display: 'grid', gap: '10px' }}>

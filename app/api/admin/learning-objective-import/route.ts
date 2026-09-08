@@ -43,11 +43,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ batch: batchResult.data, items: itemsResult.data || [], targets: targetsResult.data || [] })
   }
 
-  const { data, error } = await adminDb.from('learning_objective_import_batches')
-    .select('id,source_type,source_reference,status,total_count,valid_count,invalid_count,created_at')
-    .order('created_at', { ascending: false }).limit(20)
+  const [batchesResult, versionsResult] = await Promise.all([
+    adminDb.from('learning_objective_import_batches')
+      .select('id,source_type,source_reference,status,total_count,valid_count,invalid_count,curriculum_version_id,created_at')
+      .order('created_at', { ascending: false }).limit(20),
+    adminDb.from('curriculum_versions')
+      .select('id,code,title,status,academic_year_start,academic_year_end')
+      .in('status', ['draft', 'active']).order('academic_year_start', { ascending: false }),
+  ])
+  const error = batchesResult.error || versionsResult.error
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ batches: data || [] })
+  return NextResponse.json({ batches: batchesResult.data || [], curriculumVersions: versionsResult.data || [] })
 }
 
 export async function PATCH(req: NextRequest) {
@@ -79,18 +85,20 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
   const sourceType = body?.sourceType
   const sourceReference = typeof body?.sourceReference === 'string' ? body.sourceReference.trim() : ''
+  const curriculumVersionId = typeof body?.curriculumVersionId === 'string' ? body.curriculumVersionId : ''
   const rows = body?.rows
-  if (!['meb', 'manual', 'import'].includes(sourceType) || sourceReference.length < 3 || !Array.isArray(rows)) {
-    return NextResponse.json({ error: 'Geçerli kaynak türü, kaynak referansı ve JSON satırları gerekli.' }, { status: 400 })
+  if (!['meb', 'manual', 'import'].includes(sourceType) || sourceReference.length < 3 || !curriculumVersionId || !Array.isArray(rows)) {
+    return NextResponse.json({ error: 'Müfredat sürümü, geçerli kaynak türü, kaynak referansı ve JSON satırları gerekli.' }, { status: 400 })
   }
   if (rows.length < 1 || rows.length > 500) {
     return NextResponse.json({ error: 'Bir parti 1–500 kazanım içermelidir.' }, { status: 400 })
   }
 
-  const { data, error } = await adminDb.rpc('stage_learning_objective_import', {
+  const { data, error } = await adminDb.rpc('stage_learning_objective_import_v2', {
     p_source_type: sourceType,
     p_source_reference: sourceReference,
     p_created_by: user.id,
+    p_curriculum_version_id: curriculumVersionId,
     p_rows: rows,
   })
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })

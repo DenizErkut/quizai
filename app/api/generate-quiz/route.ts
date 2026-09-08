@@ -1564,6 +1564,7 @@ export async function POST(req: NextRequest) {
             objective_mapping_version: 'v1',
             objective_candidate_count: objectiveCandidates.length,
             objective_mapped_count: mergedObjectiveMappedCount,
+            curriculum_version_id: objectiveCandidates[0]?.curriculumVersionId || null,
           })
           .eq('id', continueSessionId)
         sessionId = continueSessionId
@@ -1593,6 +1594,7 @@ export async function POST(req: NextRequest) {
           objective_mapping_version: 'v1',
           objective_candidate_count: objectiveCandidates.length,
           objective_mapped_count: objectiveMapping.mappedCount,
+          curriculum_version_id: objectiveCandidates[0]?.curriculumVersionId || null,
         })
         .select('id')
         .maybeSingle()

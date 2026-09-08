@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities } from '@/lib/identity/resolve-client'
 import LearningCatalogReview from '@/components/admin/LearningCatalogReview'
 import LearningObjectiveImport from '@/components/admin/LearningObjectiveImport'
+import CurriculumLifecycleManager from '@/components/admin/CurriculumLifecycleManager'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -1553,6 +1554,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           </div>
           <LearningCatalogReview />
           <LearningObjectiveImport />
+          <CurriculumLifecycleManager />
         </div>
       )}
 

@@ -97,6 +97,7 @@ export type Database = {
           objective_mapping_version: string | null
           objective_candidate_count: number
           objective_mapped_count: number
+          curriculum_version_id: string | null
           created_at: string
         }
         Insert: {
@@ -116,6 +117,7 @@ export type Database = {
           objective_mapping_version?: string | null
           objective_candidate_count?: number
           objective_mapped_count?: number
+          curriculum_version_id?: string | null
           created_at?: string
         }
         Update: {
@@ -133,6 +135,7 @@ export type Database = {
           objective_mapping_version?: string | null
           objective_candidate_count?: number
           objective_mapped_count?: number
+          curriculum_version_id?: string | null
         }
       }
       daily_challenges: {

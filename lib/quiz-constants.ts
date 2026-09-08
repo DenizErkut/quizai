@@ -26,6 +26,8 @@ export interface Question {
   learningObjectiveRef?: string | null
   learningObjectiveId?: string | null
   learningObjectiveCode?: string | null
+  curriculumVersionId?: string | null
+  learningObjectiveRevisionId?: string | null
   objectiveMappingStatus?: 'mapped' | 'unmapped' | 'no_candidates'
   objectiveMappingVersion?: 'v1'
 }
