@@ -306,6 +306,16 @@ Bu 108 konu eğitimsel doğruluk açısından otomatik onaylanmadı; insan incel
 7. **AI Tutor ve sınırlı yetkili agentic akışlar**
 8. **Tahmine dayalı modeller ve kurum ölçeğinde operasyonel olgunluk**
 
+### Yatay teknik katman — Multi‑AI Gateway v3
+
+Bu katman Learning OS aşamalarinin yerine geçmez; içerik üretimi, doğrulama,
+tutor ve ajan çağrılarını güvenli ve ölçülebilir hâle getirir. Kanonik sıra:
+deterministik/approved content → Mistral primary → OpenAI validator → Claude
+premium escalation → Gemini multimodal. Geçiş sağlayıcı bazında toplu değil,
+işlem bazında pilot ve geri alınabilir biçimde yapılacaktır. P0 sözleşme, model
+kayıt merkezi ve router temeli tamamlandı; sıradaki iş `generate-quiz` için
+Mistral adapter ve shadow comparison pipeline'dır.
+
 Bu sıra önemlidir: AI Tutor ve ajanların doğru karar vermesi, önce kanonik müfredat, güvenilir Learning Event ve kalibre edilmiş öğrenci durum modelinin yeterli kapsama ulaşmasına bağlıdır.
 
 ---
