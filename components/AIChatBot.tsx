@@ -169,7 +169,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '5px' }}>
-                <img src="/mascot-prati-face.svg" alt="Prati" style={{ width: '100%', height: '100%' }} />
+                <img src="/mascot-prati-face-v2.webp" alt="Prati" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
               </div>
               <div>
                 <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>Pratium Asistan</div>
@@ -195,7 +195,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
               <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
                 {m.role === 'assistant' && (
                   <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #082465, #1ECFB8)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: '8px', alignSelf: 'flex-end', padding: '3px' }}>
-                    <img src="/mascot-prati-face.svg" alt="Prati" style={{ width: '100%', height: '100%' }} />
+                    <img src="/mascot-prati-face-v2.webp" alt="Prati" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                   </div>
                 )}
                 <div style={{
@@ -214,7 +214,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
             {loading && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #082465, #1ECFB8)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3px' }}>
-                  <img src="/mascot-prati-face.svg" alt="Prati" style={{ width: '100%', height: '100%' }} />
+                  <img src="/mascot-prati-face-v2.webp" alt="Prati" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                 </div>
                 <div style={{ display: 'flex', gap: '4px', padding: '10px 14px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
                   {[0,1,2].map(i => <span key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: '#1ECFB8', display: 'inline-block', animation: `botBounce 1.2s ${i * 0.2}s infinite` }} />)}
@@ -360,7 +360,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
       >
         {open
           ? <span style={{ fontSize: '28px', color: '#fff' }}>×</span>
-          : <span className="prati-mascot-live"><img src="/mascot-prati-cute.svg" alt="Prati" /></span>
+          : <span className="prati-mascot-live"><img src="/mascot-prati-face-v2.webp" alt="Prati" /></span>
         }
         {!open && unread > 0 && (
           <span style={{ position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#FDD31D', color: '#082465', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>

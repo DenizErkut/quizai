@@ -46,7 +46,7 @@ export default function CookieConsent() {
   return <>
     {visible && <section className="cookie-consent" role="dialog" aria-modal="true" aria-labelledby="cookie-title">
       <div className="cookie-copy">
-        <div className="cookie-mascot"><img src="/mascot-prati-face.svg" alt="" /></div>
+        <div className="cookie-mascot"><img src="/mascot-prati-face-v2.webp" alt="" /></div>
         <div><h2 id="cookie-title">Çerez tercihlerin senin kontrolünde</h2><p>Pratium’un güvenli biçimde çalışması için zorunlu çerezleri kullanıyoruz. Analiz ve kişiselleştirme çerezleri yalnızca izin verirsen etkinleştirilir. Ayrıntılar için <Link href="/cookie-policy">Çerez Politikası</Link>’nı inceleyebilirsin.</p></div>
       </div>
       {preferencesOpen && <div className="cookie-preferences">
