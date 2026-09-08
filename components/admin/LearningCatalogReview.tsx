@@ -11,6 +11,9 @@ interface Candidate {
   sample_grades: string[]
   status: 'pending' | 'mapped' | 'dismissed'
   last_seen_at: string | null
+  triage_category: 'ready_review' | 'subject_missing' | 'multi_grade' | 'non_k12' | 'likely_free_text'
+  priority_score: number
+  suggested_unit_ids: string[]
 }
 
 interface UnitNode {
@@ -22,6 +25,14 @@ interface UnitNode {
 }
 
 interface EditValue { canonicalTopic: string; unitNodeId: string }
+
+const TRIAGE_LABELS: Record<Candidate['triage_category'], string> = {
+  ready_review: 'İncelemeye hazır',
+  subject_missing: 'Ders bilgisi eksik',
+  multi_grade: 'Çok sınıflı',
+  non_k12: 'K12 dışı',
+  likely_free_text: 'Serbest metin / gürültü',
+}
 
 function gradeKey(value: string) {
   return value.toLocaleLowerCase('tr-TR')
@@ -39,16 +50,22 @@ export default function LearningCatalogReview() {
   const [loading, setLoading] = useState(false)
   const [updating, setUpdating] = useState<string | null>(null)
   const [message, setMessage] = useState('')
+  const [category, setCategory] = useState('all')
+  const [search, setSearch] = useState('')
+  const [stats, setStats] = useState<{ total: number; categoryCounts: Record<string, number> } | null>(null)
 
   async function loadQueue() {
     setLoading(true); setMessage('')
     try {
-      const response = await fetch('/api/admin/learning-catalog-review?status=pending&limit=100')
+      const params = new URLSearchParams({ status: 'pending', limit: '100', category })
+      if (search.trim()) params.set('search', search.trim())
+      const response = await fetch(`/api/admin/learning-catalog-review?${params}`)
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'İnceleme kuyruğu yüklenemedi.')
       setCandidates(data.candidates || [])
       setUnits(data.units || [])
-      setMessage(`✅ ${data.candidates?.length || 0} bekleyen başlık yüklendi.`)
+      setStats(data.stats || null)
+      setMessage(`✅ ${data.candidates?.length || 0} kayıt gösteriliyor.`)
     } catch (error) {
       setMessage(`❌ ${error instanceof Error ? error.message : 'Beklenmeyen hata'}`)
     } finally {
@@ -94,9 +111,29 @@ export default function LearningCatalogReview() {
       <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '1rem' }}>
         Öğrenci testlerinde görülen konu başlıklarını doğrulanmış MEB ünitelerine bağlayın. Çok sınıflı başlıklar ayrıştırılmadan onaylanamaz.
       </div>
-      <button onClick={loadQueue} disabled={loading} className="btn btn-sm" style={{ marginBottom: '12px' }}>
-        {loading ? '⏳ Yükleniyor...' : '🔄 İnceleme Kuyruğunu Yükle'}
-      </button>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) minmax(180px, 2fr) auto', gap: '8px', marginBottom: '12px' }}>
+        <select value={category} onChange={event => setCategory(event.target.value)} aria-label="İnceleme kategorisi"
+          style={{ padding: '8px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--primary)' }}>
+          <option value="all">Tüm bekleyenler</option>
+          {Object.entries(TRIAGE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+        <input value={search} onChange={event => setSearch(event.target.value)} onKeyDown={event => event.key === 'Enter' && loadQueue()}
+          placeholder="Konu başlığında ara…" aria-label="Konu ara"
+          style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--primary)' }} />
+        <button onClick={loadQueue} disabled={loading} className="btn btn-sm">
+          {loading ? '⏳ Yükleniyor...' : '🔄 Kuyruğu Yükle'}
+        </button>
+      </div>
+      {stats && (
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+          <span className="badge">Toplam {stats.total}</span>
+          {Object.entries(TRIAGE_LABELS).map(([key, label]) => (
+            <span key={key} style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '99px', background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--text2)' }}>
+              {label}: {stats.categoryCounts[key] || 0}
+            </span>
+          ))}
+        </div>
+      )}
       {message && <div style={{ fontSize: '12px', marginBottom: '12px', color: message.startsWith('✅') ? '#16a34a' : '#dc2626' }}>{message}</div>}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -108,15 +145,22 @@ export default function LearningCatalogReview() {
             if (!singleGrade || gradeKey(unit.grade) !== candidateGrade) return false
             return candidate.observed_subject === 'Genel'
               || unit.subject.toLocaleLowerCase('tr-TR') === candidate.observed_subject.toLocaleLowerCase('tr-TR')
+          }).sort((a, b) => {
+            const aSuggested = candidate.suggested_unit_ids?.indexOf(a.id) ?? -1
+            const bSuggested = candidate.suggested_unit_ids?.indexOf(b.id) ?? -1
+            if (aSuggested >= 0 && bSuggested < 0) return -1
+            if (bSuggested >= 0 && aSuggested < 0) return 1
+            if (aSuggested >= 0 && bSuggested >= 0) return aSuggested - bSuggested
+            return `${a.subject} ${a.label}`.localeCompare(`${b.subject} ${b.label}`, 'tr')
           })
           return (
             <div key={candidate.dimension_key} style={{ padding: '12px', border: '1px solid var(--border)', borderRadius: '10px', background: 'var(--bg2)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: '8px' }}>
                 <strong style={{ fontSize: '13px' }}>{candidate.observed_label}</strong>
-                <span style={{ fontSize: '11px', color: 'var(--text3)' }}>{candidate.occurrence_count} soru · {candidate.student_count} öğrenci</span>
+                <span style={{ fontSize: '11px', color: 'var(--text3)' }}>{candidate.occurrence_count} soru · {candidate.student_count} öğrenci · öncelik {candidate.priority_score}</span>
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>
-                {candidate.observed_subject} · {candidate.sample_grades.join(', ') || 'Sınıf bilinmiyor'}
+                {candidate.observed_subject} · {candidate.sample_grades.join(', ') || 'Sınıf bilinmiyor'} · <strong>{TRIAGE_LABELS[candidate.triage_category]}</strong>
               </div>
               {!singleGrade ? (
                 <div style={{ fontSize: '12px', color: '#d97706', marginBottom: '8px' }}>
@@ -133,7 +177,7 @@ export default function LearningCatalogReview() {
                     aria-label="Bağlanacak MEB ünitesi"
                     style={{ padding: '7px 9px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--primary)' }}>
                     <option value="">— Doğrulanmış MEB ünitesi seçin —</option>
-                    {matchingUnits.map(unit => <option key={unit.id} value={unit.id}>{unit.subject} · {unit.grade} · {unit.label}</option>)}
+                    {matchingUnits.map(unit => <option key={unit.id} value={unit.id}>{candidate.suggested_unit_ids?.includes(unit.id) ? '★ Olası · ' : ''}{unit.subject} · {unit.grade} · {unit.label}</option>)}
                   </select>
                 </div>
               )}
