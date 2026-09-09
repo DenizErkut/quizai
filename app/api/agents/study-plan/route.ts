@@ -31,6 +31,15 @@ export async function POST(req: NextRequest) {
     status: item.status,
   }))
 
+  // Denetim kaydı: ham model çıktısı veya mesaj içeriği tutulmaz.
+  await db.from('agent_decision_audit').insert({
+    actor_id: user.id,
+    agent_name: 'study-plan-v1',
+    policy_version: 'agent-readonly-v1',
+    input_summary: { time_budget_minutes: budget, exam_at_present: Boolean(examAt), recommendation_count: (data ?? []).length },
+    decision_summary: { selected_count: items.length, topics: items.map((item: { topic?: unknown }) => item.topic).filter(Boolean) },
+  })
+
   return NextResponse.json({
     plan: items,
     agent: 'study-plan-v1',
