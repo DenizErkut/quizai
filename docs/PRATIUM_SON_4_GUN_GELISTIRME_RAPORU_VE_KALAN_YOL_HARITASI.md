@@ -231,7 +231,7 @@ Bu 108 konu eğitimsel doğruluk açısından otomatik onaylanmadı; insan incel
 **Öncelik: Orta-yüksek**
 
 - [x] Misconception kataloğu için uzman onay ekranı oluşturmak (uzman karar geçmişi ve doğrulanmış-kayıt yayın kapısı; canlı yayın bekliyor).
-- [ ] Aynı kavramsal hatanın farklı ifade ve sorulardaki varyasyonlarını kontrollü alias yapısıyla birleştirmek.
+- [x] Aynı kavramsal hatanın farklı ifade ve sorulardaki varyasyonlarını kontrollü alias yapısıyla birleştirmek (uzman onaylı, döngüsüz ve denetlenebilir v1; canlı yayın bekliyor).
 - [ ] Yanılgının giderildiğini gösteren karşı kanıt ve `resolved` yaşam döngüsü eklemek.
 - [ ] Yanlış pozitif oranını ders/sınıf/soru türü bazında ölçmek.
 - [ ] Doğrulanmış yanılgıya özel kısa açıklama ve düzeltici mikro içerik üretmek.
