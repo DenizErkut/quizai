@@ -39,6 +39,14 @@ export async function recordQuizLearningEvents(
   }
   const misconceptionRow = Array.isArray(misconceptionData) ? misconceptionData[0] : misconceptionData
 
+  const { error: resolutionError } = await supabase.rpc('refresh_misconception_resolution', {
+    p_student_id: studentId,
+    p_session_id: sessionId,
+  })
+  if (resolutionError && resolutionError.code !== 'PGRST202') {
+    console.error('[misconception-resolution] refresh failed:', resolutionError.message)
+  }
+
   const { error: recommendationError } = await supabase.rpc(
     'refresh_student_recommendations',
     { p_student_id: studentId }

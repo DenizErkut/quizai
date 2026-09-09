@@ -68,11 +68,17 @@ export function enrichAnswersWithMisconceptions(
   topic: string
 ): QuizAnswer[] {
   return answers.map((answer, index) => {
-    if (answer.correct || !Number.isInteger(answer.userAns) || Number(answer.userAns) < 0) return answer
     const rawQuestion = questions[index]
-    const selectedIndex = Number(answer.userAns)
     if (!rawQuestion) return answer
     const question = normalizeQuestionMisconceptions(rawQuestion)
+    if (answer.correct) {
+      const counterMisconceptionIds = (question.distractorMisconceptions || [])
+        .map(cleanLabel).filter((label): label is string => Boolean(label))
+        .map(label => misconceptionId(subject, topic, label))
+      return counterMisconceptionIds.length ? { ...answer, counterMisconceptionIds } : answer
+    }
+    if (!Number.isInteger(answer.userAns) || Number(answer.userAns) < 0) return answer
+    const selectedIndex = Number(answer.userAns)
     if (selectedIndex === question.ans) return answer
     const label = cleanLabel(question.distractorMisconceptions?.[selectedIndex])
     if (!label) return answer
