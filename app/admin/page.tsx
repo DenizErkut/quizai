@@ -16,6 +16,7 @@ import QuestionDifficultyCalibration from '@/components/admin/QuestionDifficulty
 import MasteryShadowEvaluation from '@/components/admin/MasteryShadowEvaluation'
 import MisconceptionReview from '@/components/admin/MisconceptionReview'
 import MisconceptionQuality from '@/components/admin/MisconceptionQuality'
+import MisconceptionMicroContent from '@/components/admin/MisconceptionMicroContent'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -1570,6 +1571,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           <QuestionDifficultyCalibration />
           <MasteryShadowEvaluation />
           <MisconceptionReview />
+          <MisconceptionMicroContent />
           <MisconceptionQuality />
         </div>
       )}
