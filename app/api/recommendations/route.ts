@@ -17,16 +17,12 @@ export async function GET(req: NextRequest) {
   const user = await authenticatedUser(req)
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
-  const { data, error } = await db
-    .from('student_recommendations')
-    .select('id,subject,topic,action_type,priority_score,reason,status,deferred_until,accepted_at,generated_at')
-    .eq('student_id', user.id)
-    .in('status', ['active', 'accepted', 'deferred'])
-    .order('priority_score', { ascending: false })
-    .limit(5)
+  const { data, error } = await db.rpc('get_student_recommendations_priority_v2', {
+    p_student_id: user.id, p_time_budget_minutes: null, p_next_exam_at: null,
+  })
 
   if (error) return NextResponse.json({ error: 'Öneriler alınamadı.' }, { status: 500 })
-  return NextResponse.json({ recommendations: data ?? [] })
+  return NextResponse.json({ recommendations: (data ?? []).slice(0, 5), ranking_version: 'recommendation-priority-v2' })
 }
 
 export async function POST(req: NextRequest) {
