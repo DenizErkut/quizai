@@ -17,6 +17,7 @@ import MasteryShadowEvaluation from '@/components/admin/MasteryShadowEvaluation'
 import MisconceptionReview from '@/components/admin/MisconceptionReview'
 import MisconceptionQuality from '@/components/admin/MisconceptionQuality'
 import MisconceptionMicroContent from '@/components/admin/MisconceptionMicroContent'
+import AgentQuality from '@/components/admin/AgentQuality'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -1565,7 +1566,8 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           <LearningGraphQuality />
           <LearningGraphPrerequisitePackages />
           <LearningGraphRelations />
-          <RecommendationImpact />
+                    <RecommendationImpact />
+                    <AgentQuality />
           <MasteryCalibration />
           <RetentionCalibration />
           <QuestionDifficultyCalibration />

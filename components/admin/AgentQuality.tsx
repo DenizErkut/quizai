@@ -1,0 +1,11 @@
+'use client'
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+
+type Quality = { period_days: number; total_calls: number; agents: Record<string, { calls: number; emptyDecisions: number; policyVersions: string[] }>; alert_thresholds: { empty_decision_rate: number } }
+export default function AgentQuality() {
+  const [data, setData] = useState<Quality | null>(null)
+  useEffect(() => { void (async () => { const { data: { session } } = await createClient().auth.getSession(); if (!session) return; const response = await fetch('/api/admin/agent-quality', { headers: { Authorization: `Bearer ${session.access_token}` } }); if (response.ok) setData(await response.json()) })() }, [])
+  if (!data) return null
+  return <div className="card" style={{ marginBottom: '1rem' }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}><strong style={{ color: 'var(--primary)' }}>🛡️ Ajan kalite izleme</strong><span style={{ fontSize: 11, color: 'var(--text3)' }}>Son {data.period_days} gün</span></div><div style={{ display: 'grid', gap: 8 }}>{Object.entries(data.agents).map(([name, item]) => { const rate = item.calls ? item.emptyDecisions / item.calls : 0; const alert = rate >= data.alert_thresholds.empty_decision_rate; return <div key={name} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: 12 }}><span><strong>{name}</strong><br/><span style={{ color: 'var(--text3)' }}>{item.calls} çağrı · {item.policyVersions.join(', ')}</span></span><strong style={{ color: alert ? 'var(--red)' : 'var(--green)' }}>{alert ? '⚠️ ' : '✓ '}boş karar %{Math.round(rate * 100)}</strong></div> })}</div><div style={{ marginTop: 10, fontSize: 11, color: 'var(--text3)' }}>Toplam çağrı: {data.total_calls} · eşik aşımı varsa operasyon incelemesi gerekir.</div></div>
+}
