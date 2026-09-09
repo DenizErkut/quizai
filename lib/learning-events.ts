@@ -3,6 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 export interface LearningEventProjectionResult {
   insertedEvents: number
   updatedMasteryRows: number
+  updatedObjectiveMasteryRows?: number
   updatedMisconceptionRows?: number
 }
 
@@ -30,6 +31,13 @@ export async function recordQuizLearningEvents(
   }
 
   const row = Array.isArray(data) ? data[0] : data
+  const { data: objectiveMasteryData, error: objectiveMasteryError } = await supabase.rpc(
+    'refresh_student_objective_mastery_v1',
+    { p_student_id: studentId, p_session_id: sessionId }
+  )
+  if (objectiveMasteryError && objectiveMasteryError.code !== 'PGRST202') {
+    console.error('[objective-mastery] refresh failed:', objectiveMasteryError.message)
+  }
   const { data: misconceptionData, error: misconceptionError } = await supabase.rpc(
     'refresh_quiz_misconceptions',
     { p_student_id: studentId, p_session_id: sessionId }
@@ -58,6 +66,7 @@ export async function recordQuizLearningEvents(
   return {
     insertedEvents: Number(row?.inserted_events ?? 0),
     updatedMasteryRows: Number(row?.updated_mastery_rows ?? 0),
+    updatedObjectiveMasteryRows: Number(objectiveMasteryData ?? 0),
     updatedMisconceptionRows: Number(misconceptionRow?.updated_rows ?? 0),
   }
 }

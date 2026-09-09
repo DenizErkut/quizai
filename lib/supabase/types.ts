@@ -558,6 +558,10 @@ export type Database = {
         Args: { p_student_id: string }
         Returns: undefined
       }
+      refresh_student_objective_mastery_v1: {
+        Args: { p_student_id: string; p_session_id?: string | null }
+        Returns: number
+      }
       refresh_quiz_misconceptions: {
         Args: { p_student_id: string; p_session_id: string }
         Returns: { updated_rows: number }[]
