@@ -10,7 +10,7 @@ import QuizResult from '@/components/QuizResult'
 import QuizSetup from '@/components/quiz/QuizSetup'
 import QuizQuestion from '@/components/quiz/QuizQuestion'
 import { SUBJECT_MAP } from '@/lib/subject-map'
-import { nextChunkDifficulty, shouldShowIntervention, type DifficultyValue } from '@/lib/adaptive-difficulty'
+import { nextChunkDifficulty, nextQuestionPolicy, shouldShowIntervention, type DifficultyValue } from '@/lib/adaptive-difficulty'
 import { answerScore, matchingPartialScore, orderingPartialScore } from '@/lib/partial-scoring'
 
 type QuestionType = 'multiple_choice' | 'fill_blank' | 'matching' | 'true_false' | 'ordering' | 'short_answer' | 'multi_true_false' | 'table_fill' | 'mixed'
@@ -833,7 +833,9 @@ function QuizPageContent() {
       setFetchingNextChunk(true)
       try {
         const chunk1Answers = answersRef.current.slice(0, chunkBoundary)
-        const nextDiff = nextChunkDifficulty(resolvedDifficulty, chunk1Answers)
+        const nextPolicy = nextQuestionPolicy(resolvedDifficulty, chunk1Answers, questionType)
+        const nextDiff = nextPolicy.difficulty
+        const nextQuestionType = nextPolicy.questionType
         const excludeTexts = questions.slice(0, chunkBoundary).map(q => q.q).filter(Boolean)
         const topic = customTopic.trim() || selectedTopic
         const targetSecondChunk = qCount - chunkBoundary
@@ -846,7 +848,7 @@ function QuizPageContent() {
             questionCount: targetSecondChunk,
             difficulty: nextDiff,
             language: currentLang,
-            questionType,
+            questionType: nextQuestionType,
             includeVisuals,
             continueSessionId: sessionId,
             subject: selectedSubject || undefined,
@@ -870,7 +872,7 @@ function QuizPageContent() {
             topupAttempts++
             const { data: { session: freshSession } } = await supabase.auth.getSession()
             const extra = await fetchQuizTopup({
-              topic, subject: selectedSubject || undefined, language: currentLang, questionType, includeVisuals,
+              topic, subject: selectedSubject || undefined, language: currentLang, questionType: nextQuestionType, includeVisuals,
               difficulty: nextDiff,
               sessionId, missing: targetSecondChunk - secondChunk.length,
               existingTexts: [...excludeTexts, ...secondChunk.map((q: any) => q.q).filter(Boolean)],

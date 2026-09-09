@@ -13,6 +13,7 @@
 // (daha büyük bir mimari iş) açık bırakıldı.
 
 export type DifficultyValue = 'kolay' | 'normal' | 'zor' | 'cok zor'
+export type AdaptiveQuestionType = 'multiple_choice' | 'true_false' | 'fill_blank' | 'matching' | 'ordering'
 
 const LADDER: DifficultyValue[] = ['kolay', 'normal', 'zor', 'cok zor']
 
@@ -57,4 +58,32 @@ export function shouldShowIntervention(
   const last2Wrong = !recentAnswers[n - 1].correct && !recentAnswers[n - 2].correct
   if (!last2Wrong) return false
   return recentQuestionTypes[n - 1] === recentQuestionTypes[n - 2]
+}
+
+/** Soru-bazlı v3 politikası. Üretim katmanı bunu bir sonraki soru isteğine
+ * taşır; art arda hata öğrenciyi cezalandırmadan zorluğu bir kademe indirir
+ * ve daha düşük bilişsel yükte bir biçime geçer. */
+export function nextQuestionPolicy(
+  currentDifficulty: DifficultyValue,
+  recentAnswers: { correct: boolean }[],
+  currentType: string,
+): { difficulty: DifficultyValue; questionType: AdaptiveQuestionType; showIntervention: boolean; reason: string } {
+  const recent = recentAnswers.slice(-3)
+  const lastTwoWrong = recent.length >= 2 && recent.slice(-2).every(answer => !answer.correct)
+  const lastThreeCorrect = recent.length >= 3 && recent.slice(-3).every(answer => answer.correct)
+  const safeType: AdaptiveQuestionType = ['multiple_choice','true_false','fill_blank','matching','ordering'].includes(currentType)
+    ? currentType as AdaptiveQuestionType : 'multiple_choice'
+  if (lastTwoWrong) return {
+    difficulty: nextChunkDifficulty(currentDifficulty, [{ correct: false }, { correct: false }]),
+    questionType: safeType === 'multiple_choice' ? 'true_false' : 'multiple_choice',
+    showIntervention: true,
+    reason: 'Art arda iki yanlış: zorluk bir kademe düşürüldü ve soru biçimi sadeleştirildi.',
+  }
+  if (lastThreeCorrect) return {
+    difficulty: nextChunkDifficulty(currentDifficulty, [{ correct: true }, { correct: true }, { correct: true }]),
+    questionType: safeType,
+    showIntervention: false,
+    reason: 'Art arda üç doğru: bir sonraki soruda zorluk artırıldı.',
+  }
+  return { difficulty: currentDifficulty, questionType: safeType, showIntervention: false, reason: 'Dengeli performans: mevcut seviye korundu.' }
 }
