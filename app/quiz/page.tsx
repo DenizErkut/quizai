@@ -1011,9 +1011,9 @@ function QuizPageContent() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {[
-            { plan: 'Gümüş', price: '2.490₺/yıl', features: ['10 soru/test', 'Ayda 30 test', 'Sadece müfredat konuları'], color: '#64748b', highlight: false },
-            { plan: 'Altın', price: '4.490₺/yıl', features: ['20 soru/test', 'Sınırsız test', 'Tüm konular', 'Koç desteği yok'], color: '#2563eb', highlight: false },
-            { plan: 'Platin', price: '19.990₺/yıl', features: ['20 soru/test', 'Sınırsız test', 'Müfredat dışı konular', '12× koça danışma'], color: 'var(--accent)', highlight: true },
+            { plan: 'Gümüş', price: '299₺/ay · 2.490₺/yıl', features: ['10 soru/test', 'Ayda 30 test', 'Sadece müfredat konuları'], color: '#64748b', highlight: false },
+            { plan: 'Altın', price: '499₺/ay · 4.490₺/yıl', features: ['20 soru/test', 'Sınırsız test', 'Tüm konular', 'Koç desteği yok'], color: '#2563eb', highlight: false },
+            { plan: 'Platin', price: '2.399₺/ay · 19.990₺/yıl', features: ['20 soru/test', 'Sınırsız test', 'Müfredat dışı konular', '12× koça danışma'], color: 'var(--accent)', highlight: true },
           ].map(p => (
             <div key={p.plan} style={{ padding: '14px 16px', borderRadius: '12px', border: `2px solid ${p.highlight ? p.color : 'var(--border)'}`, background: p.highlight ? 'var(--accent-bg)' : 'var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
               <div>

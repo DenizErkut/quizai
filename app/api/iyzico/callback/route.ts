@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { generateIyzicoAuthHeader } from '@/lib/iyzico'
+import { BILLING_PLANS, resolveBillingPlanKey } from '@/lib/subscription-plans'
 
 const IYZICO_BASE_URL = process.env.IYZICO_BASE_URL!
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://pratium.com'
@@ -11,13 +12,6 @@ const supabaseAdmin = createClient(
 )
 
 const IYZICO_DETAIL_URI_PATH = '/payment/iyzipos/checkoutform/auth/ecom/detail'
-
-const PLAN_META: Record<string, { months: number; plan: string }> = {
-  silver:    { months: 12, plan: 'silver'    },
-  monthly:   { months: 1,  plan: 'premium'   },
-  yearly:    { months: 12, plan: 'premium'   },
-  unlimited: { months: 12, plan: 'unlimited' },
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -52,17 +46,22 @@ export async function POST(req: NextRequest) {
 
     // conversationId'den userId ve plan çıkar
     const conversationId = result.conversationId as string
-    const parts = conversationId.split('_')
+    const isCurrentFormat = conversationId.includes('|')
+    const parts = conversationId.split(isCurrentFormat ? '|' : '_')
     const userId = parts[0]
-    const planType = parts[1] as 'silver' | 'monthly' | 'yearly' | 'unlimited'
-    const meta = PLAN_META[planType] || { months: 1, plan: 'premium' }
+    const planType = resolveBillingPlanKey(parts[1])
+    if (!userId || !planType) {
+      console.error('Invalid payment conversation:', conversationId)
+      return NextResponse.redirect(`${APP_URL}/pricing?payment=error`)
+    }
+    const meta = BILLING_PLANS[planType]
 
     // Plan aktive et (silver, premium veya unlimited)
     const expiresAt = new Date()
     expiresAt.setMonth(expiresAt.getMonth() + meta.months)
 
     await supabaseAdmin.from('profiles').update({
-      plan: meta.plan,
+      plan: meta.profilePlan,
       plan_expires_at: expiresAt.toISOString(),
       monthly_test_count: 0,
       daily_test_count: 0,
@@ -71,8 +70,8 @@ export async function POST(req: NextRequest) {
     // Aktivasyon bildirimi gönder — plan görünen adları: silver=Gümüş,
     // premium=Altın, unlimited=Platin (6 Eylül 2026 isim değişikliği;
     // veritabanı değerleri (plan sütunu) DEĞİŞMEDİ, sadece görünen isim).
-    const displayName = meta.plan === 'unlimited' ? 'Platin' : meta.plan === 'silver' ? 'Gümüş' : 'Altın'
-    const emoji = meta.plan === 'unlimited' ? '👑' : meta.plan === 'silver' ? '🥈' : '⭐'
+    const displayName = meta.tierName
+    const emoji = meta.profilePlan === 'unlimited' ? '👑' : meta.profilePlan === 'silver' ? '🥈' : '⭐'
     await supabaseAdmin.from('notifications').insert({
       user_id: userId,
       type: 'system',

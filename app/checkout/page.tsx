@@ -3,16 +3,20 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { BILLING_PLANS, resolveBillingPlanKey, type BillingPlanKey } from '@/lib/subscription-plans'
 
-const BASE_PRICES: Record<'silver' | 'monthly' | 'yearly' | 'unlimited', number> = {
-  silver: 2490,
-  monthly: 499,
-  yearly: 4490,
-  unlimited: 19990,
-}
+const BASE_PRICES = Object.fromEntries(Object.entries(BILLING_PLANS).map(([key, value]) => [key, value.price])) as Record<BillingPlanKey, number>
 
-const PLANS = {
-  silver: {
+const PLANS: Record<BillingPlanKey, PlanDisplay> = {
+  silver_monthly: {
+    name: 'Aylık Gümüş',
+    price: '299',
+    period: 'ay',
+    badge: '',
+    color: '#94a3b8',
+    features: ['Ayda 30 test', '10 soru/test', 'Sınav simülasyonu (demo)', 'Temel soru tipleri', '6 dil'],
+  },
+  silver_yearly: {
     name: 'Yıllık Gümüş',
     price: '2.490',
     period: 'yıl',
@@ -20,7 +24,7 @@ const PLANS = {
     color: '#94a3b8',
     features: ['Ayda 30 test', '10 soru/test', 'Sınav simülasyonu (demo)', 'Temel soru tipleri', '6 dil'],
   },
-  monthly: {
+  gold_monthly: {
     name: 'Aylık Altın',
     price: '499',
     period: 'ay',
@@ -28,7 +32,7 @@ const PLANS = {
     color: '#2563eb',
     features: ['Sınırsız test', '20 soru/test', 'Tüm soru tipleri', 'Dosya/görsel yükleme', '6 dil', 'Öncelikli destek'],
   },
-  yearly: {
+  gold_yearly: {
     name: 'Yıllık Altın',
     price: '4.490',
     period: 'yıl',
@@ -36,7 +40,15 @@ const PLANS = {
     color: '#2563eb',
     features: ['Sınırsız test', '20 soru/test', 'Tüm soru tipleri', 'Dosya/görsel yükleme', '6 dil', 'Öncelikli destek'],
   },
-  unlimited: {
+  platinum_monthly: {
+    name: 'Aylık Platin',
+    price: '2.399',
+    period: 'ay',
+    badge: '👑 Tüm özellikler',
+    color: '#0d9488',
+    features: ['Sınırsız günlük test', '20 soru/test', 'Tüm soru tipleri', 'Gelişmiş analiz', 'Sınırsız sınıf', '12× birebir koç', 'Telefon desteği'],
+  },
+  platinum_yearly: {
     name: 'Yıllık Platin',
     price: '19.990',
     period: 'yıl',
@@ -80,7 +92,9 @@ function applyDiscount(discountRate: number): Record<keyof typeof PLANS, PlanDis
 function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [selectedPlan, setSelectedPlan] = useState<'silver' | 'monthly' | 'yearly' | 'unlimited'>('yearly')
+  const [selectedPlan, setSelectedPlan] = useState<BillingPlanKey>(() =>
+    resolveBillingPlanKey(searchParams.get('plan')) ?? 'gold_yearly'
+  )
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [formHtml, setFormHtml] = useState('')
@@ -93,11 +107,6 @@ function CheckoutContent() {
   const paymentStatus = searchParams.get('payment')
 
   useEffect(() => {
-    // URL'den plan al
-    const planParam = searchParams.get('plan')
-    if (planParam === 'silver' || planParam === 'monthly' || planParam === 'yearly' || planParam === 'unlimited') {
-      setSelectedPlan(planParam as any)
-    }
     // Satıcı üzerinden gelinmişse (kayıtta ?satici=KOD ile bağlanmış olabilir)
     // o satıcının o anki indirim oranını çek — girişli değilse veya
     // bağlı bir satıcı yoksa sessizce 0 döner, hata göstermez.
@@ -227,7 +236,7 @@ function CheckoutContent() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '1.5rem' }} className="anim-up-1">
               {(Object.entries(displayPlans) as [string, PlanDisplay][]).map(([key, plan]) => (
-                <button key={key} onClick={() => setSelectedPlan(key as 'silver' | 'monthly' | 'yearly' | 'unlimited')}
+                <button key={key} onClick={() => setSelectedPlan(key as BillingPlanKey)}
                   style={{
                     padding: '1.25rem', borderRadius: '14px', textAlign: 'left',
                     border: `2px solid ${selectedPlan === key ? 'var(--accent)' : 'var(--border)'}`,

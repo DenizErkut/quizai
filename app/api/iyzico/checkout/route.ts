@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getIdentityBySupabaseId } from '@/lib/identity/client'
 import { generateIyzicoAuthHeader } from '@/lib/iyzico'
+import { BILLING_PLANS, resolveBillingPlanKey } from '@/lib/subscription-plans'
 
 const IYZICO_BASE_URL = process.env.IYZICO_BASE_URL!
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://pratium.com'
@@ -12,13 +13,6 @@ const supabaseAdmin = createClient(
 )
 
 const IYZICO_CHECKOUT_URI_PATH = '/payment/iyzipos/checkoutform/initialize/auth/ecom'
-
-const PLANS = {
-  silver:    { price: '2490.0',  name: 'Pratium Gümüş - Yıllık',     months: 12, plan: 'silver'    },
-  monthly:   { price: '499.0',   name: 'Pratium Altın - Aylık',      months: 1,  plan: 'premium'   },
-  yearly:    { price: '4490.0',  name: 'Pratium Altın - Yıllık',     months: 12, plan: 'premium'   },
-  unlimited: { price: '19990.0', name: 'Pratium Platin - Yıllık',    months: 12, plan: 'unlimited' },
-}
 
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -37,9 +31,9 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Oturum geçersiz.' }, { status: 401 })
 
   const body = await req.json()
-  const planType = body.plan as 'silver' | 'monthly' | 'yearly' | 'unlimited'
-  const plan = PLANS[planType]
-  if (!plan) return NextResponse.json({ error: 'Geçersiz plan.' }, { status: 400 })
+  const planType = resolveBillingPlanKey(body.plan)
+  if (!planType) return NextResponse.json({ error: 'Geçersiz plan.' }, { status: 400 })
+  const plan = BILLING_PLANS[planType]
 
   // Fatura için ad-soyad TR-PG kimliğinden
   const identity = await getIdentityBySupabaseId(user.id)
@@ -63,12 +57,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const basePrice = parseFloat(plan.price)
+  const basePrice = plan.price
   const finalPrice = discountRate > 0
     ? Math.max(0, basePrice * (1 - discountRate / 100)).toFixed(2)
-    : plan.price
+    : plan.price.toFixed(2)
 
-  const conversationId = `${user.id}_${planType}_${Date.now()}`
+  // Plan anahtarlarında alt çizgi bulunduğu için alanları güvenli bir ayraçla taşı.
+  // Callback eski alt çizgili kayıtları da desteklemeye devam ediyor.
+  const conversationId = `${user.id}|${planType}|${Date.now()}`
   const nameParts = fullName.split(' ')
   const firstName = nameParts[0] || 'Kullanici'
   const lastName = nameParts.slice(1).join(' ') || 'Kullanici'
@@ -110,7 +106,7 @@ export async function POST(req: NextRequest) {
     basketItems: [
       {
         id: `pratium_${planType}`,
-        name: discountRate > 0 ? `${plan.name} (%${discountRate} indirimli)` : plan.name,
+        name: discountRate > 0 ? `${plan.displayName} (%${discountRate} indirimli)` : plan.displayName,
         category1: 'Dijital Ürün',
         itemType: 'VIRTUAL',
         price: finalPrice,

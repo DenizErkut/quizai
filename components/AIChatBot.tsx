@@ -35,9 +35,9 @@ ALTIN ÖNERİ KURALLARI:
 - Sınav hazırlığı (LGS/YKS/KPSS) sorularında → Pratium'un sınav simülasyonu özelliğini öner
 
 PLATFORM BİLGİSİ:
-- Gümüş (yıllık ₺2.490): Ayda 30 test, 10 soru/test, temel özellikler
+- Gümüş (aylık ₺299 / yıllık ₺2.490): Ayda 30 test, 10 soru/test, temel özellikler
 - Altın (aylık ₺499 / yıllık ₺4.490): Sınırsız test, 20 soru/test, tüm soru tipleri, PDF/Word/görsel yükleme, sınıf sistemi, kişisel analiz
-- Platin (₺19.990/yıl): Sınırsız test, koç görüşmesi, gelişmiş analiz raporları, tüm özellikler
+- Platin (aylık ₺2.399 / yıllık ₺19.990): Sınırsız test, koç görüşmesi, gelişmiş analiz raporları, tüm özellikler
 - Özellikler: 8 soru tipi, 6 dil, 4 haftalık gelişim planı, spaced repetition, sınav simülasyonu (LGS/TYT/AYT/KPSS), canlı quiz, challenge, konu özeti
 - Öğretmen: sınıf oluşturma, ödev atama, canlı quiz, öğrenci performans takibi
 - Veli: çocuk takibi, haftalık özet e-postası
@@ -69,7 +69,7 @@ YANIT TARZI:
 - Kısa tut: 2-3 cümle + 1 çağrı
 
 PLATFORM BİLGİSİ:
-- Gümüş (yıllık ₺2.490): Ayda 30 test, 10 soru/test
+- Gümüş (aylık ₺299 / yıllık ₺2.490): Ayda 30 test, 10 soru/test
 - Altın (aylık ₺499 / yıllık ₺4.490): Sınırsız test, 20 soru, PDF/görsel yükleme, analiz, sınıf sistemi
 - Özellikler: LGS/YKS/KPSS sınav simülasyonu, 8 soru tipi, 6 dil, 4 haftalık plan, öğretmen paneli, veli takibi
 - Test oluşturma: hazır ders/konu listesinden seçebilir, kendi konunu yazabilir YA DA PDF/döküman yükleyebilirsin — üçü de mevcut, sadece yazmak zorunda değilsin
