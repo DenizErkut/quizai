@@ -52,12 +52,20 @@ export async function POST(req: NextRequest) {
     // TÜM geçmişi) sohbete dahil edilir — AI'ın ne kadar sabırlı/temel
     // seviyeden başlaması gerektiğini bilmesi için.
     let masteryNote = ''
+    let graphNote = ''
     try {
       const dbForMastery = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
       const mastery = await getTopicMastery(dbForMastery, user.id, topic)
       if (mastery && mastery.totalCount >= 3) {
         masteryNote = `\n\nÖĞRENCİNİN BU KONUDAKİ GENEL GEÇMİŞİ (sadece bu test değil, tüm zamanlar): ${mastery.masteryScore}/100 mastery skoru (${mastery.totalCount} soru, ${mastery.wrongCount} yanlış). ${mastery.masteryScore < 50 ? 'Bu öğrenci bu konuda genel olarak zorlanıyor — özellikle sabırlı ol, en temel kavramdan başlamaktan çekinme.' : ''}${mastery.forgettingRisk === 'yüksek' ? ' Bu konuyu uzun süredir tekrar etmemiş, temel hatırlatmalarla başlamak iyi olur.' : ''}`
       }
+      // Kanonik kazanım ve aktif öneri bağlamı: bulunamazsa mevcut akış aynen sürer.
+      const [{ data: objective }, { data: recommendation }] = await Promise.all([
+        dbForMastery.from('student_mastery').select('learning_objective_key, subject, topic').eq('student_id', user.id).eq('topic', topic).order('last_mastery_update', { ascending: false }).limit(1).maybeSingle(),
+        dbForMastery.from('student_recommendations').select('subject, topic, reason, status').eq('student_id', user.id).eq('topic', topic).in('status', ['active', 'accepted']).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      ])
+      if (objective?.learning_objective_key) graphNote += `\nKANONİK ÖĞRENME BAĞLAMI: ders=${objective.subject || 'belirtilmemiş'}, konu=${objective.topic || topic}, kazanım=${objective.learning_objective_key}. Kazanımın dışına taşmadan, yaşa uygun anlat.`
+      if (recommendation) graphNote += `\nAKTİF ÖNERİ BAĞLAMI: durum=${recommendation.status}, gerekçe=${String(recommendation.reason || '').slice(0, 240)}. Yanıtı bu önerinin hedefiyle uyumlu tut.`
     } catch { /* mastery opsiyonel bağlam, hata olursa sessiz geç */ }
 
     // ── SOKRATİK ÖĞRETİM METODOLOJİSİ (Faz 3) ──
@@ -73,6 +81,7 @@ ${hasQuizContext ? `Öğrencinin bu testteki bilgileri:
 - Skor: %${pct} (${score}/${questions.length} doğru)
 - Yanlış soru sayısı: ${wrongQuestions.length}
 ${masteryNote}
+${graphNote}
 
 ${wrongQuestions.length > 0 ? `Yanlış sorular (kendi cevabı ve doğru cevap dahil — SEN bunları biliyorsun, öğrenciye HEMEN söyleme):\n${wrongQuestions.map((q: any, i: number) => `${i + 1}. Soru: ${q.q}\n   Doğru cevap: ${q.opts[q.ans]}\n   Öğrencinin cevabı: ${q.opts[q.userAns]}\n   Açıklama: ${q.exp}`).join('\n\n')}` : ''}` : `Bu, tek seferlik bir analiz isteği (interaktif bir sohbet değil) — öğrencinin soru/cevap detayı doğrudan aşağıdaki kullanıcı mesajının içinde. Bu durumda Sokratik yöntemi UYGULAMA, doğrudan ve net bir analiz yaz (kullanıcı mesajı zaten bunu istiyor).`}
 
