@@ -99,7 +99,7 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 ## Güncel kalan maddeler — önerilen sıra
 
 1. [x] **Recommendation Engine v2 yaşam döngüsü:** önerinin uygulanması, ertelenmesi, reddedilmesi ve tamamlanmasını izlemek. Durum geçişleri, değiştirilemez olay tarihçesi, güvenli öğrenci işlemleri ve dashboard kartı tamamlandı.
-2. **Pilot içerik operasyonu:** doğrulanmış yanılgılar için mikro içerikleri üretip uzman onayından geçirmek; uzman ön koşul paketlerini doldurmak.
+2. **Pilot içerik operasyonu:** doğrulanmış yanılgılar için mikro içerikleri üretip uzman onayından geçirmek; uzman ön koşul paketlerini doldurmak. Operasyon ekranı kapsam sayaçları ve sıradaki taslak akışı hazır; 31 içerik ve ön koşul paketleri uzman işlemi bekliyor.
 3. **Katalog kapsamını büyütmek:** kalan 36 eksik üniteyi, 8 çok-sınıflı adayı ve 64 inceleme adayını tamamlamak; yeni ders/sınıflara resmî kazanım import etmek.
 4. **Recommendation Engine v2 önceliklendirme:** zaman bütçesi, sınav tarihi, öğretmen ödevi, kurum planı, çeşitlilik ve yük dengeleme.
 5. **Adaptive Learning v3:** soru bazlı adaptasyon, güvenlik sınırları ve adaptif/standart etki karşılaştırması.
