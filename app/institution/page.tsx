@@ -263,6 +263,24 @@ export default function InstitutionPage() {
               ))}
             </div>
 
+            {/* Kurum öğrenme içgörüsü: karar desteği, öğrenci PII'si göstermeden */}
+            <div className="card" style={{ marginBottom: '1rem', background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(30,207,184,0.07))' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '8px' }}>
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 800, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Kurum öğrenme içgörüsü</div>
+                  <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--primary)', marginTop: '4px' }}>Bu hafta hangi aksiyon öncelikli?</div>
+                </div>
+                <span style={{ fontSize: '22px' }}>🏫</span>
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}>
+                {(analytics?.riskStudents?.length ?? 0) > 0
+                  ? `${analytics.riskStudents.length} öğrencide erken destek sinyali var. İlgili öğretmenlerle kısa bir konu bazlı tekrar planı oluşturun.`
+                  : (stats?.active ?? 0) > 0
+                    ? `${stats.active} aktif öğrencinin kurum ortalaması ${stats.overallAvg ? `%${stats.overallAvg}` : 'hesaplanıyor'}. Sınıflar arasında konu bazlı farklılıkları analiz ederek ortak destek materyali planlayın.`
+                    : 'Henüz yeterli performans verisi oluşmadı. Öğrencilerin ilk testlerini tamamlamasını bekleyin.'}
+              </div>
+            </div>
+
             {/* Haftalık Trend Mini */}
             {analytics?.weeklyTrend && (
               <div className="card" style={{ marginBottom: '1rem' }}>
