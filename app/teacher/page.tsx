@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities, resolveName } from '@/lib/identity/resolve-client'
 import ContentIssueReporter from '@/components/ContentIssueReporter'
+import LearningInsights from '@/components/teacher/LearningInsights'
 
 export default function TeacherDashboard() {
   const [teacher, setTeacher] = useState<any>(null)
@@ -212,6 +213,7 @@ export default function TeacherDashboard() {
         {/* DASHBOARD */}
         {activeTab === 'dashboard' && (
           <div>
+            <LearningInsights />
             <div style={{ marginBottom: '1.5rem' }}>
               <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)' }}>
                 Hoş geldin, {teacher?.name?.split(' ')[0]} 👋
