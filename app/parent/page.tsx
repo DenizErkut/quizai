@@ -386,6 +386,26 @@ function ParentContent() {
               )
             })()}
 
+            {/* Veli için açıklanabilir öğrenme özeti */}
+            <div className="card" style={{ marginBottom: '1.5rem', background: 'linear-gradient(135deg, rgba(30,207,184,0.08), rgba(99,102,241,0.06))' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '8px' }}>
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Veli öğrenme özeti</div>
+                  <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--primary)', marginTop: '4px' }}>Bugün nasıl destek olabilirsiniz?</div>
+                </div>
+                <span style={{ fontSize: '22px' }}>💡</span>
+              </div>
+              {selected.weakTopics.length > 0 ? (
+                <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}>
+                  Öncelik: <strong>{selected.weakTopics[0]}</strong>. Kısa ve sakin bir tekrar oturumu öneriyoruz; baskı yerine birlikte hedef belirleyin.
+                </div>
+              ) : selected.weeklyTests > 0 ? (
+                <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}>Bu hafta {selected.weeklyTests} test tamamlandı. Düzenli çalışma alışkanlığını küçük molalarla destekleyin.</div>
+              ) : (
+                <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}>Henüz bu hafta veri oluşmadı. Birlikte kısa bir çalışma hedefi belirleyebilirsiniz.</div>
+              )}
+            </div>
+
             {/* Son çalışılan konular + Zayıf konular */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '1.5rem' }}>
               <div className="card">
