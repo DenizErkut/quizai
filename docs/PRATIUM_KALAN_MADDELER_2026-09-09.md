@@ -103,6 +103,6 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 3. **Katalog kapsamını büyütmek:** kalan 36 eksik üniteyi, 8 çok-sınıflı adayı ve 64 inceleme adayını tamamlamak; yeni ders/sınıflara resmî kazanım import etmek. İnceleme kuyruğuna kapsam sayaçları (bekleyen/eşleşen/katalog düğümü) eklendi; gerçek eşleştirmeler uzman onayı bekliyor.
 4. [x] **Recommendation Engine v2 önceliklendirme:** zaman bütçesi, sınav tarihi, öğretmen ödevi, kurum planı, çeşitlilik ve yük dengeleme. Bağlamsal sıralama RPC'si, açıklanabilir puan kırılımı ve güvenli öncelik API'si tamamlandı.
 5. [x] **Adaptive Learning v3:** ikinci test parçasında soru-bazlı performans politikasına göre zorluk ve desteklenen soru türü değişimi; güvenlik sınırları uygulandı. Tam her-soru üretim döngüsü ve adaptif/standart etki karşılaştırması sonraki alt iş.
-6. **Rol bazlı deneyimler:** öğrenci, öğretmen, veli ve kurum ekranlarında açıklanabilir karar katmanları.
+6. **Rol bazlı deneyimler:** öğrenci, öğretmen, veli ve kurum ekranlarında açıklanabilir karar katmanları. Öğrenci dashboard öğrenme özeti v1 tamamlandı; öğretmen/veli/kurum alt ekranları sırada.
 7. **AI Tutor ve sınırlı ajanlar:** Learning Profile + Recommendation + Learning Graph bağlamıyla güvenli çalışma.
 8. **Operasyonel olgunluk:** tenant izolasyonu, pipeline alarmları, kurtarma runbook'ları ve KVKK/çocuk verisi kontrolleri.

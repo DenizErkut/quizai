@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { resolveName } from '@/lib/identity/resolve-client'
 import RecommendationLifecycle from '@/components/student/RecommendationLifecycle'
+import LearningSummary from '@/components/student/LearningSummary'
 
 interface Session { id: string; topic: string; grade: string; score: number; pct: number; question_count: number; created_at: string }
 interface Profile { name: string; grade: string; language: string; plan: string }
@@ -192,6 +193,7 @@ export default function DashboardPage() {
           boxShadow: '0 -4px 24px rgba(8,36,101,0.08)',
         }}>
           {/* SM-2 Tekrar Widget */}
+          <LearningSummary />
           <RecommendationLifecycle />
 
           {dueCards > 0 && (
