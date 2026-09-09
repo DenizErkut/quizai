@@ -11,6 +11,7 @@ import { findPrerequisiteGaps, buildPrerequisiteContext } from '@/lib/learning-g
 import { misconceptionMetadataInstruction, normalizeQuestionMisconceptions } from '@/lib/misconceptions'
 import { resolveAdaptiveLearningPolicy } from '@/lib/adaptive-learning'
 import { startingDifficultyFromMastery } from '@/lib/adaptive-difficulty'
+import { resolveDiagnosticQuestionStrategy } from '@/lib/diagnostic-question-strategy'
 import { applyCanonicalObjectiveMappings, learningObjectivePrompt, loadCanonicalObjectiveCandidates } from '@/lib/learning-objective-mapping'
 import { runMistralShadowComparison } from '@/lib/ai-gateway'
 
@@ -991,15 +992,16 @@ export async function POST(req: NextRequest) {
     // gönderilir (bkz. continueSessionId akışı).
     const adaptivePolicy = await resolveAdaptiveLearningPolicy(supabase, user.id, topic, subject)
       .catch(() => null)
+    const topicMastery = await getTopicMastery(supabase, user.id, topic).catch(() => null)
+    const diagnosticStrategy = resolveDiagnosticQuestionStrategy(
+      topicMastery,
+      safeQCount,
+      Boolean(continueSessionId),
+    )
     let resolvedDifficulty = difficulty
     if (difficulty === 'auto') {
-      try {
-        const mastery = await getTopicMastery(supabase, user.id, topic)
-        resolvedDifficulty = adaptivePolicy?.startingDifficulty
-          || startingDifficultyFromMastery(mastery?.masteryScore ?? null)
-      } catch {
-        resolvedDifficulty = 'normal'
-      }
+      resolvedDifficulty = adaptivePolicy?.startingDifficulty
+        || startingDifficultyFromMastery(topicMastery?.masteryScore ?? null)
     }
 
     const lang = language || profile.language || 'Turkce'
@@ -1102,7 +1104,7 @@ export async function POST(req: NextRequest) {
     // (lib/mastery.ts) kullanılıyor.
     try {
       const [mastery, patterns] = await Promise.all([
-        getTopicMastery(supabase, user.id, topic),
+        Promise.resolve(topicMastery),
         computeErrorPatterns(supabase, user.id, topic),
       ])
       gradeContext += buildStudentHistoryContext(mastery, patterns)
@@ -1181,10 +1183,11 @@ export async function POST(req: NextRequest) {
 
     const prompt = dynamicPrompt
       + (adaptivePolicy?.promptContext || '')
+      + diagnosticStrategy.promptContext
       + (isUniversityLevel ? misconceptionMetadataInstruction(questionType) : '') // K12'de artık statik blokta
       + objectiveInstruction
       + previousQuestionsNote
-    promptStr = fullPrompt + (adaptivePolicy?.promptContext || '') + misconceptionMetadataInstruction(questionType) + objectiveInstruction + previousQuestionsNote // fallback için TAM metin saklanır
+    promptStr = fullPrompt + (adaptivePolicy?.promptContext || '') + diagnosticStrategy.promptContext + misconceptionMetadataInstruction(questionType) + objectiveInstruction + previousQuestionsNote // fallback için TAM metin saklanır
     countRef = safeQCount
 
     // Hız optimizasyonu: az soru → Haiku (3x hızlı), çok soru → Sonnet
@@ -1545,7 +1548,7 @@ export async function POST(req: NextRequest) {
     const canonicalSubject = typeof subject === 'string' && subject.trim()
       ? subject.trim()
       : 'Genel'
-    questions = questions.map((q: any) => ({
+    questions = questions.map((q: any, questionIndex: number) => ({
       ...normalizeQuestionMisconceptions(q),
       subject: canonicalSubject,
       difficulty: resolvedDifficulty,
@@ -1553,6 +1556,11 @@ export async function POST(req: NextRequest) {
       adaptiveFocus: adaptivePolicy?.focus || 'standard',
       adaptiveReasonCode: adaptivePolicy?.reasonCode || 'NO_ACTIVE_SIGNAL',
       adaptiveRecommendationId: adaptivePolicy?.recommendationId || null,
+      diagnosticStrategyVersion: diagnosticStrategy.active ? diagnosticStrategy.version : null,
+      diagnosticReasonCode: diagnosticStrategy.active ? diagnosticStrategy.reasonCode : null,
+      diagnosticRole: diagnosticStrategy.active ? diagnosticStrategy.roles[questionIndex] || null : null,
+      masteryConfidenceBefore: diagnosticStrategy.confidenceBefore,
+      masteryEvidenceCountBefore: diagnosticStrategy.evidenceCountBefore,
     }))
     const objectiveMapping = applyCanonicalObjectiveMappings(questions, objectiveCandidates)
     questions = objectiveMapping.questions
@@ -1685,7 +1693,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    return NextResponse.json({ questions, sessionId, resolvedDifficulty, adaptivePolicy: adaptivePolicy || undefined })
+    return NextResponse.json({ questions, sessionId, resolvedDifficulty, adaptivePolicy: adaptivePolicy || undefined, diagnosticStrategy })
   } catch (error: any) {
     console.error('Generate quiz error, trying OpenAI fallback:', error?.message)
     // GPT-4o yedek model

@@ -345,7 +345,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
         onClick={() => { setOpen(v => !v); setUnread(0); setBubbleDismissed(true) }}
         style={{
           position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999,
-          width: 80, height: 80, borderRadius: '50%',
+          width: 84, height: 84, borderRadius: '22px',
           background: open ? 'linear-gradient(135deg, #082465, #1ECFB8)' : '#ffffff',
           border: open ? 'none' : '2px solid rgba(30,207,184,0.25)',
           cursor: 'pointer',
@@ -385,7 +385,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
         .prati-launcher:not(.is-open)::before,
         .prati-launcher:not(.is-open)::after {
           content: ''; position: absolute; inset: -7px; border: 2px solid rgba(30,207,184,.34);
-          border-radius: 50%; pointer-events: none; animation: pratiPulse 2.8s ease-out infinite;
+          border-radius: 28px; pointer-events: none; animation: pratiPulse 2.8s ease-out infinite;
         }
         .prati-launcher:not(.is-open)::after { animation-delay: 1.4s; }
         .prati-mascot-live { width: 100%; height: 100%; display: grid; place-items: center; animation: pratiFloat 3.2s ease-in-out infinite; transform-origin: 50% 88%; }

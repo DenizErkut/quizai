@@ -33,6 +33,11 @@ interface Question {
   adaptiveFocus?: string
   adaptiveReasonCode?: string
   adaptiveRecommendationId?: string | null
+  diagnosticStrategyVersion?: 'diagnostic-v1' | null
+  diagnosticReasonCode?: string | null
+  diagnosticRole?: 'foundation_probe' | 'application_probe' | 'misconception_probe' | null
+  masteryConfidenceBefore?: 'none' | 'düşük' | 'orta' | 'yüksek'
+  masteryEvidenceCountBefore?: number
   learningObjectiveRef?: string | null
   learningObjectiveId?: string | null
   learningObjectiveCode?: string | null

@@ -221,7 +221,7 @@ Bu 108 konu eğitimsel doğruluk açısından otomatik onaylanmadı; insan incel
 - [ ] Soru bazında kalıcı `question_id` kullanımını tamamlamak.
 - [ ] Soru zorluk değerlerini yalnızca üretim etiketiyle değil gerçek öğrenci performansıyla kalibre etmek.
 - [x] Tahmin edilen mastery ile sonraki test başarısını karşılaştıran kalibrasyon raporu oluşturmak.
-- [ ] Tahmin güveni düşük öğrenciler için daha fazla tanılayıcı soru stratejisi eklemek.
+- [x] Tahmin güveni düşük öğrenciler için daha fazla tanılayıcı soru stratejisi eklemek.
 - [ ] Retention modelini gerçek tekrar sonuçlarıyla kalibre etmek.
 - [ ] Algoritma v1/v2 sonuçlarını yan yana ölçebilecek gölge değerlendirme altyapısı kurmak.
 - [ ] Açık uçlu, eşleştirme ve sıralama soruları için güvenilir kısmi puan modelini geliştirmek.
