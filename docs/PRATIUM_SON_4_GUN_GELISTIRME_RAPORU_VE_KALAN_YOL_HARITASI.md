@@ -233,7 +233,7 @@ Bu 108 konu eğitimsel doğruluk açısından otomatik onaylanmadı; insan incel
 - [x] Misconception kataloğu için uzman onay ekranı oluşturmak (uzman karar geçmişi ve doğrulanmış-kayıt yayın kapısı; canlı yayın bekliyor).
 - [x] Aynı kavramsal hatanın farklı ifade ve sorulardaki varyasyonlarını kontrollü alias yapısıyla birleştirmek (uzman onaylı, döngüsüz ve denetlenebilir v1; canlı yayın bekliyor).
 - [x] Yanılgının giderildiğini gösteren karşı kanıt ve `resolved` yaşam döngüsü eklemek (iki bağımsız oturum kanıtı ve yeniden açılma kuralı; canlı yayın bekliyor).
-- [ ] Yanlış pozitif oranını ders/sınıf/soru türü bazında ölçmek.
+- [x] Yanlış pozitif oranını ders/sınıf/soru türü bazında ölçmek (uzman karar özeti v1; sınıf alanı henüz katalogda yok).
 - [ ] Doğrulanmış yanılgıya özel kısa açıklama ve düzeltici mikro içerik üretmek.
 
 ### Aşama 6 — Recommendation Engine v2
