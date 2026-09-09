@@ -218,8 +218,8 @@ Bu 108 konu eğitimsel doğruluk açısından otomatik onaylanmadı; insan incel
 
 **Öncelik: Yüksek**
 
-- [ ] Soru bazında kalıcı `question_id` kullanımını tamamlamak.
-- [ ] Soru zorluk değerlerini yalnızca üretim etiketiyle değil gerçek öğrenci performansıyla kalibre etmek.
+- [x] Soru bazında kalıcı `question_id` kullanımını Learning Event katmanında tamamlamak.
+- [x] Soru zorluk değerlerini yalnızca üretim etiketiyle değil gerçek öğrenci performansıyla kalibre etmek (ölçüm v1; otomatik puanlama değişikliği yok).
 - [x] Tahmin edilen mastery ile sonraki test başarısını karşılaştıran kalibrasyon raporu oluşturmak.
 - [x] Tahmin güveni düşük öğrenciler için daha fazla tanılayıcı soru stratejisi eklemek.
 - [x] Retention modelini gerçek tekrar sonuçlarıyla kalibre etmek.
