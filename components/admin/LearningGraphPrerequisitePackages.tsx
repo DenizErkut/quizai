@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 
 interface Node { id: string; label: string; node_type: string; subject: string | null; grade: string | null }
 interface Version { id: string; code: string; title: string; status: string }
-interface Package { id: string; name: string; subject: string; grade: string; curriculum_version_id: string; source_reference: string; status: string }
+interface Package { id: string; name: string; subject: string; grade: string; curriculum_version_id: string; source_reference: string; status: string; source_kind?: string; ai_model?: string | null; proposed_count?: number | null; dropped_count?: number | null }
 interface Item { id: string; package_id: string; source_node_id: string; target_node_id: string; confidence: number; rationale: string; review_status: string; review_note: string | null }
 interface Data { packages: Package[]; items: Item[]; nodes: Node[]; versions: Version[] }
 
@@ -63,6 +63,7 @@ export default function LearningGraphPrerequisitePackages() {
       const items = data.items.filter(item => item.package_id === pkg.id)
       return <div key={pkg.id} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 10, fontSize: 12 }}>
         <strong>{pkg.name}</strong> · {pkg.status}<div style={{ color: 'var(--text3)' }}>{pkg.subject} · {pkg.grade} · {pkg.source_reference}</div>
+        {pkg.source_kind === 'ai_suggestion' && <div style={{ color: '#7c3aed', marginTop: 3 }}>AI adayı · {pkg.ai_model} · önerilen {pkg.proposed_count ?? 0} · elenen {pkg.dropped_count ?? 0} · uzman onayı zorunlu</div>}
         {items.map(item => <div key={item.id} style={{ marginTop: 7, paddingTop: 7, borderTop: '1px solid var(--border)' }}>
           <div>{nodeMap.get(item.source_node_id)?.label} → {nodeMap.get(item.target_node_id)?.label} · güven {item.confidence} · {item.review_status}</div>
           <div style={{ color: 'var(--text3)' }}>{item.rationale}</div>

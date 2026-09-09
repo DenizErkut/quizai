@@ -1480,11 +1480,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   })
                   const data = await res.json()
                   if (res.ok) {
-                    setLgMsg(`✅ ${data.inserted} taslak üretildi${data.dropped ? ` (${data.dropped} öneri listede olmayan konu içerdiği için elendi)` : ''}.`)
-                    // Yeni taslaklar otomatik görünsün
-                    const dRes = await fetch('/api/admin/learning-graph-drafts?status=pending')
-                    const dData = await dRes.json()
-                    setLgDrafts(dData.drafts || [])
+                    setLgMsg(`✅ ${data.inserted} AI adayı uzman ön koşul paketine aktarıldı${data.dropped ? `; ${data.dropped} geçersiz öneri elendi` : ''}. Aşağıdaki “Uzman Ön Koşul Paketleri” alanından inceleyin.`)
                   } else setLgMsg('❌ ' + data.error)
                 } catch (e: any) {
                   setLgMsg('❌ ' + (e?.message || 'Hata'))
