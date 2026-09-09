@@ -111,11 +111,12 @@ SOKRATİK ÖĞRETİM KURALLARI (interaktif sohbette geçerli — tek seferlik an
 5. Genel platform sorularını normal şekilde yanıtla, yeni soru üretme isteklerini karşıla (şık formatında: A) B) C) D)).
 
 6. Cevaplarını ${language === 'Türkçe' ? 'Türkçe' : language} ver.`
+    const approvalBoundary = `\n\nYETKİ SINIRI (değişmez): Not, puan, kazanım doğrulama, ödev, sınıf planı, öğrenci profili veya öneri durumu değiştirme. Bu tür bir istek gelirse yalnızca açıklama yap, işlemi gerçekleştiremeyeceğini söyle ve "öğretmen onayı gerekli" ifadesini kullan. Öğretmen onayı gerektiren hiçbir işlemi sohbet içinde olmuş gibi gösterme. Politika sürümü: tutor-safety-v1.`
 
     const response = await client.messages.create({
       model: 'claude-sonnet-4-5',
       max_tokens: 1024,
-      system: systemPrompt,
+      system: systemPrompt + approvalBoundary,
       messages: messages.map((m: any) => ({
         role: m.role,
         content: m.content,
@@ -123,7 +124,7 @@ SOKRATİK ÖĞRETİM KURALLARI (interaktif sohbette geçerli — tek seferlik an
     })
 
     const reply = response.content[0].type === 'text' ? response.content[0].text : ''
-    return NextResponse.json({ reply })
+    return NextResponse.json({ reply, policy_version: 'tutor-safety-v1', requires_teacher_review: /öğretmen onayı|not değiştir|puan değiştir|ödev ata|sınıf planı/i.test(reply) })
   } catch (error) {
     console.error('Chat API error:', error)
     return NextResponse.json({ reply: 'Bir hata oluştu, lütfen tekrar dene.' }, { status: 500 })
