@@ -13,6 +13,7 @@ import MasteryCalibration from '@/components/admin/MasteryCalibration'
 import RetentionCalibration from '@/components/admin/RetentionCalibration'
 import QuestionDifficultyCalibration from '@/components/admin/QuestionDifficultyCalibration'
 import MasteryShadowEvaluation from '@/components/admin/MasteryShadowEvaluation'
+import MisconceptionReview from '@/components/admin/MisconceptionReview'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -1569,6 +1570,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           <RetentionCalibration />
           <QuestionDifficultyCalibration />
           <MasteryShadowEvaluation />
+          <MisconceptionReview />
         </div>
       )}
 
