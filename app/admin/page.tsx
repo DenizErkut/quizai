@@ -12,6 +12,7 @@ import RecommendationImpact from '@/components/admin/RecommendationImpact'
 import MasteryCalibration from '@/components/admin/MasteryCalibration'
 import RetentionCalibration from '@/components/admin/RetentionCalibration'
 import QuestionDifficultyCalibration from '@/components/admin/QuestionDifficultyCalibration'
+import MasteryShadowEvaluation from '@/components/admin/MasteryShadowEvaluation'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -1567,6 +1568,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           <MasteryCalibration />
           <RetentionCalibration />
           <QuestionDifficultyCalibration />
+          <MasteryShadowEvaluation />
         </div>
       )}
 

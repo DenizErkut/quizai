@@ -223,7 +223,7 @@ Bu 108 konu eğitimsel doğruluk açısından otomatik onaylanmadı; insan incel
 - [x] Tahmin edilen mastery ile sonraki test başarısını karşılaştıran kalibrasyon raporu oluşturmak.
 - [x] Tahmin güveni düşük öğrenciler için daha fazla tanılayıcı soru stratejisi eklemek.
 - [x] Retention modelini gerçek tekrar sonuçlarıyla kalibre etmek.
-- [ ] Algoritma v1/v2 sonuçlarını yan yana ölçebilecek gölge değerlendirme altyapısı kurmak.
+- [x] Algoritma v1/v2 sonuçlarını yan yana ölçebilecek gölge değerlendirme altyapısı kurmak (ölçüm-only; v1 üretimde kalır).
 - [ ] Açık uçlu, eşleştirme ve sıralama soruları için güvenilir kısmi puan modelini geliştirmek.
 
 ### Aşama 5 — Misconception Engine v2
