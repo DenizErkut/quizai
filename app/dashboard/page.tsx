@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { resolveName } from '@/lib/identity/resolve-client'
+import RecommendationLifecycle from '@/components/student/RecommendationLifecycle'
 
 interface Session { id: string; topic: string; grade: string; score: number; pct: number; question_count: number; created_at: string }
 interface Profile { name: string; grade: string; language: string; plan: string }
@@ -191,6 +192,8 @@ export default function DashboardPage() {
           boxShadow: '0 -4px 24px rgba(8,36,101,0.08)',
         }}>
           {/* SM-2 Tekrar Widget */}
+          <RecommendationLifecycle />
+
           {dueCards > 0 && (
             <a href="/review" style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(124,58,237,0.06))', border: '1.5px solid rgba(139,92,246,0.25)', textDecoration: 'none', marginBottom: '1rem', cursor: 'pointer' }}>
               <div style={{ width: 46, height: 46, borderRadius: '12px', background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>🧠</div>

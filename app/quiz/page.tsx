@@ -339,6 +339,13 @@ function QuizPageContent() {
     const asgDiff = searchParams.get('difficulty')
     const asgType = searchParams.get('type')
     const retrySession = searchParams.get('retry_session')
+    const recommendationId = searchParams.get('recommendationId')
+
+    if (recommendationId && asgTopic) {
+      setCustomTopic(decodeURIComponent(asgTopic))
+      const recommendedSubject = searchParams.get('subject')
+      if (recommendedSubject) setSelectedSubject(decodeURIComponent(recommendedSubject))
+    }
 
     if (asgId && asgTopic) {
       setAssignmentId(asgId)

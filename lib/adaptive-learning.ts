@@ -35,7 +35,7 @@ export async function resolveAdaptiveLearningPolicy(
 ): Promise<AdaptiveLearningPolicy> {
   const baseQuery = () => supabase.from('student_recommendations')
     .select('id, action_type, reason_code, reason, evidence')
-    .eq('student_id', studentId).eq('status', 'active').ilike('topic', topic)
+    .eq('student_id', studentId).in('status', ['active', 'accepted']).ilike('topic', topic)
     .gt('valid_until', new Date().toISOString())
     .order('priority_score', { ascending: false }).limit(1)
   let { data } = subject
