@@ -96,12 +96,18 @@ export async function GET(req: NextRequest) {
     .limit(500)
   if (status !== 'all') candidatesQuery = candidatesQuery.eq('status', status)
 
-  const [candidatesResult, unitsResult] = await Promise.all([
+  const allCandidatesQuery = adminDb.from('learning_catalog_review_queue')
+    .select('dimension_key,observed_label,observed_subject,occurrence_count,student_count,sample_grades,status,mapped_node_id,last_seen_at')
+    .order('occurrence_count', { ascending: false }).limit(1000)
+  const [candidatesResult, allCandidatesResult, unitsResult, catalogNodesResult] = await Promise.all([
     candidatesQuery,
+    allCandidatesQuery,
     adminDb.from('learning_graph_nodes')
       .select('id,label,subject,grade,level')
       .eq('node_type', 'unit').eq('is_active', true)
       .order('subject').order('grade').order('label'),
+    adminDb.from('learning_graph_nodes').select('id', { count: 'exact', head: true })
+      .eq('node_type', 'topic').eq('is_active', true),
   ])
 
   if (candidatesResult.error) {
@@ -110,8 +116,12 @@ export async function GET(req: NextRequest) {
   if (unitsResult.error) {
     return NextResponse.json({ error: unitsResult.error.message }, { status: 500 })
   }
+  if (allCandidatesResult.error || catalogNodesResult.error) {
+    return NextResponse.json({ error: allCandidatesResult.error?.message || catalogNodesResult.error?.message }, { status: 500 })
+  }
 
   const allCandidates = ((candidatesResult.data || []) as QueueCandidate[]).map(triageCandidate)
+  const coverageCandidates = (allCandidatesResult.data || []) as QueueCandidate[]
   const units = (unitsResult.data || []) as UnitNode[]
   const categoryCounts = allCandidates.reduce((counts: Record<string, number>, candidate) => {
     counts[candidate.triage_category] = (counts[candidate.triage_category] || 0) + 1
@@ -138,7 +148,16 @@ export async function GET(req: NextRequest) {
         .map((suggestion: UnitSuggestion) => suggestion.id),
     }))
 
-  return NextResponse.json({ candidates, units, stats: { total: allCandidates.length, categoryCounts, subjectCounts } })
+  const statusCounts = coverageCandidates.reduce((counts: Record<string, number>, candidate) => {
+    counts[candidate.status] = (counts[candidate.status] || 0) + 1
+    return counts
+  }, {})
+  return NextResponse.json({ candidates, units, stats: {
+    total: coverageCandidates.length, pending: statusCounts.pending || 0,
+    mapped: statusCounts.mapped || 0, dismissed: statusCounts.dismissed || 0,
+    mappedNodeCount: coverageCandidates.filter(candidate => candidate.mapped_node_id).length,
+    activeTopicNodes: catalogNodesResult.count || 0, categoryCounts, subjectCounts,
+  } })
 }
 
 function gradeKeyForApi(value: string) {

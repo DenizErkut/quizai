@@ -52,7 +52,7 @@ export default function LearningCatalogReview() {
   const [message, setMessage] = useState('')
   const [category, setCategory] = useState('all')
   const [search, setSearch] = useState('')
-  const [stats, setStats] = useState<{ total: number; categoryCounts: Record<string, number> } | null>(null)
+  const [stats, setStats] = useState<{ total: number; pending: number; mapped: number; dismissed: number; mappedNodeCount: number; activeTopicNodes: number; categoryCounts: Record<string, number> } | null>(null)
 
   async function loadQueue() {
     setLoading(true); setMessage('')
@@ -127,6 +127,9 @@ export default function LearningCatalogReview() {
       {stats && (
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
           <span className="badge">Toplam {stats.total}</span>
+          <span className="badge">Bekleyen {stats.pending}</span>
+          <span className="badge">Eşleşen {stats.mapped}</span>
+          <span className="badge">Aktif konu düğümü {stats.activeTopicNodes}</span>
           {Object.entries(TRIAGE_LABELS).map(([key, label]) => (
             <span key={key} style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '99px', background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--text2)' }}>
               {label}: {stats.categoryCounts[key] || 0}
