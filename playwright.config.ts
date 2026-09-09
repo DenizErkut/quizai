@@ -24,6 +24,7 @@ export default defineConfig({
         env: {
           NEXT_PUBLIC_SUPABASE_URL: 'https://e2e.supabase.invalid',
           NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiJ9.invalid',
+          SUPABASE_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.invalid',
         },
       },
 })
