@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { resolveName } from '@/lib/identity/resolve-client'
 import LearningSummary from '@/components/student/LearningSummary'
+import RecommendationLifecycle from '@/components/student/RecommendationLifecycle'
 
 interface Profile { name: string; grade: string; plan: string }
 
@@ -121,6 +122,7 @@ export default function HomeChoicePage() {
       {/* ── SEÇİM KARTLARI ── */}
       <div style={{ maxWidth: '520px', margin: '-1.5rem auto 0', padding: '0 1.25rem', position: 'relative', zIndex: 2 }}>
         <div style={{ marginBottom: '1rem' }}><LearningSummary /></div>
+        <RecommendationLifecycle />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
           {CHOICES.map(c => (
             <Link key={c.href} href={c.href} style={{
