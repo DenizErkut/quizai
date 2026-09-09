@@ -8,6 +8,7 @@ import LearningObjectiveImport from '@/components/admin/LearningObjectiveImport'
 import CurriculumLifecycleManager from '@/components/admin/CurriculumLifecycleManager'
 import LearningGraphQuality from '@/components/admin/LearningGraphQuality'
 import LearningGraphRelations from '@/components/admin/LearningGraphRelations'
+import LearningGraphPrerequisitePackages from '@/components/admin/LearningGraphPrerequisitePackages'
 import RecommendationImpact from '@/components/admin/RecommendationImpact'
 import MasteryCalibration from '@/components/admin/MasteryCalibration'
 import RetentionCalibration from '@/components/admin/RetentionCalibration'
@@ -1565,6 +1566,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           <LearningObjectiveImport />
           <CurriculumLifecycleManager />
           <LearningGraphQuality />
+          <LearningGraphPrerequisitePackages />
           <LearningGraphRelations />
           <RecommendationImpact />
           <MasteryCalibration />
