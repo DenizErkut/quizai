@@ -53,8 +53,13 @@ export async function POST(req: NextRequest) {
     // seviyeden başlaması gerektiğini bilmesi için.
     let masteryNote = ''
     let graphNote = ''
+    let learnerLevelNote = ''
     try {
       const dbForMastery = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+      const { data: learnerProfile } = await dbForMastery.from('profiles').select('grade, age').eq('id', user.id).maybeSingle()
+      if (learnerProfile?.grade || learnerProfile?.age) {
+        learnerLevelNote = `\nÖĞRENCİ SEVİYESİ: sınıf=${learnerProfile.grade || 'belirtilmemiş'}, yaş=${learnerProfile.age || 'belirtilmemiş'}. Anlatımı bu seviyeye uyarla; gereksiz teknik terim kullanma.`
+      }
       const mastery = await getTopicMastery(dbForMastery, user.id, topic)
       if (mastery && mastery.totalCount >= 3) {
         masteryNote = `\n\nÖĞRENCİNİN BU KONUDAKİ GENEL GEÇMİŞİ (sadece bu test değil, tüm zamanlar): ${mastery.masteryScore}/100 mastery skoru (${mastery.totalCount} soru, ${mastery.wrongCount} yanlış). ${mastery.masteryScore < 50 ? 'Bu öğrenci bu konuda genel olarak zorlanıyor — özellikle sabırlı ol, en temel kavramdan başlamaktan çekinme.' : ''}${mastery.forgettingRisk === 'yüksek' ? ' Bu konuyu uzun süredir tekrar etmemiş, temel hatırlatmalarla başlamak iyi olur.' : ''}`
@@ -82,6 +87,7 @@ ${hasQuizContext ? `Öğrencinin bu testteki bilgileri:
 - Yanlış soru sayısı: ${wrongQuestions.length}
 ${masteryNote}
 ${graphNote}
+${learnerLevelNote}
 
 ${wrongQuestions.length > 0 ? `Yanlış sorular (kendi cevabı ve doğru cevap dahil — SEN bunları biliyorsun, öğrenciye HEMEN söyleme):\n${wrongQuestions.map((q: any, i: number) => `${i + 1}. Soru: ${q.q}\n   Doğru cevap: ${q.opts[q.ans]}\n   Öğrencinin cevabı: ${q.opts[q.userAns]}\n   Açıklama: ${q.exp}`).join('\n\n')}` : ''}` : `Bu, tek seferlik bir analiz isteği (interaktif bir sohbet değil) — öğrencinin soru/cevap detayı doğrudan aşağıdaki kullanıcı mesajının içinde. Bu durumda Sokratik yöntemi UYGULAMA, doğrudan ve net bir analiz yaz (kullanıcı mesajı zaten bunu istiyor).`}
 
@@ -99,6 +105,8 @@ SOKRATİK ÖĞRETİM KURALLARI (interaktif sohbette geçerli — tek seferlik an
 3. **İstisna — doğrudan cevap verilecek durumlar:** Öğrenci açıkça "sadece cevabı söyle", "direkt anlat", "vaktim yok" derse ya da aynı soru için ikinci kez sorarsa, o zaman doğrudan ve net anlat — Sokratik yöntemi ısrarla dayatma, öğrencinin isteğine saygı göster. Konuyu SIFIRDAN anlatma isteğinde (yanlış bir soru bağlamında değil) de doğrudan, düzenli bir anlatım yap — Sokratik yöntem özellikle "bu soruyu neden yanlış yaptım" durumları için.
 
 4. **Ton:** Meraklı, sıcak, sabırlı bir öğretmen gibi — asla küçümseyici veya sınav yapar gibi değil. Kısa tut (2-4 cümle), tek seferde çok fazla soru sorma.
+
+4a. **Seviye ve güvenlik:** Öğrencinin sınıf/yaş seviyesinin üstünde içerik, korkutucu dil, kişisel veri talebi veya yaşa uygun olmayan konu üretme. Seviyeden emin değilsen temel ve güvenli açıklamayla başla. İpucu seviyesini birer adım artır; ilk yanıtta doğrudan çözümü verme.
 
 5. Genel platform sorularını normal şekilde yanıtla, yeni soru üretme isteklerini karşıla (şık formatında: A) B) C) D)).
 
