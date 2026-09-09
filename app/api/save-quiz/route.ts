@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { checkAndNotifyRiskyTopic } from '@/lib/parent-risk-alert'
 import { recordQuizLearningEvents } from '@/lib/learning-events'
 import { enrichAnswersWithMisconceptions } from '@/lib/misconceptions'
+import { answerScore } from '@/lib/partial-scoring'
 // NEXT_PUBLIC_SUPABASE_ANON_KEY used for auth verification
 
 export const maxDuration = 30
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     console.log(`[save-quiz] START sessionId=${body?.sessionId} userId=${authUser.id} score=${body?.score}`)
 
-    const { sessionId, answers, score } = body
+    const { sessionId, answers } = body
     const userId = authUser.id // Token'dan al, body'den değil
 
     if (!sessionId || !userId) {
@@ -48,9 +49,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 })
     }
 
-    const pct = session.question_count > 0
-      ? Math.round((score / session.question_count) * 100) : 0
-
     const sessionQuestions = Array.isArray(session.questions) ? session.questions : []
     const safeAnswers = Array.isArray(answers)
       ? enrichAnswersWithMisconceptions(
@@ -60,13 +58,23 @@ export async function POST(req: NextRequest) {
           session.topic || 'Genel'
         )
       : []
+    // Toplamı istemciden alma; normalize edilmiş soru puanlarından yeniden üret.
+    const score = Math.round(safeAnswers.reduce((total, answer) => total + answerScore(answer), 0) * 1000) / 1000
+    const pct = session.question_count > 0
+      ? Math.round((score / session.question_count) * 100) : 0
 
     // Mark completed
     const { error: updateError, data: updateData } = await supabase
       .from('quiz_sessions')
-      .update({ answers: safeAnswers, score, completed: true }) // pct: generated column, DB otomatik hesaplıyor
+      .update({
+        answers: safeAnswers,
+        score: Math.round(score), // eski raporlar için geriye uyumlu tam sayı
+        partial_score: score,
+        partial_pct: pct,
+        completed: true,
+      }) // pct eski tam sayı skordan DB tarafından üretilmeye devam eder
       .eq('id', sessionId)
-      .select('id, pct, score, completed')
+      .select('id, pct, score, partial_score, partial_pct, completed')
 
     console.log('[save-quiz] update result:', JSON.stringify({ updateData, updateError, sessionId, score, pct }))
     

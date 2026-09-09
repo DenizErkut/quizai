@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import ChatAssistant from '@/components/ChatAssistant'
 import type { Question } from '@/lib/quiz-constants'
+import { answerScore } from '@/lib/partial-scoring'
 
 interface YouTubeLink {
   url: string; title: string; channel: string; thumbnail: string
@@ -11,7 +12,7 @@ interface YouTubeLink {
 
 interface Props {
   questions: Question[]
-  answers: { userAns: number; correct: boolean }[]
+  answers: { userAns: number; correct: boolean; awardedScore?: number }[]
   topic: string
   difficulty: string
   language: string
@@ -100,7 +101,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
   const [reportingIdx, setReportingIdx] = useState<number | null>(null)
   const supabase = createClient() as any
 
-  const finalScore = answers.filter(a => a.correct).length
+  const finalScore = Math.round(answers.reduce((total, answer) => total + answerScore(answer), 0) * 10) / 10
   const finalPct = questions.length > 0 ? Math.round((finalScore / questions.length) * 100) : 0
   const diff = DIFFICULTIES[difficulty] || DIFFICULTIES.normal
   const wrongQuestions = questions.filter((_, i) => !answers[i]?.correct)
@@ -495,14 +496,20 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
         <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Cevap özeti
         </div>
-        {questions.map((q, i) => (
+        {questions.map((q, i) => {
+          const earned = answerScore(answers[i] || {})
+          const isPartial = earned > 0 && earned < 1
+          return (
           <div key={i} style={{ padding: '12px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: answers[i]?.correct ? 'var(--green)' : 'var(--red)', flexShrink: 0 }}>
-                {answers[i]?.correct ? '✓' : '✗'}
+              <span style={{ fontSize: '13px', fontWeight: 700, color: answers[i]?.correct ? 'var(--green)' : isPartial ? '#d97706' : 'var(--red)', flexShrink: 0 }}>
+                {answers[i]?.correct ? '✓' : isPartial ? '◐' : '✗'}
               </span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '3px' }}>{q.q}</div>
+                {isPartial && <div style={{ fontSize: '12px', color: '#d97706', fontWeight: 700, marginBottom: '3px' }}>
+                  Kısmi puan: %{Math.round(earned * 100)}
+                </div>}
                 <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px' }}>
                   Doğru: {correctAnswerText(q)}
                 </div>
@@ -531,7 +538,8 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
               </div>
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* AI Sohbet Asistanı */}

@@ -33,7 +33,8 @@ export function evaluateQuestionStructure(question: Question): QualitySignal {
   if (type === 'ordering') {
     const items = question.items || []
     const order = question.correctOrder || []
-    const validPermutation = items.length >= 2 && order.length === items.length && new Set(order).size === items.length && order.every(index => Number.isInteger(index) && index >= 0 && index < items.length)
+    const uniqueItems = new Set(items.map(item => item.trim().toLocaleLowerCase('tr'))).size === items.length
+    const validPermutation = items.length >= 2 && uniqueItems && order.length === items.length && new Set(order).size === items.length && order.every(index => Number.isInteger(index) && index >= 0 && index < items.length)
     if (!validPermutation) return fail('ORDERING_SHAPE_INVALID')
   }
   if (type === 'table_fill' && (!question.tableData?.rows?.length || !question.tableAnswers?.length)) return fail('TABLE_FILL_SHAPE_INVALID')

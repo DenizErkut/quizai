@@ -11,6 +11,7 @@ import QuizSetup from '@/components/quiz/QuizSetup'
 import QuizQuestion from '@/components/quiz/QuizQuestion'
 import { SUBJECT_MAP } from '@/lib/subject-map'
 import { nextChunkDifficulty, shouldShowIntervention, type DifficultyValue } from '@/lib/adaptive-difficulty'
+import { answerScore, matchingPartialScore, orderingPartialScore } from '@/lib/partial-scoring'
 
 type QuestionType = 'multiple_choice' | 'fill_blank' | 'matching' | 'true_false' | 'ordering' | 'short_answer' | 'multi_true_false' | 'table_fill' | 'mixed'
 
@@ -269,7 +270,7 @@ function QuizPageContent() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [current, setCurrent] = useState(0)
-  const [answers, setAnswers] = useState<{ userAns: number; correct: boolean; timeMs?: number }[]>([])
+  const [answers, setAnswers] = useState<{ userAns: number; correct: boolean; awardedScore?: number; timeMs?: number }[]>([])
   // ── Adaptif Test Motoru (Faz 2) ──
   // chunkBoundary: ilk parçanın kaç sorudan oluştuğu (null = adaptif değil
   // veya ikinci parça zaten getirilmiş). resolvedDifficulty: sunucunun
@@ -282,7 +283,7 @@ function QuizPageContent() {
   const [showIntervention, setShowIntervention] = useState(false)
   const [interventionInfo, setInterventionInfo] = useState<{ exp: string; typeLabel: string } | null>(null)
   // ✅ answersRef: save-quiz için her zaman güncel değeri tut (React state async sorununu çözer)
-  const answersRef = useRef<{ userAns: number; correct: boolean; timeMs?: number }[]>([])
+  const answersRef = useRef<{ userAns: number; correct: boolean; awardedScore?: number; timeMs?: number }[]>([])
   // Faz 11 (kalan tahmin modeli — uygun çalışma süresi): her soru
   // gösterildiğinde bu referans güncellenir, cevap gönderilirken
   // "bu soruda ne kadar zaman geçirildi" hesaplanabilsin diye. Tek bir
@@ -749,10 +750,11 @@ function QuizPageContent() {
       })
     }
 
-    const correct = correctCount === pairs.length
+    const awardedScore = matchingPartialScore(correctCount, pairs.length)
+    const correct = awardedScore === 1
     setChosen(correct ? q.ans : -1)
     setAnswers(prev => {
-      const next = [...prev, { userAns: correct ? q.ans : -1, correct, timeMs: Date.now() - questionShownAtRef.current }]
+      const next = [...prev, { userAns: correct ? q.ans : -1, correct, awardedScore, timeMs: Date.now() - questionShownAtRef.current }]
       answersRef.current = next
       return next
     })
@@ -761,10 +763,12 @@ function QuizPageContent() {
   function submitOrdering() {
     const q = questions[current]
     const items = q.items || []
-    const correct = orderItems.every((item, i) => item === items[q.correctOrder?.[i] ?? i])
+    const expectedOrder = (q.correctOrder || items.map((_, index) => index)).map(index => items[index])
+    const awardedScore = orderingPartialScore(orderItems, expectedOrder)
+    const correct = awardedScore === 1
     setChosen(correct ? 0 : -1)
     setAnswers(prev => {
-      const next = [...prev, { userAns: correct ? 0 : -1, correct, timeMs: Date.now() - questionShownAtRef.current }]
+      const next = [...prev, { userAns: correct ? 0 : -1, correct, awardedScore, timeMs: Date.now() - questionShownAtRef.current }]
       answersRef.current = next
       return next
     })
@@ -893,7 +897,7 @@ function QuizPageContent() {
       // answers state async — son eklenen correct field'ını kullan
       // ✅ answersRef: React state async sorunundan bağımsız, her zaman güncel
       const finalAnswers = answersRef.current
-      const score = finalAnswers.filter(a => a.correct).length
+      const score = finalAnswers.reduce((total, answer) => total + answerScore(answer), 0)
       console.log('[quiz] finish: finalAnswers.length=', finalAnswers.length, 'score=', score, 'questions=', questions.length)
 
       // getUser() ile userId al — getSession().user güvenilmez
@@ -943,8 +947,10 @@ function QuizPageContent() {
             assignment_id: assignmentId,
             student_id: user.id,
             session_id: sessionId,
-            score,
+            score: Math.round(score),
             pct,
+            partial_score: score,
+            partial_pct: pct,
             answers: enrichedAnswers,
             completed_at: new Date().toISOString(),
           }, { onConflict: 'assignment_id,student_id' })

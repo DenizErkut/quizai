@@ -128,14 +128,22 @@ SADECE aşağıdaki JSON formatında yanıt ver:
     }
 
     // Guvenlik agi: yabanci alfabe karakterlerini temizle
-    parsed.criteriaResults = parsed.criteriaResults.map((r: any) => ({
-      ...r,
-      feedback: stripForeignScripts(r.feedback || ''),
-      criterion: stripForeignScripts(r.criterion || ''),
-    }))
+    const canonicalRubric = Array.isArray(session.rubric) ? session.rubric : []
+    parsed.criteriaResults = canonicalRubric.map((criterion: any, index: number) => {
+      const modelResult = parsed.criteriaResults[index] || {}
+      const maxPoints = Math.max(0, Number(criterion.maxPoints) || 0)
+      const earnedPoints = Math.min(maxPoints, Math.max(0, Math.round(Number(modelResult.earnedPoints) || 0)))
+      return {
+        criterion: stripForeignScripts(String(criterion.criterion || 'Kriter')),
+        maxPoints,
+        earnedPoints,
+        feedback: stripForeignScripts(String(modelResult.feedback || '')),
+      }
+    })
     parsed.overallFeedback = stripForeignScripts(parsed.overallFeedback || '')
 
-    const totalEarned = parsed.criteriaResults.reduce((s: number, r: any) => s + (r.earnedPoints || 0), 0)
+    const totalEarned = Math.min(Number(session.total_possible) || 0,
+      parsed.criteriaResults.reduce((s: number, r: any) => s + r.earnedPoints, 0))
 
     await supabase.from('open_ended_sessions').update({
       student_answer: studentAnswer.trim(),

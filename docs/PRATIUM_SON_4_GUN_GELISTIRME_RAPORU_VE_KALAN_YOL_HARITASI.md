@@ -224,7 +224,7 @@ Bu 108 konu eğitimsel doğruluk açısından otomatik onaylanmadı; insan incel
 - [x] Tahmin güveni düşük öğrenciler için daha fazla tanılayıcı soru stratejisi eklemek.
 - [x] Retention modelini gerçek tekrar sonuçlarıyla kalibre etmek.
 - [x] Algoritma v1/v2 sonuçlarını yan yana ölçebilecek gölge değerlendirme altyapısı kurmak (ölçüm-only; v1 üretimde kalır).
-- [ ] Açık uçlu, eşleştirme ve sıralama soruları için güvenilir kısmi puan modelini geliştirmek.
+- [x] Açık uçlu, eşleştirme ve sıralama soruları için güvenilir kısmi puan modelini geliştirmek (`partial_credit_v1`; canlı migrasyon/yayın doğrulaması bekliyor).
 
 ### Aşama 5 — Misconception Engine v2
 
