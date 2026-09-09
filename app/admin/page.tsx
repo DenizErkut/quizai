@@ -10,6 +10,7 @@ import LearningGraphQuality from '@/components/admin/LearningGraphQuality'
 import LearningGraphRelations from '@/components/admin/LearningGraphRelations'
 import RecommendationImpact from '@/components/admin/RecommendationImpact'
 import MasteryCalibration from '@/components/admin/MasteryCalibration'
+import RetentionCalibration from '@/components/admin/RetentionCalibration'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -1563,6 +1564,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           <LearningGraphRelations />
           <RecommendationImpact />
           <MasteryCalibration />
+          <RetentionCalibration />
         </div>
       )}
 
