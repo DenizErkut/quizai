@@ -4,8 +4,11 @@ export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 import { getTopicMastery } from '@/lib/mastery'
+import { logAnthropicUsage } from '@/lib/ai-usage'
 
 const client = new Anthropic()
+type TutorQuestion = { q: string; opts: string[]; ans: number; exp?: string; userAns?: number }
+type TutorAnswer = { userAns?: number; correct?: boolean }
 
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -14,10 +17,11 @@ export async function POST(req: NextRequest) {
   const sbAuth = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
   const { data: { user } } = await sbAuth.auth.getUser(token)
   if (!user) return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 })
+  const adminDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
   // Rate limiting — 30 istek/gün
   try {
-    const rlDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+    const rlDb = adminDb
     const today = new Date().toISOString().split('T')[0]
     const { data: rl } = await rlDb.from('api_rate_limits').select('id, count').eq('user_id', user.id).eq('endpoint', 'chat').eq('window_date', today).maybeSingle()
     if (rl) {
@@ -28,6 +32,15 @@ export async function POST(req: NextRequest) {
 
   try {
     const { messages, topic, language, questions = [], answers = [] } = await req.json()
+    if (!Array.isArray(messages) || messages.length === 0 || messages.length > 24 || typeof topic !== 'string' || topic.length > 160) {
+      return NextResponse.json({ error: 'Geçersiz sohbet bağlamı.' }, { status: 400 })
+    }
+    const safeMessages = messages.filter((message: unknown): message is { role: 'user' | 'assistant'; content: string } => {
+      if (!message || typeof message !== 'object') return false
+      const item = message as { role?: unknown; content?: unknown }
+      return (item.role === 'user' || item.role === 'assistant') && typeof item.content === 'string' && item.content.length <= 4000
+    })
+    if (safeMessages.length !== messages.length) return NextResponse.json({ error: 'Geçersiz mesaj.' }, { status: 400 })
 
     // ÖNEMLİ: questions/answers her zaman gelmeyebilir — örn. app/exam/page.tsx
     // sınav sonu analiz özelliği sadece messages+topic+language gönderiyor
@@ -38,13 +51,15 @@ export async function POST(req: NextRequest) {
     // çalışmıyordu. questions=[] varsayılanıyla bu artık çökmüyor.
     const hasQuizContext = Array.isArray(questions) && questions.length > 0
 
+    const typedQuestions = questions as TutorQuestion[]
+    const typedAnswers = Array.isArray(answers) ? answers as TutorAnswer[] : []
     const wrongQuestions = hasQuizContext
-      ? questions
-          .map((q: any, i: number) => ({ ...q, userAns: answers[i]?.userAns }))
-          .filter((_: any, i: number) => !answers[i]?.correct)
+      ? typedQuestions
+          .map((q, i) => ({ ...q, userAns: typedAnswers[i]?.userAns }))
+          .filter((_, i) => !typedAnswers[i]?.correct)
       : []
 
-    const score = hasQuizContext ? answers.filter((a: any) => a.correct).length : 0
+    const score = hasQuizContext ? typedAnswers.filter(a => a.correct).length : 0
     const pct = hasQuizContext ? Math.round((score / questions.length) * 100) : null
 
     // Faz 1 (Learning Intelligence) entegrasyonu: bu konudaki geçmiş
@@ -55,7 +70,7 @@ export async function POST(req: NextRequest) {
     let graphNote = ''
     let learnerLevelNote = ''
     try {
-      const dbForMastery = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+      const dbForMastery = adminDb
       const { data: learnerProfile } = await dbForMastery.from('profiles').select('grade, age').eq('id', user.id).maybeSingle()
       if (learnerProfile?.grade || learnerProfile?.age) {
         learnerLevelNote = `\nÖĞRENCİ SEVİYESİ: sınıf=${learnerProfile.grade || 'belirtilmemiş'}, yaş=${learnerProfile.age || 'belirtilmemiş'}. Anlatımı bu seviyeye uyarla; gereksiz teknik terim kullanma.`
@@ -89,7 +104,7 @@ ${masteryNote}
 ${graphNote}
 ${learnerLevelNote}
 
-${wrongQuestions.length > 0 ? `Yanlış sorular (kendi cevabı ve doğru cevap dahil — SEN bunları biliyorsun, öğrenciye HEMEN söyleme):\n${wrongQuestions.map((q: any, i: number) => `${i + 1}. Soru: ${q.q}\n   Doğru cevap: ${q.opts[q.ans]}\n   Öğrencinin cevabı: ${q.opts[q.userAns]}\n   Açıklama: ${q.exp}`).join('\n\n')}` : ''}` : `Bu, tek seferlik bir analiz isteği (interaktif bir sohbet değil) — öğrencinin soru/cevap detayı doğrudan aşağıdaki kullanıcı mesajının içinde. Bu durumda Sokratik yöntemi UYGULAMA, doğrudan ve net bir analiz yaz (kullanıcı mesajı zaten bunu istiyor).`}
+${wrongQuestions.length > 0 ? `Yanlış sorular (kendi cevabı ve doğru cevap dahil — SEN bunları biliyorsun, öğrenciye HEMEN söyleme):\n${wrongQuestions.map((q, i) => `${i + 1}. Soru: ${q.q}\n   Doğru cevap: ${q.opts[q.ans]}\n   Öğrencinin cevabı: ${q.userAns === undefined ? 'Yanıtlanmadı' : q.opts[q.userAns]}\n   Açıklama: ${q.exp || ''}`).join('\n\n')}` : ''}` : `Bu, tek seferlik bir analiz isteği (interaktif bir sohbet değil) — öğrencinin soru/cevap detayı doğrudan aşağıdaki kullanıcı mesajının içinde. Bu durumda Sokratik yöntemi UYGULAMA, doğrudan ve net bir analiz yaz (kullanıcı mesajı zaten bunu istiyor).`}
 
 SOKRATİK ÖĞRETİM KURALLARI (interaktif sohbette geçerli — tek seferlik analiz isteklerinde değil):
 
@@ -113,18 +128,24 @@ SOKRATİK ÖĞRETİM KURALLARI (interaktif sohbette geçerli — tek seferlik an
 6. Cevaplarını ${language === 'Türkçe' ? 'Türkçe' : language} ver.`
     const approvalBoundary = `\n\nYETKİ SINIRI (değişmez): Not, puan, kazanım doğrulama, ödev, sınıf planı, öğrenci profili veya öneri durumu değiştirme. Bu tür bir istek gelirse yalnızca açıklama yap, işlemi gerçekleştiremeyeceğini söyle ve "öğretmen onayı gerekli" ifadesini kullan. Öğretmen onayı gerektiren hiçbir işlemi sohbet içinde olmuş gibi gösterme. Politika sürümü: tutor-safety-v1.`
 
+    const startedAt = Date.now()
     const response = await client.messages.create({
       model: 'claude-sonnet-4-5',
       max_tokens: 1024,
       system: systemPrompt + approvalBoundary,
-      messages: messages.map((m: any) => ({
+      messages: safeMessages.map(m => ({
         role: m.role,
         content: m.content,
       })),
     })
 
     const reply = response.content[0].type === 'text' ? response.content[0].text : ''
-    return NextResponse.json({ reply, policy_version: 'tutor-safety-v1', requires_teacher_review: /öğretmen onayı|not değiştir|puan değiştir|ödev ata|sınıf planı/i.test(reply) })
+    const requiresTeacherReview = /öğretmen onayı|not değiştir|puan değiştir|ödev ata|sınıf planı/i.test(reply)
+    await Promise.allSettled([
+      logAnthropicUsage('tutor-response', 'claude-sonnet-4-5', response, { userId: user.id, durationMs: Date.now() - startedAt, meta: { policy_version: 'tutor-safety-v1', has_quiz_context: hasQuizContext } }),
+      adminDb.from('agent_decision_audit').insert({ actor_id: user.id, agent_name: 'ai-tutor-v1', policy_version: 'tutor-safety-v1', input_summary: { topic, has_quiz_context: hasQuizContext, message_count: safeMessages.length, wrong_question_count: wrongQuestions.length }, decision_summary: { response_length: reply.length, requires_teacher_review: requiresTeacherReview } }),
+    ])
+    return NextResponse.json({ reply, policy_version: 'tutor-safety-v1', requires_teacher_review: requiresTeacherReview })
   } catch (error) {
     console.error('Chat API error:', error)
     return NextResponse.json({ reply: 'Bir hata oluştu, lütfen tekrar dene.' }, { status: 500 })

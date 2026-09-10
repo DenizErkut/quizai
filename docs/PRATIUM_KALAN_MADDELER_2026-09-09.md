@@ -69,11 +69,11 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 
 ## 8. AI Tutor ve ajanlar — orta
 
-- [ ] AI Tutor’u Student Learning Profile, Recommendation Engine ve Learning Graph’e bağlamak.
-- [ ] Seviye uygunluğu, kontrollü ipucu ve Socratic yönlendirme politikaları oluşturmak.
+- [x] AI Tutor’u Student Learning Profile, Recommendation Engine ve Learning Graph’e bağlamak.
+- [x] Seviye uygunluğu, kontrollü ipucu ve Socratic yönlendirme politikaları oluşturmak.
 - [ ] Öğretmen onayı gereken işlemleri otomatik işlemlerden ayırmak.
 - [ ] Sınırlı yetkili planlama, içerik, tekrar ve ilerleme ajanları geliştirmek.
-- [ ] Ajan kararlarını kanıt, neden ve sürüm bilgisiyle denetlenebilir yapmak.
+- [x] Ajan kararlarını kanıt, neden ve sürüm bilgisiyle denetlenebilir yapmak. (AI Tutor dahil tüm sınırlı ajanlarda ham çıktı içermeyen, service-role-only karar denetimi.)
 - [ ] Yaş, güvenlik, mahremiyet ve pedagojik doğruluk kontrolleri eklemek.
 
 ## 9. Tahmine dayalı öğrenme ve operasyon — yüksek
