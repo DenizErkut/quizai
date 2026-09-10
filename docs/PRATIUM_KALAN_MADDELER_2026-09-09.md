@@ -60,7 +60,7 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 
 ## 7. Kullanıcı deneyimleri — orta-yüksek
 
-- [ ] Öğrenci dashboard’unda “Şimdi ne çalışmalıyım ve neden?” alanını merkezileştirmek.
+- [x] Öğrenci dashboard’unda “Şimdi ne çalışmalıyım ve neden?” alanını merkezileştirmek. (Aktif öneri → yüksek risk → çalışma planı önceliğiyle tek ana aksiyon; ayrıntılar ikincil açılır alanda.)
 - [ ] Mastery, retention, misconception ve öneri geçmişini sade görsellerle sunmak.
 - [ ] Öğretmene sınıf ortak eksikleri ve müdahale önerileri vermek.
 - [x] Veli ekranında teknik olmayan gelişim ve destek önerileri göstermek. (Konu gelişim durumu, erken uyarı nedeni, tekrar ihtiyacı ve evde uygulanabilir destek adımı.)

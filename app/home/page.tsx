@@ -8,6 +8,7 @@ import LearningSummary from '@/components/student/LearningSummary'
 import RecommendationLifecycle from '@/components/student/RecommendationLifecycle'
 import LearningRiskCard from '@/components/student/LearningRiskCard'
 import AgentInsights from '@/components/student/AgentInsights'
+import NextBestAction from '@/components/student/NextBestAction'
 
 interface Profile { name: string; grade: string; plan: string }
 
@@ -126,10 +127,8 @@ export default function HomeChoicePage() {
 
       {/* ── SEÇİM KARTLARI ── */}
       <div style={{ maxWidth: '520px', margin: '-1.5rem auto 0', padding: '0 1.25rem', position: 'relative', zIndex: 2 }}>
-        <div style={{ marginBottom: '1rem' }}><LearningSummary /></div>
-        <LearningRiskCard />
-        <AgentInsights />
-        <RecommendationLifecycle />
+        <NextBestAction />
+        <details style={{ marginBottom:'1rem' }}><summary style={{ cursor:'pointer',fontSize:12,fontWeight:700,color:'var(--text3)',padding:'8px 2px' }}>Öğrenme durumunun ayrıntıları</summary><div style={{ marginTop:8 }}><LearningSummary /><LearningRiskCard /><AgentInsights /><RecommendationLifecycle /></div></details>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
           {CHOICES.map(c => (
             <Link key={c.href} href={c.href} style={{
