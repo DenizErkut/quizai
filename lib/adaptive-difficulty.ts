@@ -5,12 +5,9 @@
 // ('use client', bir sonraki test parçasının zorluğunu anlık performansa göre
 // hesaplamak için) tarafından kullanılabilir.
 //
-// Tasarım notu: tam "her soruda anlık ayarlama" (soru-bazlı üretim/sunum)
-// yerine, testi PARÇALARA (chunk) bölüp parça sınırında zorluğu ayarlayan bir
-// v1 uygulandı — mevcut 1000+ satırlık, çok sayıda soru tipini yöneten quiz
-// sayfasını riske atmadan gerçek ve test edilebilir bir adaptasyon sağlıyor.
-// Tam soru-bazlı döngü, roadmap'in checklist'inde ayrı bir madde olarak
-// (daha büyük bir mimari iş) açık bırakıldı.
+// Aktif kişiselleştirme oturumlarında ilk iki tanılayıcı sorudan sonraki
+// sorular bu saf politika ile tek tek seçilir. Standart/öğretmen override
+// oturumları aynı toplu üretim davranışını korur.
 
 export type DifficultyValue = 'kolay' | 'normal' | 'zor' | 'cok zor'
 export type AdaptiveQuestionType = 'multiple_choice' | 'true_false' | 'fill_blank' | 'matching' | 'ordering'

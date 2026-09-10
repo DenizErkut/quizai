@@ -52,9 +52,9 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 
 ## 6. Adaptive Learning v3 — yüksek
 
-- [ ] Adaptasyonu soru bazına taşımak.
+- [x] Adaptasyonu soru bazına taşımak. *(Aktif politika için iki tanılayıcı başlangıç sorusundan sonra her yeni soru son üç cevaba göre seçilir; standart ve öğretmen override akışı toplu üretimi korur.)*
 - [ ] Soru türü, ipucu, anlatım biçimi ve ön koşul kapsamını adapte etmek.
-- [ ] Öğrencinin sıkışmasını ve gereksiz kolay soruları önleyen sınırlar eklemek.
+- [x] Öğrencinin sıkışmasını ve gereksiz kolay soruları önleyen sınırlar eklemek. *(İki ardışık yanlışta sadeleştirme+müdahale, üç ardışık doğruda kademe artışı; tek-adım değişim ve alt/üst zorluk sınırı.)*
 - [x] Adaptif ve standart grupları öğrenme kazanımıyla karşılaştırmak. *(Dengeli kohort ataması, başlangıç ve takip mastery/retention/test yüzdesi, örneklem eşiği ve yönetici Adaptive Pilot görünümü.)*
 - [x] Öğretmene adaptasyon gerekçesi ve manuel müdahale seçeneği sunmak. (Risk kanıtı görünür; öğretmen öğrenci+konuyu 30 gün standart moda alabilir veya yeniden otomatiğe bırakabilir.)
 

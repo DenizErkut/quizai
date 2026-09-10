@@ -272,8 +272,9 @@ function QuizPageContent() {
   const [current, setCurrent] = useState(0)
   const [answers, setAnswers] = useState<{ userAns: number; correct: boolean; awardedScore?: number; timeMs?: number }[]>([])
   // ── Adaptif Test Motoru (Faz 2) ──
-  // chunkBoundary: ilk parçanın kaç sorudan oluştuğu (null = adaptif değil
-  // veya ikinci parça zaten getirilmiş). resolvedDifficulty: sunucunun
+  // chunkBoundary: sıradaki adaptif karar sınırı (null = standart akış).
+  // Aktif kişiselleştirmede ilk iki tanılayıcı sorudan sonra her yeni soru,
+  // son cevaplara göre tek tek üretilir. resolvedDifficulty: sunucunun
   // (mastery skoruna göre) seçtiği o anki zorluk — bir sonraki parça için
   // referans noktası. showIntervention/interventionInfo: aynı soru tipinde
   // art arda 2 yanlış yapıldığında gösterilen öğretici ara ekran.
@@ -480,13 +481,17 @@ function QuizPageContent() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
 
-      // Adaptif Test Motoru: kullanıcıya zorluk sorulmuyor. İlk parça,
-      // sunucunun bu konudaki mastery skoruna göre seçtiği zorlukla
-      // ('auto') üretilir. qCount yeterince büyükse (>=4) test 2 parçaya
-      // bölünür — ikinci parçanın zorluğu, ilk parçadaki performansa göre
-      // next() içinde ayarlanır (bkz. lib/adaptive-difficulty.ts).
-      const isAdaptiveEligible = qCount >= 4
-      const firstChunkSize = isAdaptiveEligible ? Math.ceil(qCount / 2) : qCount
+      // Önce güvenli, salt-okunur politika kontrolü yapılır. Standart mod
+      // tek istekte mevcut davranışı korur. Aktif adaptasyonda iki başlangıç
+      // sorusu alınır; kalan sorular her cevaptan sonra tek tek seçilir.
+      let isAdaptiveEligible = false
+      if (qCount >= 4 && session?.access_token) {
+        const policyParams = new URLSearchParams({ topic })
+        if (selectedSubject) policyParams.set('subject', selectedSubject)
+        const policyResponse = await fetch(`/api/student/adaptive-policy?${policyParams}`, { headers: { Authorization: `Bearer ${session.access_token}` } })
+        if (policyResponse.ok) isAdaptiveEligible = Boolean((await policyResponse.json()).active)
+      }
+      const firstChunkSize = isAdaptiveEligible ? Math.min(2, qCount) : qCount
 
       const res = await fetch('/api/generate-quiz', {
         method: 'POST',
@@ -824,21 +829,21 @@ function QuizPageContent() {
       return
     }
 
-    // Adaptif Test Motoru — chunk sınırı: ilk parçanın son sorusundan sonra
+    // Adaptif Test Motoru — karar sınırı: aktif kişiselleştirmede her cevap
     // (henüz questions.length'e ikinci parça eklenmediği için current+1,
     // "bitti" kontrolüyle aynı görünür — bu yüzden BU kontrol ondan ÖNCE
-    // çalışmalı). İkinci parça, ilk parçadaki performansa göre ayarlanmış
-    // zorlukla getirilip mevcut soru listesine eklenir.
+    // çalışmalı). Bir sonraki soru son üç cevaba göre ayarlanmış zorluk ve
+    // soru türüyle getirilip aynı oturuma eklenir.
     if (chunkBoundary !== null && current + 1 === chunkBoundary) {
       setFetchingNextChunk(true)
       try {
         const chunk1Answers = answersRef.current.slice(0, chunkBoundary)
-        const nextPolicy = nextQuestionPolicy(resolvedDifficulty, chunk1Answers, questionType)
+        const nextPolicy = nextQuestionPolicy(resolvedDifficulty, chunk1Answers, questions[current]?.type || questionType)
         const nextDiff = nextPolicy.difficulty
         const nextQuestionType = nextPolicy.questionType
         const excludeTexts = questions.slice(0, chunkBoundary).map(q => q.q).filter(Boolean)
         const topic = customTopic.trim() || selectedTopic
-        const targetSecondChunk = qCount - chunkBoundary
+        const targetSecondChunk = 1
         const { data: { session } } = await supabase.auth.getSession()
         const res = await fetch('/api/generate-quiz', {
           method: 'POST',
@@ -883,17 +888,26 @@ function QuizPageContent() {
           }
         }
         if (secondChunk.length > 0) {
+          const nextBoundary = questions.length + secondChunk.length
           setQuestions(prev => [...prev, ...secondChunk])
           setResolvedDifficulty(nextDiff)
           setDifficulty(nextDiff) // gösterim rozeti senkron kalsın
+          setChunkBoundary(nextBoundary < qCount ? nextBoundary : null)
+        } else {
+          setChunkBoundary(null)
+          setFetchingNextChunk(false)
+          setQuizError({ code: 'adaptive_next_failed', title: 'Sonraki soru hazırlanamadı', desc: 'Bağlantıyı kontrol edip testi yeniden başlatabilirsin.', retry: true })
+          setScreen('error')
+          return
         }
       } catch {
-        // İkinci parça tamamen getirilemezse (ağ hatası vb.) mevcut
-        // sorularla devam edilir — bu artık son çare, çünkü yukarıdaki
-        // güvenlik ağı normal şartlarda hedefe ulaşmayı garantiliyor.
+        setFetchingNextChunk(false)
+        setChunkBoundary(null)
+        setQuizError({ code: 'adaptive_next_failed', title: 'Sonraki soru hazırlanamadı', desc: 'Bağlantıyı kontrol edip testi yeniden başlatabilirsin.', retry: true })
+        setScreen('error')
+        return
       }
       setFetchingNextChunk(false)
-      setChunkBoundary(null) // tek geçişlik — bu v1'de sadece 2 parça var
       setCurrent(c => c + 1); setChosen(null)
       return
     }
