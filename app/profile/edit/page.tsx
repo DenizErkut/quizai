@@ -65,8 +65,17 @@ export default function ProfileEditPage() {
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [copied, setCopied] = useState(false)
   const [email, setEmail] = useState('')
+  const [deletionRequested, setDeletionRequested] = useState(false)
 
   const supabase = createClient() as any
+
+  async function requestDeletion() {
+    if (!window.confirm('Kaydınızın silinmesi için admin incelemesine talep göndermek istediğinize emin misiniz?')) return
+    const { data: { session } } = await supabase.auth.getSession()
+    const response = await fetch('/api/profile/data-request', { method: 'POST', headers: { Authorization: `Bearer ${session?.access_token}` } })
+    setDeletionRequested(response.ok || response.status === 409)
+    if (!response.ok && response.status !== 409) setError('Silme talebi oluşturulamadı. Lütfen tekrar deneyin.')
+  }
 
   useEffect(() => {
     async function load() {
@@ -511,6 +520,13 @@ export default function ProfileEditPage() {
           style={{ width: '100%', justifyContent: 'center' }}>
           {saving ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Kaydet'}
         </button>
+
+        <div style={{ marginTop: '1rem', padding: '1rem', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '12px' }}>
+          <button onClick={requestDeletion} className="btn" style={{ width: '100%', justifyContent: 'center', color: 'var(--red)', borderColor: 'rgba(220,38,38,0.35)' }} disabled={deletionRequested}>
+            {deletionRequested ? '✓ Silme talebi oluşturuldu' : 'Kaydımı sil'}
+          </button>
+          <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px', textAlign: 'center' }}>Talep admin doğrulamasına gönderilir; hemen silme yapılmaz.</div>
+        </div>
 
         {/* Madde 2: İçerik hatası bildirme + "Bildirdiklerim" — katlanabilir,
             profil sayfasını kalabalıklaştırmasın diye varsayılan kapalı. */}
