@@ -44,6 +44,7 @@ function ProfileSetupContent() {
   const [showOptional, setShowOptional] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [deletionRequested, setDeletionRequested] = useState(false)
   const [step, setStep] = useState(1) // 1: ad/soyad, 2: sınıf/yaş
   const supabase = createClient() as any
 
@@ -146,6 +147,14 @@ function ProfileSetupContent() {
     router.push(isSafeNext(next) ? next! : '/home')
   }
 
+  async function requestDeletion() {
+    if (!window.confirm('Kaydınızın silinmesi için admin incelemesine talep göndermek istediğinize emin misiniz?')) return
+    const { data: { session } } = await supabase.auth.getSession()
+    const response = await fetch('/api/profile/data-request', { method: 'POST', headers: { Authorization: `Bearer ${session?.access_token}` } })
+    setDeletionRequested(response.ok || response.status === 409)
+    if (!response.ok && response.status !== 409) setError('Silme talebi oluşturulamadı. Lütfen tekrar deneyin.')
+  }
+
   return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
       <div style={{ width: '100%', maxWidth: '420px' }}>
@@ -182,6 +191,12 @@ function ProfileSetupContent() {
                   <label className="field-label">Soyad <span style={{ color: 'var(--red)' }}>*</span></label>
                   <input className="input" placeholder="Yılmaz" value={surname} onChange={e => setSurname(e.target.value)} />
                 </div>
+              </div>
+              <div style={{ marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                <button onClick={requestDeletion} className="btn" style={{ color: 'var(--red)', borderColor: 'rgba(220,38,38,0.35)' }} disabled={deletionRequested}>
+                  {deletionRequested ? '✓ Silme talebi oluşturuldu' : 'Kaydımı sil'}
+                </button>
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px' }}>Bu işlem hemen silme yapmaz; talebiniz admin doğrulamasına gönderilir.</div>
               </div>
 
               {error && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{error}</div>}
