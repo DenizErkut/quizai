@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import GradeImportWizard from '@/components/GradeImportWizard'
 import ReportsHub from '@/components/ReportsHub'
+import LearningRiskOverview from '@/components/LearningRiskOverview'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Cell
@@ -592,6 +593,7 @@ export default function InstitutionPage() {
         {/* ── RİSK ALARMI ─────────────────────────────────────────────────── */}
         {activeTab === 'risk' && (
           <div>
+            <LearningRiskOverview endpoint="/api/institution/learning-risk" title="Kurum erken uyarıları" />
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '4px' }}>⚠️ Risk Alarmı</h1>
             <p style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '1.25rem' }}>
               7+ gün aktif olmayan veya ortalaması %40 altında olan öğrenciler
