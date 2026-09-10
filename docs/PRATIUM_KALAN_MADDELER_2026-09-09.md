@@ -74,7 +74,7 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 - [x] Öğretmen onayı gereken işlemleri otomatik işlemlerden ayırmak. (Service-only ajan öneri kuyruğu, sınıf sahibi öğretmen kapsamı ve tek-seferlik onay/red yaşam döngüsü.)
 - [ ] Sınırlı yetkili planlama, içerik, tekrar ve ilerleme ajanları geliştirmek.
 - [x] Ajan kararlarını kanıt, neden ve sürüm bilgisiyle denetlenebilir yapmak. (AI Tutor dahil tüm sınırlı ajanlarda ham çıktı içermeyen, service-role-only karar denetimi.)
-- [ ] Yaş, güvenlik, mahremiyet ve pedagojik doğruluk kontrolleri eklemek.
+- [x] Yaş, güvenlik, mahremiyet ve pedagojik doğruluk kontrolleri eklemek. (Tutor Safety v2: yaş/sınıf bağlamı, kişisel veri, tehlikeli talimat, kriz yönlendirmesi, prompt enjeksiyonu ve çıktı güvenlik kapısı.)
 
 ## 9. Tahmine dayalı öğrenme ve operasyon — yüksek
 

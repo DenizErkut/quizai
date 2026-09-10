@@ -5,6 +5,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 import { getTopicMastery } from '@/lib/mastery'
 import { logAnthropicUsage } from '@/lib/ai-usage'
+import { inspectTutorInput, inspectTutorOutput } from '@/lib/tutor-safety'
 
 const client = new Anthropic()
 type TutorQuestion = { q: string; opts: string[]; ans: number; exp?: string; userAns?: number }
@@ -41,6 +42,12 @@ export async function POST(req: NextRequest) {
       return (item.role === 'user' || item.role === 'assistant') && typeof item.content === 'string' && item.content.length <= 4000
     })
     if (safeMessages.length !== messages.length) return NextResponse.json({ error: 'Geçersiz mesaj.' }, { status: 400 })
+    const lastUserMessage = [...safeMessages].reverse().find(message => message.role === 'user')?.content || ''
+    const inputSafety = inspectTutorInput(lastUserMessage)
+    if ('code' in inputSafety) {
+      await adminDb.from('agent_decision_audit').insert({ actor_id:user.id, agent_name:'ai-tutor-v1', policy_version:'tutor-safety-v2', input_summary:{ safety_code:inputSafety.code, message_count:safeMessages.length }, decision_summary:{ blocked:true } })
+      return NextResponse.json({ reply:inputSafety.reply, policy_version:'tutor-safety-v2', safety_intervention:inputSafety.code, requires_teacher_review:inputSafety.code==='self_harm' })
+    }
 
     // ÖNEMLİ: questions/answers her zaman gelmeyebilir — örn. app/exam/page.tsx
     // sınav sonu analiz özelliği sadece messages+topic+language gönderiyor
@@ -139,13 +146,15 @@ SOKRATİK ÖĞRETİM KURALLARI (interaktif sohbette geçerli — tek seferlik an
       })),
     })
 
-    const reply = response.content[0].type === 'text' ? response.content[0].text : ''
+    const rawReply = response.content[0].type === 'text' ? response.content[0].text : ''
+    const outputSafety = inspectTutorOutput(rawReply)
+    const reply = 'code' in outputSafety ? outputSafety.reply : rawReply
     const requiresTeacherReview = /öğretmen onayı|not değiştir|puan değiştir|ödev ata|sınıf planı/i.test(reply)
     await Promise.allSettled([
-      logAnthropicUsage('tutor-response', 'claude-sonnet-4-5', response, { userId: user.id, durationMs: Date.now() - startedAt, meta: { policy_version: 'tutor-safety-v1', has_quiz_context: hasQuizContext } }),
-      adminDb.from('agent_decision_audit').insert({ actor_id: user.id, agent_name: 'ai-tutor-v1', policy_version: 'tutor-safety-v1', input_summary: { topic, has_quiz_context: hasQuizContext, message_count: safeMessages.length, wrong_question_count: wrongQuestions.length }, decision_summary: { response_length: reply.length, requires_teacher_review: requiresTeacherReview } }),
+      logAnthropicUsage('tutor-response', 'claude-sonnet-4-5', response, { userId: user.id, durationMs: Date.now() - startedAt, meta: { policy_version: 'tutor-safety-v2', has_quiz_context: hasQuizContext } }),
+      adminDb.from('agent_decision_audit').insert({ actor_id: user.id, agent_name: 'ai-tutor-v1', policy_version: 'tutor-safety-v2', input_summary: { topic, has_quiz_context: hasQuizContext, message_count: safeMessages.length, wrong_question_count: wrongQuestions.length }, decision_summary: { response_length: reply.length, requires_teacher_review: requiresTeacherReview, output_blocked:'code' in outputSafety } }),
     ])
-    return NextResponse.json({ reply, policy_version: 'tutor-safety-v1', requires_teacher_review: requiresTeacherReview })
+    return NextResponse.json({ reply, policy_version: 'tutor-safety-v2', requires_teacher_review: requiresTeacherReview, safety_intervention:'code' in outputSafety?outputSafety.code:null })
   } catch (error) {
     console.error('Chat API error:', error)
     return NextResponse.json({ reply: 'Bir hata oluştu, lütfen tekrar dene.' }, { status: 500 })
