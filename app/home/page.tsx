@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { resolveName } from '@/lib/identity/resolve-client'
 import LearningSummary from '@/components/student/LearningSummary'
 import RecommendationLifecycle from '@/components/student/RecommendationLifecycle'
+import LearningRiskCard from '@/components/student/LearningRiskCard'
 
 interface Profile { name: string; grade: string; plan: string }
 
@@ -44,20 +45,22 @@ const CHOICES = [
   },
 ]
 
+function currentGreeting() {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Günaydın'
+  if (hour < 18) return 'İyi günler'
+  return 'İyi akşamlar'
+}
+
 export default function HomeChoicePage() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [greeting, setGreeting] = useState('Merhaba')
+  const [greeting] = useState(currentGreeting)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const h = new Date().getHours()
-    if (h < 12) setGreeting('Günaydın')
-    else if (h < 18) setGreeting('İyi günler')
-    else setGreeting('İyi akşamlar')
-
     async function load() {
-      const supabase = createClient() as any
+      const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
@@ -65,11 +68,12 @@ export default function HomeChoicePage() {
         supabase.from('profiles').select('grade, plan').eq('id', user.id).single(),
         resolveName(supabase, user.id),
       ])
-      setProfile(p ? { ...p, name: displayName } : (displayName ? { name: displayName, grade: '', plan: 'free' } : null))
+      const profileData = p as Pick<Profile, 'grade' | 'plan'> | null
+      setProfile(profileData ? { ...profileData, name: displayName } : (displayName ? { name: displayName, grade: '', plan: 'free' } : null))
       setLoading(false)
     }
     load()
-  }, [])
+  }, [router])
 
   const firstName = profile?.name?.split(' ')[0] || ''
   const initials = profile?.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U'
@@ -122,6 +126,7 @@ export default function HomeChoicePage() {
       {/* ── SEÇİM KARTLARI ── */}
       <div style={{ maxWidth: '520px', margin: '-1.5rem auto 0', padding: '0 1.25rem', position: 'relative', zIndex: 2 }}>
         <div style={{ marginBottom: '1rem' }}><LearningSummary /></div>
+        <LearningRiskCard />
         <RecommendationLifecycle />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
           {CHOICES.map(c => (
