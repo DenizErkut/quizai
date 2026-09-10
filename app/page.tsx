@@ -26,7 +26,13 @@ export default function LandingPage() {
   const router = useRouter()
   const [checking,setChecking] = useState(true)
   const [openFaq,setOpenFaq] = useState<number|null>(0)
-  useEffect(()=>{(createClient() as any).auth.getUser().then(({data:{user}}:any)=>user?router.replace('/quiz'):setChecking(false))},[router])
+  useEffect(()=>{
+    let active = true
+    ;(createClient() as any).auth.getUser()
+      .then(({data:{user}}:any)=>{ if (!active) return; user ? router.replace('/quiz') : setChecking(false) })
+      .catch(()=>{ if (active) setChecking(false) })
+    return () => { active = false }
+  },[router])
   if(checking) return <main className="warm-loader"><div className="spinner" /></main>
   return <main className="landing-page">
     <header className="landing-nav"><div className="landing-container nav-inner">
