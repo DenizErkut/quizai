@@ -53,6 +53,7 @@ export default function LearningCatalogReview() {
   const [category, setCategory] = useState('all')
   const [search, setSearch] = useState('')
   const [stats, setStats] = useState<{ total: number; pending: number; mapped: number; dismissed: number; mappedNodeCount: number; activeTopicNodes: number; categoryCounts: Record<string, number> } | null>(null)
+  const [recentAudit, setRecentAudit] = useState<{ id: string; dimension_key: string; action: string; created_at: string }[]>([])
 
   async function loadQueue() {
     setLoading(true); setMessage('')
@@ -65,6 +66,7 @@ export default function LearningCatalogReview() {
       setCandidates(data.candidates || [])
       setUnits(data.units || [])
       setStats(data.stats || null)
+      setRecentAudit(data.recentAudit || [])
       setMessage(`✅ ${data.candidates?.length || 0} kayıt gösteriliyor.`)
     } catch (error) {
       setMessage(`❌ ${error instanceof Error ? error.message : 'Beklenmeyen hata'}`)
@@ -135,6 +137,7 @@ export default function LearningCatalogReview() {
               {label}: {stats.categoryCounts[key] || 0}
             </span>
           ))}
+          {recentAudit.length > 0 && <span className="badge">Son kararlar: {recentAudit.length}</span>}
         </div>
       )}
       {message && <div style={{ fontSize: '12px', marginBottom: '12px', color: message.startsWith('✅') ? '#16a34a' : '#dc2626' }}>{message}</div>}

@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
   const allCandidatesQuery = adminDb.from('learning_catalog_review_queue')
     .select('dimension_key,observed_label,observed_subject,occurrence_count,student_count,sample_grades,status,mapped_node_id,last_seen_at')
     .order('occurrence_count', { ascending: false }).limit(1000)
-  const [candidatesResult, allCandidatesResult, unitsResult, catalogNodesResult] = await Promise.all([
+  const [candidatesResult, allCandidatesResult, unitsResult, catalogNodesResult, auditResult] = await Promise.all([
     candidatesQuery,
     allCandidatesQuery,
     adminDb.from('learning_graph_nodes')
@@ -108,6 +108,7 @@ export async function GET(req: NextRequest) {
       .order('subject').order('grade').order('label'),
     adminDb.from('learning_graph_nodes').select('id', { count: 'exact', head: true })
       .eq('node_type', 'topic').eq('is_active', true),
+    adminDb.from('learning_catalog_review_audit').select('id,dimension_key,action,reviewer_id,created_at').order('created_at', { ascending: false }).limit(20),
   ])
 
   if (candidatesResult.error) {
@@ -152,7 +153,7 @@ export async function GET(req: NextRequest) {
     counts[candidate.status] = (counts[candidate.status] || 0) + 1
     return counts
   }, {})
-  return NextResponse.json({ candidates, units, stats: {
+  return NextResponse.json({ candidates, units, recentAudit: auditResult.error ? [] : (auditResult.data || []), stats: {
     total: coverageCandidates.length, pending: statusCounts.pending || 0,
     mapped: statusCounts.mapped || 0, dismissed: statusCounts.dismissed || 0,
     mappedNodeCount: coverageCandidates.filter(candidate => candidate.mapped_node_id).length,
