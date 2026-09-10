@@ -10,6 +10,7 @@
     "test": "npm run e2e",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui"
+    ,"load:test": "node scripts/load-test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.97.0",
