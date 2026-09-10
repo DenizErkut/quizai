@@ -63,7 +63,7 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 - [ ] Öğrenci dashboard’unda “Şimdi ne çalışmalıyım ve neden?” alanını merkezileştirmek.
 - [ ] Mastery, retention, misconception ve öneri geçmişini sade görsellerle sunmak.
 - [ ] Öğretmene sınıf ortak eksikleri ve müdahale önerileri vermek.
-- [ ] Veli ekranında teknik olmayan gelişim ve destek önerileri göstermek.
+- [x] Veli ekranında teknik olmayan gelişim ve destek önerileri göstermek. (Konu gelişim durumu, erken uyarı nedeni, tekrar ihtiyacı ve evde uygulanabilir destek adımı.)
 - [ ] Kurum ekranına sınıf, şube, öğretmen ve dönem karşılaştırmaları eklemek.
 - [x] Bildirim sıklığı ve önemini kullanıcı tercihleriyle yönetmek. (`notification_preferences` tablosu, RLS ve kullanıcı API'si canlı.)
 

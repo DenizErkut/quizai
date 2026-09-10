@@ -633,6 +633,10 @@ function ParentContent() {
           const riskColor = { yüksek: 'var(--red)', orta: '#f59e0b', düşük: 'var(--green)' } as Record<string, string>
           const atRisk = selected.topicRisks.filter(t => t.riskKind !== null)
           const sd = selected.studyDuration
+          const progressLabel = (score: number) => score >= 70 ? 'İyi ilerliyor' : score >= 45 ? 'Pekiştirilmeli' : 'Desteğe ihtiyaç var'
+          const homeSupport = (risk: TopicRisk) => risk.forgettingRisk === 'yüksek'
+            ? 'Bugün 10 dakikalık sakin bir tekrar planlayın; cevabı söylemek yerine ne hatırladığını sorun.'
+            : 'Bu hafta kısa bir çalışma hedefi belirleyin ve tamamladığında çabasını takdir edin.'
 
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -654,9 +658,10 @@ function ParentContent() {
                           <div style={{ fontWeight: 700, fontSize: '13px', color: t.riskKind === 'reaktif' ? '#dc2626' : '#b45309' }}>{t.topic}</div>
                           <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>
                             {t.riskKind === 'reaktif'
-                              ? `Şu anki ustalık skoru %${t.masteryScore} — destek zamanı`
-                              : `Ustalık skoru şu an %${t.masteryScore} ama son testlerin gidişatı kötüleşiyor — henüz kritik değil, erken uyarı`}
+                              ? `Son çalışmalar bu konuda desteğe ihtiyaç olduğunu gösteriyor (ilerleme göstergesi %${t.masteryScore}).`
+                              : `Genel durum henüz kritik değil; ancak son çalışmalar aşağı yönlü ilerliyor (ilerleme göstergesi %${t.masteryScore}).`}
                           </div>
+                          <div style={{ fontSize:'12px', color:'var(--text2)', marginTop:'5px' }}><strong>Evde destek:</strong> {homeSupport(t)}</div>
                         </div>
                       </div>
                     ))}
@@ -666,9 +671,9 @@ function ParentContent() {
 
               {/* Konu Ustalık Haritası */}
               <div className="card">
-                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>🧠 Konu Ustalık Haritası</div>
+                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>🧠 Konu Gelişim Haritası</div>
                 <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '12px' }}>
-                  En az bir kez zorlanılan konular için — deneme sayısına göre ağırlıklandırılmış ustalık skoru ve unutma riski.
+                  Çocuğunuzun zorlandığı konular, son çalışmalar ve tekrar ihtiyacı birlikte değerlendirilir.
                 </div>
                 {selected.topicRisks.length === 0 ? (
                   <div style={{ fontSize: '13px', color: 'var(--green)' }}>✓ Henüz zorlanılan bir konu yok</div>
@@ -678,10 +683,11 @@ function ParentContent() {
                       <div key={i} style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border)' }}>
                         <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.topic}</div>
                         <div style={{ fontWeight: 800, fontSize: '22px', color: masteryColor(t.masteryScore) }}>%{t.masteryScore}</div>
+                        <div style={{ fontSize:'11px', fontWeight:700, color:masteryColor(t.masteryScore), marginTop:2 }}>{progressLabel(t.masteryScore)}</div>
                         <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
-                          <span>Güven: {t.confidence}</span>
+                          <span>Veri güveni: {t.confidence}</span>
                           <span>·</span>
-                          <span style={{ color: riskColor[t.forgettingRisk] }}>Unutma riski: {t.forgettingRisk}</span>
+                          <span style={{ color: riskColor[t.forgettingRisk] }}>Tekrar ihtiyacı: {t.forgettingRisk}</span>
                         </div>
                         <div style={{ fontSize: '10px', color: 'var(--text4)', marginTop: '4px' }}>
                           {t.wrongCount}/{t.totalCount} yanlış · {timeAgo(selected.weakTopicsRaw[i]?.last_seen_at ?? null)}
