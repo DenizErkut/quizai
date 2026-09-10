@@ -665,6 +665,21 @@ function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
     return !flagged
   })
 
+  // 11 Eylül 2026 — gerçek öğrenci bildirimi: soru "altı çizili sözcük"
+  // diyordu fakat q alanında hangi sözcüğün vurgulandığını gösteren hiçbir
+  // işaret yoktu. HTML/Markdown biçimlendirmesi model çıktısından UI'ya
+  // güvenilir taşınmadığı için tek desteklenen gösterim [köşeli parantez].
+  // Referans var ama işaret yoksa soru birden fazla şekilde yorumlanabilir;
+  // öğrenciye ulaşmadan elenir ve aşağıdaki top-up akışı yerine yenisini üretir.
+  const invisibleEmphasisPattern = /alt[ıi] (çizili|cizili)|vurgulan(an|mış|mis)|underlined|highlighted/i
+  result = result.filter((q: any) => {
+    const text = String(q.q || '')
+    const hasVisibleTarget = /\[[^\]\n]{1,120}\]/.test(text)
+    const flagged = invisibleEmphasisPattern.test(text) && !hasVisibleTarget
+    if (flagged) logRejected('invisible-emphasis', q, 'vurgulanan/altı çizili hedef görünür biçimde işaretlenmemiş')
+    return !flagged
+  })
+
   // 3) Kaynakta gerçekten OLMAYAN, isimlendirilmiş bir esere kaçış
   // (ör. Gençliğe Hitabesi, İstiklal Marşı). 15 Ağustos 2026'da bulunan
   // İKİ ayrı hata düzeltildi:

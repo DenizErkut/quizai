@@ -22,7 +22,7 @@ function isMathQuestion(q: any): boolean {
 // Soru tipine göre doğrulama prompt'u
 function buildVerifyPrompt(q: any, lang: string): string {
   const type = q.type || 'multiple_choice'
-  const base = `You are a strict educational content verifier. Verify this ${lang} question for correctness.\n\n`
+  const base = `You are a strict educational content verifier. Verify this question for correctness and language consistency.\n\nExpected question language: ${lang}\n\nLANGUAGE RULE (MANDATORY): The question stem and answer options must be written in the expected language. Foreign proper names, formulas and short quoted examples are allowed, but a question written mainly in another language MUST return ok:false with reason \"language_mismatch\". The explanation may be Turkish for foreign-language courses.\n\nSELF-CONTAINMENT RULE (MANDATORY): If the question says a word is underlined/highlighted/emphasized, that exact target must be visibly marked inside the question with [square brackets]. Otherwise return ok:false with reason \"missing_visible_emphasis\".\n\n`
 
   switch (type) {
     case 'multiple_choice':
@@ -36,6 +36,8 @@ Check:
 1. Is the question clear and unambiguous?
 2. Is the claimed answer actually correct?
 3. Are the wrong options plausible but clearly wrong?
+4. Are the question and options predominantly in the expected language?
+5. Is every referenced underline/highlight visibly marked with [square brackets]?
 
 Respond ONLY with JSON: {"ok": true} or {"ok": false, "reason": "brief reason", "fix": "correct answer if wrong"}`
 
@@ -263,6 +265,8 @@ export async function POST(req: NextRequest) {
         const replacePrompt = `Generate ${rejected.length} verified ${replaceType} questions about "${topic}" for "${grade}" level in ${lang}.
 
 CRITICAL: Double-check every answer. Only include questions you are 100% certain about.
+The question stem and every option MUST be in ${lang}. Do not switch to another language.
+If you refer to an underlined/highlighted word, mark that exact word with [square brackets].
 Each question MUST have "type":"${replaceType}" field.
 
 Return ONLY valid JSON:

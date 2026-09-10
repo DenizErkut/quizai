@@ -299,9 +299,21 @@ export default function QuizSetup({
           </div>
 
           <label className="field-label">Veya kendi konunu yaz</label>
+          <select
+            className="input"
+            aria-label="Özel konunun dersi"
+            value={selectedSubject || ''}
+            onChange={e => setSelectedSubject(e.target.value || null)}
+            style={{ marginBottom: '8px' }}
+          >
+            <option value="">Ders seç (önerilir)</option>
+            {[...new Set([...Object.keys(gradeSubjects), ...dynamicSubjects])].map(subject => (
+              <option key={subject} value={subject}>{subject}</option>
+            ))}
+          </select>
           <textarea className="input" rows={2}
             placeholder="Örn: Güneş sistemi, Osmanlı kuruluşu, Fotosentez..."
-            value={customTopic} onChange={e => { setCustomTopic(e.target.value); setSelectedTopic(''); setSelectedSubject(null) }}
+            value={customTopic} onChange={e => { setCustomTopic(e.target.value); setSelectedTopic('') }}
             style={{ resize: 'none' }} />
 
           {/* Dosya yükleme */}

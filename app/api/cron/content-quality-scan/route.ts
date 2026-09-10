@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
     // bir havuzdan (limit 200) çekip JS tarafında karıştırıyoruz.
     const { data: pool } = await supabaseAdmin
       .from('quiz_sessions')
-      .select('id, topic, grade, questions, created_at')
+      .select('id, topic, grade, language, questions, created_at')
       .eq('completed', true)
       .gte('created_at', since)
       .not('questions', 'is', null)
@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
 
       let issues: QualityIssue[] = []
       try {
-        issues = await scanQuestionsForQualityIssues(session.topic || '', session.grade || '', forScan)
+        issues = await scanQuestionsForQualityIssues(session.topic || '', session.grade || '', forScan, session.language || 'Türkçe')
       } catch (e) {
         console.warn(`[content-quality-scan] Oturum ${session.id} taranamadı:`, e)
         continue
