@@ -20,10 +20,10 @@ export default function AgentApprovalQueue() {
     const data = await request('/api/teacher/agent-approvals', { method:'PATCH', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ id, status }) })
     if (data) setItems(current => current.filter(item => item.id !== id))
   }
-  if (!items.length) return null
   return <div className="card" style={{ marginBottom:'1rem' }}>
     <strong style={{ color:'var(--primary)' }}>🤖 Öğretmen onayı bekleyen ajan önerileri</strong>
-    <div style={{ fontSize:11, color:'var(--text3)', margin:'4px 0 10px' }}>Ajan yalnızca önerir; onayınız olmadan öğrenciye işlem uygulanmaz.</div>
+    <div style={{ fontSize:11, color:'var(--text3)', margin:'4px 0 10px' }}>Bekleyen öneri: <strong>{items.length}</strong> · Ajan yalnızca önerir; onayınız olmadan öğrenciye işlem uygulanmaz.</div>
+    {!items.length && <div style={{ fontSize:12, color:'var(--text3)', padding:'10px 0 2px' }}>Şu anda incelenmeyi bekleyen ajan önerisi yok.</div>}
     {items.map(item => <div key={item.id} style={{ borderTop:'1px solid var(--border)', padding:'9px 0', fontSize:12 }}>
       <strong>{item.title}</strong>
       <div style={{ color:'var(--text2)', margin:'4px 0' }}>{item.rationale}</div>
