@@ -81,7 +81,7 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 - [ ] Unutma, konu riski, sınav performansı ve öğrenme tıkanması tahminleri geliştirmek.
 - [ ] Tahminleri gerçek sonuçlarla sürekli kalibre etmek.
 - [ ] Tenant izolasyon testlerini otomatikleştirmek.
-- [ ] Pipeline alarm, gecikme ve hata dashboard’ları kurmak.
+- [x] Pipeline alarm, gecikme ve hata dashboard’ları kurmak. (24 saatlik AI p95 gecikme, maliyet, kullanıcı/oturum bağlam boşluğu ve Learning Event kapsaması yönetici ekranında eşiklerle izleniyor.)
 - [x] Migrasyon geri alma, yeniden hesaplama ve veri kurtarma runbook'larını tamamlamak. (`docs/PRATIUM_OPERASYON_RUNBOOK_V1.md`)
 - [ ] Veri saklama, silme talepleri, KVKK ve çocuk verisi kontrollerini güçlendirmek.
 - [x] Maliyet, gecikme ve AI bütçelerini izlemek. *(Temel kullanım/maliyet logları ve dönemsel fiyatlandırma canlı; operasyonel alarm eşikleri ayrıca geliştirilebilir.)*
