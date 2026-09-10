@@ -6,6 +6,9 @@ const db = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 )
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 async function authenticatedUser(req: NextRequest) {
   const token = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '')
   if (!token) return null

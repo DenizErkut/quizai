@@ -15,7 +15,7 @@ export default function LearningSummary() {
     async function load() {
       const { data: { session } } = await createClient().auth.getSession()
       if (!session) return
-      const response = await fetch('/api/student/learning-summary', { headers: { Authorization: `Bearer ${session.access_token}` } })
+      const response = await fetch('/api/student/learning-summary', { cache: 'no-store', headers: { Authorization: `Bearer ${session.access_token}`, 'Cache-Control': 'no-cache' } })
       if (response.ok) setData(await response.json())
     }
     void load()
