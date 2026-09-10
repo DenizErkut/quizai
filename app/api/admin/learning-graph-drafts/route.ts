@@ -7,7 +7,7 @@
 // findPrerequisiteGaps() fonksiyonunun okuduğu tablo budur) — AI önerisi
 // hiçbir zaman doğrudan bu tabloya yazmaz.
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 

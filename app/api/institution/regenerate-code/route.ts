@@ -7,7 +7,7 @@
 // önceden bu işlem sadece Pratium admin panelinden (kurum oluşturulurken) yapılabiliyordu.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { generateUniqueInstitutionCode } from '@/lib/institution-code'
 
 const supabaseAdmin = createClient(

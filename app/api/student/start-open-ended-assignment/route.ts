@@ -6,7 +6,7 @@
 // akışıyla DOĞRUDAN uyumludur — o route zaten sessionId üzerinden
 // scenario/question/rubric'i sunucudan okuyor.
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

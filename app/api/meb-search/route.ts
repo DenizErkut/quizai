@@ -1,7 +1,7 @@
 // app/api/meb-search/route.ts
 // Quiz üretimi sırasında ilgili MEB chunk'larını semantic search ile getir
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import {
   isNonContent,
   isKazanimListesi,

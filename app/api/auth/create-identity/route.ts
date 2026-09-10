@@ -6,7 +6,7 @@
 // Güvenlik: yalnızca Bearer token ile doğrulanan kullanıcı, KENDİ kimliğini
 // oluşturabilir (userId istemciden alınmaz, token'dan gelir).
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { createIdentity, getIdentityBySupabaseId, recordConsent, CURRENT_CONSENT_VERSIONS } from '@/lib/identity/client'
 
 export const runtime = 'nodejs'

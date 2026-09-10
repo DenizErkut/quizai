@@ -1,7 +1,7 @@
 // app/api/report/route.ts
 // Tüm rol tipleri için rapor verisi — service role ile
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { getIdentityBySupabaseId, getIdentitiesBySupabaseIds } from '@/lib/identity/client'

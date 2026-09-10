@@ -11,7 +11,7 @@
 //      otomatik olarak yeniden değerlendirilir (bkz. lib/study-plan-
 //      generator.ts, computeAutonomousGoals).
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 import { generateStudyPlan } from '@/lib/study-plan-generator'
 

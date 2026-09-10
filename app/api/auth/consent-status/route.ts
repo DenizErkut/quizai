@@ -6,7 +6,7 @@
 // olduğunu döner. POST: kullanıcı "onaylıyorum" dediğinde, güncel versiyonla
 // yeni bir consent_records satırı ekler (bkz. components/ConsentGate.tsx).
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentityBySupabaseId, getConsentStatus, recordConsent, CURRENT_CONSENT_VERSIONS } from '@/lib/identity/client'
 
 export const runtime = 'nodejs'

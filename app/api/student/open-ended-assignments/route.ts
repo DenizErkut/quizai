@@ -3,7 +3,7 @@
 // hangilerinin zaten tamamlandığını (graded_at dolu bir open_ended_sessions
 // kaydı var mı) işaretler.
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

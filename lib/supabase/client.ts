@@ -2,9 +2,14 @@ import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from './types'
 
 export function createClient() {
+  // Keep public pages statically renderable when a Preview deployment has no
+  // Supabase backend configured. API requests are blocked by proxy.ts; these
+  // inert values are never used for real data access.
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://supabase-not-configured.invalid'
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'supabase-not-configured'
   return createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    url,
+    key
   )
 }
 

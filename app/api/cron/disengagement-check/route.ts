@@ -7,7 +7,7 @@
 // vercel.json'da ayrı, zamanlanmış bir cron olarak kuruldu (haftada 2,
 // weekly-parent-summary/weekly-plan-refresh'ten farklı günlerde).
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { checkDisengagement } from '@/lib/disengagement-risk'
 import { sendResendEmail } from '@/lib/parent-summary'
 import { getIdentityBySupabaseId, getIdentitiesBySupabaseIds } from '@/lib/identity/client'

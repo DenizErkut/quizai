@@ -16,7 +16,7 @@
 //  - Sağlayıcı-agnostik: Anthropic, OpenAI ve Gemini usage formatlarını
 //    normalize eden yardımcılar içerir.
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 
 // ─────────────────────────────────────────────────────────────────────────
 // Model fiyatları — USD / 1M token (Eylül 2026, web'den doğrulandı).

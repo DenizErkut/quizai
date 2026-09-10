@@ -1,6 +1,6 @@
 // app/api/admin/approve-teacher/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentityBySupabaseId } from '@/lib/identity/client'
 
 const supabaseAdmin = createClient(

@@ -10,7 +10,7 @@
 // akış bu sorunu kökten çözer.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import Anthropic from '@anthropic-ai/sdk'
 import { requireAuth } from '@/lib/auth-middleware'
 

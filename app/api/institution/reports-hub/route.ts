@@ -1,6 +1,6 @@
 // app/api/institution/reports-hub/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { getAuthedUser, buildInstitutionContext } from '@/lib/report-context'
 import {
   buildProgressReport, buildWeakTopicsReport, buildAssignmentsReport,

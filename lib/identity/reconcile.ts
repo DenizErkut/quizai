@@ -12,7 +12,7 @@
 //   - app/api/admin/reconcile-identities/route.ts (admin panelinden manuel tetik)
 //   - app/api/cron/reconcile-identities/route.ts (günlük otomatik tarama)
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { createIdentity, listAllIdentitySupabaseIds } from '@/lib/identity/client'
 
 const supabaseAdmin = createClient(

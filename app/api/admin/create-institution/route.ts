@@ -1,6 +1,6 @@
 // app/api/admin/create-institution/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { generateUniqueInstitutionCode } from '@/lib/institution-code'
 import { createIdentity } from '@/lib/identity/client'
 

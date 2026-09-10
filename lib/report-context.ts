@@ -2,7 +2,7 @@
 // Kurum/Öğretmen/Veli rapor route'larının hepsinde tekrar eden "bu kullanıcı
 // kim, hangi öğrencileri görebilir" mantığının tek yeri.
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 import { ReportStudentBase } from '@/lib/student-reports'
 

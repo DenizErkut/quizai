@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 60
 export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { getTopicMastery } from '@/lib/mastery'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { inspectTutorInput, inspectTutorOutput } from '@/lib/tutor-safety'

@@ -1,7 +1,7 @@
 // app/api/admin/teachers/route.ts
 // service_role ile tüm öğretmenleri çeker — RLS'yi bypass eder
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 
 const supabaseAdmin = createClient(

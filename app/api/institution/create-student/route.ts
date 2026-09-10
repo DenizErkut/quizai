@@ -12,7 +12,7 @@
 // email_confirm: true ile oluşturulur çünkü kurum zaten bu kişinin
 // gerçekliğini biliyor/onaylıyor — ayrıca bir e-posta onayına gerek yok.
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { createIdentity, updateIdentity } from '@/lib/identity/client'
 
 const supabaseAdmin = createClient(
