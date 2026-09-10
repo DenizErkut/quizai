@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import GradeImportWizard from '@/components/GradeImportWizard'
 import ReportsHub from '@/components/ReportsHub'
 import LearningRiskOverview from '@/components/LearningRiskOverview'
+import InstitutionComparisons from '@/components/institution/InstitutionComparisons'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Cell
@@ -497,6 +498,7 @@ export default function InstitutionPage() {
         {activeTab === 'analytics' && analytics && (
           <div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.25rem' }}>📈 Detaylı Analitik</h1>
+            <InstitutionComparisons />
 
             {/* Sınıf bazlı kırılım */}
             {analytics.gradeBreakdown?.length > 0 && (

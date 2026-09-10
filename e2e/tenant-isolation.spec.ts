@@ -10,6 +10,9 @@ test.describe('tenant isolation security contract', () => {
     ['/api/admin/predictive-risk-calibration', 'get'],
     ['/api/teacher/learning-risk/actions', 'get'],
     ['/api/institution/learning-risk', 'get'],
+    ['/api/institution/comparisons', 'get'],
+    ['/api/admin/pipeline-health', 'get'],
+    ['/api/teacher/agent-approvals', 'get'],
   ] as const
 
   for (const [route, method] of protectedRoutes) {

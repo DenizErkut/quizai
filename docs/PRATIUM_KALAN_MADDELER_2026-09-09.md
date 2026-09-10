@@ -64,7 +64,7 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 - [ ] Mastery, retention, misconception ve öneri geçmişini sade görsellerle sunmak.
 - [ ] Öğretmene sınıf ortak eksikleri ve müdahale önerileri vermek.
 - [x] Veli ekranında teknik olmayan gelişim ve destek önerileri göstermek. (Konu gelişim durumu, erken uyarı nedeni, tekrar ihtiyacı ve evde uygulanabilir destek adımı.)
-- [ ] Kurum ekranına sınıf, şube, öğretmen ve dönem karşılaştırmaları eklemek.
+- [x] Kurum ekranına sınıf, şube, öğretmen ve dönem karşılaştırmaları eklemek. (En az üç öğrencili toplulaştırılmış gruplar; kurum-admin kapsamı ve son/önceki 30 gün karşılaştırması.)
 - [x] Bildirim sıklığı ve önemini kullanıcı tercihleriyle yönetmek. (`notification_preferences` tablosu, RLS ve kullanıcı API'si canlı.)
 
 ## 8. AI Tutor ve ajanlar — orta
