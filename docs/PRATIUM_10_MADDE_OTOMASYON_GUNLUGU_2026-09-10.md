@@ -14,6 +14,7 @@ Bu günlük, kullanıcı ara onayı beklemeden yürütülen sonraki 10 uygulanab
 - [x] Doğrulanmış yanılgı mikro içeriklerinde kontrollü ilk 5 taslak üretimi (`a15a408`).
 - [x] Kurum yöneticisi için kurum kapsamlı erken uyarı görünümü (`461b8d0`).
 - [x] Ajan kalite alarmı, katalog geçmişi ve risk uç noktalarının güvenlik doğrulama kapsamı genişletildi.
+- [x] Öğrenci ana ekranına salt-okunur çalışma, tekrar ve ilerleme ajanı özetleri (`5b3bf84`).
 
 ## Hazırlığı tamamlanan, veri/uzman işlemi bekleyen işler
 
