@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
         retention: Number(row.retention_score),
         trend: row.trend,
         lastPracticedAt: row.last_practiced_at,
+        attemptCount: row.attempt_count,
       }),
     }))
   await db.from('learning_risk_snapshots').upsert(
@@ -42,5 +43,5 @@ export async function GET(req: NextRequest) {
     .filter(risk => risk.level !== 'low')
     .sort((a, b) => b.score - a.score)
     .slice(0, 10)
-  return NextResponse.json({ risks, policy_version: 'predictive-learning-v1', generated_at: new Date().toISOString() })
+  return NextResponse.json({ risks, policy_version: 'predictive-learning-v2', generated_at: new Date().toISOString() })
 }

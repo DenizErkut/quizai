@@ -18,7 +18,7 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 - [ ] Hemen eşleştirilebilir 64 konu adayını uzman/admin incelemesinden geçirmek.
 - [x] Konu alias sözlüğünü kontrollü genişletmek.
 - [x] Admin inceleme ekranına filtre, toplu işlem, değişiklik geçmişi ve geri alma eklemek. (Yalnızca son ve henüz Learning Event üretmemiş karar geri alınabilir; kullanılmış eşleştirmeler ileri düzeltme gerektirir.)
-- [ ] Katalog kapsamı, eşleşme oranı ve bekleyen inceleme için kalite dashboard'u oluşturmak. *(Günlük kazanım pipeline ölçümü var; birleşik yönetici dashboard'u açık.)*
+- [x] Katalog kapsamı, eşleşme oranı ve bekleyen inceleme için kalite dashboard'u oluşturmak. *(İnceleme tamamlanma, katalog eşleşme ve Learning Graph bağlantı kapsamı yüzdeleri; bekleyen/eşleşen/katalog dışı adetleri ve kategori dağılımı yönetici ekranında.)*
 
 ## 2. Resmî kazanım kataloğu — yüksek
 
@@ -43,11 +43,11 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 
 ## 5. Recommendation Engine v2 — yüksek
 
-- [ ] Önerilerin uygulanma, ertelenme, reddedilme ve tamamlanma durumlarını izlemek.
+- [x] Önerilerin uygulanma, ertelenme, reddedilme ve tamamlanma durumlarını izlemek.
 - [x] Öneri sonrası performans artışını ölçmek.
-- [ ] Zaman bütçesi, sınav tarihi, öğretmen ödevi ve kurum planını önceliklendirmeye katmak.
-- [ ] Çeşitlilik ve yük dengeleme kuralları eklemek.
-- [ ] Öğretmen ve veli için açıklanabilir öneri özetleri sunmak.
+- [x] Zaman bütçesi, sınav tarihi, öğretmen ödevi ve kurum planını önceliklendirmeye katmak.
+- [x] Çeşitlilik ve yük dengeleme kuralları eklemek.
+- [x] Öğretmen ve veli için açıklanabilir öneri özetleri sunmak. *(Öğretmende kanıt ve müdahale, velide teknik olmayan gelişim nedeni ve ev desteği.)*
 - [x] Öneri politikalarını A/B veya gölge testleriyle karşılaştırmak. (Kullanıcı sırasını değiştirmeyen baseline v1 ↔ priority v2 gölge ölçümü; ilk sıra/ilk 5 uyumu ve en az 100 örnek kapısı.)
 
 ## 6. Adaptive Learning v3 — yüksek
@@ -55,14 +55,14 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 - [ ] Adaptasyonu soru bazına taşımak.
 - [ ] Soru türü, ipucu, anlatım biçimi ve ön koşul kapsamını adapte etmek.
 - [ ] Öğrencinin sıkışmasını ve gereksiz kolay soruları önleyen sınırlar eklemek.
-- [ ] Adaptif ve standart grupları öğrenme kazanımıyla karşılaştırmak.
+- [x] Adaptif ve standart grupları öğrenme kazanımıyla karşılaştırmak. *(Dengeli kohort ataması, başlangıç ve takip mastery/retention/test yüzdesi, örneklem eşiği ve yönetici Adaptive Pilot görünümü.)*
 - [x] Öğretmene adaptasyon gerekçesi ve manuel müdahale seçeneği sunmak. (Risk kanıtı görünür; öğretmen öğrenci+konuyu 30 gün standart moda alabilir veya yeniden otomatiğe bırakabilir.)
 
 ## 7. Kullanıcı deneyimleri — orta-yüksek
 
 - [x] Öğrenci dashboard’unda “Şimdi ne çalışmalıyım ve neden?” alanını merkezileştirmek. (Aktif öneri → yüksek risk → çalışma planı önceliğiyle tek ana aksiyon; ayrıntılar ikincil açılır alanda.)
 - [x] Mastery, retention, misconception ve öneri geçmişini sade görsellerle sunmak. (Teknik terimleri azaltan gelişim çubukları, kalıcılık, eğilim, doğrulanmış yanılgı ve son öneri hareketleri.)
-- [ ] Öğretmene sınıf ortak eksikleri ve müdahale önerileri vermek.
+- [x] Öğretmene sınıf ortak eksikleri ve müdahale önerileri vermek. *(Sınıf risk görünümü, konu kanıtı, müdahale aksiyonu ve öğrenci bazlı adaptasyon kontrolü.)*
 - [x] Veli ekranında teknik olmayan gelişim ve destek önerileri göstermek. (Konu gelişim durumu, erken uyarı nedeni, tekrar ihtiyacı ve evde uygulanabilir destek adımı.)
 - [x] Kurum ekranına sınıf, şube, öğretmen ve dönem karşılaştırmaları eklemek. (En az üç öğrencili toplulaştırılmış gruplar; kurum-admin kapsamı ve son/önceki 30 gün karşılaştırması.)
 - [x] Bildirim sıklığı ve önemini kullanıcı tercihleriyle yönetmek. (`notification_preferences` tablosu, RLS ve kullanıcı API'si canlı.)
@@ -72,18 +72,18 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 - [x] AI Tutor’u Student Learning Profile, Recommendation Engine ve Learning Graph’e bağlamak.
 - [x] Seviye uygunluğu, kontrollü ipucu ve Socratic yönlendirme politikaları oluşturmak.
 - [x] Öğretmen onayı gereken işlemleri otomatik işlemlerden ayırmak. (Service-only ajan öneri kuyruğu, sınıf sahibi öğretmen kapsamı ve tek-seferlik onay/red yaşam döngüsü.)
-- [ ] Sınırlı yetkili planlama, içerik, tekrar ve ilerleme ajanları geliştirmek.
+- [x] Sınırlı yetkili planlama, içerik, tekrar ve ilerleme ajanları geliştirmek. *(Salt-okunur çalışma planı, yalnızca uzman onaylı içerikten tekrar planı ve ilerleme özeti; karar audit'i ve yetki sınırı.)*
 - [x] Ajan kararlarını kanıt, neden ve sürüm bilgisiyle denetlenebilir yapmak. (AI Tutor dahil tüm sınırlı ajanlarda ham çıktı içermeyen, service-role-only karar denetimi.)
 - [x] Yaş, güvenlik, mahremiyet ve pedagojik doğruluk kontrolleri eklemek. (Tutor Safety v2: yaş/sınıf bağlamı, kişisel veri, tehlikeli talimat, kriz yönlendirmesi, prompt enjeksiyonu ve çıktı güvenlik kapısı.)
 
 ## 9. Tahmine dayalı öğrenme ve operasyon — yüksek
 
-- [ ] Unutma, konu riski, sınav performansı ve öğrenme tıkanması tahminleri geliştirmek.
-- [ ] Tahminleri gerçek sonuçlarla sürekli kalibre etmek.
-- [ ] Tenant izolasyon testlerini otomatikleştirmek.
+- [x] Unutma, konu riski, beklenen sonraki çalışma başarısı ve öğrenme tıkanması tahminleri geliştirmek. *(Açıklanabilir mastery/retention/zaman/eğilim modeli; en az 8 denemede düşük ve ilerlemeyen mastery tıkanma sinyali.)*
+- [x] Tahminleri gerçek sonuçlarla sürekli kalibre etmek. *(Günlük risk snapshot'ı, 14 günlük takip sonucu, isabet/yanlış pozitif oranı ve yönetici görünümü.)*
+- [x] Tenant izolasyon testlerini otomatikleştirmek. *(Kurum, öğretmen, sınıf ve öğrenci kapsamlarını doğrulayan otomatik API güvenlik senaryoları.)*
 - [x] Pipeline alarm, gecikme ve hata dashboard’ları kurmak. (24 saatlik AI p95 gecikme, maliyet, kullanıcı/oturum bağlam boşluğu ve Learning Event kapsaması yönetici ekranında eşiklerle izleniyor.)
 - [x] Migrasyon geri alma, yeniden hesaplama ve veri kurtarma runbook'larını tamamlamak. (`docs/PRATIUM_OPERASYON_RUNBOOK_V1.md`)
-- [ ] Veri saklama, silme talepleri, KVKK ve çocuk verisi kontrollerini güçlendirmek.
+- [x] Veri saklama, silme talepleri, KVKK ve çocuk verisi kontrollerini güçlendirmek. *(Kullanıcı talebi, yönetici doğrulama/etki önizleme/ikinci onay, kalıcı silme yürütücüsü, denetim kaydı ve çocuk rıza alanları.)*
 - [x] Maliyet, gecikme ve AI bütçelerini izlemek. *(Temel kullanım/maliyet logları ve dönemsel fiyatlandırma canlı; operasyonel alarm eşikleri ayrıca geliştirilebilir.)*
 
 ## 10. Pilot teslimat sırası

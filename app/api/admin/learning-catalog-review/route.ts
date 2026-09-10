@@ -153,10 +153,19 @@ export async function GET(req: NextRequest) {
     counts[candidate.status] = (counts[candidate.status] || 0) + 1
     return counts
   }, {})
+  const total = coverageCandidates.length
+  const mapped = statusCounts.mapped || 0
+  const dismissed = statusCounts.dismissed || 0
+  const decided = mapped + dismissed
+  const mappedNodeCount = coverageCandidates.filter(candidate => candidate.mapped_node_id).length
+  const percentage = (value: number) => total ? Math.round(value / total * 1000) / 10 : 0
   return NextResponse.json({ candidates, units, recentAudit: auditResult.error ? [] : (auditResult.data || []), stats: {
-    total: coverageCandidates.length, pending: statusCounts.pending || 0,
-    mapped: statusCounts.mapped || 0, dismissed: statusCounts.dismissed || 0,
-    mappedNodeCount: coverageCandidates.filter(candidate => candidate.mapped_node_id).length,
+    total, pending: statusCounts.pending || 0,
+    mapped, dismissed,
+    mappedNodeCount,
+    reviewCompletionPct: percentage(decided),
+    mappingRatePct: percentage(mapped),
+    graphCoveragePct: percentage(mappedNodeCount),
     activeTopicNodes: catalogNodesResult.count || 0, categoryCounts, subjectCounts,
   } })
 }

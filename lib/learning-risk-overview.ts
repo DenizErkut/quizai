@@ -25,6 +25,7 @@ export function buildLearningRiskOverview(
       retention: Number(row.retention_score),
       trend: row.trend,
       lastPracticedAt: row.last_practiced_at,
+      attemptCount: row.attempt_count,
     })
     if (risk.level === 'low') return []
     const classes = studentClasses.get(row.student_id) ?? []

@@ -52,7 +52,7 @@ export default function LearningCatalogReview() {
   const [message, setMessage] = useState('')
   const [category, setCategory] = useState('all')
   const [search, setSearch] = useState('')
-  const [stats, setStats] = useState<{ total: number; pending: number; mapped: number; dismissed: number; mappedNodeCount: number; activeTopicNodes: number; categoryCounts: Record<string, number> } | null>(null)
+  const [stats, setStats] = useState<{ total: number; pending: number; mapped: number; dismissed: number; mappedNodeCount: number; activeTopicNodes: number; reviewCompletionPct: number; mappingRatePct: number; graphCoveragePct: number; categoryCounts: Record<string, number> } | null>(null)
   const [recentAudit, setRecentAudit] = useState<{ id: string; dimension_key: string; action: string; created_at: string }[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
@@ -150,10 +150,22 @@ export default function LearningCatalogReview() {
         </button>
       </div>
       {stats && (
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+        <div style={{ marginBottom: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginBottom: 8 }}>
+            {[
+              ['İnceleme tamamlanma', stats.reviewCompletionPct],
+              ['Katalog eşleşme', stats.mappingRatePct],
+              ['Graph bağlantı kapsamı', stats.graphCoveragePct],
+            ].map(([label, value]) => <div key={String(label)} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 9, background: 'var(--bg2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 11, marginBottom: 5 }}><span>{label}</span><strong>{value}%</strong></div>
+              <div style={{ height: 6, borderRadius: 99, background: 'var(--border)', overflow: 'hidden' }}><div style={{ width: `${Math.min(100, Number(value))}%`, height: '100%', background: 'var(--primary)' }} /></div>
+            </div>)}
+          </div>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           <span className="badge">Toplam {stats.total}</span>
           <span className="badge">Bekleyen {stats.pending}</span>
           <span className="badge">Eşleşen {stats.mapped}</span>
+          <span className="badge">Katalog dışı {stats.dismissed}</span>
           <span className="badge">Aktif konu düğümü {stats.activeTopicNodes}</span>
           {Object.entries(TRIAGE_LABELS).map(([key, label]) => (
             <span key={key} style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '99px', background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--text2)' }}>
@@ -161,6 +173,7 @@ export default function LearningCatalogReview() {
             </span>
           ))}
           {recentAudit.length > 0 && <span className="badge">Son kararlar: {recentAudit.length}</span>}
+          </div>
         </div>
       )}
       {candidates.length > 0 && <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}><button className="btn btn-sm" disabled={loading || selected.size === 0} onClick={() => void dismissSelected()}>Seçilenleri katalog dışı bırak ({selected.size})</button><button className="btn btn-sm" disabled={loading} onClick={() => setSelected(new Set(candidates.map(item => item.dimension_key)))}>Tümünü seç</button></div>}
