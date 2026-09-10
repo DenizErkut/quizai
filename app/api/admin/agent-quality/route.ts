@@ -23,5 +23,10 @@ export async function GET(req: NextRequest) {
     if (!item.policyVersions.includes(row.policy_version)) item.policyVersions.push(row.policy_version)
     byAgent[row.agent_name] = item
   }
-  return NextResponse.json({ period_days: 7, total_calls: rows.length, agents: byAgent, alert_thresholds: { empty_decision_rate: 0.5, max_calls: 1000 } })
+  const alert_thresholds = { empty_decision_rate: 0.5, max_calls: 1000 }
+  const alerts = Object.entries(byAgent)
+    .filter(([, item]) => item.calls > 0 && item.emptyDecisions / item.calls >= alert_thresholds.empty_decision_rate)
+    .map(([agent_name, item]) => ({ agent_name, type: 'empty_decision_rate', rate: item.emptyDecisions / item.calls, severity: 'high' }))
+  if (rows.length >= alert_thresholds.max_calls) alerts.push({ agent_name: 'all', type: 'volume', rate: rows.length, severity: 'medium' })
+  return NextResponse.json({ period_days: 7, total_calls: rows.length, agents: byAgent, alerts, alert_thresholds })
 }
