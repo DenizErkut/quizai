@@ -14,9 +14,9 @@ test.beforeEach(async ({ page }) => {
 test('landing page renders public entry points', async ({ page }) => {
   await page.goto('/')
 
-  await expect(page.getByRole('heading', { name: /Pratik yap, ba\u015far\u0131ya ula\u015f/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Ezberleme.*Gerçekten öğren/i })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Giri\u015f yap' }).first()).toHaveAttribute('href', '/login')
-  await expect(page.getByRole('link', { name: '\u00dccretsiz ba\u015fla' }).first()).toHaveAttribute('href', '/register')
+  await expect(page.getByRole('link', { name: /Hemen ba\u015fla/i }).first()).toHaveAttribute('href', '/register')
 })
 
 test('a visitor can start the student registration flow', async ({ page }) => {
