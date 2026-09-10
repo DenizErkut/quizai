@@ -58,7 +58,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'exams' | 'curriculum' | 'coaching'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'exams' | 'curriculum' | 'kvkk' | 'coaching'>('users')
   const [identityMissing, setIdentityMissing] = useState<number | null>(null)
   const [identityScanning, setIdentityScanning] = useState(false)
   const [identityFixing, setIdentityFixing] = useState(false)
@@ -621,6 +621,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             { key: 'meb', label: '📚 MEB Kaynakları' },
             { key: 'exams', label: '🎯 Sınav Kitapçıkları' },
             { key: 'curriculum', label: '📋 Müfredat Yönetimi' },
+            { key: 'kvkk', label: '🔐 KVKK Talepleri' },
             { key: 'coaching', label: '🎯 Özel Koçluk Talepleri' },
           ] as const).map(t => (
             <button key={t.key} className={`btn btn-sm ${tab === t.key ? 'btn-primary' : ''}`}
@@ -1569,7 +1570,6 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           <LearningGraphRelations />
                     <RecommendationImpact />
                     <AgentQuality />
-                    <DataLifecycleRequests />
           <MasteryCalibration />
           <RetentionCalibration />
           <QuestionDifficultyCalibration />
@@ -1577,6 +1577,13 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           <MisconceptionReview />
           <MisconceptionMicroContent />
           <MisconceptionQuality />
+        </div>
+        )}
+
+      {tab === 'kvkk' && (
+        <div className="anim-up">
+          <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)', marginBottom: '1rem' }}>🔐 KVKK Talep İşleme</h2>
+          <DataLifecycleRequests />
         </div>
       )}
 
