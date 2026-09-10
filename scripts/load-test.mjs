@@ -17,18 +17,19 @@ for (let round = 0; round < rounds; round++) {
         headers: bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {},
         signal: AbortSignal.timeout(timeoutMs),
       })
-      return { status: response.status, ms: performance.now() - t0, error: null }
+      return { status: response.status, ms: performance.now() - t0, error: null, location: response.headers.get('location') }
     } catch (error) {
       const message = error instanceof Error ? `${error.name}: ${error.message}` : 'UnknownError'
-      return { status: 0, ms: performance.now() - t0, error: message }
+      return { status: 0, ms: performance.now() - t0, error: message, location: null }
     }
   }))
   const elapsed = performance.now() - started
-  const ok = results.filter(item => item.status >= 200 && item.status < 400).length
+  const ok = results.filter(item => item.status >= 200 && item.status < 300).length
   const sorted = results.map(item => item.ms).sort((a, b) => a - b)
   const percentile = (p) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))]
   const statusCounts = Object.fromEntries(Object.entries(results.reduce((acc, item) => { const key = String(item.status); acc[key] = (acc[key] ?? 0) + 1; return acc }, {})).sort())
   const errorCounts = Object.fromEntries(Object.entries(results.reduce((acc, item) => { if (item.error) acc[item.error] = (acc[item.error] ?? 0) + 1; return acc }, {})).sort((a, b) => b[1] - a[1]).slice(0, 5))
-  samples.push({ round: round + 1, requests: users, ok, errors: users - ok, errorRatePct: Number((((users - ok) / users) * 100).toFixed(2)), elapsedMs: Math.round(elapsed), rps: Math.round(users / (elapsed / 1000)), p50Ms: Math.round(percentile(.5)), p95Ms: Math.round(percentile(.95)), p99Ms: Math.round(percentile(.99)), statusCounts, errorCounts })
+  const redirectHosts = Object.fromEntries(Object.entries(results.reduce((acc, item) => { if (item.location) { let key = item.location; try { key = new URL(item.location).host } catch {} acc[key] = (acc[key] ?? 0) + 1 } return acc }, {})).sort((a, b) => b[1] - a[1]).slice(0, 5))
+  samples.push({ round: round + 1, requests: users, ok, errors: users - ok, errorRatePct: Number((((users - ok) / users) * 100).toFixed(2)), elapsedMs: Math.round(elapsed), rps: Math.round(users / (elapsed / 1000)), p50Ms: Math.round(percentile(.5)), p95Ms: Math.round(percentile(.95)), p99Ms: Math.round(percentile(.99)), statusCounts, redirectHosts, errorCounts })
 }
 console.log(JSON.stringify({ baseUrl, protectedPreviewBypass: Boolean(bypassSecret), users, rounds, timeoutMs, samples }, null, 2))
