@@ -23,6 +23,7 @@ import AdaptiveEvaluation from '@/components/admin/AdaptiveEvaluation'
 import AdaptiveParticipants from '@/components/admin/AdaptiveParticipants'
 import AdaptiveStatistics from '@/components/admin/AdaptiveStatistics'
 import LearningRiskOverview from '@/components/LearningRiskOverview'
+import PredictiveRiskCalibration from '@/components/admin/PredictiveRiskCalibration'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -1606,6 +1607,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         <div className="anim-up">
           <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)', marginBottom: '1rem' }}>⚠️ Öğrenme Erken Uyarıları</h2>
           <LearningRiskOverview endpoint="/api/admin/learning-risk" title="Tüm sınıflarda erken uyarılar" />
+          <PredictiveRiskCalibration />
         </div>
       )}
 

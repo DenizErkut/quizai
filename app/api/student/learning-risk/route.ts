@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     .order('last_mastery_update', { ascending: false })
     .limit(100)
   if (error) return NextResponse.json({ error: 'Risk verisi alınamadı.' }, { status: 500 })
-  const risks = (data ?? [])
+  const eligibleRows = (data ?? [])
     .map(row => ({
       subject: row.subject,
       topic: row.topic,
@@ -34,6 +34,11 @@ export async function GET(req: NextRequest) {
         lastPracticedAt: row.last_practiced_at,
       }),
     }))
+  await db.from('learning_risk_snapshots').upsert(
+    eligibleRows.map(risk => ({ student_id: user.id, subject: risk.subject, topic: risk.topic, risk_score: risk.score, risk_level: risk.level, mastery: risk.mastery, retention: risk.retention, confidence: risk.confidence })),
+    { onConflict: 'student_id,subject,topic,observed_day' },
+  )
+  const risks = eligibleRows
     .filter(risk => risk.level !== 'low')
     .sort((a, b) => b.score - a.score)
     .slice(0, 10)
