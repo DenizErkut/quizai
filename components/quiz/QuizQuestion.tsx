@@ -1,5 +1,5 @@
 'use client'
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import { DIFFICULTIES, type Question } from '@/lib/quiz-constants'
 
 interface QuizQuestionProps {
@@ -39,6 +39,8 @@ export default function QuizQuestion({
   onFinish, shuffledPairs, shuffledIndexMap,
 }: QuizQuestionProps) {
   const q = questions[current]
+  const [hintState, setHintState] = useState({ questionIndex: -1, open: false })
+  const hintOpen = hintState.questionIndex === current && hintState.open
   const progPct = Math.round((current / questions.length) * 100)
   const diff = DIFFICULTIES.find(d => d.value === difficulty)!
 
@@ -127,6 +129,15 @@ export default function QuizQuestion({
                 : <span key={idx}>{part}</span>
             )}
           </p>
+
+          {q.adaptiveHint && chosen === null && (
+            <div style={{ marginBottom: 12 }}>
+              <button type="button" onClick={() => setHintState({ questionIndex: current, open: !hintOpen })} style={{ border: '1px solid var(--border)', borderRadius: 9, padding: '7px 10px', background: 'var(--bg2)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                {hintOpen ? 'İpucunu kapat' : '💡 İpucu göster'}
+              </button>
+              {hintOpen && <div style={{ marginTop: 7, padding: '9px 11px', borderRadius: 9, background: '#fff9e9', color: '#725a52', fontSize: 12 }}>{q.adaptiveHint}</div>}
+            </div>
+          )}
 
           {/* ── 1. ÇOKTAN SEÇMELİ ── */}
           {(!q.type || q.type === 'multiple_choice') && (

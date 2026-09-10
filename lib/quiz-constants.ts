@@ -23,6 +23,9 @@ export interface Question {
   adaptiveFocus?: string
   adaptiveReasonCode?: string
   adaptiveRecommendationId?: string | null
+  adaptiveHint?: string | null
+  adaptiveSupportLevel?: 'none' | 'hint' | 'scaffold'
+  adaptivePresentation?: 'independent' | 'concise' | 'step_by_step'
   diagnosticStrategyVersion?: 'diagnostic-v1' | null
   diagnosticReasonCode?: string | null
   diagnosticRole?: 'foundation_probe' | 'application_probe' | 'misconception_probe' | null

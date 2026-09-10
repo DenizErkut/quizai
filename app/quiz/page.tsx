@@ -39,6 +39,9 @@ interface Question {
   diagnosticRole?: 'foundation_probe' | 'application_probe' | 'misconception_probe' | null
   masteryConfidenceBefore?: 'none' | 'düşük' | 'orta' | 'yüksek'
   masteryEvidenceCountBefore?: number
+  adaptiveHint?: string | null
+  adaptiveSupportLevel?: 'none' | 'hint' | 'scaffold'
+  adaptivePresentation?: 'independent' | 'concise' | 'step_by_step'
   learningObjectiveRef?: string | null
   learningObjectiveId?: string | null
   learningObjectiveCode?: string | null
@@ -854,6 +857,7 @@ function QuizPageContent() {
             difficulty: nextDiff,
             language: currentLang,
             questionType: nextQuestionType,
+            adaptiveSupport: nextPolicy.supportLevel,
             includeVisuals,
             continueSessionId: sessionId,
             subject: selectedSubject || undefined,

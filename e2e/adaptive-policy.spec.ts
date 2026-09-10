@@ -12,6 +12,7 @@ test('iki yanlışta zorluğu düşürür, biçimi sadeleştirir ve müdahale is
   expect(nextQuestionPolicy('zor', [{ correct: false }, { correct: false }], 'matching')).toEqual({
     difficulty: 'normal',
     questionType: 'multiple_choice',
+    supportLevel: 'scaffold',
     showIntervention: true,
     reason: 'Art arda iki yanlış: zorluk bir kademe düşürüldü ve soru biçimi sadeleştirildi.',
   })
@@ -21,12 +22,17 @@ test('üç doğru sonrası yalnızca bir zorluk basamağı yükseltir', () => {
   const policy = nextQuestionPolicy('normal', [{ correct: true }, { correct: true }, { correct: true }], 'ordering')
   expect(policy.difficulty).toBe('zor')
   expect(policy.questionType).toBe('ordering')
+  expect(policy.supportLevel).toBe('none')
   expect(policy.showIntervention).toBe(false)
 })
 
 test('zorluk merdiveninin alt ve üst sınırlarını aşmaz', () => {
   expect(nextQuestionPolicy('kolay', [{ correct: false }, { correct: false }], 'multiple_choice').difficulty).toBe('kolay')
   expect(nextQuestionPolicy('cok zor', [{ correct: true }, { correct: true }, { correct: true }], 'multiple_choice').difficulty).toBe('cok zor')
+})
+
+test('dengeli performansta cevabı açmadan isteğe bağlı ipucu seçer', () => {
+  expect(nextQuestionPolicy('normal', [{ correct: true }, { correct: false }], 'fill_blank').supportLevel).toBe('hint')
 })
 
 test('adaptif politika endpointi anonim erişimi reddeder', async ({ request }) => {

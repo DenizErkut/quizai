@@ -11,6 +11,7 @@
 
 export type DifficultyValue = 'kolay' | 'normal' | 'zor' | 'cok zor'
 export type AdaptiveQuestionType = 'multiple_choice' | 'true_false' | 'fill_blank' | 'matching' | 'ordering'
+export type AdaptiveSupportLevel = 'none' | 'hint' | 'scaffold'
 
 const LADDER: DifficultyValue[] = ['kolay', 'normal', 'zor', 'cok zor']
 
@@ -64,7 +65,7 @@ export function nextQuestionPolicy(
   currentDifficulty: DifficultyValue,
   recentAnswers: { correct: boolean }[],
   currentType: string,
-): { difficulty: DifficultyValue; questionType: AdaptiveQuestionType; showIntervention: boolean; reason: string } {
+): { difficulty: DifficultyValue; questionType: AdaptiveQuestionType; supportLevel: AdaptiveSupportLevel; showIntervention: boolean; reason: string } {
   const recent = recentAnswers.slice(-3)
   const lastTwoWrong = recent.length >= 2 && recent.slice(-2).every(answer => !answer.correct)
   const lastThreeCorrect = recent.length >= 3 && recent.slice(-3).every(answer => answer.correct)
@@ -73,14 +74,16 @@ export function nextQuestionPolicy(
   if (lastTwoWrong) return {
     difficulty: nextChunkDifficulty(currentDifficulty, [{ correct: false }, { correct: false }]),
     questionType: safeType === 'multiple_choice' ? 'true_false' : 'multiple_choice',
+    supportLevel: 'scaffold',
     showIntervention: true,
     reason: 'Art arda iki yanlış: zorluk bir kademe düşürüldü ve soru biçimi sadeleştirildi.',
   }
   if (lastThreeCorrect) return {
     difficulty: nextChunkDifficulty(currentDifficulty, [{ correct: true }, { correct: true }, { correct: true }]),
     questionType: safeType,
+    supportLevel: 'none',
     showIntervention: false,
     reason: 'Art arda üç doğru: bir sonraki soruda zorluk artırıldı.',
   }
-  return { difficulty: currentDifficulty, questionType: safeType, showIntervention: false, reason: 'Dengeli performans: mevcut seviye korundu.' }
+  return { difficulty: currentDifficulty, questionType: safeType, supportLevel: 'hint', showIntervention: false, reason: 'Dengeli performans: mevcut seviye korundu.' }
 }

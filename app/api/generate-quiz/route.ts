@@ -959,6 +959,7 @@ export async function POST(req: NextRequest) {
       dailyChallenge = false,
       continueSessionId, // adaptif akışta ikinci/sonraki parça — mevcut oturuma eklenir, yeni test sayılmaz
       excludeQuestionTexts, // aynı oturumda (henüz completed=false) az önce sorulmuş sorular — tekrar önleme
+      adaptiveSupport,
       subject, // 17 Ağustos 2026'da bulundu: frontend zaten gönderiyordu (app/quiz/page.tsx)
       // ama backend bu alanı HİÇ okumuyordu -- "İngilizce" dersi bilgisi
       // tamamen kayboluyor, AI sadece "topic" (ör. "Past simple tense")
@@ -992,6 +993,16 @@ export async function POST(req: NextRequest) {
     // gönderilir (bkz. continueSessionId akışı).
     const adaptivePolicy = await resolveAdaptiveLearningPolicy(supabase, user.id, topic, subject)
       .catch(() => null)
+    const supportLevel = continueSessionId && adaptivePolicy?.focus !== 'standard' && ['none', 'hint', 'scaffold'].includes(adaptiveSupport)
+      ? adaptiveSupport as 'none' | 'hint' | 'scaffold'
+      : 'none'
+    const adaptiveHint = supportLevel === 'scaffold'
+      ? adaptivePolicy?.focus === 'prerequisite'
+        ? 'Önce bu sorunun dayandığı temel kuralı hatırla; verilenleri o kurala göre sırala.'
+        : 'Soruyu küçük adımlara ayır: verilenleri belirle, gereken işlemi seç, sonra sonucu kontrol et.'
+      : supportLevel === 'hint'
+        ? 'Sorudaki anahtar bilgiyi bul ve senden istenenle ilişkilendir.'
+        : null
     const topicMastery = await getTopicMastery(supabase, user.id, topic).catch(() => null)
     const diagnosticStrategy = resolveDiagnosticQuestionStrategy(
       topicMastery,
@@ -1556,6 +1567,9 @@ export async function POST(req: NextRequest) {
       adaptiveFocus: adaptivePolicy?.focus || 'standard',
       adaptiveReasonCode: adaptivePolicy?.reasonCode || 'NO_ACTIVE_SIGNAL',
       adaptiveRecommendationId: adaptivePolicy?.recommendationId || null,
+      adaptiveHint,
+      adaptiveSupportLevel: supportLevel,
+      adaptivePresentation: supportLevel === 'scaffold' ? 'step_by_step' : supportLevel === 'hint' ? 'concise' : 'independent',
       diagnosticStrategyVersion: diagnosticStrategy.active ? diagnosticStrategy.version : null,
       diagnosticReasonCode: diagnosticStrategy.active ? diagnosticStrategy.reasonCode : null,
       diagnosticRole: diagnosticStrategy.active ? diagnosticStrategy.roles[questionIndex] || null : null,
