@@ -7,6 +7,8 @@ export default function ResetPasswordPage() {
   const router = useRouter()
   const [pass, setPass] = useState('')
   const [passConfirm, setPassConfirm] = useState('')
+  const [showPass, setShowPass] = useState(false)
+  const [showPassConfirm, setShowPassConfirm] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
@@ -30,7 +32,10 @@ export default function ResetPasswordPage() {
     setError(''); setLoading(true)
     const { error: err } = await supabase.auth.updateUser({ password: pass })
     setLoading(false)
-    if (err) { setError('Bir hata oluştu. Lütfen tekrar deneyin.'); return }
+    if (err) {
+      const message = /same|different|password/i.test(err.message) ? 'Yeni şifreniz önceki şifrenizden farklı olmalıdır.' : /expired|session/i.test(err.message) ? 'Bağlantının süresi dolmuş. Yeni bir sıfırlama bağlantısı isteyin.' : 'Şifre güncellenemedi. Lütfen bağlantıyı yenileyip tekrar deneyin.'
+      setError(message); return
+    }
     setDone(true)
     setTimeout(() => router.push('/quiz'), 2000)
   }
@@ -65,13 +70,14 @@ export default function ResetPasswordPage() {
               <p style={{ color: 'var(--text2)', fontSize: '14px', marginBottom: '1.5rem' }}>En az 6 karakter olmalıdır.</p>
 
               <label className="field-label">Yeni şifre</label>
-              <input className="input" type="password" placeholder="••••••••" value={pass}
-                onChange={e => setPass(e.target.value)} autoFocus />
+              <div style={{ position: 'relative' }}><input className="input" type={showPass ? 'text' : 'password'} placeholder="••••••••" value={pass}
+                onChange={e => setPass(e.target.value)} autoFocus style={{ paddingRight: '46px' }} /><button type="button" aria-label={showPass ? 'Şifreyi gizle' : 'Şifreyi göster'} onClick={() => setShowPass(v => !v)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', border: 0, background: 'transparent', cursor: 'pointer', fontSize: 18 }}>{showPass ? '🙈' : '👁️'}</button></div>
 
               <label className="field-label" style={{ marginTop: '8px' }}>Şifre tekrar</label>
-              <input className="input" type="password" placeholder="••••••••" value={passConfirm}
-                onChange={e => setPassConfirm(e.target.value)}
+              <div style={{ position: 'relative' }}><input className="input" type={showPassConfirm ? 'text' : 'password'} placeholder="••••••••" value={passConfirm}
+                onChange={e => setPassConfirm(e.target.value)} style={{ paddingRight: '46px' }}
                 onKeyDown={e => e.key === 'Enter' && handleReset()} />
+                <button type="button" aria-label={showPassConfirm ? 'Şifreyi gizle' : 'Şifreyi göster'} onClick={() => setShowPassConfirm(v => !v)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', border: 0, background: 'transparent', cursor: 'pointer', fontSize: 18 }}>{showPassConfirm ? '🙈' : '👁️'}</button></div>
 
               {error && (
                 <div style={{ marginTop: '10px', padding: '10px 12px', background: 'var(--red-bg)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)' }}>
