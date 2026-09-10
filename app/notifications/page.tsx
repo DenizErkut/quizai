@@ -306,7 +306,7 @@ export default function NotificationsPage() {
                 <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{pref.label}</span>
                 <button onClick={()=>togglePref(pref.key)} aria-label={prefs[pref.key]?'Kapat':'Aç'} style={{ width: 40, height: 22, borderRadius: '99px', background: prefs[pref.key]?'rgba(16,185,129,0.2)':'var(--border)', border: '1.5px solid #10b981', display: 'flex', alignItems: 'center', padding: '2px', cursor: 'pointer' }}>
                   <div style={{ width: 16, height: 16, borderRadius: '50%', background: prefs[pref.key]?'#10b981':'var(--text4)', marginLeft: prefs[pref.key]?'auto':0, transition: 'margin 0.2s' }} />
-                </div>
+                </button>
               </div>
             ))}
           </div>
