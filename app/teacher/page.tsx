@@ -7,6 +7,7 @@ import { resolveIdentities, resolveName } from '@/lib/identity/resolve-client'
 import ContentIssueReporter from '@/components/ContentIssueReporter'
 import LearningInsights from '@/components/teacher/LearningInsights'
 import LearningRiskOverview from '@/components/LearningRiskOverview'
+import AgentApprovalQueue from '@/components/teacher/AgentApprovalQueue'
 
 export default function TeacherDashboard() {
   const [teacher, setTeacher] = useState<any>(null)
@@ -216,6 +217,7 @@ export default function TeacherDashboard() {
           <div>
             <LearningInsights />
             <LearningRiskOverview endpoint="/api/teacher/learning-risk" title="Sınıf erken uyarıları" />
+            <AgentApprovalQueue />
             <div style={{ marginBottom: '1.5rem' }}>
               <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)' }}>
                 Hoş geldin, {teacher?.name?.split(' ')[0]} 👋
