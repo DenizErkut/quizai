@@ -6,12 +6,13 @@ import { logAnthropicUsage } from '@/lib/ai-usage'
 
 const anthropic = new Anthropic()
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
 export async function POST(req: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return NextResponse.json({ reply: 'Servis yapılandırması eksik.' }, { status: 503 })
+  }
+  const supabase = createClient(supabaseUrl, supabaseAnonKey)
   // Auth kontrolü
   // Guest (landing page) için auth opsiyonel
   const authHeader = req.headers.get('authorization')
@@ -25,7 +26,9 @@ export async function POST(req: NextRequest) {
     botUserId = user.id
     // Rate limiting — 50 istek/gün (giriş yapmış kullanıcılar)
     try {
-      const rlDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+      if (!serviceRoleKey) throw new Error('service role key missing')
+      const rlDb = createClient(supabaseUrl, serviceRoleKey)
       const today = new Date().toISOString().split('T')[0]
       const { data: rl } = await rlDb.from('api_rate_limits').select('id, count').eq('user_id', botUserId).eq('endpoint', 'bot').eq('window_date', today).maybeSingle()
       if (rl) {
