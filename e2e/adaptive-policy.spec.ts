@@ -39,3 +39,8 @@ test('adaptif politika endpointi anonim erişimi reddeder', async ({ request }) 
   const response = await request.get('/api/student/adaptive-policy?topic=Kesirler')
   expect(response.status()).toBe(401)
 })
+
+test('adaptif cevap kaydı anonim erişimi reddeder', async ({ request }) => {
+  const response = await request.post('/api/adaptive-answer', { data: { sessionId: '00000000-0000-0000-0000-000000000000', questionIndex: 0 } })
+  expect(response.status()).toBe(401)
+})

@@ -299,6 +299,22 @@ function QuizPageContent() {
     questionShownAtRef.current = Date.now()
   }, [current, questions.length])
   const isSavingRef = useRef(false) // ✅ Çift save-quiz çağrısını önle
+  const adaptiveAnswerKeyRef = useRef('')
+  useEffect(() => {
+    const index = answers.length - 1
+    if (!sessionId || index < 0) return
+    const key = `${sessionId}:${index}`
+    if (adaptiveAnswerKeyRef.current === key) return
+    adaptiveAnswerKeyRef.current = key
+    void (async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      await fetch('/api/adaptive-answer', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ sessionId, questionIndex: index, ...answers[index] }),
+      }).catch(() => undefined)
+    })()
+  }, [answers, sessionId])
   const [chosen, setChosen] = useState<number | null>(null)
   const searchParams = useSearchParams()
   const [loadMsg, setLoadMsg] = useState('Profilin analiz ediliyor...')
