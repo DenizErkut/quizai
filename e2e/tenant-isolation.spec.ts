@@ -5,6 +5,10 @@ test.describe('tenant isolation security contract', () => {
     ['/api/teacher/learning-insights', 'get'],
     ['/api/parent/reports?userId=another-user', 'get'],
     ['/api/admin/agent-quality', 'get'],
+    ['/api/teacher/learning-risk', 'get'],
+    ['/api/admin/learning-risk', 'get'],
+    ['/api/admin/predictive-risk-calibration', 'get'],
+    ['/api/teacher/learning-risk/actions', 'get'],
   ] as const
 
   for (const [route, method] of protectedRoutes) {
