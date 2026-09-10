@@ -19,6 +19,7 @@ import MisconceptionQuality from '@/components/admin/MisconceptionQuality'
 import MisconceptionMicroContent from '@/components/admin/MisconceptionMicroContent'
 import AgentQuality from '@/components/admin/AgentQuality'
 import DataLifecycleRequests from '@/components/admin/DataLifecycleRequests'
+import AdaptiveEvaluation from '@/components/admin/AdaptiveEvaluation'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -1570,6 +1571,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           <LearningGraphRelations />
                     <RecommendationImpact />
                     <AgentQuality />
+                    <AdaptiveEvaluation />
           <MasteryCalibration />
           <RetentionCalibration />
           <QuestionDifficultyCalibration />
