@@ -14,10 +14,14 @@ export default function ResetPasswordPage() {
   const supabase = createClient() as any
 
   useEffect(() => {
-    // Supabase token'ı URL hash'ten alır
-    supabase.auth.onAuthStateChange((event: string) => {
-      if (event === 'PASSWORD_RECOVERY') setReady(true)
-    })
+    let active = true
+    // Listener bazı tarayıcılarda hash işlendikten sonra bağlanabiliyor; mevcut
+    // oturumu da kontrol ederek geçerli linkte formun takılı kalmasını önle.
+    const queryError = new URLSearchParams(window.location.search).get('error_code')
+    if (queryError === 'otp_expired') setError('Bu sıfırlama bağlantısının süresi dolmuş. Giriş sayfasından yeni bağlantı isteyin.')
+    supabase.auth.getSession().then(({ data: { session } }: any) => { if (active && session) setReady(true) })
+    const { data: listener } = supabase.auth.onAuthStateChange((event: string) => { if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') setReady(true) })
+    return () => { active = false; listener?.subscription?.unsubscribe() }
   }, [])
 
   async function handleReset() {
@@ -47,9 +51,9 @@ export default function ResetPasswordPage() {
             </>
           ) : !ready ? (
             <>
-              <h1 className="serif" style={{ fontSize: '22px', marginBottom: '0.75rem' }}>Bağlantı doğrulanıyor...</h1>
+              <h1 className="serif" style={{ fontSize: '22px', marginBottom: '0.75rem' }}>{error ? 'Bağlantı geçersiz' : 'Bağlantı doğrulanıyor...'}</h1>
               <p style={{ color: 'var(--text2)', fontSize: '14px', lineHeight: 1.7 }}>
-                E-postanızdaki sıfırlama bağlantısına tıklayarak bu sayfaya gelmelisiniz. Bağlantı geçersizse lütfen tekrar deneyin.
+                {error || 'E-postanızdaki sıfırlama bağlantısına tıklayarak bu sayfaya gelmelisiniz.'}
               </p>
               <button className="btn" onClick={() => router.push('/login')} style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem' }}>
                 Giriş sayfasına dön
