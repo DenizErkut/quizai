@@ -20,6 +20,8 @@ foreach ($n in 100,500,1000,5000) { $env:LOAD_TEST_USERS=$n; $env:LOAD_TEST_ROUN
 
 Her kademe en az iki tur sürdürülür. Hata oranı `%1` üzerine çıkarsa veya p95 önceki kademeye göre iki katına çıkarsa test durdurulur. AI üretim uçları sınırsız stres testine dahil edilmez; maliyet ve sağlayıcı rate-limit riski nedeniyle sentetik/mock yanıt kullanılır.
 
+Vercel Deployment Protection açıksa Project Settings altında bir Automation Bypass Secret oluşturulur ve yalnızca çalıştırılan terminal oturumunda `VERCEL_AUTOMATION_BYPASS_SECRET` olarak tanımlanır. Anahtar repoya, loga veya sohbet mesajına yazılmaz; araç bunu `x-vercel-protection-bypass` başlığıyla gönderir.
+
 ## İzleme kabul kriterleri
 
 Vercel: function error rate, duration, concurrency ve memory. Supabase: Database > Reports altında CPU, connection count, query latency ve pool saturation. Uygulama: HTTP 4xx/5xx, timeout, p50/p95/p99 ve rate-limit (429). Her kademede zaman damgalı kayıt tutulur; production verisi veya gerçek öğrenci hesabı kullanılmaz.
