@@ -5,7 +5,7 @@
 // sellers tablosundaki diğer alanları (komisyon, iletişim bilgisi vb.)
 // sızdırma riski yoktur; yalnızca tek bir sayı döner.
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

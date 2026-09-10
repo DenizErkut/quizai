@@ -20,7 +20,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 
 export interface QualityIssue {
   questionIndex: number
-  issueType: 'unseen_passage' | 'book_metadata' | 'offtopic_drift' | 'chained_reference' | 'vocabulary_level' | 'answer_inconsistent'
+  issueType: 'unseen_passage' | 'book_metadata' | 'offtopic_drift' | 'chained_reference' | 'vocabulary_level' | 'answer_inconsistent' | 'language_mismatch' | 'missing_visible_emphasis'
   severity: 'high' | 'medium'
   reason: string
 }
@@ -34,7 +34,7 @@ interface QuestionForScan {
   type: string
 }
 
-const RULES_PROMPT = `Sen Pratium eğitim platformunun ürettiği soruları denetleyen bağımsız bir kalite kontrolcüsün. Aşağıdaki sorular, gerçek öğrencilere gösterilmiş MEB müfredatı sorularıdır. Her soruyu şu 6 bilinen kural ihlaline karşı kontrol et:
+const RULES_PROMPT = `Sen Pratium eğitim platformunun ürettiği soruları denetleyen bağımsız bir kalite kontrolcüsün. Aşağıdaki sorular, gerçek öğrencilere gösterilmiş MEB müfredatı sorularıdır. Her soruyu şu 8 bilinen kural ihlaline karşı kontrol et:
 
 1. unseen_passage: Soru "metinde anlatılan X'e göre", "verilen metne göre", "parçada anlatılan" gibi bir ifade kullanıyor AMA o metnin/örneğin özetini/içeriğini sorunun kendi metnine hiç dahil etmiyor — öğrenci için cevaplanamaz.
 2. book_metadata: Soru, kaynağın kendisi hakkında (kitabın yazarı, ISBN'i, İçindekiler sayfası, kaç sayfa olduğu vb.) — ders içeriği değil, kitabın idari bilgisi.
@@ -42,12 +42,14 @@ const RULES_PROMPT = `Sen Pratium eğitim platformunun ürettiği soruları dene
 4. chained_reference: Soru, öğrencinin görmediği BAŞKA bir soruya/örneğe/tabloya atıfta bulunuyor (ör. "Soru 39'a göre", "yukarıdaki tabloya göre" ama tablo hiç verilmemiş).
 5. vocabulary_level: Sorunun dili, belirtilen sınıf seviyesindeki bir öğrencinin bilemeyeceği kadar akademik/soyut/üniversite düzeyinde kelimeler içeriyor.
 6. answer_inconsistent: "ans" (doğru cevap indeksi) ile "exp" (açıklama) birbiriyle çelişiyor, ya da açıklama sorunun kendi mantığıyla tutarsız.
+7. language_mismatch: Soru kökü ve seçenekler, oturum için belirtilen hedef dilden ağırlıklı olarak farklı bir dilde yazılmış. Özel adlar, formüller ve kısa alıntılar ihlal değildir.
+8. missing_visible_emphasis: Soru "altı çizili", "vurgulanan", "underlined" veya "highlighted" bir ögeye atıf yapıyor ama hedef öge soru içinde [köşeli parantez] ile görünür biçimde işaretlenmemiş.
 
 SADECE gerçekten belirgin bir ihlal varsa bildir — şüpheli/sınırda durumları atla (yanlış pozitif üretmek, gerçek sorunları gözden kaçırmaktan daha maliyetlidir). Yalnızca geçerli JSON döndür:
 {"issues": [{"questionIndex": 0, "issueType": "unseen_passage", "severity": "high", "reason": "kısa açıklama (1 cümle)"}]}
 Hiç ihlal yoksa: {"issues": []}`
 
-async function callOpenAIJudge(topic: string, grade: string, questions: QuestionForScan[]): Promise<QualityIssue[]> {
+async function callOpenAIJudge(topic: string, grade: string, language: string, questions: QuestionForScan[]): Promise<QualityIssue[]> {
   if (!OPENAI_API_KEY) return []
 
   const questionsText = questions.map(q =>
@@ -68,7 +70,7 @@ async function callOpenAIJudge(topic: string, grade: string, questions: Question
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: RULES_PROMPT },
-          { role: 'user', content: `Konu: ${topic}\nSınıf seviyesi: ${grade}\n\nSorular:\n${questionsText}` },
+          { role: 'user', content: `Konu: ${topic}\nSınıf seviyesi: ${grade}\nHedef soru dili: ${language}\n\nSorular:\n${questionsText}` },
         ],
       }),
       signal: AbortSignal.timeout(30000),
@@ -92,9 +94,10 @@ async function callOpenAIJudge(topic: string, grade: string, questions: Question
 export async function scanQuestionsForQualityIssues(
   topic: string,
   grade: string,
-  questions: QuestionForScan[]
+  questions: QuestionForScan[],
+  language = 'Türkçe',
 ): Promise<QualityIssue[]> {
   if (!questions.length) return []
   const batch = questions.slice(0, 10)
-  return callOpenAIJudge(topic, grade, batch)
+  return callOpenAIJudge(topic, grade, language, batch)
 }

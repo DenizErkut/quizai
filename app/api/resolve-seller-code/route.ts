@@ -3,7 +3,7 @@
 // ile korunuyor (PII/komisyon içerdiği için), bu route SADECE id+isim
 // döndüren güvenli, herkese açık bir çözümleyici.
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

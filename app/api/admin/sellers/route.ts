@@ -2,7 +2,7 @@
 // Satıcı listesi + her satıcının getirdiği kurum ve bireysel kullanıcı
 // sayısı ("kim kaç kişi getirdi" raporu).
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

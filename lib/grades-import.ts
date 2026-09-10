@@ -3,7 +3,7 @@
 // app/api/institution/import-grades hem app/api/teacher/import-grades
 // tarafından kullanılır.
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { normalizeSubjectName } from './student-report-topics'
 
 const supabaseAdmin = createClient(

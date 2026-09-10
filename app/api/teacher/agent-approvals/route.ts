@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 const db=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.SUPABASE_SERVICE_ROLE_KEY!)
 async function context(req:NextRequest){const token=req.headers.get('Authorization')?.replace(/^Bearer\s+/i,'');if(!token)return null;const {data:{user}}=await db.auth.getUser(token);if(!user)return null;const {data:teacher}=await db.from('teachers').select('id,approved').eq('user_id',user.id).maybeSingle();return teacher?.approved?{user,teacher}:null}
 export async function GET(req:NextRequest){const ctx=await context(req);if(!ctx)return NextResponse.json({error:'Yetkisiz.'},{status:403});const {data,error}=await db.from('agent_action_approval_queue').select('id,student_id,classroom_id,agent_name,policy_version,proposed_action,title,rationale,evidence,status,created_at').eq('teacher_id',ctx.teacher.id).eq('status','pending').order('created_at',{ascending:false}).limit(100);if(error)return NextResponse.json({error:'Onay kuyruğu alınamadı.'},{status:500});return NextResponse.json({items:data??[]})}

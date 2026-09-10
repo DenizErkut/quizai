@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { checkAndNotifyRiskyTopic } from '@/lib/parent-risk-alert'
 import { recordQuizLearningEvents } from '@/lib/learning-events'
 import { enrichAnswersWithMisconceptions } from '@/lib/misconceptions'

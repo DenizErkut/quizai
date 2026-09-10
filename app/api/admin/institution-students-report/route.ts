@@ -5,7 +5,7 @@
 // tarayıcıda görsel olarak gizlemek yeterli olmazdı — network sekmesinden
 // okunabilirdi). Sadece sayı, sınıf ve kayıt tarihi ham gider.
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'

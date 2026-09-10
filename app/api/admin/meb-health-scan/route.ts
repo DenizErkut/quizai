@@ -15,7 +15,7 @@
 // yazar — "önce gör, sonra sil" (Madde 5) ile aynı ruh: script kendi
 // kendine sessizce veri değiştirmez, admin açıkça istemeden.
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { runHealthCheck } from '@/lib/content-filters'

@@ -3,7 +3,7 @@
 // sınıf analizi/önerisi. Query param: classroomId (verilmezse öğretmenin
 // TÜM öğrencileri tek bir havuzda değerlendirilir).
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 import { computeClassRiskSummary } from '@/lib/class-risk'
 import { generateClassInsight } from '@/lib/teacher-class-insight'

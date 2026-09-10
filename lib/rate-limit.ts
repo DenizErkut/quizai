@@ -2,7 +2,7 @@
 // Supabase tabanlı basit rate limiter — Upstash gerektirmez
 // API başına kullanıcı günlük limit kontrolü
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

@@ -4,7 +4,7 @@
 // app/api/cron/weekly-plan-refresh — hesaplama ve üretim mantığı
 // lib/study-plan-generator.ts üzerinden paylaşılıyor.
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentityBySupabaseId } from '@/lib/identity/client'
 import { generateStudyPlan } from '@/lib/study-plan-generator'
 

@@ -4,7 +4,7 @@
 // kayıt sayfası henüz oturumsuz olduğundan bu küçük genel endpoint gerekir.
 // Yalnızca ilk ad döner — minimum kişisel veri.
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentityBySupabaseId } from '@/lib/identity/client'
 
 export const runtime = 'nodejs'

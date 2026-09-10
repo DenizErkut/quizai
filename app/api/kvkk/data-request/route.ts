@@ -1,7 +1,7 @@
 // app/api/kvkk/data-request/route.ts (HİBRİT VERSİYON)
 // Kimlik verisi TR-PG'den, platform verisi Supabase'den birleştirilerek sunulur.
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { exportIdentityData, recordKvkkRequest } from '@/lib/identity/client'
 
 const supabaseAdmin = createClient(

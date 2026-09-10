@@ -9,7 +9,7 @@
 // dahil). Bu endpoint id PARAMETRESİ ALMAZ — token'daki kullanıcıdan başka
 // hiç kimsenin kaydına asla erişemez.
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentityBySupabaseId } from '@/lib/identity/client'
 
 export const runtime = 'nodejs'

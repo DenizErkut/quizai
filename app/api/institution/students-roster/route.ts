@@ -3,7 +3,7 @@
 // öğrencilerini { id, schoolNo, fullName, grade } olarak döner.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 
 const supabaseAdmin = createClient(

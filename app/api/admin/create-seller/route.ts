@@ -1,6 +1,6 @@
 // app/api/admin/create-seller/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { generateUniqueSellerCode } from '@/lib/seller-code'
 
 const supabaseAdmin = createClient(

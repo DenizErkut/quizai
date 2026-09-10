@@ -1,7 +1,7 @@
 // app/api/admin/meb-upload/route.ts
 // MEB kaynağı yükle — PDF parse (+ taranmış PDF'ler için OCR fallback) + chunk + embed + Supabase kaydet
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { extractPdfText } from '@/lib/pdf-extract'

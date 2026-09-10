@@ -1,6 +1,6 @@
 // app/api/teacher/notify/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import webpush from 'web-push'
 
 const supabaseAdmin = createClient(

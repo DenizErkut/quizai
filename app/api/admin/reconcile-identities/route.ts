@@ -1,6 +1,6 @@
 // app/api/admin/reconcile-identities/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { reconcileIdentities } from '@/lib/identity/reconcile'

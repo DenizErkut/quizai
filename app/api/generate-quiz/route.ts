@@ -4,7 +4,7 @@ export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
 import { generateQuizFallback, callOpenAI } from '@/lib/openai'
 import { logAnthropicUsage } from '@/lib/ai-usage'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { getTopicMastery, computeErrorPatterns, buildStudentHistoryContext } from '@/lib/mastery'
 import { recordQuizLearningEvents } from '@/lib/learning-events'
 import { findPrerequisiteGaps, buildPrerequisiteContext } from '@/lib/learning-graph'
@@ -662,6 +662,21 @@ function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
     const text = q.q || ''
     const flagged = unseenPassagePattern.test(text) && !hasEmbeddedQuote(text) && !isSelfContainedMisconceptionQuestion(text)
     if (flagged) logRejected('unseen-passage-reference', q, 'metne/parçaya atıf var ama alıntı/self-contained değil')
+    return !flagged
+  })
+
+  // 11 Eylül 2026 — gerçek öğrenci bildirimi: soru "altı çizili sözcük"
+  // diyordu fakat q alanında hangi sözcüğün vurgulandığını gösteren hiçbir
+  // işaret yoktu. HTML/Markdown biçimlendirmesi model çıktısından UI'ya
+  // güvenilir taşınmadığı için tek desteklenen gösterim [köşeli parantez].
+  // Referans var ama işaret yoksa soru birden fazla şekilde yorumlanabilir;
+  // öğrenciye ulaşmadan elenir ve aşağıdaki top-up akışı yerine yenisini üretir.
+  const invisibleEmphasisPattern = /alt[ıi] (çizili|cizili)|vurgulan(an|mış|mis)|underlined|highlighted/i
+  result = result.filter((q: any) => {
+    const text = String(q.q || '')
+    const hasVisibleTarget = /\[[^\]\n]{1,120}\]/.test(text)
+    const flagged = invisibleEmphasisPattern.test(text) && !hasVisibleTarget
+    if (flagged) logRejected('invisible-emphasis', q, 'vurgulanan/altı çizili hedef görünür biçimde işaretlenmemiş')
     return !flagged
   })
 

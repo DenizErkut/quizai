@@ -11,7 +11,7 @@
 // hissettirmemek için bilinçli bir tercih. Veli isterse zaten
 // /api/parent/send-summary ile manuel isteyebiliyor (o her zaman gönderir).
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 import { computeParentWeeklySummary, buildParentSummaryEmailHtml, sendResendEmail } from '@/lib/parent-summary'
 

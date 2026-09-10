@@ -3,7 +3,7 @@
 // fonksiyon bir roster (ReportStudentBase[]) alır, ilgili raporun JSON'a
 // hazır verisini döner. Kimlik/roster oluşturma lib/report-context.ts'te.
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { ReportStudentBase } from '@/lib/student-reports'
 import { inferSubject, normalizeSubjectName, DIGER_DERS } from '@/lib/student-report-topics'
 

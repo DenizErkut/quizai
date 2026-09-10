@@ -3,7 +3,7 @@
 // içe aktarımın (grade_imports) notlarını, Pratium'un kendi test
 // istatistikleriyle (quiz_sessions, streaks) birleştirir.
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { inferSubject, normalizeSubjectName, DIGER_DERS } from './student-report-topics'
 
 const supabaseAdmin = createClient(

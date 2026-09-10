@@ -6,7 +6,7 @@
 // bir veliye çocuk adına onay değiştirme yetkisi vermek KVKK açısından
 // riskli olurdu — bilinçli bir sınır, bkz. plan Madde 7).
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentityBySupabaseId, getConsentStatus } from '@/lib/identity/client'
 
 const supabaseAdmin = createClient(

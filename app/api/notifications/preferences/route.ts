@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 const keys = ['assignment','streak','achievement','weekly_summary','teacher_message','push_enabled'] as const
 async function getUser(req: NextRequest) { const token=req.headers.get('Authorization')?.replace(/^Bearer\s+/i,''); if(!token)return null; const {data:{user}}=await db.auth.getUser(token); return user }

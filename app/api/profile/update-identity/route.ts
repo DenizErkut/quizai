@@ -3,7 +3,7 @@
 // için ince sarmalayıcı. Kimlik verisi tarayıcıdan doğrudan yazılamaz; bu route
 // oturumu doğrular ve lib/identity/client.updateIdentity'yi çağırır.
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentityBySupabaseId, updateIdentity, createIdentity } from '@/lib/identity/client'
 
 export const runtime = 'nodejs'

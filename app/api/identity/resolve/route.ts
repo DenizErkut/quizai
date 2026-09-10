@@ -8,7 +8,7 @@
 //
 // Erişim: yalnızca kimliği doğrulanmış (oturum açmış) kullanıcılar çağırabilir.
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 
 export const runtime = 'nodejs'
