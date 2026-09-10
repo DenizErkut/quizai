@@ -15,16 +15,18 @@ Bu günlük, kullanıcı ara onayı beklemeden yürütülen sonraki 10 uygulanab
 - [x] Kurum yöneticisi için kurum kapsamlı erken uyarı görünümü (`461b8d0`).
 - [x] Ajan kalite alarmı, katalog geçmişi ve risk uç noktalarının güvenlik doğrulama kapsamı genişletildi.
 - [x] Öğrenci ana ekranına salt-okunur çalışma, tekrar ve ilerleme ajanı özetleri (`5b3bf84`).
+- [x] Katalog kalite oranları ve uzman CSV dışa aktarımı (`6d6e196`).
+- [x] Soru-bazlı adaptif karar, destek seviyesi ve cevap başına mastery projection (`971766b`, `d5b7109`).
 
 ## Hazırlığı tamamlanan, veri/uzman işlemi bekleyen işler
 
 - [ ] 31 mikro içerik taslağının uzman tarafından satır bazında onaylanması.
 - [ ] Gerçek ön koşul paketlerinin ders/sınıf bazında uzman kaynaklarıyla doldurulması.
 - [ ] Eksik üniteler, çok-sınıflı konu adayları ve bekleyen 64 katalog eşleştirmesinin MEB kaynağıyla tamamlanması.
-- [ ] Kalan otomatikleştirilebilir yol haritası maddeleri: içerik/tekrar/ilerleme ajanlarının rol ekranlarına bağlanması ve sürekli operasyon metrikleri.
+- [x] Kalan otomatikleştirilebilir yol haritası maddeleri: içerik/tekrar/ilerleme ajanlarının rol ekranlarına bağlanması ve sürekli operasyon metrikleri.
 
 ## Doğrulama
 
 - TypeScript ve ilgili ESLint kontrolleri başarılı.
 - Tenant izolasyon test listesi yeni uç noktaları kapsıyor; gerçek iki-tenant fixture testi üretim kimlik bilgisi olmadan çalıştırılmadı.
-- Supabase migrasyonları `main` dalına gönderildi; production uygulaması migration pipeline’ı tarafından uygulanmalıdır.
+- Supabase migrasyonları `main` dalına gönderildi; production uygulaması migration pipeline’ı tarafından ayrıca uygulanıp uzak migration listesiyle doğrulanmalıdır.
