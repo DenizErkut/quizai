@@ -14,6 +14,7 @@ export default function LearningRiskOverview({ endpoint, title = 'Erken uyarıla
   const [data, setData] = useState<Data | null>(null)
   const [classroomId, setClassroomId] = useState('')
   const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -30,6 +31,17 @@ export default function LearningRiskOverview({ endpoint, title = 'Erken uyarıla
     return () => { cancelled = true }
   }, [classroomId, endpoint])
 
+  async function logAction(item: Risk, action: 'notify' | 'assign' | 'resolve') {
+    const { data: { session } } = await createClient().auth.getSession()
+    if (!session) return
+    setBusy(`${item.student_id}-${item.topic}`)
+    await fetch('/api/teacher/learning-risk/actions', {
+      method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, student_id: item.student_id, classroom_id: item.classes[0]?.id, subject: item.subject, topic: item.topic }),
+    })
+    setBusy(null)
+  }
+
   return <section className="card" style={{ marginBottom: '1.5rem' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
       <div><div style={{ fontSize: 14, fontWeight: 800, color: 'var(--primary)' }}>⚠️ {title}</div><div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>En az 3 kanıt ve %30 güven · yüksek riskler önce</div></div>
@@ -42,9 +54,15 @@ export default function LearningRiskOverview({ endpoint, title = 'Erken uyarıla
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '14px 0 10px' }}><span className="badge badge-red">Yüksek: {data.counts.high_students}</span><span className="badge badge-yellow">Orta: {data.counts.medium_students}</span><span className="badge">Konu uyarısı: {data.counts.total_warnings}</span></div>
       <div style={{ display: 'grid', gap: 8 }}>{data.warnings.slice(0, 20).map(item => <div key={`${item.student_id}-${item.subject}-${item.topic}`} style={{ borderTop: '1px solid var(--border)', paddingTop: 9, display: 'grid', gridTemplateColumns: 'minmax(130px, 1fr) minmax(180px, 2fr) auto', gap: 10, alignItems: 'center', fontSize: 12 }}>
         <span><strong>{item.student_name}</strong><br/><span style={{ color: 'var(--text3)', fontSize: 10 }}>{item.classes.map(c => c.name).join(', ') || 'Sınıfsız'}</span></span>
-        <span><strong>{item.topic}</strong><br/><span style={{ color: 'var(--text3)', fontSize: 10 }}>{item.subject} · {item.evidence.map(value => reasons[value]).filter(Boolean).join(', ')}</span></span>
+        <span><strong>{item.topic}</strong><br/><span style={{ color: 'var(--text3)', fontSize: 10 }}>{item.subject} · {item.evidence.map(value => reasons[value]).filter(Boolean).join(', ')}</span>{endpoint.includes('/teacher') && <><br/><span style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 6 }}>
+          <button disabled={busy === `${item.student_id}-${item.topic}`} onClick={() => logAction(item, 'notify')} style={miniButton}>Bildir</button>
+          <a href={`/teacher/assign?classroomId=${encodeURIComponent(item.classes[0]?.id || '')}&topic=${encodeURIComponent(item.topic)}&studentId=${encodeURIComponent(item.student_id)}`} onClick={() => { void logAction(item, 'assign') }} style={miniButton}>Çalışma planla</a>
+          <button disabled={busy === `${item.student_id}-${item.topic}`} onClick={() => logAction(item, 'resolve')} style={miniButton}>Çözüldü</button>
+        </span></>}</span>
         <span style={{ color: item.level === 'high' ? 'var(--red)' : '#b7791f', fontWeight: 800, textAlign: 'right' }}>{item.level === 'high' ? 'Yüksek' : 'Orta'}<br/><span style={{ fontSize: 10 }}>risk {item.score}</span></span>
       </div>)}</div>
     </>}
   </section>
 }
+
+const miniButton = { border: '1px solid var(--border)', borderRadius: 7, background: 'var(--surface)', color: 'var(--text2)', padding: '4px 7px', fontSize: 10, fontWeight: 700, textDecoration: 'none', cursor: 'pointer' } as const
