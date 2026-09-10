@@ -46,6 +46,8 @@ function timeAgo(dateStr: string) {
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [prefs, setPrefs] = useState<Record<string, boolean>>({ assignment:true, streak:true, achievement:true, weekly_summary:true, teacher_message:true })
+  const togglePref = async (key: string) => { const next=!prefs[key]; setPrefs(p=>({...p,[key]:next})); const token=(await createClient().auth.getSession()).data.session?.access_token; if(token) await fetch('/api/notifications/preferences',{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({[key]:next})}) }
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('all')
   const [pushSupported, setPushSupported] = useState(false)
@@ -69,6 +71,8 @@ export default function NotificationsPage() {
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
+    const prefRes = await fetch('/api/notifications/preferences', { headers: { Authorization: `Bearer ${user.access_token}` } })
+    if (prefRes.ok) { const prefData = await prefRes.json(); setPrefs(prefData) }
 
     const { data } = await supabase
       .from('notifications')
@@ -300,14 +304,14 @@ export default function NotificationsPage() {
             ].map(pref => (
               <div key={pref.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                 <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{pref.label}</span>
-                <div style={{ width: 40, height: 22, borderRadius: '99px', background: 'rgba(16,185,129,0.2)', border: '1.5px solid #10b981', display: 'flex', alignItems: 'center', padding: '2px', cursor: 'pointer' }}>
-                  <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#10b981', marginLeft: 'auto', transition: 'margin 0.2s' }} />
+                <button onClick={()=>togglePref(pref.key)} aria-label={prefs[pref.key]?'Kapat':'Aç'} style={{ width: 40, height: 22, borderRadius: '99px', background: prefs[pref.key]?'rgba(16,185,129,0.2)':'var(--border)', border: '1.5px solid #10b981', display: 'flex', alignItems: 'center', padding: '2px', cursor: 'pointer' }}>
+                  <div style={{ width: 16, height: 16, borderRadius: '50%', background: prefs[pref.key]?'#10b981':'var(--text4)', marginLeft: prefs[pref.key]?'auto':0, transition: 'margin 0.2s' }} />
                 </div>
               </div>
             ))}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text4)', marginTop: '10px' }}>
-            * Tercihler yakında Supabase'e kaydedilecek
+            Tercihler hesabına anında kaydedilir.
           </div>
         </div>
 
