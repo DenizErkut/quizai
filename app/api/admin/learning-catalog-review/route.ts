@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
 
   const status = req.nextUrl.searchParams.get('status') || 'pending'
   const requestedLimit = Number(req.nextUrl.searchParams.get('limit') || 50)
-  const limit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50
+  const limit = Number.isFinite(requestedLimit) ? Math.min(500, Math.max(1, requestedLimit)) : 50
   const category = req.nextUrl.searchParams.get('category') || 'all'
   const subject = req.nextUrl.searchParams.get('subject') || 'all'
   const search = canonicalText(req.nextUrl.searchParams.get('search') || '')

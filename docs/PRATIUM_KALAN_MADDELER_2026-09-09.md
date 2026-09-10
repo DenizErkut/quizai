@@ -99,12 +99,12 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 ## Güncel kalan maddeler — önerilen sıra
 
 1. [x] **Recommendation Engine v2 yaşam döngüsü:** önerinin uygulanması, ertelenmesi, reddedilmesi ve tamamlanmasını izlemek. Durum geçişleri, değiştirilemez olay tarihçesi, güvenli öğrenci işlemleri ve dashboard kartı tamamlandı.
-2. **Pilot içerik operasyonu:** doğrulanmış yanılgılar için mikro içerikleri üretip uzman onayından geçirmek; uzman ön koşul paketlerini doldurmak. Operasyon ekranı kapsam sayaçları ve sıradaki taslak akışı hazır; 31 içerik ve ön koşul paketleri uzman işlemi bekliyor.
-3. **Katalog kapsamını büyütmek:** kalan 36 eksik üniteyi, 8 çok-sınıflı adayı ve 64 inceleme adayını tamamlamak; yeni ders/sınıflara resmî kazanım import etmek. İnceleme kuyruğuna kapsam sayaçları (bekleyen/eşleşen/katalog düğümü) eklendi; gerçek eşleştirmeler uzman onayı bekliyor.
+2. **Pilot içerik operasyonu:** doğrulanmış yanılgılar için mikro içerikleri üretip uzman onayından geçirmek; uzman ön koşul paketlerini doldurmak. Operasyon ekranı ve kabul kapıları hazır; 31 içerik ve ön koşul paketleri uzman işlemi bekliyor. Bkz. `docs/PRATIUM_UZMAN_ICERIK_TESLIM_PAKETI.md`.
+3. **Katalog kapsamını büyütmek:** kalan 36 eksik üniteyi, 8 çok-sınıflı adayı ve 64 inceleme adayını tamamlamak; yeni ders/sınıflara resmî kazanım import etmek. Kişi verisi içermeyen filtreli uzman CSV dışa aktarımı ve kapsam dashboard'u hazır; gerçek eşleştirmeler uzman onayı bekliyor.
 4. [x] **Recommendation Engine v2 önceliklendirme:** zaman bütçesi, sınav tarihi, öğretmen ödevi, kurum planı, çeşitlilik ve yük dengeleme. Bağlamsal sıralama RPC'si, açıklanabilir puan kırılımı ve güvenli öncelik API'si tamamlandı.
 5. [x] **Adaptive Learning v3:** ikinci test parçasında soru-bazlı performans politikasına göre zorluk ve desteklenen soru türü değişimi; güvenlik sınırları uygulandı. Tam her-soru üretim döngüsü ve adaptif/standart etki karşılaştırması sonraki alt iş.
 6. [x] **Rol bazlı deneyimler:** öğrenci, öğretmen, veli ve kurum ekranlarında açıklanabilir karar katmanları; kurum/dönem karşılaştırmaları ve öğretmen müdahale görünümü tamamlandı.
 7. [x] **AI Tutor ve sınırlı ajanlar:** Learning Profile + Recommendation + Learning Graph bağlamı, güvenlik kapıları, uzman-onaylı içerik, yetki sınırı ve denetim kaydı tamamlandı.
 8. [x] **Operasyonel olgunluk:** tenant izolasyonu testleri, pipeline alarmları, kurtarma runbook'ları ve KVKK/çocuk verisi kontrolleri tamamlandı.
 9. [x] **Predictive Learning v2:** unutma/konu riski, beklenen başarı ve öğrenme tıkanması sinyalleri; 14 günlük gerçek sonuç kalibrasyonu tamamlandı.
-10. **Adaptive Learning v3 derinleştirme:** iki-parçalı adaptasyonu her soru kararına yaklaştırmak; ipucu, anlatım biçimi ve ön koşul seçimini politikaya katmak. Bu iş maliyet/gecikme sınırlarıyla birlikte açık.
+10. [x] **Adaptive Learning v3 derinleştirme:** aktif kişiselleştirmede soru-bazlı zorluk/biçim kararı, kontrollü ipucu/anlatım/ön koşul desteği ve sıkışma-kolaylık sınırları tamamlandı; standart ve öğretmen override akışı korunuyor.

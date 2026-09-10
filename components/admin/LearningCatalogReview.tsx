@@ -59,7 +59,7 @@ export default function LearningCatalogReview() {
   async function loadQueue() {
     setLoading(true); setMessage('')
     try {
-      const params = new URLSearchParams({ status: 'pending', limit: '100', category })
+      const params = new URLSearchParams({ status: 'pending', limit: '500', category })
       if (search.trim()) params.set('search', search.trim())
       const response = await fetch(`/api/admin/learning-catalog-review?${params}`)
       const data = await response.json()
@@ -75,6 +75,22 @@ export default function LearningCatalogReview() {
     } finally {
       setLoading(false)
     }
+  }
+
+  function downloadQueue() {
+    if (!candidates.length) return
+    const quote = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`
+    const rows = [
+      ['dimension_key', 'konu', 'ders', 'siniflar', 'kategori', 'soru_sayisi', 'ogrenci_sayisi', 'oncelik'],
+      ...candidates.map(candidate => [candidate.dimension_key, candidate.observed_label, candidate.observed_subject, candidate.sample_grades.join(' | '), candidate.triage_category, candidate.occurrence_count, candidate.student_count, candidate.priority_score]),
+    ]
+    const csv = `\uFEFF${rows.map(row => row.map(quote).join(';')).join('\r\n')}`
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `pratium-katalog-inceleme-${category}-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
   }
 
   async function review(candidate: Candidate, action: 'map' | 'dismiss') {
@@ -148,6 +164,9 @@ export default function LearningCatalogReview() {
         <button onClick={loadQueue} disabled={loading} className="btn btn-sm">
           {loading ? '⏳ Yükleniyor...' : '🔄 Kuyruğu Yükle'}
         </button>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+        <button onClick={downloadQueue} disabled={!candidates.length || loading} className="btn btn-sm">⬇️ Uzman CSV&apos;si indir</button>
       </div>
       {stats && (
         <div style={{ marginBottom: '12px' }}>
