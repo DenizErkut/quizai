@@ -41,10 +41,13 @@ Public `/`, `/pricing` ve `/login` sayfaları tek Windows makinesinden ani trafi
 ### AI maliyet analizi
 
 - Kodda token ve maliyet loglama mevcut (`ai_usage_logs`).
-- Canlı loglara bu çalışma ortamından erişilemediği için 10 soruluk test maliyeti tahmini yapıldı.
-- Mevcut karma yapı için tahmin: **$0,05–$0,09/test**.
-- Top-up gereken test için tahmin: **$0,09–$0,13/test**.
-- Mistral’ın yalnızca gölge modda açılması ek maliyet getirir; Mistral-first mimarisi teorik olarak maliyeti düşürür.
+- Production `QuizAI` projesindeki son 30 günlük gerçek kayıtlar incelendi (130 ana quiz üretimi, 68 top-up, 270 Claude doğrulaması, 170 OpenAI doğrulaması, 105 Gemini doğrulaması).
+- Gerçek çağrı ortalamaları: ana Claude üretimi **$0,017833**, GPT-4.1-mini pilot üretimi **$0,003555**, top-up **$0,036401**, Claude doğrulaması **$0,002944**, OpenAI doğrulaması **$0,001275**, Gemini doğrulaması **$0,000245**.
+- Bu kayıtların oturum bağlamı eksik olduğu için tüm doğrulama maliyetleri tek tek oturumlara bağlanamıyor. Gözlenebilir çağrı ortalaması yaklaşık **$0,0439/quiz**; 10 soruluk test için güvenli gerçekçi aralık **$0,04–$0,07**.
+- Top-up oranı kayıtlarda **%52,3** (68/130). Top-up oluşan testlerde maliyet genellikle **$0,07–$0,11** aralığına çıkıyor.
+- Mistral shadow %100 açılırsa, gerçek üretim token hacmiyle test başına yaklaşık **$0,0055** eklenir; tasarruf sağlamaz.
+- Mistral-first üretim, mevcut üretim çağrısının yerine geçerse (doğrulamalar aynı kalır) yaklaşık **$0,03–$0,04/test**; top-up da Mistral’a taşınırsa yaklaşık **$0,02–$0,03/test** beklenir. Bu, kalite ve fallback oranı doğrulanmadan üretim kararı değildir.
+- Bu hesaplar yalnızca AI token ücretidir; Vercel, Supabase ve diğer servis ücretlerini içermez.
 
 ## Yapılmayan veya bekleyen işler
 
