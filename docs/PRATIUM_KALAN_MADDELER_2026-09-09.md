@@ -65,7 +65,7 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 - [ ] Öğretmene sınıf ortak eksikleri ve müdahale önerileri vermek.
 - [ ] Veli ekranında teknik olmayan gelişim ve destek önerileri göstermek.
 - [ ] Kurum ekranına sınıf, şube, öğretmen ve dönem karşılaştırmaları eklemek.
-- [ ] Bildirim sıklığı ve önemini kullanıcı tercihleriyle yönetmek.
+- [x] Bildirim sıklığı ve önemini kullanıcı tercihleriyle yönetmek. (`notification_preferences` tablosu, RLS ve kullanıcı API'si canlı.)
 
 ## 8. AI Tutor ve ajanlar — orta
 
@@ -103,6 +103,6 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 3. **Katalog kapsamını büyütmek:** kalan 36 eksik üniteyi, 8 çok-sınıflı adayı ve 64 inceleme adayını tamamlamak; yeni ders/sınıflara resmî kazanım import etmek. İnceleme kuyruğuna kapsam sayaçları (bekleyen/eşleşen/katalog düğümü) eklendi; gerçek eşleştirmeler uzman onayı bekliyor.
 4. [x] **Recommendation Engine v2 önceliklendirme:** zaman bütçesi, sınav tarihi, öğretmen ödevi, kurum planı, çeşitlilik ve yük dengeleme. Bağlamsal sıralama RPC'si, açıklanabilir puan kırılımı ve güvenli öncelik API'si tamamlandı.
 5. [x] **Adaptive Learning v3:** ikinci test parçasında soru-bazlı performans politikasına göre zorluk ve desteklenen soru türü değişimi; güvenlik sınırları uygulandı. Tam her-soru üretim döngüsü ve adaptif/standart etki karşılaştırması sonraki alt iş.
-6. **Rol bazlı deneyimler:** öğrenci, öğretmen, veli ve kurum ekranlarında açıklanabilir karar katmanları. Öğrenci ve öğretmen öğrenme özetleri v1 tamamlandı; veli/kurum alt ekranları sırada.
+6. **Rol bazlı deneyimler:** öğrenci, öğretmen, veli ve kurum ekranlarında açıklanabilir karar katmanları. Öğrenci, öğretmen ve kurum öğrenme özetleri v1 tamamlandı; veli alt ekranı ve ortak karşılaştırmalar sırada.
 7. **AI Tutor ve sınırlı ajanlar:** Learning Profile + Recommendation + Learning Graph bağlamıyla güvenli çalışma.
 8. **Operasyonel olgunluk:** tenant izolasyonu, pipeline alarmları, kurtarma runbook'ları ve KVKK/çocuk verisi kontrolleri.
