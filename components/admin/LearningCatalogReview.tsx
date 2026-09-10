@@ -119,6 +119,14 @@ export default function LearningCatalogReview() {
     setMessage(`✅ ${succeeded}/${keys.length} aday katalog dışı bırakıldı ve audit geçmişine yazıldı.`)
     setLoading(false)
   }
+  async function undo(auditId: string) {
+    setLoading(true); setMessage('')
+    const response = await fetch('/api/admin/learning-catalog-review', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ action:'undo', auditId }) })
+    const data = await response.json()
+    await loadQueue()
+    setMessage(response.ok ? '✅ Son katalog kararı güvenli biçimde geri alındı.' : `❌ ${data.error || 'Karar geri alınamadı.'}`)
+    setLoading(false)
+  }
 
   return (
     <div className="card">
@@ -157,6 +165,7 @@ export default function LearningCatalogReview() {
       )}
       {candidates.length > 0 && <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}><button className="btn btn-sm" disabled={loading || selected.size === 0} onClick={() => void dismissSelected()}>Seçilenleri katalog dışı bırak ({selected.size})</button><button className="btn btn-sm" disabled={loading} onClick={() => setSelected(new Set(candidates.map(item => item.dimension_key)))}>Tümünü seç</button></div>}
       {message && <div style={{ fontSize: '12px', marginBottom: '12px', color: message.startsWith('✅') ? '#16a34a' : '#dc2626' }}>{message}</div>}
+      {recentAudit.length > 0 && <details style={{ marginBottom:12 }}><summary style={{ cursor:'pointer',fontSize:12,fontWeight:700,color:'var(--primary)' }}>Son kararlar ve geri alma</summary><div style={{ marginTop:7 }}>{recentAudit.slice(0,8).map((audit,index)=><div key={audit.id} style={{ display:'flex',justifyContent:'space-between',gap:8,borderTop:'1px solid var(--border)',padding:'6px 0',fontSize:11 }}><span>{audit.dimension_key} · {audit.action} · {new Date(audit.created_at).toLocaleString('tr-TR')}</span>{index===0&&audit.action!=='reset'&&<button className="btn btn-sm" disabled={loading} onClick={()=>void undo(audit.id)}>Geri al</button>}</div>)}</div></details>}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {candidates.map(candidate => {

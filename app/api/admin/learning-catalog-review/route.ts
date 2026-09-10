@@ -175,6 +175,13 @@ export async function PATCH(req: NextRequest) {
   const unitNodeId = typeof body?.unitNodeId === 'string' && body.unitNodeId ? body.unitNodeId : null
   const canonicalTopic = typeof body?.canonicalTopic === 'string' ? body.canonicalTopic.trim() : null
 
+  if (action === 'undo') {
+    const auditId = typeof body?.auditId === 'string' ? body.auditId : ''
+    if (!auditId) return NextResponse.json({ error: 'auditId gerekli.' }, { status: 400 })
+    const { data, error } = await adminDb.rpc('undo_learning_catalog_review_v1', { p_audit_id: auditId, p_reviewer_id: user.id })
+    if (error) return NextResponse.json({ error: error.message }, { status: 409 })
+    return NextResponse.json({ success: true, dimensionKey: data })
+  }
   if (!dimensionKey || !['map', 'dismiss'].includes(action)) {
     return NextResponse.json({ error: 'dimensionKey ve action (map|dismiss) gerekli.' }, { status: 400 })
   }

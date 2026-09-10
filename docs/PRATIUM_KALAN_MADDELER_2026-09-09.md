@@ -17,7 +17,7 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 - [ ] Farklı sınıflarda görülen 8 konu adayını sınıf/kaynak bazında ayrıştırmak.
 - [ ] Hemen eşleştirilebilir 64 konu adayını uzman/admin incelemesinden geçirmek.
 - [x] Konu alias sözlüğünü kontrollü genişletmek.
-- [ ] Admin inceleme ekranına filtre, toplu işlem, değişiklik geçmişi ve geri alma eklemek. *(Temel inceleme akışı var; bu dört yönetim özelliğinin tamamı henüz bitmedi.)*
+- [x] Admin inceleme ekranına filtre, toplu işlem, değişiklik geçmişi ve geri alma eklemek. (Yalnızca son ve henüz Learning Event üretmemiş karar geri alınabilir; kullanılmış eşleştirmeler ileri düzeltme gerektirir.)
 - [ ] Katalog kapsamı, eşleşme oranı ve bekleyen inceleme için kalite dashboard'u oluşturmak. *(Günlük kazanım pipeline ölçümü var; birleşik yönetici dashboard'u açık.)*
 
 ## 2. Resmî kazanım kataloğu — yüksek
