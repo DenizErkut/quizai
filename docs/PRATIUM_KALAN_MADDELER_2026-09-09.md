@@ -103,6 +103,8 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 3. **Katalog kapsamını büyütmek:** kalan 36 eksik üniteyi, 8 çok-sınıflı adayı ve 64 inceleme adayını tamamlamak; yeni ders/sınıflara resmî kazanım import etmek. İnceleme kuyruğuna kapsam sayaçları (bekleyen/eşleşen/katalog düğümü) eklendi; gerçek eşleştirmeler uzman onayı bekliyor.
 4. [x] **Recommendation Engine v2 önceliklendirme:** zaman bütçesi, sınav tarihi, öğretmen ödevi, kurum planı, çeşitlilik ve yük dengeleme. Bağlamsal sıralama RPC'si, açıklanabilir puan kırılımı ve güvenli öncelik API'si tamamlandı.
 5. [x] **Adaptive Learning v3:** ikinci test parçasında soru-bazlı performans politikasına göre zorluk ve desteklenen soru türü değişimi; güvenlik sınırları uygulandı. Tam her-soru üretim döngüsü ve adaptif/standart etki karşılaştırması sonraki alt iş.
-6. **Rol bazlı deneyimler:** öğrenci, öğretmen, veli ve kurum ekranlarında açıklanabilir karar katmanları. Öğrenci, öğretmen ve kurum öğrenme özetleri v1 tamamlandı; veli alt ekranı ve ortak karşılaştırmalar sırada.
-7. **AI Tutor ve sınırlı ajanlar:** Learning Profile + Recommendation + Learning Graph bağlamıyla güvenli çalışma.
-8. **Operasyonel olgunluk:** tenant izolasyonu, pipeline alarmları, kurtarma runbook'ları ve KVKK/çocuk verisi kontrolleri.
+6. [x] **Rol bazlı deneyimler:** öğrenci, öğretmen, veli ve kurum ekranlarında açıklanabilir karar katmanları; kurum/dönem karşılaştırmaları ve öğretmen müdahale görünümü tamamlandı.
+7. [x] **AI Tutor ve sınırlı ajanlar:** Learning Profile + Recommendation + Learning Graph bağlamı, güvenlik kapıları, uzman-onaylı içerik, yetki sınırı ve denetim kaydı tamamlandı.
+8. [x] **Operasyonel olgunluk:** tenant izolasyonu testleri, pipeline alarmları, kurtarma runbook'ları ve KVKK/çocuk verisi kontrolleri tamamlandı.
+9. [x] **Predictive Learning v2:** unutma/konu riski, beklenen başarı ve öğrenme tıkanması sinyalleri; 14 günlük gerçek sonuç kalibrasyonu tamamlandı.
+10. **Adaptive Learning v3 derinleştirme:** iki-parçalı adaptasyonu her soru kararına yaklaştırmak; ipucu, anlatım biçimi ve ön koşul seçimini politikaya katmak. Bu iş maliyet/gecikme sınırlarıyla birlikte açık.
