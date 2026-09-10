@@ -54,6 +54,7 @@ export default function LearningCatalogReview() {
   const [search, setSearch] = useState('')
   const [stats, setStats] = useState<{ total: number; pending: number; mapped: number; dismissed: number; mappedNodeCount: number; activeTopicNodes: number; categoryCounts: Record<string, number> } | null>(null)
   const [recentAudit, setRecentAudit] = useState<{ id: string; dimension_key: string; action: string; created_at: string }[]>([])
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   async function loadQueue() {
     setLoading(true); setMessage('')
@@ -64,6 +65,7 @@ export default function LearningCatalogReview() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'İnceleme kuyruğu yüklenemedi.')
       setCandidates(data.candidates || [])
+      setSelected(new Set())
       setUnits(data.units || [])
       setStats(data.stats || null)
       setRecentAudit(data.recentAudit || [])
@@ -105,6 +107,19 @@ export default function LearningCatalogReview() {
     }
   }
 
+  async function dismissSelected() {
+    const keys = [...selected]
+    if (!keys.length || !window.confirm(`${keys.length} aday katalog dışı bırakılsın mı?`)) return
+    setLoading(true); setMessage('Toplu işlem yürütülüyor…')
+    const results = await Promise.all(keys.map(dimensionKey => fetch('/api/admin/learning-catalog-review', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dimensionKey, action: 'dismiss' }),
+    })))
+    const succeeded = results.filter(result => result.ok).length
+    await loadQueue()
+    setMessage(`✅ ${succeeded}/${keys.length} aday katalog dışı bırakıldı ve audit geçmişine yazıldı.`)
+    setLoading(false)
+  }
+
   return (
     <div className="card">
       <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>
@@ -140,6 +155,7 @@ export default function LearningCatalogReview() {
           {recentAudit.length > 0 && <span className="badge">Son kararlar: {recentAudit.length}</span>}
         </div>
       )}
+      {candidates.length > 0 && <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}><button className="btn btn-sm" disabled={loading || selected.size === 0} onClick={() => void dismissSelected()}>Seçilenleri katalog dışı bırak ({selected.size})</button><button className="btn btn-sm" disabled={loading} onClick={() => setSelected(new Set(candidates.map(item => item.dimension_key)))}>Tümünü seç</button></div>}
       {message && <div style={{ fontSize: '12px', marginBottom: '12px', color: message.startsWith('✅') ? '#16a34a' : '#dc2626' }}>{message}</div>}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -162,7 +178,7 @@ export default function LearningCatalogReview() {
           return (
             <div key={candidate.dimension_key} style={{ padding: '12px', border: '1px solid var(--border)', borderRadius: '10px', background: 'var(--bg2)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: '8px' }}>
-                <strong style={{ fontSize: '13px' }}>{candidate.observed_label}</strong>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: '13px', fontWeight: 700 }}><input type="checkbox" checked={selected.has(candidate.dimension_key)} onChange={event => setSelected(current => { const next = new Set(current); if (event.target.checked) next.add(candidate.dimension_key); else next.delete(candidate.dimension_key); return next })} />{candidate.observed_label}</label>
                 <span style={{ fontSize: '11px', color: 'var(--text3)' }}>{candidate.occurrence_count} soru · {candidate.student_count} öğrenci · öncelik {candidate.priority_score}</span>
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>
