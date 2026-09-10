@@ -33,6 +33,10 @@ export async function resolveAdaptiveLearningPolicy(
   topic: string,
   subject?: string
 ): Promise<AdaptiveLearningPolicy> {
+  let overrideQuery = supabase.from('adaptive_teacher_overrides').select('id,reason').eq('student_id',studentId).ilike('topic',topic).eq('mode','standard').gt('expires_at',new Date().toISOString()).order('updated_at',{ascending:false}).limit(1)
+  if(subject) overrideQuery=overrideQuery.ilike('subject',subject)
+  const {data:override}=await overrideQuery.maybeSingle()
+  if(override) return {...STANDARD_POLICY,reasonCode:'TEACHER_STANDARD_OVERRIDE',reason:override.reason||'Öğretmen bu konu için standart modu seçti.'}
   const baseQuery = () => supabase.from('student_recommendations')
     .select('id, action_type, reason_code, reason, evidence')
     .eq('student_id', studentId).in('status', ['active', 'accepted']).ilike('topic', topic)

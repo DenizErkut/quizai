@@ -15,6 +15,8 @@ export default function LearningRiskOverview({ endpoint, title = 'Erken uyarıla
   const [classroomId, setClassroomId] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
+  const [standardOverrides,setStandardOverrides]=useState<Set<string>>(new Set())
+  const overrideKey=(studentId:string,subject:string,topic:string)=>`${studentId}|${subject.toLocaleLowerCase('tr-TR')}|${topic.toLocaleLowerCase('tr-TR')}`
 
   useEffect(() => {
     let cancelled = false
@@ -25,6 +27,7 @@ export default function LearningRiskOverview({ endpoint, title = 'Erken uyarıla
       const query = classroomId ? `?classroomId=${encodeURIComponent(classroomId)}` : ''
       const response = await fetch(`${endpoint}${query}`, { headers: { Authorization: `Bearer ${session.access_token}` } })
       if (!cancelled && response.ok) setData(await response.json())
+      if(endpoint.includes('/teacher')){const overrideResponse=await fetch('/api/teacher/adaptive-overrides',{headers:{Authorization:`Bearer ${session.access_token}`}});if(!cancelled&&overrideResponse.ok){const payload=await overrideResponse.json();setStandardOverrides(new Set((payload.overrides??[]).map((item:{student_id:string;subject:string;topic:string})=>overrideKey(item.student_id,item.subject,item.topic))))}}
       if (!cancelled) setLoading(false)
     }
     void load()
@@ -41,6 +44,7 @@ export default function LearningRiskOverview({ endpoint, title = 'Erken uyarıla
     })
     setBusy(null)
   }
+  async function toggleAdaptive(item:Risk){const classroom=item.classes[0]?.id;if(!classroom)return;const id=overrideKey(item.student_id,item.subject,item.topic);const standard=standardOverrides.has(id);setBusy(`${item.student_id}-${item.topic}`);const {data:{session}}=await createClient().auth.getSession();if(!session){setBusy(null);return}const response=await fetch('/api/teacher/adaptive-overrides',{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({student_id:item.student_id,classroom_id:classroom,subject:item.subject,topic:item.topic,mode:standard?'automatic':'standard',reason:`${item.evidence.map(value=>reasons[value]).filter(Boolean).join(', ')} nedeniyle öğretmen müdahalesi`})});if(response.ok)setStandardOverrides(current=>{const next=new Set(current);if(standard)next.delete(id);else next.add(id);return next});setBusy(null)}
 
   return <section className="card" style={{ marginBottom: '1.5rem' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -58,6 +62,7 @@ export default function LearningRiskOverview({ endpoint, title = 'Erken uyarıla
           <button disabled={busy === `${item.student_id}-${item.topic}`} onClick={() => logAction(item, 'notify')} style={miniButton}>Bildir</button>
           <a href={`/teacher/assign?classroomId=${encodeURIComponent(item.classes[0]?.id || '')}&topic=${encodeURIComponent(item.topic)}&studentId=${encodeURIComponent(item.student_id)}`} onClick={() => { void logAction(item, 'assign') }} style={miniButton}>Çalışma planla</a>
           <button disabled={busy === `${item.student_id}-${item.topic}`} onClick={() => logAction(item, 'resolve')} style={miniButton}>Çözüldü</button>
+          <button disabled={!item.classes[0]?.id||busy===`${item.student_id}-${item.topic}`} onClick={()=>void toggleAdaptive(item)} style={miniButton}>{standardOverrides.has(overrideKey(item.student_id,item.subject,item.topic))?'Adaptasyonu otomatiğe al':'30 gün standart mod'}</button>
         </span></>}</span>
         <span style={{ color: item.level === 'high' ? 'var(--red)' : '#b7791f', fontWeight: 800, textAlign: 'right' }}>{item.level === 'high' ? 'Yüksek' : 'Orta'}<br/><span style={{ fontSize: 10 }}>risk {item.score}</span></span>
       </div>)}</div>

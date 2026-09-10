@@ -56,7 +56,7 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 - [ ] Soru türü, ipucu, anlatım biçimi ve ön koşul kapsamını adapte etmek.
 - [ ] Öğrencinin sıkışmasını ve gereksiz kolay soruları önleyen sınırlar eklemek.
 - [ ] Adaptif ve standart grupları öğrenme kazanımıyla karşılaştırmak.
-- [ ] Öğretmene adaptasyon gerekçesi ve manuel müdahale seçeneği sunmak.
+- [x] Öğretmene adaptasyon gerekçesi ve manuel müdahale seçeneği sunmak. (Risk kanıtı görünür; öğretmen öğrenci+konuyu 30 gün standart moda alabilir veya yeniden otomatiğe bırakabilir.)
 
 ## 7. Kullanıcı deneyimleri — orta-yüksek
 
