@@ -8,8 +8,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!actor) return NextResponse.json({ error: 'Yasak.' }, { status: 403 })
   const { data: adminProfile } = await db.from('profiles').select('is_admin').eq('id', actor.id).maybeSingle()
   if (adminProfile?.is_admin !== true) return NextResponse.json({ error: 'Yasak.' }, { status: 403 })
-  const body = await req.json().catch(() => ({})) as { confirmation?: string }
-  if (body.confirmation !== 'KAYDI SIL') return NextResponse.json({ error: 'Onay metni hatalı.' }, { status: 400 })
   const { id } = await params
   const { data: request } = await db.from('data_lifecycle_requests').select('id,subject_user_id,status').eq('id', id).maybeSingle()
   if (!request || request.status !== 'in_progress') return NextResponse.json({ error: 'Talep ikinci onaydan geçmemiş.' }, { status: 409 })
