@@ -12,12 +12,15 @@ Bu günlük, kullanıcı ara onayı beklemeden yürütülen sonraki 10 uygulanab
 - [x] Ajan kalite alarmının günlük yönetici bildirimi ve Vercel cron bağlantısı (`671e1e5`).
 - [x] Yeni risk uç noktalarının sahte token tenant izolasyon testlerine eklenmesi (`f251a05`).
 - [x] Doğrulanmış yanılgı mikro içeriklerinde kontrollü ilk 5 taslak üretimi (`a15a408`).
+- [x] Kurum yöneticisi için kurum kapsamlı erken uyarı görünümü (`461b8d0`).
+- [x] Ajan kalite alarmı, katalog geçmişi ve risk uç noktalarının güvenlik doğrulama kapsamı genişletildi.
 
 ## Hazırlığı tamamlanan, veri/uzman işlemi bekleyen işler
 
 - [ ] 31 mikro içerik taslağının uzman tarafından satır bazında onaylanması.
 - [ ] Gerçek ön koşul paketlerinin ders/sınıf bazında uzman kaynaklarıyla doldurulması.
 - [ ] Eksik üniteler, çok-sınıflı konu adayları ve bekleyen 64 katalog eşleştirmesinin MEB kaynağıyla tamamlanması.
+- [ ] Kalan otomatikleştirilebilir yol haritası maddeleri: içerik/tekrar/ilerleme ajanlarının rol ekranlarına bağlanması ve sürekli operasyon metrikleri.
 
 ## Doğrulama
 
