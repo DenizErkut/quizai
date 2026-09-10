@@ -59,7 +59,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'exams' | 'curriculum' | 'kvkk' | 'coaching'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'exams' | 'curriculum' | 'kvkk' | 'adaptive' | 'coaching'>('users')
   const [identityMissing, setIdentityMissing] = useState<number | null>(null)
   const [identityScanning, setIdentityScanning] = useState(false)
   const [identityFixing, setIdentityFixing] = useState(false)
@@ -623,6 +623,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             { key: 'exams', label: '🎯 Sınav Kitapçıkları' },
             { key: 'curriculum', label: '📋 Müfredat Yönetimi' },
             { key: 'kvkk', label: '🔐 KVKK Talepleri' },
+            { key: 'adaptive', label: '🧪 Adaptive Pilot' },
             { key: 'coaching', label: '🎯 Özel Koçluk Talepleri' },
           ] as const).map(t => (
             <button key={t.key} className={`btn btn-sm ${tab === t.key ? 'btn-primary' : ''}`}
@@ -1571,7 +1572,6 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           <LearningGraphRelations />
                     <RecommendationImpact />
                     <AgentQuality />
-                    <AdaptiveEvaluation />
           <MasteryCalibration />
           <RetentionCalibration />
           <QuestionDifficultyCalibration />
@@ -1586,6 +1586,13 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         <div className="anim-up">
           <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)', marginBottom: '1rem' }}>🔐 KVKK Talep İşleme</h2>
           <DataLifecycleRequests />
+        </div>
+      )}
+
+      {tab === 'adaptive' && (
+        <div className="anim-up">
+          <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)', marginBottom: '1rem' }}>🧪 Adaptive Learning v3 Pilotu</h2>
+          <AdaptiveEvaluation />
         </div>
       )}
 
