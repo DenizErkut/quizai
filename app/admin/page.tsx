@@ -21,6 +21,7 @@ import AgentQuality from '@/components/admin/AgentQuality'
 import DataLifecycleRequests from '@/components/admin/DataLifecycleRequests'
 import AdaptiveEvaluation from '@/components/admin/AdaptiveEvaluation'
 import AdaptiveParticipants from '@/components/admin/AdaptiveParticipants'
+import AdaptiveStatistics from '@/components/admin/AdaptiveStatistics'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -1595,6 +1596,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)', marginBottom: '1rem' }}>🧪 Adaptive Learning v3 Pilotu</h2>
           <AdaptiveEvaluation />
           <AdaptiveParticipants />
+          <AdaptiveStatistics />
         </div>
       )}
 

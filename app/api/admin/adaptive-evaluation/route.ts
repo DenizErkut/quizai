@@ -21,5 +21,20 @@ export async function GET(req: NextRequest) {
   const counts = cohorts.map(row => row.completed_sample)
   const balanced = Math.min(...counts) > 0 && Math.max(...counts) / Math.min(...counts) <= 1.25
   const interpretable = cohorts.every(row => row.completed_sample >= minimum) && balanced
-  return NextResponse.json({ sample_version: 'adaptive-learning-v3-pilot', cohorts, minimum_interpretation_sample: minimum, balance_tolerance: 0.25, balanced, interpretable, interpretation_status: interpretable ? 'ready' : 'insufficient_or_unbalanced_sample' })
+  const completed = (data ?? []).filter(row => row.observation_ended_at)
+  const statistics = [
+    ['mastery', 'baseline_mastery', 'followup_mastery'],
+    ['retention', 'baseline_retention', 'followup_retention'],
+    ['test_pct', 'baseline_pct', 'followup_pct'],
+  ].map(([metric, baseline, followup]) => {
+    const gains = (cohort: string) => completed.filter(row => row.cohort === cohort).map(row => Number(row[followup as keyof typeof row]) - Number(row[baseline as keyof typeof row])).filter(Number.isFinite)
+    const adaptive = gains('adaptive'); const standard = gains('standard')
+    const mean = (values: number[]) => values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0
+    const variance = (values: number[]) => values.length > 1 ? values.reduce((sum, value) => sum + (value - mean(values)) ** 2, 0) / (values.length - 1) : 0
+    const difference = mean(adaptive) - mean(standard)
+    const standardError = Math.sqrt(variance(adaptive) / Math.max(adaptive.length, 1) + variance(standard) / Math.max(standard.length, 1))
+    const pooledSd = Math.sqrt(((adaptive.length - 1) * variance(adaptive) + (standard.length - 1) * variance(standard)) / Math.max(adaptive.length + standard.length - 2, 1))
+    return { metric, difference: Math.round(difference * 100) / 100, effect_size: pooledSd > 0 ? Math.round(difference / pooledSd * 100) / 100 : null, confidence_interval_95: [Math.round((difference - 1.96 * standardError) * 100) / 100, Math.round((difference + 1.96 * standardError) * 100) / 100], classification: !interpretable ? 'insufficient_data' : difference > 0 ? 'adaptive_positive' : difference < 0 ? 'standard_positive' : 'neutral' }
+  })
+  return NextResponse.json({ sample_version: 'adaptive-learning-v3-pilot', cohorts, statistics, minimum_interpretation_sample: minimum, balance_tolerance: 0.25, balanced, interpretable, interpretation_status: interpretable ? 'ready' : 'insufficient_or_unbalanced_sample' })
 }
