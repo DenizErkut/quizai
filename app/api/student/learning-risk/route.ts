@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
     .from('student_mastery')
     .select('subject,topic,mastery_score,confidence_score,retention_score,attempt_count,trend,last_practiced_at')
     .eq('student_id', user.id)
+    .eq('learning_objective_key', '')
     .gte('attempt_count', 3)
     .gte('confidence_score', 0.3)
     .order('last_mastery_update', { ascending: false })

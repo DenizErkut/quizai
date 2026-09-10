@@ -22,6 +22,7 @@ import DataLifecycleRequests from '@/components/admin/DataLifecycleRequests'
 import AdaptiveEvaluation from '@/components/admin/AdaptiveEvaluation'
 import AdaptiveParticipants from '@/components/admin/AdaptiveParticipants'
 import AdaptiveStatistics from '@/components/admin/AdaptiveStatistics'
+import LearningRiskOverview from '@/components/LearningRiskOverview'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -61,7 +62,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'exams' | 'curriculum' | 'kvkk' | 'adaptive' | 'coaching'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'exams' | 'curriculum' | 'kvkk' | 'adaptive' | 'risk' | 'coaching'>('users')
   const [identityMissing, setIdentityMissing] = useState<number | null>(null)
   const [identityScanning, setIdentityScanning] = useState(false)
   const [identityFixing, setIdentityFixing] = useState(false)
@@ -626,6 +627,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             { key: 'curriculum', label: '📋 Müfredat Yönetimi' },
             { key: 'kvkk', label: '🔐 KVKK Talepleri' },
             { key: 'adaptive', label: '🧪 Adaptive Pilot' },
+            { key: 'risk', label: '⚠️ Erken Uyarılar' },
             { key: 'coaching', label: '🎯 Özel Koçluk Talepleri' },
           ] as const).map(t => (
             <button key={t.key} className={`btn btn-sm ${tab === t.key ? 'btn-primary' : ''}`}
@@ -1597,6 +1599,13 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           <AdaptiveEvaluation />
           <AdaptiveParticipants />
           <AdaptiveStatistics />
+        </div>
+      )}
+
+      {tab === 'risk' && (
+        <div className="anim-up">
+          <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)', marginBottom: '1rem' }}>⚠️ Öğrenme Erken Uyarıları</h2>
+          <LearningRiskOverview endpoint="/api/admin/learning-risk" title="Tüm sınıflarda erken uyarılar" />
         </div>
       )}
 
