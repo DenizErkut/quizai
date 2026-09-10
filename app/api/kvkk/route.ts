@@ -2,7 +2,7 @@
 // KVKK m.11 — İlgili kişi hakları: veri indirme (taşınabilirlik) ve silme talebi
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { exportIdentityData, deleteIdentity } from '@/lib/identity/client'
+import { exportIdentityData } from '@/lib/identity/client'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -57,37 +57,13 @@ export async function GET(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const user = await getUser(req)
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
-
-  const { confirm } = await req.json()
-  if (confirm !== 'HESABIMI SIL') {
-    return NextResponse.json({ error: 'Onay metni eşleşmiyor.' }, { status: 400 })
-  }
-
-  // Silme talebini logla (KVKK ispat yükümlülüğü — kim, ne zaman talep etti)
-  await supabaseAdmin.from('kvkk_requests').insert({
-    user_id: user.id,
-    request_type: 'deletion',
-    status: 'completed',
-    requested_at: new Date().toISOString(),
-  }).select().maybeSingle()
-
-  // Kullanıcı verilerini sil — CASCADE ile bağlı tablolar da silinir
-  const tables = [
-    'quiz_sessions', 'spaced_repetition_cards', 'notifications',
-    'referrals', 'live_quiz_answers', 'ab_assignments', 'ab_events',
-    'daily_challenges', 'streaks', 'institution_users', 'api_rate_limits',
-  ]
-  for (const t of tables) {
-    await supabaseAdmin.from(t).delete().eq('user_id', user.id).then(() => {}, () => {})
-  }
-  // referrals'da referred olarak da olabilir
-  await supabaseAdmin.from('referrals').delete().eq('referred_id', user.id).then(() => {}, () => {})
-  // Profil sil
-  await supabaseAdmin.from('profiles').delete().eq('id', user.id)
-  // Kimlik verisini TR-PG'den de sil (ad-soyad, e-posta, rıza kayıtları — CASCADE)
-  await deleteIdentity(user.id).catch((e) => console.error('[kvkk] deleteIdentity error:', e?.message))
-  // Auth kullanıcısını sil
-  await supabaseAdmin.auth.admin.deleteUser(user.id)
-
-  return NextResponse.json({ success: true, message: 'Hesabınız ve tüm kişisel verileriniz silindi.' })
+  const { data: existing } = await supabaseAdmin.from('data_lifecycle_requests').select('id,status')
+    .eq('requested_by', user.id).eq('subject_user_id', user.id).eq('request_kind', 'deletion')
+    .in('status', ['pending', 'verified', 'in_progress']).maybeSingle()
+  if (existing) return NextResponse.json({ error: 'Zaten açık bir silme talebiniz var.', request: existing }, { status: 409 })
+  const { data, error } = await supabaseAdmin.from('data_lifecycle_requests').insert({
+    requested_by: user.id, subject_user_id: user.id, request_kind: 'deletion', scope: 'all_student_data',
+  }).select('id,status,created_at').single()
+  if (error) return NextResponse.json({ error: 'Silme talebi oluşturulamadı.' }, { status: 500 })
+  return NextResponse.json({ request: data, deletion_executed: false }, { status: 202 })
 }
