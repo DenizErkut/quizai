@@ -313,6 +313,12 @@ function ProfileSetupContent() {
                   {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Başla ⚡'}
                 </button>
               </div>
+              <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
+                <button onClick={requestDeletion} className="btn" style={{ color: 'var(--red)', borderColor: 'rgba(220,38,38,0.35)', width: '100%', justifyContent: 'center' }} disabled={deletionRequested}>
+                  {deletionRequested ? '✓ Silme talebi oluşturuldu' : 'Kaydımı sil'}
+                </button>
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px' }}>Talep admin doğrulamasına gönderilir; hemen silme yapılmaz.</div>
+              </div>
             </>
           )}
         </div>
