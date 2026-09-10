@@ -48,7 +48,7 @@ Learning Event temeli, mastery/retention kalibrasyonu, kısmi puan, misconceptio
 - [ ] Zaman bütçesi, sınav tarihi, öğretmen ödevi ve kurum planını önceliklendirmeye katmak.
 - [ ] Çeşitlilik ve yük dengeleme kuralları eklemek.
 - [ ] Öğretmen ve veli için açıklanabilir öneri özetleri sunmak.
-- [ ] Öneri politikalarını A/B veya gölge testleriyle karşılaştırmak.
+- [x] Öneri politikalarını A/B veya gölge testleriyle karşılaştırmak. (Kullanıcı sırasını değiştirmeyen baseline v1 ↔ priority v2 gölge ölçümü; ilk sıra/ilk 5 uyumu ve en az 100 örnek kapısı.)
 
 ## 6. Adaptive Learning v3 — yüksek
 

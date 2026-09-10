@@ -22,7 +22,11 @@ export async function GET(req: NextRequest) {
   })
 
   if (error) return NextResponse.json({ error: 'Öneriler alınamadı.' }, { status: 500 })
-  return NextResponse.json({ recommendations: (data ?? []).slice(0, 5), ranking_version: 'recommendation-priority-v2' })
+  const ranked = (data ?? []) as { id:string }[]
+  const { data: baseline } = await db.from('student_recommendations').select('id').eq('student_id', user.id).in('status', ['active','accepted','deferred']).gt('valid_until', new Date().toISOString()).order('priority_score', { ascending:false }).order('generated_at', { ascending:false }).limit(10)
+  const baselineIds=(baseline??[]).map(row=>row.id);const rankedIds=ranked.map(row=>row.id);const topAgreement=Boolean(baselineIds[0]&&baselineIds[0]===rankedIds[0]);const overlap=baselineIds.length&&rankedIds.length?rankedIds.slice(0,5).filter(id=>baselineIds.slice(0,5).includes(id)).length/Math.min(5,baselineIds.length,rankedIds.length):null
+  await db.from('agent_decision_audit').insert({actor_id:user.id,agent_name:'recommendation-shadow-v1',policy_version:'baseline-v1-vs-priority-v2',input_summary:{baseline_count:baselineIds.length,v2_count:rankedIds.length},decision_summary:{top_agreement:topAgreement,top5_overlap:overlap,baseline_top_id:baselineIds[0]??null,v2_top_id:rankedIds[0]??null}})
+  return NextResponse.json({ recommendations: ranked.slice(0, 5), ranking_version: 'recommendation-priority-v2' })
 }
 
 export async function POST(req: NextRequest) {

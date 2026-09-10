@@ -6,7 +6,7 @@ interface Summary { subject: string; action_type: string; graph_used: boolean; e
 interface Recent { id: string; subject: string; topic: string; action_type: string; graph_used: boolean; graph_relation_version: number | null; baseline_mastery: number | null; post_mastery: number | null; mastery_delta: number | null; event_score_pct: number | null; event_count: number; applied_at: string }
 
 export default function RecommendationImpact() {
-  const [data, setData] = useState<{ summary: Summary[]; recent: Recent[] } | null>(null)
+  const [data, setData] = useState<{ summary: Summary[]; recent: Recent[]; shadow?: {sample_size:number;top_agreement_rate:number|null;avg_top5_overlap_pct:number|null;interpretable:boolean} } | null>(null)
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState('')
   async function load() {
     setBusy(true); setMessage('')
@@ -24,6 +24,7 @@ export default function RecommendationImpact() {
     <button className="btn btn-sm" disabled={busy} onClick={load}>{busy ? 'Hesaplanıyor…' : 'Etki raporunu yükle'}</button>
     {message && <div style={{ marginTop: 8, color: '#dc2626', fontSize: 12 }}>{message}</div>}
     {data && <div style={{ marginTop: 10, display: 'grid', gap: 9, fontSize: 11 }}>
+      {data.shadow && <div style={{border:'1px solid var(--border)',borderRadius:8,padding:9,background:data.shadow.interpretable?'var(--green-bg)':'var(--amber-bg)'}}><strong>Gölge politika: baseline v1 ↔ priority v2</strong><div style={{marginTop:3}}>Örneklem: {data.shadow.sample_size} · ilk öneri uyumu: %{data.shadow.top_agreement_rate??'—'} · ilk 5 örtüşmesi: %{data.shadow.avg_top5_overlap_pct??'—'}</div><div style={{marginTop:3,color:'var(--text3)'}}>{data.shadow.interpretable?'En az 100 görüntüleme oluştu; etki sonucu ile birlikte değerlendirmeye hazır.':'Politika değişikliği yapılmayacak; en az 100 görüntüleme bekleniyor.'}</div></div>}
       {data.summary.length === 0 && <div style={{ color: 'var(--text3)' }}>Henüz ölçülebilir öneri uygulaması yok. Yeni adaptif testler otomatik örneklem oluşturacak.</div>}
       {data.summary.map((row, index) => <div key={`${row.subject}-${row.action_type}-${index}`} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 9 }}>
         <strong>{row.subject} · {row.action_type}</strong> · {row.graph_used ? 'Graph kullanıldı' : 'Graph kullanılmadı'}
