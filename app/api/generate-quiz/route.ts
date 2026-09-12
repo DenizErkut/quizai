@@ -5,6 +5,24 @@ import Anthropic from '@anthropic-ai/sdk'
 import { generateQuizFallback, callOpenAI } from '@/lib/openai'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { createClient } from '@/lib/supabase/server-create-client'
+
+function contextualAdaptiveHint(question: unknown, topic: string, fallback: string | null) {
+  if (!fallback) return null
+  const text = String((question as { q?: unknown })?.q || '').toLocaleLowerCase('tr-TR')
+  if (/[+\-−]?[0-9]+/.test(text) || /kaç|toplam|fark|işlem|sayı/.test(text)) {
+    return 'Verilen sayıları ve işlem sırasını belirle; işaretleri koruyarak işlemi adım adım yap.'
+  }
+  if (/hangisi|hangileri|doğru|yanlış/.test(text)) {
+    return 'Önce her seçeneği sorudaki temel kuralla karşılaştır; doğru olanı eleyerek bul.'
+  }
+  if (/neden|amacı|görevi|işlevi/.test(text)) {
+    return 'Sorunun sorduğu görevi belirle ve seçenekleri bu görevle eşleştir.'
+  }
+  if (topic.toLocaleLowerCase('tr-TR').includes('ingiliz')) {
+    return 'Cümledeki zaman ve özne ipuçlarını bul; seçeneği bunlarla uyumlu seç.'
+  }
+  return 'Sorudaki ana kavramı belirle ve verilen bilgiyi onunla ilişkilendir.'
+}
 import { getTopicMastery, computeErrorPatterns, buildStudentHistoryContext } from '@/lib/mastery'
 import { recordQuizLearningEvents } from '@/lib/learning-events'
 import { findPrerequisiteGaps, buildPrerequisiteContext } from '@/lib/learning-graph'
@@ -1582,7 +1600,7 @@ export async function POST(req: NextRequest) {
       adaptiveFocus: adaptivePolicy?.focus || 'standard',
       adaptiveReasonCode: adaptivePolicy?.reasonCode || 'NO_ACTIVE_SIGNAL',
       adaptiveRecommendationId: adaptivePolicy?.recommendationId || null,
-      adaptiveHint,
+      adaptiveHint: contextualAdaptiveHint(q, topic, adaptiveHint),
       adaptiveSupportLevel: supportLevel,
       adaptivePresentation: supportLevel === 'scaffold' ? 'step_by_step' : supportLevel === 'hint' ? 'concise' : 'independent',
       diagnosticStrategyVersion: diagnosticStrategy.active ? diagnosticStrategy.version : null,

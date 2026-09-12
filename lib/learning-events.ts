@@ -63,6 +63,34 @@ export async function recordQuizLearningEvents(
     console.error('[recommendations] refresh failed:', recommendationError.message)
   }
 
+  // A completed quiz should close the accepted/active recommendation that it
+  // actually addressed. The refresh function intentionally preserves accepted
+  // recommendations, so reconcile them explicitly after projecting the quiz.
+  const { data: session } = await supabase
+    .from('quiz_sessions')
+    .select('topic')
+    .eq('id', sessionId)
+    .eq('user_id', studentId)
+    .maybeSingle()
+  if (session?.topic) {
+    const { data: addressed } = await supabase
+      .from('student_recommendations')
+      .select('id, topic, status')
+      .eq('student_id', studentId)
+      .in('status', ['active', 'accepted'])
+    for (const recommendation of addressed ?? []) {
+      if (String(recommendation.topic).trim().toLocaleLowerCase('tr-TR') !== String(session.topic).trim().toLocaleLowerCase('tr-TR')) continue
+      const { error } = await supabase.rpc('transition_student_recommendation_v2', {
+        p_recommendation_id: recommendation.id,
+        p_student_id: studentId,
+        p_action: 'complete',
+        p_reason: 'QUIZ_COMPLETED_RECONCILIATION',
+        p_deferred_until: null,
+      })
+      if (error) console.error('[recommendations] completion reconciliation failed:', error.message)
+    }
+  }
+
   return {
     insertedEvents: Number(row?.inserted_events ?? 0),
     updatedMasteryRows: Number(row?.updated_mastery_rows ?? 0),
