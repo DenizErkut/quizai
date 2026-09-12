@@ -495,6 +495,8 @@ export type Database = {
           source_type: string | null
           file_url: string | null
           raw_text: string | null
+          text_preview: string
+          text_char_count: number
           created_at: string
         }
         Insert: {
@@ -507,6 +509,8 @@ export type Database = {
           source_type?: string | null
           file_url?: string | null
           raw_text?: string | null
+          text_preview?: never
+          text_char_count?: never
         }
         Update: {
           title?: string
@@ -514,6 +518,8 @@ export type Database = {
           subject?: string
           unit?: string
           level?: string
+          text_preview?: never
+          text_char_count?: never
         }
       }
       exam_resources: {
