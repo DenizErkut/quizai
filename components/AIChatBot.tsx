@@ -2,37 +2,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-type SpeechRecognitionEventLike = {
-  results: ArrayLike<{ 0: { transcript: string } }>
-}
-
-type SpeechRecognitionErrorEventLike = { error: string }
-
-type SpeechRecognitionLike = {
-  lang: string
-  continuous: boolean
-  interimResults: boolean
-  maxAlternatives: number
-  onstart: (() => void) | null
-  onend: (() => void) | null
-  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null
-  start: () => void
-  stop: () => void
-  abort: () => void
-}
-
-type SpeechRecognitionConstructor = new () => SpeechRecognitionLike
-
-declare global {
-  interface Window {
-    SpeechRecognition?: SpeechRecognitionConstructor
-    webkitSpeechRecognition?: SpeechRecognitionConstructor
-  }
-}
-
-const VOICE_SESSION_SECONDS = 5 * 60
-
 interface Message {
   role: 'user' | 'assistant'
   content: string
@@ -125,127 +94,15 @@ export default function AIChatBot({ isGuest = false }: Props) {
   const [loading, setLoading] = useState(false)
   const [unread, setUnread] = useState(0)
   const [bubbleDismissed, setBubbleDismissed] = useState(false)
-  const [voiceEnabled, setVoiceEnabled] = useState(false)
-  const [voiceConsentPending, setVoiceConsentPending] = useState(false)
-  const [voiceEligible, setVoiceEligible] = useState(false)
-  const voiceSupported = typeof window !== 'undefined' && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition)
-  const [listening, setListening] = useState(false)
-  const [voiceError, setVoiceError] = useState('')
-  const [voiceSecondsLeft, setVoiceSecondsLeft] = useState(VOICE_SESSION_SECONDS)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
-  const voiceEnabledRef = useRef(false)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  useEffect(() => {
-    let active = true
-    void createClient().auth.getSession().then(({ data }) => {
-      if (active) setVoiceEligible(Boolean(data.session) && !isGuest)
-    })
-    return () => {
-      active = false
-      recognitionRef.current?.abort()
-      window.speechSynthesis?.cancel()
-    }
-  }, [isGuest])
-
-  useEffect(() => {
-    voiceEnabledRef.current = voiceEnabled
-    if (!voiceEnabled) return
-    const timer = window.setInterval(() => {
-      setVoiceSecondsLeft(current => {
-        if (current <= 1) {
-          recognitionRef.current?.abort()
-          window.speechSynthesis?.cancel()
-          setListening(false)
-          setVoiceEnabled(false)
-          setVoiceError('5 dakikalık pilot oturumu tamamlandı. Yeniden başlatabilirsin.')
-          return VOICE_SESSION_SECONDS
-        }
-        return current - 1
-      })
-    }, 1000)
-    return () => window.clearInterval(timer)
-  }, [voiceEnabled])
-
-  function speak(text: string) {
-    if (!voiceEnabledRef.current || !('speechSynthesis' in window)) return
-    window.speechSynthesis.cancel()
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.lang = 'tr-TR'
-    utterance.rate = 0.96
-    utterance.pitch = 1
-    window.speechSynthesis.speak(utterance)
-  }
-
-  function enableVoice() {
-    if (!voiceSupported) {
-      setVoiceError('Bu tarayıcı sesli konuşmayı desteklemiyor. Chrome veya Edge ile deneyebilirsin.')
-      return
-    }
-    setVoiceConsentPending(false)
-    setVoiceError('')
-    setVoiceSecondsLeft(VOICE_SESSION_SECONDS)
-    setVoiceEnabled(true)
-  }
-
-  function disableVoice() {
-    recognitionRef.current?.abort()
-    recognitionRef.current = null
-    window.speechSynthesis?.cancel()
-    setListening(false)
-    setVoiceEnabled(false)
-    setVoiceConsentPending(false)
-    setVoiceSecondsLeft(VOICE_SESSION_SECONDS)
-  }
-
-  function startListening() {
-    if (!voiceEnabled || listening || loading) return
-    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!Recognition) {
-      setVoiceError('Bu tarayıcı sesli konuşmayı desteklemiyor.')
-      return
-    }
-
-    window.speechSynthesis?.cancel()
-    const recognition = new Recognition()
-    recognition.lang = 'tr-TR'
-    recognition.continuous = false
-    recognition.interimResults = false
-    recognition.maxAlternatives = 1
-    recognition.onstart = () => {
-      setVoiceError('')
-      setListening(true)
-    }
-    recognition.onend = () => setListening(false)
-    recognition.onerror = event => {
-      setListening(false)
-      setVoiceError(event.error === 'not-allowed'
-        ? 'Mikrofon izni verilmedi. Tarayıcı adres çubuğundan mikrofon iznini açabilirsin.'
-        : 'Seni anlayamadım. Mikrofon düğmesine basıp tekrar deneyebilirsin.')
-    }
-    recognition.onresult = event => {
-      const transcript = event.results[0]?.[0]?.transcript?.trim()
-      if (transcript) {
-        setInput(transcript)
-        void send(transcript)
-      }
-    }
-    recognitionRef.current = recognition
-    try {
-      recognition.start()
-    } catch {
-      setListening(false)
-      setVoiceError('Mikrofon başlatılamadı. Birkaç saniye sonra tekrar deneyebilirsin.')
-    }
-  }
-
-  async function send(textOverride?: string) {
-    const userMsg = (textOverride ?? input).trim()
-    if (!userMsg || loading) return
+  async function send() {
+    if (!input.trim() || loading) return
+    const userMsg = input.trim()
     setInput('')
     setMessages(prev => [...prev, { role: 'user', content: userMsg }])
     setLoading(true)
@@ -269,9 +126,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
         }),
       })
       const data = await res.json()
-      const reply = typeof data.reply === 'string' ? data.reply : 'Yanıt alınamadı, lütfen tekrar dene.'
-      setMessages(prev => [...prev, { role: 'assistant', content: reply }])
-      speak(reply)
+      setMessages(prev => [...prev, { role: 'assistant', content: data.reply }])
       if (!open) setUnread(prev => prev + 1)
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Bağlantı hatası, lütfen tekrar dene.' }])
@@ -333,36 +188,6 @@ export default function AIChatBot({ isGuest = false }: Props) {
                 : 'Öğrenme hedefin, platform kullanımı veya plan soruların için buradayım.'}
             </span>
           </div>
-
-          {voiceEligible && (
-            <div style={{ padding: '8px 12px', borderBottom: '1px solid #e2e8f0', background: voiceEnabled ? 'rgba(30,207,184,0.08)' : '#fff' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                <div>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#082465' }}>🎙️ Sesli Prati <span style={{ color: '#0a9e90', fontSize: '10px' }}>PİLOT</span></div>
-                  <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
-                    {voiceEnabled ? `Bas-konuş · ${Math.floor(voiceSecondsLeft / 60)}:${String(voiceSecondsLeft % 60).padStart(2, '0')} kaldı` : 'İsteğe bağlı, 5 dakikalık sesli çalışma'}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => voiceEnabled ? disableVoice() : setVoiceConsentPending(true)}
-                  style={{ border: '1px solid #b9e8e1', borderRadius: '16px', padding: '6px 10px', background: voiceEnabled ? '#082465' : '#effcf9', color: voiceEnabled ? '#fff' : '#087c70', cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}
-                >
-                  {voiceEnabled ? 'Sesliyi kapat' : 'Sesliyi dene'}
-                </button>
-              </div>
-              {voiceConsentPending && (
-                <div style={{ marginTop: '8px', padding: '9px', borderRadius: '10px', background: '#fff8df', border: '1px solid #f6df8b', fontSize: '10.5px', color: '#6b5420', lineHeight: 1.45 }}>
-                  Konuşman yazıya çevrilmek üzere tarayıcının konuşma servisine gönderilebilir. Pratium ham ses kaydetmez; Tutor’a yalnızca oluşan metin gönderilir.
-                  <div style={{ display: 'flex', gap: '6px', marginTop: '7px' }}>
-                    <button type="button" onClick={enableVoice} style={{ border: 0, borderRadius: '12px', padding: '5px 9px', background: '#087c70', color: '#fff', cursor: 'pointer', fontSize: '10px', fontWeight: 700 }}>Kabul et ve aç</button>
-                    <button type="button" onClick={() => setVoiceConsentPending(false)} style={{ border: '1px solid #d9c778', borderRadius: '12px', padding: '5px 9px', background: '#fff', color: '#6b5420', cursor: 'pointer', fontSize: '10px' }}>Vazgeç</button>
-                  </div>
-                </div>
-              )}
-              {voiceError && <div role="status" style={{ color: '#b42318', fontSize: '10px', marginTop: '6px', lineHeight: 1.35 }}>{voiceError}</div>}
-            </div>
-          )}
 
           {/* Mesajlar */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px', minHeight: 0 }}>
@@ -434,18 +259,6 @@ export default function AIChatBot({ isGuest = false }: Props) {
 
           {/* Input */}
           <div style={{ padding: '12px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '8px' }}>
-            {voiceEnabled && (
-              <button
-                type="button"
-                onClick={listening ? () => recognitionRef.current?.stop() : startListening}
-                disabled={loading}
-                aria-label={listening ? 'Dinlemeyi durdur' : 'Konuşmaya başla'}
-                title={listening ? 'Dinleniyor — durdurmak için tıkla' : 'Bas ve konuş'}
-                style={{ width: 38, height: 38, borderRadius: '50%', border: listening ? '2px solid #ff8a80' : '1.5px solid #b9e8e1', background: listening ? '#fff0ef' : '#effcf9', color: listening ? '#c62828' : '#087c70', cursor: loading ? 'default' : 'pointer', fontSize: '17px', flexShrink: 0, animation: listening ? 'voicePulse 1.2s ease-in-out infinite' : 'none' }}
-              >
-                {listening ? '■' : '🎙️'}
-              </button>
-            )}
             <input
               value={input}
               onChange={e => setInput(e.target.value)}
@@ -460,7 +273,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
               onFocus={e => (e.target.style.borderColor = '#1ECFB8')}
               onBlur={e => (e.target.style.borderColor = '#e2e8f0')}
             />
-            <button onClick={() => void send()} disabled={loading || !input.trim()} style={{
+            <button onClick={send} disabled={loading || !input.trim()} style={{
               width: 38, height: 38, borderRadius: '50%',
               background: input.trim() ? 'linear-gradient(135deg, #082465, #1ECFB8)' : '#e2e8f0',
               border: 'none', cursor: input.trim() ? 'pointer' : 'default',
@@ -581,7 +394,6 @@ export default function AIChatBot({ isGuest = false }: Props) {
         @keyframes pratiFloat { 0%,100%{transform:translateY(1px) rotate(-1deg)} 45%{transform:translateY(-7px) rotate(2deg)} 55%{transform:translateY(-7px) rotate(1deg)} }
         @keyframes pratiHello { 0%,100%{transform:translateY(0) rotate(0) scale(1)} 30%{transform:translateY(-7px) rotate(-7deg) scale(1.06)} 60%{transform:translateY(-4px) rotate(7deg) scale(1.04)} }
         @keyframes pratiPulse { 0%{opacity:.72;transform:scale(.88)} 75%,100%{opacity:0;transform:scale(1.18)} }
-        @keyframes voicePulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
         @media (prefers-reduced-motion: reduce) { .prati-mascot-live,.prati-launcher::before,.prati-launcher::after{animation:none!important} }
       `}</style>
     </>
