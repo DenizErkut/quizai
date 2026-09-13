@@ -365,6 +365,12 @@ function QuizPageContent() {
       setCustomTopic(decodeURIComponent(asgTopic))
       const recommendedSubject = searchParams.get('subject')
       if (recommendedSubject) setSelectedSubject(decodeURIComponent(recommendedSubject))
+
+      // Öneri bağlantısı yalnızca ilk açılışta formu doldurur. Parametreler
+      // adreste kalırsa F5/geri dönüşte tamamlanmış eski konu tekrar forma
+      // yazılıyordu. Next.js gezinme state'ini koruyarak tek kullanımlık URL'yi
+      // temizle; mevcut ekrandaki seçim bu oturum boyunca state'te kalır.
+      window.history.replaceState(window.history.state, '', '/quiz')
     }
 
     if (asgId && asgTopic) {

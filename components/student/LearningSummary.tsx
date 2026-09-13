@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { LIVE_DATA_REFRESH_EVENT } from '@/components/LiveDataRefresh'
 
 type Summary = {
   mastery: { subject: string; topic: string; mastery_score: number; retention_score: number; trend: string }[]
@@ -19,6 +20,8 @@ export default function LearningSummary() {
       if (response.ok) setData(await response.json())
     }
     void load()
+    window.addEventListener(LIVE_DATA_REFRESH_EVENT, load)
+    return () => window.removeEventListener(LIVE_DATA_REFRESH_EVENT, load)
   }, [])
   if (!data || (!data.mastery.length && !data.misconceptions.length && !data.recommendationHistory.length)) return null
   const focus = data.mastery[0]
