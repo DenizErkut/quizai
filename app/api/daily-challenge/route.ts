@@ -129,8 +129,39 @@ export async function POST(request: NextRequest) {
   const score = normalized.filter((answer: any) => answer.correct).length
   const pct = questions.length ? Math.round(score / questions.length * 100) : 0
   const date = today()
-  await db.from('quiz_sessions').insert({ user_id: user.id, topic: challenge.topic, grade: (await getProfile(user.id)).grade, language: 'Türkçe', question_count: questions.length, questions, answers: normalized, score, pct, completed: true, is_daily: true, question_type: 'mixed' })
-  await db.from('daily_challenges').update({ completed: true }).eq('id', challenge.id).eq('user_id', user.id)
+  const profile = await getProfile(user.id)
+  const { data: savedSession, error: sessionError } = await db.from('quiz_sessions').insert({
+    user_id: user.id,
+    topic: challenge.topic,
+    grade: profile.grade,
+    language: profile.language || 'Türkçe',
+    question_count: questions.length,
+    questions,
+    answers: normalized,
+    score,
+    partial_score: score,
+    partial_pct: pct,
+    completed: true,
+    is_daily: true,
+    question_type: 'mixed',
+    gen_engine: 'daily-question-bank-v1',
+  }).select('id').single()
+  if (sessionError || !savedSession) {
+    console.error('[daily-challenge] quiz session save failed', sessionError?.code)
+    return NextResponse.json({ error: 'Günlük test sonucu kaydedilemedi. Lütfen tekrar deneyin.' }, { status: 500 })
+  }
+
+  const { data: completedChallenge, error: completionError } = await db.from('daily_challenges')
+    .update({ completed: true })
+    .eq('id', challenge.id)
+    .eq('user_id', user.id)
+    .eq('completed', false)
+    .select('id')
+    .maybeSingle()
+  if (completionError || !completedChallenge) {
+    await db.from('quiz_sessions').delete().eq('id', savedSession.id).eq('user_id', user.id)
+    return NextResponse.json({ error: 'Günlük görev tamamlanamadı. Lütfen tekrar deneyin.' }, { status: 409 })
+  }
 
   const current = await getStreak(user.id)
   const yesterday = new Date(); yesterday.setUTCDate(yesterday.getUTCDate() - 1)
