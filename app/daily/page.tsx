@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
-interface Question { q: string; opts?: string[]; ans: number; exp?: string; type?: string; pairs?: {left: string; right: string}[]; items?: string[]; blank?: string; statements?: {text: string; correct: boolean}[] }
+interface Question { q: string; opts?: string[]; ans: number; exp?: string; explanation?: string; type?: string; pairs?: {left: string; right: string}[]; items?: string[]; blank?: string; statements?: {text: string; correct: boolean}[]; bankQuestionId?: string; bankSubject?: string; bankTopic?: string }
 interface Streak { current_streak: number; longest_streak: number; total_points: number; last_activity_date: string | null }
 interface Challenge { id: string; date: string; topic: string; subject: string; questions: Question[] }
 
@@ -20,6 +20,10 @@ export default function DailyPage() {
   const [current, setCurrent] = useState(0)
   const [answers, setAnswers] = useState<{ userAns: number; correct: boolean }[]>([])
   const [chosen, setChosen] = useState<number | null>(null)
+  const [multiTFAnswer, setMultiTFAnswer] = useState<Record<number, boolean>>({})
+  const [reportedQuestions, setReportedQuestions] = useState<Set<number>>(new Set())
+  const [reportingQuestion, setReportingQuestion] = useState<number | null>(null)
+  const [reportError, setReportError] = useState('')
   const [alreadyDone, setAlreadyDone] = useState(false)
   const [dailyQuestionType, setDailyQuestionType] = useState('multiple_choice')
   const supabase = createClient() as any
@@ -53,6 +57,47 @@ export default function DailyPage() {
     setAnswers(prev => [...prev, { userAns: idx, correct }])
   }
 
+  function correctAnswerText(question: Question) {
+    if (question.type === 'multi_true_false' && question.statements?.length) {
+      return question.statements.map(statement => `${statement.text}: ${statement.correct ? 'Doğru' : 'Yanlış'}`).join(' · ')
+    }
+    return question.opts?.[question.ans] || (question.ans === 0 ? 'Doğru' : 'Yanlış')
+  }
+
+  function currentUserAnswerText(question: Question) {
+    if (question.type === 'multi_true_false' && question.statements?.length) {
+      return question.statements.map((statement, index) => `${statement.text}: ${multiTFAnswer[index] === true ? 'Doğru' : multiTFAnswer[index] === false ? 'Yanlış' : 'Cevaplanmadı'}`).join(' · ')
+    }
+    return chosen == null ? 'Cevap verilmedi' : question.opts?.[chosen] || String(chosen)
+  }
+
+  async function reportCurrentQuestion() {
+    if (!challenge || reportedQuestions.has(current)) return
+    setReportingQuestion(current)
+    setReportError('')
+    const question = challenge.questions[current]
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Oturum bulunamadı.')
+      const { error } = await supabase.from('error_reports').insert({
+        user_id: user.id,
+        question_text: question.q,
+        correct_answer: correctAnswerText(question),
+        user_answer: currentUserAnswerText(question),
+        topic: question.bankTopic || challenge.topic,
+        status: 'pending',
+        source: 'user_report',
+        reporter_role: 'student',
+      })
+      if (error) throw error
+      setReportedQuestions(previous => new Set([...previous, current]))
+    } catch (error: any) {
+      setReportError(error?.message || 'Bildirim gönderilemedi.')
+    } finally {
+      setReportingQuestion(null)
+    }
+  }
+
   async function next() {
     if (!challenge) return
     if (current + 1 >= challenge.questions.length) {
@@ -67,7 +112,7 @@ export default function DailyPage() {
       setAlreadyDone(true)
       setScreen('done')
     } else {
-      setCurrent(c => c + 1); setChosen(null)
+      setCurrent(c => c + 1); setChosen(null); setMultiTFAnswer({}); setReportError('')
     }
   }
 
@@ -194,6 +239,16 @@ export default function DailyPage() {
               Günlük Test · Soru {current + 1}/{challenge.questions.length}
             </div>
             <p style={{ fontSize: '17px', fontWeight: 500, lineHeight: 1.55, marginBottom: '1.5rem' }}>{q.q}</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-0.75rem', marginBottom: '1rem' }}>
+              <button
+                type="button"
+                onClick={reportCurrentQuestion}
+                disabled={reportedQuestions.has(current) || reportingQuestion === current}
+                style={{ border: 'none', background: 'transparent', color: reportedQuestions.has(current) ? 'var(--green)' : 'var(--text3)', fontSize: '12px', cursor: reportedQuestions.has(current) ? 'default' : 'pointer', padding: '4px 0' }}>
+                {reportedQuestions.has(current) ? '✓ Hata bildirimi gönderildi' : reportingQuestion === current ? 'Gönderiliyor...' : '⚠️ Bu soruyu bildir'}
+              </button>
+            </div>
+            {reportError && <div style={{ color: 'var(--red)', fontSize: '12px', marginBottom: '1rem', textAlign: 'right' }}>{reportError}</div>}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {((): React.ReactNode => {
                 const qq = q as any
@@ -244,7 +299,40 @@ export default function DailyPage() {
                     </div>
                   )
                 }
-                if (qq.type === 'true_false' || qq.type === 'multi_true_false') {
+                if (qq.type === 'multi_true_false' && Array.isArray(qq.statements)) {
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {qq.statements.map((statement: any, statementIndex: number) => {
+                        const answered = chosen !== null
+                        const correct = multiTFAnswer[statementIndex] === statement.correct
+                        return (
+                          <div key={statementIndex} style={{ padding: '12px 14px', borderRadius: '10px', border: `1.5px solid ${answered ? (correct ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.3)') : 'var(--border)'}`, background: answered ? (correct ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)' }}>
+                            <div style={{ fontSize: '14px', lineHeight: 1.5, marginBottom: '9px' }}>{statementIndex + 1}. {statement.text}</div>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              {[true, false].map(value => (
+                                <button key={String(value)} type="button" disabled={answered}
+                                  onClick={() => setMultiTFAnswer(previous => ({ ...previous, [statementIndex]: value }))}
+                                  style={{ padding: '7px 14px', borderRadius: '8px', border: `1.5px solid ${multiTFAnswer[statementIndex] === value ? (value ? 'rgba(22,163,74,0.5)' : 'rgba(220,38,38,0.4)') : 'var(--border)'}`, background: multiTFAnswer[statementIndex] === value ? (value ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg3)', color: 'var(--text)', fontWeight: 600, cursor: answered ? 'default' : 'pointer' }}>
+                                  {value ? '✓ Doğru' : '✗ Yanlış'}
+                                </button>
+                              ))}
+                              {answered && <span style={{ fontSize: '12px', fontWeight: 700, color: correct ? 'var(--green)' : 'var(--red)' }}>{correct ? '✓' : `✗ Doğrusu: ${statement.correct ? 'Doğru' : 'Yanlış'}`}</span>}
+                            </div>
+                          </div>
+                        )
+                      })}
+                      {chosen === null && (
+                        <button type="button" className="btn btn-primary"
+                          disabled={qq.statements.some((_: any, index: number) => multiTFAnswer[index] === undefined)}
+                          onClick={() => choose(qq.statements.every((statement: any, index: number) => multiTFAnswer[index] === statement.correct) ? qq.ans : -1)}
+                          style={{ width: '100%', justifyContent: 'center', marginTop: '4px' }}>
+                          Cevapları onayla ✓
+                        </button>
+                      )}
+                    </div>
+                  )
+                }
+                if (qq.type === 'true_false') {
                   return (
                     <div style={{ display: 'flex', gap: '10px' }}>
                       {['Doğru', 'Yanlış'].map((lbl, i) => {
@@ -286,7 +374,7 @@ export default function DailyPage() {
             {chosen !== null && (
               <>
                 <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', borderLeft: '3px solid var(--accent)', fontSize: '13px', color: 'var(--text2)', lineHeight: 1.65 }}>
-                  <strong style={{ color: chosen === q.ans ? 'var(--green)' : 'var(--red)' }}>{chosen === q.ans ? 'Doğru! ' : 'Yanlış. '}</strong>{q.exp}
+                  <strong style={{ color: chosen === q.ans ? 'var(--green)' : 'var(--red)' }}>{chosen === q.ans ? 'Doğru! ' : 'Yanlış. '}</strong>{q.exp || q.explanation}
                 </div>
                 <button className="btn btn-primary" onClick={next} style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}>
                   {current + 1 < challenge.questions.length ? 'Sonraki →' : 'Sonuçlar →'}
@@ -303,7 +391,7 @@ export default function DailyPage() {
   if (screen === 'done') {
     const score = answers.filter(a => a.correct).length
     const pct = Math.round(score / 10 * 100)
-    const newStreak = (streak?.current_streak || 0) + 1
+    const newStreak = streak?.current_streak || 0
     return (
       <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
         <div style={{ maxWidth: '440px', width: '100%', textAlign: 'center' }} className="anim-up">
