@@ -46,10 +46,10 @@ async function openAIJudge(batch) {
     body: JSON.stringify({
       model: process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini',
       temperature: 0.1,
-      max_tokens: 1800,
+      max_tokens: 1200,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: 'Sen MEB uyumlu eğitim sorularını denetleyen bağımsız bir uzmansın. Her soru için doğru cevap indeksini, açıklamayı, konu/sınıf uygunluğunu, dil ve seçenek kalitesini kontrol et. Belirsiz soruyu reddet. Yalnızca JSON döndür: {"results":[{"index":0,"approved":true,"reason":"..."}]}' },
+        { role: 'system', content: 'Sen MEB uyumlu eğitim sorularını denetleyen bağımsız bir uzmansın. Doğru cevap indeksini, açıklamayı, konu/sınıf uygunluğunu, dili ve seçenekleri kontrol et. Belirsiz soruyu reddet. Açıklama veya gerekçe yazma. Her indeks için tam bir sonuç ver. Yalnızca kısa JSON döndür: {"results":[{"index":0,"approved":true}]}' },
         { role: 'user', content: JSON.stringify(batch.map((item, index) => ({ index, topic: item.topic, grade: item.grade, language: item.language, question: item.question }))) },
       ],
     }),
@@ -63,10 +63,10 @@ async function openAIJudge(batch) {
 
 async function geminiJudge(batch) {
   const model = process.env.GEMINI_FINAL_VALIDATOR_MODEL || 'gemini-3.6-flash'
-  const prompt = `MEB eğitim sorularını son kontrol uzmanı olarak denetle. Her soru için cevap indeksinin kesin doğruluğunu, açıklama tutarlılığını, konu ve sınıf uygunluğunu kontrol et. Belirsizse reddet. Yalnızca JSON döndür: {"results":[{"index":0,"approved":true,"reason":"..."}]}\n\n${JSON.stringify(batch.map((item, index) => ({ index, topic: item.topic, grade: item.grade, language: item.language, question: item.question })))}`
+  const prompt = `MEB eğitim sorularını son kontrol uzmanı olarak denetle. Her soru için cevap indeksinin kesin doğruluğunu, açıklama tutarlılığını, konu ve sınıf uygunluğunu kontrol et. Belirsizse reddet. Açıklama veya gerekçe yazma. Her indeks için tam bir sonuç ver. Yalnızca kısa JSON döndür: {"results":[{"index":0,"approved":true}]}\n\n${JSON.stringify(batch.map((item, index) => ({ index, topic: item.topic, grade: item.grade, language: item.language, question: item.question })))}`
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 1800, responseMimeType: 'application/json' } }),
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 1200, responseMimeType: 'application/json' } }),
     signal: AbortSignal.timeout(60000),
   })
   if (!response.ok) throw new Error(`Gemini validation failed: ${response.status}`)
