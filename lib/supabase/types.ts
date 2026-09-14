@@ -141,6 +141,56 @@ export type Database = {
           objective_candidate_basis?: string | null
         }
       }
+      question_bank: {
+        Row: {
+          id: string
+          fingerprint: string
+          subject_key: string
+          topic_key: string
+          grade_key: string
+          language_key: string
+          question_type: string
+          difficulty: string
+          question: Json
+          review_status: 'candidate' | 'approved' | 'rejected' | 'retired'
+          quality_score: number
+          source_session_id: string | null
+          source_engine: string | null
+          use_count: number
+          report_count: number
+          last_used_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          fingerprint: string
+          subject_key: string
+          topic_key: string
+          grade_key: string
+          language_key: string
+          question_type: string
+          difficulty: string
+          question: Json
+          review_status?: 'candidate' | 'approved' | 'rejected' | 'retired'
+          quality_score?: number
+          source_session_id?: string | null
+          source_engine?: string | null
+          use_count?: number
+          report_count?: number
+          last_used_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          review_status?: 'candidate' | 'approved' | 'rejected' | 'retired'
+          quality_score?: number
+          use_count?: number
+          report_count?: number
+          last_used_at?: string | null
+          updated_at?: string
+        }
+      }
       daily_challenges: {
         Row: {
           id: string
@@ -553,6 +603,10 @@ export type Database = {
       record_quiz_learning_events: {
         Args: { p_student_id: string; p_session_id: string }
         Returns: { inserted_events: number; updated_mastery_rows: number }[]
+      }
+      mark_question_bank_used: {
+        Args: { p_ids: string[] }
+        Returns: undefined
       }
       refresh_student_learning_profile: {
         Args: { p_student_id: string }

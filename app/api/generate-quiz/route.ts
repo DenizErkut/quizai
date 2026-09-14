@@ -32,6 +32,7 @@ import { startingDifficultyFromMastery } from '@/lib/adaptive-difficulty'
 import { resolveDiagnosticQuestionStrategy } from '@/lib/diagnostic-question-strategy'
 import { applyCanonicalObjectiveMappings, learningObjectivePrompt, loadCanonicalObjectiveCandidates } from '@/lib/learning-objective-mapping'
 import { runMistralShadowComparison } from '@/lib/ai-gateway'
+import { getQuestionBankSet, promoteQuestionsToBank } from '@/lib/question-bank'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -1072,6 +1073,7 @@ export async function POST(req: NextRequest) {
 
     // Tekrar eden soruları önle
     let previousQuestionsNote = ''
+    const recentQuestionTexts: string[] = []
     try {
       // ✅ Son 10 test, 50 soru — agresif tekrar önleme
       const { data: recentSessions } = await supabase
@@ -1092,6 +1094,7 @@ export async function POST(req: NextRequest) {
           (s.questions || []).forEach((q: any) => {
             if (!q.q) return
             if (prevQTexts.length < 50) prevQTexts.push(q.q.slice(0, 100))
+            if (recentQuestionTexts.length < 100) recentQuestionTexts.push(q.q)
             // İlk 3 kelimeyi keyword olarak ekle — benzer soruları önle
             q.q.split(' ').slice(0, 5).forEach((w: string) => {
               if (w.length > 3) prevKeywords.add(w.toLowerCase())
@@ -1106,6 +1109,7 @@ export async function POST(req: NextRequest) {
         if (Array.isArray(excludeQuestionTexts)) {
           excludeQuestionTexts.forEach((t: string) => {
             if (typeof t === 'string' && prevQTexts.length < 50) prevQTexts.push(t.slice(0, 100))
+            if (typeof t === 'string' && recentQuestionTexts.length < 100) recentQuestionTexts.push(t)
           })
         }
 
@@ -1211,6 +1215,61 @@ export async function POST(req: NextRequest) {
       return []
     })
     const objectiveInstruction = learningObjectivePrompt(objectiveCandidates)
+
+    // Question Bank v1: only a complete, server-approved set bypasses AI.
+    // Uploaded/source passages, university content, daily challenges and
+    // adaptive continuation remain on their existing generation paths.
+    const bankEligible = !fileContent && !continueSessionId && !dailyChallenge && !isUniversityLevel
+    if (bankEligible) {
+      const bankQuestions = await getQuestionBankSet(supabase, {
+        subject, topic, grade, language: effectiveLang,
+        questionType, difficulty: resolvedDifficulty,
+      }, safeQCount, recentQuestionTexts)
+
+      if (bankQuestions.length === safeQCount && usageSessionId) {
+        const mappedCount = bankQuestions.filter((question: any) => question?.objectiveMappingStatus === 'mapped').length
+        const { data: bankSession, error: bankSessionError } = await supabase
+          .from('quiz_sessions')
+          .insert({
+            id: usageSessionId,
+            user_id: user.id,
+            topic,
+            grade,
+            language: effectiveLang,
+            question_count: bankQuestions.length,
+            questions: bankQuestions,
+            answers: [],
+            score: 0,
+            completed: false,
+            question_type: questionType,
+            gen_engine: 'question-bank-v1',
+            gen_request_id: usageRequestId,
+            objective_mapping_version: 'v1',
+            objective_candidate_count: objectiveCandidates.length,
+            objective_mapped_count: mappedCount,
+            curriculum_version_id: objectiveCandidates[0]?.curriculumVersionId || null,
+            objective_candidate_basis: objectiveCandidates[0]?.matchBasis || null,
+          })
+          .select('id')
+          .maybeSingle()
+
+        if (!bankSessionError && bankSession?.id) {
+          await supabase.from('profiles').update({
+            monthly_test_count: (profile.monthly_test_count || 0) + 1,
+          }).eq('id', user.id)
+          console.log(`[question-bank] HIT topic=${topic} count=${bankQuestions.length}`)
+          return NextResponse.json({
+            questions: bankQuestions,
+            sessionId: bankSession.id,
+            resolvedDifficulty,
+            source: 'question-bank',
+            adaptivePolicy: adaptivePolicy || undefined,
+            diagnosticStrategy,
+          })
+        }
+        console.warn(`[question-bank] session insert failed code=${bankSessionError?.code || 'unknown'}`)
+      }
+    }
 
     // 5 Eylül 2026 — P0 prompt caching (bkz. K12_STATIC_* tanımları ve
     // getStaticSystemBlock/stripStaticPartsForCaching yukarıda). Sadece K12/
@@ -1390,6 +1449,7 @@ export async function POST(req: NextRequest) {
     }
 
     let questions = (parsed.questions || []).map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
+    let externalValidationPassed = false
 
     // Soru doğrulama + SVG üretimi — PARALEL çalışır (timeout optimizasyonu)
     const visualCategory = detectVisualCategory(topic)
@@ -1422,6 +1482,7 @@ export async function POST(req: NextRequest) {
     // Verify sonucunu uygula
     if (verifyResult.status === 'fulfilled' && verifyResult.value?.questions?.length > 0) {
       questions = verifyResult.value.questions.map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
+      externalValidationPassed = true
     }
 
     // SVG sonuçlarını uygula
@@ -1454,6 +1515,11 @@ export async function POST(req: NextRequest) {
     if (questions.length < beforeDupCount) {
       console.warn(`[generate-quiz] yakın-tekrar kontrolü sonrası ${beforeDupCount - questions.length} soru elendi (${beforeDupCount} -> ${questions.length})`)
     }
+
+    // Only this externally validated slice may enter the shared bank. Top-up
+    // questions are generated later and are intentionally excluded until they
+    // pass the same independent validation path in a future request.
+    const validatedQuestionsForBank = externalValidationPassed ? questions.slice() : []
 
     // 14 Ağustos 2026'da öğretmen geri bildirimiyle bulunan ayrı bir hata:
     // istenen soru sayısı ile üretilen soru sayısı SIK SIK uyuşmuyordu
@@ -1740,7 +1806,17 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    return NextResponse.json({ questions, sessionId, resolvedDifficulty, adaptivePolicy: adaptivePolicy || undefined, diagnosticStrategy })
+    if (bankEligible && sessionId) {
+      after(async () => {
+        const promoted = await promoteQuestionsToBank(supabase, {
+          subject, topic, grade, language: effectiveLang,
+          questionType, difficulty: resolvedDifficulty,
+        }, validatedQuestionsForBank, { sessionId, engine: genEngineUsed })
+        console.log(`[question-bank] promoted=${promoted} topic=${topic}`)
+      })
+    }
+
+    return NextResponse.json({ questions, sessionId, resolvedDifficulty, source: 'ai', adaptivePolicy: adaptivePolicy || undefined, diagnosticStrategy })
   } catch (error: any) {
     console.error('Generate quiz error, trying OpenAI fallback:', error?.message)
     // GPT-4o yedek model
