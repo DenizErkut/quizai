@@ -16,6 +16,22 @@ const personalFields = [
   'diagnosticStrategyVersion', 'diagnosticReasonCode', 'diagnosticRole',
   'masteryConfidenceBefore', 'masteryEvidenceCountBefore', 'passage',
 ]
+const validationSchema = {
+  type: 'object',
+  properties: {
+    results: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { index: { type: 'integer' }, approved: { type: 'boolean' } },
+        required: ['index', 'approved'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['results'],
+  additionalProperties: false,
+}
 
 function key(value) {
   return String(value || '').trim().toLocaleLowerCase('tr-TR').normalize('NFKD')
@@ -47,7 +63,7 @@ async function openAIJudge(batch) {
       model: process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini',
       temperature: 0.1,
       max_tokens: 1200,
-      response_format: { type: 'json_object' },
+      response_format: { type: 'json_schema', json_schema: { name: 'validation_results', strict: true, schema: validationSchema } },
       messages: [
         { role: 'system', content: 'Sen MEB uyumlu eğitim sorularını denetleyen bağımsız bir uzmansın. Doğru cevap indeksini, açıklamayı, konu/sınıf uygunluğunu, dili ve seçenekleri kontrol et. Belirsiz soruyu reddet. Açıklama veya gerekçe yazma. Her indeks için tam bir sonuç ver. Yalnızca kısa JSON döndür: {"results":[{"index":0,"approved":true}]}' },
         { role: 'user', content: JSON.stringify(batch.map((item, index) => ({ index, topic: item.topic, grade: item.grade, language: item.language, question: item.question }))) },
@@ -66,13 +82,14 @@ async function geminiJudge(batch) {
   const prompt = `MEB eğitim sorularını son kontrol uzmanı olarak denetle. Her soru için cevap indeksinin kesin doğruluğunu, açıklama tutarlılığını, konu ve sınıf uygunluğunu kontrol et. Belirsizse reddet. Açıklama veya gerekçe yazma. Her indeks için tam bir sonuç ver. Yalnızca kısa JSON döndür: {"results":[{"index":0,"approved":true}]}\n\n${JSON.stringify(batch.map((item, index) => ({ index, topic: item.topic, grade: item.grade, language: item.language, question: item.question })))}`
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 1200, responseMimeType: 'application/json' } }),
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 1200, responseMimeType: 'application/json', responseSchema: validationSchema } }),
     signal: AbortSignal.timeout(60000),
   })
   if (!response.ok) throw new Error(`Gemini validation failed: ${response.status}`)
   const data = await response.json()
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
-  const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
+  const text = (data.candidates?.[0]?.content?.parts || []).filter(part => !part.thought).map(part => part.text || '').join('') || '{}'
+  const clean = text.replace(/```json|```/g, '').trim()
+  const parsed = JSON.parse(clean.slice(clean.indexOf('{'), clean.lastIndexOf('}') + 1))
   return { results: Array.isArray(parsed.results) ? parsed.results : [], usage: data.usageMetadata }
 }
 
