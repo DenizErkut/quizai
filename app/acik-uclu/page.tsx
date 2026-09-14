@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { getSubjectsForGrade } from '@/lib/subject-map-grade'
+import { useVoiceTutor } from '@/lib/use-voice-tutor'
 
 interface RubricItem { criterion: string; maxPoints: number; description: string }
 interface CriteriaResult { criterion: string; maxPoints: number; earnedPoints: number; feedback: string }
@@ -28,6 +29,9 @@ export default function AcikUcluPage() {
   const [rubric, setRubric] = useState<RubricItem[]>([])
   const [totalPossible, setTotalPossible] = useState(0)
   const [answer, setAnswer] = useState('')
+  const voice = useVoiceTutor(transcript => {
+    setAnswer(current => `${current}${current.trim() ? ' ' : ''}${transcript}`)
+  })
 
   const [criteriaResults, setCriteriaResults] = useState<CriteriaResult[]>([])
   const [overallFeedback, setOverallFeedback] = useState('')
@@ -146,6 +150,7 @@ export default function AcikUcluPage() {
       setOverallFeedback(json.overallFeedback)
       setTotalEarned(json.totalEarned)
       setStep('graded')
+      voice.disable()
     } catch {
       setError('Bağlantı hatası, tekrar dene.')
     }
@@ -153,6 +158,7 @@ export default function AcikUcluPage() {
   }
 
   function newQuestion() {
+    voice.disable()
     setStep('setup')
     setTopic('')
     setError('')
@@ -285,6 +291,37 @@ export default function AcikUcluPage() {
 
             <div className="card" style={{ padding: '1.25rem' }}>
               <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)' }}>Cevabın</label>
+              <div style={{ marginTop: '8px', marginBottom: '10px', padding: '10px 12px', borderRadius: '12px', border: '1px solid rgba(0,149,200,0.25)', background: voice.enabled ? 'rgba(30,207,184,0.08)' : 'rgba(0,149,200,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)' }}>🎙️ Sesli AUS <span style={{ color: '#0a9e90', fontSize: '10px' }}>PİLOT</span></div>
+                    <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '2px' }}>
+                      {voice.enabled ? `Bas-konuş · ${Math.floor(voice.secondsLeft / 60)}:${String(voice.secondsLeft % 60).padStart(2, '0')} kaldı` : 'Soruyu dinle veya cevabını konuşarak yazdır'}
+                    </div>
+                  </div>
+                  <button type="button" onClick={voice.enabled ? voice.disable : voice.requestConsent} style={{ border: '1px solid rgba(0,149,200,0.3)', borderRadius: '16px', padding: '6px 10px', background: voice.enabled ? 'var(--accent)' : 'var(--bg)', color: voice.enabled ? '#fff' : 'var(--accent)', cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}>
+                    {voice.enabled ? 'Sesliyi kapat' : 'Sesliyi aç'}
+                  </button>
+                </div>
+                {voice.consentPending && (
+                  <div style={{ marginTop: '8px', padding: '9px', borderRadius: '10px', background: '#fff8df', border: '1px solid #f6df8b', fontSize: '10.5px', color: '#6b5420', lineHeight: 1.45 }}>
+                    Konuşman yazıya çevrilmek üzere tarayıcının konuşma servisine gönderilebilir. Pratium ham ses kaydetmez; yalnızca metin alanına aktarılan cevabı işler.
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '7px' }}>
+                      <button type="button" onClick={voice.acceptConsent} style={{ border: 0, borderRadius: '12px', padding: '5px 9px', background: '#087c70', color: '#fff', cursor: 'pointer', fontSize: '10px', fontWeight: 700 }}>Kabul et ve aç</button>
+                      <button type="button" onClick={voice.cancelConsent} style={{ border: '1px solid #d9c778', borderRadius: '12px', padding: '5px 9px', background: '#fff', color: '#6b5420', cursor: 'pointer', fontSize: '10px' }}>Vazgeç</button>
+                    </div>
+                  </div>
+                )}
+                {voice.enabled && (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '9px', flexWrap: 'wrap' }}>
+                    <button type="button" onClick={() => voice.speak(`${scenario}. ${question}`)} style={{ padding: '7px 10px', borderRadius: '9px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text2)', cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}>🔊 Soruyu dinle</button>
+                    <button type="button" onClick={voice.listening ? voice.stop : voice.start} disabled={grading} aria-label={voice.listening ? 'Dinlemeyi durdur' : 'Cevabını konuş'} style={{ padding: '7px 10px', borderRadius: '9px', border: voice.listening ? '2px solid #ff8a80' : '1px solid rgba(0,149,200,0.3)', background: voice.listening ? '#fff0ef' : 'var(--bg)', color: voice.listening ? '#c62828' : 'var(--accent)', cursor: grading ? 'default' : 'pointer', fontSize: '11px', fontWeight: 700 }}>
+                      {voice.listening ? '■ Dinlemeyi durdur' : '🎙️ Bas ve konuş'}
+                    </button>
+                  </div>
+                )}
+                {voice.error && <div role="status" style={{ color: '#b42318', fontSize: '10px', marginTop: '6px' }}>{voice.error}</div>}
+              </div>
               <textarea className="input" rows={8} value={answer} onChange={e => setAnswer(e.target.value)}
                 placeholder="Kendi cümlelerinle, düşüncelerini gerekçelendirerek yaz…"
                 style={{ marginTop: '8px', marginBottom: '4px', resize: 'vertical', borderRadius: '12px' }} />
