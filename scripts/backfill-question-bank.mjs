@@ -32,6 +32,20 @@ const validationSchema = {
   required: ['results'],
   additionalProperties: false,
 }
+const geminiValidationSchema = {
+  type: 'OBJECT',
+  properties: {
+    results: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: { index: { type: 'INTEGER' }, approved: { type: 'BOOLEAN' } },
+        required: ['index', 'approved'],
+      },
+    },
+  },
+  required: ['results'],
+}
 
 function key(value) {
   return String(value || '').trim().toLocaleLowerCase('tr-TR').normalize('NFKD')
@@ -82,7 +96,7 @@ async function geminiJudge(batch) {
   const prompt = `MEB eğitim sorularını son kontrol uzmanı olarak denetle. Her soru için cevap indeksinin kesin doğruluğunu, açıklama tutarlılığını, konu ve sınıf uygunluğunu kontrol et. Belirsizse reddet. Açıklama veya gerekçe yazma. Her indeks için tam bir sonuç ver. Yalnızca kısa JSON döndür: {"results":[{"index":0,"approved":true}]}\n\n${JSON.stringify(batch.map((item, index) => ({ index, topic: item.topic, grade: item.grade, language: item.language, question: item.question })))}`
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 1200, responseMimeType: 'application/json', responseSchema: validationSchema } }),
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 1200, responseMimeType: 'application/json', responseSchema: geminiValidationSchema } }),
     signal: AbortSignal.timeout(60000),
   })
   if (!response.ok) throw new Error(`Gemini validation failed: ${response.status}`)
