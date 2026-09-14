@@ -952,12 +952,15 @@ export async function POST(req: NextRequest) {
       .single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
+    const body = await req.json()
+    const isDailyChallengeRequest = body?.dailyChallenge === true
+
     const plan = profile.plan || 'free'
     const today = new Date().toISOString().split('T')[0]
 
     // Premium ve Unlimited planlarda HİÇBİR soru/test sınırı yok — sadece
     // freemium/silver için günlük/aylık limit uygulanır.
-    if (plan !== 'premium' && plan !== 'unlimited') {
+    if (!isDailyChallengeRequest && plan !== 'premium' && plan !== 'unlimited') {
       // 6 Eylül 2026 — Deniz'in talebiyle: "free" plan artık YENİ kayıtlara
       // verilmiyor (bkz. profiles.plan kolon varsayılanı artık 'none').
       // Mevcut 'free' kullanıcılar dokunulmadan eski haklarında (10/gün,
@@ -981,7 +984,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const body = await req.json()
     const {
       topic,
       questionCount = 10,
@@ -1007,7 +1009,7 @@ export async function POST(req: NextRequest) {
 
     const MAX_QCOUNT: Record<string, number> = { free: 5, silver: 10, premium: 20, unlimited: 20 }
     const maxQ = MAX_QCOUNT[plan] ?? 0
-    const safeQCount = Math.min(questionCount, maxQ)
+    const safeQCount = isDailyChallengeRequest ? Math.min(questionCount, 10) : Math.min(questionCount, maxQ)
     usageRequestId = crypto.randomUUID()
     // Yeni oturumun kimliği üretimden önce bilinir; böylece AI maliyet kaydı
     // kullanıcı ve oturumla atomik olmayan bir sonradan eşleştirmeye ihtiyaç duymaz.

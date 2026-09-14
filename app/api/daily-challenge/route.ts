@@ -34,15 +34,13 @@ async function getProfile(userId: string) {
 
 async function selectPersonalizedQuestions(userId: string, profile: any) {
   const gradeKey = questionBankKey(profile.grade || 'Ortaokul 6. sınıf')
-  const isSixthGrade = gradeKey.includes('6')
-  const subjectKey = isSixthGrade ? 'fen bilimleri' : questionBankKey(profile.subject || 'genel')
   const languageKey = questionBankKey(profile.language || 'Türkçe')
 
   const [{ data: mastery }, { data: weakTopics }, { data: bank, error }] = await Promise.all([
     db.from('student_mastery').select('topic,mastery_score').eq('student_id', userId).eq('learning_objective_key', '').order('mastery_score', { ascending: true }).limit(8),
     db.from('weak_topics').select('topic,wrong_count,total_count').eq('user_id', userId).order('wrong_count', { ascending: false }).limit(8),
-    db.from('question_bank').select('id,question,topic_key,use_count,last_used_at')
-      .eq('subject_key', subjectKey).eq('grade_key', gradeKey).eq('language_key', languageKey)
+    db.from('question_bank').select('id,question,subject_key,topic_key,use_count,last_used_at')
+      .eq('grade_key', gradeKey).eq('language_key', languageKey)
       .eq('review_status', 'approved').eq('report_count', 0)
       .order('use_count', { ascending: true }).order('last_used_at', { ascending: true, nullsFirst: true }).limit(100),
   ])
@@ -52,14 +50,15 @@ async function selectPersonalizedQuestions(userId: string, profile: any) {
     ...(mastery || []).filter((row: any) => Number(row.mastery_score) < 70).map((row: any) => questionBankKey(row.topic)),
     ...(weakTopics || []).map((row: any) => questionBankKey(row.topic)),
   ])
-  const ordered = [...(bank || [])].sort((a: any, b: any) => {
-    const aPriority = priority.has(a.topic_key) ? 0 : 1
-    const bPriority = priority.has(b.topic_key) ? 0 : 1
-    return aPriority - bPriority
-  })
-  const selected = shuffled(ordered.slice(0, Math.min(40, ordered.length))).slice(0, 10)
-  if (selected.length < 10) return null
-  return selected.map((row: any) => ({ ...row.question, bankQuestionId: row.id, bankTopic: row.topic_key }))
+  const prioritized = shuffled((bank || []).filter((row: any) => priority.has(row.topic_key)))
+  const other = shuffled((bank || []).filter((row: any) => !priority.has(row.topic_key)))
+  const selected = [...prioritized.slice(0, 6), ...other].slice(0, 10)
+  const focusTopic = mastery?.[0]?.topic || weakTopics?.[0]?.topic || `${profile.grade || 'öğrenci'} okul dersleri karma tekrar`
+  return {
+    questions: selected.map((row: any) => ({ ...row.question, bankQuestionId: row.id, bankTopic: row.topic_key, bankSubject: row.subject_key })),
+    focusTopic,
+    gradeKey,
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -71,12 +70,34 @@ export async function GET(request: NextRequest) {
   const { data: existing } = await db.from('daily_challenges').select('*').eq('user_id', user.id).eq('date', date).maybeSingle()
   if (existing) return NextResponse.json({ challenge: existing, streak: await getStreak(user.id) })
 
-  const questions = await selectPersonalizedQuestions(user.id, profile)
-  if (!questions) return NextResponse.json({ error: 'Günlük görev için yeterli onaylı soru yok.' }, { status: 503 })
-  const topics = [...new Set(questions.map((question: any) => question.bankTopic).filter(Boolean))]
+  const selection = await selectPersonalizedQuestions(user.id, profile)
+  const questions = [...selection.questions]
+  if (questions.length < 10) {
+    const token = request.headers.get('authorization') || ''
+    const generation = await fetch(new URL('/api/generate-quiz', request.url), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: token },
+      body: JSON.stringify({
+        topic: selection.focusTopic,
+        subject: 'Genel',
+        questionCount: 10 - questions.length,
+        difficulty: 'auto',
+        language: profile.language || 'Türkçe',
+        questionType: 'multiple_choice',
+        dailyChallenge: true,
+        includeVisuals: false,
+        excludeQuestionTexts: questions.map((question: any) => question.q),
+      }),
+    })
+    const generated = await generation.json().catch(() => ({}))
+    if (generation.ok && Array.isArray(generated.questions)) questions.push(...generated.questions)
+  }
+  if (questions.length < 10) return NextResponse.json({ error: 'Günlük görev için 10 uygun soru hazırlanamadı.' }, { status: 503 })
+  const finalQuestions = shuffled(questions).slice(0, 10)
+  const topics = [...new Set(finalQuestions.map((question: any) => question.bankTopic).filter(Boolean))]
   const { data: challenge, error } = await db.from('daily_challenges').insert({
-    user_id: user.id, date, topic: 'Fen Bilimleri · Karma', subject: 'Fen Bilimleri', grade_level: questionBankKey(profile.grade || 'Ortaokul 6. sınıf'),
-    questions, question_type: 'mixed', completed: false,
+    user_id: user.id, date, topic: 'Günün 10 Dakikası · Karma', subject: 'Karma', grade_level: selection.gradeKey,
+    questions: finalQuestions, question_type: 'mixed', completed: false,
   }).select('*').single()
   if (error) {
     const { data: raced } = await db.from('daily_challenges').select('*').eq('user_id', user.id).eq('date', date).maybeSingle()
