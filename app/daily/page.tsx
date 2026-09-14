@@ -30,105 +30,21 @@ export default function DailyPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    const today = new Date().toISOString().split('T')[0]
-
-    // Önce profili çek — grade'e göre challenge seçeceğiz
     const { data: p } = await supabase.from('profiles').select('grade,language,plan').eq('id', user.id).maybeSingle()
-
-    const gradeGroup = !p?.grade ? 'ortaokul'
-      : p.grade.includes('ilkokul') ? 'ilkokul'
-      : p.grade.includes('lise') ? 'lise'
-      : (p.grade.includes('universite') || p.grade.includes('üniversite')) ? 'universite'
-      : 'ortaokul'
-
-    const [{ data: s }, { data: c }] = await Promise.all([
-      supabase.from('streaks').select('*').eq('user_id', user.id).maybeSingle(),
-      supabase.from('daily_challenges').select('*')
-        .eq('date', today)
-        .eq('grade_level', gradeGroup)
-        .maybeSingle(),
-    ])
-
+    const { data: s } = await supabase.from('streaks').select('*').eq('user_id', user.id).maybeSingle()
+    const { data: { session } } = await supabase.auth.getSession()
+    const response = await fetch('/api/daily-challenge', { headers: { Authorization: `Bearer ${session?.access_token || ''}` } })
+    const payload = await response.json()
     setProfile(p)
-    setStreak(s)
-
-    // Bugün günlük test tamamlandı mı? — SADECE daily_challenges tablosuna bak
-    // (streak.last_activity_date quiz dışı aktivitede de güncellenebilir, güvenilmez)
-    const todayDoneInChallenges = c?.date === today && c?.completed === true
-    
-    // Yedek kontrol: daily_challenges'ta completed yoksa quiz_sessions'dan bak
-    // Sadece is_daily=true olan session'lara bak — normal testlerle karışmasın
-    let todayDoneInSessions = false
-    if (!todayDoneInChallenges) {
-      const { data: dailySessions } = await supabase
-        .from('quiz_sessions')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('completed', true)
-        .eq('is_daily', true)
-        .gte('created_at', today + 'T00:00:00')
-        .lte('created_at', today + 'T23:59:59')
-        .limit(1)
-      todayDoneInSessions = (dailySessions?.length || 0) > 0
-    }
-
-    if (todayDoneInChallenges || todayDoneInSessions) {
-      setAlreadyDone(true)
-    }
-
-    if (c) {
-      setChallenge(c)
-    } else {
-      await generateDailyChallenge(p, user)
+    setStreak(payload.streak || s)
+    if (payload.challenge) {
+      setChallenge(payload.challenge)
+      setAlreadyDone(payload.challenge.completed === true)
     }
     setLoading(false)
   }
 
-  async function generateDailyChallenge(p: any, user: any) {
-    setGenerating(true)
-    const { data: { session } } = await supabase.auth.getSession()
-
-    const gradeGroup = !p?.grade ? 'ortaokul'
-      : p.grade.includes('ilkokul') ? 'ilkokul'
-      : p.grade.includes('lise') ? 'lise'
-      : (p.grade.includes('universite') || p.grade.includes('üniversite')) ? 'universite'
-      : 'ortaokul'
-
-    const TOPICS: Record<string, string[]> = {
-      ilkokul: ['Toplama ve çıkarma', 'Hayvanlar', 'Mevsimler', 'Vücudumuz', 'Türkiye haritası', 'Çarpım tablosu', 'Sağlıklı beslenme'],
-      ortaokul: ['Türkiye coğrafyası', 'Osmanlı tarihi', 'Hücre biyolojisi', 'Denklemler', 'Fotosentez', 'Atatürk ilkeleri', 'Doğal sayılar'],
-      lise: ['Türev ve integral', 'Osmanlı çöküşü', 'Genetik', 'Organik kimya', 'Elektromanyetizma', 'Edebiyat akımları', 'Trigonometri'],
-      universite: ['Diferansiyel denklemler', 'Makroekonomi', 'Termodinamik', 'Hukuk felsefesi', 'Veri yapıları', 'İstatistik', 'Moleküler biyoloji'],
-    }
-
-    const topics = TOPICS[gradeGroup] || TOPICS.ortaokul
-    const topic = topics[new Date().getDay() % topics.length]
-
-    // Günün gününe göre soru tipi rotate (Pzt=çoktan seçmeli, Sal=boşluk, Çar=D/Y ...)
-    const DAILY_TYPES = ['multiple_choice', 'fill_blank', 'true_false', 'matching', 'ordering', 'multiple_choice', 'mixed']
-    const dailyQuestionType = DAILY_TYPES[new Date().getDay()]
-    setDailyQuestionType(dailyQuestionType)
-
-    const res = await fetch('/api/generate-quiz', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ topic, questionCount: 5, difficulty: 'normal', language: p?.language || 'Türkçe', dailyChallenge: true, questionType: dailyQuestionType }),
-    })
-    const data = await res.json()
-    if (data.questions) {
-      const today = new Date().toISOString().split('T')[0]
-      const { data: newChallenge } = await supabase.from('daily_challenges').insert({
-        date: today,
-        topic,
-        subject: 'Genel',
-        grade_level: gradeGroup,
-        questions: data.questions,
-        question_type: dailyQuestionType || 'multiple_choice',
-      }).select().single()
-      setChallenge(newChallenge)
-    }
-    setGenerating(false)
-  }
+  async function generateDailyChallenge() { return null }
 
   function choose(idx: number) {
     if (chosen !== null || !challenge) return
@@ -140,52 +56,14 @@ export default function DailyPage() {
   async function next() {
     if (!challenge) return
     if (current + 1 >= challenge.questions.length) {
-      const score = answers.filter(a => a.correct).length
-      const { data: { user } } = await supabase.auth.getUser()
-      const today = new Date().toISOString().split('T')[0]
-
-      // Quiz session kaydet — completed:true olsun ki arşivde görünsün
-      await supabase.from('quiz_sessions').insert({
-        user_id: user.id,
-        topic: challenge.topic,
-        grade: profile?.grade,
-        language: profile?.language,
-        question_count: challenge.questions.length,
-        questions: challenge.questions,
-        answers,
-        score,
-        pct: Math.round(score / challenge.questions.length * 100),
-        completed: true,
-        question_type: dailyQuestionType || 'multiple_choice',
+      const { data: { session } } = await supabase.auth.getSession()
+      const response = await fetch('/api/daily-challenge', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ challengeId: challenge.id, answers }),
       })
-
-      // Streak güncelle
-      // daily_challenges tablosunu tamamlandı olarak işaretle
-      if (challenge?.id) {
-        await supabase.from('daily_challenges').update({ completed: true }).eq('id', challenge.id)
-      }
-
-      const { data: streakData } = await supabase
-        .from('streaks').select('*').eq('user_id', user.id).single()
-
-      if (!streakData) {
-        await supabase.from('streaks').insert({
-          user_id: user.id, current_streak: 1, longest_streak: 1,
-          total_points: 10, last_activity_date: today,
-        })
-      } else if (streakData.last_activity_date !== today) {
-        const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1)
-        const yStr = yesterday.toISOString().split('T')[0]
-        const ns = streakData.last_activity_date === yStr ? (streakData.current_streak || 0) + 1 : 1
-        await supabase.from('streaks').update({
-          current_streak: ns,
-          longest_streak: Math.max(ns, streakData.longest_streak || 0),
-          total_points: (streakData.total_points || 0) + 10,
-          last_activity_date: today,
-        }).eq('user_id', user.id)
-        setStreak(prev => prev ? { ...prev, current_streak: ns, last_activity_date: today } : prev)
-      }
-
+      const result = await response.json()
+      if (!response.ok) return
+      setStreak(result.streak)
       setAlreadyDone(true)
       setScreen('done')
     } else {
@@ -217,7 +95,7 @@ export default function DailyPage() {
           <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>Günlük</div>
           <h1 className="serif" style={{ fontSize: '28px' }}>Günlük test</h1>
           <p style={{ color: 'var(--text2)', fontSize: '14px', marginTop: '4px' }}>
-            Her gün 5 soru — serini koru!
+            Her gün 10 karma soru — serini koru!
           </p>
         </div>
 
@@ -251,7 +129,7 @@ export default function DailyPage() {
                   {new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </div>
                 <div style={{ fontWeight: 600, fontSize: '18px' }}>{challenge.topic}</div>
-                <div style={{ fontSize: '13px', color: 'var(--text2)', marginTop: '2px' }}>5 soru · Normal zorluk</div>
+                <div style={{ fontSize: '13px', color: 'var(--text2)', marginTop: '2px' }}>10 karma soru · Kişiselleştirilmiş</div>
               </div>
               <div style={{ fontSize: '32px' }}>📝</div>
             </div>
@@ -305,7 +183,7 @@ export default function DailyPage() {
       <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span className="serif" style={{ fontSize: '18px' }}>PRATIUM</span>
+            <span className="serif" style={{ fontSize: '18px' }}>GÜNÜN 10 DAKİKASI</span>
             <span style={{ fontSize: '13px', color: 'var(--text2)' }}>🔥 {streak?.current_streak || 0} gün seri</span>
           </div>
           <div className="progress-bar" style={{ marginBottom: '1.5rem' }}>
@@ -424,7 +302,7 @@ export default function DailyPage() {
   // ── DONE ──
   if (screen === 'done') {
     const score = answers.filter(a => a.correct).length
-    const pct = Math.round(score / 5 * 100)
+    const pct = Math.round(score / 10 * 100)
     const newStreak = (streak?.current_streak || 0) + 1
     return (
       <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
@@ -434,7 +312,7 @@ export default function DailyPage() {
           </div>
           <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.5rem' }}>Günlük test tamam!</h2>
           <div style={{ fontSize: '42px', fontWeight: 700, color: pct >= 60 ? 'var(--green)' : 'var(--red)', marginBottom: '0.5rem' }}>
-            {score}/5
+            {score}/10
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '1.5rem' }}>
             <span style={{ fontSize: '24px' }}>🔥</span>
