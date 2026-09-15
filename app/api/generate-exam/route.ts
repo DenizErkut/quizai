@@ -46,7 +46,7 @@ export const EXAM_FORMATS = {
     ],
     scoring: { correct: 1, wrong: -0.25, base: 0 },
     maxScore: 400,
-    description: '120 soru · 135 dakika · Net puan sistemi',
+    description: '120 soru · 165 dakika · Net puan sistemi',
     targetAudience: 'lise',
     color: '#0ea5e9',
   },
