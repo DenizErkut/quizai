@@ -25,6 +25,7 @@ import AdaptiveStatistics from '@/components/admin/AdaptiveStatistics'
 import LearningRiskOverview from '@/components/LearningRiskOverview'
 import PredictiveRiskCalibration from '@/components/admin/PredictiveRiskCalibration'
 import PipelineHealth from '@/components/admin/PipelineHealth'
+import DailyHabitMetrics from '@/components/admin/DailyHabitMetrics'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -679,6 +680,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                 </div>
               </div>
             </div>
+            <DailyHabitMetrics />
           </div>
         )}
 

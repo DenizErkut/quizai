@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createHash } from 'node:crypto'
+import { callOpenAI } from '@/lib/openai'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -163,7 +164,15 @@ async function promoteTeacherQuestions(row: { subject?: string | null; grade?: s
   const response = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 12000, messages: [{ role: 'user', content: prompt }] })
   const text = response.content[0].type === 'text' ? response.content[0].text : ''
   const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
-  const questions = (parsed.questions || []).filter((q: any) => q?.q && Array.isArray(q.opts) && q.opts.length >= 4 && q.opts.length <= 5 && Number.isInteger(q.ans) && q.ans >= 0 && q.ans < q.opts.length && q.exp)
+  const extracted = (parsed.questions || []).filter((q: any) => q?.q && Array.isArray(q.opts) && q.opts.length >= 4 && q.opts.length <= 5 && Number.isInteger(q.ans) && q.ans >= 0 && q.ans < q.opts.length && q.exp)
+  if (!extracted.length) return 0
+  const validationText = await callOpenAI([
+    { role: 'system', content: 'Sen bağımsız soru kalite denetçisisin. Soruları değiştirme. Yalnızca doğru cevabı kesin, seçenekleri benzersiz ve soru eksiksiz olan kayıtları onayla. JSON döndür.' },
+    { role: 'user', content: `${JSON.stringify({ questions: extracted.map((q: any, index: number) => ({ index, q: q.q, opts: q.opts, ans: q.ans, exp: q.exp })) })}\nYanıt şeması: {"results":[{"index":0,"approved":true,"reason":"..."}]}` },
+  ], { model: process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini', max_tokens: 3000, json: true, operation: 'teacher-booklet-validator' })
+  const validation = JSON.parse(validationText)
+  const approvedIndexes = new Set<number>((validation.results || []).filter((item: any) => item.approved === true).map((item: any) => Number(item.index)))
+  const questions = extracted.filter((_: any, index: number) => approvedIndexes.has(index))
   const rows = questions.map((q: any) => ({
     fingerprint: createHash('sha256').update(`${q.q}|${q.opts.join('|')}`.toLocaleLowerCase('tr')).digest('hex'),
     subject_key: String(row.subject || 'genel').toLocaleLowerCase('tr'), topic_key: String(q.topic || row.subtopic || 'genel').toLocaleLowerCase('tr'), grade_key: String(row.grade || '').toLocaleLowerCase('tr'), language_key: 'tr', question_type: 'multiple_choice', difficulty: ['easy','medium','hard'].includes(q.difficulty) ? q.difficulty : 'medium', question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, objective: q.topic || row.subtopic || '', sourcePolicy: 'teacher_exact' }, review_status: 'approved', quality_score: 1, source_engine: 'teacher_booklet_exact', report_count: 0
