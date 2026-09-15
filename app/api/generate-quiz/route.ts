@@ -745,6 +745,29 @@ function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
   return result
 }
 
+async function loadAnonymousBookletContext(subject: string, grade: string, topic: string): Promise<string> {
+  const { data, error } = await supabase.from('exam_resources')
+    .select('raw_text,subject,grade,subtopic')
+    .eq('purpose', 'instant_test')
+    .eq('source_type', 'anonymous')
+    .neq('review_status', 'rejected')
+    .limit(12)
+  if (error || !data?.length) return ''
+  const subjectKey = normalizeTR(subject)
+  const gradeKey = normalizeTR(grade)
+  const topicKey = normalizeTR(topic)
+  const matches = data.filter((row: any) => {
+    const rowSubject = normalizeTR(String(row.subject || ''))
+    const rowGrade = normalizeTR(String(row.grade || ''))
+    const rowTopic = normalizeTR(String(row.subtopic || ''))
+    return (!rowSubject || rowSubject.includes(subjectKey) || subjectKey.includes(rowSubject))
+      && (!rowGrade || gradeKey.includes(rowGrade) || rowGrade.includes(gradeKey))
+      && (!rowTopic || rowTopic.includes(topicKey) || topicKey.includes(rowTopic))
+  }).slice(0, 2)
+  if (!matches.length) return ''
+  return `\n\nANONİM SORU KİTAPÇIĞI REFERANSI — KOPYALAMA YASAK:\n${matches.map((row: any) => String(row.raw_text || '').slice(0, 2500)).join('\n---\n')}\nBu kaynak yalnızca ölçülen kavram, soru mantığı ve zorluk seviyesini anlamak içindir. Kaynaktaki soru cümlesini, sayıları, özel isimleri, seçenekleri veya kurguyu aynen kullanma. Öğrencinin karşısına tamamen yeni fakat aynı kazanımı ölçen benzer bir soru çıkar.`
+}
+
 // Model/provider çıktısı UI'ya ulaşmadan önce soru tiplerinin zorunlu alanlarını
 // tek biçime getirir. Prompt talimatları tek başına şema garantisi değildir;
 // özellikle true_false sorularında opts'un atlanması sonuç ekranını çökertebilir.
@@ -1208,6 +1231,9 @@ export async function POST(req: NextRequest) {
       previousQuestionsNote += `\n\n⚠️ KAYNAK METİN SÜREKLİLİĞİ: Bu, aynı kaynak metne dayanan bir testin İKİNCİ (veya sonraki) parçası. Yukarıda listelenen önceki sorular, kaynak metnin BELİRLİ cümlelerini/olgularını zaten kullandı. Bu parçada o AYNI cümleleri/olguları FARKLI bir ifadeyle, farklı bir soru formatıyla, ya da "doğru mu yanlış mı" gibi tersinden bile olsa TEKRAR HEDEFLEME — bu, öğretmen tarafından "aynı bilgi 6-7 kez soruldu" diye eleştirilen bilinen bir hata deseni. Bunun yerine: (a) kaynak metnin önceki parçada HİÇ değinilmemiş başka bir cümlesini/paragrafını kullan, VEYA (b) konunun (topic) kendisi hakkında, kaynak metne dayanmayan, genel kavramsal bir soru sor (ör. temel itikat/tanım sorusu) — bu ikinci seçenek özellikle kaynak metin kısaysa ve tüm cümleleri önceki parçada tükenmişse tercih edilmeli.`
     }
 
+    const anonymousBookletContext = !fileContent
+      ? await loadAnonymousBookletContext(subject, grade, topic).catch(() => '')
+      : ''
     const fullPrompt = buildPrompt(questionType, topic, grade, resolvedDifficulty, effectiveLang, safeQCount, fileContent || '', gradeContext, mebContext, profile.department || undefined, subject)
     const isUniversityLevel = level === 'universite'
     const objectiveCandidates = await loadCanonicalObjectiveCandidates(supabase, {
@@ -1291,8 +1317,9 @@ export async function POST(req: NextRequest) {
       + diagnosticStrategy.promptContext
       + (isUniversityLevel ? misconceptionMetadataInstruction(questionType) : '') // K12'de artık statik blokta
       + objectiveInstruction
+      + anonymousBookletContext
       + previousQuestionsNote
-    promptStr = fullPrompt + (adaptivePolicy?.promptContext || '') + diagnosticStrategy.promptContext + misconceptionMetadataInstruction(questionType) + objectiveInstruction + previousQuestionsNote // fallback için TAM metin saklanır
+    promptStr = fullPrompt + (adaptivePolicy?.promptContext || '') + diagnosticStrategy.promptContext + misconceptionMetadataInstruction(questionType) + objectiveInstruction + anonymousBookletContext + previousQuestionsNote // fallback için TAM metin saklanır
     countRef = safeQCount
 
     // Hız optimizasyonu: az soru → Haiku (3x hızlı), çok soru → Sonnet

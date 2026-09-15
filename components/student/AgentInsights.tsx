@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { LIVE_DATA_REFRESH_EVENT } from '@/components/LiveDataRefresh'
 
 type PlanItem = { topic?: string; subject?: string; reason?: string; estimated_minutes?: number; misconception?: string }
 type Data = { study: PlanItem[]; review: PlanItem[]; progress: { completed_tests: number; average_pct: number | null; latest_topic: string | null; lowest_mastery_topics: { topic: string; mastery: number; retention: number | null }[] } | null }
@@ -23,7 +24,11 @@ export default function AgentInsights() {
       if (!cancelled) setData({ study: study.ok ? studyJson.plan ?? [] : [], review: review.ok ? reviewJson.plan ?? [] : [], progress: progress.ok ? progressJson.summary ?? null : null })
     }
     void load()
-    return () => { cancelled = true }
+    window.addEventListener(LIVE_DATA_REFRESH_EVENT, load)
+    return () => {
+      cancelled = true
+      window.removeEventListener(LIVE_DATA_REFRESH_EVENT, load)
+    }
   }, [])
 
   if (!data || (!data.study.length && !data.review.length && !data.progress)) return null
