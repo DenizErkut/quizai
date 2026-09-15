@@ -1622,7 +1622,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               {tab === 'exam-books' ? '🎯 Yeni Sınav Kitapçığı Yükle' : '📚 Yeni Soru Kitapçığı Yükle'}
             </div>
             <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '12px', padding: '12px 14px', marginBottom: '1.25rem', fontSize: '12px', color: '#6366f1' }}>
-              📌 {tab === 'exam-books' ? 'LGS, TYT, AYT ve YDT simülasyonlarında kullanılacak sınav kitapçıklarını yönetin.' : 'Bu alan test oluşturmaz; dışarıdan gelen soru kitapçıklarını düzenli bir kaynak olarak saklar. Anonim kaynaklar yalnızca konu ve zorluk referansıdır; özgün soru ve şıklar kopyalanmaz. Öğretmen imzalı kaynaklar inceleme sonrası onaylı havuza birebir kullanım adayı olur.'}
+              📌 {tab === 'exam-books' ? 'LGS, TYT, AYT ve YDT simülasyonlarında kullanılacak sınav kitapçıklarını yönetin.' : 'Bu alan yalnızca anlık test havuzunu besler. Öğretmen imzalı sorular aynı metin ve seçeneklerle havuza alınır. Anonim sorular öğrenciye aynen gösterilmez; AI yalnızca bunları referans alarak yeni ve benzer sorular üretir.'}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
@@ -1637,33 +1637,33 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                 <select value={examForm.source_type} onChange={e => setExamForm(p => ({ ...p, source_type: e.target.value }))}
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px' }}>
                   <option value="anonymous">Anonim — benzer/özgün üretim</option>
-                  <option value="teacher">Öğretmen imzalı — onay sonrası birebir havuz adayı</option>
+                  <option value="teacher">Öğretmen imzalı — birebir anlık test havuzu</option>
                 </select>
               </div>
-              {tab === 'exam-books' && <div>
+              {tab === 'question-books' && <div>
                 <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Sınıf</label>
                 <input value={examForm.grade} onChange={e => setExamForm(p => ({ ...p, grade: e.target.value }))} placeholder="6" style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', boxSizing: 'border-box' as const }} />
               </div>}
-              {tab === 'exam-books' && <div>
+              {tab === 'question-books' && <div>
                 <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Alt başlık</label>
                 <input value={examForm.subtopic} onChange={e => setExamForm(p => ({ ...p, subtopic: e.target.value }))} placeholder="Hücre bölünmeleri" style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', boxSizing: 'border-box' as const }} />
               </div>}
-              <div>
+              {tab === 'exam-books' && <div>
                 <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Sınav Türü *</label>
                 <select value={examForm.exam_type} onChange={e => setExamForm(p => ({ ...p, exam_type: e.target.value }))}
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)' }}>
                   {['LGS', 'TYT', 'AYT', 'KPSS', 'YKS', 'TEOG', 'Diğer'].map(t => <option key={t}>{t}</option>)}
                 </select>
-              </div>
-              <div>
+              </div>}
+              {tab === 'exam-books' && <div>
                 <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Yıl *</label>
                 <select value={examForm.year} onChange={e => setExamForm(p => ({ ...p, year: e.target.value }))}
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)' }}>
                   {Array.from({ length: 15 }, (_, i) => (new Date().getFullYear() - i).toString()).map(y => <option key={y}>{y}</option>)}
                 </select>
-              </div>
+              </div>}
               <div>
-                <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Ders / Alan</label>
+                <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>{tab === 'exam-books' ? 'Ders / Alan' : 'Ders'}</label>
                 <input value={examForm.subject} onChange={e => setExamForm(p => ({ ...p, subject: e.target.value }))}
                   placeholder="Matematik, Türkçe, Tüm Dersler..."
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' as const }} />
@@ -1721,7 +1721,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     })
                     const data = await res.json()
                     if (res.ok) {
-                      setExamMsg(`✅ Yuklendi! ${data.chunks} soru chunk, ${data.embedded} embedding`)
+                      setExamMsg(tab === 'question-books' && examForm.source_type === 'teacher' ? `✅ Yüklendi; ${data.promoted || 0} soru birebir anlık test havuzuna aktarıldı.` : `✅ Yüklendi! ${data.chunks} kaynak parçası işlendi.`)
                       setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '' })
                       setExamFile(null)
                     } else setExamMsg('❌ ' + (data.error || 'Sunucu hatasi'))
@@ -1734,7 +1734,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     const res = await fetch('/api/admin/exam-upload', { method: 'POST', body: fd })
                     const data = await res.json()
                     if (res.ok) {
-                      setExamMsg(`✅ Yuklendi! ${data.chunks} soru chunk`)
+                      setExamMsg(tab === 'question-books' && examForm.source_type === 'teacher' ? `✅ Yüklendi; ${data.promoted || 0} soru birebir anlık test havuzuna aktarıldı.` : `✅ Yüklendi! ${data.chunks} kaynak parçası işlendi.`)
                       setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '' })
                       setExamFile(null)
                     } else setExamMsg('❌ ' + (data.error || 'Sunucu hatasi'))

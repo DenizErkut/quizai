@@ -25,7 +25,7 @@ async function getAdminUser() {
   return p?.is_admin ? user : null
 }
 
-export const maxDuration = 60
+export const maxDuration = 120
 export const runtime = 'nodejs'
 
 function normTR(s: string) {
@@ -158,6 +158,22 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ exams: withCounts })
 }
 
+async function promoteTeacherQuestions(row: { subject?: string | null; grade?: string | null; subtopic?: string | null; raw_text?: string | null }) {
+  const prompt = `Aşağıdaki öğretmen imzalı kitapçıktaki çoktan seçmeli soruları AYNI soru metni, AYNI seçenekler ve AYNI doğru cevapla ayıkla. Yeniden yazma, sadeleştirme veya benzer soru üretme. Açıklama kitapçıkta yoksa yalnızca doğru cevabı kısaca açıkla. Eksik ya da cevabı belirlenemeyen soruyu atla. En fazla 40 soru döndür. {"questions":[{"q":"...","opts":["..."],"ans":0,"exp":"...","topic":"...","difficulty":"easy|medium|hard"}]}\n\n${String(row.raw_text || '').slice(0, 50000)}`
+  const response = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 12000, messages: [{ role: 'user', content: prompt }] })
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
+  const questions = (parsed.questions || []).filter((q: any) => q?.q && Array.isArray(q.opts) && q.opts.length >= 4 && q.opts.length <= 5 && Number.isInteger(q.ans) && q.ans >= 0 && q.ans < q.opts.length && q.exp)
+  const rows = questions.map((q: any) => ({
+    fingerprint: createHash('sha256').update(`${q.q}|${q.opts.join('|')}`.toLocaleLowerCase('tr')).digest('hex'),
+    subject_key: String(row.subject || 'genel').toLocaleLowerCase('tr'), topic_key: String(q.topic || row.subtopic || 'genel').toLocaleLowerCase('tr'), grade_key: String(row.grade || '').toLocaleLowerCase('tr'), language_key: 'tr', question_type: 'multiple_choice', difficulty: ['easy','medium','hard'].includes(q.difficulty) ? q.difficulty : 'medium', question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, objective: q.topic || row.subtopic || '', sourcePolicy: 'teacher_exact' }, review_status: 'approved', quality_score: 1, source_engine: 'teacher_booklet_exact', report_count: 0
+  }))
+  if (!rows.length) return 0
+  const result = await adminDb.from('question_bank').upsert(rows, { onConflict: 'fingerprint', ignoreDuplicates: true })
+  if (result.error) throw result.error
+  return rows.length
+}
+
 // POST: yeni kitapçık yükle
 export async function POST(req: NextRequest) {
   const user = await getAdminUser()
@@ -230,6 +246,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (purpose === 'instant_test') {
+      exam_type = 'ANLIK_TEST'
+      year = new Date().getFullYear().toString()
+      answer_key = ''
+    }
     if (!title || !exam_type || !year) {
       return NextResponse.json({ error: 'Baslik, sinav turu ve yil zorunlu.' }, { status: 400 })
     }
@@ -238,7 +259,13 @@ export async function POST(req: NextRequest) {
     const result = await processExam({ title, exam_type, year, subject, answer_key, rawText, fileUrl, fileName, source_type, grade, subtopic, purpose, uploaded_by: user.id })
     if ('error' in result) return NextResponse.json({ error: result.error }, { status: 500 })
 
-    return NextResponse.json({ success: true, ...result })
+    let promoted = 0
+    if (purpose === 'instant_test' && source_type === 'teacher') {
+      promoted = await promoteTeacherQuestions({ subject, grade, subtopic, raw_text: rawText })
+      await adminDb.from('exam_resources').update({ review_status: 'approved', reuse_policy: 'exact_reuse' }).eq('id', result.resource_id)
+    }
+
+    return NextResponse.json({ success: true, ...result, promoted })
 
   } catch (e: any) {
     console.error('[exam-upload]', e)
@@ -258,17 +285,8 @@ export async function PATCH(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   let promoted = 0
   if (review_status === 'approved' && row.source_type === 'teacher' && row.purpose === 'instant_test') {
-    const prompt = `Aşağıdaki öğretmen imzalı soru kitapçığı metninden en fazla 20 çoktan seçmeli soruyu ayıkla. Soru, seçenekler, doğru cevap indeksi (0 tabanlı), kısa açıklama, konu ve zorluk alanlarını JSON olarak döndür. Metin bozuksa uydurma; eksik soruyu atla. {"questions":[{"q":"...","opts":["..."],"ans":0,"exp":"...","topic":"...","difficulty":"easy|medium|hard"}]}\n\n${String(row.raw_text || '').slice(0, 30000)}`
     try {
-      const response = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 7000, messages: [{ role: 'user', content: prompt }] })
-      const text = response.content[0].type === 'text' ? response.content[0].text : ''
-      const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
-      const questions = (parsed.questions || []).filter((q: any) => q?.q && Array.isArray(q.opts) && q.opts.length >= 4 && q.opts.length <= 5 && Number.isInteger(q.ans) && q.ans >= 0 && q.ans < q.opts.length && q.exp)
-      const rows = questions.map((q: any) => ({
-        fingerprint: createHash('sha256').update(`${q.q}|${q.opts.join('|')}`.toLocaleLowerCase('tr')).digest('hex'),
-        subject_key: String(row.subject || 'genel').toLocaleLowerCase('tr'), topic_key: String(q.topic || row.subtopic || 'genel').toLocaleLowerCase('tr'), grade_key: String(row.grade || '').toLocaleLowerCase('tr'), language_key: 'tr', question_type: 'multiple_choice', difficulty: ['easy','medium','hard'].includes(q.difficulty) ? q.difficulty : 'medium', question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, objective: q.topic || row.subtopic || '' }, review_status: 'approved', quality_score: 1, source_engine: 'teacher_booklet_review', report_count: 0
-      }))
-      if (rows.length) { const result = await adminDb.from('question_bank').upsert(rows, { onConflict: 'fingerprint', ignoreDuplicates: true }); if (!result.error) promoted = rows.length }
+      promoted = await promoteTeacherQuestions(row)
     } catch (e) { console.error('[exam-upload] teacher promotion failed', e) }
   }
   return NextResponse.json({ success: true, promoted })
