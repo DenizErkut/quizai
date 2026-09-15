@@ -1639,14 +1639,14 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   <option value="teacher">Öğretmen imzalı — onay sonrası birebir havuz adayı</option>
                 </select>
               </div>
-              <div>
+              {false && <div>
                 <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Sınıf</label>
                 <input value={examForm.grade} onChange={e => setExamForm(p => ({ ...p, grade: e.target.value }))} placeholder="6" style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', boxSizing: 'border-box' as const }} />
-              </div>
-              <div>
+              </div>}
+              {false && <div>
                 <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Alt başlık</label>
                 <input value={examForm.subtopic} onChange={e => setExamForm(p => ({ ...p, subtopic: e.target.value }))} placeholder="Hücre bölünmeleri" style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', boxSizing: 'border-box' as const }} />
-              </div>
+              </div>}
               <div>
                 <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Sınav Türü *</label>
                 <select value={examForm.exam_type} onChange={e => setExamForm(p => ({ ...p, exam_type: e.target.value }))}
@@ -1670,13 +1670,13 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             </div>
 
             {/* Cevap anahtarı */}
-            <div style={{ marginBottom: '12px' }}>
+            {false && <div style={{ marginBottom: '12px' }}>
               <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Cevap Anahtarı (opsiyonel)</label>
               <textarea value={examForm.answer_key} onChange={e => setExamForm(p => ({ ...p, answer_key: e.target.value }))}
                 placeholder="1-A, 2-B, 3-C... veya yapıştır"
                 rows={3}
                 style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' as const, resize: 'vertical' as const }} />
-            </div>
+            </div>}
 
             {/* PDF yükleme */}
             <div style={{ marginBottom: '14px' }}>
