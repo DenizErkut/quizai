@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { createHash } from 'node:crypto'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
