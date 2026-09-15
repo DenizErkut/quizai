@@ -1716,7 +1716,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     const res = await fetch('/api/admin/exam-upload', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ storage_path: signData.storage_path, file_url: fileUrl, ...examForm })
+                      body: JSON.stringify({ storage_path: signData.storage_path, file_url: fileUrl, purpose: 'instant_test', ...examForm })
                     })
                     const data = await res.json()
                     if (res.ok) {
@@ -1729,6 +1729,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     const fd = new FormData()
                     fd.append('file', examFile)
                     Object.entries(examForm).forEach(([k, v]) => fd.append(k, v))
+                    fd.append('purpose', 'instant_test')
                     const res = await fetch('/api/admin/exam-upload', { method: 'POST', body: fd })
                     const data = await res.json()
                     if (res.ok) {
@@ -1754,7 +1755,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '14px' }}>📋 Yüklü Soru Kitapçıkları</div>
               <button onClick={async () => {
                 setExamListLoading(true)
-                const res = await fetch('/api/admin/exam-upload')
+                const res = await fetch('/api/admin/exam-upload?purpose=instant_test')
                 const data = await res.json()
                 setExamList(data.exams || [])
                 setExamListLoading(false)
@@ -1771,9 +1772,9 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>🎯</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--primary)' }}>{ex.title}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{ex.exam_type} · {ex.year}{ex.subject ? ` · ${ex.subject}` : ''} · {ex.chunk_count || 0} chunk</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Anlık test kaynağı · {ex.grade ? `${ex.grade}. sınıf · ` : ''}{ex.subject || 'Ders belirtilmedi'}{ex.subtopic ? ` · ${ex.subtopic}` : ''} · {ex.chunk_count || 0} parça</div>
                     </div>
-                    <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '99px', background: 'rgba(99,102,241,0.1)', color: '#6366f1', fontWeight: 600 }}>{ex.exam_type}</span>
+                    <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '99px', background: ex.source_type === 'teacher' ? 'rgba(22,163,74,0.1)' : 'rgba(99,102,241,0.1)', color: ex.source_type === 'teacher' ? '#15803d' : '#6366f1', fontWeight: 600 }}>{ex.source_type === 'teacher' ? 'Öğretmen' : 'Anonim'} · {ex.review_status === 'approved' ? 'Onaylı' : 'Bekliyor'}</span>
                     <button onClick={async () => {
                       // "Önce gör, sonra sil" — exam_chunks için ilk defa buradan
                       // silinebiliyor (önceden repo dışı, elle SQL ile yapılıyordu).
