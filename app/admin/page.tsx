@@ -64,7 +64,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'exams' | 'curriculum' | 'kvkk' | 'adaptive' | 'risk' | 'coaching'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'question-books' | 'curriculum' | 'kvkk' | 'adaptive' | 'risk' | 'coaching'>('users')
   const [identityMissing, setIdentityMissing] = useState<number | null>(null)
   const [identityScanning, setIdentityScanning] = useState(false)
   const [identityFixing, setIdentityFixing] = useState(false)
@@ -625,7 +625,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             { key: 'institutions', label: '🏛️ Kurumlar' },
             { key: 'sellers', label: '🤝 Satıcılar' },
             { key: 'meb', label: '📚 MEB Kaynakları' },
-            { key: 'exams', label: '🎯 Sınav Kitapçıkları' },
+            { key: 'question-books', label: '📚 Soru Kitapçıkları' },
             { key: 'curriculum', label: '📋 Müfredat Yönetimi' },
             { key: 'kvkk', label: '🔐 KVKK Talepleri' },
             { key: 'adaptive', label: '🧪 Adaptive Pilot' },
@@ -1613,15 +1613,15 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         </div>
       )}
 
-      {tab === 'exams' && (
+      {tab === 'question-books' && (
         <div>
           {/* Sınav kitapçığı yükleme formu */}
           <div className="card" style={{ marginBottom: '1.5rem' }}>
             <div style={{ fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem', fontSize: '14px' }}>
-              🎯 Yeni Sınav Kitapçığı Yükle
+              📚 Yeni Soru Kitapçığı Yükle
             </div>
             <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '12px', padding: '12px 14px', marginBottom: '1.25rem', fontSize: '12px', color: '#6366f1' }}>
-              📌 Anonim kaynaklar yalnızca konu ve zorluk referansıdır; özgün soru ve şıklar kopyalanmaz. Öğretmen imzalı kaynaklar inceleme sonrası onaylı havuza birebir kullanım adayı olur.
+              📌 Bu alan test oluşturmaz; dışarıdan gelen soru kitapçıklarını düzenli bir kaynak olarak saklar. Anonim kaynaklar yalnızca konu ve zorluk referansıdır; özgün soru ve şıklar kopyalanmaz. Öğretmen imzalı kaynaklar inceleme sonrası onaylı havuza birebir kullanım adayı olur.
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
@@ -1680,7 +1680,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
 
             {/* PDF yükleme */}
             <div style={{ marginBottom: '14px' }}>
-              <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Sınav PDF Dosyası *</label>
+              <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Soru Kitapçığı PDF Dosyası *</label>
               <input type="file" accept=".pdf" onChange={e => setExamFile(e.target.files?.[0] || null)} />
               {examFile && <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '4px' }}>✓ {examFile.name} ({(examFile.size / 1024 / 1024).toFixed(1)} MB)</div>}
             </div>
@@ -1744,14 +1744,14 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                 }
               }}
               style={{ padding: '11px 20px', borderRadius: '12px', border: 'none', background: examUploading || !examFile || !examForm.title ? 'var(--bg2)' : '#6366f1', color: examUploading || !examFile || !examForm.title ? 'var(--text3)' : '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-              {examUploading ? '⏳ Yukleniyor...' : '🚀 Yukle ve Sinav Verisine Ekle'}
+              {examUploading ? '⏳ Yükleniyor...' : '🚀 Kitapçığı yükle ve kaydet'}
             </button>
           </div>
 
           {/* Yüklü kitapçıklar listesi */}
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '14px' }}>📋 Yuklu Sinav Kitapciklari</div>
+              <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '14px' }}>📋 Yüklü Soru Kitapçıkları</div>
               <button onClick={async () => {
                 setExamListLoading(true)
                 const res = await fetch('/api/admin/exam-upload')
