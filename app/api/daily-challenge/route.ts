@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
-import { questionBankKey } from '@/lib/question-bank'
+import { balanceAnswerPositions, questionBankKey } from '@/lib/question-bank'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
     if (generation.ok && Array.isArray(generated.questions)) questions.push(...generated.questions)
   }
   if (questions.length < 10) return NextResponse.json({ error: 'Günlük görev için 10 uygun soru hazırlanamadı.' }, { status: 503 })
-  const finalQuestions = shuffled(questions).slice(0, 10)
+  const finalQuestions = balanceAnswerPositions(shuffled(questions).slice(0, 10))
   const topics = [...new Set(finalQuestions.map((question: any) => question.bankTopic).filter(Boolean))]
   const { data: challenge, error } = await db.from('daily_challenges').insert({
     user_id: user.id, date, topic: 'Günün 10 Dakikası · Karma', subject: 'Karma', grade_level: selection.gradeKey,

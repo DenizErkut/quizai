@@ -32,7 +32,7 @@ import { startingDifficultyFromMastery } from '@/lib/adaptive-difficulty'
 import { resolveDiagnosticQuestionStrategy } from '@/lib/diagnostic-question-strategy'
 import { applyCanonicalObjectiveMappings, learningObjectivePrompt, loadCanonicalObjectiveCandidates } from '@/lib/learning-objective-mapping'
 import { runMistralShadowComparison } from '@/lib/ai-gateway'
-import { getQuestionBankSet, promoteQuestionsToBank } from '@/lib/question-bank'
+import { balanceAnswerPositions, getQuestionBankSet, promoteQuestionsToBank } from '@/lib/question-bank'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -1677,6 +1677,7 @@ export async function POST(req: NextRequest) {
       masteryConfidenceBefore: diagnosticStrategy.confidenceBefore,
       masteryEvidenceCountBefore: diagnosticStrategy.evidenceCountBefore,
     }))
+    questions = balanceAnswerPositions(questions)
     const objectiveMapping = applyCanonicalObjectiveMappings(questions, objectiveCandidates)
     questions = objectiveMapping.questions
 
@@ -1834,12 +1835,12 @@ export async function POST(req: NextRequest) {
       const fbQuestions = parsed.questions || parsed
       if (Array.isArray(fbQuestions) && fbQuestions.length > 0) {
         console.log('[generate-quiz] OpenAI fallback success:', fbQuestions.length, 'questions')
-        const fbFinal = sourcePassage
+        const fbFinal = balanceAnswerPositions(sourcePassage
           ? fbQuestions.map((q: any) => {
               const passageWords = extractMeaningfulWords(sourcePassage)
               return questionReferencesPassage(q, sourcePassage, passageWords) ? { ...q, passage: sourcePassage } : q
             })
-          : fbQuestions
+          : fbQuestions)
         return NextResponse.json({ questions: fbFinal, sessionId: crypto.randomUUID() })
       }
     } catch (fe: any) {

@@ -52,15 +52,37 @@ function shuffled<T>(items: T[]): T[] {
   return result
 }
 
-function randomizedForDelivery(question: Question): Question {
-  const result = { ...question }
-  if (Array.isArray(question.opts) && Number.isInteger(question.ans)) {
-    const indexed = question.opts.map((option: unknown, index: number) => ({ option, index }))
-    const randomized = shuffled(indexed)
-    result.opts = randomized.map(item => item.option)
-    result.ans = randomized.findIndex(item => item.index === question.ans)
-  }
-  return result
+export function balanceAnswerPositions(questions: Question[]): Question[] {
+  const eligibleIndexes = questions
+    .map((question, index) => ({ question, index }))
+    .filter(({ question }) => Array.isArray(question.opts)
+      && question.opts.length === 4
+      && Number.isInteger(question.ans)
+      && question.ans >= 0
+      && question.ans < 4)
+    .map(({ index }) => index)
+
+  // Every four eligible questions contain one A/B/C/D answer. The remainder
+  // is randomized, so the sequence stays unpredictable while the whole quiz
+  // remains as even as mathematically possible.
+  const targetPositions = shuffled(
+    eligibleIndexes.map((_, index) => index % 4)
+  )
+  const targets = new Map(eligibleIndexes.map((questionIndex, index) => [questionIndex, targetPositions[index]]))
+
+  return questions.map((question, questionIndex) => {
+    const target = targets.get(questionIndex)
+    if (target === undefined) return { ...question }
+
+    const correctOption = question.opts[question.ans]
+    const distractors = shuffled(question.opts.filter((_: unknown, index: number) => index !== question.ans))
+    const opts: unknown[] = []
+    let distractorIndex = 0
+    for (let optionIndex = 0; optionIndex < 4; optionIndex++) {
+      opts.push(optionIndex === target ? correctOption : distractors[distractorIndex++])
+    }
+    return { ...question, opts, ans: target }
+  })
 }
 
 function validQuestion(question: Question): boolean {
@@ -114,11 +136,11 @@ export async function getQuestionBankSet(
   })
   if (usageError) console.warn(`[question-bank] usage update skipped code=${usageError.code || 'unknown'}`)
 
-  return selected.map((row: any) => ({
-    ...randomizedForDelivery(row.question),
+  return balanceAnswerPositions(selected.map((row: any) => ({
+    ...row.question,
     bankQuestionId: row.id,
     bankFingerprint: row.fingerprint,
-  }))
+  })))
 }
 
 export async function promoteQuestionsToBank(
