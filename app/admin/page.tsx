@@ -91,7 +91,7 @@ export default function AdminPage() {
   const [examUploading, setExamUploading] = useState(false)
   const [examMsg, setExamMsg] = useState('')
   const [examFile, setExamFile] = useState<File | null>(null)
-  const [examForm, setExamForm] = useState({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', answer_key: '' })
+  const [examForm, setExamForm] = useState({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '' })
   const [examList, setExamList] = useState<any[]>([])
   const [examListLoading, setExamListLoading] = useState(false)
 
@@ -1621,7 +1621,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               🎯 Yeni Sınav Kitapçığı Yükle
             </div>
             <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '12px', padding: '12px 14px', marginBottom: '1.25rem', fontSize: '12px', color: '#6366f1' }}>
-              📌 Geçmiş yıl LGS, TYT, AYT, KPSS kitapçıklarını yükleyin. AI bu sorulardan öğrenerek daha gerçekçi sınav soruları üretir.
+              📌 Anonim kaynaklar yalnızca konu ve zorluk referansıdır; özgün soru ve şıklar kopyalanmaz. Öğretmen imzalı kaynaklar inceleme sonrası onaylı havuza birebir kullanım adayı olur.
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
@@ -1630,6 +1630,22 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                 <input value={examForm.title} onChange={e => setExamForm(p => ({ ...p, title: e.target.value }))}
                   placeholder="2024 LGS Sosyal Bilgiler"
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' as const }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Kaynak imzası *</label>
+                <select value={examForm.source_type} onChange={e => setExamForm(p => ({ ...p, source_type: e.target.value }))}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px' }}>
+                  <option value="anonymous">Anonim — benzer/özgün üretim</option>
+                  <option value="teacher">Öğretmen imzalı — onay sonrası birebir havuz adayı</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Sınıf</label>
+                <input value={examForm.grade} onChange={e => setExamForm(p => ({ ...p, grade: e.target.value }))} placeholder="6" style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', boxSizing: 'border-box' as const }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Alt başlık</label>
+                <input value={examForm.subtopic} onChange={e => setExamForm(p => ({ ...p, subtopic: e.target.value }))} placeholder="Hücre bölünmeleri" style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', boxSizing: 'border-box' as const }} />
               </div>
               <div>
                 <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Sınav Türü *</label>
@@ -1705,7 +1721,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     const data = await res.json()
                     if (res.ok) {
                       setExamMsg(`✅ Yuklendi! ${data.chunks} soru chunk, ${data.embedded} embedding`)
-                      setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', answer_key: '' })
+                      setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '' })
                       setExamFile(null)
                     } else setExamMsg('❌ ' + (data.error || 'Sunucu hatasi'))
                   } else {
@@ -1717,7 +1733,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     const data = await res.json()
                     if (res.ok) {
                       setExamMsg(`✅ Yuklendi! ${data.chunks} soru chunk`)
-                      setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', answer_key: '' })
+                      setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '' })
                       setExamFile(null)
                     } else setExamMsg('❌ ' + (data.error || 'Sunucu hatasi'))
                   }

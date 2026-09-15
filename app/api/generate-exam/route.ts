@@ -44,7 +44,7 @@ type ExamQuestion = {
   visual?: { kind: 'table' | 'diagram'; title?: string; headers?: string[]; rows?: string[][]; description?: string }
 }
 
-function buildSectionPrompt(section: ExamSection, count: number, format: ExamFormat): string {
+function buildSectionPrompt(section: ExamSection, count: number, format: ExamFormat, referenceContext = ''): string {
   const { subject, grade } = section
   const examType = format.label
   const isLanguageSection = isForeignLanguageSubject(subject)
@@ -54,6 +54,7 @@ function buildSectionPrompt(section: ExamSection, count: number, format: ExamFor
     ? `\n\n🌐 YABANCI DİL BÖLÜMÜ KURALI: Bu bir ${subject} bölümü — gerçek bir ${examType} ${subject} sınavı gibi davran. Soru kökü (q alanı) DAHİL HER ŞEY -- soru metni, şıklar (opts), örnek cümleler, kelimeler, gramer yapıları -- TAMAMEN ${subject} DİLİNDE olmalı, soru/şık metninde TEK BİR TÜRKÇE CÜMLE bile olmamalı. SADECE "exp" (açıklama) alanını öğrenci anlayışı için TÜRKÇE yaz.`
     : ''
 
+  const sourceNote = referenceContext ? `\n\nDIŞ KAYNAK REFERANSI (KOPYALAMA YASAK):\n${referenceContext}\nBu parçalar yalnızca konu, beceri ve zorluk bağlamıdır. Hiçbir cümleyi, sayıyı, seçenek dizisini veya özgün kurguyu birebir kullanma; tamamen yeni sorular üret.` : ''
   return `Sen ${examType} sınavı için soru hazırlayan bir eğitim uzmanısın.
 Ders: ${subject}
 Seviye: ${grade}
@@ -71,8 +72,22 @@ KURALLAR:
 - Tablo veya şema gerçekten gerekiyorsa "visual" alanını kullan; görünmeyen bir metne ya da şekle atıf yapma
 - Kısa açıklama ekle${languageNote}
 
-SADECE geçerli JSON döndür, markdown yok. passage ve visual gerekmiyorsa null gönder:
+SADECE geçerli JSON döndür, markdown yok. passage ve visual gerekmiyorsa null gönder:${sourceNote}
 {"questions":[{"type":"multiple_choice","q":"Soru metni","opts":[${optionCount === 4 ? '"A şıkkı","B şıkkı","C şıkkı","D şıkkı"' : '"A şıkkı","B şıkkı","C şıkkı","D şıkkı","E şıkkı"'}],"ans":0,"exp":"Kısa açıklama","difficulty":"medium","cognitiveSkill":"reasoning","objective":"ölçülen kazanım","passage":null,"visual":null}]}`
+}
+
+async function getBookletReference(format: ExamFormat, section: ExamSection): Promise<string> {
+  const { data } = await supabase.from('exam_resources')
+    .select('id,title,raw_text,source_type,grade,subject,subtopic')
+    .eq('exam_type', format.label)
+    .in('source_type', ['anonymous', 'teacher'])
+    .limit(12)
+  const rows = (data || []).filter((r: any) => {
+    const gradeOk = !r.grade || !section.grade || String(r.grade).toLocaleLowerCase('tr') === String(section.grade).toLocaleLowerCase('tr')
+    const subjectOk = !r.subject || !section.subject || String(r.subject).toLocaleLowerCase('tr').includes(String(section.subject).toLocaleLowerCase('tr'))
+    return gradeOk && subjectOk
+  }).slice(0, 3)
+  return rows.map((r: any) => `[${r.source_type === 'teacher' ? 'öğretmen imzalı' : 'anonim'} referans] ${(r.raw_text || '').slice(0, 1400)}`).filter((s: string) => s.length > 40).join('\n---\n')
 }
 
 function structurallyValid(question: ExamQuestion, optionCount: number): boolean {
@@ -225,7 +240,8 @@ export async function POST(req: NextRequest) {
           const accepted: ExamQuestion[] = [...pooled]
           for (let attempt = 0; attempt < 2 && accepted.length < sectionCount; attempt++) {
             const missing = sectionCount - accepted.length
-            const prompt = buildSectionPrompt(section, missing, format)
+            const referenceContext = await getBookletReference(format, section)
+            const prompt = buildSectionPrompt(section, missing, format, referenceContext)
             const response = await anthropic.messages.create({
               model: 'claude-sonnet-4-5', max_tokens: 6000,
               system: 'Sen Türk eğitim sisteminde sınav soruları hazırlayan bir uzmansın. Sadece geçerli JSON döndür, markdown kullanma.',

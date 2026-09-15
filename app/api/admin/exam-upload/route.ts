@@ -70,9 +70,9 @@ async function embedText(text: string): Promise<number[] | null> {
 
 async function processExam(params: {
   title: string; exam_type: string; year: string; subject: string; answer_key: string
-  rawText: string; fileUrl?: string
+  rawText: string; fileUrl?: string; fileName?: string; source_type: 'anonymous' | 'teacher'; grade: string; subtopic: string; uploaded_by?: string
 }) {
-  const { title, exam_type, year, subject, answer_key, rawText, fileUrl } = params
+  const { title, exam_type, year, subject, answer_key, rawText, fileUrl, fileName, source_type, grade, subtopic, uploaded_by } = params
 
   // exam_resources tablosuna kaydet
   const { data: examRow, error: rowErr } = await adminDb.from('exam_resources').insert({
@@ -80,6 +80,13 @@ async function processExam(params: {
     answer_key: answer_key || null,
     file_url: fileUrl || null,
     raw_text: rawText,
+    source_type,
+    reuse_policy: source_type === 'teacher' ? 'exact_reuse' : 'reference_only',
+    grade: grade || '',
+    subtopic: subtopic || '',
+    review_status: 'pending',
+    uploaded_by: uploaded_by || null,
+    file_name: fileName || null,
     created_at: new Date().toISOString(),
   }).select('id').single()
 
@@ -99,6 +106,8 @@ async function processExam(params: {
       content: chunks[i],
       embedding: embedding ? JSON.stringify(embedding) : null,
       exam_type, year: parseInt(year), subject: subject || null,
+      source_type, reuse_policy: source_type === 'teacher' ? 'exact_reuse' : 'reference_only',
+      grade: grade || '', subtopic: subtopic || '',
     })
     if (embedding) embeddedCount++
     if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 150))
@@ -120,7 +129,7 @@ export async function GET(req: NextRequest) {
   if (id) {
     const { data, error } = await adminDb
       .from('exam_resources')
-      .select('id, title, exam_type, year, subject, answer_key, file_url, raw_text, created_at')
+      .select('id, title, exam_type, year, subject, answer_key, file_url, raw_text, source_type, reuse_policy, grade, subtopic, review_status, created_at')
       .eq('id', id).single()
     if (error || !data) return NextResponse.json({ error: 'Bulunamadı' }, { status: 404 })
     return NextResponse.json({ exam: { ...data, char_count: data.raw_text?.length || 0 } })
@@ -128,7 +137,7 @@ export async function GET(req: NextRequest) {
 
   const { data: exams } = await adminDb
     .from('exam_resources')
-    .select('id, title, exam_type, year, subject, created_at, file_url')
+    .select('id, title, exam_type, year, subject, source_type, reuse_policy, grade, subtopic, review_status, created_at, file_url')
     .order('exam_type', { ascending: true })
     .order('year', { ascending: false })
 
@@ -152,7 +161,7 @@ export async function POST(req: NextRequest) {
   try {
     const contentType = req.headers.get('content-type') || ''
 
-    let title = '', exam_type = 'LGS', year = '', subject = '', answer_key = ''
+    let title = '', exam_type = 'LGS', year = '', subject = '', answer_key = '', source_type: 'anonymous' | 'teacher' = 'anonymous', grade = '', subtopic = '', fileName = ''
     let rawText = '', fileUrl = ''
 
     // JSON mod: storage_path ile (büyük dosya)
@@ -160,6 +169,7 @@ export async function POST(req: NextRequest) {
       const body = await req.json()
       title = body.title; exam_type = body.exam_type; year = body.year
       subject = body.subject || ''; answer_key = body.answer_key || ''
+      source_type = body.source_type === 'teacher' ? 'teacher' : 'anonymous'; grade = body.grade || ''; subtopic = body.subtopic || ''; fileName = body.file_name || ''
 
       const { data: fileData, error: dlErr } = await adminDb.storage
         .from('meb-resources').download(body.storage_path)
@@ -186,7 +196,11 @@ export async function POST(req: NextRequest) {
       year = form.get('year') as string
       subject = form.get('subject') as string || ''
       answer_key = form.get('answer_key') as string || ''
+      source_type = form.get('source_type') === 'teacher' ? 'teacher' : 'anonymous'
+      grade = form.get('grade') as string || ''
+      subtopic = form.get('subtopic') as string || ''
       const file = form.get('file') as File | null
+      fileName = file?.name || ''
 
       if (file && file.size > 0) {
         const bytes = await file.arrayBuffer()
@@ -214,7 +228,7 @@ export async function POST(req: NextRequest) {
     }
     if (!rawText) rawText = `[${exam_type} ${year} ${subject}]`
 
-    const result = await processExam({ title, exam_type, year, subject, answer_key, rawText, fileUrl })
+    const result = await processExam({ title, exam_type, year, subject, answer_key, rawText, fileUrl, fileName, source_type, grade, subtopic, uploaded_by: user.id })
     if ('error' in result) return NextResponse.json({ error: result.error }, { status: 500 })
 
     return NextResponse.json({ success: true, ...result })
@@ -224,6 +238,18 @@ export async function POST(req: NextRequest) {
     const msg = e?.message || 'Bilinmeyen hata'
     return NextResponse.json({ error: msg }, { status: 500 })
   }
+}
+
+export async function PATCH(req: NextRequest) {
+  const user = await getAdminUser()
+  if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const { id, review_status } = await req.json()
+  if (!id || !['pending', 'approved', 'rejected'].includes(review_status)) return NextResponse.json({ error: 'Geçersiz durum' }, { status: 400 })
+  const { data: row } = await adminDb.from('exam_resources').select('source_type').eq('id', id).single()
+  if (!row) return NextResponse.json({ error: 'Bulunamadı' }, { status: 404 })
+  const { error } = await adminDb.from('exam_resources').update({ review_status, reuse_policy: row.source_type === 'teacher' ? 'exact_reuse' : 'reference_only' }).eq('id', id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ success: true })
 }
 
 // DELETE: kitapçık sil. Bu tablolar için repoda bir FK/migration
