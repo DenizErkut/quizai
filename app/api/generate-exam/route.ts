@@ -80,6 +80,7 @@ async function getBookletReference(format: ExamFormat, section: ExamSection): Pr
   const { data } = await supabase.from('exam_resources')
     .select('id,title,raw_text,source_type,grade,subject,subtopic')
     .eq('exam_type', format.label)
+    .eq('purpose', 'exam')
     .in('source_type', ['anonymous', 'teacher'])
     .limit(12)
   const rows = (data || []).filter((r: any) => {
