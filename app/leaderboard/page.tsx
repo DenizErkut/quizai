@@ -82,11 +82,17 @@ export default function LeaderboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      const [{ data: lb }, { data: profile }, { data: badges }] = await Promise.all([
+      const { data: { session } } = await supabase.auth.getSession()
+      const [{ data: lb }, { data: profile }, badgeResponse] = await Promise.all([
         supabase.from('leaderboard').select('*').order('points', { ascending: false }).limit(200),
         supabase.from('profiles').select('grade').eq('id', user.id).single(),
-        supabase.from('badges').select('badge_key, earned_at').eq('user_id', user.id),
+        fetch('/api/badges/sync', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+        }),
       ])
+
+      const badgePayload = badgeResponse.ok ? await badgeResponse.json() : { badges: [] }
 
       // İsimler TR-PG'den çözülür; leaderboard view'i yalnızca id/grade/puan sağlar
       const identities = await resolveIdentities(supabase, (lb || []).map((e: any) => e.id))
@@ -102,7 +108,7 @@ export default function LeaderboardPage() {
       setEntries(allEntries)
       setMyEntry(allEntries.find((e: LeaderEntry) => e.id === user.id) || null)
       setMyGrade(profile?.grade || '')
-      setMyBadges(badges || [])
+      setMyBadges(badgePayload.badges || [])
 
       // Varsayılan tab: kendi sınıf grubu
       const g = gradeGroup(profile?.grade || '')
