@@ -251,11 +251,26 @@ export async function PATCH(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const { id, review_status } = await req.json()
   if (!id || !['pending', 'approved', 'rejected'].includes(review_status)) return NextResponse.json({ error: 'Geçersiz durum' }, { status: 400 })
-  const { data: row } = await adminDb.from('exam_resources').select('source_type').eq('id', id).single()
+  const { data: row } = await adminDb.from('exam_resources').select('source_type,purpose,title,subject,grade,subtopic,raw_text').eq('id', id).single()
   if (!row) return NextResponse.json({ error: 'Bulunamadı' }, { status: 404 })
   const { error } = await adminDb.from('exam_resources').update({ review_status, reuse_policy: row.source_type === 'teacher' ? 'exact_reuse' : 'reference_only' }).eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ success: true })
+  let promoted = 0
+  if (review_status === 'approved' && row.source_type === 'teacher' && row.purpose === 'instant_test') {
+    const prompt = `Aşağıdaki öğretmen imzalı soru kitapçığı metninden en fazla 20 çoktan seçmeli soruyu ayıkla. Soru, seçenekler, doğru cevap indeksi (0 tabanlı), kısa açıklama, konu ve zorluk alanlarını JSON olarak döndür. Metin bozuksa uydurma; eksik soruyu atla. {"questions":[{"q":"...","opts":["..."],"ans":0,"exp":"...","topic":"...","difficulty":"easy|medium|hard"}]}\n\n${String(row.raw_text || '').slice(0, 30000)}`
+    try {
+      const response = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 7000, messages: [{ role: 'user', content: prompt }] })
+      const text = response.content[0].type === 'text' ? response.content[0].text : ''
+      const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
+      const questions = (parsed.questions || []).filter((q: any) => q?.q && Array.isArray(q.opts) && q.opts.length >= 4 && q.opts.length <= 5 && Number.isInteger(q.ans) && q.ans >= 0 && q.ans < q.opts.length && q.exp)
+      const rows = questions.map((q: any) => ({
+        fingerprint: createHash('sha256').update(`${q.q}|${q.opts.join('|')}`.toLocaleLowerCase('tr')).digest('hex'),
+        subject_key: String(row.subject || 'genel').toLocaleLowerCase('tr'), topic_key: String(q.topic || row.subtopic || 'genel').toLocaleLowerCase('tr'), grade_key: String(row.grade || '').toLocaleLowerCase('tr'), language_key: 'tr', question_type: 'multiple_choice', difficulty: ['easy','medium','hard'].includes(q.difficulty) ? q.difficulty : 'medium', question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, objective: q.topic || row.subtopic || '' }, review_status: 'approved', quality_score: 1, source_engine: 'teacher_booklet_review', report_count: 0
+      }))
+      if (rows.length) { const result = await adminDb.from('question_bank').upsert(rows, { onConflict: 'fingerprint', ignoreDuplicates: true }); if (!result.error) promoted = rows.length }
+    } catch (e) { console.error('[exam-upload] teacher promotion failed', e) }
+  }
+  return NextResponse.json({ success: true, promoted })
 }
 
 // DELETE: kitapçık sil. Bu tablolar için repoda bir FK/migration
