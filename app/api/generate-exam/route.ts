@@ -101,6 +101,26 @@ function structurallyValid(question: ExamQuestion, optionCount: number): boolean
   )
 }
 
+function qualityValid(question: ExamQuestion, optionCount: number): boolean {
+  if (!structurallyValid(question, optionCount)) return false
+  if (!question.objective?.trim()) return false
+  if (!question.difficulty || !['easy', 'medium', 'hard'].includes(question.difficulty)) return false
+  const text = `${question.q} ${question.exp}`.toLocaleLowerCase('tr')
+  if (text.includes('soru metni') || /şık\s*[abcd e]\s*şıkkı/.test(text)) return false
+  return true
+}
+
+function uniqueQualityQuestions(questions: ExamQuestion[], optionCount: number): ExamQuestion[] {
+  const seen = new Set<string>()
+  return questions.filter((question) => {
+    if (!qualityValid(question, optionCount)) return false
+    const key = createHash('sha256').update(`${question.q.trim()}|${question.opts.join('|')}`.toLocaleLowerCase('tr')).digest('hex')
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 async function validateWithIndependentModel(
   questions: ExamQuestion[], section: ExamSection, format: ExamFormat, userId: string,
 ): Promise<ExamQuestion[]> {
@@ -251,8 +271,7 @@ export async function POST(req: NextRequest) {
             const text = response.content[0].type === 'text' ? response.content[0].text : ''
             const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
             const optionCount = format.label === 'LGS' ? 4 : 5
-            const structurallyAccepted = ((parsed.questions || []) as ExamQuestion[])
-              .filter(question => structurallyValid(question, optionCount))
+            const structurallyAccepted = uniqueQualityQuestions((parsed.questions || []) as ExamQuestion[], optionCount)
               .slice(0, missing)
             const independentlyAccepted = await validateWithIndependentModel(structurallyAccepted, section, format, user.id)
             await storeApprovedExamQuestions(format, section, independentlyAccepted)
