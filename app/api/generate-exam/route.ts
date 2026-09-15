@@ -4,6 +4,9 @@ import { logAnthropicUsage } from '@/lib/ai-usage'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { checkMinorConsentBlock } from '@/lib/identity/client'
 import { balanceAnswerPositions } from '@/lib/question-bank'
+import { callOpenAI } from '@/lib/openai'
+import { EXAM_FORMATS, resolveExamFormat, type ExamFormat, type ExamSection } from '@/lib/exam-system'
+import { createHash } from 'node:crypto'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -13,85 +16,6 @@ const supabase = createClient(
 
 export const maxDuration = 120
 export const runtime = 'nodejs'
-
-// ─── SINAV FORMATLARI ────────────────────────────────────────────────────────
-export const EXAM_FORMATS = {
-  LGS: {
-    label: 'LGS',
-    fullName: 'Liselere Geçiş Sınavı',
-    duration: 155,
-    sections: [
-      { id: 'turkce',    label: 'Türkçe',              count: 20, subject: 'Türkçe',                    grade: 'ortaokul 8. sinif', netCoef: 4 },
-      { id: 'matematik', label: 'Matematik',            count: 20, subject: 'Matematik',                 grade: 'ortaokul 8. sinif', netCoef: 4 },
-      { id: 'fen',       label: 'Fen Bilimleri',        count: 20, subject: 'Fen Bilimleri',             grade: 'ortaokul 8. sinif', netCoef: 4 },
-      { id: 'inkilap',   label: 'T.C. İnkılap Tarihi', count: 10, subject: 'T.C. İnkılap Tarihi',       grade: 'ortaokul 8. sinif', netCoef: 1 },
-      { id: 'ingilizce', label: 'İngilizce',            count: 10, subject: 'İngilizce',                 grade: 'ortaokul 8. sinif', netCoef: 1 },
-      { id: 'din',       label: 'Din Kültürü',          count: 10, subject: 'Din Kültürü ve Ahlak',      grade: 'ortaokul 8. sinif', netCoef: 1 },
-    ],
-    scoring: { correct: 4, wrong: -1, base: 0 },
-    maxScore: 500,
-    description: '90 soru · Sözel 75 dk + Sayısal 80 dk',
-    targetAudience: 'ortaokul',
-    color: '#6366f1',
-  },
-  TYT: {
-    label: 'TYT',
-    fullName: 'Temel Yeterlilik Testi',
-    duration: 165,
-    sections: [
-      { id: 'turkce',    label: 'Türkçe',          count: 40, subject: 'Türkçe',          grade: 'lise 12. sinif', netCoef: 1 },
-      { id: 'sosyal',    label: 'Sosyal Bilimler',  count: 20, subject: 'Sosyal Bilimler', grade: 'lise 12. sinif', netCoef: 1 },
-      { id: 'matematik', label: 'Temel Matematik',  count: 40, subject: 'Matematik',       grade: 'lise 12. sinif', netCoef: 1 },
-      { id: 'fen',       label: 'Fen Bilimleri',    count: 20, subject: 'Fen Bilimleri',   grade: 'lise 12. sinif', netCoef: 1 },
-    ],
-    scoring: { correct: 1, wrong: -0.25, base: 0 },
-    maxScore: 400,
-    description: '120 soru · 165 dakika · Net puan sistemi',
-    targetAudience: 'lise',
-    color: '#0ea5e9',
-  },
-  AYT: {
-    label: 'AYT',
-    fullName: 'Alan Yeterlilik Testi',
-    duration: 180,
-    sections: [
-      { id: 'matematik', label: 'Matematik',             count: 40, subject: 'Matematik İleri',                  grade: 'lise 12. sinif', netCoef: 1.2 },
-      { id: 'fizik',     label: 'Fizik',                 count: 14, subject: 'Fizik',                            grade: 'lise 12. sinif', netCoef: 1.2 },
-      { id: 'kimya',     label: 'Kimya',                 count: 13, subject: 'Kimya',                            grade: 'lise 12. sinif', netCoef: 1.2 },
-      { id: 'biyoloji',  label: 'Biyoloji',              count: 13, subject: 'Biyoloji',                         grade: 'lise 12. sinif', netCoef: 1.2 },
-      { id: 'edebiyat',  label: 'Türk Dili ve Edebiyatı',count: 24, subject: 'Türk Edebiyatı',                  grade: 'lise 12. sinif', netCoef: 1.2 },
-      { id: 'tarih1',    label: 'Tarih-1',               count: 10, subject: 'Tarih',                            grade: 'lise 12. sinif', netCoef: 1.2 },
-      { id: 'cografya1', label: 'Coğrafya-1',            count: 6,  subject: 'Coğrafya',                        grade: 'lise 12. sinif', netCoef: 1.2 },
-      { id: 'tarih2',    label: 'Tarih-2',               count: 11, subject: 'Çağdaş Türk ve Dünya Tarihi',     grade: 'lise 12. sinif', netCoef: 1.2 },
-      { id: 'cografya2', label: 'Coğrafya-2',            count: 11, subject: 'Coğrafya',                        grade: 'lise 12. sinif', netCoef: 1.2 },
-      { id: 'felsefe',   label: 'Felsefe Grubu',         count: 12, subject: 'Felsefe',                         grade: 'lise 12. sinif', netCoef: 1.2 },
-      { id: 'din',       label: 'Din',                   count: 6,  subject: 'Din Kültürü',                     grade: 'lise 12. sinif', netCoef: 1.2 },
-    ],
-    scoring: { correct: 1, wrong: -0.25, base: 0 },
-    maxScore: 500,
-    description: '160 soru · 180 dakika · Sayısal / Sözel / EA',
-    targetAudience: 'lise',
-    color: '#f59e0b',
-  },
-  KPSS_GENEL: {
-    label: 'KPSS',
-    fullName: 'KPSS Genel Yetenek / Genel Kültür',
-    duration: 120,
-    sections: [
-      { id: 'turkce',      label: 'Türkçe',           count: 30, subject: 'Türkçe',           grade: 'universite mezun', netCoef: 1 },
-      { id: 'matematik',   label: 'Matematik',         count: 30, subject: 'Matematik',        grade: 'universite mezun', netCoef: 1 },
-      { id: 'tarih',       label: 'Tarih',             count: 16, subject: 'Türk Tarihi',      grade: 'universite mezun', netCoef: 1 },
-      { id: 'cografya',    label: 'Coğrafya',          count: 7,  subject: 'Coğrafya',         grade: 'universite mezun', netCoef: 1 },
-      { id: 'vatandaslik', label: 'Vatandaşlık',       count: 7,  subject: 'Vatandaşlık',      grade: 'universite mezun', netCoef: 1 },
-      { id: 'ataturk',     label: 'Atatürk İlkeleri',  count: 10, subject: 'Atatürk İlkeleri', grade: 'universite mezun', netCoef: 1 },
-    ],
-    scoring: { correct: 1, wrong: -0.25, base: 0 },
-    maxScore: 100,
-    description: '100 soru · 120 dakika · GY + GK',
-    targetAudience: 'universite',
-    color: '#10b981',
-  },
-} as const
 
 type ExamKey = keyof typeof EXAM_FORMATS
 
@@ -108,7 +32,21 @@ function isForeignLanguageSubject(subject: string): boolean {
   return FOREIGN_LANGUAGE_SUBJECTS.includes(subject.trim().toLocaleLowerCase('tr'))
 }
 
-function buildSectionPrompt(subject: string, grade: string, count: number, examType: string): string {
+type ExamQuestion = {
+  q: string
+  opts: string[]
+  ans: number
+  exp: string
+  difficulty?: 'easy' | 'medium' | 'hard'
+  cognitiveSkill?: 'comprehension' | 'application' | 'reasoning' | 'analysis'
+  objective?: string
+  passage?: string
+  visual?: { kind: 'table' | 'diagram'; title?: string; headers?: string[]; rows?: string[][]; description?: string }
+}
+
+function buildSectionPrompt(section: ExamSection, count: number, format: ExamFormat): string {
+  const { subject, grade } = section
+  const examType = format.label
   const isLanguageSection = isForeignLanguageSubject(subject)
   const optionCount = examType === 'LGS' ? 4 : 5
   const optionLabels = optionCount === 4 ? 'A/B/C/D' : 'A/B/C/D/E'
@@ -120,16 +58,101 @@ function buildSectionPrompt(subject: string, grade: string, count: number, examT
 Ders: ${subject}
 Seviye: ${grade}
 Soru sayısı: ${count}
+Sınav yılı: ${format.examYear}
+Müfredat sürümü: ${format.curriculumVersion}
 
 KURALLAR:
 - Gerçek ${examType} sınav sorusu formatında, MEB müfredatına uygun
 - ${optionCount} şık (${optionLabels}), tek doğru cevap
 - Zorluk dağılımı: %30 kolay, %50 orta, %20 zor
+- Bilişsel beceri dağılımı: anlama, uygulama, akıl yürütme ve analiz
 - Güncel ve doğru bilgi içeren sorular
+- Paragraf gerektiren soruda "passage" alanına öğrencinin göreceği metnin tamamını yaz
+- Tablo veya şema gerçekten gerekiyorsa "visual" alanını kullan; görünmeyen bir metne ya da şekle atıf yapma
 - Kısa açıklama ekle${languageNote}
 
-SADECE geçerli JSON döndür, markdown yok:
-{"questions":[{"type":"multiple_choice","q":"Soru metni","opts":[${optionCount === 4 ? '"A şıkkı","B şıkkı","C şıkkı","D şıkkı"' : '"A şıkkı","B şıkkı","C şıkkı","D şıkkı","E şıkkı"'}],"ans":0,"exp":"Kısa açıklama","difficulty":"easy"}]}`
+SADECE geçerli JSON döndür, markdown yok. passage ve visual gerekmiyorsa null gönder:
+{"questions":[{"type":"multiple_choice","q":"Soru metni","opts":[${optionCount === 4 ? '"A şıkkı","B şıkkı","C şıkkı","D şıkkı"' : '"A şıkkı","B şıkkı","C şıkkı","D şıkkı","E şıkkı"'}],"ans":0,"exp":"Kısa açıklama","difficulty":"medium","cognitiveSkill":"reasoning","objective":"ölçülen kazanım","passage":null,"visual":null}]}`
+}
+
+function structurallyValid(question: ExamQuestion, optionCount: number): boolean {
+  return Boolean(
+    question && typeof question.q === 'string' && question.q.trim()
+    && Array.isArray(question.opts) && question.opts.length === optionCount
+    && question.opts.every(option => typeof option === 'string' && option.trim())
+    && new Set(question.opts.map(option => option.trim().toLocaleLowerCase('tr'))).size === optionCount
+    && Number.isInteger(question.ans) && question.ans >= 0 && question.ans < optionCount
+    && typeof question.exp === 'string' && question.exp.trim()
+  )
+}
+
+async function validateWithIndependentModel(
+  questions: ExamQuestion[], section: ExamSection, format: ExamFormat, userId: string,
+): Promise<ExamQuestion[]> {
+  if (!questions.length) return []
+  const accepted: ExamQuestion[] = []
+  for (let offset = 0; offset < questions.length; offset += 10) {
+    const batch = questions.slice(offset, offset + 10)
+    const content = await callOpenAI([
+      { role: 'system', content: 'Sen bağımsız ve katı bir sınav sorusu denetçisisin. Yalnızca geçerli JSON döndür.' },
+      { role: 'user', content: `Bu ${format.examYear} ${format.label} ${section.label} sorularını doğruluk, tek doğru cevap, seçenek-açıklama tutarlılığı, yaş düzeyi, müfredat, görünür kaynak metin/şekil ve dil açısından denetle. Yalnızca tamamen güvenli soruların sıfır tabanlı indekslerini döndür: {"acceptedIndices":[0,1]}\n\n${JSON.stringify(batch)}` },
+    ], {
+      model: process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini',
+      max_tokens: 500,
+      temperature: 0,
+      json: true,
+      operation: 'generate-exam:validator',
+      userId,
+    })
+    const parsed = JSON.parse(content) as { acceptedIndices?: number[] }
+    if (!Array.isArray(parsed.acceptedIndices)) throw new Error('Validator şeması geçersiz')
+    for (const index of parsed.acceptedIndices) {
+      if (Number.isInteger(index) && index >= 0 && index < batch.length) accepted.push(batch[index])
+    }
+  }
+  return accepted
+}
+
+function examFingerprint(question: ExamQuestion, format: ExamFormat, section: ExamSection): string {
+  return createHash('sha256').update(JSON.stringify({
+    examYear: format.examYear, examType: format.label, track: format.track || '', language: format.language || '',
+    section: section.id, q: question.q, opts: question.opts,
+  })).digest('hex')
+}
+
+async function getApprovedExamQuestions(format: ExamFormat, section: ExamSection, count: number): Promise<ExamQuestion[]> {
+  const { data, error } = await supabase.from('exam_question_bank')
+    .select('id, question')
+    .eq('exam_year', format.examYear)
+    .eq('exam_type', format.label)
+    .eq('track', format.track || '')
+    .eq('language', format.language || 'Türkçe')
+    .eq('section_id', section.id)
+    .eq('curriculum_version', format.curriculumVersion)
+    .eq('review_status', 'approved')
+    .eq('report_count', 0)
+    .order('use_count', { ascending: true })
+    .order('last_used_at', { ascending: true, nullsFirst: true })
+    .limit(count)
+  if (error) throw error
+  const rows = data || []
+  if (rows.length) {
+    await supabase.rpc('mark_exam_questions_used', { p_ids: rows.map(row => row.id) })
+  }
+  return rows.map(row => row.question as ExamQuestion)
+}
+
+async function storeApprovedExamQuestions(format: ExamFormat, section: ExamSection, questions: ExamQuestion[]) {
+  if (!questions.length) return
+  const rows = questions.map(question => ({
+    fingerprint: examFingerprint(question, format, section), exam_year: format.examYear, exam_type: format.label,
+    track: format.track || '', language: format.language || 'Türkçe', section_id: section.id,
+    subject: section.subject, grade: section.grade, curriculum_version: format.curriculumVersion,
+    objective: question.objective || '', cognitive_skill: question.cognitiveSkill || 'application',
+    difficulty: question.difficulty || 'medium', question, review_status: 'approved', validator_model: process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini',
+  }))
+  const { error } = await supabase.from('exam_question_bank').upsert(rows, { onConflict: 'fingerprint', ignoreDuplicates: true })
+  if (error) console.error('[generate-exam] bank insert failed', error)
 }
 
 export async function GET() {
@@ -165,7 +188,9 @@ export async function POST(req: NextRequest) {
   const isDemoOnly = profile.plan !== 'premium' && profile.plan !== 'unlimited'
 
   const body = await req.json()
-  const { examType, sectionIds, demo: demoParam } = body as { examType: ExamKey; sectionIds?: string[]; demo?: boolean }
+  const { examType, sectionIds, demo: demoParam, track, ydtLanguage } = body as {
+    examType: ExamKey; sectionIds?: string[]; demo?: boolean; track?: string; ydtLanguage?: string
+  }
 
   // Gümüş/free/none: SADECE demo modu — tam sınav isteği reddedilir.
   // Bu kontrol istemci tarafındaki (disabled buton) kontrolden BAĞIMSIZ —
@@ -176,7 +201,7 @@ export async function POST(req: NextRequest) {
   // Defense-in-depth: kısıtlı planlar için demo her koşulda true kabul edilir.
   const demo = isDemoOnly ? true : !!demoParam
 
-  const format = EXAM_FORMATS[examType]
+  const format = resolveExamFormat(examType, track, ydtLanguage)
   if (!format) return NextResponse.json({ error: 'Geçersiz sınav türü.' }, { status: 400 })
 
   const sectionsToGenerate = sectionIds
@@ -194,26 +219,48 @@ export async function POST(req: NextRequest) {
       const chunk = sectionsToGenerate.slice(i, i + CHUNK)
       await Promise.all(chunk.map(async (section: any) => {
         const sectionCount = isDemoOnly ? 1 : Math.max(4, Math.round(section.count * countMultiplier))
-        const prompt = buildSectionPrompt(section.subject, section.grade, sectionCount, format.label)
 
         try {
-          const response = await anthropic.messages.create({
-            model: 'claude-sonnet-4-5',
-            max_tokens: 6000,
-            system: 'Sen Türk eğitim sisteminde sınav soruları hazırlayan bir uzmansın. Sadece geçerli JSON döndür, markdown kullanma.',
-            messages: [{ role: 'user', content: prompt }],
-          })
-          await logAnthropicUsage('generate-exam', 'claude-sonnet-4-5', response, { userId: user.id })
-
-          const text = response.content[0].type === 'text' ? response.content[0].text : ''
-          const clean = text.replace(/```json|```/g, '').trim()
-          const parsed = JSON.parse(clean)
-          results[section.id] = balanceAnswerPositions((parsed.questions || []).slice(0, sectionCount))
+          const pooled = await getApprovedExamQuestions(format, section, sectionCount)
+          const accepted: ExamQuestion[] = [...pooled]
+          for (let attempt = 0; attempt < 2 && accepted.length < sectionCount; attempt++) {
+            const missing = sectionCount - accepted.length
+            const prompt = buildSectionPrompt(section, missing, format)
+            const response = await anthropic.messages.create({
+              model: 'claude-sonnet-4-5', max_tokens: 6000,
+              system: 'Sen Türk eğitim sisteminde sınav soruları hazırlayan bir uzmansın. Sadece geçerli JSON döndür, markdown kullanma.',
+              messages: [{ role: 'user', content: prompt }],
+            })
+            await logAnthropicUsage('generate-exam', 'claude-sonnet-4-5', response, { userId: user.id })
+            const text = response.content[0].type === 'text' ? response.content[0].text : ''
+            const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
+            const optionCount = format.label === 'LGS' ? 4 : 5
+            const structurallyAccepted = ((parsed.questions || []) as ExamQuestion[])
+              .filter(question => structurallyValid(question, optionCount))
+              .slice(0, missing)
+            const independentlyAccepted = await validateWithIndependentModel(structurallyAccepted, section, format, user.id)
+            await storeApprovedExamQuestions(format, section, independentlyAccepted)
+            accepted.push(...independentlyAccepted)
+          }
+          if (accepted.length < sectionCount) throw new Error(`Kalite kontrolünden geçen soru sayısı yetersiz: ${accepted.length}/${sectionCount}`)
+          results[section.id] = balanceAnswerPositions(accepted.slice(0, sectionCount))
         } catch (e) {
           console.error(`[generate-exam] section ${section.id} failed:`, e)
           results[section.id] = []
         }
       }))
+    }
+
+    const incompleteSections = sectionsToGenerate.filter(section => {
+      const expected = isDemoOnly ? 1 : Math.max(4, Math.round(section.count * countMultiplier))
+      return (results[section.id]?.length || 0) < expected
+    })
+    if (incompleteSections.length) {
+      return NextResponse.json({
+        error: 'quality_validation_failed',
+        message: 'Kalite kontrolünden yeterli sayıda soru geçmedi. Lütfen yeniden deneyin.',
+        sections: incompleteSections.map(section => section.label),
+      }, { status: 422 })
     }
 
     const { data: examRow } = await supabase
@@ -244,9 +291,11 @@ export async function PATCH(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser(token)
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
-  const { examId, answers, timeSpent, examType } = await req.json()
-  const format = EXAM_FORMATS[examType as ExamKey]
-  if (!format) return NextResponse.json({ error: 'Geçersiz sınav türü.' }, { status: 400 })
+  const { examId, answers, timeSpent } = await req.json()
+  const { data: storedExam } = await supabase.from('exam_sessions')
+    .select('format').eq('id', examId).eq('user_id', user.id).maybeSingle()
+  const format = storedExam?.format as ExamFormat | undefined
+  if (!format) return NextResponse.json({ error: 'Sınav bulunamadı.' }, { status: 404 })
 
   const sectionNets: Record<string, { correct: number; wrong: number; empty: number; net: number }> = {}
   let totalNet = 0
@@ -262,7 +311,8 @@ export async function PATCH(req: NextRequest) {
       else wrong++
     })
 
-    const net = Math.max(0, correct - wrong * 0.25)
+    const wrongPenalty = Math.abs(format.scoring.wrong / format.scoring.correct)
+    const net = Math.max(0, correct - wrong * wrongPenalty)
     sectionNets[sectionId] = { correct, wrong, empty, net }
     totalNet += net * (section.netCoef || 1)
   }
