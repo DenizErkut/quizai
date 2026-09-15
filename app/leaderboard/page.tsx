@@ -92,7 +92,14 @@ export default function LeaderboardPage() {
         }),
       ])
 
-      const badgePayload = badgeResponse.ok ? await badgeResponse.json() : { badges: [] }
+      let badgePayload = badgeResponse.ok ? await badgeResponse.json() : null
+      if (!badgePayload) {
+        const { data: existingBadges } = await supabase
+          .from('badges')
+          .select('badge_key, earned_at')
+          .eq('user_id', user.id)
+        badgePayload = { badges: existingBadges || [] }
+      }
 
       // İsimler TR-PG'den çözülür; leaderboard view'i yalnızca id/grade/puan sağlar
       const identities = await resolveIdentities(supabase, (lb || []).map((e: any) => e.id))
