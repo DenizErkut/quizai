@@ -336,5 +336,5 @@ export async function PATCH(req: NextRequest) {
     .eq('id', examId)
     .eq('user_id', user.id)
 
-  return NextResponse.json({ sectionNets, totalNet, estimatedScore })
+  return NextResponse.json({ sectionNets, totalNet, practiceScore: estimatedScore })
 }

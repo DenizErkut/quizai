@@ -794,7 +794,7 @@ export default function ExamPage() {
   // SONUÇ EKRANI
   if (screen === 'result' && examFormat) {
     const stats = getTotalStats()
-    const scorePct = examFormat.maxScore > 0 ? Math.round((result?.estimatedScore || 0) / examFormat.maxScore * 100) : 0
+    const scorePct = examFormat.maxScore > 0 ? Math.round((result?.practiceScore || 0) / examFormat.maxScore * 100) : 0
     const sectionMeta = EXAM_META[selectedExam as keyof typeof EXAM_META]
 
     return (
@@ -806,7 +806,7 @@ export default function ExamPage() {
           {/* Büyük skor */}
           <div style={{ textAlign: 'center', padding: '2rem 1rem', marginBottom: '1rem', borderRadius: '20px', background: `linear-gradient(135deg, #082465, ${sectionMeta?.color || '#6366f1'})`, color: '#fff' }}>
             <div style={{ fontSize: '13px', opacity: 0.7, marginBottom: '8px' }}>Pratik puanı (resmî sonuç değildir)</div>
-            <div style={{ fontSize: '56px', fontWeight: 900, lineHeight: 1 }}>{result?.estimatedScore ?? '—'}</div>
+            <div style={{ fontSize: '56px', fontWeight: 900, lineHeight: 1 }}>{result?.practiceScore ?? '—'}</div>
             <div style={{ fontSize: '14px', opacity: 0.6, marginTop: '4px' }}>/ {examFormat.maxScore}</div>
             <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'center', gap: '24px', fontSize: '13px' }}>
               <span>✓ {stats.correct} doğru</span>
