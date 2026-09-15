@@ -5,21 +5,28 @@ import PageHeader from '@/components/PageHeader'
 import { createClient } from '@/lib/supabase/client'
 
 // ─── TIPLER ──────────────────────────────────────────────────────────────────
-interface Question { q: string; opts: string[]; ans: number; exp: string; difficulty?: string }
+interface Question {
+  q: string; opts: string[]; ans: number; exp: string; difficulty?: string; passage?: string
+  cognitiveSkill?: string; objective?: string
+  visual?: { kind: 'table' | 'diagram'; title?: string; headers?: string[]; rows?: string[][]; description?: string }
+}
 interface Section { id: string; label: string; count: number; netCoef: number; subject: string; grade: string }
+interface ExamPhase { id: string; label: string; duration: number; sectionIds: string[] }
 interface ExamFormat {
   label: string; fullName: string; duration: number; color: string
   sections: Section[]; scoring: { correct: number; wrong: number }
-  maxScore: number; description: string; targetAudience: string
+  sessions: ExamPhase[]; maxScore: number; description: string; targetAudience: string
+  track?: 'SAY' | 'EA' | 'SOZ'; language?: string; examYear: number; curriculumVersion: string
 }
 interface SectionAnswer { chosen: number | null; correct: boolean | null }
 
-type Screen = 'select' | 'confirm' | 'loading' | 'exam' | 'result'
+type Screen = 'select' | 'confirm' | 'loading' | 'exam' | 'break' | 'result'
 
 const EXAM_META = {
   LGS:        { emoji: '🏫', badge: '8. Sınıf',   color: '#6366f1', bg: 'rgba(99,102,241,0.08)'  },
   TYT:        { emoji: '🎓', badge: 'Lise',        color: '#0ea5e9', bg: 'rgba(14,165,233,0.08)'  },
   AYT:        { emoji: '🏆', badge: 'YKS',         color: '#f59e0b', bg: 'rgba(245,158,11,0.08)'  },
+  YDT:        { emoji: '🌍', badge: 'YKS',         color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)'  },
   KPSS_GENEL: { emoji: '📋', badge: 'Mezun',       color: '#10b981', bg: 'rgba(16,185,129,0.08)'  },
 }
 
@@ -45,6 +52,8 @@ export default function ExamPage() {
   const [formats, setFormats] = useState<Record<string, ExamFormat>>({})
   const [selectedExam, setSelectedExam] = useState<string | null>(null)
   const [demoMode, setDemoMode] = useState(true)
+  const [aytTrack, setAytTrack] = useState<'SAY' | 'EA' | 'SOZ'>('SAY')
+  const [ydtLanguage, setYdtLanguage] = useState('İngilizce')
 
   // Sınav durumu
   const [examId, setExamId] = useState<string | null>(null)
@@ -55,12 +64,14 @@ export default function ExamPage() {
   const [answers, setAnswers] = useState<Record<string, SectionAnswer[]>>({})
   const [chosen, setChosen] = useState<number | null>(null)
   const [showExp, setShowExp] = useState(false)
+  const [activePhaseIndex, setActivePhaseIndex] = useState(0)
 
   // Zamanlayıcı
   const [timeLeft, setTimeLeft] = useState(0)
   const [timeSpent, setTimeSpent] = useState(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const startTimeRef = useRef<number>(0)
+  const accumulatedTimeRef = useRef(0)
 
   // Sonuç
   const [result, setResult] = useState<any>(null)
@@ -96,7 +107,7 @@ export default function ExamPage() {
       setTimeLeft(prev => {
         if (prev <= 1) {
           clearInterval(timerRef.current!)
-          finishExam()
+          handlePhaseEnd()
           return 0
         }
         return prev - 1
@@ -128,7 +139,11 @@ export default function ExamPage() {
       const res = await fetch('/api/generate-exam', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ examType: selectedExam, demo: demoMode }),
+        body: JSON.stringify({
+          examType: selectedExam, demo: demoMode,
+          track: selectedExam === 'AYT' ? aytTrack : undefined,
+          ydtLanguage: selectedExam === 'YDT' ? ydtLanguage : undefined,
+        }),
       })
 
       clearInterval(msgInterval)
@@ -161,11 +176,12 @@ export default function ExamPage() {
       setCurrentQ(0)
       setChosen(null)
       setShowExp(false)
+      setActivePhaseIndex(0)
+      accumulatedTimeRef.current = 0
 
       // Zamanlayıcı
-      const durationSec = demoMode
-        ? Math.round(data.format.duration * 60 * 0.25)
-        : data.format.duration * 60
+      const firstPhaseDuration = data.format.sessions?.[0]?.duration || data.format.duration
+      const durationSec = demoMode ? Math.max(60, Math.round(firstPhaseDuration * 60 * 0.25)) : firstPhaseDuration * 60
       setTimeLeft(durationSec)
       startTimeRef.current = Date.now()
 
@@ -195,6 +211,37 @@ export default function ExamPage() {
     })
   }
 
+  function handlePhaseEnd() {
+    if (!examFormat || screen !== 'exam') return
+    if (timerRef.current) clearInterval(timerRef.current)
+    accumulatedTimeRef.current += Math.max(0, Math.round((Date.now() - startTimeRef.current) / 1000))
+    const nextPhase = examFormat.sessions?.[activePhaseIndex + 1]
+    if (nextPhase) {
+      setScreen('break')
+      return
+    }
+    finishExam(true)
+  }
+
+  function startNextPhase() {
+    if (!examFormat) return
+    const nextIndex = activePhaseIndex + 1
+    const nextPhase = examFormat.sessions?.[nextIndex]
+    if (!nextPhase) return
+    const firstSection = nextPhase.sectionIds.find(id => sections[id]?.length)
+    if (!firstSection) return
+    setActivePhaseIndex(nextIndex)
+    setCurrentSection(firstSection)
+    setCurrentQ(0)
+    const answer = answers[firstSection]?.[0]
+    setChosen(answer?.chosen ?? null)
+    setShowExp(answer?.chosen !== null && answer?.chosen !== undefined)
+    const duration = demoMode ? Math.max(60, Math.round(nextPhase.duration * 60 * 0.25)) : nextPhase.duration * 60
+    setTimeLeft(duration)
+    startTimeRef.current = Date.now()
+    setScreen('exam')
+  }
+
   // ── SONRAKİ SORU ─────────────────────────────────────────────────────────
   function nextQuestion() {
     const sectionQs = sections[currentSection] || []
@@ -205,17 +252,18 @@ export default function ExamPage() {
       setShowExp(nextAns?.chosen !== null && nextAns?.chosen !== undefined)
     } else {
       // Bölüm bitti — sonraki bölüme geç
-      const sectionList = examFormat?.sections || []
-      const ci = sectionList.findIndex(s => s.id === currentSection)
-      if (ci < sectionList.length - 1) {
-        const nextSec = sectionList[ci + 1].id
+      const activePhase = examFormat?.sessions?.[activePhaseIndex]
+      const phaseSectionIds = activePhase?.sectionIds || examFormat?.sections.map(section => section.id) || []
+      const ci = phaseSectionIds.indexOf(currentSection)
+      if (ci < phaseSectionIds.length - 1) {
+        const nextSec = phaseSectionIds[ci + 1]
         setCurrentSection(nextSec)
         setCurrentQ(0)
         const nextAns = answers[nextSec]?.[0]
         setChosen(nextAns?.chosen ?? null)
         setShowExp(false)
       } else {
-        finishExam()
+        handlePhaseEnd()
       }
     }
   }
@@ -230,6 +278,8 @@ export default function ExamPage() {
   }
 
   function jumpToSection(secId: string) {
+    const activePhase = examFormat?.sessions?.[activePhaseIndex]
+    if (activePhase && !activePhase.sectionIds.includes(secId)) return
     setCurrentSection(secId)
     setCurrentQ(0)
     const ans = answers[secId]?.[0]
@@ -276,9 +326,10 @@ export default function ExamPage() {
     setAiLoading(false)
   }
 
-  const finishExam = useCallback(async () => {
+  const finishExam = useCallback(async (phaseAlreadyRecorded = false) => {
     if (timerRef.current) clearInterval(timerRef.current)
-    const spent = Math.round((Date.now() - startTimeRef.current) / 1000)
+    const currentPhaseTime = phaseAlreadyRecorded ? 0 : Math.max(0, Math.round((Date.now() - startTimeRef.current) / 1000))
+    const spent = accumulatedTimeRef.current + currentPhaseTime
     setTimeSpent(spent)
     setScreen('loading')
     setLoadingMsg('Sonuçlar hesaplanıyor...')
@@ -288,7 +339,7 @@ export default function ExamPage() {
       const res = await fetch('/api/generate-exam', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ examId, answers, timeSpent: spent, examType: selectedExam }),
+        body: JSON.stringify({ examId, answers, timeSpent: spent }),
       })
       const data = await res.json()
       setResult(data)
@@ -307,7 +358,8 @@ export default function ExamPage() {
     const correct = ans.filter(a => a.correct === true).length
     const wrong = ans.filter(a => a.correct === false).length
     const total = sections[secId]?.length || 0
-    const net = Math.max(0, correct - wrong * 0.25)
+    const penalty = examFormat ? Math.abs(examFormat.scoring.wrong / examFormat.scoring.correct) : 0.25
+    const net = Math.max(0, correct - wrong * penalty)
     return { answered, correct, wrong, total, net }
   }
 
@@ -332,6 +384,25 @@ export default function ExamPage() {
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </main>
   )
+
+  if (screen === 'break' && examFormat) {
+    const completedPhase = examFormat.sessions[activePhaseIndex]
+    const nextPhase = examFormat.sessions[activePhaseIndex + 1]
+    return (
+      <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--bg)', padding: '1rem' }}>
+        <div className="card" style={{ maxWidth: 520, width: '100%', textAlign: 'center', padding: '2rem' }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>☕</div>
+          <h1 className="serif" style={{ fontSize: 28 }}>{completedPhase?.label} tamamlandı</h1>
+          <p style={{ color: 'var(--text2)', lineHeight: 1.6, margin: '10px 0 20px' }}>
+            Cevapların kaydedildi. Hazır olduğunda {nextPhase?.label} bölümüne geçebilirsin. Önceki oturuma geri dönülemez.
+          </p>
+          <button onClick={startNextPhase} style={{ padding: '13px 24px', borderRadius: 12, border: 0, background: '#6366f1', color: '#fff', fontWeight: 800, cursor: 'pointer' }}>
+            {nextPhase?.label} bölümünü başlat →
+          </button>
+        </div>
+      </main>
+    )
+  }
 
   // SINAV SEÇİM
   if (screen === 'select') return (
@@ -429,6 +500,32 @@ export default function ExamPage() {
           })}
         </div>
 
+        {selectedExam === 'AYT' && (
+          <div className="card-sm" style={{ marginTop: '1rem' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>AYT puan alanını seç</div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {([['SAY', 'Sayısal'], ['EA', 'Eşit Ağırlık'], ['SOZ', 'Sözel']] as const).map(([value, label]) => (
+                <button key={value} onClick={() => setAytTrack(value)} style={{ padding: '9px 14px', borderRadius: 10, border: `1.5px solid ${aytTrack === value ? '#f59e0b' : 'var(--border)'}`, background: aytTrack === value ? 'rgba(245,158,11,.1)' : 'var(--bg2)', color: aytTrack === value ? '#b45309' : 'var(--text2)', fontWeight: 700, cursor: 'pointer' }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {selectedExam === 'YDT' && (
+          <div className="card-sm" style={{ marginTop: '1rem' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>YDT dilini seç</div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {['İngilizce', 'Almanca', 'Fransızca', 'Arapça', 'Rusça'].map(language => (
+                <button key={language} onClick={() => setYdtLanguage(language)} style={{ padding: '9px 12px', borderRadius: 10, border: `1.5px solid ${ydtLanguage === language ? '#8b5cf6' : 'var(--border)'}`, background: ydtLanguage === language ? 'rgba(139,92,246,.1)' : 'var(--bg2)', color: ydtLanguage === language ? '#7c3aed' : 'var(--text2)', fontWeight: 700, cursor: 'pointer' }}>
+                  {language}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {selectedExam && (
           <div style={{ marginTop: '1.5rem', padding: '16px', borderRadius: '16px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
@@ -438,7 +535,9 @@ export default function ExamPage() {
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--text2)', marginTop: '3px' }}>
                   {demoMode
-                    ? `~${(formats[selectedExam]?.sections.length || 0) * 4} soru · ${Math.round((formats[selectedExam]?.duration || 60) * 0.25)} dakika`
+                    ? `Kısa önizleme · ${Math.round((formats[selectedExam]?.duration || 60) * 0.25)} dakika`
+                    : selectedExam === 'AYT' ? `${aytTrack} · 80 soru · 180 dakika`
+                    : selectedExam === 'YDT' ? `${ydtLanguage} · 80 soru · 120 dakika`
                     : `${formats[selectedExam]?.sections.reduce((a: number, s: any) => a + s.count, 0)} soru · ${formats[selectedExam]?.duration} dakika`
                   }
                 </div>
@@ -546,7 +645,7 @@ export default function ExamPage() {
 
         {/* ── BÖLÜM SEKMELERI ── */}
         <div style={{ background: 'var(--bg2)', borderBottom: '1px solid var(--border)', padding: '0 8px', display: 'flex', gap: '2px', overflowX: 'auto' }}>
-          {examFormat.sections.map(sec => {
+          {examFormat.sections.filter(sec => examFormat.sessions?.[activePhaseIndex]?.sectionIds.includes(sec.id) ?? true).map(sec => {
             const s = getSectionStats(sec.id)
             const isActive = sec.id === currentSection
             return (
@@ -582,6 +681,22 @@ export default function ExamPage() {
 
           {q ? (
             <div className="card" style={{ marginBottom: '1rem' }}>
+              {q.passage && (
+                <div style={{ padding: '14px', borderRadius: 12, background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: 13, lineHeight: 1.7, marginBottom: 16, whiteSpace: 'pre-wrap' }}>
+                  {q.passage}
+                </div>
+              )}
+              {q.visual && (
+                <div style={{ padding: '14px', borderRadius: 12, background: '#f8fafc', border: '1px solid #cbd5e1', marginBottom: 16 }}>
+                  {q.visual.title && <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 8 }}>{q.visual.title}</div>}
+                  {q.visual.kind === 'table' && q.visual.rows?.length ? (
+                    <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                      {q.visual.headers?.length ? <thead><tr>{q.visual.headers.map((header, index) => <th key={index} style={{ border: '1px solid #cbd5e1', padding: 7 }}>{header}</th>)}</tr></thead> : null}
+                      <tbody>{q.visual.rows.map((row, ri) => <tr key={ri}>{row.map((cell, ci) => <td key={ci} style={{ border: '1px solid #cbd5e1', padding: 7 }}>{cell}</td>)}</tr>)}</tbody>
+                    </table></div>
+                  ) : <div style={{ fontSize: 12, lineHeight: 1.6 }}>{q.visual.description}</div>}
+                </div>
+              )}
               <div style={{ fontSize: '15px', fontWeight: 500, color: 'var(--primary)', lineHeight: 1.65, marginBottom: '1.25rem' }}>
                 {q.q.split(/(\[[^\]]+\])/).map((part: string, idx: number) =>
                   part.startsWith('[') && part.endsWith(']')
@@ -613,7 +728,7 @@ export default function ExamPage() {
                         display: 'flex', gap: '10px', alignItems: 'flex-start', transition: 'all 0.15s',
                       }}>
                       <span style={{ fontWeight: 700, flexShrink: 0, width: '18px' }}>
-                        {['A', 'B', 'C', 'D'][i]}
+                        {['A', 'B', 'C', 'D', 'E'][i]}
                       </span>
                       {opt}
                       {chosen !== null && isCorrect && <span style={{ marginLeft: 'auto' }}>✓</span>}
@@ -636,7 +751,7 @@ export default function ExamPage() {
 
           {/* Navigasyon */}
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button onClick={prevQuestion} disabled={currentQ === 0 && currentSection === examFormat.sections[0]?.id}
+            <button onClick={prevQuestion} disabled={currentQ === 0}
               style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text2)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: '14px', fontWeight: 500 }}>
               ← Önceki
             </button>
