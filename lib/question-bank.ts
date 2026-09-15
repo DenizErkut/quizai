@@ -15,7 +15,7 @@ export type QuestionBankDimensions = {
 
 const PERSONAL_FIELDS = new Set([
   'adaptivePolicyVersion', 'adaptiveReasonCode', 'adaptiveRecommendationId',
-  'adaptiveHint', 'adaptiveSupportLevel', 'adaptivePresentation',
+  'adaptiveHint', 'adaptiveSupportLevel', 'adaptivePresentation', 'adaptiveFocus',
   'diagnosticStrategyVersion', 'diagnosticReasonCode', 'diagnosticRole',
   'masteryConfidenceBefore', 'masteryEvidenceCountBefore', 'passage',
 ])
@@ -53,22 +53,22 @@ function shuffled<T>(items: T[]): T[] {
 }
 
 export function balanceAnswerPositions(questions: Question[]): Question[] {
-  const eligibleIndexes = questions
-    .map((question, index) => ({ question, index }))
-    .filter(({ question }) => Array.isArray(question.opts)
-      && question.opts.length === 4
-      && Number.isInteger(question.ans)
-      && question.ans >= 0
-      && question.ans < 4)
-    .map(({ index }) => index)
+  const targets = new Map<number, number>()
+  for (const optionCount of [4, 5]) {
+    const eligibleIndexes = questions
+      .map((question, index) => ({ question, index }))
+      .filter(({ question }) => Array.isArray(question.opts)
+        && question.opts.length === optionCount
+        && Number.isInteger(question.ans)
+        && question.ans >= 0
+        && question.ans < optionCount)
+      .map(({ index }) => index)
 
-  // Every four eligible questions contain one A/B/C/D answer. The remainder
-  // is randomized, so the sequence stays unpredictable while the whole quiz
-  // remains as even as mathematically possible.
-  const targetPositions = shuffled(
-    eligibleIndexes.map((_, index) => index % 4)
-  )
-  const targets = new Map(eligibleIndexes.map((questionIndex, index) => [questionIndex, targetPositions[index]]))
+    // Each complete group contains one answer at every position. Remainders
+    // and order are randomized, so the sequence is not predictable.
+    const targetPositions = shuffled(eligibleIndexes.map((_, index) => index % optionCount))
+    eligibleIndexes.forEach((questionIndex, index) => targets.set(questionIndex, targetPositions[index]))
+  }
 
   return questions.map((question, questionIndex) => {
     const target = targets.get(questionIndex)
@@ -78,7 +78,7 @@ export function balanceAnswerPositions(questions: Question[]): Question[] {
     const distractors = shuffled(question.opts.filter((_: unknown, index: number) => index !== question.ans))
     const opts: unknown[] = []
     let distractorIndex = 0
-    for (let optionIndex = 0; optionIndex < 4; optionIndex++) {
+    for (let optionIndex = 0; optionIndex < question.opts.length; optionIndex++) {
       opts.push(optionIndex === target ? correctOption : distractors[distractorIndex++])
     }
     return { ...question, opts, ans: target }
@@ -88,6 +88,12 @@ export function balanceAnswerPositions(questions: Question[]): Question[] {
 function validQuestion(question: Question): boolean {
   if (!question || typeof question.q !== 'string' || !question.q.trim()) return false
   if (question.sourceBased || question.passage) return false
+  if (question.type === 'short_answer') {
+    const referenceAnswer = question.blank || question.referenceAnswer || question.opts?.[question.ans]
+    const explanation = question.exp || question.explanation
+    return typeof referenceAnswer === 'string' && referenceAnswer.trim().length > 0
+      && typeof explanation === 'string' && explanation.trim().length > 0
+  }
   if (question.type === 'multiple_choice' || Array.isArray(question.opts)) {
     return Array.isArray(question.opts)
       && question.opts.length >= 2

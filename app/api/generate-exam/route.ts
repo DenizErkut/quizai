@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { checkMinorConsentBlock } from '@/lib/identity/client'
+import { balanceAnswerPositions } from '@/lib/question-bank'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -18,25 +19,25 @@ export const EXAM_FORMATS = {
   LGS: {
     label: 'LGS',
     fullName: 'Liselere Geçiş Sınavı',
-    duration: 80,
+    duration: 155,
     sections: [
       { id: 'turkce',    label: 'Türkçe',              count: 20, subject: 'Türkçe',                    grade: 'ortaokul 8. sinif', netCoef: 4 },
       { id: 'matematik', label: 'Matematik',            count: 20, subject: 'Matematik',                 grade: 'ortaokul 8. sinif', netCoef: 4 },
       { id: 'fen',       label: 'Fen Bilimleri',        count: 20, subject: 'Fen Bilimleri',             grade: 'ortaokul 8. sinif', netCoef: 4 },
-      { id: 'inkilap',   label: 'T.C. İnkılap Tarihi', count: 10, subject: 'T.C. İnkılap Tarihi',       grade: 'ortaokul 8. sinif', netCoef: 4 },
-      { id: 'ingilizce', label: 'İngilizce',            count: 10, subject: 'İngilizce',                 grade: 'ortaokul 8. sinif', netCoef: 4 },
-      { id: 'din',       label: 'Din Kültürü',          count: 10, subject: 'Din Kültürü ve Ahlak',      grade: 'ortaokul 8. sinif', netCoef: 4 },
+      { id: 'inkilap',   label: 'T.C. İnkılap Tarihi', count: 10, subject: 'T.C. İnkılap Tarihi',       grade: 'ortaokul 8. sinif', netCoef: 1 },
+      { id: 'ingilizce', label: 'İngilizce',            count: 10, subject: 'İngilizce',                 grade: 'ortaokul 8. sinif', netCoef: 1 },
+      { id: 'din',       label: 'Din Kültürü',          count: 10, subject: 'Din Kültürü ve Ahlak',      grade: 'ortaokul 8. sinif', netCoef: 1 },
     ],
     scoring: { correct: 4, wrong: -1, base: 0 },
     maxScore: 500,
-    description: '90 soru · 80 dakika · Net × 4 puan',
+    description: '90 soru · Sözel 75 dk + Sayısal 80 dk',
     targetAudience: 'ortaokul',
     color: '#6366f1',
   },
   TYT: {
     label: 'TYT',
     fullName: 'Temel Yeterlilik Testi',
-    duration: 135,
+    duration: 165,
     sections: [
       { id: 'turkce',    label: 'Türkçe',          count: 40, subject: 'Türkçe',          grade: 'lise 12. sinif', netCoef: 1 },
       { id: 'sosyal',    label: 'Sosyal Bilimler',  count: 20, subject: 'Sosyal Bilimler', grade: 'lise 12. sinif', netCoef: 1 },
@@ -109,6 +110,8 @@ function isForeignLanguageSubject(subject: string): boolean {
 
 function buildSectionPrompt(subject: string, grade: string, count: number, examType: string): string {
   const isLanguageSection = isForeignLanguageSubject(subject)
+  const optionCount = examType === 'LGS' ? 4 : 5
+  const optionLabels = optionCount === 4 ? 'A/B/C/D' : 'A/B/C/D/E'
   const languageNote = isLanguageSection
     ? `\n\n🌐 YABANCI DİL BÖLÜMÜ KURALI: Bu bir ${subject} bölümü — gerçek bir ${examType} ${subject} sınavı gibi davran. Soru kökü (q alanı) DAHİL HER ŞEY -- soru metni, şıklar (opts), örnek cümleler, kelimeler, gramer yapıları -- TAMAMEN ${subject} DİLİNDE olmalı, soru/şık metninde TEK BİR TÜRKÇE CÜMLE bile olmamalı. SADECE "exp" (açıklama) alanını öğrenci anlayışı için TÜRKÇE yaz.`
     : ''
@@ -120,13 +123,13 @@ Soru sayısı: ${count}
 
 KURALLAR:
 - Gerçek ${examType} sınav sorusu formatında, MEB müfredatına uygun
-- 4 şık (A/B/C/D), tek doğru cevap
+- ${optionCount} şık (${optionLabels}), tek doğru cevap
 - Zorluk dağılımı: %30 kolay, %50 orta, %20 zor
 - Güncel ve doğru bilgi içeren sorular
 - Kısa açıklama ekle${languageNote}
 
 SADECE geçerli JSON döndür, markdown yok:
-{"questions":[{"q":"Soru metni","opts":["A şıkkı","B şıkkı","C şıkkı","D şıkkı"],"ans":0,"exp":"Kısa açıklama","difficulty":"easy"}]}`
+{"questions":[{"type":"multiple_choice","q":"Soru metni","opts":[${optionCount === 4 ? '"A şıkkı","B şıkkı","C şıkkı","D şıkkı"' : '"A şıkkı","B şıkkı","C şıkkı","D şıkkı","E şıkkı"'}],"ans":0,"exp":"Kısa açıklama","difficulty":"easy"}]}`
 }
 
 export async function GET() {
@@ -205,7 +208,7 @@ export async function POST(req: NextRequest) {
           const text = response.content[0].type === 'text' ? response.content[0].text : ''
           const clean = text.replace(/```json|```/g, '').trim()
           const parsed = JSON.parse(clean)
-          results[section.id] = (parsed.questions || []).slice(0, sectionCount)
+          results[section.id] = balanceAnswerPositions((parsed.questions || []).slice(0, sectionCount))
         } catch (e) {
           console.error(`[generate-exam] section ${section.id} failed:`, e)
           results[section.id] = []

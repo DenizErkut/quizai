@@ -690,7 +690,7 @@ export default function ExamPage() {
 
           {/* Büyük skor */}
           <div style={{ textAlign: 'center', padding: '2rem 1rem', marginBottom: '1rem', borderRadius: '20px', background: `linear-gradient(135deg, #082465, ${sectionMeta?.color || '#6366f1'})`, color: '#fff' }}>
-            <div style={{ fontSize: '13px', opacity: 0.7, marginBottom: '8px' }}>Tahmini Puan</div>
+            <div style={{ fontSize: '13px', opacity: 0.7, marginBottom: '8px' }}>Pratik puanı (resmî sonuç değildir)</div>
             <div style={{ fontSize: '56px', fontWeight: 900, lineHeight: 1 }}>{result?.estimatedScore ?? '—'}</div>
             <div style={{ fontSize: '14px', opacity: 0.6, marginTop: '4px' }}>/ {examFormat.maxScore}</div>
             <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'center', gap: '24px', fontSize: '13px' }}>
