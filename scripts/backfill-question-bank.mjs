@@ -125,10 +125,25 @@ if (!supabaseUrl || !serviceKey || !openaiKey || !geminiKey) {
 }
 db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 const runLimit = Math.max(1, Math.min(1000, Number(requestedLimit) || 200))
-const [{ data: sessions, error: sessionError }, { data: reports }, { data: existing }] = await Promise.all([
+const fetchAllFingerprints = async () => {
+  const fingerprints = []
+  const pageSize = 1000
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await db
+      .from('question_bank')
+      .select('fingerprint')
+      .order('fingerprint', { ascending: true })
+      .range(from, from + pageSize - 1)
+    if (error) throw error
+    fingerprints.push(...(data || []))
+    if (!data || data.length < pageSize) break
+  }
+  return fingerprints
+}
+const [{ data: sessions, error: sessionError }, { data: reports }, existing] = await Promise.all([
   db.from('quiz_sessions').select('id,topic,grade,language,question_type,questions,gen_engine,created_at').eq('completed', true).order('created_at', { ascending: false }).limit(1000),
   db.from('error_reports').select('question_text').limit(5000),
-  db.from('question_bank').select('fingerprint').limit(10000),
+  fetchAllFingerprints(),
 ])
 if (sessionError) throw sessionError
 
