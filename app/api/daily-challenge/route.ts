@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
 
   const selection = await selectPersonalizedQuestions(user.id, profile)
   const questions = [...selection.questions]
+  const bankQuestionCount = questions.length
   if (questions.length < 10) {
     const token = request.headers.get('authorization') || ''
     const generation = await fetch(new URL('/api/generate-quiz', request.url), {
@@ -97,7 +98,8 @@ export async function GET(request: NextRequest) {
   const topics = [...new Set(finalQuestions.map((question: any) => question.bankTopic).filter(Boolean))]
   const { data: challenge, error } = await db.from('daily_challenges').insert({
     user_id: user.id, date, topic: 'Günün 10 Dakikası · Karma', subject: 'Karma', grade_level: selection.gradeKey,
-    questions: finalQuestions, question_type: 'mixed', completed: false,
+    questions: finalQuestions, question_type: 'mixed', completed: false, bank_question_count: bankQuestionCount,
+    generated_question_count: Math.max(0, finalQuestions.length - bankQuestionCount), focus_topics: [...new Set(finalQuestions.map((q: any) => q.bankTopic).filter(Boolean))],
   }).select('*').single()
   if (error) {
     const { data: raced } = await db.from('daily_challenges').select('*').eq('user_id', user.id).eq('date', date).maybeSingle()
@@ -152,7 +154,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { data: completedChallenge, error: completionError } = await db.from('daily_challenges')
-    .update({ completed: true })
+    .update({ completed: true, completed_at: new Date().toISOString() })
     .eq('id', challenge.id)
     .eq('user_id', user.id)
     .eq('completed', false)

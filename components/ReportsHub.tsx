@@ -14,7 +14,7 @@ const ALL_TABS: { key: ReportKey; label: string }[] = [
   { key: 'grades',            label: '📋 Öğrenci Raporları' },
   { key: 'sectional',         label: '📚 Ders Bazlı' },
   { key: 'progress',          label: '📈 İlerleme' },
-  { key: 'weak-topics',       label: '🎯 Zayıf Konular' },
+  { key: 'weak-topics',       label: '🎯 Zayıf Kazanımlar' },
   { key: 'assignments',       label: '📝 Ödev Karnesi' },
   { key: 'live-quiz',         label: '🎮 Canlı Quiz' },
   { key: 'inactivity',        label: '😴 Devamsızlık' },
@@ -231,12 +231,12 @@ function WeakTopicsPanel({ data, scope, classroomId }: { data: any; scope: strin
         <>
           <div className="card" style={{ marginBottom: '1.25rem' }}>
             <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
-              En Çok Zorlanılan Konular (başarı %)
+              Sınıf Genelinde En Çok Zorlanılan Kazanımlar (başarı %)
             </div>
             <SubjectPerformanceChart data={chartTopics} />
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-          <thead><tr><th style={th}>Konu</th><th style={th}>Ders</th><th style={th}>Yanlış</th><th style={th}>Hata Oranı</th><th style={th}>Kaç Öğrenci</th></tr></thead>
+          <thead><tr><th style={th}>Kazanım / Konu</th><th style={th}>Ders</th><th style={th}>Yanlış</th><th style={th}>Hata Oranı</th><th style={th}>Kaç Öğrenci</th></tr></thead>
           <tbody>
             {data.topics.map((t: any, i: number) => (
               <tr key={i}>

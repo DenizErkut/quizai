@@ -266,7 +266,7 @@ export async function GET(req: NextRequest) {
   const sortAsc = searchParams.get('sort') === 'asc'
   let query = adminDb
     .from('meb_resources')
-    .select('id, title, grade, subject, unit, level, source_type, created_at, raw_text')
+    .select('id, title, grade, subject, unit, level, source_type, created_at, text_preview, text_char_count')
     .order('created_at', { ascending: sortAsc })
 
   if (level) query = query.eq('level', level)
@@ -275,12 +275,18 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // raw_text'i kırp — sadece önizleme
-  const resources = (data || []).map((r: any) => ({
-    ...r,
-    preview: r.raw_text?.slice(0, 200) || '',
-    raw_text: undefined,
-    char_count: r.raw_text?.length || 0,
+  // Tam kaynak metnini liste boyunca taşımadan yalnızca küçük özeti döndür.
+  const resources = (data || []).map(r => ({
+    id: r.id,
+    title: r.title,
+    grade: r.grade,
+    subject: r.subject,
+    unit: r.unit,
+    level: r.level,
+    source_type: r.source_type,
+    created_at: r.created_at,
+    preview: r.text_preview || '',
+    char_count: r.text_char_count || 0,
   }))
 
   return NextResponse.json({ resources })

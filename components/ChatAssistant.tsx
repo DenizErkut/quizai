@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useVoiceTutor } from '@/lib/use-voice-tutor'
 
 interface Question {
   q: string; opts: string[]; ans: number; exp: string
@@ -28,6 +29,7 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
   const wrongQuestions = questions.filter((_, i) => !answers[i]?.correct)
   const score = answers.filter(a => a.correct).length
   const pct = Math.round((score / questions.length) * 100)
+  const voice = useVoiceTutor(text => void send(text))
 
   useEffect(() => {
     if (open && messages.length === 0) {
@@ -42,9 +44,9 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
-  async function send() {
-    if (!input.trim() || loading) return
-    const userMsg = input.trim()
+  async function send(textOverride?: string) {
+    const userMsg = (textOverride ?? input).trim()
+    if (!userMsg || loading) return
     setInput('')
     setMessages(prev => [...prev, { role: 'user', content: userMsg }])
     setLoading(true)
@@ -61,7 +63,9 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
         }),
       })
       const data = await res.json()
-      setMessages(prev => [...prev, { role: 'assistant', content: data.reply }])
+      const reply = typeof data.reply === 'string' ? data.reply : 'Yanıt alınamadı, tekrar dene.'
+      setMessages(prev => [...prev, { role: 'assistant', content: reply }])
+      voice.speak(reply)
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Bir hata oluştu, tekrar dene.' }])
     } finally {
@@ -83,7 +87,11 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
         body: JSON.stringify({ messages: [...messages, { role: 'user', content: text }], topic, language, questions, answers }),
       })
         .then(r => r.json())
-        .then(d => setMessages(prev => [...prev, { role: 'assistant', content: d.reply }]))
+        .then(d => {
+          const reply = typeof d.reply === 'string' ? d.reply : 'Yanıt alınamadı, tekrar dene.'
+          setMessages(prev => [...prev, { role: 'assistant', content: reply }])
+          voice.speak(reply)
+        })
         .catch(() => setMessages(prev => [...prev, { role: 'assistant', content: 'Bir hata olustu.' }]))
         .finally(() => setLoading(false))
     }, 0)
@@ -133,6 +141,31 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
             </button>
           </div>
 
+          {/* Sesli Tutor pilotu */}
+          <div style={{ padding: '9px 14px', borderBottom: '1px solid var(--border)', background: voice.enabled ? 'rgba(30,207,184,0.08)' : 'var(--bg)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+              <div>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)' }}>🎙️ Sesli Tutor <span style={{ color: '#0a9e90', fontSize: '10px' }}>PİLOT</span></div>
+                <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '2px' }}>
+                  {voice.enabled ? `Bas-konuş · ${Math.floor(voice.secondsLeft / 60)}:${String(voice.secondsLeft % 60).padStart(2, '0')} kaldı` : `“${topic}” testi ve yanlışlarınla konuş`}
+                </div>
+              </div>
+              <button type="button" onClick={voice.enabled ? voice.disable : voice.requestConsent} style={{ border: '1px solid rgba(0,149,200,0.3)', borderRadius: '16px', padding: '6px 10px', background: voice.enabled ? 'var(--accent)' : 'rgba(0,149,200,0.08)', color: voice.enabled ? '#fff' : 'var(--accent)', cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}>
+                {voice.enabled ? 'Sesliyi kapat' : 'Sesliyi dene'}
+              </button>
+            </div>
+            {voice.consentPending && (
+              <div style={{ marginTop: '8px', padding: '9px', borderRadius: '10px', background: '#fff8df', border: '1px solid #f6df8b', fontSize: '10.5px', color: '#6b5420', lineHeight: 1.45 }}>
+                Konuşman yazıya çevrilmek üzere tarayıcının konuşma servisine gönderilebilir. Pratium ham ses kaydetmez; Tutor’a yalnızca oluşan metin ve mevcut test bağlamı gönderilir.
+                <div style={{ display: 'flex', gap: '6px', marginTop: '7px' }}>
+                  <button type="button" onClick={voice.acceptConsent} style={{ border: 0, borderRadius: '12px', padding: '5px 9px', background: '#087c70', color: '#fff', cursor: 'pointer', fontSize: '10px', fontWeight: 700 }}>Kabul et ve aç</button>
+                  <button type="button" onClick={voice.cancelConsent} style={{ border: '1px solid #d9c778', borderRadius: '12px', padding: '5px 9px', background: '#fff', color: '#6b5420', cursor: 'pointer', fontSize: '10px' }}>Vazgeç</button>
+                </div>
+              </div>
+            )}
+            {voice.error && <div role="status" style={{ color: '#b42318', fontSize: '10px', marginTop: '6px' }}>{voice.error}</div>}
+          </div>
+
           {/* Quick actions */}
           {wrongQuestions.length > 0 && messages.length <= 1 && (
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
@@ -180,6 +213,11 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
 
           {/* Input */}
           <div style={{ display: 'flex', gap: '8px', padding: '12px 14px', borderTop: '1px solid var(--border)' }}>
+            {voice.enabled && (
+              <button type="button" onClick={voice.listening ? voice.stop : voice.start} disabled={loading} aria-label={voice.listening ? 'Dinlemeyi durdur' : 'Konuşmaya başla'} title={voice.listening ? 'Dinleniyor — durdurmak için tıkla' : 'Bas ve konuş'} style={{ width: 40, height: 40, flexShrink: 0, borderRadius: '10px', border: voice.listening ? '2px solid #ff8a80' : '1.5px solid rgba(0,149,200,0.3)', background: voice.listening ? '#fff0ef' : 'rgba(0,149,200,0.08)', color: voice.listening ? '#c62828' : 'var(--accent)', cursor: loading ? 'default' : 'pointer', fontSize: '17px', animation: voice.listening ? 'voicePulse 1.2s ease-in-out infinite' : 'none' }}>
+                {voice.listening ? '■' : '🎙️'}
+              </button>
+            )}
             <input
               value={input}
               onChange={e => setInput(e.target.value)}
@@ -192,7 +230,7 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
               }}
             />
             <button
-              onClick={send}
+              onClick={() => void send()}
               disabled={loading || !input.trim()}
               style={{
                 padding: '10px 14px', borderRadius: '10px', background: 'var(--accent)',
@@ -210,6 +248,10 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
         @keyframes bounce {
           0%, 60%, 100% { transform: translateY(0); }
           30% { transform: translateY(-5px); }
+        }
+        @keyframes voicePulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.08); }
         }
       `}</style>
     </>

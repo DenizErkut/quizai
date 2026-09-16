@@ -25,6 +25,8 @@ import AdaptiveStatistics from '@/components/admin/AdaptiveStatistics'
 import LearningRiskOverview from '@/components/LearningRiskOverview'
 import PredictiveRiskCalibration from '@/components/admin/PredictiveRiskCalibration'
 import PipelineHealth from '@/components/admin/PipelineHealth'
+import QuestionBankEditor from '@/components/QuestionBankEditor'
+import DailyHabitMetrics from '@/components/admin/DailyHabitMetrics'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -64,7 +66,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'exams' | 'curriculum' | 'kvkk' | 'adaptive' | 'risk' | 'coaching'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'question-books' | 'exam-books' | 'question-bank' | 'curriculum' | 'kvkk' | 'adaptive' | 'risk' | 'coaching'>('users')
   const [identityMissing, setIdentityMissing] = useState<number | null>(null)
   const [identityScanning, setIdentityScanning] = useState(false)
   const [identityFixing, setIdentityFixing] = useState(false)
@@ -91,7 +93,7 @@ export default function AdminPage() {
   const [examUploading, setExamUploading] = useState(false)
   const [examMsg, setExamMsg] = useState('')
   const [examFile, setExamFile] = useState<File | null>(null)
-  const [examForm, setExamForm] = useState({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', answer_key: '' })
+  const [examForm, setExamForm] = useState({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '' })
   const [examList, setExamList] = useState<any[]>([])
   const [examListLoading, setExamListLoading] = useState(false)
 
@@ -625,7 +627,9 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             { key: 'institutions', label: '🏛️ Kurumlar' },
             { key: 'sellers', label: '🤝 Satıcılar' },
             { key: 'meb', label: '📚 MEB Kaynakları' },
-            { key: 'exams', label: '🎯 Sınav Kitapçıkları' },
+            { key: 'question-books', label: '📚 Soru Kitapçıkları' },
+            { key: 'exam-books', label: '🎯 Sınav Kitapçıkları' },
+            { key: 'question-bank', label: '📝 Soru Havuzu' },
             { key: 'curriculum', label: '📋 Müfredat Yönetimi' },
             { key: 'kvkk', label: '🔐 KVKK Talepleri' },
             { key: 'adaptive', label: '🧪 Adaptive Pilot' },
@@ -678,6 +682,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                 </div>
               </div>
             </div>
+            <DailyHabitMetrics />
           </div>
         )}
 
@@ -1589,6 +1594,14 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         </div>
         )}
 
+      {tab === 'question-bank' && (
+        <div className="anim-up">
+          <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)', marginBottom: '1rem' }}>📝 Soru Havuzu</h2>
+          <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1rem' }}>Anlık testlerde kullanılacak soruları inceleyin, düzenleyin ve yeniden onaya gönderin.</p>
+          <QuestionBankEditor />
+        </div>
+      )}
+
       {tab === 'kvkk' && (
         <div className="anim-up">
           <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)', marginBottom: '1rem' }}>🔐 KVKK Talep İşleme</h2>
@@ -1613,15 +1626,15 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         </div>
       )}
 
-      {tab === 'exams' && (
+      {(tab === 'question-books' || tab === 'exam-books') && (
         <div>
           {/* Sınav kitapçığı yükleme formu */}
           <div className="card" style={{ marginBottom: '1.5rem' }}>
             <div style={{ fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem', fontSize: '14px' }}>
-              🎯 Yeni Sınav Kitapçığı Yükle
+              {tab === 'exam-books' ? '🎯 Yeni Sınav Kitapçığı Yükle' : '📚 Yeni Soru Kitapçığı Yükle'}
             </div>
             <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '12px', padding: '12px 14px', marginBottom: '1.25rem', fontSize: '12px', color: '#6366f1' }}>
-              📌 Geçmiş yıl LGS, TYT, AYT, KPSS kitapçıklarını yükleyin. AI bu sorulardan öğrenerek daha gerçekçi sınav soruları üretir.
+              📌 {tab === 'exam-books' ? 'LGS, TYT, AYT ve YDT simülasyonlarında kullanılacak sınav kitapçıklarını yönetin.' : 'Bu alan yalnızca anlık test havuzunu besler. Öğretmen imzalı sorular aynı metin ve seçeneklerle havuza alınır. Anonim sorular öğrenciye aynen gösterilmez; AI yalnızca bunları referans alarak yeni ve benzer sorular üretir.'}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
@@ -1632,21 +1645,37 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' as const }} />
               </div>
               <div>
+                <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Kaynak imzası *</label>
+                <select value={examForm.source_type} onChange={e => setExamForm(p => ({ ...p, source_type: e.target.value }))}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px' }}>
+                  <option value="anonymous">Anonim — benzer/özgün üretim</option>
+                  <option value="teacher">Öğretmen imzalı — birebir anlık test havuzu</option>
+                </select>
+              </div>
+              {tab === 'question-books' && <div>
+                <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Sınıf</label>
+                <input value={examForm.grade} onChange={e => setExamForm(p => ({ ...p, grade: e.target.value }))} placeholder="6" style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', boxSizing: 'border-box' as const }} />
+              </div>}
+              {tab === 'question-books' && <div>
+                <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>ÜNİTE/KONU</label>
+                <input value={examForm.subtopic} onChange={e => setExamForm(p => ({ ...p, subtopic: e.target.value }))} placeholder="Hücre bölünmeleri" aria-label="ÜNİTE/KONU" style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', boxSizing: 'border-box' as const }} />
+              </div>}
+              {tab === 'exam-books' && <div>
                 <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Sınav Türü *</label>
                 <select value={examForm.exam_type} onChange={e => setExamForm(p => ({ ...p, exam_type: e.target.value }))}
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)' }}>
                   {['LGS', 'TYT', 'AYT', 'KPSS', 'YKS', 'TEOG', 'Diğer'].map(t => <option key={t}>{t}</option>)}
                 </select>
-              </div>
-              <div>
+              </div>}
+              {tab === 'exam-books' && <div>
                 <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Yıl *</label>
                 <select value={examForm.year} onChange={e => setExamForm(p => ({ ...p, year: e.target.value }))}
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)' }}>
                   {Array.from({ length: 15 }, (_, i) => (new Date().getFullYear() - i).toString()).map(y => <option key={y}>{y}</option>)}
                 </select>
-              </div>
+              </div>}
               <div>
-                <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Ders / Alan</label>
+                <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>{tab === 'exam-books' ? 'Ders / Alan' : 'Ders'}</label>
                 <input value={examForm.subject} onChange={e => setExamForm(p => ({ ...p, subject: e.target.value }))}
                   placeholder="Matematik, Türkçe, Tüm Dersler..."
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' as const }} />
@@ -1654,17 +1683,17 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             </div>
 
             {/* Cevap anahtarı */}
-            <div style={{ marginBottom: '12px' }}>
+            {tab === 'exam-books' && <div style={{ marginBottom: '12px' }}>
               <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Cevap Anahtarı (opsiyonel)</label>
               <textarea value={examForm.answer_key} onChange={e => setExamForm(p => ({ ...p, answer_key: e.target.value }))}
                 placeholder="1-A, 2-B, 3-C... veya yapıştır"
                 rows={3}
                 style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' as const, resize: 'vertical' as const }} />
-            </div>
+            </div>}
 
             {/* PDF yükleme */}
             <div style={{ marginBottom: '14px' }}>
-              <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Sınav PDF Dosyası *</label>
+              <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Soru Kitapçığı PDF Dosyası *</label>
               <input type="file" accept=".pdf" onChange={e => setExamFile(e.target.files?.[0] || null)} />
               {examFile && <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '4px' }}>✓ {examFile.name} ({(examFile.size / 1024 / 1024).toFixed(1)} MB)</div>}
             </div>
@@ -1700,12 +1729,12 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     const res = await fetch('/api/admin/exam-upload', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ storage_path: signData.storage_path, file_url: fileUrl, ...examForm })
+                      body: JSON.stringify({ storage_path: signData.storage_path, file_url: fileUrl, purpose: tab === 'exam-books' ? 'exam' : 'instant_test', ...examForm, topic: examForm.subtopic })
                     })
                     const data = await res.json()
                     if (res.ok) {
-                      setExamMsg(`✅ Yuklendi! ${data.chunks} soru chunk, ${data.embedded} embedding`)
-                      setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', answer_key: '' })
+                      setExamMsg(tab === 'question-books' && examForm.source_type === 'teacher' ? `✅ Yüklendi; ${data.promoted || 0} soru birebir anlık test havuzuna aktarıldı.` : `✅ Yüklendi! ${data.chunks} kaynak parçası işlendi.`)
+                      setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '' })
                       setExamFile(null)
                     } else setExamMsg('❌ ' + (data.error || 'Sunucu hatasi'))
                   } else {
@@ -1713,11 +1742,13 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     const fd = new FormData()
                     fd.append('file', examFile)
                     Object.entries(examForm).forEach(([k, v]) => fd.append(k, v))
+                    fd.append('purpose', tab === 'exam-books' ? 'exam' : 'instant_test')
+                    if (tab === 'question-books') fd.append('topic', examForm.subtopic)
                     const res = await fetch('/api/admin/exam-upload', { method: 'POST', body: fd })
                     const data = await res.json()
                     if (res.ok) {
-                      setExamMsg(`✅ Yuklendi! ${data.chunks} soru chunk`)
-                      setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', answer_key: '' })
+                      setExamMsg(tab === 'question-books' && examForm.source_type === 'teacher' ? `✅ Yüklendi; ${data.promoted || 0} soru birebir anlık test havuzuna aktarıldı.` : `✅ Yüklendi! ${data.chunks} kaynak parçası işlendi.`)
+                      setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '' })
                       setExamFile(null)
                     } else setExamMsg('❌ ' + (data.error || 'Sunucu hatasi'))
                   }
@@ -1728,17 +1759,17 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                 }
               }}
               style={{ padding: '11px 20px', borderRadius: '12px', border: 'none', background: examUploading || !examFile || !examForm.title ? 'var(--bg2)' : '#6366f1', color: examUploading || !examFile || !examForm.title ? 'var(--text3)' : '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-              {examUploading ? '⏳ Yukleniyor...' : '🚀 Yukle ve Sinav Verisine Ekle'}
+              {examUploading ? '⏳ Yükleniyor...' : '🚀 Kitapçığı yükle ve kaydet'}
             </button>
           </div>
 
           {/* Yüklü kitapçıklar listesi */}
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '14px' }}>📋 Yuklu Sinav Kitapciklari</div>
+              <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '14px' }}>📋 Yüklü Soru Kitapçıkları</div>
               <button onClick={async () => {
                 setExamListLoading(true)
-                const res = await fetch('/api/admin/exam-upload')
+                const res = await fetch(`/api/admin/exam-upload?purpose=${tab === 'exam-books' ? 'exam' : 'instant_test'}`)
                 const data = await res.json()
                 setExamList(data.exams || [])
                 setExamListLoading(false)
@@ -1755,9 +1786,14 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>🎯</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--primary)' }}>{ex.title}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{ex.exam_type} · {ex.year}{ex.subject ? ` · ${ex.subject}` : ''} · {ex.chunk_count || 0} chunk</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Anlık test kaynağı · {ex.grade ? `${ex.grade}. sınıf · ` : ''}{ex.subject || 'Ders belirtilmedi'}{(ex.topic || ex.subtopic) ? ` · ${ex.topic || ex.subtopic}` : ''} · {ex.chunk_count || 0} parça</div>
                     </div>
-                    <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '99px', background: 'rgba(99,102,241,0.1)', color: '#6366f1', fontWeight: 600 }}>{ex.exam_type}</span>
+                    <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '99px', background: ex.source_type === 'teacher' ? 'rgba(22,163,74,0.1)' : 'rgba(99,102,241,0.1)', color: ex.source_type === 'teacher' ? '#15803d' : '#6366f1', fontWeight: 600 }}>{ex.source_type === 'teacher' ? 'Öğretmen' : 'Anonim'} · {ex.review_status === 'approved' ? 'Onaylı' : 'Bekliyor'}</span>
+                    {ex.source_type === 'teacher' && ex.review_status !== 'approved' && <button onClick={async () => {
+                      const res = await fetch('/api/admin/exam-upload', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: ex.id, review_status: 'approved' }) })
+                      const data = await res.json()
+                      setExamMsg(res.ok ? `✅ Onaylandı; ${data.promoted || 0} soru anlık test havuzuna aktarıldı.` : `❌ ${data.error || 'Onay başarısız'}`)
+                    }} style={{ padding: '5px 9px', borderRadius: '7px', border: '1px solid rgba(22,163,74,0.3)', background: 'rgba(22,163,74,0.08)', color: '#15803d', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>✓ Onayla ve havuza aktar</button>}
                     <button onClick={async () => {
                       // "Önce gör, sonra sil" — exam_chunks için ilk defa buradan
                       // silinebiliyor (önceden repo dışı, elle SQL ile yapılıyordu).

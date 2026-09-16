@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
 import ReportsHub from '@/components/ReportsHub'
 import { createClient } from '@/lib/supabase/client'
+import QuestionBankEditor from '@/components/QuestionBankEditor'
 
 export default function TeacherReportsPage() {
   const router = useRouter()
@@ -48,6 +49,7 @@ export default function TeacherReportsPage() {
       />
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '1.5rem' }}>
         <ReportsHub scope="teacher" gradesEndpoint="/api/teacher/reports" sectionalEndpoint="/api/teacher/reports" hubEndpoint="/api/teacher/reports-hub" />
+        <QuestionBankEditor />
       </div>
     </main>
   )

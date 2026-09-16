@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { LIVE_DATA_REFRESH_EVENT } from '@/components/LiveDataRefresh'
 
 type Recommendation = {
   id: string; subject: string; topic: string; reason: string
@@ -22,7 +23,12 @@ export default function RecommendationLifecycle() {
     return response.ok ? response.json() : null
   }
 
-  useEffect(() => { request().then(data => setItems(data?.recommendations ?? [])) }, [])
+  useEffect(() => {
+    const load = () => { void request().then(data => setItems(data?.recommendations ?? [])) }
+    load()
+    window.addEventListener(LIVE_DATA_REFRESH_EVENT, load)
+    return () => window.removeEventListener(LIVE_DATA_REFRESH_EVENT, load)
+  }, [])
 
   async function act(item: Recommendation, action: string) {
     setBusy(item.id)

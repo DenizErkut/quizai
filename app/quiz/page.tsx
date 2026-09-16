@@ -300,6 +300,9 @@ function QuizPageContent() {
   }, [current, questions.length])
   const isSavingRef = useRef(false) // ✅ Çift save-quiz çağrısını önle
   const adaptiveAnswerKeyRef = useRef('')
+  // Adaptif akışta kullanıcı cevap verirken bir sonraki soru hazırlanır.
+  // Promise önbelleği geçiş anında aynı isteğin tekrar gönderilmesini önler.
+  const adaptivePrefetchRef = useRef<{ key: string; promise: Promise<any> } | null>(null)
   useEffect(() => {
     const index = answers.length - 1
     if (!sessionId || index < 0) return
@@ -315,6 +318,26 @@ function QuizPageContent() {
       }).catch(() => undefined)
     })()
   }, [answers, sessionId])
+  useEffect(() => {
+    if (chunkBoundary === null || !sessionId || current + 1 !== chunkBoundary || !answers[current]) return
+    const key = `${sessionId}:${chunkBoundary}:${answers.length}`
+    if (adaptivePrefetchRef.current?.key === key) return
+    const run = (async () => {
+      const chunk1Answers = answersRef.current.slice(0, chunkBoundary)
+      const nextPolicy = nextQuestionPolicy(resolvedDifficulty, chunk1Answers, questions[current]?.type || questionType)
+      const topic = customTopic.trim() || selectedTopic
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return { questions: [], nextPolicy }
+      const res = await fetch('/api/generate-quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ topic, questionCount: 1, difficulty: nextPolicy.difficulty, language: currentLang, questionType: nextPolicy.questionType, adaptiveSupport: nextPolicy.supportLevel, includeVisuals, continueSessionId: sessionId, subject: selectedSubject || undefined, excludeQuestionTexts: questions.slice(0, chunkBoundary).map(q => q.q).filter(Boolean) }),
+      })
+      const data = await res.json().catch(() => ({}))
+      return { questions: res.ok && Array.isArray(data.questions) ? data.questions : [], nextPolicy }
+    })().catch(() => ({ questions: [], nextPolicy: null }))
+    adaptivePrefetchRef.current = { key, promise: run }
+  }, [answers, chunkBoundary, current, sessionId, resolvedDifficulty, questions, questionType, customTopic, selectedTopic, currentLang, selectedSubject, includeVisuals])
   const [chosen, setChosen] = useState<number | null>(null)
   const searchParams = useSearchParams()
   const [loadMsg, setLoadMsg] = useState('Profilin analiz ediliyor...')
@@ -365,6 +388,12 @@ function QuizPageContent() {
       setCustomTopic(decodeURIComponent(asgTopic))
       const recommendedSubject = searchParams.get('subject')
       if (recommendedSubject) setSelectedSubject(decodeURIComponent(recommendedSubject))
+
+      // Öneri bağlantısı yalnızca ilk açılışta formu doldurur. Parametreler
+      // adreste kalırsa F5/geri dönüşte tamamlanmış eski konu tekrar forma
+      // yazılıyordu. Next.js gezinme state'ini koruyarak tek kullanımlık URL'yi
+      // temizle; mevcut ekrandaki seçim bu oturum boyunca state'te kalır.
+      window.history.replaceState(window.history.state, '', '/quiz')
     }
 
     if (asgId && asgTopic) {
@@ -410,7 +439,11 @@ function QuizPageContent() {
         setScreen('loading')
 
         const { data: { session } } = await supabase.auth.getSession()
-        const res = await fetch('/api/generate-quiz', {
+        const prefetchKey = `${sessionId}:${chunkBoundary}:${answersRef.current.length}`
+        const prefetched = adaptivePrefetchRef.current?.key === prefetchKey
+          ? await adaptivePrefetchRef.current.promise
+          : null
+        const res = prefetched ? null : await fetch('/api/generate-quiz', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
           body: JSON.stringify({
@@ -864,7 +897,11 @@ function QuizPageContent() {
         const topic = customTopic.trim() || selectedTopic
         const targetSecondChunk = 1
         const { data: { session } } = await supabase.auth.getSession()
-        const res = await fetch('/api/generate-quiz', {
+        const prefetchKey = `${sessionId}:${chunkBoundary}:${answersRef.current.length}`
+        const prefetched = adaptivePrefetchRef.current?.key === prefetchKey
+          ? await adaptivePrefetchRef.current.promise
+          : null
+        const res = prefetched ? null : await fetch('/api/generate-quiz', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
           body: JSON.stringify({
@@ -881,7 +918,9 @@ function QuizPageContent() {
           }),
         })
         let secondChunk: any[] = []
-        if (res.ok) {
+        if (prefetched) {
+          secondChunk = prefetched.questions
+        } else if (res?.ok) {
           const data = await res.json()
           if (Array.isArray(data.questions)) secondChunk = data.questions
         }
@@ -907,6 +946,7 @@ function QuizPageContent() {
             secondChunk = [...secondChunk, ...extra].slice(0, targetSecondChunk)
           }
         }
+        adaptivePrefetchRef.current = null
         if (secondChunk.length > 0) {
           const nextBoundary = questions.length + secondChunk.length
           setQuestions(prev => [...prev, ...secondChunk])
