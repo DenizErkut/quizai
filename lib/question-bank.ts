@@ -53,14 +53,21 @@ function shuffled<T>(items: T[]): T[] {
 }
 
 function hasVisual(question: Question): boolean {
+  if (question.hasVisual === true) return true
   if (typeof question.svg === 'string' && question.svg.includes('<svg')) return true
   if (question.qtype === 'svg' || question.type === 'table_fill') return true
   const text = questionBankKey(question.q)
   return /grafik|tablo|sekil|diyagram|koordinat|harita|sema|zaman cizelgesi/.test(text)
 }
 
-function selectWithVisualQuota(rows: any[], count: number): any[] {
-  const target = Math.min(count, Math.max(1, Math.ceil(count * 0.3)))
+function isNewGenerationTopic(topic: string): boolean {
+  const key = questionBankKey(topic)
+  return /yeni nesil|beceri temelli|yorum gerektiren|gercek yasam|gunluk hayat/.test(key)
+}
+
+function selectWithVisualQuota(rows: any[], count: number, topic: string): any[] {
+  const ratio = isNewGenerationTopic(topic) ? 0.5 : 0.3
+  const target = Math.min(count, Math.max(1, Math.ceil(count * ratio)))
   const visualRows = shuffled(rows.filter(row => hasVisual(row.question))).slice(0, target)
   const chosen = new Set(visualRows.map(row => row.id))
   const remaining = shuffled(rows.filter(row => !chosen.has(row.id))).slice(0, count - visualRows.length)
@@ -159,7 +166,7 @@ export async function getQuestionBankSet(
     .slice(0, Math.min(data.length, count * 2))
   // Havuzda görsel soru varsa her testte yaklaşık %30 oranında seç. Görsel
   // kapasite yetersizse kalan yerler normal sorularla doldurulur.
-  const selected = selectWithVisualQuota(candidates, count)
+  const selected = selectWithVisualQuota(candidates, count, dimensions.topic)
 
   const { error: usageError } = await db.rpc('mark_question_bank_used', {
     p_ids: selected.map((row: any) => row.id),
@@ -183,15 +190,24 @@ export async function promoteQuestionsToBank(
     .filter(validQuestion)
     .map(question => {
       const clean = reusableQuestion(question)
+      const visual = hasVisual(clean)
+      // Görsel soru ile ilişkili SVG aynı question JSON'unda tutulur. Ayrı
+      // bir dosya/URL'ye bağımlı olmadığı için havuzdan tekrar sunulduğunda
+      // soru ve görsel birlikte gelir.
+      const bankQuestion = {
+        ...clean,
+        hasVisual: visual,
+        visualKind: visual ? (clean.qtype === 'svg' || clean.svg ? 'svg' : 'structured') : null,
+      }
       return {
-        fingerprint: questionFingerprint(clean),
+        fingerprint: questionFingerprint(bankQuestion),
         subject_key: questionBankKey(dimensions.subject || 'genel'),
         topic_key: questionBankKey(dimensions.topic),
         grade_key: questionBankKey(dimensions.grade),
         language_key: questionBankKey(dimensions.language),
         question_type: dimensions.questionType,
         difficulty: dimensions.difficulty,
-        question: clean,
+        question: bankQuestion,
         review_status: 'approved',
         quality_score: 1,
         source_session_id: source.sessionId || null,

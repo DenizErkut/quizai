@@ -252,7 +252,7 @@ function isNewGenerationRequest(topic: string): boolean {
 
 function visualPedagogyInstruction(topic: string, count: number): string {
   if (isNewGenerationRequest(topic)) {
-    const minimum = Math.min(3, Math.max(1, Math.ceil(count * 0.4)))
+    const minimum = Math.max(1, Math.ceil(count * 0.5))
     return `\n\nYENİ NESİL / BECERİ TEMELLİ SORU KURALI: Kullanıcı bunu açıkça istedi. Soruları kısa işlem veya ezber sorusu olarak kurma; öğrencinin bilgiyi yorumlamasını, ilişki kurmasını ya da gerçek yaşam durumuna uygulamasını iste. Matematikte özellikle tablo, koordinat sistemi, grafik, ölçüm şeması veya günlük yaşam verisi kullan. En az ${minimum} soru görsel/grafik/tablo/şema ile çözülebilecek biçimde olsun ve gerekli görsel/veri soru içinde açıkça tanımlansın. Uzun hikâye tek başına yeni nesil değildir; anlamlı veri ve çok adımlı düşünme kullan.`
   }
   return `\n\nGÖRSEL SORU ÇEŞİTLİLİĞİ: Konu uygunsa soruların yaklaşık %30'unu grafik, tablo, şekil, koordinat sistemi, deney düzeneği, harita veya zaman çizelgesi üzerinden yorumlama gerektirecek biçimde kur. Gerekli bütün veri ve etiketler sorunun içinde bulunmalı; görünmeyen bir görsele "yukarıdaki" diye atıf yapma.`
@@ -269,7 +269,9 @@ function visualQuestionCandidate(question: any, category: string | null): boolea
 
 function visualQuestionIndexes(questions: any[], category: string | null, requestedCount: number, forceVisuals: boolean): number[] {
   if (!category || requestedCount <= 0) return []
-  const target = Math.min(3, Math.max(1, Math.ceil(requestedCount * (forceVisuals ? 0.4 : 0.3))))
+  const target = forceVisuals
+    ? Math.max(1, Math.ceil(requestedCount * 0.5))
+    : Math.min(3, Math.max(1, Math.ceil(requestedCount * 0.3)))
   const preferred = questions
     .map((question, index) => ({ question, index }))
     .filter(({ question }) => visualQuestionCandidate(question, category))
@@ -775,6 +777,12 @@ function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
   })
 
   return result
+}
+
+async function generateVisualWithRetry(q: any, category: string, topic: string, grade: string): Promise<string | null> {
+  const first = await generateVisualForQuestion(q, category, topic, grade)
+  if (first) return first
+  return generateVisualForQuestion(q, category, topic, grade)
 }
 
 async function loadAnonymousBookletContext(subject: string, grade: string, topic: string): Promise<string> {
@@ -1538,12 +1546,12 @@ export async function POST(req: NextRequest) {
           }).then(r => r.ok ? r.json() : null).catch(() => null)
         : Promise.resolve(null),
 
-      // 2. SVG üretimi: konu uygunsa testin yaklaşık %30'u, açık yeni nesil
-      // talebinde %40'ı; maliyet/gecikme için en fazla 3, paralel.
+      // 2. SVG üretimi: konu uygunsa testin yaklaşık %30'u; açık yeni nesil
+      // talebinde en az %50. Normal akışta maliyet/gecikme için en fazla 3.
       includeVisuals && visualCategory
         ? Promise.all(
             visualIndexes.map(i =>
-              generateVisualForQuestion(questions[i], visualCategory, topic, grade)
+              generateVisualWithRetry(questions[i], visualCategory, topic, grade)
                 .then(svg => ({ i, svg }))
                 .catch(() => ({ i, svg: null }))
             )
