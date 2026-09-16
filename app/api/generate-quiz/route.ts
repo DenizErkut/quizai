@@ -253,7 +253,7 @@ function isNewGenerationRequest(topic: string): boolean {
 function visualPedagogyInstruction(topic: string, count: number): string {
   if (isNewGenerationRequest(topic)) {
     const minimum = Math.max(1, Math.ceil(count * 0.5))
-    return `\n\nYENİ NESİL / BECERİ TEMELLİ SORU KURALI: Kullanıcı bunu açıkça istedi. Soruları kısa işlem veya ezber sorusu olarak kurma; öğrencinin bilgiyi yorumlamasını, ilişki kurmasını ya da gerçek yaşam durumuna uygulamasını iste. Matematikte özellikle tablo, koordinat sistemi, grafik, ölçüm şeması veya günlük yaşam verisi kullan. En az ${minimum} soru görsel/grafik/tablo/şema ile çözülebilecek biçimde olsun ve gerekli görsel/veri soru içinde açıkça tanımlansın. Uzun hikâye tek başına yeni nesil değildir; anlamlı veri ve çok adımlı düşünme kullan. Metin içinde tablo gerekiyorsa her satırı \\n ile ayıran geçerli Markdown tablo biçimi kullan; tablo ayraçlarını ve satırları tek satırda birbirine yapıştırma.`
+    return `\n\nYENİ NESİL / BECERİ TEMELLİ SORU KURALI (ZORUNLU): Kullanıcı bunu açıkça istedi. Soruları kısa işlem, tanım veya ezber sorusu olarak kurma. En az ${minimum} soru; öğrencinin verilen bir grafik, tablo, şema, koordinat sistemi, ölçüm çizimi veya gerçek yaşam veri setini yorumlayıp en az iki akıl yürütme adımıyla sonuca ulaşmasını gerektirmelidir. Soruya yalnızca uzun bir hikâye eklemek yeni nesil sayılmaz. Her görseldeki nesneler, sayılar, birimler ve etiketler soru metnindeki senaryoyla BİREBİR aynı olmalıdır; meyve sorusuna hayvan, başka denklem veya genel konu görseli koyma. Görsel soruyu tekrar etmemeli, cevabı göstermemeli ve çözüm için anlamlı veri taşımalıdır. Geçerli Markdown tablo kullanılıyorsa başlık, ayraç ve her veri satırı ayrı \\n satırında olmalıdır. Bu koşulları karşılamayan soruyu çıktı listesine alma.`
   }
   return `\n\nGÖRSEL SORU ÇEŞİTLİLİĞİ: Konu uygunsa soruların yaklaşık %30'unu grafik, tablo, şekil, koordinat sistemi, deney düzeneği, harita veya zaman çizelgesi üzerinden yorumlama gerektirecek biçimde kur. Gerekli bütün veri ve etiketler sorunun içinde bulunmalı; görünmeyen bir görsele "yukarıdaki" diye atıf yapma. Metin içinde tablo gerekiyorsa her satırı \\n ile ayıran geçerli Markdown tablo biçimi kullan; tablo ayraçlarını ve satırları tek satırda birbirine yapıştırma.`
 }
@@ -297,6 +297,8 @@ CRITICAL SVG RULES:
 - NO JavaScript, NO external resources, NO foreignObject
 - Return ONLY the SVG code, nothing else, starting with <svg
 - CORRECT ANSWER (DO NOT SHOW THIS IN SVG): "${correctAnswer}"
+- Every object, number, unit, label and relationship MUST come from this exact QUESTION. Never substitute another scenario, equation, person, animal, product or dataset.
+- Exact semantic identity is mandatory: an animal question must not show shopping/fruit, and an equation question must not show a different equation.
 
 ABSOLUTE RULE - NEVER REVEAL THE ANSWER IN THE DIAGRAM:
 You are creating a QUESTION diagram, NOT an answer key.
@@ -335,6 +337,21 @@ The student must figure out the answer from the question, NOT from your diagram.
   return `${base}\n\nDIAGRAM INSTRUCTIONS:\n${guides[category] || guides.geometry}\n\nMake it directly relevant to the specific question being asked. The student should understand the concept better by seeing this diagram.`
 }
 
+async function visualMatchesQuestion(questionText: string, svg: string): Promise<boolean> {
+  try {
+    const res = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 8,
+      messages: [{ role: 'user', content: `Check whether this SVG is strictly and specifically about the exact quiz question. Every scenario, object, number, unit, equation and label must agree. A generic topic match is insufficient. Reject if it depicts another example or reveals the answer. Reply only VALID or INVALID.\n\nQUESTION:\n${questionText}\n\nSVG:\n${svg.slice(0, 9000)}` }],
+    })
+    const verdict = res.content[0]?.type === 'text' ? res.content[0].text.trim().toUpperCase() : ''
+    return verdict === 'VALID'
+  } catch (error) {
+    console.error('[visual-validation] error:', error)
+    return false
+  }
+}
+
 // ─── GÖRSEL ÜRETİMİ ──────────────────────────────────────────────────────────
 async function generateVisualForQuestion(
   q: any,
@@ -367,7 +384,8 @@ async function generateVisualForQuestion(
     const text = res.content[0].type === 'text' ? res.content[0].text.trim() : ''
     // SVG'yi temizle — sadece <svg...></svg> al
     const match = text.match(/<svg[\s\S]*<\/svg>/i)
-    if (match) return match[0]
+    if (match && await visualMatchesQuestion(q.q, match[0])) return match[0]
+    if (match) console.warn('[generate-visual] rejected unrelated or answer-revealing SVG')
     return null
   } catch (e) {
     console.error('[generate-visual] error:', e)

@@ -104,8 +104,22 @@ export function balanceAnswerPositions(questions: Question[]): Question[] {
     for (let optionIndex = 0; optionIndex < question.opts.length; optionIndex++) {
       opts.push(optionIndex === target ? correctOption : distractors[distractorIndex++])
     }
-    return { ...question, opts, ans: target }
+    return normalizeAnswerReference({ ...question, opts, ans: target })
   })
+}
+
+function normalizeAnswerReference(question: Question): Question {
+  if (!Array.isArray(question.opts) || !Number.isInteger(question.ans)) return question
+  const correct = String(question.opts[question.ans] ?? '').trim()
+  if (!correct) return question
+  const explanationKey = typeof question.exp === 'string'
+    ? 'exp'
+    : typeof question.explanation === 'string' ? 'explanation' : null
+  if (!explanationKey) return question
+  const explanation = String(question[explanationKey])
+    .replace(/Doğru\s+cevap\s+[A-E][\)\.]?\s*(?:seçeneğidir|şıkkıdır|şıkkı)?\.?/giu, `Doğru cevap: ${correct}.`)
+    .replace(/(?:Cevap|Yanıt)\s*[:：]?\s*[A-E][\)\.]\b/giu, `Cevap: ${correct}.`)
+  return { ...question, [explanationKey]: explanation }
 }
 
 function validQuestion(question: Question): boolean {
