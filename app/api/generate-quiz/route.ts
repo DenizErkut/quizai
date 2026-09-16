@@ -246,6 +246,38 @@ function detectVisualCategory(topic: string): string | null {
   return null
 }
 
+function isNewGenerationRequest(topic: string): boolean {
+  return /yeni\s*nesil|beceri\s*temelli|yorum\s*gerektiren|gercek\s*yasam|gunluk\s*hayat/.test(normalizeTR(topic))
+}
+
+function visualPedagogyInstruction(topic: string, count: number): string {
+  if (isNewGenerationRequest(topic)) {
+    const minimum = Math.min(3, Math.max(1, Math.ceil(count * 0.4)))
+    return `\n\nYENİ NESİL / BECERİ TEMELLİ SORU KURALI: Kullanıcı bunu açıkça istedi. Soruları kısa işlem veya ezber sorusu olarak kurma; öğrencinin bilgiyi yorumlamasını, ilişki kurmasını ya da gerçek yaşam durumuna uygulamasını iste. Matematikte özellikle tablo, koordinat sistemi, grafik, ölçüm şeması veya günlük yaşam verisi kullan. En az ${minimum} soru görsel/grafik/tablo/şema ile çözülebilecek biçimde olsun ve gerekli görsel/veri soru içinde açıkça tanımlansın. Uzun hikâye tek başına yeni nesil değildir; anlamlı veri ve çok adımlı düşünme kullan.`
+  }
+  return `\n\nGÖRSEL SORU ÇEŞİTLİLİĞİ: Konu uygunsa soruların yaklaşık %30'unu grafik, tablo, şekil, koordinat sistemi, deney düzeneği, harita veya zaman çizelgesi üzerinden yorumlama gerektirecek biçimde kur. Gerekli bütün veri ve etiketler sorunun içinde bulunmalı; görünmeyen bir görsele "yukarıdaki" diye atıf yapma.`
+}
+
+function visualQuestionCandidate(question: any, category: string | null): boolean {
+  if (!question || question.type === 'true_false' || question.type === 'short_answer' || question.type === 'multi_true_false') return false
+  const text = normalizeTR(String(question.q || ''))
+  const explicitVisual = /sekil|grafik|tablo|diyagram|koordinat|venn|sema|harita|zaman cizelgesi|veri/.test(text)
+  const shape = /kare|dikdortgen|ucgen|daire|cember|cokgen|prizma|kup|silindir|koni|kure|paralelkenar/.test(text)
+  const mathVisual = category === 'math_graph' && /denklem|fonksiyon|oran|yuzde|olasilik|istatistik|degisim|iliski|dogru|parabol/.test(text)
+  return explicitVisual || shape || mathVisual
+}
+
+function visualQuestionIndexes(questions: any[], category: string | null, requestedCount: number, forceVisuals: boolean): number[] {
+  if (!category || requestedCount <= 0) return []
+  const target = Math.min(3, Math.max(1, Math.ceil(requestedCount * (forceVisuals ? 0.4 : 0.3))))
+  const preferred = questions
+    .map((question, index) => ({ question, index }))
+    .filter(({ question }) => visualQuestionCandidate(question, category))
+    .map(({ index }) => index)
+  const fallback = questions.map((_: any, index: number) => index).filter(index => !preferred.includes(index))
+  return [...preferred, ...fallback].slice(0, Math.min(target, questions.length))
+}
+
 // ─── SVG PROMPT OLUŞTURMA ─────────────────────────────────────────────────────
 function buildSVGPrompt(category: string, topic: string, questionText: string, grade: string, correctAnswer: string = ''): string {
   const base = `You are an expert SVG educational diagram creator for Turkish students (${grade}).
@@ -319,7 +351,7 @@ async function generateVisualForQuestion(
     const needsVisual = /şekil|grafik|tablo|diyagram|geometr|koordinat|venn|kesir|şema|harita|ok.*diyagram|ağaç/.test(qText)
     const hasShape = /kare|dikdörtgen|üçgen|daire|çember|çokgen|prizma|küp|silindir|koni|küre|paralelkenar|eşkenar|ikizkenar/.test(qText)
     // Sadece görsel gerektiren sorularda SVG üret
-    if (category !== 'math' && !needsVisual && !hasShape) {
+    if (category !== 'math_graph' && !needsVisual && !hasShape) {
       return null
     }
     // Doğru cevabı prompt'a ekle — "bunu YAZMA" diye belirt
@@ -1301,6 +1333,7 @@ export async function POST(req: NextRequest) {
     }
     const aiQuestionCount = Math.max(0, safeQCount - bankQuestions.length)
     const fullPrompt = buildPrompt(questionType, topic, grade, resolvedDifficulty, effectiveLang, aiQuestionCount, fileContent || '', gradeContext, mebContext, profile.department || undefined, subject)
+      + visualPedagogyInstruction(topic, aiQuestionCount)
 
     // 5 Eylül 2026 — P0 prompt caching (bkz. K12_STATIC_* tanımları ve
     // getStaticSystemBlock/stripStaticPartsForCaching yukarıda). Sadece K12/
@@ -1485,6 +1518,12 @@ export async function POST(req: NextRequest) {
 
     // Soru doğrulama + SVG üretimi — PARALEL çalışır (timeout optimizasyonu)
     const visualCategory = detectVisualCategory(topic)
+    const visualIndexes = visualQuestionIndexes(
+      questions,
+      visualCategory,
+      aiQuestionCount,
+      isNewGenerationRequest(topic),
+    )
     console.log(`[generate-quiz] topic="${topic}" visualCategory=${visualCategory} includeVisuals=${includeVisuals}`)
 
     // Verify ve SVG'yi aynı anda başlat
@@ -1499,10 +1538,11 @@ export async function POST(req: NextRequest) {
           }).then(r => r.ok ? r.json() : null).catch(() => null)
         : Promise.resolve(null),
 
-      // 2. SVG üretimi (max 2, paralel)
+      // 2. SVG üretimi: konu uygunsa testin yaklaşık %30'u, açık yeni nesil
+      // talebinde %40'ı; maliyet/gecikme için en fazla 3, paralel.
       includeVisuals && visualCategory
         ? Promise.all(
-            Array.from({ length: Math.min(questions.length, 1) }, (_, i) => // Max 1 SVG — hız optimizasyonu
+            visualIndexes.map(i =>
               generateVisualForQuestion(questions[i], visualCategory, topic, grade)
                 .then(svg => ({ i, svg }))
                 .catch(() => ({ i, svg: null }))
