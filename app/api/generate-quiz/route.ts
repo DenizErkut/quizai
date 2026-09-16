@@ -397,7 +397,13 @@ async function visualMatchesQuestion(questionText: string, svg: string): Promise
 // tanısı buydu). Kategoriye göre farklılaştırıp basit şekiller için hız/maliyet
 // kazanırken karmaşık diyagramlara daha baştan yeterli pay veriyoruz.
 const SVG_MAX_TOKENS: Record<string, number> = {
-  geometry: 700,
+  // 16 Eylül 2026 — production loglarında geometri kategorisinin İLK
+  // denemesi 3/3 oranında 700 tokende kesiliyordu (ölçü etiketleri + iki
+  // şekil karşılaştırması bu bütçeye hiç sığmıyor), her seferinde ikinci bir
+  // OpenAI çağrısına (ekstra gecikme + maliyet) mecbur bırakıyordu. 1150'ye
+  // çıkarıldı; retry mekanizması güvenlik ağı olarak kalıyor ama artık
+  // normal senaryoda devreye girmemesi bekleniyor.
+  geometry: 1150,
   math_graph: 950,
   map: 1200,
   biology: 950,
