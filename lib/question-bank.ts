@@ -53,9 +53,10 @@ function shuffled<T>(items: T[]): T[] {
 }
 
 function hasVisual(question: Question): boolean {
-  if (question.hasVisual === true) return true
-  if (typeof question.svg === 'string' && question.svg.includes('<svg')) return true
-  if (question.qtype === 'svg' || question.type === 'table_fill') return true
+  if (typeof question.svg === 'string' && question.svg.includes('<svg')) {
+    return question.visualQuestionText === question.q
+  }
+  if (question.type === 'table_fill') return true
   const text = questionBankKey(question.q)
   return /grafik|tablo|sekil|diyagram|koordinat|harita|sema|zaman cizelgesi/.test(text)
 }

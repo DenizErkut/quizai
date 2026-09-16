@@ -1524,55 +1524,40 @@ export async function POST(req: NextRequest) {
     let questions = (parsed.questions || []).map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
     let externalValidationPassed = false
 
-    // Soru doğrulama + SVG üretimi — PARALEL çalışır (timeout optimizasyonu)
+    // Önce soru doğrulanır, sonra görsel doğrulanmış kesin soru metninden
+    // üretilir. Eski paralel akışta doğrulayıcı soruların sırasını/metnini
+    // değiştirdiğinde başka soruya ait SVG aynı index'e takılabiliyordu.
     const visualCategory = detectVisualCategory(topic)
-    const visualIndexes = visualQuestionIndexes(
-      questions,
-      visualCategory,
-      aiQuestionCount,
-      isNewGenerationRequest(topic),
-    )
     console.log(`[generate-quiz] topic="${topic}" visualCategory=${visualCategory} includeVisuals=${includeVisuals}`)
 
-    // Verify ve SVG'yi aynı anda başlat
-    const [verifyResult, svgResults] = await Promise.allSettled([
-      // 1. Soru doğrulama
-      questions.length > 0
-        ? fetch(`${req.nextUrl.origin}/api/verify-questions`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
-            body: JSON.stringify({ questions, topic, grade, language: effectiveLang, questionType }),
-            signal: AbortSignal.timeout(40000), // 40sn - asilmasin, generate-quiz kendi butcesini korusun
-          }).then(r => r.ok ? r.json() : null).catch(() => null)
-        : Promise.resolve(null),
+    const verifyResult = questions.length > 0
+      ? await fetch(`${req.nextUrl.origin}/api/verify-questions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
+          body: JSON.stringify({ questions, topic, grade, language: effectiveLang, questionType }),
+          signal: AbortSignal.timeout(40000),
+        }).then(r => r.ok ? r.json() : null).catch(() => null)
+      : null
 
-      // 2. SVG üretimi: konu uygunsa testin yaklaşık %30'u; açık yeni nesil
-      // talebinde en az %50. Normal akışta maliyet/gecikme için en fazla 3.
-      includeVisuals && visualCategory
-        ? Promise.all(
-            visualIndexes.map(i =>
-              generateVisualWithRetry(questions[i], visualCategory, topic, grade)
-                .then(svg => ({ i, svg }))
-                .catch(() => ({ i, svg: null }))
-            )
-          )
-        : Promise.resolve([]),
-    ])
-
-    // Verify sonucunu uygula
-    if (verifyResult.status === 'fulfilled' && verifyResult.value?.questions?.length > 0) {
-      questions = verifyResult.value.questions.map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
+    if (verifyResult?.questions?.length > 0) {
+      questions = verifyResult.questions.map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
       externalValidationPassed = true
     }
 
-    // SVG sonuçlarını uygula
-    if (svgResults.status === 'fulfilled' && Array.isArray(svgResults.value)) {
-      for (const { i, svg } of svgResults.value as { i: number; svg: string | null }[]) {
+    const visualIndexes = visualQuestionIndexes(questions, visualCategory, aiQuestionCount, isNewGenerationRequest(topic))
+    const svgResults = includeVisuals && visualCategory
+      ? await Promise.all(visualIndexes.map(i =>
+          generateVisualWithRetry(questions[i], visualCategory, topic, grade)
+            .then(svg => ({ i, svg }))
+            .catch(() => ({ i, svg: null }))
+        ))
+      : []
+
+    for (const { i, svg } of svgResults) {
         if (svg && questions[i]) {
-          questions[i] = { ...questions[i], svg, qtype: 'svg' }
+          questions[i] = { ...questions[i], svg, qtype: 'svg', visualQuestionText: questions[i].q }
           console.log(`[generate-quiz] visual generated for q[${i}]`)
         }
-      }
     }
 
     // Kaynağın kendisi (yazar, ISBN, künye) hakkında soru üretilmesini
