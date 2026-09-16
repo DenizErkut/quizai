@@ -20,6 +20,17 @@ function shuffled<T>(items: T[]) {
   return result
 }
 
+// Eski havuz kayıtlarının bir bölümü Türkçe karakterleri ASCII olarak
+// saklandı ("sınıf" / "sinif"). Günlük görev yalnızca tek biçimi aradığında
+// yeterli onaylı soru varken boş havuz sanılıyor ve görev oluşmuyordu.
+function questionBankKeyAliases(value: string) {
+  const canonical = questionBankKey(value)
+  const ascii = canonical
+    .replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ı/g, 'i')
+    .replace(/ö/g, 'o').replace(/ş/g, 's').replace(/ü/g, 'u')
+  return [...new Set([canonical, ascii])]
+}
+
 async function authenticate(request: NextRequest) {
   const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim()
   if (!token) return null
@@ -35,12 +46,13 @@ async function getProfile(userId: string) {
 async function selectPersonalizedQuestions(userId: string, profile: any) {
   const gradeKey = questionBankKey(profile.grade || 'Ortaokul 6. sınıf')
   const languageKey = questionBankKey(profile.language || 'Türkçe')
+  const gradeKeyAliases = questionBankKeyAliases(profile.grade || 'Ortaokul 6. sınıf')
 
   const [{ data: mastery }, { data: weakTopics }, { data: bank, error }] = await Promise.all([
     db.from('student_mastery').select('topic,mastery_score').eq('student_id', userId).eq('learning_objective_key', '').order('mastery_score', { ascending: true }).limit(8),
     db.from('weak_topics').select('topic,wrong_count,total_count').eq('user_id', userId).order('wrong_count', { ascending: false }).limit(8),
     db.from('question_bank').select('id,question,subject_key,topic_key,use_count,last_used_at')
-      .eq('grade_key', gradeKey).eq('language_key', languageKey)
+      .in('grade_key', gradeKeyAliases).eq('language_key', languageKey)
       .eq('review_status', 'approved').eq('report_count', 0)
       .order('use_count', { ascending: true }).order('last_used_at', { ascending: true, nullsFirst: true }).limit(100),
   ])
