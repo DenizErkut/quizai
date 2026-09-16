@@ -339,13 +339,22 @@ The student must figure out the answer from the question, NOT from your diagram.
 
 async function visualMatchesQuestion(questionText: string, svg: string): Promise<boolean> {
   try {
-    const res = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+    // Görseli üreten sağlayıcıdan bağımsız bir OpenAI denetimi. Doğrulama
+    // yapılamazsa görsel yayınlanmaz (fail closed).
+    const verdict = await callOpenAI([
+      { role: 'system', content: 'You are a strict K-12 visual-question QA gate. Reply with exactly VALID or INVALID.' },
+      { role: 'user', content: `Check whether this SVG is strictly and specifically about the exact quiz question. Every scenario, object, number, unit, equation and label must agree. A generic topic match is insufficient. Reject if it depicts another example, contains unsupported facts, or reveals the answer.\n\nQUESTION:\n${questionText}\n\nSVG:\n${svg.slice(0, 9000)}` },
+    ], {
+      model: process.env.OPENAI_VISUAL_VALIDATOR_MODEL || process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini',
       max_tokens: 8,
-      messages: [{ role: 'user', content: `Check whether this SVG is strictly and specifically about the exact quiz question. Every scenario, object, number, unit, equation and label must agree. A generic topic match is insufficient. Reject if it depicts another example or reveals the answer. Reply only VALID or INVALID.\n\nQUESTION:\n${questionText}\n\nSVG:\n${svg.slice(0, 9000)}` }],
+      temperature: 0,
+      operation: 'visual-question:validate',
     })
-    const verdict = res.content[0]?.type === 'text' ? res.content[0].text.trim().toUpperCase() : ''
-    return verdict === 'VALID'
+    const normalizedVerdict = verdict.trim().toUpperCase()
+    // Bazı modeller kısa bir gerekçe ekleyebilir; sadece net VALID kararı kabul.
+    const isValid = normalizedVerdict === 'VALID'
+    if (!isValid) console.warn('[visual-validation] OpenAI rejected SVG:', normalizedVerdict.slice(0, 120))
+    return isValid
   } catch (error) {
     console.error('[visual-validation] error:', error)
     return false
@@ -376,12 +385,18 @@ async function generateVisualForQuestion(
     // Doğru cevabı prompt'a ekle — "bunu YAZMA" diye belirt
     const correctAnswer = q.opts?.[q.ans] || q.blank || q.correctOrder || ''
     const prompt = buildSVGPrompt(category, topic, q.q, grade, String(correctAnswer))
-    const res = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001', // SVG için hızlı model yeterli
-      max_tokens: 1200,
-      messages: [{ role: 'user', content: prompt }],
+    // Soruya özgü eğitim görsellerinin üretimi OpenAI'ye taşındı. SVG, grafik,
+    // tablo ve denklem gibi ölçülebilir içeriklerde raster görsele göre sayısal
+    // doğruluğu ve erişilebilirliği korur.
+    const text = await callOpenAI([
+      { role: 'system', content: 'You create precise, safe educational SVG diagrams. Follow the user constraints exactly. Return only SVG.' },
+      { role: 'user', content: prompt },
+    ], {
+      model: process.env.OPENAI_VISUAL_MODEL || process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini',
+      max_tokens: 1600,
+      temperature: 0.15,
+      operation: 'visual-question:generate',
     })
-    const text = res.content[0].type === 'text' ? res.content[0].text.trim() : ''
     // SVG'yi temizle — sadece <svg...></svg> al
     const match = text.match(/<svg[\s\S]*<\/svg>/i)
     if (match && await visualMatchesQuestion(q.q, match[0])) return match[0]
