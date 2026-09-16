@@ -52,6 +52,21 @@ function shuffled<T>(items: T[]): T[] {
   return result
 }
 
+function hasVisual(question: Question): boolean {
+  if (typeof question.svg === 'string' && question.svg.includes('<svg')) return true
+  if (question.qtype === 'svg' || question.type === 'table_fill') return true
+  const text = questionBankKey(question.q)
+  return /grafik|tablo|sekil|diyagram|koordinat|harita|sema|zaman cizelgesi/.test(text)
+}
+
+function selectWithVisualQuota(rows: any[], count: number): any[] {
+  const target = Math.min(count, Math.max(1, Math.ceil(count * 0.3)))
+  const visualRows = shuffled(rows.filter(row => hasVisual(row.question))).slice(0, target)
+  const chosen = new Set(visualRows.map(row => row.id))
+  const remaining = shuffled(rows.filter(row => !chosen.has(row.id))).slice(0, count - visualRows.length)
+  return shuffled([...visualRows, ...remaining])
+}
+
 export function balanceAnswerPositions(questions: Question[]): Question[] {
   const targets = new Map<number, number>()
   for (const optionCount of [4, 5]) {
@@ -142,7 +157,9 @@ export async function getQuestionBankSet(
   const candidates = data
     .filter((row: any) => !excluded.has(questionBankKey(row.question?.q)))
     .slice(0, Math.min(data.length, count * 2))
-  const selected = shuffled(candidates).slice(0, count)
+  // Havuzda görsel soru varsa her testte yaklaşık %30 oranında seç. Görsel
+  // kapasite yetersizse kalan yerler normal sorularla doldurulur.
+  const selected = selectWithVisualQuota(candidates, count)
 
   const { error: usageError } = await db.rpc('mark_question_bank_used', {
     p_ids: selected.map((row: any) => row.id),
