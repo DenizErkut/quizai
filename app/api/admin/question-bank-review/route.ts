@@ -11,7 +11,9 @@ async function isAdmin() {
   const { data: { user } } = await sb.auth.getUser()
   if (!user) return false
   const { data } = await db.from('profiles').select('is_admin').eq('id', user.id).single()
-  return Boolean(data?.is_admin)
+  if (data?.is_admin) return true
+  const { data: teacher } = await db.from('teachers').select('id,approved').eq('user_id', user.id).maybeSingle()
+  return Boolean(teacher?.approved)
 }
 
 // Öğretmen sorusunu düzeltir ve yeniden uzman incelemesine alır.
