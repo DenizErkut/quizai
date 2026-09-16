@@ -9,36 +9,60 @@ type ParsedInlineTable = {
   after: string
 }
 
-function parseInlineMarkdownTable(text: string): ParsedInlineTable | null {
-  const firstPipe = text.indexOf('|')
-  if (firstPipe < 0) return null
-  const parts = text.slice(firstPipe).split('|').map(part => part.trim())
-  const separatorIndex = parts.findIndex(part => /^:?-{3,}:?$/.test(part))
-  if (separatorIndex < 2) return null
+// 16 Eylül 2026 — eski uygulama tüm tablo bloğunu TEK bir '|' listesine
+// düzleştirip başlık sayısına göre gruplara bölüyordu. Bir satırda hücre
+// eksik/fazla olduğunda (AI'nin boş bıraktığı bir hücre, eksik kapanış '|'
+// vb. — pratikte sık görülüyor) o noktadan sonraki HER satır bir kayar:
+// değerler yanlış sütuna, hatta yanlış satıra düşer (öğretmen geri
+// bildirimi: "tablolarda satır kaymaları var"). Artık her satır kendi
+// hücrelerini kendi içinde taşıyor; bir satırın hücre sayısı yanlışsa
+// sadece O satır düzeltilir (kısa ise boşlukla tamamlanır, uzun ise
+// taşan hücreler `after` metnine eklenir), başka satırı etkilemez.
+function splitTableRow(line: string): string[] {
+  let trimmed = line.trim()
+  if (trimmed.startsWith('|')) trimmed = trimmed.slice(1)
+  if (trimmed.endsWith('|')) trimmed = trimmed.slice(0, -1)
+  return trimmed.split('|').map(cell => cell.trim())
+}
 
-  const headers = parts.slice(1, separatorIndex).filter(Boolean)
+function parseInlineMarkdownTable(text: string): ParsedInlineTable | null {
+  const lines = text.split('\n')
+  const isSeparatorLine = (line: string) => {
+    const cells = splitTableRow(line)
+    return cells.length > 0 && cells.every(cell => /^:?-{2,}:?$/.test(cell))
+  }
+
+  // Ayraç satırını bul (|---|---|); tablo başlığı bunun bir önceki satırı.
+  const separatorLineIndex = lines.findIndex((line, i) => i > 0 && line.includes('|') && isSeparatorLine(line))
+  if (separatorLineIndex < 1) return null
+
+  const headers = splitTableRow(lines[separatorLineIndex - 1]).filter(Boolean)
   if (headers.length < 2 || headers.length > 8) return null
 
-  let data = parts.slice(separatorIndex)
-  while (data.length && (!data[0] || /^:?-{3,}:?$/.test(data[0]))) data = data.slice(1)
-  while (data.length && (!data[0] || /^:?-{3,}:?$/.test(data[0]))) data = data.slice(1)
-
-  // Son parça kapanış | işaretinden sonraki asıl soru cümlesidir. Geriye
-  // kalan tam kolon grupları tablo satırlarıdır.
-  const remainder = data.length % headers.length
-  const afterParts = remainder ? data.splice(data.length - remainder, remainder) : []
   const rows: string[][] = []
-  for (let index = 0; index + headers.length <= data.length; index += headers.length) {
-    const row = data.slice(index, index + headers.length)
-    if (row.some(Boolean)) rows.push(row)
+  let afterStartIndex = lines.length
+  for (let i = separatorLineIndex + 1; i < lines.length; i++) {
+    const line = lines[i]
+    if (!line.includes('|')) { afterStartIndex = i; break }
+    const cells = splitTableRow(line)
+    if (!cells.some(Boolean)) { afterStartIndex = i + 1; continue }
+    // Hücre sayısı başlıkla eşleşmiyorsa SADECE bu satırı düzelt (eksikse
+    // boşlukla tamamla, fazlaysa kırp) — önceki/sonraki satırlar etkilenmez.
+    const row = cells.length === headers.length
+      ? cells
+      : cells.length > headers.length
+        ? cells.slice(0, headers.length)
+        : [...cells, ...Array(headers.length - cells.length).fill('')]
+    rows.push(row)
+    afterStartIndex = i + 1
   }
   if (!rows.length) return null
 
   return {
-    before: text.slice(0, firstPipe).trim(),
+    before: lines.slice(0, separatorLineIndex - 1).join('\n').trim(),
     headers,
     rows,
-    after: afterParts.filter(Boolean).join(' ').trim(),
+    after: lines.slice(afterStartIndex).join('\n').trim(),
   }
 }
 
