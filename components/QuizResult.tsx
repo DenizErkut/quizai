@@ -266,19 +266,23 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
     const q = questions[idx]
     const a = answers[idx]
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      await supabase.from('error_reports').insert({
-        user_id: user?.id || null,
-        question_text: q.q,
-        correct_answer: correctAnswerText(q),
-        user_answer: userAnswerText(q, a?.userAns),
-        topic,
-        status: 'pending',
-        // Madde 2: reporter_role artık kaydediliyor — öğretmenin yeni genel
-        // bildirim formundan (components/ContentIssueReporter.tsx) ayırt
-        // edilebilsin diye.
-        reporter_role: 'student',
+      const { data: { session } } = await supabase.auth.getSession()
+      const response = await fetch('/api/report-question', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({
+          questionText: q.q,
+          correctAnswer: correctAnswerText(q),
+          userAnswer: userAnswerText(q, a?.userAns),
+          topic,
+          bankQuestionId: q.bankQuestionId || null,
+          bankFingerprint: q.bankFingerprint || null,
+        }),
       })
+      if (!response.ok) throw new Error(`Question report failed (${response.status})`)
       setReportedIdx(prev => new Set([...prev, idx]))
     } catch (e) {
       console.error('Report error:', e)
