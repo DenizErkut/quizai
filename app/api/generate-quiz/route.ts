@@ -747,7 +747,7 @@ function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
 
 async function loadAnonymousBookletContext(subject: string, grade: string, topic: string): Promise<string> {
   const { data, error } = await supabase.from('exam_resources')
-    .select('raw_text,subject,grade,subtopic')
+    .select('raw_text,subject,grade,topic,subtopic')
     .eq('purpose', 'instant_test')
     .eq('source_type', 'anonymous')
     .neq('review_status', 'rejected')
@@ -759,7 +759,7 @@ async function loadAnonymousBookletContext(subject: string, grade: string, topic
   const matches = data.filter((row: any) => {
     const rowSubject = normalizeTR(String(row.subject || ''))
     const rowGrade = normalizeTR(String(row.grade || ''))
-    const rowTopic = normalizeTR(String(row.subtopic || ''))
+    const rowTopic = normalizeTR(String(row.topic || row.subtopic || ''))
     return (!rowSubject || rowSubject.includes(subjectKey) || subjectKey.includes(rowSubject))
       && (!rowGrade || gradeKey.includes(rowGrade) || rowGrade.includes(gradeKey))
       && (!rowTopic || rowTopic.includes(topicKey) || topicKey.includes(rowTopic))
