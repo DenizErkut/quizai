@@ -2,6 +2,54 @@
 import { Fragment, useState } from 'react'
 import { DIFFICULTIES, type Question } from '@/lib/quiz-constants'
 
+type ParsedInlineTable = {
+  before: string
+  headers: string[]
+  rows: string[][]
+  after: string
+}
+
+function parseInlineMarkdownTable(text: string): ParsedInlineTable | null {
+  const firstPipe = text.indexOf('|')
+  if (firstPipe < 0) return null
+  const parts = text.slice(firstPipe).split('|').map(part => part.trim())
+  const separatorIndex = parts.findIndex(part => /^:?-{3,}:?$/.test(part))
+  if (separatorIndex < 2) return null
+
+  const headers = parts.slice(1, separatorIndex).filter(Boolean)
+  if (headers.length < 2 || headers.length > 8) return null
+
+  let data = parts.slice(separatorIndex)
+  while (data.length && (!data[0] || /^:?-{3,}:?$/.test(data[0]))) data = data.slice(1)
+  while (data.length && (!data[0] || /^:?-{3,}:?$/.test(data[0]))) data = data.slice(1)
+
+  // Son parça kapanış | işaretinden sonraki asıl soru cümlesidir. Geriye
+  // kalan tam kolon grupları tablo satırlarıdır.
+  const remainder = data.length % headers.length
+  const afterParts = remainder ? data.splice(data.length - remainder, remainder) : []
+  const rows: string[][] = []
+  for (let index = 0; index + headers.length <= data.length; index += headers.length) {
+    const row = data.slice(index, index + headers.length)
+    if (row.some(Boolean)) rows.push(row)
+  }
+  if (!rows.length) return null
+
+  return {
+    before: text.slice(0, firstPipe).trim(),
+    headers,
+    rows,
+    after: afterParts.filter(Boolean).join(' ').trim(),
+  }
+}
+
+function HighlightedText({ text }: { text: string }) {
+  return <>{text.split(/(\[[^\]]+\])/).map((part, idx) =>
+    part.startsWith('[') && part.endsWith(']')
+      ? <span key={idx} style={{ textDecoration: 'underline', textDecorationStyle: 'double', textDecorationColor: '#6366f1', fontWeight: 700 }}>{part.slice(1, -1)}</span>
+      : <span key={idx}>{part}</span>
+  )}</>
+}
+
 interface QuizQuestionProps {
   questions: Question[]
   current: number
@@ -62,6 +110,7 @@ export default function QuizQuestion({
   })
   const passageOrigin = q.passage ? passageFirstIndex.get(q.passage) : undefined
   const isFirstPassageOccurrence = passageOrigin === current
+  const inlineTable = parseInlineMarkdownTable(q.q)
 
   return (
     <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', position: 'relative' }}>
@@ -122,13 +171,24 @@ export default function QuizQuestion({
             </details>
           )}
 
-          <p style={{ fontSize: '17px', fontWeight: 500, lineHeight: 1.55, marginBottom: '1.5rem' }}>
-            {q.q.split(/(\[[^\]]+\])/).map((part: string, idx: number) =>
-              part.startsWith('[') && part.endsWith(']')
-                ? <span key={idx} style={{ textDecoration: 'underline', textDecorationStyle: 'double' as const, textDecorationColor: '#6366f1', fontWeight: 700 }}>{part.slice(1, -1)}</span>
-                : <span key={idx}>{part}</span>
-            )}
-          </p>
+          {inlineTable ? (
+            <div style={{ marginBottom: '1.5rem' }}>
+              {inlineTable.before && <p style={{ fontSize: '17px', fontWeight: 500, lineHeight: 1.55, marginBottom: '12px' }}><HighlightedText text={inlineTable.before} /></p>}
+              <div style={{ overflowX: 'auto', marginBottom: '12px', border: '1px solid var(--border)', borderRadius: '10px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '420px', fontSize: '14px' }}>
+                  <thead>
+                    <tr>{inlineTable.headers.map((header, index) => <th key={index} style={{ padding: '10px 12px', background: 'rgba(8,36,101,0.08)', color: 'var(--primary)', textAlign: 'left', borderBottom: '1px solid var(--border)', fontWeight: 700 }}>{header}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {inlineTable.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex} style={{ padding: '10px 12px', borderBottom: rowIndex === inlineTable.rows.length - 1 ? 'none' : '1px solid var(--border)', background: rowIndex % 2 ? 'var(--bg2)' : 'var(--bg)' }}>{cell}</td>)}</tr>)}
+                  </tbody>
+                </table>
+              </div>
+              {inlineTable.after && <p style={{ fontSize: '17px', fontWeight: 500, lineHeight: 1.55, margin: 0 }}><HighlightedText text={inlineTable.after} /></p>}
+            </div>
+          ) : (
+            <p style={{ fontSize: '17px', fontWeight: 500, lineHeight: 1.55, marginBottom: '1.5rem' }}><HighlightedText text={q.q} /></p>
+          )}
 
           {q.adaptiveHint && chosen === null && (
             <div style={{ marginBottom: 12 }}>
