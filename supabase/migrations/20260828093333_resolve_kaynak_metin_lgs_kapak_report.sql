@@ -1,0 +1,4 @@
+UPDATE error_reports
+SET status = 'confirmed',
+    admin_note = 'Kok neden bulundu ve duzeltildi (28 Agustos 2026): 26 Agustosta eklenen "kaynak metni goster" ozelligi mebContexti HIC kirpmadan/temizlemeden passage alanina koyuyordu -- LGS sinav kapak sayfasi (SINAVLA OGRENCI ALACAK...) ogrenciye "Kaynak Metin" olarak gosteriliyordu. cleanPassageForDisplay() eklendi (sadece gercek MEB Kaynak bloklarini tutar, Sinav Sorusu bloklarini haric tutar). Ayrica isFrontMatter() sinyal listesine LGS kapak sayfasi ifadeleri eklendi + bu dosyadaki tum .toLowerCase() kullanimlari Turkce buyuk I hatasi tasidigi icin .toLocaleLowerCase("tr")ye cevrildi (yeni eklenen sinyaller bu duzeltme olmadan hic calismiyordu). question_count=1 sorununun bu asiri buyuk/kirli mebContext ile iliskili olabilecegi degerlendiriliyor, kesin garanti verilmiyor -- bir sonraki testte tekrar izlenmeli.'
+WHERE id = 'd4670967-10ed-461c-9705-0b54f2c6ad8e';
