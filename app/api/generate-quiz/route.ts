@@ -396,25 +396,31 @@ async function visualMatchesQuestion(questionText: string, svg: string): Promise
 // <svg>, regex eşleşmiyor, görsel sessizce kayboluyordu — ChatGPT'nin ilk
 // tanısı buydu). Kategoriye göre farklılaştırıp basit şekiller için hız/maliyet
 // kazanırken karmaşık diyagramlara daha baştan yeterli pay veriyoruz.
+// 16 Eylül 2026 — production loglarında geometri (700) ve math_graph (950)
+// kategorilerinin İLK denemesi neredeyse HER SEFERİNDE (geometri 3/3,
+// math_graph 5/5) taban bütçede kesiliyordu, her seferinde ikinci bir OpenAI
+// çağrısına (ekstra gecikme + maliyet) mecbur bırakıyordu; math_graph'ta
+// hatta 2x retry (1900) bile bazen yetmiyordu. Aynı deseni diğer
+// kategorilerde de bekleyip hepsini toptan yükselttik — amaç retry'ın
+// istisna kalması, kural olmaması. Ölçü etiketi/veri noktası sayısı daha
+// yüksek olan kategoriler (harita, zaman çizelgesi, ekosistem, biyoloji)
+// orantılı olarak daha fazla pay alıyor.
 const SVG_MAX_TOKENS: Record<string, number> = {
-  // 16 Eylül 2026 — production loglarında geometri kategorisinin İLK
-  // denemesi 3/3 oranında 700 tokende kesiliyordu (ölçü etiketleri + iki
-  // şekil karşılaştırması bu bütçeye hiç sığmıyor), her seferinde ikinci bir
-  // OpenAI çağrısına (ekstra gecikme + maliyet) mecbur bırakıyordu. 1150'ye
-  // çıkarıldı; retry mekanizması güvenlik ağı olarak kalıyor ama artık
-  // normal senaryoda devreye girmemesi bekleniyor.
   geometry: 1150,
-  math_graph: 950,
-  map: 1200,
-  biology: 950,
-  chemistry: 850,
-  physics: 850,
-  space: 700,
-  ecosystem: 1000,
-  timeline: 1050,
+  math_graph: 1500,
+  map: 1700,
+  biology: 1400,
+  chemistry: 1200,
+  physics: 1200,
+  space: 1000,
+  ecosystem: 1500,
+  timeline: 1500,
 }
-const SVG_MAX_TOKENS_DEFAULT = 800
-const SVG_MAX_TOKENS_CEILING = 2200 // gerçekten kesilen çağrılarda bile taşmasın
+const SVG_MAX_TOKENS_DEFAULT = 1300
+// Taban zaten yükseldiği için 2x retry çoğu kategoride tavana (2200) çarpıp
+// gerçek faydayı kaybediyordu (ör. math_graph 1500*2=3000 → 2200'e
+// kırpılırdı, oysa 1900'de bile kesilme görüldü). 2800'e çıkarıldı.
+const SVG_MAX_TOKENS_CEILING = 2800
 
 async function generateVisualForQuestion(
   q: any,
@@ -465,14 +471,27 @@ async function generateVisualForQuestion(
       if (!(e instanceof OpenAITruncatedError)) throw e
       const retryMaxTokens = Math.min(SVG_MAX_TOKENS_CEILING, baseMaxTokens * 2)
       console.warn(`[generate-visual] truncated at ${baseMaxTokens} tokens (category=${category}), retrying with ${retryMaxTokens}`)
-      text = await callOpenAI(messages, {
-        model,
-        max_tokens: retryMaxTokens,
-        temperature: 0.15,
-        operation: 'visual-question:generate-retry-truncated',
-        requireComplete: true,
-        timeoutMs: 20000,
-      })
+      try {
+        text = await callOpenAI(messages, {
+          model,
+          max_tokens: retryMaxTokens,
+          temperature: 0.15,
+          operation: 'visual-question:generate-retry-truncated',
+          requireComplete: true,
+          timeoutMs: 25000,
+        })
+      } catch (e2) {
+        // Yeniden deneme bile kesiliyorsa bu ARTIK beklenmedik bir hata
+        // değil, sadece "bu diyagram bu bütçeye de sığmadı" durumu — dış
+        // catch'e düşüp genel "[generate-visual] error" olarak loglanması
+        // (log'da sanki yakalanmamış bir hata varmış izlenimi veriyordu)
+        // yerine burada ayrı, açıklayıcı bir uyarıyla vazgeçiyoruz.
+        if (e2 instanceof OpenAITruncatedError) {
+          console.warn(`[generate-visual] still truncated after retry at ${retryMaxTokens} tokens (category=${category}), giving up on this visual`)
+          return null
+        }
+        throw e2
+      }
     }
     // SVG'yi temizle — sadece <svg...></svg> al
     const match = text.match(/<svg[\s\S]*<\/svg>/i)
@@ -904,10 +923,19 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
   })
 }
 
-async function generateVisualWithRetry(q: any, category: string, topic: string, grade: string): Promise<string | null> {
-  const first = await withTimeout(generateVisualForQuestion(q, category, topic, grade), 45000, null)
-  if (first) return first
-  return withTimeout(generateVisualForQuestion(q, category, topic, grade), 45000, null)
+// 16 Eylül 2026 — token bütçeleri yükselince tek bir generateVisualForQuestion
+// çağrısının gerçekçi en kötü süresi (üretim + kesilme sonrası yeniden deneme
+// + doğrulama) sabit 45sn'lik eski üst sınırı aşabiliyordu; üstüne bu
+// fonksiyon o çağrıyı yeniden BAŞTAN bir kez daha deniyordu (2×45sn=90sn).
+// Sabit bir süre yerine artık ÇAĞIRANIN o an isteğin 120sn'lik bütçesinden
+// GERÇEKTEN ne kadar kaldığını hesaplayıp verdiği payı kullanıyoruz — böylece
+// tek bir görsel zinciri, kalan süreden fazlasını asla harcayamaz.
+async function generateVisualWithRetry(q: any, category: string, topic: string, grade: string, maxMs: number): Promise<string | null> {
+  return withTimeout((async () => {
+    const first = await generateVisualForQuestion(q, category, topic, grade)
+    if (first) return first
+    return generateVisualForQuestion(q, category, topic, grade)
+  })(), maxMs, null)
 }
 
 async function loadAnonymousBookletContext(subject: string, grade: string, topic: string): Promise<string> {
@@ -1844,16 +1872,26 @@ export async function POST(req: NextRequest) {
     // fonksiyon SIFIRDAN öldürülür ve öğrenci tamamlanmış sorularını bile
     // görmez — eksik-görsel hatasından daha kötü bir sonuç. Yetersiz süre
     // kaldıysa görseller atlanır, testin kendisi yine tam teslim edilir.
-    const VISUAL_TIME_BUDGET_MS = 100000
-    const visualTimeRemaining = VISUAL_TIME_BUDGET_MS - (Date.now() - requestStartTime)
+    //
+    // 16 Eylül 2026 (devam) — kategori token bütçeleri yükseltilince tek bir
+    // görsel zincirinin gerçekçi en kötü süresi de uzadı. Eskiden burada
+    // SADECE "başlamaya değer mi" diye sabit bir eşik (100sn bütçeden pay)
+    // kontrol ediliyor, sonrasında Promise.all'un GERÇEKTE ne kadar süreceğine
+    // hiçbir sınır konmuyordu — yani "yeterli süre var" denip başlansa bile
+    // zincirler kendi iç zaman aşımlarına kadar (artık daha uzun) sürebilir
+    // ve isteğin gerçek 120sn sınırını aşabilirdi. Artık kalan süre HER
+    // zincire ortak bir üst sınır (maxMs) olarak da geçiliyor; hiçbir zincir
+    // isteğin gerçekte sahip olduğundan fazla zaman harcayamaz.
+    const REQUEST_HARD_DEADLINE_MS = 112000 // 120sn'den DB yazımı/response için pay bırak
+    const visualBudgetMs = REQUEST_HARD_DEADLINE_MS - (Date.now() - requestStartTime)
     const visualIndexes = visualQuestionIndexes(questions, visualCategory, safeQCount, isNewGenerationRequest(topic))
-    const shouldGenerateVisuals = includeVisuals && visualCategory && visualIndexes.length > 0 && visualTimeRemaining > 15000
+    const shouldGenerateVisuals = includeVisuals && visualCategory && visualIndexes.length > 0 && visualBudgetMs > 15000
     if (includeVisuals && visualCategory && visualIndexes.length > 0 && !shouldGenerateVisuals) {
-      console.warn(`[generate-quiz] zaman bütçesi görseller için yetersiz (${visualTimeRemaining}ms kaldı), görseller atlanıyor`)
+      console.warn(`[generate-quiz] zaman bütçesi görseller için yetersiz (${visualBudgetMs}ms kaldı), görseller atlanıyor`)
     }
     const svgResults = shouldGenerateVisuals
       ? await Promise.all(visualIndexes.map(i =>
-          generateVisualWithRetry(questions[i], visualCategory, topic, grade)
+          generateVisualWithRetry(questions[i], visualCategory, topic, grade, visualBudgetMs)
             .then(svg => ({ i, svg }))
             .catch(() => ({ i, svg: null }))
         ))
