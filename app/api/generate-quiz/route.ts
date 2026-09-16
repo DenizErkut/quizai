@@ -393,7 +393,9 @@ async function generateVisualForQuestion(
       { role: 'user', content: prompt },
     ], {
       model: process.env.OPENAI_VISUAL_MODEL || process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini',
-      max_tokens: 1600,
+      // Eğitim diyagramı için 800 token yeterli; daha yüksek sınır, paralel
+      // görsel çağrılarını gereksiz uzatıp soru tamamlama bütçesini yiyordu.
+      max_tokens: 800,
       temperature: 0.15,
       operation: 'visual-question:generate',
     })
@@ -1581,22 +1583,6 @@ export async function POST(req: NextRequest) {
       externalValidationPassed = true
     }
 
-    const visualIndexes = visualQuestionIndexes(questions, visualCategory, aiQuestionCount, isNewGenerationRequest(topic))
-    const svgResults = includeVisuals && visualCategory
-      ? await Promise.all(visualIndexes.map(i =>
-          generateVisualWithRetry(questions[i], visualCategory, topic, grade)
-            .then(svg => ({ i, svg }))
-            .catch(() => ({ i, svg: null }))
-        ))
-      : []
-
-    for (const { i, svg } of svgResults) {
-        if (svg && questions[i]) {
-          questions[i] = { ...questions[i], svg, qtype: 'svg', visualQuestionText: questions[i].q }
-          console.log(`[generate-quiz] visual generated for q[${i}]`)
-        }
-    }
-
     // Kaynağın kendisi (yazar, ISBN, künye) hakkında soru üretilmesini
     // engellemek için prompt'a talimat eklendi (bkz. yukarı) — ama LLM'ler
     // talimatlara %100 uymayabiliyor. Bu yüzden ek bir kod-seviyesi güvenlik
@@ -1754,6 +1740,27 @@ export async function POST(req: NextRequest) {
         requestedCount: safeQCount,
         deliveredCount: questions.length,
       }, { status: 503 })
+    }
+
+    // Görsel üretimi TAM soru seti oluşmadan çalıştırılmaz. Önceki sıralamada
+    // doğrulama sonrası eksik kalan sorular tamamlanmadan 5+ SVG isteği
+    // başlıyor, 120 saniyelik isteğin bütçesini tüketiyor ve öğrenciye
+    // "Sorular tamamlanamadı" hatası dönüyordu. Görsel hiçbir zaman testin
+    // eksiksiz oluşturulmasının önüne geçemez.
+    const visualIndexes = visualQuestionIndexes(questions, visualCategory, safeQCount, isNewGenerationRequest(topic))
+    const svgResults = includeVisuals && visualCategory
+      ? await Promise.all(visualIndexes.map(i =>
+          generateVisualWithRetry(questions[i], visualCategory, topic, grade)
+            .then(svg => ({ i, svg }))
+            .catch(() => ({ i, svg: null }))
+        ))
+      : []
+
+    for (const { i, svg } of svgResults) {
+      if (svg && questions[i]) {
+        questions[i] = { ...questions[i], svg, qtype: 'svg', visualQuestionText: questions[i].q }
+        console.log(`[generate-quiz] visual generated for q[${i}]`)
+      }
     }
 
     // 26 Ağustos 2026 — kaynak metni öğrenciye de gönder (yukarıdaki nota bkz.).
