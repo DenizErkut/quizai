@@ -250,12 +250,35 @@ function isNewGenerationRequest(topic: string): boolean {
   return /yeni\s*nesil|beceri\s*temelli|yorum\s*gerektiren|gercek\s*yasam|gunluk\s*hayat/.test(normalizeTR(topic))
 }
 
+// 16 Eylül 2026 — öğretmen geri bildirimi: modele format seçimi tamamen
+// bırakılınca (grafik/tablo/şema/... listesi) neredeyse hep en kolay yola,
+// metne gömülü veri tablosuna kaçıyordu. Sonuç: örneklerde gönderilen gerçek
+// sınav sorularındaki somut şekil/harita/ölçüm çizimleri yerine art arda
+// "üç günlük satış tablosu" tarzı sorular. Kategoriye özgü somut bir sahne
+// önerip tabloyu sayıca sınırlayarak modeli çeşitliliğe zorluyoruz.
+function visualFormatGuidance(category: string | null): string {
+  const guides: Record<string, string> = {
+    geometry: 'somut, ölçüleri/açıları verilmiş bir geometrik şekil kurgusu (ör. iki şekli yan yana koyup çevre/alan karşılaştırması, bir kenar veya köşegen ilişkisi sorusu)',
+    math_graph: 'gerçek eksenli bir koordinat sistemi grafiği (nokta/doğru/parabol) veya sayı doğrusu — satır satır sayı dizen bir tablo değil',
+    map: 'basitleştirilmiş bir harita/plan üzerinde numaralandırılmış konumlar ve bu konumlar arası bir ilişkiyi (en kısa yol, mesafe, yön) soran bir kurgu',
+    biology: 'etiketli bir biyolojik yapı/organ/hücre şeması',
+    chemistry: 'bir atom modeli, molekül şeması veya basit deney düzeneği çizimi',
+    physics: 'bir kuvvet oku, hareket diyagramı veya (farklı seviyelerde sıvı bulunan kaplar gibi) somut bir ölçüm sahnesi',
+    space: 'bir gök cismi/gezegen büyüklük veya konum karşılaştırması',
+    ecosystem: 'bir besin zinciri/ağı diyagramı',
+    timeline: 'yatay, olayları işaretlerle gösteren bir zaman çizelgesi',
+  }
+  return category ? (guides[category] || guides.geometry) : 'somut bir şekil, harita veya ölçüm diyagramı'
+}
+
 function visualPedagogyInstruction(topic: string, count: number): string {
+  const formatHint = visualFormatGuidance(detectVisualCategory(topic))
   if (isNewGenerationRequest(topic)) {
     const minimum = Math.max(1, Math.ceil(count * 0.5))
-    return `\n\nYENİ NESİL / BECERİ TEMELLİ SORU KURALI (ZORUNLU): Kullanıcı bunu açıkça istedi. Soruları kısa işlem, tanım veya ezber sorusu olarak kurma. En az ${minimum} soru; öğrencinin verilen bir grafik, tablo, şema, koordinat sistemi, ölçüm çizimi veya gerçek yaşam veri setini yorumlayıp en az iki akıl yürütme adımıyla sonuca ulaşmasını gerektirmelidir. Soruya yalnızca uzun bir hikâye eklemek yeni nesil sayılmaz. Her görseldeki nesneler, sayılar, birimler ve etiketler soru metnindeki senaryoyla BİREBİR aynı olmalıdır; meyve sorusuna hayvan, başka denklem veya genel konu görseli koyma. Görsel soruyu tekrar etmemeli, cevabı göstermemeli ve çözüm için anlamlı veri taşımalıdır. Geçerli Markdown tablo kullanılıyorsa başlık, ayraç ve her veri satırı ayrı \\n satırında olmalıdır. Bu koşulları karşılamayan soruyu çıktı listesine alma.`
+    const maxTables = Math.max(1, Math.floor(minimum / 3))
+    return `\n\nYENİ NESİL / BECERİ TEMELLİ SORU KURALI (ZORUNLU): Kullanıcı bunu açıkça istedi. Soruları kısa işlem, tanım veya ezber sorusu olarak kurma. En az ${minimum} soru; öğrencinin verilen bir grafik, tablo, şema, koordinat sistemi, ölçüm çizimi veya gerçek yaşam veri setini yorumlayıp en az iki akıl yürütme adımıyla sonuca ulaşmasını gerektirmelidir. Soruya yalnızca uzun bir hikâye eklemek yeni nesil sayılmaz. Her görseldeki nesneler, sayılar, birimler ve etiketler soru metnindeki senaryoyla BİREBİR aynı olmalıdır; meyve sorusuna hayvan, başka denklem veya genel konu görseli koyma. Görsel soruyu tekrar etmemeli, cevabı göstermemeli ve çözüm için anlamlı veri taşımalıdır. GÖRSEL FORMAT ÖNCELİĞİ: bu görsel soruların EN FAZLA ${maxTables} tanesi metne gömülü Markdown tablo olabilir; geri kalanı ${formatHint} gibi öğrencinin GERÇEKTEN GÖRDÜĞÜ somut bir sahne olmalı, sadece sayıların satır satır dizildiği bir veri tablosu değil. Aynı görsel fikri (ör. aynı "üç günlük satış" kurgusu) birden fazla soruda tekrar etme — her görsel soru farklı bir sahne/senaryo kullanmalı. Geçerli Markdown tablo kullanılıyorsa başlık, ayraç ve her veri satırı ayrı \\n satırında olmalı, hiçbir hücre boş bırakılmamalı (bilinmeyen değer için "?" yaz, hücreyi atlama). Bu koşulları karşılamayan soruyu çıktı listesine alma.`
   }
-  return `\n\nGÖRSEL SORU ÇEŞİTLİLİĞİ: Konu uygunsa soruların yaklaşık %30'unu grafik, tablo, şekil, koordinat sistemi, deney düzeneği, harita veya zaman çizelgesi üzerinden yorumlama gerektirecek biçimde kur. Gerekli bütün veri ve etiketler sorunun içinde bulunmalı; görünmeyen bir görsele "yukarıdaki" diye atıf yapma. Metin içinde tablo gerekiyorsa her satırı \\n ile ayıran geçerli Markdown tablo biçimi kullan; tablo ayraçlarını ve satırları tek satırda birbirine yapıştırma.`
+  return `\n\nGÖRSEL SORU ÇEŞİTLİLİĞİ: Konu uygunsa soruların yaklaşık %30'unu grafik, tablo, şekil, koordinat sistemi, deney düzeneği, harita veya zaman çizelgesi üzerinden yorumlama gerektirecek biçimde kur. Gerekli bütün veri ve etiketler sorunun içinde bulunmalı; görünmeyen bir görsele "yukarıdaki" diye atıf yapma. GÖRSEL FORMAT ÖNCELİĞİ: bu görsel sorulardan en fazla 1 tanesi metne gömülü Markdown tablo olsun; diğerleri ${formatHint} gibi somut bir sahne olmalı. Metin içinde tablo gerekiyorsa her satırı \\n ile ayıran geçerli Markdown tablo biçimi kullan, tablo ayraçlarını ve satırları tek satırda birbirine yapıştırma, hiçbir hücreyi boş bırakma (bilinmeyen değer için "?" yaz).`
 }
 
 function visualQuestionCandidate(question: any, category: string | null): boolean {
