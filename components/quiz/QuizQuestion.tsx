@@ -111,6 +111,9 @@ export default function QuizQuestion({
   const passageOrigin = q.passage ? passageFirstIndex.get(q.passage) : undefined
   const isFirstPassageOccurrence = passageOrigin === current
   const inlineTable = parseInlineMarkdownTable(q.q)
+  // Yalnızca üretildiği soru metnine açıkça bağlı görseller gösterilir.
+  // Metadata taşımayan eski havuz görselleri güvenilmez kabul edilerek gizlenir.
+  const trustedVisual = q.qtype === 'svg' && Boolean(q.svg) && q.visualQuestionText === q.q
 
   return (
     <main style={{ minHeight: '100vh', padding: '1.5rem', paddingBottom: '5rem', position: 'relative' }}>
@@ -137,12 +140,12 @@ export default function QuizQuestion({
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
             <span style={{ fontSize: '12px', color: 'var(--text3)', fontWeight: 500 }}>Soru {current + 1} / {questions.length}</span>
             <div style={{ display: 'flex', gap: '8px' }}>
-              {q.qtype === 'svg' && q.svg && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid rgba(91,76,245,0.2)' }}>📊 Görsel</span>}
+              {trustedVisual && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid rgba(91,76,245,0.2)' }}>📊 Görsel</span>}
               <span style={{ fontSize: '11px', color: 'var(--text3)' }}>🌐 {currentLang}</span>
             </div>
           </div>
 
-          {q.qtype === 'svg' && q.svg && (
+          {trustedVisual && q.svg && (
             <div style={{ marginBottom: '1rem', padding: '1rem', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', overflow: 'hidden' }}>
               <div dangerouslySetInnerHTML={{ __html: q.svg }} style={{ width: '100%' }} />
             </div>

@@ -4,7 +4,7 @@ export type QuestionType = 'multiple_choice' | 'fill_blank' | 'matching' | 'true
 
 export interface Question {
   q: string; opts: string[]; ans: number; exp: string
-  svg?: string | null; qtype?: 'text' | 'svg'
+  svg?: string | null; qtype?: 'text' | 'svg'; visualQuestionText?: string
   type?: QuestionType
   blank?: string
   pairs?: {left:string; right:string}[]
