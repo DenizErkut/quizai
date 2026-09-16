@@ -12,8 +12,8 @@ async function isAdmin() {
   if (!user) return false
   const { data } = await db.from('profiles').select('is_admin').eq('id', user.id).single()
   if (data?.is_admin) return true
-  const { data: teacher } = await db.from('teachers').select('id,approved').eq('user_id', user.id).maybeSingle()
-  return Boolean(teacher?.approved)
+  const { data: teacher } = await db.from('teachers').select('id,approved,question_bank_editor').eq('user_id', user.id).maybeSingle()
+  return Boolean(teacher?.approved && teacher?.question_bank_editor)
 }
 
 // Öğretmen sorusunu düzeltir ve yeniden uzman incelemesine alır.
@@ -29,4 +29,11 @@ export async function PATCH(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!data) return NextResponse.json({ error: 'Soru bulunamadı.' }, { status: 404 })
   return NextResponse.json({ success: true, question: data, message: 'Düzeltildi ve yeniden uzman onayına gönderildi.' })
+}
+
+export async function GET() {
+  if (!(await isAdmin())) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
+  const { data, error } = await db.from('question_bank').select('id,question,subject_key,topic_key,grade_key,difficulty,review_status,updated_at').in('review_status', ['candidate', 'approved']).order('updated_at', { ascending: false }).limit(200)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ questions: data || [] })
 }
