@@ -4,6 +4,21 @@ import { logOpenAIUsage } from '@/lib/ai-usage'
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY!
 
+// 16 Eylül 2026 — görsel üretiminde OpenAI yanıtı token sınırına takılıp
+// yarıda kesildiğinde (finish_reason: 'length'), çağıran taraf bunu sıradan
+// bir "kötü yanıt"tan ayırt edemiyordu; SVG'yi olduğu gibi (kapanış etiketi
+// olmadan) alıp regex eşleşmesi başarısız oluyor, sebep hiçbir yerde
+// görünmüyordu. requireComplete:true ile işaretlenen çağrılar artık kesilme
+// durumunda bu özel hatayı fırlatıyor, böylece çağıran taraf "gerçekten
+// kesildi mi yoksa model kötü mü cevap verdi" ayrımını yapıp buna göre
+// (örn. daha yüksek token limitiyle) yeniden deneyebiliyor.
+export class OpenAITruncatedError extends Error {
+  constructor(message = 'OpenAI response truncated (finish_reason=length)') {
+    super(message)
+    this.name = 'OpenAITruncatedError'
+  }
+}
+
 async function callOpenAI(messages: {role: string, content: any}[], options: {
   model?: string
   max_tokens?: number
@@ -13,22 +28,34 @@ async function callOpenAI(messages: {role: string, content: any}[], options: {
   userId?: string
   quizSessionId?: string
   requestId?: string
+  requireComplete?: boolean // finish_reason='length' olursa OpenAITruncatedError fırlat
+  timeoutMs?: number        // 16 Eylül 2026 — sınırsız bekleyen fetch, zaman bütçesini sessizce yiyordu
 } = {}) {
   const model = options.model || 'gpt-4o-mini'
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: options.max_tokens || 1000,
-      temperature: options.temperature ?? 0.3,
-      response_format: options.json ? { type: 'json_object' } : undefined,
-      messages,
+  const controller = new AbortController()
+  const timeout = options.timeoutMs
+    ? setTimeout(() => controller.abort(), options.timeoutMs)
+    : null
+  let res: Response
+  try {
+    res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: options.max_tokens || 1000,
+        temperature: options.temperature ?? 0.3,
+        response_format: options.json ? { type: 'json_object' } : undefined,
+        messages,
+      }),
+      signal: controller.signal,
     })
-  })
+  } finally {
+    if (timeout) clearTimeout(timeout)
+  }
   if (!res.ok) throw new Error(`OpenAI ${res.status}: ${await res.text()}`)
   const data = await res.json()
   // Gerçek token tüketimini logla (best-effort, ana akışı bozmaz)
@@ -37,7 +64,11 @@ async function callOpenAI(messages: {role: string, content: any}[], options: {
     quizSessionId: options.quizSessionId,
     requestId: options.requestId,
   })
-  return data.choices[0].message.content as string
+  const choice = data.choices[0]
+  if (options.requireComplete && choice.finish_reason === 'length') {
+    throw new OpenAITruncatedError()
+  }
+  return choice.message.content as string
 }
 
 // 1. Yedek model — Claude hata verirse GPT-4o devreye girer

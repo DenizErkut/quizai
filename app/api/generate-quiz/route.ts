@@ -2,7 +2,7 @@ import { after, NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 120
 export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
-import { generateQuizFallback, callOpenAI } from '@/lib/openai'
+import { generateQuizFallback, callOpenAI, OpenAITruncatedError } from '@/lib/openai'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { createClient } from '@/lib/supabase/server-create-client'
 
@@ -346,13 +346,18 @@ async function visualMatchesQuestion(questionText: string, svg: string): Promise
       { role: 'user', content: `Check whether this SVG is strictly and specifically about the exact quiz question. Every scenario, object, number, unit, equation and label must agree. A generic topic match is insufficient. Reject if it depicts another example, contains unsupported facts, or reveals the answer.\n\nQUESTION:\n${questionText}\n\nSVG:\n${svg.slice(0, 9000)}` },
     ], {
       model: process.env.OPENAI_VISUAL_VALIDATOR_MODEL || process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini',
-      max_tokens: 8,
+      // 16 saniye kesinlikle "VALID"/"INVALID" için yeterli ama bazı modeller
+      // kısa bir gerekçe iliştiriyor; 8 token bunu bile bazen kesiyordu ve
+      // kesik yanıt normalize sonrası INVALID'e düşüp geçerli görseli
+      // reddediyordu. 24'e çıkarıldı, karar hâlâ sadece net VALID ise kabul.
+      max_tokens: 24,
       temperature: 0,
       operation: 'visual-question:validate',
+      timeoutMs: 15000,
     })
     const normalizedVerdict = verdict.trim().toUpperCase()
     // Bazı modeller kısa bir gerekçe ekleyebilir; sadece net VALID kararı kabul.
-    const isValid = normalizedVerdict === 'VALID'
+    const isValid = normalizedVerdict.startsWith('VALID')
     if (!isValid) console.warn('[visual-validation] OpenAI rejected SVG:', normalizedVerdict.slice(0, 120))
     return isValid
   } catch (error) {
@@ -362,6 +367,26 @@ async function visualMatchesQuestion(questionText: string, svg: string): Promise
 }
 
 // ─── GÖRSEL ÜRETİMİ ──────────────────────────────────────────────────────────
+// 16 Eylül 2026 — sabit 800 token TÜM kategoriler için yeterli değildi: harita,
+// zaman çizelgesi ve ekosistem gibi çok elemanlı diyagramlar bu bütçeye çoğu
+// zaman sığmıyor, SVG kapanış etiketine ulaşamadan kesiliyordu (kapanmamış
+// <svg>, regex eşleşmiyor, görsel sessizce kayboluyordu — ChatGPT'nin ilk
+// tanısı buydu). Kategoriye göre farklılaştırıp basit şekiller için hız/maliyet
+// kazanırken karmaşık diyagramlara daha baştan yeterli pay veriyoruz.
+const SVG_MAX_TOKENS: Record<string, number> = {
+  geometry: 700,
+  math_graph: 950,
+  map: 1200,
+  biology: 950,
+  chemistry: 850,
+  physics: 850,
+  space: 700,
+  ecosystem: 1000,
+  timeline: 1050,
+}
+const SVG_MAX_TOKENS_DEFAULT = 800
+const SVG_MAX_TOKENS_CEILING = 2200 // gerçekten kesilen çağrılarda bile taşmasın
+
 async function generateVisualForQuestion(
   q: any,
   category: string,
@@ -388,17 +413,38 @@ async function generateVisualForQuestion(
     // Soruya özgü eğitim görsellerinin üretimi OpenAI'ye taşındı. SVG, grafik,
     // tablo ve denklem gibi ölçülebilir içeriklerde raster görsele göre sayısal
     // doğruluğu ve erişilebilirliği korur.
-    const text = await callOpenAI([
+    const messages = [
       { role: 'system', content: 'You create precise, safe educational SVG diagrams. Follow the user constraints exactly. Return only SVG.' },
       { role: 'user', content: prompt },
-    ], {
-      model: process.env.OPENAI_VISUAL_MODEL || process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini',
-      // Eğitim diyagramı için 800 token yeterli; daha yüksek sınır, paralel
-      // görsel çağrılarını gereksiz uzatıp soru tamamlama bütçesini yiyordu.
-      max_tokens: 800,
-      temperature: 0.15,
-      operation: 'visual-question:generate',
-    })
+    ]
+    const model = process.env.OPENAI_VISUAL_MODEL || process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini'
+    const baseMaxTokens = SVG_MAX_TOKENS[category] ?? SVG_MAX_TOKENS_DEFAULT
+    let text: string
+    try {
+      // requireComplete: true → finish_reason='length' olursa (yanıt tam
+      // kesilmişse) OpenAITruncatedError fırlatılır; aşağıda bunu "model kötü
+      // cevap verdi"den ayırıp daha yüksek bütçeyle TEK SEFER yeniden deneriz.
+      text = await callOpenAI(messages, {
+        model,
+        max_tokens: baseMaxTokens,
+        temperature: 0.15,
+        operation: 'visual-question:generate',
+        requireComplete: true,
+        timeoutMs: 20000,
+      })
+    } catch (e) {
+      if (!(e instanceof OpenAITruncatedError)) throw e
+      const retryMaxTokens = Math.min(SVG_MAX_TOKENS_CEILING, baseMaxTokens * 2)
+      console.warn(`[generate-visual] truncated at ${baseMaxTokens} tokens (category=${category}), retrying with ${retryMaxTokens}`)
+      text = await callOpenAI(messages, {
+        model,
+        max_tokens: retryMaxTokens,
+        temperature: 0.15,
+        operation: 'visual-question:generate-retry-truncated',
+        requireComplete: true,
+        timeoutMs: 20000,
+      })
+    }
     // SVG'yi temizle — sadece <svg...></svg> al
     const match = text.match(/<svg[\s\S]*<\/svg>/i)
     if (match && await visualMatchesQuestion(q.q, match[0])) return match[0]
@@ -814,10 +860,25 @@ function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
   return result
 }
 
+// Tek bir görsel zinciri (üretim + doğrulama, gerekirse kesilme sonrası
+// yeniden deneme + tekrar doğrulama) teorik en kötü durumda birkaç ardışık
+// OpenAI çağrısı yapabilir. withTimeout, bu zincirlerden biri askıda kalırsa
+// tüm isteğin (maxDuration=120s) onunla birlikte boğulmasını engeller —
+// zaman aşımında görsel sessizce atlanır, test yine tam teslim edilir.
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms)
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value) },
+      () => { clearTimeout(timer); resolve(fallback) },
+    )
+  })
+}
+
 async function generateVisualWithRetry(q: any, category: string, topic: string, grade: string): Promise<string | null> {
-  const first = await generateVisualForQuestion(q, category, topic, grade)
+  const first = await withTimeout(generateVisualForQuestion(q, category, topic, grade), 45000, null)
   if (first) return first
-  return generateVisualForQuestion(q, category, topic, grade)
+  return withTimeout(generateVisualForQuestion(q, category, topic, grade), 45000, null)
 }
 
 async function loadAnonymousBookletContext(subject: string, grade: string, topic: string): Promise<string> {
@@ -1747,8 +1808,21 @@ export async function POST(req: NextRequest) {
     // başlıyor, 120 saniyelik isteğin bütçesini tüketiyor ve öğrenciye
     // "Sorular tamamlanamadı" hatası dönüyordu. Görsel hiçbir zaman testin
     // eksiksiz oluşturulmasının önüne geçemez.
+    //
+    // 16 Eylül 2026 — bu adımın kendisinin de bir zaman bütçesi YOKTU: topup
+    // turu tek başına 95sn'ye kadar kullanabiliyor, ardından görseller hiçbir
+    // kalan-süre kontrolü olmadan başlıyordu. maxDuration=120s'i aşarsa
+    // fonksiyon SIFIRDAN öldürülür ve öğrenci tamamlanmış sorularını bile
+    // görmez — eksik-görsel hatasından daha kötü bir sonuç. Yetersiz süre
+    // kaldıysa görseller atlanır, testin kendisi yine tam teslim edilir.
+    const VISUAL_TIME_BUDGET_MS = 100000
+    const visualTimeRemaining = VISUAL_TIME_BUDGET_MS - (Date.now() - requestStartTime)
     const visualIndexes = visualQuestionIndexes(questions, visualCategory, safeQCount, isNewGenerationRequest(topic))
-    const svgResults = includeVisuals && visualCategory
+    const shouldGenerateVisuals = includeVisuals && visualCategory && visualIndexes.length > 0 && visualTimeRemaining > 15000
+    if (includeVisuals && visualCategory && visualIndexes.length > 0 && !shouldGenerateVisuals) {
+      console.warn(`[generate-quiz] zaman bütçesi görseller için yetersiz (${visualTimeRemaining}ms kaldı), görseller atlanıyor`)
+    }
+    const svgResults = shouldGenerateVisuals
       ? await Promise.all(visualIndexes.map(i =>
           generateVisualWithRetry(questions[i], visualCategory, topic, grade)
             .then(svg => ({ i, svg }))
