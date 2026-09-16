@@ -66,7 +66,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'question-books' | 'exam-books' | 'curriculum' | 'kvkk' | 'adaptive' | 'risk' | 'coaching'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'question-books' | 'exam-books' | 'question-bank' | 'curriculum' | 'kvkk' | 'adaptive' | 'risk' | 'coaching'>('users')
   const [identityMissing, setIdentityMissing] = useState<number | null>(null)
   const [identityScanning, setIdentityScanning] = useState(false)
   const [identityFixing, setIdentityFixing] = useState(false)
@@ -629,6 +629,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             { key: 'meb', label: '📚 MEB Kaynakları' },
             { key: 'question-books', label: '📚 Soru Kitapçıkları' },
             { key: 'exam-books', label: '🎯 Sınav Kitapçıkları' },
+            { key: 'question-bank', label: '📝 Soru Havuzu' },
             { key: 'curriculum', label: '📋 Müfredat Yönetimi' },
             { key: 'kvkk', label: '🔐 KVKK Talepleri' },
             { key: 'adaptive', label: '🧪 Adaptive Pilot' },
@@ -1583,7 +1584,6 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     <RecommendationImpact />
                     <AgentQuality />
           <PipelineHealth />
-          <QuestionBankEditor />
           <MasteryCalibration />
           <RetentionCalibration />
           <QuestionDifficultyCalibration />
@@ -1593,6 +1593,14 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           <MisconceptionQuality />
         </div>
         )}
+
+      {tab === 'question-bank' && (
+        <div className="anim-up">
+          <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)', marginBottom: '1rem' }}>📝 Soru Havuzu</h2>
+          <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1rem' }}>Anlık testlerde kullanılacak soruları inceleyin, düzenleyin ve yeniden onaya gönderin.</p>
+          <QuestionBankEditor />
+        </div>
+      )}
 
       {tab === 'kvkk' && (
         <div className="anim-up">
