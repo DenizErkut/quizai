@@ -1385,7 +1385,11 @@ export async function POST(req: NextRequest) {
     countRef = aiQuestionCount
 
     // Hız optimizasyonu: az soru → Haiku (3x hızlı), çok soru → Sonnet
-    const useHaiku = aiQuestionCount <= 7
+    // Kısmi havuz eşleşmesinde kısa kalan AI üretimi, öğrencinin testinin
+    // eksik kaydedilmesine yol açabiliyordu. Hibrit setlerde daha güvenilir
+    // Sonnet yolu kullanılır; Haiku yalnızca tamamen AI ile üretilen kısa
+    // setlerde hız avantajı için tercih edilir.
+    const useHaiku = aiQuestionCount <= 7 && bankQuestions.length === 0
 
     // 5 Eylül 2026 — Deniz'in talebiyle: KÜÇÜK, KONTROLLÜ bir pilot.
     // "Ana üretimi (en yüksek hacim, en yüksek tasarruf potansiyeli)
@@ -1721,6 +1725,21 @@ export async function POST(req: NextRequest) {
     // AI ile üret. Böylece kısmi bir havuz eşleşmesi de maliyeti ve beklemeyi
     // azaltır; eskisi gibi 9/10 eşleşmede dokuz soruyu çöpe atmayız.
     questions = [...bankQuestions, ...questions].slice(0, safeQCount)
+
+    // Sözleşme: Bir test ya eksiksizdir ya hiç oluşturulmaz. Daha önce
+    // burada 4/10 gibi kısmi diziler session'a yazılıyor, arayüz de bunu
+    // başlatmaya çalışıyordu. Bu kontrol kota/session değişikliklerinden
+    // ÖNCE çalışır; öğrenciye yeniden deneme seçeneği verir ve bozuk oturum
+    // bırakmaz.
+    if (questions.length !== safeQCount) {
+      console.error(`[generate-quiz] incomplete_set requested=${safeQCount} delivered=${questions.length} topic=${topic}`)
+      return NextResponse.json({
+        error: 'insufficient_questions',
+        message: 'Soruların tamamı kalite kontrolünden geçemedi. Lütfen birkaç saniye sonra yeniden dene.',
+        requestedCount: safeQCount,
+        deliveredCount: questions.length,
+      }, { status: 503 })
+    }
 
     // 26 Ağustos 2026 — kaynak metni öğrenciye de gönder (yukarıdaki nota bkz.).
     // Öncelik: öğrencinin kendi yüklediği dosya varsa o (fileContent), yoksa

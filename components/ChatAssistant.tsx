@@ -11,6 +11,7 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
 }
+type VoiceSession = { access_token?: string } | null
 
 interface Props {
   topic: string
@@ -29,7 +30,17 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
   const wrongQuestions = questions.filter((_, i) => !answers[i]?.correct)
   const score = answers.filter(a => a.correct).length
   const pct = Math.round((score / questions.length) * 100)
-  const voice = useVoiceTutor(text => void send(text))
+  const voice = useVoiceTutor(
+    text => void send(text),
+    metric => {
+      const supabase = createClient() as any
+      void supabase.auth.getSession().then(({ data: { session } }: { data: { session: VoiceSession } }) => fetch('/api/voice-tutor/telemetry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ ...metric, topic }),
+      }).catch(() => undefined))
+    },
+  )
 
   useEffect(() => {
     if (open && messages.length === 0) {
@@ -141,13 +152,13 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
             </button>
           </div>
 
-          {/* Sesli Tutor pilotu */}
+          {/* Ölçülebilir canlı sesli tutor */}
           <div style={{ padding: '9px 14px', borderBottom: '1px solid var(--border)', background: voice.enabled ? 'rgba(30,207,184,0.08)' : 'var(--bg)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
               <div>
-                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)' }}>🎙️ Sesli Tutor <span style={{ color: '#0a9e90', fontSize: '10px' }}>PİLOT</span></div>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)' }}>🎙️ Canlı Sesli Tutor <span style={{ color: '#0a9e90', fontSize: '10px' }}>ÖLÇÜMLÜ</span></div>
                 <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '2px' }}>
-                  {voice.enabled ? `Bas-konuş · ${Math.floor(voice.secondsLeft / 60)}:${String(voice.secondsLeft % 60).padStart(2, '0')} kaldı` : `“${topic}” testi ve yanlışlarınla konuş`}
+                  {voice.enabled ? `Bas-konuş · ${voice.turnCount} tur · ${Math.floor(voice.secondsLeft / 60)}:${String(voice.secondsLeft % 60).padStart(2, '0')} kaldı${voice.lastRecognitionMs ? ` · son algılama ${Math.round(voice.lastRecognitionMs / 100) / 10} sn` : ''}` : `“${topic}” testi ve yanlışlarınla konuş`}
                 </div>
               </div>
               <button type="button" onClick={voice.enabled ? voice.disable : voice.requestConsent} style={{ border: '1px solid rgba(0,149,200,0.3)', borderRadius: '16px', padding: '6px 10px', background: voice.enabled ? 'var(--accent)' : 'rgba(0,149,200,0.08)', color: voice.enabled ? '#fff' : 'var(--accent)', cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}>

@@ -14,6 +14,7 @@ export default function DailyPage() {
   const [profile, setProfile] = useState<any>(null)
   const [streak, setStreak] = useState<Streak | null>(null)
   const [challenge, setChallenge] = useState<Challenge | null>(null)
+  const [challengeError, setChallengeError] = useState('')
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [screen, setScreen] = useState<'home' | 'quiz' | 'done'>('home')
@@ -31,24 +32,36 @@ export default function DailyPage() {
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+    setGenerating(true)
+    setChallengeError('')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
 
-    const { data: p } = await supabase.from('profiles').select('grade,language,plan').eq('id', user.id).maybeSingle()
-    const { data: s } = await supabase.from('streaks').select('*').eq('user_id', user.id).maybeSingle()
-    const { data: { session } } = await supabase.auth.getSession()
-    const response = await fetch('/api/daily-challenge', { headers: { Authorization: `Bearer ${session?.access_token || ''}` } })
-    const payload = await response.json()
-    setProfile(p)
-    setStreak(payload.streak || s)
-    if (payload.challenge) {
-      setChallenge(payload.challenge)
-      setAlreadyDone(payload.challenge.completed === true)
+      const { data: p } = await supabase.from('profiles').select('grade,language,plan').eq('id', user.id).maybeSingle()
+      const { data: s } = await supabase.from('streaks').select('*').eq('user_id', user.id).maybeSingle()
+      const { data: { session } } = await supabase.auth.getSession()
+      const response = await fetch('/api/daily-challenge', { headers: { Authorization: `Bearer ${session?.access_token || ''}` } })
+      const payload = await response.json().catch(() => ({}))
+      setProfile(p)
+      setStreak(payload.streak || s)
+      if (response.ok && payload.challenge) {
+        setChallenge(payload.challenge)
+        setAlreadyDone(payload.challenge.completed === true)
+      } else {
+        setChallenge(null)
+        setChallengeError(payload.error || 'Günlük 10 soru şu an hazırlanamadı.')
+      }
+    } catch {
+      setChallenge(null)
+      setChallengeError('Günlük test bağlantısı kurulamadı. Lütfen tekrar dene.')
+    } finally {
+      setGenerating(false)
+      setLoading(false)
     }
-    setLoading(false)
   }
 
-  async function generateDailyChallenge() { return null }
+  async function generateDailyChallenge() { await loadData() }
 
   function choose(idx: number) {
     if (chosen !== null || !challenge) return
@@ -193,6 +206,24 @@ export default function DailyPage() {
                 Teste başla 🔥
               </button>
             )}
+          </div>
+        )}
+
+        {!challenge && (
+          <div className="card anim-up-2" style={{ marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '18px' }}>Bugünün 10 sorusu</div>
+                <div style={{ fontSize: '13px', color: 'var(--text2)', marginTop: '4px', lineHeight: 1.5 }}>
+                  {challengeError || 'Sana özel 10 soruluk günlük görev hazırlanıyor.'}
+                </div>
+              </div>
+              <div style={{ fontSize: '30px' }}>📝</div>
+            </div>
+            <button className="btn btn-primary" onClick={() => void generateDailyChallenge()} disabled={generating}
+              style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}>
+              {generating ? '10 soru hazırlanıyor...' : '10 soruluk testi hazırla'}
+            </button>
           </div>
         )}
 

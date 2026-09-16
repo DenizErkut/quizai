@@ -18,6 +18,7 @@ type Recognition = {
   abort: () => void
 }
 type RecognitionConstructor = new () => Recognition
+type VoiceMetric = { event: 'session_started' | 'session_ended' | 'turn_completed' | 'recognition_error'; turnCount?: number; recognitionMs?: number; errorCode?: string }
 
 declare global {
   interface Window {
@@ -28,15 +29,18 @@ declare global {
 
 const SESSION_SECONDS = 5 * 60
 
-export function useVoiceTutor(onTranscript: (text: string) => void) {
+export function useVoiceTutor(onTranscript: (text: string) => void, onMetric?: (metric: VoiceMetric) => void) {
   const [enabled, setEnabled] = useState(false)
   const [consentPending, setConsentPending] = useState(false)
   const [listening, setListening] = useState(false)
   const [error, setError] = useState('')
   const [secondsLeft, setSecondsLeft] = useState(SESSION_SECONDS)
+  const [turnCount, setTurnCount] = useState(0)
+  const [lastRecognitionMs, setLastRecognitionMs] = useState<number | null>(null)
   const recognitionRef = useRef<Recognition | null>(null)
   const enabledRef = useRef(false)
   const onTranscriptRef = useRef(onTranscript)
+  const onMetricRef = useRef(onMetric)
 
   const supported = typeof window !== 'undefined'
     && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition)
@@ -44,6 +48,7 @@ export function useVoiceTutor(onTranscript: (text: string) => void) {
   useEffect(() => {
     onTranscriptRef.current = onTranscript
   }, [onTranscript])
+  useEffect(() => { onMetricRef.current = onMetric }, [onMetric])
 
   useEffect(() => () => {
     recognitionRef.current?.abort()
@@ -60,6 +65,7 @@ export function useVoiceTutor(onTranscript: (text: string) => void) {
         window.speechSynthesis?.cancel()
         setListening(false)
         setEnabled(false)
+        onMetricRef.current?.({ event: 'session_ended' })
         setError('5 dakikalık pilot oturumu tamamlandı. Yeniden başlatabilirsin.')
         return SESSION_SECONDS
       })
@@ -81,7 +87,10 @@ export function useVoiceTutor(onTranscript: (text: string) => void) {
     setConsentPending(false)
     setError('')
     setSecondsLeft(SESSION_SECONDS)
+    setTurnCount(0)
+    setLastRecognitionMs(null)
     setEnabled(true)
+    onMetricRef.current?.({ event: 'session_started' })
   }
 
   function disable() {
@@ -92,6 +101,7 @@ export function useVoiceTutor(onTranscript: (text: string) => void) {
     setEnabled(false)
     setConsentPending(false)
     setSecondsLeft(SESSION_SECONDS)
+    onMetricRef.current?.({ event: 'session_ended', turnCount })
   }
 
   function start() {
@@ -100,6 +110,7 @@ export function useVoiceTutor(onTranscript: (text: string) => void) {
     if (!RecognitionApi) return
 
     window.speechSynthesis?.cancel()
+    const recognitionStartedAt = performance.now()
     const recognition = new RecognitionApi()
     recognition.lang = 'tr-TR'
     recognition.continuous = false
@@ -112,13 +123,23 @@ export function useVoiceTutor(onTranscript: (text: string) => void) {
     recognition.onend = () => setListening(false)
     recognition.onerror = event => {
       setListening(false)
+      onMetricRef.current?.({ event: 'recognition_error', errorCode: event.error })
       setError(event.error === 'not-allowed'
         ? 'Mikrofon izni verilmedi. Tarayıcı adres çubuğundan mikrofon iznini açabilirsin.'
         : 'Seni anlayamadım. Mikrofon düğmesine basıp tekrar deneyebilirsin.')
     }
     recognition.onresult = event => {
       const transcript = event.results[0]?.[0]?.transcript?.trim()
-      if (transcript) onTranscriptRef.current(transcript)
+      if (transcript) {
+        const recognitionMs = Math.round(performance.now() - recognitionStartedAt)
+        setLastRecognitionMs(recognitionMs)
+        setTurnCount(current => {
+          const next = current + 1
+          onMetricRef.current?.({ event: 'turn_completed', turnCount: next, recognitionMs })
+          return next
+        })
+        onTranscriptRef.current(transcript)
+      }
     }
     recognitionRef.current = recognition
     try {
@@ -143,7 +164,7 @@ export function useVoiceTutor(onTranscript: (text: string) => void) {
   }
 
   return {
-    enabled, consentPending, listening, error, secondsLeft,
+    enabled, consentPending, listening, error, secondsLeft, turnCount, lastRecognitionMs,
     requestConsent, acceptConsent, cancelConsent: () => setConsentPending(false),
     disable, start, stop, speak,
   }
