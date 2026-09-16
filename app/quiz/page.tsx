@@ -770,9 +770,7 @@ function QuizPageContent() {
             language: currentLang,
           }),
         })
-        if (prefetched) {
-          secondChunk = prefetched.questions
-        } else if (res?.ok) {
+        if (res.ok) {
           const data = await res.json()
           correct = data.correct === true
         }
