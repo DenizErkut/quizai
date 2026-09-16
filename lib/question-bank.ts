@@ -112,30 +112,37 @@ export async function getQuestionBankSet(
 ): Promise<Question[]> {
   if (count <= 0) return []
   const excluded = new Set(excludedTexts.map(questionBankKey).filter(Boolean))
-  const { data, error } = await db
-    .from('question_bank')
-    .select('id, question, fingerprint, use_count')
-    .eq('subject_key', questionBankKey(dimensions.subject || 'genel'))
-    .eq('topic_key', questionBankKey(dimensions.topic))
-    .eq('grade_key', questionBankKey(dimensions.grade))
-    .eq('language_key', questionBankKey(dimensions.language))
-    .eq('question_type', dimensions.questionType)
-    .eq('difficulty', dimensions.difficulty)
-    .eq('review_status', 'approved')
-    .eq('report_count', 0)
-    .order('use_count', { ascending: true })
-    .order('last_used_at', { ascending: true, nullsFirst: true })
-    .limit(Math.max(count * 5, 30))
+  const query = (includeSubject: boolean) => {
+    let request = db.from('question_bank').select('id, question, fingerprint, use_count')
+      .eq('topic_key', questionBankKey(dimensions.topic))
+      .eq('grade_key', questionBankKey(dimensions.grade))
+      .eq('language_key', questionBankKey(dimensions.language))
+      .eq('question_type', dimensions.questionType)
+      .eq('difficulty', dimensions.difficulty)
+      .eq('review_status', 'approved').eq('report_count', 0)
+      .order('use_count', { ascending: true })
+      .order('last_used_at', { ascending: true, nullsFirst: true })
+      .limit(Math.max(count * 5, 30))
+    if (includeSubject) request = request.eq('subject_key', questionBankKey(dimensions.subject || 'genel'))
+    return request
+  }
+  let { data, error } = await query(true)
+  // Eski oturumların önemli bir bölümünde ders alanı "Genel" olarak
+  // kaydedildi. Konu+sınıf+dil+tip+zorluk zaten yeterince dar bir anahtardır;
+  // tam ders eşleşmesi kapasiteyi doldurmazsa yalnızca bu ekseni gevşet.
+  if (!error && (data?.length || 0) < count) {
+    const fallback = await query(false)
+    if (!fallback.error && Array.isArray(fallback.data)) {
+      const unique = new Map([...(data || []), ...fallback.data].map((row: any) => [row.id, row]))
+      data = [...unique.values()]
+    }
+  }
 
   if (error || !Array.isArray(data)) return []
   const candidates = data
     .filter((row: any) => !excluded.has(questionBankKey(row.question?.q)))
     .slice(0, Math.min(data.length, count * 2))
   const selected = shuffled(candidates).slice(0, count)
-
-  // Do not serve a partial cache result: the caller either avoids the AI
-  // call completely or follows the existing generation path unchanged.
-  if (selected.length < count) return []
 
   const { error: usageError } = await db.rpc('mark_question_bank_used', {
     p_ids: selected.map((row: any) => row.id),

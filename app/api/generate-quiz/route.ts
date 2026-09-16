@@ -32,7 +32,7 @@ import { startingDifficultyFromMastery } from '@/lib/adaptive-difficulty'
 import { resolveDiagnosticQuestionStrategy } from '@/lib/diagnostic-question-strategy'
 import { applyCanonicalObjectiveMappings, learningObjectivePrompt, loadCanonicalObjectiveCandidates } from '@/lib/learning-objective-mapping'
 import { runMistralShadowComparison } from '@/lib/ai-gateway'
-import { balanceAnswerPositions, getQuestionBankSet, promoteQuestionsToBank } from '@/lib/question-bank'
+import { balanceAnswerPositions, getQuestionBankSet, promoteQuestionsToBank, questionBankKey } from '@/lib/question-bank'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -1234,7 +1234,6 @@ export async function POST(req: NextRequest) {
     const anonymousBookletContext = !fileContent
       ? await loadAnonymousBookletContext(subject, grade, topic).catch(() => '')
       : ''
-    const fullPrompt = buildPrompt(questionType, topic, grade, resolvedDifficulty, effectiveLang, safeQCount, fileContent || '', gradeContext, mebContext, profile.department || undefined, subject)
     const isUniversityLevel = level === 'universite'
     const objectiveCandidates = await loadCanonicalObjectiveCandidates(supabase, {
       subject, grade, topic,
@@ -1248,8 +1247,9 @@ export async function POST(req: NextRequest) {
     // Uploaded/source passages, university content, daily challenges and
     // adaptive continuation remain on their existing generation paths.
     const bankEligible = !fileContent && !continueSessionId && !dailyChallenge && !isUniversityLevel
+    let bankQuestions: any[] = []
     if (bankEligible) {
-      const bankQuestions = await getQuestionBankSet(supabase, {
+      bankQuestions = await getQuestionBankSet(supabase, {
         subject, topic, grade, language: effectiveLang,
         questionType, difficulty: resolvedDifficulty,
       }, safeQCount, recentQuestionTexts)
@@ -1285,6 +1285,7 @@ export async function POST(req: NextRequest) {
           await supabase.from('profiles').update({
             monthly_test_count: (profile.monthly_test_count || 0) + 1,
           }).eq('id', user.id)
+          after(async () => { await supabase.from('question_bank_events').insert({ request_id: usageRequestId, user_id: user.id, quiz_session_id: bankSession.id, subject_key: questionBankKey(subject || 'genel'), topic_key: questionBankKey(topic), grade_key: questionBankKey(grade), requested_count: safeQCount, bank_count: bankQuestions.length, ai_count: 0, outcome: 'full' }) })
           console.log(`[question-bank] HIT topic=${topic} count=${bankQuestions.length}`)
           return NextResponse.json({
             questions: bankQuestions,
@@ -1298,6 +1299,8 @@ export async function POST(req: NextRequest) {
         console.warn(`[question-bank] session insert failed code=${bankSessionError?.code || 'unknown'}`)
       }
     }
+    const aiQuestionCount = Math.max(0, safeQCount - bankQuestions.length)
+    const fullPrompt = buildPrompt(questionType, topic, grade, resolvedDifficulty, effectiveLang, aiQuestionCount, fileContent || '', gradeContext, mebContext, profile.department || undefined, subject)
 
     // 5 Eylül 2026 — P0 prompt caching (bkz. K12_STATIC_* tanımları ve
     // getStaticSystemBlock/stripStaticPartsForCaching yukarıda). Sadece K12/
@@ -1320,10 +1323,10 @@ export async function POST(req: NextRequest) {
       + anonymousBookletContext
       + previousQuestionsNote
     promptStr = fullPrompt + (adaptivePolicy?.promptContext || '') + diagnosticStrategy.promptContext + misconceptionMetadataInstruction(questionType) + objectiveInstruction + anonymousBookletContext + previousQuestionsNote // fallback için TAM metin saklanır
-    countRef = safeQCount
+    countRef = aiQuestionCount
 
     // Hız optimizasyonu: az soru → Haiku (3x hızlı), çok soru → Sonnet
-    const useHaiku = safeQCount <= 7
+    const useHaiku = aiQuestionCount <= 7
 
     // 5 Eylül 2026 — Deniz'in talebiyle: KÜÇÜK, KONTROLLÜ bir pilot.
     // "Ana üretimi (en yüksek hacim, en yüksek tasarruf potansiyeli)
@@ -1371,7 +1374,7 @@ export async function POST(req: NextRequest) {
         { model: 'gpt-4.1-mini', max_tokens: useHaiku ? 2500 : 3500, json: true, operation: 'generate-quiz:pilot-gpt41mini', userId: user.id, quizSessionId: usageSessionId, requestId: usageRequestId }
       )
       text = gptResult
-      console.log(`[generate-quiz] PILOT model=gpt-4.1-mini qCount=${safeQCount}`)
+      console.log(`[generate-quiz] PILOT model=gpt-4.1-mini qCount=${aiQuestionCount}`)
     } else {
       const response = await anthropic.messages.create({
         model: useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5',
@@ -1384,12 +1387,12 @@ export async function POST(req: NextRequest) {
             ],
         messages: [{ role: 'user', content: prompt }],
       })
-      console.log(`[generate-quiz] model=${useHaiku ? 'haiku' : 'sonnet'} qCount=${safeQCount}`)
+      console.log(`[generate-quiz] model=${useHaiku ? 'haiku' : 'sonnet'} qCount=${aiQuestionCount}`)
       await logAnthropicUsage('generate-quiz', useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5', response, {
         userId: user.id,
         quizSessionId: usageSessionId,
         requestId: usageRequestId,
-        meta: { qCount: safeQCount, topic, hasMebContext: !!mebContext },
+        meta: { qCount: aiQuestionCount, topic, hasMebContext: !!mebContext, bankQuestionCount: bankQuestions.length },
       })
       text = response.content[0].type === 'text' ? response.content[0].text : ''
     }
@@ -1540,7 +1543,10 @@ export async function POST(req: NextRequest) {
     // önceki parçasında (chunk1) sorulmuş soruları içerir — bu çağrının
     // ürettiği sorular onlarla yüksek kelime örtüşümü gösteriyorsa silinir.
     const beforeDupCount = questions.length
-    questions = filterOutNearDuplicates(questions, Array.isArray(excludeQuestionTexts) ? excludeQuestionTexts : [])
+    questions = filterOutNearDuplicates(questions, [
+      ...(Array.isArray(excludeQuestionTexts) ? excludeQuestionTexts : []),
+      ...bankQuestions.map((question: any) => question.q).filter(Boolean),
+    ])
     if (questions.length < beforeDupCount) {
       console.warn(`[generate-quiz] yakın-tekrar kontrolü sonrası ${beforeDupCount - questions.length} soru elendi (${beforeDupCount} -> ${questions.length})`)
     }
@@ -1576,18 +1582,18 @@ export async function POST(req: NextRequest) {
     // (~600 token/soru, taban 2000), 0 sorudan da başlayabiliyor, ve döngü
     // sadece ART ARDA 2 turda hiç ilerleme olmazsa erken kesiliyor (tek
     // seferlik bir parse/format hatasına tolerans tanınıyor).
-    if (questions.length > safeQCount) {
-      questions = questions.slice(0, safeQCount)
-    } else if (questions.length < safeQCount) {
+    if (questions.length > aiQuestionCount) {
+      questions = questions.slice(0, aiQuestionCount)
+    } else if (questions.length < aiQuestionCount) {
       const maxTopupRounds = 4
       const TOPUP_TIME_BUDGET_MS = 95000 // 120sn'lik toplam bütçeden DB yazımı/response için pay bırak
       let consecutiveNoProgress = 0
-      for (let round = 0; round < maxTopupRounds && questions.length < safeQCount; round++) {
+      for (let round = 0; round < maxTopupRounds && questions.length < aiQuestionCount; round++) {
         if (Date.now() - requestStartTime > TOPUP_TIME_BUDGET_MS) {
-          console.warn(`[generate-quiz] zaman bütçesi doldu, topup turu ${round + 1} atlanıyor (elde olan: ${questions.length}/${safeQCount})`)
+            console.warn(`[generate-quiz] zaman bütçesi doldu, topup turu ${round + 1} atlanıyor (elde olan: ${questions.length}/${aiQuestionCount})`)
           break
         }
-        const missing = safeQCount - questions.length
+        const missing = aiQuestionCount - questions.length
         const beforeRoundCount = questions.length
         try {
           const topupPrompt = `${prompt}\n\nÖNEMLİ: Bu sefer TAM OLARAK ${missing} adet YENİ ve BİRBİRİNDEN FARKLI soru üret (ne bir eksik ne bir fazla). Daha önce üretilenlerle aynı/benzer soru üretme. Yanıtın SADECE geçerli, TAMAMLANMIŞ (yarıda kesilmemiş) JSON olmalı.`
@@ -1642,10 +1648,11 @@ export async function POST(req: NextRequest) {
           // hem de bu çağrıda ŞİMDİYE KADAR kabul edilmiş sorulara (questions) karşı.
           const alreadyAsked = [
             ...(Array.isArray(excludeQuestionTexts) ? excludeQuestionTexts : []),
+            ...bankQuestions.map((q: any) => q.q).filter(Boolean),
             ...questions.map((q: any) => q.q).filter(Boolean),
           ]
           topupQuestions = filterOutNearDuplicates(topupQuestions, alreadyAsked)
-          questions = [...questions, ...topupQuestions].slice(0, safeQCount)
+          questions = [...questions, ...topupQuestions].slice(0, aiQuestionCount)
           console.log(`[generate-quiz] eksik soru tamamlama (tur ${round + 1}/${maxTopupRounds}): ${missing} istendi, ${topupQuestions.length} eklendi (toplam ${questions.length})`)
         } catch (e) {
           console.warn(`[generate-quiz] eksik soru tamamlama (tur ${round + 1}) başarısız:`, e)
@@ -1658,6 +1665,11 @@ export async function POST(req: NextRequest) {
         }
       }
     }
+
+    // Hibrit sonuç: onaylı havuz sorularını önce kullan, yalnızca eksik kısmı
+    // AI ile üret. Böylece kısmi bir havuz eşleşmesi de maliyeti ve beklemeyi
+    // azaltır; eskisi gibi 9/10 eşleşmede dokuz soruyu çöpe atmayız.
+    questions = [...bankQuestions, ...questions].slice(0, safeQCount)
 
     // 26 Ağustos 2026 — kaynak metni öğrenciye de gönder (yukarıdaki nota bkz.).
     // Öncelik: öğrencinin kendi yüklediği dosya varsa o (fileContent), yoksa
@@ -1765,7 +1777,7 @@ export async function POST(req: NextRequest) {
           score: 0,
           completed: false,
           question_type: questionType,
-          gen_engine: genEngineUsed,
+          gen_engine: bankQuestions.length > 0 ? 'question-bank-hybrid-v2' : genEngineUsed,
           gen_request_id: usageRequestId,
           gen_experiment: experimentVariant ? 'quiz-generation-v1' : null,
           gen_experiment_variant: experimentVariant,
@@ -1779,6 +1791,11 @@ export async function POST(req: NextRequest) {
         .select('id')
         .maybeSingle()
       sessionId = sessionRow?.id
+    }
+
+    if (bankEligible && sessionId) {
+      const bankCount = bankQuestions.length
+      after(async () => { await supabase.from('question_bank_events').insert({ request_id: usageRequestId, user_id: user.id, quiz_session_id: sessionId, subject_key: questionBankKey(subject || 'genel'), topic_key: questionBankKey(topic), grade_key: questionBankKey(grade), requested_count: safeQCount, bank_count: bankCount, ai_count: Math.max(0, questions.length - bankCount), outcome: bankCount > 0 ? 'partial' : 'miss' }) })
     }
 
     // Multi-AI Gateway v3 shadow pilot. Varsayılan oran 0'dır; açıkça
@@ -1808,7 +1825,7 @@ export async function POST(req: NextRequest) {
         const metrics = await runMistralShadowComparison({
           systemPrompt: shadowSystemPrompt,
           userPrompt: prompt,
-          expectedCount: safeQCount,
+          expectedCount: aiQuestionCount,
           userId: user.id,
           sessionId,
           requestId: usageRequestId,
@@ -1846,7 +1863,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    return NextResponse.json({ questions, sessionId, resolvedDifficulty, source: 'ai', adaptivePolicy: adaptivePolicy || undefined, diagnosticStrategy })
+    return NextResponse.json({ questions, sessionId, resolvedDifficulty, source: bankQuestions.length > 0 ? 'hybrid' : 'ai', bankQuestionCount: bankQuestions.length, aiQuestionCount: Math.max(0, questions.length - bankQuestions.length), adaptivePolicy: adaptivePolicy || undefined, diagnosticStrategy })
   } catch (error: any) {
     console.error('Generate quiz error, trying OpenAI fallback:', error?.message)
     // GPT-4o yedek model
