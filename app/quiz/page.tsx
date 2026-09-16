@@ -899,7 +899,11 @@ function QuizPageContent() {
         const topic = customTopic.trim() || selectedTopic
         const targetSecondChunk = 1
         const { data: { session } } = await supabase.auth.getSession()
-        const res = await fetch('/api/generate-quiz', {
+        const prefetchKey = `${sessionId}:${chunkBoundary}:${answersRef.current.length}`
+        const prefetched = adaptivePrefetchRef.current?.key === prefetchKey
+          ? await adaptivePrefetchRef.current.promise
+          : null
+        const res = prefetched ? null : await fetch('/api/generate-quiz', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
           body: JSON.stringify({
@@ -916,7 +920,9 @@ function QuizPageContent() {
           }),
         })
         let secondChunk: any[] = []
-        if (res.ok) {
+        if (prefetched) {
+          secondChunk = prefetched.questions
+        } else if (res?.ok) {
           const data = await res.json()
           if (Array.isArray(data.questions)) secondChunk = data.questions
         }
