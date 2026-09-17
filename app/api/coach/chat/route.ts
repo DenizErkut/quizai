@@ -1,30 +1,28 @@
-// app/api/coach/chat/route.ts — Pratium Koç, Faz B: çok turlu sohbet endpoint'i.
+// app/api/coach/chat/route.ts — Pratium Koç, Faz B/C: çok turlu sohbet
+// endpoint'i + eyleme geçirilebilir mesajlar.
 //
 // 17 Eylül 2026 — /api/ai-analysis'in yerini alacak yeni nesil koç akışı
 // (o endpoint ve /analysis sayfasındaki tek seferlik "AI Çalışma Planı"
 // kutusu şimdilik olduğu gibi bırakıldı, kaldırılmadı). Farkı: konuşma
-// hafızası var (coach_conversations/coach_messages) ve bağlam HER
-// istekte sunucu tarafında lib/coach-context.ts ile taze hesaplanıyor —
-// istemciden gelen hiçbir istatistiğe güvenilmiyor.
+// hafızası var (coach_conversations/coach_messages), bağlam HER istekte
+// sunucu tarafında lib/coach-context.ts ile taze hesaplanıyor (istemciden
+// gelen hiçbir istatistiğe güvenilmiyor), ve koç somut bir çalışma
+// önerdiğinde bunu bir `action` (lib/coach-generation.ts, Faz C) olarak
+// da dönebiliyor — UI bunu gerçek bir butona çeviriyor.
 //
 // GET  → kullanıcının aktif konuşmasını (yoksa oluşturarak) ve mesaj
 //        geçmişini döner. Konuşma yeni açıldıysa (hiç mesaj yoksa) gerçek
-//        veriye dayanan proaktif bir açılış mesajı üretip kaydeder — bu,
-//        mockup'taki "Bu hafta +%18 ilerleme" tarzı karşılamanın temelini
-//        atar (tam proaktif bildirim/cron entegrasyonu Faz D'de).
-// POST → kullanıcının mesajını kaydeder, koçun yanıtını üretir ve döner.
+//        veriye dayanan proaktif bir açılış mesajı üretip kaydeder.
+// POST → kullanıcının mesajını kaydeder, koçun yanıtını (+ varsa action'ı)
+//        üretir ve döner.
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentityBySupabaseId } from '@/lib/identity/client'
-import { buildCoachContext, formatCoachContextForPrompt, CoachContext } from '@/lib/coach-context'
-import { logAnthropicUsage } from '@/lib/ai-usage'
-import Anthropic from '@anthropic-ai/sdk'
+import { buildCoachContext, CoachContext } from '@/lib/coach-context'
+import { generateCoachReply, generateCoachOpening } from '@/lib/coach-generation'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
-const COACH_MODEL = 'claude-sonnet-4-5'
 
 // Bağlam penceresini ve maliyeti sınırlı tutmak için son N mesaj yeterli —
 // koç zaten her turda taze hesaplanan gerçek veriye bakıyor, uzun
@@ -43,56 +41,6 @@ function authClient(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { global: { headers: { Authorization: `Bearer ${token}` } } }
   ) as any
-}
-
-function buildSystemPrompt(ctx: CoachContext): string {
-  return `Sen Pratium'un yapay zeka destekli kişisel öğrenme koçusun. Adın "Pratium Koç".
-
-Bu genel bir sohbet asistanı DEĞİL — sadece aşağıdaki, sistem tarafından hesaplanmış GERÇEK öğrenci verisine dayanarak konuşuyorsun.
-
-ÖĞRENCİ VERİSİ (gerçek, bu isteğe özel taze hesaplandı):
-${formatCoachContextForPrompt(ctx)}
-
-YANIT TARZI:
-- Sıcak, samimi, motive edici — asla soğuk, robotik veya yargılayıcı değil
-- Kısa: maksimum 3-4 cümle
-- Somut ol: yukarıdaki veriden en az bir gerçek konu adı, sayı veya gözlem kullan
-- Mümkünse tek bir somut sonraki adım öner (örn. "X konusunda kısa bir tekrar yapabilirsin")
-
-KESİN KURAL:
-- Yukarıdaki veri bloğunda YER ALMAYAN hiçbir istatistik, başarı, konu adı veya karşılaştırma UYDURMA
-- Veri yetersizse ("henüz test yok", "öncelikli konu yok" gibi) bunu olduğu gibi söyle, uydurarak doldurma
-
-SINIRLAR:
-- Senden bir soruyu/problemi çözmen istenirse çözme: "Bunu Pratium'da bir test olarak çözersen çok daha etkili öğrenirsin" de ve Yeni Test'e yönlendir
-- Düşük performansı asla olumsuz/utandırıcı bir çerçevede sunma; dürüst ama destekleyici ol
-
-Kullanıcı Türkçe yazarsa Türkçe, İngilizce yazarsa İngilizce yanıt ver.`
-}
-
-async function callCoach(ctx: CoachContext, history: { role: 'user' | 'assistant'; content: string }[], userId: string): Promise<string> {
-  const message = await anthropic.messages.create({
-    model: COACH_MODEL,
-    max_tokens: 400,
-    system: buildSystemPrompt(ctx),
-    messages: history.length ? history : [{ role: 'user', content: 'Merhaba' }],
-  }) as any
-  await logAnthropicUsage('coach-chat', COACH_MODEL, message, { userId })
-  return message.content?.[0]?.text ?? ''
-}
-
-async function generateOpeningMessage(ctx: CoachContext, userId: string): Promise<string> {
-  const message = await anthropic.messages.create({
-    model: COACH_MODEL,
-    max_tokens: 300,
-    system: buildSystemPrompt(ctx),
-    messages: [{
-      role: 'user',
-      content: 'Bu, öğrencinin bugün seninle ilk karşılaşması. Yukarıdaki gerçek veriye dayanarak, onu karşılayan ve en dikkat çekici tek sinyali (seri, gerileme veya en öncelikli çalışma önerisi) vurgulayan kısa bir açılış mesajı yaz. Soru sorup bekleme, doğrudan yaz.',
-    }],
-  }) as any
-  await logAnthropicUsage('coach-chat-opening', COACH_MODEL, message, { userId })
-  return message.content?.[0]?.text ?? 'Merhaba! Bugün nasıl gidiyor?'
 }
 
 async function getOrCreateConversation(supabase: any, userId: string): Promise<string> {
@@ -141,10 +89,10 @@ export async function GET(req: NextRequest) {
 
     if (!messages || messages.length === 0) {
       const ctx = await loadCoachContext(supabase, user.id)
-      const opening = await generateOpeningMessage(ctx, user.id)
+      const opening = await generateCoachOpening(ctx, user.id, 'coach-chat-opening')
       const { data: inserted, error } = await supabase
         .from('coach_messages')
-        .insert({ conversation_id: conversationId, role: 'assistant', content: opening })
+        .insert({ conversation_id: conversationId, role: 'assistant', content: opening.text, action: opening.action })
         .select('id, role, content, action, created_at')
         .single()
       if (error) throw error
@@ -201,11 +149,11 @@ export async function POST(req: NextRequest) {
       .order('created_at', { ascending: true })
       .limit(MAX_HISTORY_MESSAGES)
 
-    const reply = await callCoach(ctx, (history ?? []) as { role: 'user' | 'assistant'; content: string }[], user.id)
+    const reply = await generateCoachReply(ctx, (history ?? []) as { role: 'user' | 'assistant'; content: string }[], user.id, 'coach-chat')
 
     const { data: inserted, error: insertAssistantErr } = await supabase
       .from('coach_messages')
-      .insert({ conversation_id: conversationId, role: 'assistant', content: reply })
+      .insert({ conversation_id: conversationId, role: 'assistant', content: reply.text, action: reply.action })
       .select('id, role, content, action, created_at')
       .single()
     if (insertAssistantErr) throw insertAssistantErr

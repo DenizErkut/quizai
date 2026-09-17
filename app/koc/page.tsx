@@ -1,18 +1,32 @@
 'use client'
-// app/koc/page.tsx — Pratium Koç, Faz E (sade sürüm): dedike bir sohbet
-// sayfası. /api/coach/chat'e bağlanır — konuşma geçmişi kalıcı, açılış
-// mesajı gerçek öğrenci verisine (streak/mastery/öneriler) dayanıyor.
-// Eylem butonları (Faz C) ve dashboard'a gömülü sohbet balonu (Faz D
-// sonrası) sonraki adımlar; bu sürüm bilinçli olarak sade tutuldu.
+// app/koc/page.tsx — Pratium Koç, Faz E/C: dedike bir sohbet sayfası +
+// eyleme geçirilebilir mesajlar. /api/coach/chat'e bağlanır — konuşma
+// geçmişi kalıcı, açılış mesajı gerçek öğrenci verisine (streak/mastery/
+// öneriler) dayanıyor. Koç somut bir çalışma önerdiğinde mesajın action
+// alanı dolu gelir (bkz. lib/coach-generation.ts); bu, gerçek bir
+// "Çalışmayı başlat" butonuna çevrilip /quiz'e yönlendiriyor. action bir
+// gerçek student_recommendations satırına (recommendationId) karşılık
+// geliyorsa, /quiz'e gitmeden önce /api/recommendations üzerinden o
+// öneri 'accepted' olarak işaretleniyor — RecommendationLifecycle
+// bileşeninin izlediği aynı akış.
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
+interface CoachAction {
+  type: 'start_practice'
+  topic: string
+  subject?: string
+  questionCount?: number
+  recommendationId?: string
+}
+
 interface CoachMessage {
   id?: string
   role: 'user' | 'assistant'
   content: string
+  action?: CoachAction | null
   created_at?: string
 }
 
@@ -50,6 +64,27 @@ export default function PratiumKocPage() {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  async function startPractice(action: CoachAction) {
+    try {
+      if (action.recommendationId) {
+        const { data: { session } } = await supabase.auth.getSession()
+        await fetch('/api/recommendations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ recommendationId: action.recommendationId, action: 'accept' }),
+        })
+      }
+    } catch {
+      // öneri kabul edilemese bile pratiğe başlamayı engelleme
+    }
+    const params = new URLSearchParams()
+    params.set('topic', action.topic)
+    if (action.subject) params.set('subject', action.subject)
+    params.set('count', String(action.questionCount || 8))
+    if (action.recommendationId) params.set('recommendationId', action.recommendationId)
+    router.push(`/quiz?${params.toString()}`)
+  }
 
   async function send() {
     const text = input.trim()
@@ -107,6 +142,15 @@ export default function PratiumKocPage() {
                   color: m.role === 'user' ? '#fff' : 'var(--text)',
                 }}>
                   {m.content}
+                  {m.action?.type === 'start_practice' && (
+                    <button
+                      onClick={() => startPractice(m.action as CoachAction)}
+                      className="btn btn-primary"
+                      style={{ marginTop: '10px', width: '100%', fontSize: '13px', padding: '8px 12px' }}
+                    >
+                      ▶ Çalışmayı başlat: {m.action.topic}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

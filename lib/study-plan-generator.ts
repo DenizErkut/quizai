@@ -21,6 +21,13 @@ export interface AutonomousGoal {
   forgettingRisk: string
   reason: string
   actionType?: string
+  // 17 Eylül 2026 — Pratium Koç Faz C: bu hedef gerçek bir
+  // student_recommendations satırından geldiyse (weak_topics fallback'i
+  // DEĞİL), koçun önerdiği "Çalışmayı başlat" butonu /api/recommendations
+  // üzerinden bu öneriyi 'accepted' olarak işaretleyebilsin diye id'sini
+  // taşıyor.
+  recommendationId?: string
+  subject?: string
 }
 
 // weak_topics'teki TÜM konuları mastery skoruna göre değerlendirip en
@@ -34,7 +41,7 @@ export async function computeAutonomousGoals(
   // where migration 017 is not live continue through the weak_topics fallback.
   const { data: recommendations } = await supabase
     .from('student_recommendations')
-    .select('topic, action_type, reason, evidence, priority_score')
+    .select('id, subject, topic, action_type, reason, evidence, priority_score')
     .eq('student_id', userId)
     .eq('status', 'active')
     .gt('valid_until', new Date().toISOString())
@@ -44,10 +51,12 @@ export async function computeAutonomousGoals(
   if (recommendations?.length) {
     return recommendations.map((row: any) => ({
       topic: row.topic,
+      subject: row.subject,
       masteryScore: Number(row.evidence?.masteryScore ?? row.evidence?.prerequisiteMastery ?? 0),
       forgettingRisk: row.action_type === 'spaced_review' ? 'yüksek' : 'düşük',
       reason: row.reason,
       actionType: row.action_type,
+      recommendationId: row.id,
     }))
   }
 

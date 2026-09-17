@@ -24,15 +24,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
-import { buildCoachContext, formatCoachContextForPrompt, CoachContext } from '@/lib/coach-context'
-import { logAnthropicUsage } from '@/lib/ai-usage'
-import Anthropic from '@anthropic-ai/sdk'
+import { buildCoachContext, CoachContext } from '@/lib/coach-context'
+import { generateCoachReply, CoachTurn } from '@/lib/coach-generation'
 
 export const maxDuration = 120
 export const runtime = 'nodejs'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
-const NUDGE_MODEL = 'claude-sonnet-4-5'
 const MIN_DAYS_BETWEEN_NUDGES = 4
 
 const supabaseAdmin = createClient(
@@ -52,25 +49,12 @@ function nudgeTitle(reason: NudgeReason): string {
   return reason === 'disengagement' ? '👋 Pratium Koç seni bekliyor' : '✦ Pratium Koç\'tan bir öneri'
 }
 
-async function generateNudgeBody(ctx: CoachContext, reason: NudgeReason, userId: string): Promise<string | null> {
+async function generateNudge(ctx: CoachContext, reason: NudgeReason, userId: string): Promise<CoachTurn | null> {
   const instruction = reason === 'disengagement'
-    ? 'Öğrenci bir süredir aktif değil. Onu yargılamadan, sıcak bir dille geri çağıran ve somut TEK bir ilk adım öneren, en fazla 2 cümlelik bir mesaj yaz. Bu bir bildirimde görünecek, kısa tut.'
-    : 'Sistemin hesapladığı en öncelikli çalışma önerisini vurgulayan, motive edici, en fazla 2 cümlelik bir mesaj yaz. Bu bir bildirimde görünecek, kısa tut.'
+    ? 'Öğrenci bir süredir aktif değil. Onu yargılamadan, sıcak bir dille geri çağıran ve somut TEK bir ilk adım öneren, en fazla 2 cümlelik bir mesaj yaz (bu bir bildirimde görünecek, kısa tut). Önerdiğin adım belirli bir konuysa suggest_practice aracını da çağır.'
+    : 'Sistemin hesapladığı en öncelikli çalışma önerisini vurgulayan, motive edici, en fazla 2 cümlelik bir mesaj yaz (bu bir bildirimde görünecek, kısa tut) ve suggest_practice aracını çağırarak öneriyi doğrudan başlatılabilir hale getir.'
   try {
-    const message = await anthropic.messages.create({
-      model: NUDGE_MODEL,
-      max_tokens: 200,
-      system: `Sen Pratium'un yapay zeka destekli kişisel öğrenme koçusun. Adın "Pratium Koç".
-
-ÖĞRENCİ VERİSİ (gerçek, sistem tarafından hesaplandı):
-${formatCoachContextForPrompt(ctx)}
-
-KESİN KURAL: yukarıdaki veri bloğunda yer almayan hiçbir istatistik, başarı veya konu adı uydurma. Sıcak, samimi, asla yargılayıcı olma. Sadece mesaj metnini yaz, başka açıklama ekleme, tırnak işareti kullanma. Türkçe yaz.`,
-      messages: [{ role: 'user', content: instruction }],
-    }) as any
-    await logAnthropicUsage('coach-proactive-nudge', NUDGE_MODEL, message, { userId })
-    const text = message.content?.[0]?.text?.trim()
-    return text || null
+    return await generateCoachReply(ctx, [{ role: 'user', content: instruction }], userId, 'coach-proactive-nudge')
   } catch (e) {
     console.error('[coach-proactive-nudge] generation error:', userId, e)
     return null
@@ -154,17 +138,17 @@ export async function GET(req: NextRequest) {
       const reason = decideNudgeReason(ctx)
       if (!reason) { skippedNoSignal++; continue }
 
-      const body = await generateNudgeBody(ctx, reason, uid)
-      if (!body) { failed++; continue }
+      const nudge = await generateNudge(ctx, reason, uid)
+      if (!nudge?.text) { failed++; continue }
 
       const conversationId = await getOrCreateConversationAdmin(uid)
-      await supabaseAdmin.from('coach_messages').insert({ conversation_id: conversationId, role: 'assistant', content: body })
+      await supabaseAdmin.from('coach_messages').insert({ conversation_id: conversationId, role: 'assistant', content: nudge.text, action: nudge.action })
       await supabaseAdmin.from('coach_conversations').update({ last_message_at: new Date().toISOString() }).eq('id', conversationId)
       await supabaseAdmin.from('notifications').insert({
         user_id: uid,
         type: 'coach_nudge',
         title: nudgeTitle(reason),
-        body,
+        body: nudge.text,
         read: false,
         action_url: '/koc',
       })
