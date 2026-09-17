@@ -42,13 +42,20 @@
 // Seni tanıyan kişisel AI öğrenme koçun. / Sadece sorularını cevaplamaz —
 // nasıl öğrendiğini anlar." Kurumsal "Powered by..." etiketi tamamen
 // kaldırıldı.
+//
+// 17 Eylül 2026 (7. güncelleme) — Deniz'in kararı: Koç artık SADECE ücretli
+// üyelere (silver/premium/unlimited) açık, free planda hiç yok. Asıl
+// engelleme sunucuda (app/api/coach/chat/route.ts, lib/coach-access.ts)
+// ama ikon da free kullanıcıya hiç görünmüyor — aksi halde tıklayıp 403
+// almaları gereksiz bir sürtünme olurdu.
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useUser } from '@/lib/user-context'
 import { createClient } from '@/lib/supabase/client'
+import { isPaidCoachPlan } from '@/lib/coach-access'
 
 export default function CoachMascot() {
-  const { user, loading, isTeacher, isParent, isInstitution } = useUser()
+  const { user, profile, loading, isTeacher, isParent, isInstitution } = useUser()
   const [unread, setUnread] = useState(0)
   const [bubbleDismissed, setBubbleDismissed] = useState(false)
 
@@ -68,7 +75,8 @@ export default function CoachMascot() {
 
   // Koç sadece öğrenciler için — öğretmen/veli/kurum hesaplarında
   // gösterilmiyor (bu hesaplar zaten /koc'a erişemez, kendi verisi yok).
-  if (loading || !user || isTeacher || isParent || isInstitution) return null
+  // Ayrıca sadece ücretli plan (silver/premium/unlimited) — free'de hiç yok.
+  if (loading || !user || isTeacher || isParent || isInstitution || !isPaidCoachPlan(profile?.plan)) return null
 
   return (
     <>

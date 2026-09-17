@@ -23,8 +23,13 @@ export const COACH_MODEL = 'claude-sonnet-4-5'
 // lib/subscription-plans.ts'teki profilePlan değerleriyle (silver/premium/
 // unlimited) ve app/quiz/page.tsx'in PLAN_DAILY_LIMIT deseniyle aynı
 // mantık: plan yoksa/tanınmıyorsa en düşük (free) tavan uygulanır.
+//
+// 17 Eylül 2026 (2. güncelleme) — Deniz'in kararı: koç artık free planda
+// HİÇ açık değil (bkz. lib/coach-access.ts, isPaidCoachPlan — asıl
+// engelleme orada, API route'un GET/POST'unda). free:0 burada sadece
+// ikinci bir güvenlik katmanı, tek başına yeterli değil.
 export const COACH_DAILY_MESSAGE_LIMITS: Record<string, number> = {
-  free: 10,
+  free: 0,
   silver: 20,
   premium: 40,
   unlimited: 100,

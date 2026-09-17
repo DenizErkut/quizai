@@ -38,6 +38,7 @@ export default function PratiumKocPage() {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+  const [planBlocked, setPlanBlocked] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -54,7 +55,10 @@ export default function PratiumKocPage() {
           headers: { Authorization: `Bearer ${session?.access_token}` },
         })
         const data = await res.json()
-        if (!res.ok) { setError(data.error || 'Koç yüklenemedi.'); setLoading(false); return }
+        if (!res.ok) {
+          if (data.code === 'plan_required') { setPlanBlocked(true); setLoading(false); return }
+          setError(data.error || 'Koç yüklenemedi.'); setLoading(false); return
+        }
         setMessages(data.messages || [])
         // Öğrenci koçu açtığında, Faz D'nin cron'unun bıraktığı proaktif
         // bildirimleri okunmuş işaretle — aksi halde global maskot
@@ -131,6 +135,36 @@ export default function PratiumKocPage() {
       setError('Bağlantı hatası, lütfen tekrar dene.')
     }
     setSending(false)
+  }
+
+  if (planBlocked) {
+    return (
+      <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
+        <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Link href="/dashboard" className="btn-ghost btn" style={{ padding: '6px 10px' }}>←</Link>
+          <span style={{ fontSize: '22px' }}>🎓</span>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--primary)' }}>Profesör Prati</div>
+            <div style={{ fontSize: '12px', color: 'var(--text3)' }}>Kişisel AI öğrenme koçu</div>
+          </div>
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1.25rem' }}>
+          <div style={{ maxWidth: '420px', textAlign: 'center' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>🎓</div>
+            <h1 style={{ fontSize: '19px', fontWeight: 800, color: 'var(--primary)', marginBottom: '10px' }}>
+              Profesör Prati ücretli üyelere özel
+            </h1>
+            <p style={{ fontSize: '13.5px', color: 'var(--text3)', lineHeight: 1.6, marginBottom: '20px' }}>
+              Seni tanıyan, verine dayanan kişisel bir öğrenme koçu istiyorsan
+              bir plana geçmen gerekiyor — koç, ücretsiz planda kullanılamıyor.
+            </p>
+            <button className="btn btn-primary" onClick={() => router.push('/checkout')}>
+              Planları görüntüle
+            </button>
+          </div>
+        </div>
+      </main>
+    )
   }
 
   return (

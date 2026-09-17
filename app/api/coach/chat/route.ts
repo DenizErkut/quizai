@@ -20,6 +20,7 @@ import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentityBySupabaseId } from '@/lib/identity/client'
 import { buildCoachContext, CoachContext } from '@/lib/coach-context'
 import { generateCoachReply, generateCoachOpening, getCoachDailyMessageLimit } from '@/lib/coach-generation'
+import { isPaidCoachPlan, COACH_PLAN_REQUIRED_MESSAGE } from '@/lib/coach-access'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -76,6 +77,13 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
+  // Koç sadece ücretli üyelere açık — ücretsiz (free) planda hiç
+  // konuşma oluşturulmuyor, hiç Claude çağrısı yapılmıyor.
+  const { data: accessPlanRow } = await supabase.from('profiles').select('plan').eq('id', user.id).maybeSingle()
+  if (!isPaidCoachPlan(accessPlanRow?.plan)) {
+    return NextResponse.json({ error: COACH_PLAN_REQUIRED_MESSAGE, code: 'plan_required' }, { status: 403 })
+  }
+
   try {
     const conversationId = await getOrCreateConversation(supabase, user.id)
     const { data: messages } = await supabase
@@ -118,10 +126,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Mesaj çok uzun.' }, { status: 400 })
   }
 
+  const { data: planRow } = await supabase.from('profiles').select('plan').eq('id', user.id).maybeSingle()
+  // Koç sadece ücretli üyelere açık — free planda GET zaten engelliyor,
+  // ama POST'a doğrudan istek atılırsa diye burada da tekrar kontrol edilir.
+  if (!isPaidCoachPlan(planRow?.plan)) {
+    return NextResponse.json({ error: COACH_PLAN_REQUIRED_MESSAGE, code: 'plan_required' }, { status: 403 })
+  }
+
   try {
     const conversationId = await getOrCreateConversation(supabase, user.id)
 
-    const { data: planRow } = await supabase.from('profiles').select('plan').eq('id', user.id).maybeSingle()
     const dailyLimit = getCoachDailyMessageLimit(planRow?.plan)
 
     const startOfDay = new Date()
