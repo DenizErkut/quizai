@@ -17,6 +17,24 @@ import { CoachContext, formatCoachContextForPrompt } from '@/lib/coach-context'
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 export const COACH_MODEL = 'claude-sonnet-4-5'
 
+// Faz F — plana göre farklılaştırılmış günlük mesaj sınırı. Faz B/C'de
+// herkes için sabit 40'tı; bu hem ücretsiz kullanıcılar için gereksiz
+// yüksek (maliyet), hem de üst plan sahiplerine haksız bir tavan koyuyordu.
+// lib/subscription-plans.ts'teki profilePlan değerleriyle (silver/premium/
+// unlimited) ve app/quiz/page.tsx'in PLAN_DAILY_LIMIT deseniyle aynı
+// mantık: plan yoksa/tanınmıyorsa en düşük (free) tavan uygulanır.
+export const COACH_DAILY_MESSAGE_LIMITS: Record<string, number> = {
+  free: 10,
+  silver: 20,
+  premium: 40,
+  unlimited: 100,
+}
+
+export function getCoachDailyMessageLimit(plan: string | null | undefined): number {
+  if (!plan) return COACH_DAILY_MESSAGE_LIMITS.free
+  return COACH_DAILY_MESSAGE_LIMITS[plan] ?? COACH_DAILY_MESSAGE_LIMITS.free
+}
+
 export interface CoachAction {
   type: 'start_practice'
   topic: string

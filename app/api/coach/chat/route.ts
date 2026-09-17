@@ -19,7 +19,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentityBySupabaseId } from '@/lib/identity/client'
 import { buildCoachContext, CoachContext } from '@/lib/coach-context'
-import { generateCoachReply, generateCoachOpening } from '@/lib/coach-generation'
+import { generateCoachReply, generateCoachOpening, getCoachDailyMessageLimit } from '@/lib/coach-generation'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -29,8 +29,6 @@ export const runtime = 'nodejs'
 // geçmişe ihtiyacı yok.
 const MAX_HISTORY_MESSAGES = 20
 const MAX_USER_MESSAGE_LENGTH = 2000
-// Basit maliyet koruması: konuşma başına günlük kullanıcı mesajı sınırı.
-const DAILY_USER_MESSAGE_LIMIT = 40
 
 function authClient(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -123,6 +121,9 @@ export async function POST(req: NextRequest) {
   try {
     const conversationId = await getOrCreateConversation(supabase, user.id)
 
+    const { data: planRow } = await supabase.from('profiles').select('plan').eq('id', user.id).maybeSingle()
+    const dailyLimit = getCoachDailyMessageLimit(planRow?.plan)
+
     const startOfDay = new Date()
     startOfDay.setHours(0, 0, 0, 0)
     const { count: todayCount } = await supabase
@@ -131,8 +132,11 @@ export async function POST(req: NextRequest) {
       .eq('conversation_id', conversationId)
       .eq('role', 'user')
       .gte('created_at', startOfDay.toISOString())
-    if ((todayCount ?? 0) >= DAILY_USER_MESSAGE_LIMIT) {
-      return NextResponse.json({ error: 'Bugünlük koç mesaj sınırına ulaştın, yarın devam edebilirsin.' }, { status: 429 })
+    if ((todayCount ?? 0) >= dailyLimit) {
+      const upsellHint = planRow?.plan === 'premium' || planRow?.plan === 'unlimited'
+        ? ''
+        : ' Daha yüksek bir plana geçerek günlük mesaj hakkını artırabilirsin.'
+      return NextResponse.json({ error: `Bugünlük koç mesaj sınırına ulaştın, yarın devam edebilirsin.${upsellHint}` }, { status: 429 })
     }
 
     const { error: insertUserErr } = await supabase
