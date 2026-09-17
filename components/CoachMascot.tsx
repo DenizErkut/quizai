@@ -98,6 +98,7 @@ export default function CoachMascot() {
       )}
 
       <Link href="/koc" aria-label="Pratium Koç ile sohbet et" onClick={() => setBubbleDismissed(true)}
+        className="coach-launcher"
         style={{
           position: 'fixed', bottom: '24px', left: '24px', zIndex: 9998,
           width: 68, height: 68, borderRadius: '20px',
@@ -105,7 +106,7 @@ export default function CoachMascot() {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: '0 8px 28px rgba(41,72,61,0.25)', textDecoration: 'none',
         }}>
-        <span style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', padding: '4px' }}>
+        <span className="coach-mascot-live" style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', padding: '4px' }}>
           <img src="/mascot-coach-human.webp" alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </span>
         {unread > 0 && (
@@ -119,6 +120,35 @@ export default function CoachMascot() {
         @keyframes coachBubbleUp {
           from { opacity: 0; transform: translateY(16px) scale(0.97); }
           to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        /* Deniz'in isteği: ikon "canlı" dursun (hafif sürekli hareket) ve
+           üzerine gelince büyüsün. AIChatBot'taki prati-launcher/pratiFloat
+           kalıbıyla aynı yaklaşım — bkz. components/AIChatBot.tsx. */
+        .coach-launcher {
+          transition: transform 0.22s ease, box-shadow 0.22s ease;
+        }
+        .coach-launcher:hover, .coach-launcher:focus-visible {
+          transform: scale(1.12);
+          box-shadow: 0 12px 36px rgba(41,72,61,0.35);
+        }
+        .coach-mascot-live {
+          animation: coachFloat 3.4s ease-in-out infinite;
+          transform-origin: 50% 88%;
+        }
+        .coach-launcher:hover .coach-mascot-live {
+          animation: coachWave 0.7s ease-in-out;
+        }
+        @keyframes coachFloat {
+          0%, 100% { transform: translateY(0) rotate(-1deg); }
+          50% { transform: translateY(-4px) rotate(1deg); }
+        }
+        @keyframes coachWave {
+          0%, 100% { transform: translateY(0) rotate(0) scale(1); }
+          30% { transform: translateY(-5px) rotate(-6deg) scale(1.05); }
+          60% { transform: translateY(-2px) rotate(6deg) scale(1.03); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .coach-mascot-live, .coach-launcher:hover .coach-mascot-live { animation: none; }
         }
       `}</style>
     </>
