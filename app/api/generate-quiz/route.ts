@@ -290,6 +290,15 @@ function visualQuestionCandidate(question: any, category: string | null): boolea
   return explicitVisual || shape || mathVisual
 }
 
+function rigorInstruction(difficulty: string, count: number, topic: string): string {
+  const level = normalizeTR(difficulty)
+  const hard = /zor|hard|ileri|advanced/.test(level)
+  const easy = /kolay|easy|temel|basic/.test(level)
+  const applicationCount = easy ? Math.max(1, Math.ceil(count * 0.4)) : Math.max(1, Math.ceil(count * (hard ? 0.8 : 0.6)))
+  const inferenceCount = easy ? 1 : Math.max(1, Math.ceil(count * (hard ? 0.5 : 0.3)))
+  return `\n\nÖLÇME KALİTESİ VE ZORLUK KURALI (ZORUNLU): "${topic}" için ${count} soru üretirken sadece tanım ezberini veya tek adımlı işlemi ölçme. En az ${applicationCount} soru bilgiyi yeni bir bağlama/senaryoya uygulamayı, verilenleri ayıklamayı veya en az iki akıl yürütme adımını gerektirsin. En az ${inferenceCount} soru ilişki kurma, hata bulma, karşılaştırma ya da sonuç çıkarma ölçsün. Zorluk uzun ve karışık cümlelerden değil, kazanımın gerçekten kullanılmasından gelmeli. Her çoktan seçmeli soruda üç çeldirici öğrencinin yapabileceği gerçek işlem, kavram veya yorum hatasına dayansın; komik, alakasız ya da ilk bakışta elenen seçenekler kullanma. Aynı hesap yöntemi, senaryo veya soru kalıbını tekrarlama. Sınıf seviyesinin dışına çıkma ve soruyu çözülemez hâle getirme. Açıklamada doğru sonuca giden mantığı kısa ama açık biçimde göster.`
+}
+
 function visualQuestionIndexes(questions: any[], category: string | null, requestedCount: number, forceVisuals: boolean): number[] {
   if (!category || requestedCount <= 0) return []
   const target = forceVisuals
@@ -508,9 +517,10 @@ async function generateVisualForQuestion(
 }
 
 function buildPrompt(type: string, topic: string, grade: string, difficulty: string, language: string, count: number, fileContent?: string, gradeCtx?: string, mebCtx?: string, department?: string, subject?: string): string {
-  const contentNote = fileContent
-    ? `Topic: "${topic}". Generate questions from this content:\n${fileContent.slice(0, 3000)}`
-    : `Topic: "${topic}".`
+  const rigor = rigorInstruction(difficulty, count, topic)
+  const contentNote = rigor + (fileContent
+    ? `\n\nTopic: "${topic}". Generate questions from this content:\n${fileContent.slice(0, 3000)}`
+    : `\n\nTopic: "${topic}".`)
 
   // 17 Ağustos 2026'da bulundu: "subject" (ders) bilgisi promptta hiç
   // AÇIKÇA yer almıyordu, AI sadece "topic" adından (ör. "Past simple

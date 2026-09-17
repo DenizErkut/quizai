@@ -38,6 +38,7 @@ Check:
 3. Are the wrong options plausible but clearly wrong?
 4. Are the question and options predominantly in the expected language?
 5. Is every referenced underline/highlight visibly marked with [square brackets]?
+6. Does the question require meaningful use of the target knowledge rather than a trivial wording/recall trick, and are all distractors realistic student misconceptions? Reject trivial or implausible-option questions.
 
 Respond ONLY with JSON: {"ok": true} or {"ok": false, "reason": "brief reason", "fix": "correct answer if wrong"}`
 
