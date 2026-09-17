@@ -360,32 +360,32 @@ The student must figure out the answer from the question, NOT from your diagram.
   return `${base}\n\nDIAGRAM INSTRUCTIONS:\n${guides[category] || guides.geometry}\n\nMake it directly relevant to the specific question being asked. The student should understand the concept better by seeing this diagram.`
 }
 
-async function visualMatchesQuestion(questionText: string, svg: string): Promise<boolean> {
+type VisualContextQuality = { passed: boolean; score: number; reason: string }
+
+async function visualMatchesQuestion(questionText: string, svg: string): Promise<VisualContextQuality> {
   try {
-    // Görseli üreten sağlayıcıdan bağımsız bir OpenAI denetimi. Doğrulama
-    // yapılamazsa görsel yayınlanmaz (fail closed).
-    const verdict = await callOpenAI([
-      { role: 'system', content: 'You are a strict K-12 visual-question QA gate. Reply with exactly VALID or INVALID.' },
-      { role: 'user', content: `Check whether this SVG is strictly and specifically about the exact quiz question. Every scenario, object, number, unit, equation and label must agree. A generic topic match is insufficient. Reject if it depicts another example, contains unsupported facts, or reveals the answer.\n\nQUESTION:\n${questionText}\n\nSVG:\n${svg.slice(0, 9000)}` },
+    // Genel konu benzerliği yeterli değildir: bağlam, soru ve SVG'nin
+    // nesne/sayı/birim/etiket ilişkisi 100 üzerinden ayrı denetlenir.
+    const raw = await callOpenAI([
+      { role: 'system', content: 'You are a strict K-12 visual-question QA gate. Return only valid JSON.' },
+      { role: 'user', content: `Score the SVG against the exact question. Check scenario/context, every object, quantity, unit, label and relationship. A generic topic match is NOT enough. The SVG must not reveal the answer. Return exactly {"score":0-100,"contextMatch":boolean,"answerLeak":boolean,"reason":"short Turkish reason"}.\n\nQUESTION:\n${questionText}\n\nSVG:\n${svg.slice(0, 9000)}` },
     ], {
       model: process.env.OPENAI_VISUAL_VALIDATOR_MODEL || process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini',
-      // 16 saniye kesinlikle "VALID"/"INVALID" için yeterli ama bazı modeller
-      // kısa bir gerekçe iliştiriyor; 8 token bunu bile bazen kesiyordu ve
-      // kesik yanıt normalize sonrası INVALID'e düşüp geçerli görseli
-      // reddediyordu. 24'e çıkarıldı, karar hâlâ sadece net VALID ise kabul.
-      max_tokens: 24,
+      max_tokens: 120,
       temperature: 0,
       operation: 'visual-question:validate',
       timeoutMs: 15000,
+      json: true,
     })
-    const normalizedVerdict = verdict.trim().toUpperCase()
-    // Bazı modeller kısa bir gerekçe ekleyebilir; sadece net VALID kararı kabul.
-    const isValid = normalizedVerdict.startsWith('VALID')
-    if (!isValid) console.warn('[visual-validation] OpenAI rejected SVG:', normalizedVerdict.slice(0, 120))
-    return isValid
+    const result = JSON.parse(raw) as { score?: unknown; contextMatch?: unknown; answerLeak?: unknown; reason?: unknown }
+    const score = Number(result.score)
+    const reason = typeof result.reason === 'string' ? result.reason.slice(0, 240) : 'Görsel bağlamı doğrulanamadı.'
+    const passed = Number.isFinite(score) && score >= 90 && result.contextMatch === true && result.answerLeak !== true
+    if (!passed) console.warn(`[visual-validation] OpenAI rejected SVG score=${score}: ${reason}`)
+    return { passed, score: Number.isFinite(score) ? score : 0, reason }
   } catch (error) {
     console.error('[visual-validation] error:', error)
-    return false
+    return { passed: false, score: 0, reason: 'Görsel kalite denetimi tamamlanamadı.' }
   }
 }
 
@@ -427,7 +427,7 @@ async function generateVisualForQuestion(
   category: string,
   topic: string,
   grade: string
-): Promise<string | null> {
+): Promise<{ svg: string; contextQuality: VisualContextQuality } | null> {
   try {
     // Soru tipine göre SVG uygunluk kontrolü
     // true_false ve short_answer sorularında SVG üretme
@@ -495,8 +495,11 @@ async function generateVisualForQuestion(
     }
     // SVG'yi temizle — sadece <svg...></svg> al
     const match = text.match(/<svg[\s\S]*<\/svg>/i)
-    if (match && await visualMatchesQuestion(q.q, match[0])) return match[0]
-    if (match) console.warn('[generate-visual] rejected unrelated or answer-revealing SVG')
+    if (match) {
+      const contextQuality = await visualMatchesQuestion(q.q, match[0])
+      if (contextQuality.passed) return { svg: match[0], contextQuality }
+    }
+    if (match) console.warn('[generate-visual] rejected unrelated, low-context, or answer-revealing SVG')
     return null
   } catch (e) {
     console.error('[generate-visual] error:', e)
@@ -930,7 +933,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
 // Sabit bir süre yerine artık ÇAĞIRANIN o an isteğin 120sn'lik bütçesinden
 // GERÇEKTEN ne kadar kaldığını hesaplayıp verdiği payı kullanıyoruz — böylece
 // tek bir görsel zinciri, kalan süreden fazlasını asla harcayamaz.
-async function generateVisualWithRetry(q: any, category: string, topic: string, grade: string, maxMs: number): Promise<string | null> {
+async function generateVisualWithRetry(q: any, category: string, topic: string, grade: string, maxMs: number): Promise<{ svg: string; contextQuality: VisualContextQuality } | null> {
   return withTimeout((async () => {
     const first = await generateVisualForQuestion(q, category, topic, grade)
     if (first) return first
@@ -1892,15 +1895,18 @@ export async function POST(req: NextRequest) {
     const svgResults = shouldGenerateVisuals
       ? await Promise.all(visualIndexes.map(i =>
           generateVisualWithRetry(questions[i], visualCategory, topic, grade, visualBudgetMs)
-            .then(svg => ({ i, svg }))
-            .catch(() => ({ i, svg: null }))
+            .then(visual => ({ i, visual }))
+            .catch(() => ({ i, visual: null }))
         ))
       : []
 
-    for (const { i, svg } of svgResults) {
-      if (svg && questions[i]) {
-        questions[i] = { ...questions[i], svg, qtype: 'svg', visualQuestionText: questions[i].q }
-        console.log(`[generate-quiz] visual generated for q[${i}]`)
+    for (const { i, visual } of svgResults) {
+      if (visual && questions[i]) {
+        questions[i] = {
+          ...questions[i], svg: visual.svg, qtype: 'svg', visualQuestionText: questions[i].q,
+          visualContextQuality: { score: visual.contextQuality.score, reason: visual.contextQuality.reason, evaluator: 'openai' },
+        }
+        console.log(`[generate-quiz] visual generated for q[${i}] contextScore=${visual.contextQuality.score}`)
       }
     }
 
