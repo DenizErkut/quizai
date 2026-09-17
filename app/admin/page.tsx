@@ -25,6 +25,7 @@ import AdaptiveStatistics from '@/components/admin/AdaptiveStatistics'
 import LearningRiskOverview from '@/components/LearningRiskOverview'
 import PredictiveRiskCalibration from '@/components/admin/PredictiveRiskCalibration'
 import PipelineHealth from '@/components/admin/PipelineHealth'
+import CoachAnalytics from '@/components/admin/CoachAnalytics'
 import QuestionBankEditor from '@/components/QuestionBankEditor'
 import DailyHabitMetrics from '@/components/admin/DailyHabitMetrics'
 
@@ -1584,6 +1585,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     <RecommendationImpact />
                     <AgentQuality />
           <PipelineHealth />
+          <CoachAnalytics />
           <MasteryCalibration />
           <RetentionCalibration />
           <QuestionDifficultyCalibration />

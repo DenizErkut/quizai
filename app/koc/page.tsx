@@ -65,7 +65,25 @@ export default function PratiumKocPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function startPractice(action: CoachAction) {
+  async function startPractice(action: CoachAction, messageId?: string) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      // Kullanım analitikleri: butona gerçekten tıklandığını kaydet — koçun
+      // action'ı SUNMASI (coach_messages.action) ile öğrencinin onu
+      // TIKLAMASI farklı şeyler; bu olmadan click-through oranı hiç
+      // ölçülemiyordu. Analitik yazımı başarısız olsa bile pratiğe
+      // başlamayı asla engellemiyoruz.
+      if (user) {
+        void supabase.from('coach_action_clicks').insert({
+          user_id: user.id,
+          message_id: messageId || null,
+          topic: action.topic,
+          recommendation_id: action.recommendationId || null,
+        })
+      }
+    } catch {
+      // analitik kaydı başarısız olabilir, akışı bozmaz
+    }
     try {
       if (action.recommendationId) {
         const { data: { session } } = await supabase.auth.getSession()
@@ -144,7 +162,7 @@ export default function PratiumKocPage() {
                   {m.content}
                   {m.action?.type === 'start_practice' && (
                     <button
-                      onClick={() => startPractice(m.action as CoachAction)}
+                      onClick={() => startPractice(m.action as CoachAction, m.id)}
                       className="btn btn-primary"
                       style={{ marginTop: '10px', width: '100%', fontSize: '13px', padding: '8px 12px' }}
                     >
