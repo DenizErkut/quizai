@@ -26,6 +26,7 @@ const TYPE_META: Record<string, { icon: string; color: string; bg: string; label
   quiz_result:     { icon: '✅', color: '#3b82f6', bg: 'rgba(59,130,246,0.08)',   label: 'Test' },
   reminder:        { icon: '⏰', color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)',   label: 'Hatırlatma' },
   parent_report:   { icon: '👨‍👩‍👧', color: '#ec4899', bg: 'rgba(236,72,153,0.08)', label: 'Veli' },
+  coach_nudge:     { icon: '✦', color: '#a855f7', bg: 'rgba(168,85,247,0.08)',     label: 'Pratium Koç' },
 }
 
 function getMeta(type: string) {
@@ -46,7 +47,7 @@ function timeAgo(dateStr: string) {
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const [prefs, setPrefs] = useState<Record<string, boolean>>({ assignment:true, streak:true, achievement:true, weekly_summary:true, teacher_message:true })
+  const [prefs, setPrefs] = useState<Record<string, boolean>>({ assignment:true, streak:true, achievement:true, weekly_summary:true, teacher_message:true, coach_nudge:true })
   const togglePref = async (key: string) => { const next=!prefs[key]; setPrefs(p=>({...p,[key]:next})); const token=(await createClient().auth.getSession()).data.session?.access_token; if(token) await fetch('/api/notifications/preferences',{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({[key]:next})}) }
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('all')
@@ -301,6 +302,7 @@ export default function NotificationsPage() {
               { label: '🏆 Başarı rozetleri', key: 'achievement' },
               { label: '📊 Haftalık özet (Pazar)', key: 'weekly_summary' },
               { label: '🎓 Öğretmen mesajları', key: 'teacher_message' },
+              { label: '✦ Pratium Koç mesajları', key: 'coach_nudge' },
             ].map(pref => (
               <div key={pref.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                 <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{pref.label}</span>
