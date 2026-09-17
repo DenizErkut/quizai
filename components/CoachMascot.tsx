@@ -15,6 +15,11 @@
 //
 // useUser() UserProvider içinde çağrılmalı — bu yüzden layout.tsx'te
 // <UserProvider> içine, AIChatBot'un DIŞINDA monte ediliyor.
+//
+// 17 Eylül 2026 (2. güncelleme) — Deniz'in isteği üzerine: baloncuk başlığı
+// "Koç'un Benim!" oldu, ikon eski robot/AI-blob maskotu (mascot-prati-*)
+// yerine daha insani, sıcak bir "öğretmen" karakterine (public/mascot-coach-
+// human.webp, lisanslı bir stok vektörden kırpıldı) geçti.
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useUser } from '@/lib/user-context'
@@ -100,8 +105,8 @@ export default function CoachMascot() {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: '0 8px 28px rgba(41,72,61,0.25)', textDecoration: 'none',
         }}>
-        <span style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', padding: '6px' }}>
-          <img src="/mascot-prati-face-v2.webp" alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        <span style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', padding: '4px' }}>
+          <img src="/mascot-coach-human.webp" alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </span>
         {unread > 0 && (
           <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 20, height: 20, padding: '0 4px', borderRadius: '999px', background: '#a855f7', color: '#fff', fontSize: '11px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
