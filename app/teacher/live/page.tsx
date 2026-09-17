@@ -11,7 +11,7 @@ export default function TeacherLivePage() {
 
   const [teacher, setTeacher] = useState<any>(null)
   const [classrooms, setClassrooms] = useState<any[]>([])
-  const [screen, setScreen] = useState<'setup' | 'waiting' | 'active' | 'results'>('setup')
+  const [screen, setScreen] = useState<'setup' | 'waiting' | 'active' | 'reveal' | 'results'>('setup')
   const [form, setForm] = useState({ classroom_id: '', topic: '', question_count: 5, difficulty: 'normal', time_per_question: 30 })
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
@@ -69,7 +69,7 @@ export default function TeacherLivePage() {
   async function fetchAnswers(liveQuizId: string) {
     const { data: ans } = await supabase
       .from('live_quiz_answers')
-      .select('user_id, question_index, chosen_answer, is_correct, answered_at, profiles(avatar_url)')
+      .select('user_id, question_index, chosen_answer, is_correct, answered_at, score, profiles(avatar_url)')
       .eq('live_quiz_id', liveQuizId)
     // İsimler TR-PG'den; her cevap satırına profiles.name olarak enjekte edilir
     const identities = await resolveIdentities(supabase, (ans ?? []).map((a: any) => a.user_id))
@@ -81,15 +81,18 @@ export default function TeacherLivePage() {
     const realAnswers = enriched.filter((a: any) => a.question_index >= 0)
     setAnswers(realAnswers)
 
-    // Liderboard hesapla
-    const scoreMap: Record<string, { name: string; avatar: string | null; correct: number; total: number }> = {}
+    // Liderboard hesapla — Kahoot tarzı puan (doğruluk + hız) toplamına göre
+    // sıralanıyor, sadece doğru sayısına göre değil. Deniz'in isteği: "cevap
+    // süresi ve doğruluk üzerinden" değerlendirme.
+    const scoreMap: Record<string, { name: string; avatar: string | null; correct: number; total: number; points: number }> = {}
     for (const a of realAnswers) {
-      if (!scoreMap[a.user_id]) scoreMap[a.user_id] = { name: a.profiles?.name || 'Öğrenci', avatar: a.profiles?.avatar_url || null, correct: 0, total: 0 }
+      if (!scoreMap[a.user_id]) scoreMap[a.user_id] = { name: a.profiles?.name || 'Öğrenci', avatar: a.profiles?.avatar_url || null, correct: 0, total: 0, points: 0 }
       scoreMap[a.user_id].total++
       if (a.is_correct) scoreMap[a.user_id].correct++
+      scoreMap[a.user_id].points += a.score || 0
     }
     const lb = Object.entries(scoreMap).map(([uid, s]) => ({ uid, ...s, pct: s.total > 0 ? Math.round(s.correct / s.total * 100) : 0 }))
-    lb.sort((a, b) => b.correct - a.correct)
+    lb.sort((a, b) => b.points - a.points)
     setLeaderboard(lb)
   }
 
@@ -179,6 +182,22 @@ export default function TeacherLivePage() {
     }, 1000)
   }
 
+  // Deniz'in isteği: "canlı quiz esnasında her soruda ilk üçü gösterelim" —
+  // soru bitince direkt sonraki soruya geçmek yerine önce bir ara "yarış
+  // tablosu" ekranı gösteriliyor. Öğretmen "Sıralamayı Göster" deyince
+  // revealing=true oluyor (bkz. app/api/live-quiz/route.ts), bu da
+  // Realtime/polling ile öğrenci ekranına (LiveContent.tsx) da yansıyor.
+  async function revealLeaderboard() {
+    if (timerRef.current) clearInterval(timerRef.current)
+    const { data: { session } } = await supabase.auth.getSession()
+    await fetch('/api/live-quiz', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ live_quiz_id: liveQuiz.id, action: 'reveal' }),
+    })
+    setScreen('reveal')
+  }
+
   async function nextQuestion() {
     const nextQ = currentQ + 1
     if (nextQ >= (liveQuiz.questions?.length || 0)) {
@@ -192,6 +211,7 @@ export default function TeacherLivePage() {
       body: JSON.stringify({ live_quiz_id: liveQuiz.id, action: 'next', current_question: nextQ }),
     })
     setCurrentQ(nextQ)
+    setScreen('active')
     startTimer()
   }
 
@@ -382,11 +402,42 @@ export default function TeacherLivePage() {
             <div><div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text2)' }}>{Math.max(0, totalParticipants - answeredThisQ)}</div><div style={{ fontSize: '11px', color: 'var(--text3)' }}>Bekliyor</div></div>
           </div>
 
-          <button onClick={nextQuestion}
-            style={{ width: '100%', padding: '13px', borderRadius: '12px', border: 'none', background: currentQ >= (liveQuiz.questions.length - 1) ? '#dc2626' : '#6366f1', color: '#fff', fontWeight: 700, fontSize: '15px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-            {currentQ >= (liveQuiz.questions.length - 1) ? '🏁 Quizi Bitir' : 'Sonraki Soru →'}
+          <button onClick={revealLeaderboard}
+            style={{ width: '100%', padding: '13px', borderRadius: '12px', border: 'none', background: '#f59e0b', color: '#fff', fontWeight: 700, fontSize: '15px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+            🏆 Sıralamayı Göster
           </button>
         </div>
+      </main>
+    )
+  }
+
+  // ── REVEAL (Soru arası yarış tablosu) ─────────────────────────────────────
+  if (screen === 'reveal') {
+    const top3 = leaderboard.slice(0, 3)
+    const isLastQuestion = currentQ >= (liveQuiz.questions.length - 1)
+    return (
+      <main style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #082465, #6366f1)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
+        <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '4px' }}>Soru {currentQ + 1}/{liveQuiz.questions.length} sonrası</div>
+        <div style={{ fontWeight: 900, fontSize: '26px', color: '#fff', marginBottom: '1.5rem' }}>🏆 İlk 3</div>
+
+        <div style={{ background: '#fff', borderRadius: '20px', padding: '1.5rem', width: '100%', maxWidth: '420px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', marginBottom: '1.5rem' }}>
+          {top3.length === 0 ? (
+            <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', padding: '1rem' }}>Henüz kimse cevap vermedi.</div>
+          ) : top3.map((entry, i) => (
+            <div key={entry.uid} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
+              <div style={{ fontSize: '26px' }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</div>
+              <div style={{ flex: 1, fontWeight: 700, fontSize: '15px', color: 'var(--primary)' }}>{entry.name}</div>
+              <div style={{ fontWeight: 800, fontSize: '16px', color: '#6366f1' }}>{entry.points} puan</div>
+            </div>
+          ))}
+        </div>
+
+        <button onClick={isLastQuestion ? finishQuiz : nextQuestion}
+          style={{ width: '100%', maxWidth: '420px', padding: '16px', borderRadius: '14px', border: 'none',
+            background: isLastQuestion ? '#dc2626' : 'linear-gradient(135deg, #1ECFB8, #0ea5a0)',
+            color: '#fff', fontWeight: 800, fontSize: '16px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+          {isLastQuestion ? '🏁 Quizi Bitir' : 'Sonraki Soru →'}
+        </button>
       </main>
     )
   }
@@ -417,10 +468,10 @@ export default function TeacherLivePage() {
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary)' }}>{entry.name}</div>
-                <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{entry.correct} doğru / {entry.total} soru</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{entry.correct} doğru / {entry.total} soru · %{entry.pct}</div>
               </div>
-              <div style={{ fontWeight: 800, fontSize: '16px', color: entry.pct >= 70 ? '#16a34a' : entry.pct >= 50 ? '#d97706' : '#dc2626' }}>
-                %{entry.pct}
+              <div style={{ fontWeight: 800, fontSize: '16px', color: '#6366f1' }}>
+                {entry.points} puan
               </div>
             </div>
           ))}

@@ -9,15 +9,16 @@ export default function LiveContent() {
   const searchParams = useSearchParams()
   const supabase = createClient() as any
 
-  const [screen, setScreen] = useState<'join' | 'waiting' | 'question' | 'answer_sent' | 'results'>('join')
+  const [screen, setScreen] = useState<'join' | 'waiting' | 'question' | 'answer_sent' | 'leaderboard' | 'results'>('join')
   const [code, setCode] = useState(searchParams.get('code')?.toUpperCase() || '')
   const [liveQuiz, setLiveQuiz] = useState<any>(null)
   const [currentQ, setCurrentQ] = useState(0)
   const [chosen, setChosen] = useState<number | null>(null)
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
   const [timeLeft, setTimeLeft] = useState(0)
-  const [score, setScore] = useState({ correct: 0, total: 0 })
+  const [score, setScore] = useState({ correct: 0, total: 0, points: 0 })
   const [leaderboard, setLeaderboard] = useState<any[]>([])
+  const [lastAnswerScore, setLastAnswerScore] = useState<number | null>(null)
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState('')
   const timerRef = useRef<NodeJS.Timeout | null>(null)
@@ -93,7 +94,7 @@ export default function LiveContent() {
     const pollId = setInterval(async () => {
       const { data: updated } = await supabase
         .from('live_quizzes')
-        .select('id, status, current_question, time_per_question')
+        .select('id, status, current_question, time_per_question, revealing')
         .eq('id', lq.id)
         .single()
       if (updated) handleQuizUpdate(updated)
@@ -120,7 +121,19 @@ export default function LiveContent() {
       return
     }
 
-    // ② Yeni soru geldi (current_question değişti)
+    // ② Öğretmen "Sıralamayı Göster" dedi (revealing=true) — soru henüz
+    // değişmedi ama ara yarış tablosu ekranı gösteriliyor. Deniz'in isteği:
+    // "her soru da ilk üçü gösterelim, canlı testler yarış formatına dönüşsün."
+    if (updated.revealing === true && screenRef.current !== 'leaderboard') {
+      if (timerRef.current) clearInterval(timerRef.current)
+      fetchLeaderboard(prev.id, 3)
+      setScreen('leaderboard')
+      screenRef.current = 'leaderboard'
+      setLiveQuiz((p: any) => ({ ...p, ...updated }))
+      return
+    }
+
+    // ③ Yeni soru geldi (current_question değişti)
     if (
       updated.status === 'active' &&
       updated.current_question !== undefined &&
@@ -137,7 +150,7 @@ export default function LiveContent() {
       return
     }
 
-    // ③ waiting → active (quiz başladı)
+    // ④ waiting → active (quiz başladı)
     if (updated.status === 'active' && screenRef.current === 'waiting') {
       setCurrentQ(updated.current_question ?? 0)
       currentQRef.current = updated.current_question ?? 0
@@ -178,8 +191,9 @@ export default function LiveContent() {
     })
     const data = await res.json()
     setIsCorrect(data.is_correct)
+    setLastAnswerScore(typeof data.score === 'number' ? data.score : null)
 
-    const newScore = { correct: score.correct + (data.is_correct ? 1 : 0), total: score.total + 1 }
+    const newScore = { correct: score.correct + (data.is_correct ? 1 : 0), total: score.total + 1, points: score.points + (data.score || 0) }
     setScore(newScore)
 
     const totalQuestions = liveQuizRef.current?.questions?.length || 0
@@ -195,22 +209,27 @@ export default function LiveContent() {
     setScreen('answer_sent')
   }
 
-  async function fetchLeaderboard(liveQuizId: string) {
+  // limit verilirse (ör. soru arası ara tablo) sadece ilk N kişi tutulur —
+  // Deniz'in isteği: "her soru da ilk üçü gösterelim." Puan Kahoot tarzı
+  // (doğruluk + hız) — bkz. app/api/live-quiz/route.ts PUT handler.
+  async function fetchLeaderboard(liveQuizId: string, limit?: number) {
     const { data: ans } = await supabase
       .from('live_quiz_answers')
-      .select('user_id, is_correct')
+      .select('user_id, question_index, is_correct, score')
       .eq('live_quiz_id', liveQuizId)
     // İsimler TR-PG'den toplu çekilir
     const identities = await resolveIdentities(supabase, (ans ?? []).map((a: any) => a.user_id))
-    const scoreMap: Record<string, { name: string; correct: number; total: number }> = {}
+    const scoreMap: Record<string, { name: string; correct: number; total: number; points: number }> = {}
     for (const a of (ans ?? [])) {
       if (a.question_index < 0) continue  // join marker'ı atla
-      if (!scoreMap[a.user_id]) scoreMap[a.user_id] = { name: identities[a.user_id]?.full_name || 'Öğrenci', correct: 0, total: 0 }
+      if (!scoreMap[a.user_id]) scoreMap[a.user_id] = { name: identities[a.user_id]?.full_name || 'Öğrenci', correct: 0, total: 0, points: 0 }
       scoreMap[a.user_id].total++
       if (a.is_correct) scoreMap[a.user_id].correct++
+      scoreMap[a.user_id].points += a.score || 0
     }
-    const lb = Object.values(scoreMap).map(s => ({ ...s, pct: s.total > 0 ? Math.round(s.correct / s.total * 100) : 0 }))
-    lb.sort((a, b) => b.correct - a.correct)
+    let lb = Object.values(scoreMap).map(s => ({ ...s, pct: s.total > 0 ? Math.round(s.correct / s.total * 100) : 0 }))
+    lb.sort((a, b) => b.points - a.points)
+    if (limit) lb = lb.slice(0, limit)
     setLeaderboard(lb)
   }
 
@@ -308,6 +327,32 @@ export default function LiveContent() {
     </main>
   )
 
+  // ── LEADERBOARD (soru arası yarış tablosu) ──────────────────────────────────
+  if (screen === 'leaderboard') return (
+    <main style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #082465, #6366f1)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem', textAlign: 'center' }}>
+      {lastAnswerScore !== null && (
+        <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '4px' }}>
+          {lastAnswerScore > 0 ? `Bu soruda +${lastAnswerScore} puan aldın` : 'Bu soruda puan alamadın'}
+        </div>
+      )}
+      <div style={{ fontWeight: 900, fontSize: '26px', color: '#fff', marginBottom: '1.5rem' }}>🏆 İlk 3</div>
+
+      <div style={{ background: '#fff', borderRadius: '20px', padding: '1.5rem', width: '100%', maxWidth: '380px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', marginBottom: '1.5rem' }}>
+        {leaderboard.length === 0 ? (
+          <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '13px', padding: '1rem' }}>Henüz kimse cevap vermedi.</div>
+        ) : leaderboard.map((entry, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderTop: i > 0 ? '1px solid #e2e8f0' : undefined }}>
+            <div style={{ fontSize: '26px' }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</div>
+            <div style={{ flex: 1, fontWeight: 700, fontSize: '15px', color: '#082465', textAlign: 'left' }}>{entry.name}</div>
+            <div style={{ fontWeight: 800, fontSize: '16px', color: '#6366f1' }}>{entry.points}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>Öğretmen sonraki soruyu açıyor...</div>
+    </main>
+  )
+
   // ── RESULTS ───────────────────────────────────────────────────────────────
   if (screen === 'results') return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: '80px' }}>
@@ -328,8 +373,8 @@ export default function LiveContent() {
                 {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
               </div>
               <div style={{ flex: 1, fontWeight: 500, fontSize: '14px', color: 'var(--primary)' }}>{entry.name}</div>
-              <div style={{ fontWeight: 800, fontSize: '15px', color: entry.pct >= 70 ? '#16a34a' : entry.pct >= 50 ? '#d97706' : '#dc2626' }}>
-                %{entry.pct}
+              <div style={{ fontWeight: 800, fontSize: '15px', color: '#6366f1' }}>
+                {entry.points} puan
               </div>
             </div>
           ))}

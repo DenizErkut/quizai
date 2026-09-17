@@ -101,12 +101,18 @@ export async function PATCH(req: NextRequest) {
   if (!teacher) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
 
   const { live_quiz_id, action, current_question } = await req.json()
-  // action: 'start' | 'next' | 'finish'
-
+  // action: 'start' | 'reveal' | 'next' | 'finish'
+  //
+  // 'reveal': öğretmen bir soru bittiğinde "Sıralamayı Göster" diyor — soru
+  // değişmiyor ama revealing=true oluyor, bu da Realtime/polling ile
+  // öğrenci tarafında (bkz. app/live/LiveContent.tsx) ara liderlik tablosu
+  // ekranını tetikliyor. Yarış hissi bunun üzerine kuruluyor.
+  const nowIso = new Date().toISOString()
   const updates: any = {}
-  if (action === 'start') { updates.status = 'active'; updates.started_at = new Date().toISOString(); updates.current_question = 0 }
-  else if (action === 'next') { updates.current_question = current_question }
-  else if (action === 'finish') { updates.status = 'finished'; updates.finished_at = new Date().toISOString() }
+  if (action === 'start') { updates.status = 'active'; updates.started_at = nowIso; updates.current_question = 0; updates.question_started_at = nowIso; updates.revealing = false }
+  else if (action === 'reveal') { updates.revealing = true }
+  else if (action === 'next') { updates.current_question = current_question; updates.question_started_at = nowIso; updates.revealing = false }
+  else if (action === 'finish') { updates.status = 'finished'; updates.finished_at = nowIso; updates.revealing = false }
 
   const { data } = await supabase.from('live_quizzes')
     .update(updates)
@@ -130,11 +136,33 @@ export async function PUT(req: NextRequest) {
   const { live_quiz_id, question_index, chosen_answer } = await req.json()
 
   // live_quiz'i çek — doğru cevabı kontrol et
-  const { data: lq } = await supabase.from('live_quizzes').select('questions').eq('id', live_quiz_id).single()
+  const { data: lq } = await supabase.from('live_quizzes').select('questions,question_started_at,time_per_question').eq('id', live_quiz_id).single()
   if (!lq) return NextResponse.json({ error: 'Quiz bulunamadı.' }, { status: 404 })
 
   const question = lq.questions[question_index]
   const is_correct = question?.ans === chosen_answer
+
+  // Cevap süresi (ms) — question_started_at, öğretmenin bu soruyu açtığı an
+  // (PATCH 'start'/'next') sunucuda set ediliyor. Eksikse (eski kayıt/edge
+  // case) süre bazlı puanlamayı devre dışı bırakıp sadece doğruluk puanı ver.
+  const now = new Date()
+  const startedAt = lq.question_started_at ? new Date(lq.question_started_at) : null
+  const response_ms = startedAt ? Math.max(0, now.getTime() - startedAt.getTime()) : null
+  const timeLimitMs = (lq.time_per_question || 30) * 1000
+
+  // Kahoot tarzı puanlama: doğru cevap her zaman en az 500, en fazla 1000
+  // puan — ne kadar hızlı cevaplarsa o kadar yüksek. Yanlış cevap 0 puan.
+  // Deniz'in tercihi: "her soru sonrası ilk 3'ü göstermek" için doğruluk +
+  // hız birlikte değerlendirilsin.
+  let score = 0
+  if (is_correct) {
+    if (response_ms === null) {
+      score = 1000
+    } else {
+      const elapsedRatio = Math.min(1, response_ms / timeLimitMs)
+      score = Math.round(1000 - 500 * elapsedRatio)
+    }
+  }
 
   // Upsert: aynı soru için tekrar cevap gönderilirse güncelle
   await supabase.from('live_quiz_answers').upsert({
@@ -143,10 +171,12 @@ export async function PUT(req: NextRequest) {
     question_index,
     chosen_answer,
     is_correct,
-    answered_at: new Date().toISOString(),
+    response_ms,
+    score,
+    answered_at: now.toISOString(),
   }, { onConflict: 'live_quiz_id,user_id,question_index' })
 
-  return NextResponse.json({ is_correct, correct_ans: question?.ans })
+  return NextResponse.json({ is_correct, correct_ans: question?.ans, score })
 }
 
 // Öğrenci: quize katıl (join kaydı — question_index: -1 ile marker)
