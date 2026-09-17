@@ -29,6 +29,10 @@
     {
       "path": "/api/cron/adaptive-evidence-checkpoints",
       "schedule": "15 4 * * *"
+    },
+    {
+      "path": "/api/cron/coach-proactive-nudge",
+      "schedule": "0 7 * * *"
     }
   ]
 }
