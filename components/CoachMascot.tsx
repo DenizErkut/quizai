@@ -74,7 +74,7 @@ export default function CoachMascot() {
           >×</button>
           <Link href="/koc" style={{ textDecoration: 'none' }}>
             <div style={{ fontSize: '13px', fontWeight: 700, color: '#082465', marginBottom: '2px' }}>
-              Ben buradayım! ✦
+              Koç'un Benim! ✦
             </div>
             <div style={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.5 }}>
               Hadi şimdi birlikte çalışalım — sana özel önerim var 💪
