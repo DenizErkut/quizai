@@ -4,6 +4,7 @@ import Navbar from '@/components/Navbar'
 import ThemeToggleFloating from '@/components/ThemeToggleFloating'
 import { UserProvider } from '@/lib/user-context'
 import AIChatBot from '@/components/AIChatBot'
+import CoachMascot from '@/components/CoachMascot'
 import PWAInstallBanner from '@/components/PWAInstallBanner'
 import ConsentGate from '@/components/ConsentGate'
 import CookieConsent from '@/components/CookieConsent'
@@ -132,6 +133,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {/* Madde 7: sözleşme/rıza versiyonu değiştiğinde yeniden-onay modalı */}
           <ConsentGate />
           <CookieConsent />
+          {/* Pratium Koç maskotu — useUser() gerektirdiği için UserProvider
+              içinde; artık her sayfada görünüyor (önceden sadece dashboard'a
+              gömülüydü). */}
+          <CoachMascot />
         </UserProvider>
         <AIChatBot />
       </body>

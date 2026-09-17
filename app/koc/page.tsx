@@ -56,6 +56,12 @@ export default function PratiumKocPage() {
         const data = await res.json()
         if (!res.ok) { setError(data.error || 'Koç yüklenemedi.'); setLoading(false); return }
         setMessages(data.messages || [])
+        // Öğrenci koçu açtığında, Faz D'nin cron'unun bıraktığı proaktif
+        // bildirimleri okunmuş işaretle — aksi halde global maskot
+        // ikonundaki rozet (bkz. components/CoachMascot.tsx) burayı
+        // ziyaret etse bile hiç sıfırlanmıyordu.
+        void supabase.from('notifications').update({ read: true })
+          .eq('user_id', user.id).eq('type', 'coach_nudge').eq('read', false)
       } catch {
         setError('Bağlantı hatası, lütfen sayfayı yenile.')
       }

@@ -25,7 +25,7 @@ interface QuizSetupProps {
   setUploadedFiles: (v: UploadedFile[]) => void
   favorites: string[]
   mebTopics: Record<string, string[]>
-  topicSummary: { summary: string; keyPoints: string[]; keyTerms: { term: string; definition: string }[]; rememberThis: string } | null
+  topicSummary: { summary: string; keyPoints: string[]; keyTerms: { term: string; definition: string }[]; rememberThis: string; curriculumGrounded?: boolean } | null
   summaryLoading: boolean
   showSummary: boolean
   setShowSummary: (v: boolean) => void
@@ -252,8 +252,13 @@ export default function QuizSetup({
             {showSummary && (
               <div style={{ marginTop: '12px', borderRadius: '14px', border: '1.5px solid rgba(99,102,241,0.25)', background: 'rgba(99,102,241,0.04)', padding: '14px 16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <div style={{ fontWeight: 700, fontSize: '13px', color: '#6366f1', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ fontWeight: 700, fontSize: '13px', color: '#6366f1', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                     📖 {selectedTopic || customTopic.trim()} — Hızlı Özet
+                    {topicSummary?.curriculumGrounded && (
+                      <span title="Bu özet MEB müfredatındaki gerçek kazanımlara dayanıyor" style={{ fontSize: '10px', fontWeight: 700, color: '#0d9488', background: 'rgba(13,148,136,0.1)', border: '1px solid rgba(13,148,136,0.3)', borderRadius: '99px', padding: '2px 8px' }}>
+                        ✓ MEB müfredatına dayalı
+                      </span>
+                    )}
                   </div>
                   <button onClick={() => setShowSummary(false)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '16px', padding: 0 }}>×</button>
                 </div>

@@ -42,7 +42,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [dueCards, setDueCards] = useState(0)
   const [greeting, setGreeting] = useState('Merhaba')
-  const [coachUnread, setCoachUnread] = useState(0)
 
   useEffect(() => {
     const h = new Date().getHours()
@@ -55,7 +54,7 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      const [{ data: p }, { data: s }, { data: dashStats }, { data: sk }, displayName, { count: coachNudgeCount }] = await Promise.all([
+      const [{ data: p }, { data: s }, { data: dashStats }, { data: sk }, displayName] = await Promise.all([
         supabase.from('profiles').select('grade,language,plan').eq('id', user.id).single(),
         // Son 5 test — sadece ihtiyaç duyulan alanlar
         supabase.from('quiz_sessions')
@@ -66,17 +65,12 @@ export default function DashboardPage() {
         supabase.rpc('get_dashboard_stats', { p_user_id: user.id }),
         supabase.from('streaks').select('current_streak').eq('user_id', user.id).maybeSingle(),
         resolveName(supabase, user.id),
-        // Pratium Koç, Faz D: proaktif cron'un bıraktığı okunmamış bildirim
-        // sayısı — dashboard'daki koç ikonunda rozet olarak gösteriliyor.
-        supabase.from('notifications').select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id).eq('type', 'coach_nudge').eq('read', false),
       ])
 
       setProfile(p ? { ...p, name: displayName } : (displayName ? { name: displayName } : null))
       setSessions(s || [])
       setStats(dashStats || { total_count: 0, total_correct: 0, total_questions: 0, avg_pct: 0, best_pct: 0, weak_count: 0 })
       setStreak(sk?.current_streak || 0)
-      setCoachUnread(coachNudgeCount || 0)
       // SM-2 bugün bekleyen kartlar
       try {
         const { data: { session: srSession } } = await supabase.auth.getSession()
@@ -300,28 +294,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Pratium Koç — kişisel koç maskotu, dashboard'un her yerinden
-          erişilebilir sabit bir ikon. AIChatBot'un genel sohbet balonuyla
-          (sağ altta) çakışmaması için sol altta konumlandırıldı. coachUnread
-          rozeti, Faz D'nin proaktif cron'unun bıraktığı okunmamış bir
-          mesaj olduğunda görünür. */}
-      <Link href="/koc" aria-label="Pratium Koç ile sohbet et" className="pratium-koc-launcher"
-        style={{
-          position: 'fixed', bottom: '24px', left: '24px', zIndex: 9998,
-          width: 68, height: 68, borderRadius: '20px',
-          background: '#fff', border: '2px solid rgba(168,85,247,0.3)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 8px 28px rgba(41,72,61,0.25)', textDecoration: 'none',
-        }}>
-        <span style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', padding: '6px' }}>
-          <img src="/mascot-prati-face-v2.webp" alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-        </span>
-        {coachUnread > 0 && (
-          <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 20, height: 20, padding: '0 4px', borderRadius: '999px', background: '#a855f7', color: '#fff', fontSize: '11px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
-            {coachUnread}
-          </span>
-        )}
-      </Link>
     </main>
   )
 }

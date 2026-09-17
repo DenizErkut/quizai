@@ -142,7 +142,7 @@ function QuizPageContent() {
   const [advancedOpen, setAdvancedOpen] = useState(false) // Gelişmiş ayarlar
   const [favorites, setFavorites] = useState<string[]>([]) // Favori konular
   const [mebTopics, setMebTopics] = useState<Record<string, string[]>>({}) // subject -> units (grade filtreli)
-  const [topicSummary, setTopicSummary] = useState<{summary: string; keyPoints: string[]; keyTerms: {term: string; definition: string}[]; rememberThis: string} | null>(null)
+  const [topicSummary, setTopicSummary] = useState<{summary: string; keyPoints: string[]; keyTerms: {term: string; definition: string}[]; rememberThis: string; curriculumGrounded?: boolean} | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [showSummary, setShowSummary] = useState(false)
 
@@ -240,7 +240,7 @@ function QuizPageContent() {
       const res = await fetch('/api/topic-summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ topic, grade: profile?.grade, language: currentLang }),
+        body: JSON.stringify({ topic, subject: selectedSubject || undefined, grade: profile?.grade, language: currentLang }),
       })
       const data = await res.json()
       if (res.ok) setTopicSummary(data)
