@@ -20,9 +20,17 @@
 //
 // 17 Eylül 2026 (3. güncelleme) — Deniz'in isteği: koç ikonu artık sağ altta,
 // AIChatBot'un (Prati, 84x84, bottom:24/right:24) TAM ÜSTÜNDE, aynı sağ
-// kenara hizalı dikey olarak istifleniyor — eskiden sol alttaydı. İkisi
-// arasında AIChatBot'un yüksekliği + boşluk kadar mesafe var, üst üste
-// binmiyorlar.
+// kenara hizalı dikey olarak istifleniyor — eskiden sol alttaydı.
+//
+// 17 Eylül 2026 (4. güncelleme) — Deniz'in ekran görüntüsüyle bildirdiği
+// sorun: ikon, Prati'nin kendi "Merhaba, ben Prati!" balonunun ARKASINDA
+// kalıp görünmez oluyordu (iki bileşen de zIndex 9998 kullanıyordu, DOM'da
+// sonra gelen AIChatBot üstte kalıyordu) ve boyutu Prati'den (84x84) küçüktü
+// (68x68). Düzeltme: koç ikonu artık Prati ile AYNI boyutta (84x84), zIndex
+// AIChatBot'un HER ŞEYİNDEN yüksek (10000) ki asla arkada kalmasın, ve
+// Prati'nin balonunun tahmini üst kenarının üstünde, iki balon arasındaki
+// boşlukla aynı mertebede bir boşluk bırakılarak konumlandı (bottom:208px —
+// Prati'nin balonu ~bottom:108-192 arası kaplıyor).
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useUser } from '@/lib/user-context'
@@ -57,7 +65,7 @@ export default function CoachMascot() {
         <div
           onClick={() => setBubbleDismissed(true)}
           style={{
-            position: 'fixed', bottom: '196px', right: '24px', zIndex: 9998,
+            position: 'fixed', bottom: '292px', right: '24px', zIndex: 10000,
             maxWidth: '220px',
             background: '#fff',
             borderRadius: '18px 18px 18px 4px',
@@ -103,13 +111,13 @@ export default function CoachMascot() {
       <Link href="/koc" aria-label="Pratium Koç ile sohbet et" onClick={() => setBubbleDismissed(true)}
         className="coach-launcher"
         style={{
-          position: 'fixed', bottom: '120px', right: '32px', zIndex: 9998,
-          width: 68, height: 68, borderRadius: '20px',
+          position: 'fixed', bottom: '208px', right: '24px', zIndex: 10000,
+          width: 84, height: 84, borderRadius: '22px',
           background: '#fff', border: '2px solid rgba(168,85,247,0.3)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: '0 8px 28px rgba(41,72,61,0.25)', textDecoration: 'none',
         }}>
-        <span className="coach-mascot-live" style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', padding: '4px' }}>
+        <span className="coach-mascot-live" style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', padding: '6px' }}>
           <img src="/mascot-coach-human.webp" alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </span>
         {unread > 0 && (
