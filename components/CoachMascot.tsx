@@ -32,12 +32,16 @@
 // boşlukla aynı mertebede bir boşluk bırakılarak konumlandı (bottom:208px —
 // Prati'nin balonu ~bottom:108-192 arası kaplıyor).
 //
-// 17 Eylül 2026 (5. güncelleme) — Deniz'in isteği: koç artık isimlendirildi —
-// "PROF. PRATİ", alt başlık "Powered by Pratium Learning Intelligence™",
-// mesajı "Seni tanır. Seninle düşünür. Öğrenmeni yönlendirir." Not: AIChatBot
-// (genel satış/destek asistanı) de "Prati" adını kullanıyor — iki farklı
-// karakter aynı temel ismi paylaşıyor, bu bilinçli bir marka kararıysa sorun
-// değil, karışıklık istenmiyorsa AIChatBot'un adı ayrıca gözden geçirilebilir.
+// 17 Eylül 2026 (5. güncelleme) — Deniz'in isteği: koç artık isimlendirildi.
+// AIChatBot'un (genel satış/destek asistanı) "Prati" adı bu yüzden
+// kaldırıldı (bkz. components/AIChatBot.tsx) — karışıklık olmasın diye.
+//
+// 17 Eylül 2026 (6. güncelleme) — İlk isimlendirme denemesi ("PROF. PRATİ" +
+// büyük harfli mor "Powered by..." alt başlığı) Deniz'e göre "çok çirkin"
+// durdu. Onun kendi önerdiği daha sıcak metne geçildi: "🎓 Profesör Prati /
+// Seni tanıyan kişisel AI öğrenme koçun. / Sadece sorularını cevaplamaz —
+// nasıl öğrendiğini anlar." Kurumsal "Powered by..." etiketi tamamen
+// kaldırıldı.
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useUser } from '@/lib/user-context'
@@ -96,14 +100,13 @@ export default function CoachMascot() {
             }}
           >×</button>
           <Link href="/koc" style={{ textDecoration: 'none' }}>
-            <div style={{ fontSize: '14px', fontWeight: 800, color: '#082465', letterSpacing: '0.01em' }}>
-              PROF. PRATİ ✦
+            <div style={{ fontSize: '14px', fontWeight: 800, color: '#082465', marginBottom: '5px' }}>
+              🎓 Profesör Prati
             </div>
-            <div style={{ fontSize: '9px', fontWeight: 700, color: '#a855f7', textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: '1px', marginBottom: '6px' }}>
-              Powered by Pratium Learning Intelligence™
-            </div>
-            <div style={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.5 }}>
-              Seni tanır. Seninle düşünür. Öğrenmeni yönlendirir.
+            <div style={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.55 }}>
+              Seni tanıyan kişisel AI öğrenme koçun.<br />
+              Sadece sorularını cevaplamaz —<br />
+              nasıl öğrendiğini anlar.
             </div>
           </Link>
           {/* balon kuyruğu */}
