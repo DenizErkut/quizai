@@ -10,9 +10,6 @@
 // AIChatBot'un (bkz. components/AIChatBot.tsx) "Merhaba, ben Prati!"
 // balonuyla aynı kalıpta kendi davetkâr balonunu ekliyor.
 //
-// AIChatBot sağ altta (genel satış/destek asistanı), bu ikon sol altta
-// (kişisel koç) — birbirlerinin üstüne binmiyorlar.
-//
 // useUser() UserProvider içinde çağrılmalı — bu yüzden layout.tsx'te
 // <UserProvider> içine, AIChatBot'un DIŞINDA monte ediliyor.
 //
@@ -20,6 +17,12 @@
 // "Koç'un Benim!" oldu, ikon eski robot/AI-blob maskotu (mascot-prati-*)
 // yerine daha insani, sıcak bir "öğretmen" karakterine (public/mascot-coach-
 // human.webp, lisanslı bir stok vektörden kırpıldı) geçti.
+//
+// 17 Eylül 2026 (3. güncelleme) — Deniz'in isteği: koç ikonu artık sağ altta,
+// AIChatBot'un (Prati, 84x84, bottom:24/right:24) TAM ÜSTÜNDE, aynı sağ
+// kenara hizalı dikey olarak istifleniyor — eskiden sol alttaydı. İkisi
+// arasında AIChatBot'un yüksekliği + boşluk kadar mesafe var, üst üste
+// binmiyorlar.
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useUser } from '@/lib/user-context'
@@ -54,7 +57,7 @@ export default function CoachMascot() {
         <div
           onClick={() => setBubbleDismissed(true)}
           style={{
-            position: 'fixed', bottom: '100px', left: '24px', zIndex: 9998,
+            position: 'fixed', bottom: '196px', right: '24px', zIndex: 9998,
             maxWidth: '220px',
             background: '#fff',
             borderRadius: '18px 18px 18px 4px',
@@ -87,7 +90,7 @@ export default function CoachMascot() {
           </Link>
           {/* balon kuyruğu */}
           <div style={{
-            position: 'absolute', bottom: '-8px', left: '28px',
+            position: 'absolute', bottom: '-8px', right: '28px',
             width: 0, height: 0,
             borderLeft: '8px solid transparent',
             borderRight: '8px solid transparent',
@@ -100,7 +103,7 @@ export default function CoachMascot() {
       <Link href="/koc" aria-label="Pratium Koç ile sohbet et" onClick={() => setBubbleDismissed(true)}
         className="coach-launcher"
         style={{
-          position: 'fixed', bottom: '24px', left: '24px', zIndex: 9998,
+          position: 'fixed', bottom: '120px', right: '32px', zIndex: 9998,
           width: 68, height: 68, borderRadius: '20px',
           background: '#fff', border: '2px solid rgba(168,85,247,0.3)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
