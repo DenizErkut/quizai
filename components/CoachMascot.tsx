@@ -31,6 +31,13 @@
 // Prati'nin balonunun tahmini üst kenarının üstünde, iki balon arasındaki
 // boşlukla aynı mertebede bir boşluk bırakılarak konumlandı (bottom:208px —
 // Prati'nin balonu ~bottom:108-192 arası kaplıyor).
+//
+// 17 Eylül 2026 (5. güncelleme) — Deniz'in isteği: koç artık isimlendirildi —
+// "PROF. PRATİ", alt başlık "Powered by Pratium Learning Intelligence™",
+// mesajı "Seni tanır. Seninle düşünür. Öğrenmeni yönlendirir." Not: AIChatBot
+// (genel satış/destek asistanı) de "Prati" adını kullanıyor — iki farklı
+// karakter aynı temel ismi paylaşıyor, bu bilinçli bir marka kararıysa sorun
+// değil, karışıklık istenmiyorsa AIChatBot'un adı ayrıca gözden geçirilebilir.
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useUser } from '@/lib/user-context'
@@ -66,7 +73,7 @@ export default function CoachMascot() {
           onClick={() => setBubbleDismissed(true)}
           style={{
             position: 'fixed', bottom: '292px', right: '24px', zIndex: 10000,
-            maxWidth: '220px',
+            maxWidth: '240px',
             background: '#fff',
             borderRadius: '18px 18px 18px 4px',
             padding: '12px 16px',
@@ -89,11 +96,14 @@ export default function CoachMascot() {
             }}
           >×</button>
           <Link href="/koc" style={{ textDecoration: 'none' }}>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: '#082465', marginBottom: '2px' }}>
-              Koç'un Benim! ✦
+            <div style={{ fontSize: '14px', fontWeight: 800, color: '#082465', letterSpacing: '0.01em' }}>
+              PROF. PRATİ ✦
+            </div>
+            <div style={{ fontSize: '9px', fontWeight: 700, color: '#a855f7', textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: '1px', marginBottom: '6px' }}>
+              Powered by Pratium Learning Intelligence™
             </div>
             <div style={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.5 }}>
-              Hadi şimdi birlikte çalışalım — sana özel önerim var 💪
+              Seni tanır. Seninle düşünür. Öğrenmeni yönlendirir.
             </div>
           </Link>
           {/* balon kuyruğu */}
@@ -108,7 +118,7 @@ export default function CoachMascot() {
         </div>
       )}
 
-      <Link href="/koc" aria-label="Pratium Koç ile sohbet et" onClick={() => setBubbleDismissed(true)}
+      <Link href="/koc" aria-label="Prof. Prati ile sohbet et" onClick={() => setBubbleDismissed(true)}
         className="coach-launcher"
         style={{
           position: 'fixed', bottom: '208px', right: '24px', zIndex: 10000,
@@ -118,7 +128,7 @@ export default function CoachMascot() {
           boxShadow: '0 8px 28px rgba(41,72,61,0.25)', textDecoration: 'none',
         }}>
         <span className="coach-mascot-live" style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', padding: '6px' }}>
-          <img src="/mascot-coach-human.webp" alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          <img src="/mascot-coach-human.webp" alt="Prof. Prati" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </span>
         {unread > 0 && (
           <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 20, height: 20, padding: '0 4px', borderRadius: '999px', background: '#a855f7', color: '#fff', fontSize: '11px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
