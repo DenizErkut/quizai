@@ -40,6 +40,7 @@ export default function AnalysisPage() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [weakTopics, setWeakTopics] = useState<WeakTopic[]>([])
   const [aiPlan, setAiPlan] = useState('')
+  const [aiPlanError, setAiPlanError] = useState('')
   const [loadingAi, setLoadingAi] = useState(false)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'overview' | 'subjects' | 'trend' | 'weakpoints'>('overview')
@@ -146,15 +147,27 @@ export default function AnalysisPage() {
 
   async function generateAiAnalysis() {
     setLoadingAi(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    const weakList = weakTopics.slice(0, 5).map(w => `${w.topic} (${w.wrong_count}/${w.total_count} yanlış)`).join(', ')
-    const res = await fetch('/api/ai-analysis', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ weakTopics: weakList, sessions: sessions.slice(0, 10).map(s => ({ topic: s.topic, pct: s.pct })) }),
-    })
-    const data = await res.json()
-    setAiPlan(data.plan || '')
+    setAiPlanError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const weakList = weakTopics.slice(0, 5).map(w => `${w.topic} (${w.wrong_count}/${w.total_count} yanlış)`).join(', ')
+      const res = await fetch('/api/ai-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ weakTopics: weakList, sessions: sessions.slice(0, 10).map(s => ({ topic: s.topic, pct: s.pct })) }),
+      })
+      const data = await res.json()
+      // 17 Eylül 2026 — API /api/ai-analysis {analysis} döndürüyordu, burada
+      // yanlışlıkla {plan} okunuyordu; istek başarılı olsa bile aiPlan hep
+      // boş kalıp "Plan Oluştur" butonu sessizce hiçbir şey göstermiyordu.
+      if (!res.ok) {
+        setAiPlanError(data.error || 'Plan oluşturulamadı, lütfen tekrar dene.')
+      } else {
+        setAiPlan(data.analysis || '')
+      }
+    } catch {
+      setAiPlanError('Bağlantı hatası, lütfen tekrar dene.')
+    }
     setLoadingAi(false)
   }
 
@@ -433,7 +446,9 @@ export default function AnalysisPage() {
                   </button>
                 )}
               </div>
-              {aiPlan ? (
+              {aiPlanError ? (
+                <div style={{ fontSize: '13px', color: 'var(--red, #ef4444)' }}>{aiPlanError}</div>
+              ) : aiPlan ? (
                 <div style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-line' }}>{aiPlan}</div>
               ) : (
                 <div style={{ fontSize: '13px', color: 'var(--text3)', fontStyle: 'italic' }}>
