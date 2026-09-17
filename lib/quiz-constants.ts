@@ -5,6 +5,7 @@ export type QuestionType = 'multiple_choice' | 'fill_blank' | 'matching' | 'true
 export interface Question {
   q: string; opts: string[]; ans: number; exp: string
   svg?: string | null; qtype?: 'text' | 'svg'; visualQuestionText?: string
+  visualContextQuality?: { score: number; reason: string; evaluator: 'openai' }
   bankQuestionId?: string; bankFingerprint?: string
   type?: QuestionType
   blank?: string
