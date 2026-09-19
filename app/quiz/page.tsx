@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import OnboardingModal from '@/components/OnboardingModal'
+import PrioritySetupModal from '@/components/PrioritySetupModal'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -48,7 +49,7 @@ interface Question {
   objectiveMappingStatus?: 'mapped' | 'unmapped' | 'no_candidates'
   objectiveMappingVersion?: 'v1'
 }
-interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number; daily_test_count?: number; daily_test_date?: string; onboarding_completed?: boolean }
+interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number; daily_test_count?: number; daily_test_date?: string; onboarding_completed?: boolean; priority_subjects?: unknown }
 
 // MEB müfredatına göre ders ve konu haritası (bkz. lib/subject-map.ts)
 
@@ -124,6 +125,7 @@ function QuizPageContent() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [showPrioritySetup, setShowPrioritySetup] = useState(false)
   const [quizError, setQuizError] = useState<{code: string; title: string; desc: string; retry: boolean} | null>(null)
   const [retryCount, setRetryCount] = useState(0)
   const [currentLang, setCurrentLang] = useState('Türkçe')
@@ -354,7 +356,7 @@ function QuizPageContent() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return null }
     const { data } = await supabase
-      .from('profiles').select('grade,language,plan,monthly_test_count,daily_test_count,daily_test_date,onboarding_completed')
+      .from('profiles').select('grade,language,plan,monthly_test_count,daily_test_count,daily_test_date,onboarding_completed,priority_subjects')
       .eq('id', user.id).single()
     // İsim artik profiles'ta degil, TR-PG kimliginde — resolve ile cekilir
     const displayName = await resolveName(supabase, user.id)
@@ -367,6 +369,12 @@ function QuizPageContent() {
     // ✅ Onboarding: ilk kez giren kullanıcı için modal göster
     if (data && !data.onboarding_completed) {
       setShowOnboarding(true)
+    } else if (data && !data.priority_subjects) {
+      // 19 Eylül 2026 — Deniz'in isteği: tanıtım turu bittiyse (veya daha
+      // önce bitmişse — mevcut kullanıcılar da bir kez görsün), hedef sınav +
+      // öncelik ders kurulumu henüz yapılmadıysa göster (bkz.
+      // components/PrioritySetupModal.tsx, lib/onboarding-priorities.ts).
+      setShowPrioritySetup(true)
     }
     setCurrentLang(lang)
     return { ...data, language: lang }
@@ -1161,7 +1169,17 @@ function QuizPageContent() {
         <OnboardingModal
           userName={profile.name}
           grade={profile.grade}
-          onComplete={() => setShowOnboarding(false)}
+          onComplete={() => {
+            setShowOnboarding(false)
+            // Tanıtım turu bitince, kurulum hâlâ yapılmadıysa hemen ardından göster.
+            if (!profile.priority_subjects) setShowPrioritySetup(true)
+          }}
+        />
+      )}
+      {!showOnboarding && showPrioritySetup && profile && (
+        <PrioritySetupModal
+          grade={profile.grade}
+          onComplete={() => setShowPrioritySetup(false)}
         />
       )}
       <QuizSetup

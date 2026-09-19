@@ -30,6 +30,7 @@ import { misconceptionMetadataInstruction, normalizeQuestionMisconceptions } fro
 import { resolveAdaptiveLearningPolicy } from '@/lib/adaptive-learning'
 import { startingDifficultyFromMastery } from '@/lib/adaptive-difficulty'
 import { resolveDiagnosticQuestionStrategy } from '@/lib/diagnostic-question-strategy'
+import { parsePrioritySubjects, seedScoreForSubject } from '@/lib/onboarding-priorities'
 import { applyCanonicalObjectiveMappings, learningObjectivePrompt, loadCanonicalObjectiveCandidates } from '@/lib/learning-objective-mapping'
 import { runMistralShadowComparison } from '@/lib/ai-gateway'
 import { balanceAnswerPositions, getQuestionBankSet, promoteQuestionsToBank, questionBankKey } from '@/lib/question-bank'
@@ -1176,7 +1177,7 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('plan, monthly_test_count, daily_test_count, daily_test_date, grade, language, department')
+      .select('plan, monthly_test_count, daily_test_count, daily_test_date, grade, language, department, priority_subjects')
       .eq('id', user.id)
       .single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
@@ -1276,8 +1277,19 @@ export async function POST(req: NextRequest) {
     )
     let resolvedDifficulty = difficulty
     if (difficulty === 'auto') {
+      // 19 Eylül 2026 — Deniz'in isteği: sabit "10 soruluk genel test" yerine,
+      // kayıt sonrası hızlı öz-bildirim (bkz. components/PrioritySetupModal.tsx)
+      // bu dersin gerçek mastery kanıtı yokken başlangıç zorluğu için bir
+      // TOHUM sağlıyor. Gerçek kanıt (topicMastery) her zaman önceliklidir —
+      // bu sadece "hiç veri yok" durumunda nötr 'normal' yerine kullanılan
+      // daha isabetli bir varsayılan. diagnosticStrategy zaten "kanıt yok"
+      // olarak davranmaya devam ediyor, yani öz-bildirim yanlış çıksa bile
+      // ilk birkaç soruda gerçek cevaplara göre kendini düzeltir.
+      const prioritySeed = topicMastery
+        ? null
+        : seedScoreForSubject(parsePrioritySubjects(profile.priority_subjects), subject)
       resolvedDifficulty = adaptivePolicy?.startingDifficulty
-        || startingDifficultyFromMastery(topicMastery?.masteryScore ?? null)
+        || startingDifficultyFromMastery(topicMastery?.masteryScore ?? prioritySeed)
     }
 
     const lang = language || profile.language || 'Turkce'
