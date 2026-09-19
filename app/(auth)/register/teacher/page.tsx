@@ -252,9 +252,21 @@ function RegisterTeacherContent() {
             <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7, marginBottom: '4px' }}>
               <b>{email}</b> adresine bir onay bağlantısı gönderdik.
             </p>
-            <p style={{ fontSize: '13px', color: 'var(--text3)', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: '13px', color: 'var(--text3)', lineHeight: 1.6, marginBottom: '1rem' }}>
               Bağlantıya tıkladığında öğretmen bilgilerini gireceğin adıma otomatik geçeceksin.
             </p>
+            {/* 19 Eylül 2026 — Deniz'in isteği: yeni kayıtlarda onay ekranına
+                spam/gereksiz kutusu uyarısı (bkz. app/(auth)/register/page.tsx) */}
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: '8px', textAlign: 'left',
+              background: 'rgba(253,211,29,0.12)', border: '1px solid rgba(253,211,29,0.35)',
+              borderRadius: '12px', padding: '10px 12px', marginBottom: '1.5rem',
+            }}>
+              <span style={{ fontSize: '16px', lineHeight: 1 }}>⚠️</span>
+              <span style={{ fontSize: '12.5px', color: 'var(--text2)', lineHeight: 1.55 }}>
+                E-postayı birkaç dakika içinde göremezsen lütfen <b>spam / gereksiz</b> klasörünü kontrol et — onay bağlantısı bazen oraya düşebiliyor.
+              </span>
+            </div>
             <button className="btn" onClick={handleResendConfirmation} disabled={resendStatus === 'sending'}
               style={{ width: '100%', justifyContent: 'center' }}>
               {resendStatus === 'sending' ? <span className="spinner" style={{ width: 18, height: 18 }} />
