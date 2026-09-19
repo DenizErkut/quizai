@@ -59,16 +59,28 @@
 // breakpoint) hem baloncuk hem ikon artık TOP-anchored: baloncuk üst barın
 // hemen altında, ikon onun altında — masaüstünde eski bottom-right
 // konumlanma aynen korunuyor.
+//
+// 19 Eylül 2026 (9. güncelleme) — Deniz'in isteği: "her iki maskotta
+// kapatılabilir ve taşınabilir olsun... kullanıcı istediğinde maskotların
+// yerini değiştirebilsin veya kapatsın geçici olarak." Ortak sürükle/gizle
+// mantığı lib/useDraggableMascot.ts'e taşındı (AIChatBot.tsx ile paylaşımlı):
+// ikon artık serbestçe sürüklenip bırakılabiliyor (konum localStorage'da
+// kalıcı), sol üstündeki küçük × ile GEÇİCİ olarak gizlenebiliyor
+// (sessionStorage — sekme kapanınca sıfırlanır, koç tekrar belirir).
+// Konum bir kez değiştirildiyse ilk-tanıtım baloncuğu artık gösterilmiyor.
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useUser } from '@/lib/user-context'
 import { createClient } from '@/lib/supabase/client'
 import { isPaidCoachPlan } from '@/lib/coach-access'
+import { useDraggableMascot } from '@/lib/useDraggableMascot'
 
 export default function CoachMascot() {
   const { user, profile, loading, isTeacher, isParent, isInstitution } = useUser()
   const [unread, setUnread] = useState(0)
   const [bubbleDismissed, setBubbleDismissed] = useState(false)
+  const { pos, style: dragStyle, hidden, hide, show, elRef, wasDragged, dragHandlers } =
+    useDraggableMascot('coach_mascot', 84)
 
   useEffect(() => {
     if (!user) { setUnread(0); return }
@@ -91,72 +103,110 @@ export default function CoachMascot() {
 
   return (
     <>
-      {!bubbleDismissed && (
-        <div
-          onClick={() => setBubbleDismissed(true)}
-          className="coach-bubble"
+      {hidden ? (
+        <button
+          onClick={show}
+          aria-label="Prof. Prati'yi tekrar göster"
+          title="Koç'u göster"
+          className="coach-launcher-restore"
           style={{
-            maxWidth: '240px',
-            background: '#fff',
-            borderRadius: '18px 18px 18px 4px',
-            padding: '12px 16px',
-            boxShadow: '0 10px 32px rgba(41,72,61,0.2)',
-            border: '1.5px solid rgba(168,85,247,0.25)',
-            cursor: 'pointer',
-            animation: 'coachBubbleUp 0.3s ease',
+            width: 44, height: 44, borderRadius: '50%',
+            background: '#fff', border: '2px solid rgba(168,85,247,0.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 6px 20px rgba(41,72,61,0.22)', cursor: 'pointer', fontSize: '20px',
+            ...dragStyle,
           }}
-        >
-          <button
-            onClick={e => { e.stopPropagation(); setBubbleDismissed(true) }}
-            aria-label="Kapat"
-            style={{
-              position: 'absolute', top: '-8px', right: '-8px',
-              width: 22, height: 22, borderRadius: '50%',
-              background: '#fff', border: '1.5px solid #e2e8f0',
-              color: '#64748b', fontSize: '13px', lineHeight: 1,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-            }}
-          >×</button>
-          <Link href="/koc" style={{ textDecoration: 'none' }}>
-            <div style={{ fontSize: '14px', fontWeight: 800, color: '#082465', marginBottom: '5px' }}>
-              🎓 Profesör Prati
+        >🎓</button>
+      ) : (
+        <>
+          {!bubbleDismissed && !pos && (
+            <div
+              onClick={() => setBubbleDismissed(true)}
+              className="coach-bubble"
+              style={{
+                maxWidth: '240px',
+                background: '#fff',
+                borderRadius: '18px 18px 18px 4px',
+                padding: '12px 16px',
+                boxShadow: '0 10px 32px rgba(41,72,61,0.2)',
+                border: '1.5px solid rgba(168,85,247,0.25)',
+                cursor: 'pointer',
+                animation: 'coachBubbleUp 0.3s ease',
+              }}
+            >
+              <button
+                onClick={e => { e.stopPropagation(); setBubbleDismissed(true) }}
+                aria-label="Kapat"
+                style={{
+                  position: 'absolute', top: '-8px', right: '-8px',
+                  width: 22, height: 22, borderRadius: '50%',
+                  background: '#fff', border: '1.5px solid #e2e8f0',
+                  color: '#64748b', fontSize: '13px', lineHeight: 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                }}
+              >×</button>
+              <Link href="/koc" style={{ textDecoration: 'none' }}>
+                <div style={{ fontSize: '14px', fontWeight: 800, color: '#082465', marginBottom: '5px' }}>
+                  🎓 Profesör Prati
+                </div>
+                <div style={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.55 }}>
+                  Seni tanıyan kişisel AI öğrenme koçun.<br />
+                  Sadece sorularını cevaplamaz —<br />
+                  nasıl öğrendiğini anlar.
+                </div>
+              </Link>
+              {/* balon kuyruğu */}
+              <div style={{
+                position: 'absolute', bottom: '-8px', right: '28px',
+                width: 0, height: 0,
+                borderLeft: '8px solid transparent',
+                borderRight: '8px solid transparent',
+                borderTop: '8px solid #fff',
+                filter: 'drop-shadow(0 2px 1px rgba(41,72,61,0.06))',
+              }} />
             </div>
-            <div style={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.55 }}>
-              Seni tanıyan kişisel AI öğrenme koçun.<br />
-              Sadece sorularını cevaplamaz —<br />
-              nasıl öğrendiğini anlar.
-            </div>
-          </Link>
-          {/* balon kuyruğu */}
-          <div style={{
-            position: 'absolute', bottom: '-8px', right: '28px',
-            width: 0, height: 0,
-            borderLeft: '8px solid transparent',
-            borderRight: '8px solid transparent',
-            borderTop: '8px solid #fff',
-            filter: 'drop-shadow(0 2px 1px rgba(41,72,61,0.06))',
-          }} />
-        </div>
-      )}
+          )}
 
-      <Link href="/koc" aria-label="Prof. Prati ile sohbet et" onClick={() => setBubbleDismissed(true)}
-        className="coach-launcher"
-        style={{
-          width: 84, height: 84, borderRadius: '22px',
-          background: '#fff', border: '2px solid rgba(168,85,247,0.3)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 8px 28px rgba(41,72,61,0.25)', textDecoration: 'none',
-        }}>
-        <span className="coach-mascot-live" style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', padding: '6px' }}>
-          <img src="/mascot-coach-human.webp" alt="Prof. Prati" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-        </span>
-        {unread > 0 && (
-          <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 20, height: 20, padding: '0 4px', borderRadius: '999px', background: '#a855f7', color: '#fff', fontSize: '11px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
-            {unread}
-          </span>
-        )}
-      </Link>
+          <Link href="/koc" aria-label="Prof. Prati ile sohbet et"
+            ref={elRef}
+            onClick={(e) => { if (wasDragged()) { e.preventDefault(); return } setBubbleDismissed(true) }}
+            onPointerDown={dragHandlers.onPointerDown}
+            onPointerMove={dragHandlers.onPointerMove}
+            onPointerUp={dragHandlers.onPointerUp}
+            className="coach-launcher"
+            style={{
+              width: 84, height: 84, borderRadius: '22px',
+              background: '#fff', border: '2px solid rgba(168,85,247,0.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 8px 28px rgba(41,72,61,0.25)', textDecoration: 'none',
+              touchAction: 'none',
+              ...dragStyle,
+            }}>
+            <button
+              onClick={e => { e.preventDefault(); e.stopPropagation(); hide(); setBubbleDismissed(true) }}
+              aria-label="Koç'u geçici olarak gizle"
+              title="Geçici olarak gizle"
+              style={{
+                position: 'absolute', top: '-6px', left: '-6px',
+                width: 20, height: 20, borderRadius: '50%',
+                background: '#fff', border: '1.5px solid #e2e8f0',
+                color: '#64748b', fontSize: '12px', lineHeight: 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.12)', zIndex: 1,
+              }}
+            >×</button>
+            <span className="coach-mascot-live" style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', padding: '6px' }}>
+              <img src="/mascot-coach-human.webp" alt="Prof. Prati" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            </span>
+            {unread > 0 && (
+              <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 20, height: 20, padding: '0 4px', borderRadius: '999px', background: '#a855f7', color: '#fff', fontSize: '11px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
+                {unread}
+              </span>
+            )}
+          </Link>
+        </>
+      )}
 
       <style>{`
         @keyframes coachBubbleUp {
@@ -168,7 +218,7 @@ export default function CoachMascot() {
         .coach-bubble {
           position: fixed; bottom: 292px; right: 24px; z-index: 10000;
         }
-        .coach-launcher {
+        .coach-launcher, .coach-launcher-restore {
           position: fixed; bottom: 208px; right: 24px; z-index: 10000;
         }
         /* 19 Eylül 2026 — Deniz'in isteği: mobilde sağ-üst köşeye, Navbar'ın
@@ -178,7 +228,7 @@ export default function CoachMascot() {
           .coach-bubble {
             top: 68px; bottom: auto; right: 12px;
           }
-          .coach-launcher {
+          .coach-launcher, .coach-launcher-restore {
             top: 156px; bottom: auto; right: 12px;
           }
         }

@@ -1,6 +1,17 @@
 'use client'
+// 19 Eylül 2026 — Deniz'in isteği: "her iki maskotta kapatılabilir ve
+// taşınabilir olsun... kullanıcı istediğinde maskotların yerini
+// değiştirebilsin veya kapatsın geçici olarak." Ortak sürükle/gizle mantığı
+// lib/useDraggableMascot.ts'te (components/CoachMascot.tsx ile paylaşımlı):
+// FAB ikonu artık serbestçe sürüklenip bırakılabiliyor (konum localStorage'da
+// kalıcı), sol üstündeki küçük × ile GEÇİCİ olarak gizlenebiliyor
+// (sessionStorage — sekme kapanınca sıfırlanır, asistan tekrar belirir).
+// Konum bir kez değiştirildiyse ilk-tanıtım baloncuğu artık gösterilmiyor,
+// ve sohbet paneli açıldığında ikonun GÜNCEL konumuna göre konumlanıyor
+// (bkz. anchoredPanelStyle).
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useDraggableMascot } from '@/lib/useDraggableMascot'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -95,6 +106,20 @@ export default function AIChatBot({ isGuest = false }: Props) {
   const [unread, setUnread] = useState(0)
   const [bubbleDismissed, setBubbleDismissed] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const { pos, style: dragStyle, hidden, hide, show, fabRect, elRef, wasDragged, dragHandlers } =
+    useDraggableMascot('prati_mascot', 84)
+
+  function anchoredPanelStyle(): React.CSSProperties {
+    if (!pos || !fabRect || typeof window === 'undefined') return {}
+    const width = Math.min(370, window.innerWidth - 32)
+    const height = Math.min(560, window.innerHeight - 32)
+    let left = fabRect.left + fabRect.width - width
+    let top = fabRect.top - height - 12
+    if (top < 8) top = fabRect.top + fabRect.height + 12
+    left = Math.min(Math.max(left, 8), window.innerWidth - width - 8)
+    top = Math.min(Math.max(top, 8), window.innerHeight - height - 8)
+    return { position: 'fixed', left, top, right: 'auto', bottom: 'auto', width, maxHeight: height }
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -149,7 +174,25 @@ export default function AIChatBot({ isGuest = false }: Props) {
 
   return (
     <>
-      {open && (
+      {hidden && (
+        <button
+          onClick={show}
+          aria-label="Pratium Asistanını tekrar göster"
+          title="Asistanı göster"
+          className="prati-launcher-restore"
+          style={{
+            width: 44, height: 44, borderRadius: '50%', padding: 0, overflow: 'hidden',
+            background: '#fff', border: '2px solid rgba(30,207,184,0.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 6px 20px rgba(8,36,101,0.2)', cursor: 'pointer',
+            ...dragStyle,
+          }}
+        >
+          <img src="/mascot-prati-face-v2.webp" alt="Pratium Asistan" style={{ width: '70%', height: '70%', objectFit: 'contain' }} />
+        </button>
+      )}
+
+      {!hidden && open && (
         <div style={{
           position: 'fixed', bottom: '108px', right: '24px', zIndex: 9998,
           width: '370px', maxWidth: 'calc(100vw - 32px)',
@@ -159,6 +202,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
           display: 'flex', flexDirection: 'column',
           maxHeight: '560px',
           animation: 'botSlideUp 0.2s ease',
+          ...anchoredPanelStyle(),
         }}>
           {/* Header */}
           <div style={{
@@ -293,8 +337,10 @@ export default function AIChatBot({ isGuest = false }: Props) {
         </div>
       )}
 
-      {/* Konuşma balonu — sohbet kapalıyken ve kapatılmadıysa görünür */}
-      {!open && !bubbleDismissed && (
+      {/* Konuşma balonu — sohbet kapalıyken, kapatılmadıysa ve ikon hiç
+          sürüklenmediyse görünür (bir kez taşındıysa artık kullanıcı zaten
+          maskotu tanıyor demektir, tanıtım balonu tekrar gösterilmiyor) */}
+      {!hidden && !open && !bubbleDismissed && !pos && (
         <div
           onClick={() => { setOpen(true); setUnread(0) }}
           style={{
@@ -339,35 +385,60 @@ export default function AIChatBot({ isGuest = false }: Props) {
         </div>
       )}
 
-      {/* FAB */}
-      <button
-        className={`prati-launcher${open ? ' is-open' : ''}`}
-        onClick={() => { setOpen(v => !v); setUnread(0); setBubbleDismissed(true) }}
-        style={{
-          position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999,
-          width: 84, height: 84, borderRadius: '22px',
-          background: open ? 'linear-gradient(135deg, #082465, #1ECFB8)' : '#ffffff',
-          border: open ? 'none' : '2px solid rgba(30,207,184,0.25)',
-          cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 8px 32px rgba(8,36,101,0.3)',
-          transition: 'transform 0.2s, box-shadow 0.2s',
-          padding: open ? 0 : '8px',
-        }}
-        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(8,36,101,0.4)' }}
-        onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 8px 32px rgba(8,36,101,0.3)' }}
-        aria-label={open ? 'Sohbeti kapat' : 'Pratium Asistanı ile sohbet et'}
-      >
-        {open
-          ? <span style={{ fontSize: '28px', color: '#fff' }}>×</span>
-          : <span className="prati-mascot-live"><img src="/mascot-prati-face-v2.webp" alt="Pratium Asistan" /></span>
-        }
-        {!open && unread > 0 && (
-          <span style={{ position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#FDD31D', color: '#082465', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
-            {unread}
-          </span>
-        )}
-      </button>
+      {/* FAB — konumu taşıyan sarmalayıcı sürüklenebilir (bkz.
+          lib/useDraggableMascot.ts); buton kendisi artık pozisyonsuz,
+          sarmalayıcının içini dolduruyor. */}
+      {!hidden && (
+        <div
+          ref={elRef}
+          className="prati-launcher-wrap"
+          {...dragHandlers}
+          style={{ width: 84, height: 84, touchAction: 'none', ...dragStyle }}
+        >
+          <button
+            className={`prati-launcher${open ? ' is-open' : ''}`}
+            onClick={(e) => { if (wasDragged()) { e.preventDefault(); return } setOpen(v => !v); setUnread(0); setBubbleDismissed(true) }}
+            style={{
+              width: 84, height: 84, borderRadius: '22px',
+              background: open ? 'linear-gradient(135deg, #082465, #1ECFB8)' : '#ffffff',
+              border: open ? 'none' : '2px solid rgba(30,207,184,0.25)',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 8px 32px rgba(8,36,101,0.3)',
+              transition: 'transform 0.2s, box-shadow 0.2s',
+              padding: open ? 0 : '8px',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(8,36,101,0.4)' }}
+            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 8px 32px rgba(8,36,101,0.3)' }}
+            aria-label={open ? 'Sohbeti kapat' : 'Pratium Asistanı ile sohbet et'}
+          >
+            {open
+              ? <span style={{ fontSize: '28px', color: '#fff' }}>×</span>
+              : <span className="prati-mascot-live"><img src="/mascot-prati-face-v2.webp" alt="Pratium Asistan" /></span>
+            }
+            {!open && unread > 0 && (
+              <span style={{ position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#FDD31D', color: '#082465', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
+                {unread}
+              </span>
+            )}
+          </button>
+          {!open && (
+            <button
+              onClick={(e) => { e.stopPropagation(); hide(); setBubbleDismissed(true) }}
+              aria-label="Pratium Asistanını geçici olarak gizle"
+              title="Geçici olarak gizle"
+              style={{
+                position: 'absolute', top: '-6px', left: '-6px',
+                width: 20, height: 20, borderRadius: '50%',
+                background: '#fff', border: '1.5px solid #e2e8f0',
+                color: '#64748b', fontSize: '12px', lineHeight: 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.12)', zIndex: 1,
+              }}
+            >×</button>
+          )}
+        </div>
+      )}
 
       <style>{`
         @keyframes botSlideUp {
@@ -381,6 +452,11 @@ export default function AIChatBot({ isGuest = false }: Props) {
         @keyframes botFloat {
           0%, 100% { transform: translateY(0) rotate(0deg); }
           50% { transform: translateY(-5px) rotate(-3deg); }
+        }
+        /* 19 Eylül 2026 — konum artık sarmalayıcıda (drag ile taşınabilir),
+           .prati-launcher butonun kendisi konumsuz, sarmalayıcıyı dolduruyor. */
+        .prati-launcher-wrap, .prati-launcher-restore {
+          position: fixed; bottom: 24px; right: 24px; z-index: 9999;
         }
         .prati-launcher:not(.is-open)::before,
         .prati-launcher:not(.is-open)::after {
