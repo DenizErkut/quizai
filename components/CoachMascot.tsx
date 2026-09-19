@@ -48,6 +48,17 @@
 // engelleme sunucuda (app/api/coach/chat/route.ts, lib/coach-access.ts)
 // ama ikon da free kullanıcıya hiç görünmüyor — aksi halde tıklayıp 403
 // almaları gereksiz bir sürtünme olurdu.
+//
+// 19 Eylül 2026 (8. güncelleme) — Deniz'in ekran görüntüsüyle bildirdiği
+// sorun: mobilde sağ-alt köşeye sabitlenen baloncuk, kısa viewport'larda
+// görsel olarak ekranın ORTASINA denk düşüp dashboard içeriğinin (ör.
+// "Ondalık sayılar" kartı) üzerine biniyordu. Deniz'in isteği: "mobilde
+// profesör pratiyi sağ üst köşeye, profil fotosunun hemen altına alalım."
+// Navbar.tsx'teki mobil üst bar (position:fixed, top:0, height:58px) ve
+// oradaki avatar (sağda) baz alınarak, mobilde (<=768px, Navbar ile aynı
+// breakpoint) hem baloncuk hem ikon artık TOP-anchored: baloncuk üst barın
+// hemen altında, ikon onun altında — masaüstünde eski bottom-right
+// konumlanma aynen korunuyor.
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useUser } from '@/lib/user-context'
@@ -83,8 +94,8 @@ export default function CoachMascot() {
       {!bubbleDismissed && (
         <div
           onClick={() => setBubbleDismissed(true)}
+          className="coach-bubble"
           style={{
-            position: 'fixed', bottom: '292px', right: '24px', zIndex: 10000,
             maxWidth: '240px',
             background: '#fff',
             borderRadius: '18px 18px 18px 4px',
@@ -132,7 +143,6 @@ export default function CoachMascot() {
       <Link href="/koc" aria-label="Prof. Prati ile sohbet et" onClick={() => setBubbleDismissed(true)}
         className="coach-launcher"
         style={{
-          position: 'fixed', bottom: '208px', right: '24px', zIndex: 10000,
           width: 84, height: 84, borderRadius: '22px',
           background: '#fff', border: '2px solid rgba(168,85,247,0.3)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -152,6 +162,25 @@ export default function CoachMascot() {
         @keyframes coachBubbleUp {
           from { opacity: 0; transform: translateY(16px) scale(0.97); }
           to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        /* Masaüstü (ve mobil olmayan geniş ekranlar): eski sağ-alt yerleşim
+           aynen korunuyor — baloncuk ikonun üstünde dikey istifleniyor. */
+        .coach-bubble {
+          position: fixed; bottom: 292px; right: 24px; z-index: 10000;
+        }
+        .coach-launcher {
+          position: fixed; bottom: 208px; right: 24px; z-index: 10000;
+        }
+        /* 19 Eylül 2026 — Deniz'in isteği: mobilde sağ-üst köşeye, Navbar'ın
+           mobil üst barındaki (top:0, height:58px) profil fotosunun hemen
+           altına. Navbar.tsx ile aynı breakpoint (max-width:768px). */
+        @media (max-width: 768px) {
+          .coach-bubble {
+            top: 68px; bottom: auto; right: 12px;
+          }
+          .coach-launcher {
+            top: 156px; bottom: auto; right: 12px;
+          }
         }
         /* Deniz'in isteği: ikon "canlı" dursun (hafif sürekli hareket) ve
            üzerine gelince büyüsün. AIChatBot'taki prati-launcher/pratiFloat
