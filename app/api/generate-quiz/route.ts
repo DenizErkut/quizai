@@ -1177,13 +1177,21 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('plan, monthly_test_count, daily_test_count, daily_test_date, grade, language, department, priority_subjects')
+      .select('plan, monthly_test_count, daily_test_count, daily_test_date, grade, language, department, priority_subjects, is_admin')
       .eq('id', user.id)
       .single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
     const body = await req.json()
     const isDailyChallengeRequest = body?.dailyChallenge === true
+    // 21 Eylül 2026 — Deniz'in isteğiyle: gerçek öğrenci trafiğine hiç
+    // dokunmadan Mistral çıktısını gözle kontrol edebilmesi için admin-only
+    // bir test anahtarı. SADECE profiles.is_admin=true olan hesap
+    // body.forceMistralTest:true gönderirse etkili olur; başka hiçbir
+    // kullanıcı/istek bunu tetikleyemez ve MISTRAL_LIVE_FRACTION kovasını
+    // (dolayısıyla gerçek A/B istatistiklerini) etkilemez — bkz. aşağıda
+    // genEngineUsed='mistral-admin-test' ayrı etiketleniyor.
+    const forceMistralTest = body?.forceMistralTest === true && profile.is_admin === true
 
     const plan = profile.plan || 'free'
     const today = new Date().toISOString().split('T')[0]
@@ -1599,10 +1607,14 @@ export async function POST(req: NextRequest) {
     // kalanı kontrol (Claude). Böylece üçü de birbirini dışlar.
     const mistralBucketEnd = Math.round(MISTRAL_LIVE_FRACTION * 10000)
     const gptBucketEnd = mistralBucketEnd + Math.round(GPT_PILOT_FRACTION * 10000)
-    const useMistralLive = pilotEligible && isProviderConfigured('mistral') && experimentBucket < mistralBucketEnd
+    // forceMistralTest (yalnızca admin) kovadan bağımsız olarak Mistral'i
+    // devreye sokar — gerçek A/B istatistiklerini bozmasın diye
+    // experimentVariant'a 'mistral-live' değil null yazılıyor, genEngineUsed
+    // da ayrı 'mistral-admin-test' etiketiyle işaretleniyor (aşağıda).
+    const useMistralLive = pilotEligible && isProviderConfigured('mistral') && (forceMistralTest || experimentBucket < mistralBucketEnd)
     const useGptPilot = pilotEligible && !useMistralLive && experimentBucket < gptBucketEnd
-    experimentVariant = pilotEligible ? (useMistralLive ? 'mistral-live' : useGptPilot ? 'gpt-4.1-mini' : 'control') : null
-    genEngineUsed = useMistralLive ? 'mistral-large' : useGptPilot ? 'gpt-4.1-mini' : (useHaiku ? 'claude-haiku' : 'claude-sonnet')
+    experimentVariant = pilotEligible ? (useMistralLive ? (forceMistralTest ? null : 'mistral-live') : useGptPilot ? 'gpt-4.1-mini' : 'control') : null
+    genEngineUsed = useMistralLive ? (forceMistralTest ? 'mistral-admin-test' : 'mistral-large') : useGptPilot ? 'gpt-4.1-mini' : (useHaiku ? 'claude-haiku' : 'claude-sonnet')
 
     // 21 Eylül 2026 — Deniz'in bulduğu "Sorular tamamlanamadı" (503
     // incomplete_set) hatasının kök nedeni: ana üretim çağrısının
@@ -1634,12 +1646,12 @@ export async function POST(req: NextRequest) {
           userId: user.id,
           sessionId: usageSessionId,
           requestId: usageRequestId,
-          operationTag: 'generate-quiz:pilot-mistral',
+          operationTag: forceMistralTest ? 'generate-quiz:admin-test-mistral' : 'generate-quiz:pilot-mistral',
           shadow: false,
         }
       )
       text = mistralResponse.content
-      console.log(`[generate-quiz] LIVE PILOT model=mistral (${mistralResponse.model}) qCount=${aiQuestionCount}`)
+      console.log(`[generate-quiz] ${forceMistralTest ? 'ADMIN TEST' : 'LIVE PILOT'} model=mistral (${mistralResponse.model}) qCount=${aiQuestionCount}`)
     } else if (useGptPilot) {
       const gptResult = await callOpenAI(
         [
