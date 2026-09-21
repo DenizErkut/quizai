@@ -26,14 +26,26 @@
 // debugGenEngine/debugBankFallback alanlarını dönüyor; bu sayfa bunları
 // açıkça gösteriyor.
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { SUBJECT_MAP } from '@/lib/subject-map'
 
 const GRADE_OPTIONS = [
   'ortaokul 6. sinif', 'ortaokul 7. sinif', 'ortaokul 8. sinif',
   'lise 9. sinif', 'lise 10. sinif', 'lise 11. sinif', 'lise 12. sinif',
 ]
+
+// 21 Eylül 2026 — Deniz'in isteğiyle: "Ders" alanı serbest metindi, yazdığı
+// değer soru üretimine BİREBİR gidiyordu ama SUBJECT_MAP'te (bkz.
+// lib/subject-map.ts — quiz oluşturma ekranıyla PAYLAŞILAN tek kaynak)
+// karşılığı olmayan bir ders adı yazılırsa AI'ın elindeki tek referans o
+// serbest metindi, konu listesi de hep aynı (elle girilen "Mutlak değer")
+// kaldığı için sonuç hep "Matematik" hissi veriyordu. Artık ders VE konu,
+// gerçek platform kataloğundan (aynı ortaokul/lise ayrımıyla) seçiliyor.
+function getLevel(grade: string): 'ilkokul' | 'ortaokul' | 'lise' | 'universite' {
+  return grade.startsWith('ilk') ? 'ilkokul' : grade.startsWith('orta') ? 'ortaokul' : grade.startsWith('lise') ? 'lise' : 'universite'
+}
 
 const PROVIDERS = [
   { id: 'mistral', label: 'Mistral Large', color: '#f97316' },
@@ -54,15 +66,36 @@ type RunResult = {
 export default function AIQualityTestPage() {
   const router = useRouter()
   const supabase = createClient() as any
-  const [subject, setSubject] = useState('Matematik')
-  const [topic, setTopic] = useState('Mutlak değer')
   const [grade, setGrade] = useState('lise 9. sinif')
+  const level = getLevel(grade)
+  const subjectOptions = Object.keys(SUBJECT_MAP[level] || {})
+  const [subject, setSubject] = useState('Matematik')
+  const topicOptions = SUBJECT_MAP[level]?.[subject] || []
+  const [topic, setTopic] = useState('Mutlak değer')
   const [questionCount, setQuestionCount] = useState(5)
   const [runs, setRuns] = useState<Record<ProviderId, RunResult>>({
     mistral: { provider: 'mistral', loading: false, error: null, data: null, clientMs: null },
     openai: { provider: 'openai', loading: false, error: null, data: null, clientMs: null },
     claude: { provider: 'claude', loading: false, error: null, data: null, clientMs: null },
   })
+
+  // Sınıf değişince o seviyede olmayan bir ders seçili kalmasın (ör.
+  // ortaokul'dan lise'ye geçince "T.C. İnkılap Tarihi..." lise'de yok).
+  useEffect(() => {
+    if (subjectOptions.length && !subjectOptions.includes(subject)) {
+      setSubject(subjectOptions.includes('Matematik') ? 'Matematik' : subjectOptions[0])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grade])
+
+  // Ders değişince konu listesi de değişir — eski konu artık listede yoksa
+  // ilk konuya düş (ama admin isterse yine de serbestçe düzenleyebilir).
+  useEffect(() => {
+    if (topicOptions.length && !topicOptions.includes(topic)) {
+      setTopic(topicOptions[0])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subject, grade])
 
   async function runOne(provider: ProviderId) {
     setRuns(prev => ({ ...prev, [provider]: { ...prev[provider], loading: true, error: null, data: null, clientMs: null } }))
@@ -121,7 +154,9 @@ export default function AIQualityTestPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
             <div>
               <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: 4 }}>Ders</label>
-              <input value={subject} onChange={e => setSubject(e.target.value)} className="input" style={{ width: '100%', boxSizing: 'border-box' }} />
+              <select value={subject} onChange={e => setSubject(e.target.value)} className="input" style={{ width: '100%', boxSizing: 'border-box' }}>
+                {subjectOptions.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
             </div>
             <div>
               <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: 4 }}>Sınıf</label>
@@ -131,7 +166,9 @@ export default function AIQualityTestPage() {
             </div>
             <div style={{ gridColumn: '1/-1' }}>
               <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: 4 }}>Konu</label>
-              <input value={topic} onChange={e => setTopic(e.target.value)} className="input" style={{ width: '100%', boxSizing: 'border-box' }} />
+              <select value={topic} onChange={e => setTopic(e.target.value)} className="input" style={{ width: '100%', boxSizing: 'border-box' }}>
+                {topicOptions.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
             </div>
             <div>
               <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: 4 }}>Soru sayısı</label>
