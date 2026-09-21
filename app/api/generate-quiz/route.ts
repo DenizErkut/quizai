@@ -1158,7 +1158,7 @@ export async function POST(req: NextRequest) {
   let usageRequestId: string | undefined
   let usageSessionId: string | undefined
   let experimentBucket: number | null = null
-  let experimentVariant: 'gpt-4.1-mini' | 'control' | null = null
+  let experimentVariant: 'gpt-4.1-mini' | 'mistral-live' | 'control' | null = null
   // 26 Ağustos 2026 — öğretmen geri bildirimi: "Metinde, ..." tarzı sorularda
   // öğrenciye kaynak metnin KENDİSİ hiç gösterilmiyordu. mebContext/fileContent
   // yalnızca AI'ın prompt'una gidiyordu, response'a hiç eklenmiyordu — AI'ın
