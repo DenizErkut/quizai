@@ -27,6 +27,7 @@ import { getTopicMastery, computeErrorPatterns, buildStudentHistoryContext } fro
 import { recordQuizLearningEvents } from '@/lib/learning-events'
 import { findPrerequisiteGaps, buildPrerequisiteContext } from '@/lib/learning-graph'
 import { misconceptionMetadataInstruction, normalizeQuestionMisconceptions } from '@/lib/misconceptions'
+import { renderChartSVG, validateChartData } from '@/lib/chart-svg'
 import { resolveAdaptiveLearningPolicy } from '@/lib/adaptive-learning'
 import { startingDifficultyFromMastery } from '@/lib/adaptive-difficulty'
 import { resolveDiagnosticQuestionStrategy } from '@/lib/diagnostic-question-strategy'
@@ -282,6 +283,27 @@ function visualPedagogyInstruction(topic: string, count: number): string {
   return `\n\nGÖRSEL SORU ÇEŞİTLİLİĞİ: Konu uygunsa soruların yaklaşık %30'unu grafik, tablo, şekil, koordinat sistemi, deney düzeneği, harita veya zaman çizelgesi üzerinden yorumlama gerektirecek biçimde kur. Gerekli bütün veri ve etiketler sorunun içinde bulunmalı; görünmeyen bir görsele "yukarıdaki" diye atıf yapma. GÖRSEL FORMAT ÖNCELİĞİ: bu görsel sorulardan en fazla 1 tanesi metne gömülü Markdown tablo olsun; diğerleri ${formatHint} gibi somut bir sahne olmalı. Metin içinde tablo gerekiyorsa her satırı \\n ile ayıran geçerli Markdown tablo biçimi kullan, tablo ayraçlarını ve satırları tek satırda birbirine yapıştırma, hiçbir hücreyi boş bırakma (bilinmeyen değer için "?" yaz).`
 }
 
+// 21 Eylül 2026 — Deniz'in isteğiyle: "grafik oluşturmada eksiğiz" sorununa
+// cevap. math_graph kategorisinde artık modelden SVG XML YAZDIRMIYORUZ
+// (bkz. lib/chart-svg.ts açıklaması) — bunun yerine küçük, kesin bir
+// "chartData" JSON nesnesi istiyoruz, bir çizim motoru bunu HER ZAMAN doğru
+// ve tutarlı şekilde çiziyor. chartData göndermezse ya da bozuk gönderirse
+// (validateChartData reddeder) eski AI-SVG yoluna otomatik geri düşülüyor —
+// bu yüzden bu talimat SADECE math_graph'ta ekleniyor ve diğer tüm kategori/
+// soru tiplerinde hiçbir token maliyeti eklemiyor.
+function chartDataInstruction(category: string | null): string {
+  if (category !== 'math_graph') return ''
+  return `\n\nGRAFİK VERİSİ (chartData) KURALI: Bu konu koordinat/sayı doğrusu/istatistik grafiği kategorisinde. Görsel gerektirdiğini belirttiğin HER soruya, sorunun içeriğiyle BİREBİR uyumlu bir "chartData" alanı ekle — bu veri bir çizim motoru tarafından OTOMATİK çizilecek, SEN SVG/ÇİZİM ÜRETMEYECEKSİN, sadece veriyi ver. chartData eklemediğin sorularda görsel üretilmeyecek. Tam olarak şu 5 tipten birini kullan, başka alan/tip EKLEME:
+
+1. Sayı doğrusu: {"type":"numberline","min":-10,"max":10,"points":[{"value":-3,"label":"A"},{"value":5,"label":"B"}]}
+2. Koordinat sistemi (nokta/doğru/parabol): {"type":"coordinate","xMin":-5,"xMax":5,"yMin":-5,"yMax":5,"points":[{"x":2,"y":3,"label":"A"}],"lines":[{"points":[{"x":-5,"y":-5},{"x":5,"y":5}],"label":"y=x"}]}
+3. Çubuk grafik: {"type":"bar","categories":["Pzt","Sal","Çar"],"series":[{"label":"Satış","values":[12,18,9]}],"unit":"adet"}
+4. Çizgi grafik: {"type":"line","categories":["2021","2022","2023"],"series":[{"label":"Nüfus","values":[100,120,135]}],"unit":"bin kişi"}
+5. Pasta grafik: {"type":"pie","segments":[{"label":"Elma","value":40},{"label":"Armut","value":60}]}
+
+KRİTİK KURALLAR: (a) chartData içindeki TÜM sayı ve etiket, sorunun "q" metninde geçen değerlerle BİREBİR aynı olmalı — uydurma veri ekleme. (b) Cevabı ifşa eden bir nokta/çubuk/segment EKLEME — sadece sorunun VERDİĞİ bilgiyi göster, sorunun SORDUĞU/bilinmeyen değeri göstermeye çalışma. (c) categories/series uzunlukları birbirini tutmalı (her seri, her kategori için bir değer). (d) Sayısal olmayan, tahmini veya soruda geçmeyen bir değer YAZMA.`
+}
+
 function visualQuestionCandidate(question: any, category: string | null): boolean {
   if (!question || question.type === 'true_false' || question.type === 'short_answer' || question.type === 'multi_true_false') return false
   const text = normalizeTR(String(question.q || ''))
@@ -302,9 +324,17 @@ function rigorInstruction(difficulty: string, count: number, topic: string): str
 
 function visualQuestionIndexes(questions: any[], category: string | null, requestedCount: number, forceVisuals: boolean): number[] {
   if (!category || requestedCount <= 0) return []
+  // 21 Eylül 2026 — kapsamı artırma: math_graph artık çoğunlukla deterministik
+  // chart-svg.ts ile (AI çağrısı YOK, maliyet/gecikme/kesilme riski yok)
+  // çiziliyor, bu yüzden eski AI-SVG kategorileri için konan temkinli min(3,...)
+  // sınırı math_graph'ta gereksiz — daha yüksek bir tavanla (6) kapsam artıyor.
+  // Diğer kategoriler (hâlâ her görsel için gerçek bir AI çağrısı gerektiriyor)
+  // eski, temkinli sınırda kalıyor.
+  const cap = category === 'math_graph' ? 6 : 3
+  const ratio = category === 'math_graph' ? 0.5 : 0.3
   const target = forceVisuals
     ? Math.max(1, Math.ceil(requestedCount * 0.5))
-    : Math.min(3, Math.max(1, Math.ceil(requestedCount * 0.3)))
+    : Math.min(cap, Math.max(1, Math.ceil(requestedCount * ratio)))
   const preferred = questions
     .map((question, index) => ({ question, index }))
     .filter(({ question }) => visualQuestionCandidate(question, category))
@@ -443,6 +473,17 @@ async function generateVisualForQuestion(
     // true_false ve short_answer sorularında SVG üretme
     if (q.type === 'true_false' || q.type === 'short_answer' || q.type === 'multi_true_false') {
       return null
+    }
+    // 21 Eylül 2026 — DETERMİNİSTİK GRAFİK YOLU (bkz. lib/chart-svg.ts): model
+    // bu soru için geçerli bir "chartData" ürettiyse, AI'ya hiç SVG
+    // yazdırmadan, doğrudan bu veriden çizilir. AI çağrısı yok → kesilme,
+    // bağlam uyuşmazlığı veya cevap ifşası riski yok, bu yüzden ayrıca
+    // visualMatchesQuestion QA çağrısına da gerek yok (veri zaten sorunun
+    // kendisinden geliyor). chartData YOKSA ya da bozuksa (validateChartData
+    // reddeder) sessizce aşağıdaki eski AI-SVG yoluna düşülür — regresyon yok.
+    if (category === 'math_graph' && q.chartData && validateChartData(q.chartData)) {
+      const svg = renderChartSVG(q.chartData)
+      if (svg) return { svg, contextQuality: { passed: true, score: 100, reason: 'deterministic-chart' } }
     }
     // Soru metni şekil/görsel gerektiriyor mu kontrol et
     const qText = (q.q || '').toLowerCase()
@@ -1542,8 +1583,13 @@ export async function POST(req: NextRequest) {
       }
     }
     const aiQuestionCount = Math.max(0, safeQCount - bankQuestions.length)
+    // chartDataInstruction: yalnızca math_graph'ta ek talimat üretir (bkz.
+    // fonksiyon tanımı) — burada erken hesaplamak için detectVisualCategory
+    // tekrar çağrılıyor (saf/yan etkisiz fonksiyon, aşağıda zaten tekrar
+    // çağrılacak — maliyeti sıfıra yakın, kod tekrarını önlemek riskli olurdu).
     const fullPrompt = buildPrompt(questionType, topic, grade, resolvedDifficulty, effectiveLang, aiQuestionCount, fileContent || '', gradeContext, mebContext, profile.department || undefined, subject)
       + visualPedagogyInstruction(topic, aiQuestionCount)
+      + chartDataInstruction(detectVisualCategory(topic))
 
     // 5 Eylül 2026 — P0 prompt caching (bkz. K12_STATIC_* tanımları ve
     // getStaticSystemBlock/stripStaticPartsForCaching yukarıda). Sadece K12/
@@ -2021,7 +2067,7 @@ export async function POST(req: NextRequest) {
       if (visual && questions[i]) {
         questions[i] = {
           ...questions[i], svg: visual.svg, qtype: 'svg', visualQuestionText: questions[i].q,
-          visualContextQuality: { score: visual.contextQuality.score, reason: visual.contextQuality.reason, evaluator: 'openai' },
+          visualContextQuality: { score: visual.contextQuality.score, reason: visual.contextQuality.reason, evaluator: visual.contextQuality.reason === 'deterministic-chart' ? 'deterministic' : 'openai' },
         }
         console.log(`[generate-quiz] visual generated for q[${i}] contextScore=${visual.contextQuality.score}`)
       }
