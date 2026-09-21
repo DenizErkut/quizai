@@ -21,9 +21,19 @@ async function getAdminUser() {
     { cookies: { get: (n) => cookieStore.get(n)?.value } }
   )
   const { data: { user } } = await sb.auth.getUser()
-  if (!user) return null
+  if (!user) {
+    // 21 Eylül 2026 — teşhis logu: "Forbidden" hatası tekrarlarsa Vercel
+    // runtime log'larında en azından "oturum yok" mu yoksa "admin değil" mi
+    // olduğunu görebilelim (öncesinde ikisi de sessizce 403 dönüyordu).
+    console.warn('[admin/exam-upload] Forbidden: cookie/oturum bulunamadı (muhtemelen aynı tarayıcıda başka bir hesapla giriş yapılmış ya da oturum süresi dolmuş).')
+    return null
+  }
   const { data: p } = await adminDb.from('profiles').select('is_admin').eq('id', user.id).single()
-  return p?.is_admin ? user : null
+  if (!p?.is_admin) {
+    console.warn(`[admin/exam-upload] Forbidden: ${user.email} oturumu geçerli ama is_admin=false.`)
+    return null
+  }
+  return user
 }
 
 export const maxDuration = 120
