@@ -141,6 +141,14 @@ function QuizPageContent() {
   // Artık QuizSetup, konu seçildiği ANDA (akordiyon kapanmadan HEMEN
   // ÖNCE) doğru ders adını buraya "yukarı taşıyor" (state lifting).
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null)
+  // 21 Eylül 2026 — Deniz'in isteği: PrioritySetupModal'da öncelik ders
+  // seçilip "Hazırım"a basıldığında (Atla değil), öğrencinin gerçek
+  // seviyesini hemen ölçmek için o ders için otomatik bir kalibrasyon
+  // testi başlatılsın. selectedSubject/selectedTopic state güncellemesi
+  // React'ta senkron olmadığından (startQuiz() closure'ı eski değeri
+  // görür), bu bayrak state'in gerçekten güncellendiği render'ı bekleyip
+  // useEffect içinde startQuiz()'i tetikler (aşağıya bkz.).
+  const [autoCalibrationPending, setAutoCalibrationPending] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false) // Gelişmiş ayarlar
   const [favorites, setFavorites] = useState<string[]>([]) // Favori konular
   const [mebTopics, setMebTopics] = useState<Record<string, string[]>>({}) // subject -> units (grade filtreli)
@@ -503,6 +511,18 @@ function QuizPageContent() {
   }, [currentLang, profile?.language])
 
   useEffect(() => { if (screen === 'topic') fetchProfile() }, [screen])
+
+  // PrioritySetupModal'dan gelen otomatik kalibrasyon tetikleyicisi — bkz.
+  // autoCalibrationPending tanımındaki not. selectedSubject/selectedTopic
+  // gerçekten set edildiğinde (bu effect yeniden çalıştığında) startQuiz()
+  // artık güncel değerleri görür.
+  useEffect(() => {
+    if (autoCalibrationPending && screen === 'topic' && selectedSubject && selectedTopic) {
+      setAutoCalibrationPending(false)
+      startQuiz()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCalibrationPending, selectedSubject, selectedTopic, screen])
 
   function getLevel(grade: string) {
     return grade.startsWith('ilk') ? 'ilkokul'
@@ -1186,7 +1206,23 @@ function QuizPageContent() {
       {!showOnboarding && showPrioritySetup && profile && (
         <PrioritySetupModal
           grade={profile.grade}
-          onComplete={() => setShowPrioritySetup(false)}
+          onComplete={(chosenSubjects) => {
+            setShowPrioritySetup(false)
+            // 21 Eylül 2026 — en az bir öncelik ders seçilmişse (Atla değil),
+            // ilk dersi seçip o dersin ilk konusuyla otomatik bir kalibrasyon
+            // testi başlat. Konu bulunamazsa (beklenmedik ders adı vb.)
+            // sessizce normal "hangi konuyu test edelim" ekranında bırak.
+            if (chosenSubjects.length > 0) {
+              const subject = chosenSubjects[0].subject
+              const level = getLevel(profile.grade)
+              const topics = SUBJECT_MAP[level]?.[subject] || []
+              if (topics.length > 0) {
+                setSelectedSubject(subject)
+                setSelectedTopic(topics[0])
+                setAutoCalibrationPending(true)
+              }
+            }
+          }}
         />
       )}
       <QuizSetup

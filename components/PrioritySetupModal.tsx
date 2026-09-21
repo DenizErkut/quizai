@@ -22,11 +22,15 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getSubjectsForGrade } from '@/lib/subject-map-grade'
-import type { SelfReportLevel } from '@/lib/onboarding-priorities'
+import type { SelfReportLevel, PrioritySubject } from '@/lib/onboarding-priorities'
 
 interface PrioritySetupModalProps {
   grade: string
-  onComplete: () => void
+  // 21 Eylül 2026 — Deniz'in isteği: kullanıcı en az bir öncelik ders
+  // seçip tamamladıysa (Atla değil), quiz/page.tsx bu dersler için hemen
+  // bir kalibrasyon testi başlatabilsin diye seçilen dersleri de veriyoruz.
+  // Atla'da ya da hiç ders seçilmeden bitirildiğinde boş dizi gelir.
+  onComplete: (chosenSubjects: PrioritySubject[]) => void
 }
 
 const EXAM_OPTIONS: { value: string; label: string; icon: string }[] = [
@@ -73,10 +77,10 @@ export default function PrioritySetupModal({ grade, onComplete }: PrioritySetupM
 
   async function persist(examValue: string | null, subjectsValue: Record<string, SelfReportLevel>) {
     setSaving(true)
+    const priority_subjects: PrioritySubject[] = Object.entries(subjectsValue).map(([subject, self_report]) => ({ subject, self_report: self_report as SelfReportLevel }))
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        const priority_subjects = Object.entries(subjectsValue).map(([subject, self_report]) => ({ subject, self_report }))
         // ÖNEMLİ (21 Eylül 2026 düzeltmesi): priority_subjects boş/null olabilir
         // (kullanıcı "Atla"yı seçebilir ya da hedef sınavı seçip hiç ders
         // seçmeyebilir) — bu YÜZDEN app/quiz/page.tsx'in modalı tekrar
@@ -94,7 +98,7 @@ export default function PrioritySetupModal({ grade, onComplete }: PrioritySetupM
       console.error('[PrioritySetupModal] persist hatası:', e)
     }
     setSaving(false)
-    onComplete()
+    onComplete(priority_subjects)
   }
 
   function goToSubjects() {
