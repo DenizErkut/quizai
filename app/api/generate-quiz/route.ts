@@ -1482,7 +1482,13 @@ export async function POST(req: NextRequest) {
     // Question Bank v1: only a complete, server-approved set bypasses AI.
     // Uploaded/source passages, university content, daily challenges and
     // adaptive continuation remain on their existing generation paths.
-    const bankEligible = !fileContent && !continueSessionId && !dailyChallenge && !isUniversityLevel
+    // 21 Eylül 2026 — Deniz'in bulduğu hata: admin AI kalite testi (forceProvider)
+    // aynı konu/sınıf/zorluk için banka zaten doluysa (ki test amacıyla aynı
+    // konuyu tekrar tekrar üretince hemen doluyor) AI'ı HİÇ ÇAĞIRMADAN direkt
+    // bankadan dönüyordu — üç sağlayıcı da aslında aynı bankadaki soruları
+    // gösteriyordu. Zorlamalı testlerde bankayı tamamen devre dışı bırakıyoruz
+    // ki gerçekten o sağlayıcının o anki çıktısı görülsün.
+    const bankEligible = !fileContent && !continueSessionId && !dailyChallenge && !isUniversityLevel && !forcedMistral && !forcedOpenAI && !forcedClaude
     let bankQuestions: any[] = []
     if (bankEligible) {
       bankQuestions = await getQuestionBankSet(supabase, {
