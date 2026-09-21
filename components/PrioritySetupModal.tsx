@@ -77,12 +77,22 @@ export default function PrioritySetupModal({ grade, onComplete }: PrioritySetupM
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const priority_subjects = Object.entries(subjectsValue).map(([subject, self_report]) => ({ subject, self_report }))
-        await supabase.from('profiles').update({
+        // ÖNEMLİ (21 Eylül 2026 düzeltmesi): priority_subjects boş/null olabilir
+        // (kullanıcı "Atla"yı seçebilir ya da hedef sınavı seçip hiç ders
+        // seçmeyebilir) — bu YÜZDEN app/quiz/page.tsx'in modalı tekrar
+        // göstermemesi için priority_subjects'in null OLMAMASINA değil, ayrı
+        // bir priority_setup_completed bayrağına bakması gerekiyor. Bu bayrak
+        // olmadan modal her sayfa yüklemesinde sonsuza kadar tekrar çıkıyordu.
+        const { error } = await supabase.from('profiles').update({
           target_exam: examValue,
           priority_subjects: priority_subjects.length > 0 ? priority_subjects : null,
+          priority_setup_completed: true,
         }).eq('id', user.id)
+        if (error) console.error('[PrioritySetupModal] profil güncellenemedi:', error.message)
       }
-    } catch {}
+    } catch (e) {
+      console.error('[PrioritySetupModal] persist hatası:', e)
+    }
     setSaving(false)
     onComplete()
   }

@@ -49,7 +49,7 @@ interface Question {
   objectiveMappingStatus?: 'mapped' | 'unmapped' | 'no_candidates'
   objectiveMappingVersion?: 'v1'
 }
-interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number; daily_test_count?: number; daily_test_date?: string; onboarding_completed?: boolean; priority_subjects?: unknown }
+interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number; daily_test_count?: number; daily_test_date?: string; onboarding_completed?: boolean; priority_subjects?: unknown; priority_setup_completed?: boolean }
 
 // MEB müfredatına göre ders ve konu haritası (bkz. lib/subject-map.ts)
 
@@ -356,7 +356,7 @@ function QuizPageContent() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return null }
     const { data } = await supabase
-      .from('profiles').select('grade,language,plan,monthly_test_count,daily_test_count,daily_test_date,onboarding_completed,priority_subjects')
+      .from('profiles').select('grade,language,plan,monthly_test_count,daily_test_count,daily_test_date,onboarding_completed,priority_subjects,priority_setup_completed')
       .eq('id', user.id).single()
     // İsim artik profiles'ta degil, TR-PG kimliginde — resolve ile cekilir
     const displayName = await resolveName(supabase, user.id)
@@ -369,11 +369,18 @@ function QuizPageContent() {
     // ✅ Onboarding: ilk kez giren kullanıcı için modal göster
     if (data && !data.onboarding_completed) {
       setShowOnboarding(true)
-    } else if (data && !data.priority_subjects) {
+    } else if (data && !data.priority_setup_completed) {
       // 19 Eylül 2026 — Deniz'in isteği: tanıtım turu bittiyse (veya daha
       // önce bitmişse — mevcut kullanıcılar da bir kez görsün), hedef sınav +
       // öncelik ders kurulumu henüz yapılmadıysa göster (bkz.
       // components/PrioritySetupModal.tsx, lib/onboarding-priorities.ts).
+      //
+      // 21 Eylül 2026 DÜZELTMESİ: burada önceden `!data.priority_subjects`
+      // kontrol ediliyordu — ama priority_subjects, kullanıcı "Atla"yı
+      // seçtiğinde ya da hedef sınavı seçip hiç ders seçmediğinde de null
+      // kalıyor (geçerli bir tamamlanmış durum). Bu yüzden modal HER quiz
+      // sayfası yüklemesinde sonsuza kadar tekrar çıkıyordu. Artık ayrı ve
+      // içerikten bağımsız bir priority_setup_completed bayrağına bakıyoruz.
       setShowPrioritySetup(true)
     }
     setCurrentLang(lang)
@@ -1172,7 +1179,7 @@ function QuizPageContent() {
           onComplete={() => {
             setShowOnboarding(false)
             // Tanıtım turu bitince, kurulum hâlâ yapılmadıysa hemen ardından göster.
-            if (!profile.priority_subjects) setShowPrioritySetup(true)
+            if (!profile.priority_setup_completed) setShowPrioritySetup(true)
           }}
         />
       )}
