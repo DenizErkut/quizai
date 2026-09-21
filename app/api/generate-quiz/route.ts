@@ -1604,6 +1604,19 @@ export async function POST(req: NextRequest) {
     experimentVariant = pilotEligible ? (useMistralLive ? 'mistral-live' : useGptPilot ? 'gpt-4.1-mini' : 'control') : null
     genEngineUsed = useMistralLive ? 'mistral-large' : useGptPilot ? 'gpt-4.1-mini' : (useHaiku ? 'claude-haiku' : 'claude-sonnet')
 
+    // 21 Eylül 2026 — Deniz'in bulduğu "Sorular tamamlanamadı" (503
+    // incomplete_set) hatasının kök nedeni: ana üretim çağrısının
+    // max_tokens'ı qCount'tan BAĞIMSIZ olarak sabitti (2500/3500), oysa
+    // topup zaten "missing * 600, taban 2000, tavan 4000" ile ölçekleniyordu
+    // (bkz. aşağıdaki topup bloğu ve 29 Ağustos yorumu). qCount=10 gibi
+    // yüksek isteklerde 3500 token çoğu zaman JSON'u YARIDA kesiyordu
+    // (loglarda doğrulandı: out=3500 tam sınırda, "balanced-brace parser"
+    // ile kurtarma, 10 istenip 7-9 soru gelmesi) — bu da topup'u gerekli
+    // kılıyor, topup da 95sn'lik zaman bütçesini dolduruyor, sonuç 503.
+    // Düzeltme: ana çağrının max_tokens'ı da aynı mantıkla qCount'a göre
+    // ölçeklendi, böylece topup'a düşme ihtiyacı kaynağında azalıyor.
+    const genMaxTokens = Math.min(6000, Math.max(useHaiku ? 2500 : 3500, aiQuestionCount * 550))
+
     let text: string
     if (useMistralLive) {
       const mistralAdapter = new MistralAdapter()
@@ -1613,7 +1626,7 @@ export async function POST(req: NextRequest) {
             { role: 'system', content: 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca MEB müfredatındaki konularda soru üret. Müfredat dışı, siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.\n\n' + getStaticSystemBlock(questionType, effectiveLang) },
             { role: 'user', content: prompt },
           ],
-          maxTokens: useHaiku ? 2500 : 3500,
+          maxTokens: genMaxTokens,
           json: true,
         },
         {
@@ -1633,14 +1646,14 @@ export async function POST(req: NextRequest) {
           { role: 'system', content: 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca MEB müfredatındaki konularda soru üret. Müfredat dışı, siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.\n\n' + getStaticSystemBlock(questionType, effectiveLang) },
           { role: 'user', content: prompt },
         ],
-        { model: 'gpt-4.1-mini', max_tokens: useHaiku ? 2500 : 3500, json: true, operation: 'generate-quiz:pilot-gpt41mini', userId: user.id, quizSessionId: usageSessionId, requestId: usageRequestId }
+        { model: 'gpt-4.1-mini', max_tokens: genMaxTokens, json: true, operation: 'generate-quiz:pilot-gpt41mini', userId: user.id, quizSessionId: usageSessionId, requestId: usageRequestId }
       )
       text = gptResult
       console.log(`[generate-quiz] PILOT model=gpt-4.1-mini qCount=${aiQuestionCount}`)
     } else {
       const response = await anthropic.messages.create({
         model: useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5',
-        max_tokens: useHaiku ? 2500 : 3500,
+        max_tokens: genMaxTokens,
         system: isUniversityLevel
           ? 'Sen üniversite düzeyinde soru üreten bir eğitim asistanısın. MEB K-12 müfredatı kısıtı burada geçerli değil; öğrencinin bölümüne/seviyesine uygun, akademik olarak doğru sorular üret. Siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.'
           : [
