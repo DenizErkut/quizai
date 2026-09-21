@@ -20,6 +20,11 @@ export interface IntelligenceRequestContext {
   requiresVision?: boolean
   requiresPremiumReasoning?: boolean
   containsSensitiveStudentData?: boolean
+  // 21 Eylül 2026 — canlı pilot (gölge değil) çağrıları ayrı telemetry
+  // etiketiyle loglanabilsin diye. Verilmezse adapter'lar eski (gölge)
+  // varsayılanını korur — mevcut shadow-comparison çağrısı ETKİLENMEZ.
+  operationTag?: string
+  shadow?: boolean
 }
 
 export interface ModelTarget {

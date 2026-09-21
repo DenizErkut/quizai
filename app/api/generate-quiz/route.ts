@@ -32,7 +32,7 @@ import { startingDifficultyFromMastery } from '@/lib/adaptive-difficulty'
 import { resolveDiagnosticQuestionStrategy } from '@/lib/diagnostic-question-strategy'
 import { parsePrioritySubjects, seedScoreForSubject } from '@/lib/onboarding-priorities'
 import { applyCanonicalObjectiveMappings, learningObjectivePrompt, loadCanonicalObjectiveCandidates } from '@/lib/learning-objective-mapping'
-import { runMistralShadowComparison } from '@/lib/ai-gateway'
+import { runMistralShadowComparison, MistralAdapter, isProviderConfigured } from '@/lib/ai-gateway'
 import { balanceAnswerPositions, getQuestionBankSet, promoteQuestionsToBank, questionBankKey } from '@/lib/question-bank'
 
 const anthropic = new Anthropic()
@@ -1573,6 +1573,18 @@ export async function POST(req: NextRequest) {
     const GPT_PILOT_FRACTION = Number.isFinite(configuredFraction)
       ? Math.min(1, Math.max(0, configuredFraction))
       : 0.30
+    // 21 Eylül 2026 — Deniz'in talebiyle: Mistral'i CANLI (gölge değil) bir
+    // pilot olarak devreye al. Varsayılan %0 — MISTRAL_LIVE_FRACTION Vercel'de
+    // açıkça ayarlanmadan davranış değişmez (Mistral hesabında sadece $10
+    // kredi var, auto-recharge kapalı; agresif bir varsayılanla başlamak
+    // riskli olur). MistralAdapter.execute() hata fırlatırsa (yanlış/eksik
+    // anahtar, HTTP hatası) bu istek diğer motorlardaki gibi aşağıdaki genel
+    // catch bloğuna düşer ve mevcut GPT-4o fallback'i devreye girer — yani
+    // Mistral'in başarısız olması öğrenciye asla 500 döndürmez.
+    const configuredMistralFraction = Number(process.env.MISTRAL_LIVE_FRACTION ?? '0')
+    const MISTRAL_LIVE_FRACTION = Number.isFinite(configuredMistralFraction)
+      ? Math.min(1, Math.max(0, configuredMistralFraction))
+      : 0
     // Kullanıcıyı deney boyunca aynı grupta tutan deterministik FNV-1a kovası.
     // Devam parçaları pilot dışında kalır; yalnızca ilk K12 üretimi ölçülür.
     const experimentKey = `quiz-generation-v1:${user.id}`
@@ -1583,12 +1595,39 @@ export async function POST(req: NextRequest) {
     }
     experimentBucket = Math.abs(hash >>> 0) % 10000
     const pilotEligible = !isUniversityLevel && !continueSessionId
-    const useGptPilot = pilotEligible && experimentBucket < Math.round(GPT_PILOT_FRACTION * 10000)
-    experimentVariant = pilotEligible ? (useGptPilot ? 'gpt-4.1-mini' : 'control') : null
-    genEngineUsed = useGptPilot ? 'gpt-4.1-mini' : (useHaiku ? 'claude-haiku' : 'claude-sonnet')
+    // Kova 0-9999 üzerinde bölünür: önce Mistral dilimi, sonra GPT dilimi,
+    // kalanı kontrol (Claude). Böylece üçü de birbirini dışlar.
+    const mistralBucketEnd = Math.round(MISTRAL_LIVE_FRACTION * 10000)
+    const gptBucketEnd = mistralBucketEnd + Math.round(GPT_PILOT_FRACTION * 10000)
+    const useMistralLive = pilotEligible && isProviderConfigured('mistral') && experimentBucket < mistralBucketEnd
+    const useGptPilot = pilotEligible && !useMistralLive && experimentBucket < gptBucketEnd
+    experimentVariant = pilotEligible ? (useMistralLive ? 'mistral-live' : useGptPilot ? 'gpt-4.1-mini' : 'control') : null
+    genEngineUsed = useMistralLive ? 'mistral-large' : useGptPilot ? 'gpt-4.1-mini' : (useHaiku ? 'claude-haiku' : 'claude-sonnet')
 
     let text: string
-    if (useGptPilot) {
+    if (useMistralLive) {
+      const mistralAdapter = new MistralAdapter()
+      const mistralResponse = await mistralAdapter.execute(
+        {
+          messages: [
+            { role: 'system', content: 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca MEB müfredatındaki konularda soru üret. Müfredat dışı, siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.\n\n' + getStaticSystemBlock(questionType, effectiveLang) },
+            { role: 'user', content: prompt },
+          ],
+          maxTokens: useHaiku ? 2500 : 3500,
+          json: true,
+        },
+        {
+          task: 'quiz_generation',
+          userId: user.id,
+          sessionId: usageSessionId,
+          requestId: usageRequestId,
+          operationTag: 'generate-quiz:pilot-mistral',
+          shadow: false,
+        }
+      )
+      text = mistralResponse.content
+      console.log(`[generate-quiz] LIVE PILOT model=mistral (${mistralResponse.model}) qCount=${aiQuestionCount}`)
+    } else if (useGptPilot) {
       const gptResult = await callOpenAI(
         [
           { role: 'system', content: 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca MEB müfredatındaki konularda soru üret. Müfredat dışı, siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.\n\n' + getStaticSystemBlock(questionType, effectiveLang) },
@@ -2077,6 +2116,7 @@ export async function POST(req: NextRequest) {
       && !isUniversityLevel
       && !continueSessionId
       && !(fileContent && fileContent.trim())
+      && !useMistralLive // bu istek zaten canlıda Mistral kullandıysa gölge karşılaştırma tekrar Mistral'e ikinci bir çağrı yaptırmasın (boşa maliyet)
       && shadowBucket < Math.round(shadowFraction * 10000)
 
     if (shadowEligible && sessionId) {

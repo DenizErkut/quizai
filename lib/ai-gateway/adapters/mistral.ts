@@ -47,7 +47,7 @@ export class MistralAdapter implements AIProviderAdapter<MistralChatRequest, Mis
     const inputTokens = Number(data?.usage?.prompt_tokens || 0)
     const outputTokens = Number(data?.usage?.completion_tokens || 0)
     await logAIUsage({
-      operation: 'generate-quiz:shadow-mistral',
+      operation: context.operationTag || 'generate-quiz:shadow-mistral',
       provider: 'mistral',
       model,
       inputTokens,
@@ -56,7 +56,7 @@ export class MistralAdapter implements AIProviderAdapter<MistralChatRequest, Mis
       userId: context.userId,
       quizSessionId: context.sessionId,
       requestId: context.requestId,
-      meta: { policyVersion: 'multi-ai-gateway-v3-p0', shadow: true },
+      meta: { policyVersion: 'multi-ai-gateway-v3-p0', shadow: context.shadow !== false },
     })
     return { content: data?.choices?.[0]?.message?.content || '', model, inputTokens, outputTokens, durationMs }
   }
