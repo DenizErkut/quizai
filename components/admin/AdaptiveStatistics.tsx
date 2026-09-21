@@ -2,17 +2,50 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
+// 21 Eylül 2026 — Deniz'in isteğiyle: bu rapor teknik olarak doğruydu ama
+// "3.04", "güven aralığı [3.04, 3.04]" gibi rakamlar okuyucuya SANKİ anlamlı
+// bir sonuçmuş gibi görünüyordu; oysa şu an her grupta 0-1 kişi 7 günlük
+// ölçümü tamamlamış durumda (gerekli: 30) — yani bu rakamlar tek bir kişinin
+// (ya da hiç kimsenin) verisine dayanıyor ve istatistiksel olarak anlamsız.
+// API (route.ts) bunu zaten classification:'insufficient_data' ile doğru
+// işaretliyor; burada yapılan değişiklik SADECE gösterimi netleştiriyor —
+// hesaplamalara dokunulmadı: (a) üstte açık bir "bu rapor ne ölçüyor" cümlesi,
+// (b) her grup kartında "7 gün tamamlayan / gerekli eşik" ilerleme olarak,
+// (c) veri yetersizken rakamı büyük/kalın göstermek yerine önce sade Türkçe
+// açıklama, rakamı ise küçük/soluk "referans" olarak, (d) jargon
+// (güven aralığı, etki büyüklüğü) için hover ile okunan kısa açıklama.
 export default function AdaptiveStatistics() {
   const [report, setReport] = useState<any>(null)
   useEffect(() => { void (async () => { const { data: { session } } = await createClient().auth.getSession(); if (!session) return; const response = await fetch('/api/admin/adaptive-evaluation', { headers: { Authorization: `Bearer ${session.access_token}` } }); if (response.ok) setReport(await response.json()) })() }, [])
   if (!report?.statistics) return null
   const labels: Record<string, string> = { mastery: 'Mastery değişimi', retention: '7 günlük kalıcılık', test_pct: 'Test başarısı', completion_rate: 'Tamamlama oranı', duration_seconds: 'Ortalama süre (sn)', test_count: 'Tamamlanan test sayısı' }
   const cohortLabel = (name: string) => name === 'adaptive' ? 'Adaptive' : 'Standard'
+  const minCompleted = Math.min(...(report.cohorts?.map((c: any) => c.completed_sample) ?? [0]))
+  const min = report.minimum_interpretation_sample
+  const classificationText = (row: any): string => {
+    if (row.classification === 'insufficient_data') return `Henüz güvenilir değil — şu an sadece ${minCompleted} kişilik veriye dayanıyor, en az ${min} gerekiyor.`
+    if (row.classification === 'adaptive_positive') return 'Bu ölçütte Adaptive grubu şu ana kadar önde.'
+    if (row.classification === 'standard_positive') return 'Bu ölçütte Standard grubu şu ana kadar önde.'
+    return 'İki grup arasında fark görünmüyor.'
+  }
   return <div className="card" style={{ marginTop: '1rem' }}>
     <strong style={{ color: 'var(--primary)' }}>📊 İstatistiksel etki raporu</strong>
+    <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text3)' }}>Bu rapor, Adaptive Learning'in mevcut (Standard) yönteme göre öğrenmeyi GERÇEKTEN iyileştirip iyileştirmediğini ölçer. Rastgele iki-üç kişinin sonucuyla bunu söylemek mümkün değil — bu yüzden her grupta en az {min} kişi 7 günlük ölçümü tamamlayana kadar aşağıdaki tüm sayılar "henüz güvenilir değil" olarak işaretlenir.</div>
     <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: report.claim_status === 'supported_by_pilot' ? '#eaf8ef' : '#fff4e5', color: report.claim_status === 'supported_by_pilot' ? '#176b3a' : '#8a5200', fontSize: 12, fontWeight: 700 }}>{report.claim_message}</div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 8, marginTop: 10 }}>{report.cohorts?.map((cohort: any) => <div key={cohort.cohort} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10, fontSize: 12 }}><strong>{cohortLabel(cohort.cohort)}</strong><div>Atanan: {cohort.assigned_sample} · 24 saat: {cohort.day1_sample} · 7 gün: {cohort.completed_sample}</div><div style={{ color: 'var(--text3)', marginTop: 3 }}>Tamamlama: {cohort.completion_rate == null ? '—' : `%${Math.round(cohort.completion_rate * 100)}`} · Ortalama süre: {cohort.avg_duration_seconds ?? '—'} sn · Test: {cohort.avg_test_count ?? '—'}</div></div>)}</div>
-    <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text3)' }}>Yorum eşiği: her grupta en az {report.minimum_interpretation_sample} tamamlanmış 7 günlük ölçüm ve gruplar arasında en fazla %25 örneklem farkı.</div>
-    <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>{report.statistics.map((row: any) => <div key={row.metric} style={{ borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: 12 }}><strong>{labels[row.metric] || row.metric}</strong><div>Adaptive − Standard: {row.difference}{row.effect_size != null ? ` · Etki büyüklüğü: ${row.effect_size}` : ''}</div><div style={{ color: 'var(--text3)' }}>%95 güven aralığı: [{row.confidence_interval_95.join(', ')}] · {row.classification === 'insufficient_data' ? 'veri yetersiz' : row.classification}</div></div>)}</div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 8, marginTop: 10 }}>{report.cohorts?.map((cohort: any) => <div key={cohort.cohort} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10, fontSize: 12 }}>
+      <strong>{cohortLabel(cohort.cohort)}</strong>
+      <div style={{ marginTop: 4 }}>Atanan kişi: {cohort.assigned_sample} · 24 saat ölçümü alınan: {cohort.day1_sample}</div>
+      <div style={{ marginTop: 4, fontWeight: 700, color: cohort.completed_sample >= min ? 'var(--green, #176b3a)' : 'var(--amber, #8a5200)' }}>7 gün tamamlayan: {cohort.completed_sample} / {min} gerekli {cohort.completed_sample < min ? '(yetersiz)' : '(eşik geçildi)'}</div>
+      <div style={{ color: 'var(--text3)', marginTop: 3 }}>Bu {cohort.completed_sample} kişide: tamamlama oranı {cohort.completion_rate == null ? '—' : `%${Math.round(cohort.completion_rate * 100)}`} · ortalama süre {cohort.avg_duration_seconds ?? '—'} sn · test sayısı {cohort.avg_test_count ?? '—'}</div>
+    </div>)}</div>
+    <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{report.statistics.map((row: any) => <div key={row.metric} style={{ borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: 12 }}>
+      <strong>{labels[row.metric] || row.metric}</strong>
+      <div style={{ marginTop: 2, fontWeight: row.classification === 'insufficient_data' ? 400 : 700, color: row.classification === 'insufficient_data' ? 'var(--text3)' : 'inherit' }}>{classificationText(row)}</div>
+      <div style={{ color: 'var(--text3)', marginTop: 3, opacity: row.classification === 'insufficient_data' ? 0.6 : 1 }}>
+        Referans rakam — Adaptive − Standard farkı: {row.difference}
+        {row.effect_size != null ? <span title="Farkın, gruplar içindeki doğal (kişiden kişiye) farklılığa oranı. 0'a yakınsa fark küçük, 0.8'in üzerinde ise fark büyük kabul edilir."> · etki büyüklüğü: {row.effect_size} (?)</span> : null}
+        <span title="Gerçek fark muhtemelen bu aralıkta bir yerde. Aralık sıfırı içine alıyorsa (ör. [-5, 5]) fark istatistiksel olarak anlamlı değildir — henüz 'adaptive daha iyi' ya da 'standard daha iyi' denemez."> · %95 olası aralık: [{row.confidence_interval_95.join(', ')}] (?)</span>
+      </div>
+    </div>)}</div>
   </div>
 }
