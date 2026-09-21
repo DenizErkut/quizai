@@ -36,6 +36,13 @@ async function callOpenAI(messages: {role: string, content: any}[], options: {
   const timeout = options.timeoutMs
     ? setTimeout(() => controller.abort(), options.timeoutMs)
     : null
+  // 21 Eylül 2026 — 3 sağlayıcılı (Mistral/OpenAI/Claude) hız karşılaştırması
+  // için: Mistral adaptörü zaten kendi süresini ölçüyordu, OpenAI çağrıları
+  // ölçmüyordu — bu yüzden ai_usage_logs.duration_ms OpenAI satırlarında hep
+  // NULL'du. Burada merkezi olarak ölçülüp logOpenAIUsage'a geçiriliyor,
+  // böylece TÜM OpenAI çağrıları (sadece generate-quiz değil) için gerçek
+  // süre kaydediliyor.
+  const startedAt = Date.now()
   let res: Response
   try {
     res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -58,11 +65,13 @@ async function callOpenAI(messages: {role: string, content: any}[], options: {
   }
   if (!res.ok) throw new Error(`OpenAI ${res.status}: ${await res.text()}`)
   const data = await res.json()
+  const durationMs = Date.now() - startedAt
   // Gerçek token tüketimini logla (best-effort, ana akışı bozmaz)
   await logOpenAIUsage(options.operation || 'openai', model, data, {
     userId: options.userId,
     quizSessionId: options.quizSessionId,
     requestId: options.requestId,
+    durationMs,
   })
   const choice = data.choices[0]
   if (options.requireComplete && choice.finish_reason === 'length') {

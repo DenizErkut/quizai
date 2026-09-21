@@ -1185,13 +1185,23 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const isDailyChallengeRequest = body?.dailyChallenge === true
     // 21 Eylül 2026 — Deniz'in isteğiyle: gerçek öğrenci trafiğine hiç
-    // dokunmadan Mistral çıktısını gözle kontrol edebilmesi için admin-only
-    // bir test anahtarı. SADECE profiles.is_admin=true olan hesap
-    // body.forceMistralTest:true gönderirse etkili olur; başka hiçbir
-    // kullanıcı/istek bunu tetikleyemez ve MISTRAL_LIVE_FRACTION kovasını
-    // (dolayısıyla gerçek A/B istatistiklerini) etkilemez — bkz. aşağıda
-    // genEngineUsed='mistral-admin-test' ayrı etiketleniyor.
-    const forceMistralTest = body?.forceMistralTest === true && profile.is_admin === true
+    // dokunmadan üç sağlayıcının (Mistral/GPT-4.1-mini/Claude) çıktısını
+    // gözle kontrol edebilmesi için admin-only bir test anahtarı. SADECE
+    // profiles.is_admin=true olan hesap body.forceProvider:'mistral'|
+    // 'openai'|'claude' gönderirse etkili olur; başka hiçbir kullanıcı/istek
+    // bunu tetikleyemez ve deneyin kovasını (dolayısıyla gerçek A/B
+    // istatistiklerini) etkilemez — bkz. aşağıda genEngineUsed
+    // '...-admin-test' ile ayrı etiketleniyor, experimentVariant her zaman
+    // null kalıyor. body.forceMistralTest:true eski/geriye-dönük biçim,
+    // hâlâ 'mistral' zorlamasına denk gelir.
+    const rawForceProvider = typeof body?.forceProvider === 'string' ? body.forceProvider : null
+    const forceProviderTest: 'mistral' | 'openai' | 'claude' | null =
+      profile.is_admin === true && (rawForceProvider === 'mistral' || rawForceProvider === 'openai' || rawForceProvider === 'claude')
+        ? rawForceProvider
+        : (body?.forceMistralTest === true && profile.is_admin === true ? 'mistral' : null)
+    const forcedMistral = forceProviderTest === 'mistral'
+    const forcedOpenAI = forceProviderTest === 'openai'
+    const forcedClaude = forceProviderTest === 'claude'
 
     const plan = profile.plan || 'free'
     const today = new Date().toISOString().split('T')[0]
@@ -1607,14 +1617,19 @@ export async function POST(req: NextRequest) {
     // kalanı kontrol (Claude). Böylece üçü de birbirini dışlar.
     const mistralBucketEnd = Math.round(MISTRAL_LIVE_FRACTION * 10000)
     const gptBucketEnd = mistralBucketEnd + Math.round(GPT_PILOT_FRACTION * 10000)
-    // forceMistralTest (yalnızca admin) kovadan bağımsız olarak Mistral'i
-    // devreye sokar — gerçek A/B istatistiklerini bozmasın diye
-    // experimentVariant'a 'mistral-live' değil null yazılıyor, genEngineUsed
-    // da ayrı 'mistral-admin-test' etiketiyle işaretleniyor (aşağıda).
-    const useMistralLive = pilotEligible && isProviderConfigured('mistral') && (forceMistralTest || experimentBucket < mistralBucketEnd)
-    const useGptPilot = pilotEligible && !useMistralLive && experimentBucket < gptBucketEnd
-    experimentVariant = pilotEligible ? (useMistralLive ? (forceMistralTest ? null : 'mistral-live') : useGptPilot ? 'gpt-4.1-mini' : 'control') : null
-    genEngineUsed = useMistralLive ? (forceMistralTest ? 'mistral-admin-test' : 'mistral-large') : useGptPilot ? 'gpt-4.1-mini' : (useHaiku ? 'claude-haiku' : 'claude-sonnet')
+    // forceProviderTest (yalnızca admin) kovadan bağımsız olarak istenen
+    // sağlayıcıyı devreye sokar — gerçek A/B istatistiklerini bozmasın diye
+    // experimentVariant her zaman null kalıyor, genEngineUsed ayrı
+    // '...-admin-test' etiketiyle işaretleniyor (aşağıda).
+    const useMistralLive = pilotEligible && isProviderConfigured('mistral') && !forcedOpenAI && !forcedClaude && (forcedMistral || experimentBucket < mistralBucketEnd)
+    const useGptPilot = pilotEligible && !useMistralLive && !forcedClaude && (forcedOpenAI || experimentBucket < gptBucketEnd)
+    const isForcedProviderTest = forcedMistral || forcedOpenAI || forcedClaude
+    experimentVariant = pilotEligible ? (isForcedProviderTest ? null : (useMistralLive ? 'mistral-live' : useGptPilot ? 'gpt-4.1-mini' : 'control')) : null
+    genEngineUsed = useMistralLive
+      ? (forcedMistral ? 'mistral-admin-test' : 'mistral-large')
+      : useGptPilot
+        ? (forcedOpenAI ? 'gpt-4.1-mini-admin-test' : 'gpt-4.1-mini')
+        : (forcedClaude ? (useHaiku ? 'claude-haiku-admin-test' : 'claude-sonnet-admin-test') : (useHaiku ? 'claude-haiku' : 'claude-sonnet'))
 
     // 21 Eylül 2026 — Deniz'in bulduğu "Sorular tamamlanamadı" (503
     // incomplete_set) hatasının kök nedeni: ana üretim çağrısının
@@ -1646,23 +1661,31 @@ export async function POST(req: NextRequest) {
           userId: user.id,
           sessionId: usageSessionId,
           requestId: usageRequestId,
-          operationTag: forceMistralTest ? 'generate-quiz:admin-test-mistral' : 'generate-quiz:pilot-mistral',
+          operationTag: forcedMistral ? 'generate-quiz:admin-test-mistral' : 'generate-quiz:pilot-mistral',
           shadow: false,
         }
       )
       text = mistralResponse.content
-      console.log(`[generate-quiz] ${forceMistralTest ? 'ADMIN TEST' : 'LIVE PILOT'} model=mistral (${mistralResponse.model}) qCount=${aiQuestionCount}`)
+      console.log(`[generate-quiz] ${forcedMistral ? 'ADMIN TEST' : 'LIVE PILOT'} model=mistral (${mistralResponse.model}) qCount=${aiQuestionCount}`)
     } else if (useGptPilot) {
+      // 21 Eylül 2026 — 3 sağlayıcılı admin kalite/hız/maliyet karşılaştırması
+      // için: callOpenAI kendi içinde durationMs ölçüp logOpenAIUsage'a
+      // geçiriyor (bkz. lib/openai.ts), bu yüzden burada ayrıca ölçmeye
+      // gerek yok — sadece operation etiketi forced-test'i ayırt ediyor.
       const gptResult = await callOpenAI(
         [
           { role: 'system', content: 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca MEB müfredatındaki konularda soru üret. Müfredat dışı, siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.\n\n' + getStaticSystemBlock(questionType, effectiveLang) },
           { role: 'user', content: prompt },
         ],
-        { model: 'gpt-4.1-mini', max_tokens: genMaxTokens, json: true, operation: 'generate-quiz:pilot-gpt41mini', userId: user.id, quizSessionId: usageSessionId, requestId: usageRequestId }
+        { model: 'gpt-4.1-mini', max_tokens: genMaxTokens, json: true, operation: forcedOpenAI ? 'generate-quiz:admin-test-openai' : 'generate-quiz:pilot-gpt41mini', userId: user.id, quizSessionId: usageSessionId, requestId: usageRequestId }
       )
       text = gptResult
-      console.log(`[generate-quiz] PILOT model=gpt-4.1-mini qCount=${aiQuestionCount}`)
+      console.log(`[generate-quiz] ${forcedOpenAI ? 'ADMIN TEST' : 'PILOT'} model=gpt-4.1-mini qCount=${aiQuestionCount}`)
     } else {
+      // 21 Eylül 2026 — Claude çağrısının süresi önceden hiç loglanmıyordu
+      // (Mistral/OpenAI'nin aksine); 3 sağlayıcılı hız karşılaştırması için
+      // burada da ölçülüp logAnthropicUsage'a durationMs olarak geçiriliyor.
+      const claudeStartedAt = Date.now()
       const response = await anthropic.messages.create({
         model: useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5',
         max_tokens: genMaxTokens,
@@ -1674,11 +1697,13 @@ export async function POST(req: NextRequest) {
             ],
         messages: [{ role: 'user', content: prompt }],
       })
-      console.log(`[generate-quiz] model=${useHaiku ? 'haiku' : 'sonnet'} qCount=${aiQuestionCount}`)
-      await logAnthropicUsage('generate-quiz', useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5', response, {
+      const claudeDurationMs = Date.now() - claudeStartedAt
+      console.log(`[generate-quiz] ${forcedClaude ? 'ADMIN TEST' : ''} model=${useHaiku ? 'haiku' : 'sonnet'} qCount=${aiQuestionCount} ms=${claudeDurationMs}`)
+      await logAnthropicUsage(forcedClaude ? 'generate-quiz:admin-test-claude' : 'generate-quiz', useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5', response, {
         userId: user.id,
         quizSessionId: usageSessionId,
         requestId: usageRequestId,
+        durationMs: claudeDurationMs,
         meta: { qCount: aiQuestionCount, topic, hasMebContext: !!mebContext, bankQuestionCount: bankQuestions.length },
       })
       text = response.content[0].type === 'text' ? response.content[0].text : ''
@@ -2142,6 +2167,7 @@ export async function POST(req: NextRequest) {
       && !continueSessionId
       && !(fileContent && fileContent.trim())
       && !useMistralLive // bu istek zaten canlıda Mistral kullandıysa gölge karşılaştırma tekrar Mistral'e ikinci bir çağrı yaptırmasın (boşa maliyet)
+      && !isForcedProviderTest // admin zorlamalı test istekleri gölge karşılaştırmayı da tetiklemesin (boşa maliyet, A/B dışı istek)
       && shadowBucket < Math.round(shadowFraction * 10000)
 
     if (shadowEligible && sessionId) {
@@ -2189,7 +2215,20 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    return NextResponse.json({ questions, sessionId, resolvedDifficulty, source: bankQuestions.length > 0 ? 'hybrid' : 'ai', bankQuestionCount: bankQuestions.length, aiQuestionCount: Math.max(0, questions.length - bankQuestions.length), adaptivePolicy: adaptivePolicy || undefined, diagnosticStrategy })
+    return NextResponse.json({
+      questions, sessionId, resolvedDifficulty,
+      source: bankQuestions.length > 0 ? 'hybrid' : 'ai',
+      bankQuestionCount: bankQuestions.length,
+      aiQuestionCount: Math.max(0, questions.length - bankQuestions.length),
+      adaptivePolicy: adaptivePolicy || undefined,
+      diagnosticStrategy,
+      // 21 Eylül 2026 — admin zorlamalı sağlayıcı testinde, sorular gerçekten
+      // istenen sağlayıcıdan mı geldi yoksa soru bankası fallback'i mi devreye
+      // girdi görünsün diye (önceki sorun: sayfa "Mistral ile üret" dese de
+      // fallback sessizce bank sorularını döndürebiliyordu, admin bunu asla
+      // göremiyordu). Normal öğrenci trafiğinde bu alan hiç eklenmiyor.
+      ...(isForcedProviderTest ? { debugGenEngine: genEngineUsed, debugBankFallback: bankQuestions.length > 0 } : {}),
+    })
   } catch (error: any) {
     console.error('Generate quiz error, trying OpenAI fallback:', error?.message)
     // GPT-4o yedek model
