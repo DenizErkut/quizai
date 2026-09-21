@@ -1199,7 +1199,7 @@ export async function POST(req: NextRequest) {
   let usageRequestId: string | undefined
   let usageSessionId: string | undefined
   let experimentBucket: number | null = null
-  let experimentVariant: 'gpt-4.1-mini' | 'mistral-live' | 'control' | null = null
+  let experimentVariant: 'gpt-4.1-mini' | 'mistral-live' | 'claude-hard-difficulty' | 'control' | null = null
   // 26 Ağustos 2026 — öğretmen geri bildirimi: "Metinde, ..." tarzı sorularda
   // öğrenciye kaynak metnin KENDİSİ hiç gösterilmiyordu. mebContext/fileContent
   // yalnızca AI'ın prompt'una gidiyordu, response'a hiç eklenmiyordu — AI'ın
@@ -1639,10 +1639,18 @@ export async function POST(req: NextRequest) {
     //    quiz_sessions.gen_engine sütununa (bkz. aşağıda insert) kaydediliyor
     //    — bir hafta sonra hem MALİYET hem KALİTE (skor, tamamlanma oranı,
     //    topup'a düşme sıklığı) karşılaştırması yapılabilsin diye.
-    const configuredFraction = Number(process.env.GPT_PILOT_FRACTION ?? '0.30')
+    // 21 Eylül 2026 — Deniz'in talebiyle: GPT-4.1-mini artık %30'luk bir A/B
+    // dilimi değil, "gövde" (varsayılan) motor. Bugünkü geniş admin-test
+    // karşılaştırmasında GPT-4.1-mini 11/11 konuda hatasız tamamladı, en
+    // hızlı ve en ucuzdu; Claude ise aynı taramada %36 oranında görünür
+    // şekilde başarısız oldu (bkz. yukarıdaki Anthropic timeout düzeltmesi)
+    // ve ~7 kat daha pahalıydı. Varsayılan artık %100 — GPT_PILOT_FRACTION
+    // env değişkeniyle Vercel'de anında (redeploy gerekmeden) düşürülebilir,
+    // tıpkı MISTRAL_LIVE_FRACTION'daki güvenlik supabı gibi.
+    const configuredFraction = Number(process.env.GPT_PILOT_FRACTION ?? '1.0')
     const GPT_PILOT_FRACTION = Number.isFinite(configuredFraction)
       ? Math.min(1, Math.max(0, configuredFraction))
-      : 0.30
+      : 1.0
     // 21 Eylül 2026 — Deniz'in talebiyle: Mistral'i CANLI (gölge değil) bir
     // pilot olarak devreye al. Varsayılan %0 — MISTRAL_LIVE_FRACTION Vercel'de
     // açıkça ayarlanmadan davranış değişmez (Mistral hesabında sadece $10
@@ -1673,15 +1681,30 @@ export async function POST(req: NextRequest) {
     // sağlayıcıyı devreye sokar — gerçek A/B istatistiklerini bozmasın diye
     // experimentVariant her zaman null kalıyor, genEngineUsed ayrı
     // '...-admin-test' etiketiyle işaretleniyor (aşağıda).
-    const useMistralLive = pilotEligible && isProviderConfigured('mistral') && !forcedOpenAI && !forcedClaude && (forcedMistral || experimentBucket < mistralBucketEnd)
-    const useGptPilot = pilotEligible && !useMistralLive && !forcedClaude && (forcedOpenAI || experimentBucket < gptBucketEnd)
+    //
+    // 21 Eylül 2026 — Deniz'in talebiyle yeniden yapılandırıldı: Claude artık
+    // "kalan her şeyin" varsayılanı DEĞİL — sadece zorluk seviyesi zor/çok
+    // zor olan istekler için ayrılan özel bir motor. Sıra: admin
+    // forceProvider testi > zorluk tabanlı Claude zorunluluğu > Mistral
+    // kovası (payı değişmedi) > GPT-4.1-mini (artık varsayılan gövde).
+    // Not: difficulty 'auto' iken resolvedDifficulty adaptif politikadan
+    // gelir (bkz. yukarıda ~1337. satır) — yani bu kontrol hem öğrencinin
+    // elle seçtiği hem sistemin otomatik atadığı zorluk için çalışır.
+    const resolvedDifficultyIsHard = resolvedDifficulty === 'zor' || resolvedDifficulty === 'cok zor'
     const isForcedProviderTest = forcedMistral || forcedOpenAI || forcedClaude
-    experimentVariant = pilotEligible ? (isForcedProviderTest ? null : (useMistralLive ? 'mistral-live' : useGptPilot ? 'gpt-4.1-mini' : 'control')) : null
+    const claudeRequiredForDifficulty = pilotEligible && !isForcedProviderTest && resolvedDifficultyIsHard
+    const useMistralLive = pilotEligible && isProviderConfigured('mistral') && !forcedOpenAI && !forcedClaude && !claudeRequiredForDifficulty && (forcedMistral || experimentBucket < mistralBucketEnd)
+    const useGptPilot = pilotEligible && !useMistralLive && !forcedClaude && !claudeRequiredForDifficulty && (forcedOpenAI || experimentBucket < gptBucketEnd)
+    experimentVariant = pilotEligible ? (isForcedProviderTest ? null : (useMistralLive ? 'mistral-live' : useGptPilot ? 'gpt-4.1-mini' : claudeRequiredForDifficulty ? 'claude-hard-difficulty' : 'control')) : null
     genEngineUsed = useMistralLive
       ? (forcedMistral ? 'mistral-admin-test' : 'mistral-large')
       : useGptPilot
         ? (forcedOpenAI ? 'gpt-4.1-mini-admin-test' : 'gpt-4.1-mini')
-        : (forcedClaude ? (useHaiku ? 'claude-haiku-admin-test' : 'claude-sonnet-admin-test') : (useHaiku ? 'claude-haiku' : 'claude-sonnet'))
+        : (forcedClaude
+            ? (useHaiku ? 'claude-haiku-admin-test' : 'claude-sonnet-admin-test')
+            : (claudeRequiredForDifficulty
+                ? (useHaiku ? 'claude-haiku-hard-difficulty' : 'claude-sonnet-hard-difficulty')
+                : (useHaiku ? 'claude-haiku' : 'claude-sonnet')))
 
     // 21 Eylül 2026 — Deniz'in bulduğu "Sorular tamamlanamadı" (503
     // incomplete_set) hatasının kök nedeni: ana üretim çağrısının
@@ -1738,6 +1761,24 @@ export async function POST(req: NextRequest) {
       // (Mistral/OpenAI'nin aksine); 3 sağlayıcılı hız karşılaştırması için
       // burada da ölçülüp logAnthropicUsage'a durationMs olarak geçiriliyor.
       const claudeStartedAt = Date.now()
+      // 21 Eylül 2026 — KÖK NEDEN BULUNDU: Anthropic SDK'nın varsayılan
+      // isteği-zaman-aşımı 10 DAKİKA (!) ve zaman aşımına uğrayan istekler
+      // varsayılan olarak 2 kez daha otomatik tekrar deneniyor. Bizim
+      // fonksiyonumuzun bütçesi (Vercel maxDuration=120sn) bunun çok altında
+      // — yani SDK, bizim tarafımızdan hiç yakalanamayacak kadar uzun
+      // bekleyebiliyordu. Sonuç: Vercel fonksiyonu SESSIZCE saat sınırında
+      // öldürülüyor, bizim try/catch'imiz (aşağıda OpenAI'a düşen fallback
+      // dahil) HİÇ ÇALIŞMIYOR, istemci JSON değil Vercel'in kendi düz metin
+      // hata sayfasını alıyor ("An error occurred..." → "Unexpected token
+      // 'A'... is not valid JSON" client hatası olarak görünüyordu — bkz.
+      // Deniz'in 21 Eylül admin-test taramasında Claude'un %36 oranında
+      // görünür şekilde başarısız olması, hiç log satırı bırakmadan).
+      // Düzeltme: bütçe-farkında bir timeout + maxRetries:0 veriyoruz.
+      // Zaman aşımı olursa artık BİZİM kodumuz (satır ~2284'teki catch)
+      // yakalıyor ve OpenAI fallback'e düşüyor — öğrenci hata yerine yine
+      // de bir quiz alıyor.
+      const CLAUDE_MAIN_CALL_DEADLINE_MS = 100000 // 120sn bütçeden DB yazımı+response için pay bırak
+      const claudeCallTimeoutMs = Math.max(20000, CLAUDE_MAIN_CALL_DEADLINE_MS - (Date.now() - requestStartTime))
       const response = await anthropic.messages.create({
         model: useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5',
         max_tokens: genMaxTokens,
@@ -1748,7 +1789,7 @@ export async function POST(req: NextRequest) {
               { type: 'text' as const, text: getStaticSystemBlock(questionType, effectiveLang), cache_control: { type: 'ephemeral' as const } },
             ],
         messages: [{ role: 'user', content: prompt }],
-      })
+      }, { timeout: claudeCallTimeoutMs, maxRetries: 0 })
       const claudeDurationMs = Date.now() - claudeStartedAt
       console.log(`[generate-quiz] ${forcedClaude ? 'ADMIN TEST' : ''} model=${useHaiku ? 'haiku' : 'sonnet'} qCount=${aiQuestionCount} ms=${claudeDurationMs}`)
       await logAnthropicUsage(forcedClaude ? 'generate-quiz:admin-test-claude' : 'generate-quiz', useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5', response, {
@@ -1937,6 +1978,13 @@ export async function POST(req: NextRequest) {
         const beforeRoundCount = questions.length
         try {
           const topupPrompt = `${prompt}\n\nÖNEMLİ: Bu sefer TAM OLARAK ${missing} adet YENİ ve BİRBİRİNDEN FARKLI soru üret (ne bir eksik ne bir fazla). Daha önce üretilenlerle aynı/benzer soru üretme. Yanıtın SADECE geçerli, TAMAMLANMIŞ (yarıda kesilmemiş) JSON olmalı.`
+          // 21 Eylül 2026 — ana çağrıdaki aynı zaman aşımı düzeltmesi: SDK'nın
+          // 10 dakikalık varsayılan zaman aşımı + otomatik tekrar denemeleri
+          // burada da fonksiyonu Vercel'in sessizce öldürmesine yol açabilir.
+          // Kalan TOPUP_TIME_BUDGET_MS'e göre bütçe-farkında bir timeout
+          // veriyoruz; aşılırsa bu turun kendi try/catch'i (üstte) yakalar,
+          // döngü bir sonraki turda zaten zaman kontrolüyle duruyor olurdu.
+          const topupCallTimeoutMs = Math.max(15000, TOPUP_TIME_BUDGET_MS - (Date.now() - requestStartTime))
           const topupResponse = await anthropic.messages.create({
             // Eksik soru tamamlama, sayıya SADIK KALMA konusunda Haiku'dan
             // daha güvenilir olan Sonnet ile yapılır — burada hız değil
@@ -1954,7 +2002,7 @@ export async function POST(req: NextRequest) {
               ? undefined
               : [{ type: 'text' as const, text: getStaticSystemBlock(questionType, effectiveLang), cache_control: { type: 'ephemeral' as const } }],
             messages: [{ role: 'user', content: topupPrompt }],
-          })
+          }, { timeout: topupCallTimeoutMs, maxRetries: 0 })
           await logAnthropicUsage('generate-quiz:topup', 'claude-sonnet-4-5', topupResponse, {
             userId: user.id,
             quizSessionId: usageSessionId,
