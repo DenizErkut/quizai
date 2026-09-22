@@ -193,8 +193,16 @@ function CheckoutContent() {
   const [error, setError] = useState('')
   const [paytrToken, setPaytrToken] = useState('')
   const [discountRate, setDiscountRate] = useState(0)
+  const [codeInput, setCodeInput] = useState('')
+  const [appliedCode, setAppliedCode] = useState<{ code: string; discountRate: number; label: string } | null>(null)
+  const [codeError, setCodeError] = useState('')
+  const [codeChecking, setCodeChecking] = useState(false)
   const supabase = createClient() as any
-  const displayPlans = applyDiscount(discountRate)
+  // Elle girilip uygulanan bir satıcı/kurum kodu varsa, kayıt anında profile
+  // bağlanmış olan otomatik indirimin YERİNE geçer (bkz. app/api/paytr/checkout
+  // route'undaki aynı öncelik mantığı — ikisi tutarlı olmalı).
+  const effectiveDiscountRate = appliedCode ? appliedCode.discountRate : discountRate
+  const displayPlans = applyDiscount(effectiveDiscountRate)
 
   // Ödeme sonucu kontrol. 'processing': PayTR'ın iframe içinden yaptığı
   // tarayıcı yönlendirmesi (merchant_ok_url) — bu GÜVENİLİR bir onay DEĞİL,
@@ -224,6 +232,43 @@ function CheckoutContent() {
     }
     loadDiscount()
   }, [])
+
+  async function applyCode() {
+    const code = codeInput.trim()
+    if (!code) return
+    setCodeError(''); setCodeChecking(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        const next = `/checkout?plan=${selectedPlan}`
+        router.push(`/login?next=${encodeURIComponent(next)}`)
+        return
+      }
+      const res = await fetch('/api/checkout/apply-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ code }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.valid) {
+        setAppliedCode(null)
+        setCodeError(data.error || 'Kod bulunamadı veya artık geçerli değil.')
+        return
+      }
+      setAppliedCode({ code, discountRate: data.discount_rate || 0, label: data.label || 'Kod uygulandı' })
+    } catch {
+      setAppliedCode(null)
+      setCodeError('Kod doğrulanamadı, tekrar dene.')
+    } finally {
+      setCodeChecking(false)
+    }
+  }
+
+  function removeCode() {
+    setAppliedCode(null)
+    setCodeInput('')
+    setCodeError('')
+  }
 
   // PayTR'ın iframe boyutlandırma script'ini bir kez yükle (iframe token
   // gelince <iframe> zaten DOM'da oluyor, iFrameResize onu bulup sarıyor).
@@ -257,7 +302,7 @@ function CheckoutContent() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ plan: selectedPlan }),
+        body: JSON.stringify({ plan: selectedPlan, code: appliedCode?.code || undefined }),
       })
 
       const data = await res.json()
@@ -369,6 +414,37 @@ function CheckoutContent() {
                   </div>
                 </button>
               ))}
+            </div>
+
+            {/* Satıcı/Kurum Kodu */}
+            <div className="card-sm anim-up-1" style={{ marginBottom: '1.5rem' }}>
+              {appliedCode ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--green)' }}>
+                    ✓ <strong>{appliedCode.code}</strong> — {appliedCode.label} (%{appliedCode.discountRate} indirim)
+                  </div>
+                  <button className="btn btn-ghost btn-sm" onClick={removeCode}>Kaldır</button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      className="input"
+                      placeholder="Satıcı veya kurum kodu"
+                      value={codeInput}
+                      onChange={e => { setCodeInput(e.target.value); setCodeError('') }}
+                      onKeyDown={e => { if (e.key === 'Enter') applyCode() }}
+                      style={{ flex: 1 }}
+                    />
+                    <button className="btn btn-sm" onClick={applyCode} disabled={codeChecking || !codeInput.trim()}>
+                      {codeChecking ? <span className="spinner" style={{ width: 16, height: 16 }} /> : 'Uygula'}
+                    </button>
+                  </div>
+                  {codeError && (
+                    <div style={{ fontSize: '12px', color: 'var(--red)', marginTop: '6px' }}>{codeError}</div>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Güven unsurları */}

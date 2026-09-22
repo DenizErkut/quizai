@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentityBySupabaseId } from '@/lib/identity/client'
 import { BILLING_PLANS, resolveBillingPlanKey } from '@/lib/subscription-plans'
+import { resolveDiscountCode } from '@/lib/referral-code'
 import {
   PAYTR_MERCHANT_ID,
   PAYTR_GET_TOKEN_URL,
@@ -49,19 +50,36 @@ export async function POST(req: NextRequest) {
   const identity = await getIdentityBySupabaseId(user.id)
   const fullName = identity?.full_name || 'Kullanici'
 
-  // Satıcı indirimi — Iyzico route'uyla birebir aynı mantık (bkz.
-  // app/api/iyzico/checkout/route.ts).
-  const { data: buyerProfile } = await supabaseAdmin
-    .from('profiles').select('seller_id').eq('id', user.id).maybeSingle()
-
   let sellerId: string | null = null
   let discountRate = 0
-  if (buyerProfile?.seller_id) {
-    const { data: seller } = await supabaseAdmin
-      .from('sellers').select('id, discount_rate, active').eq('id', buyerProfile.seller_id).maybeSingle()
-    if (seller?.active) {
-      sellerId = seller.id
-      discountRate = Number(seller.discount_rate) || 0
+
+  // Checkout ekranındaki "Satıcı/Kurum Kodu" alanına elle girilen kod —
+  // varsa, kayıt anında profile bağlanmış olan otomatik satıcı indirimini
+  // EZER (kullanıcı bilinçli olarak bu kodu girdiği için). Kod client'ta
+  // önizleme amaçlı /api/checkout/apply-code ile önceden doğrulanmış olsa
+  // bile, gerçek tahsilat burada YENİDEN doğrulanır — client'tan gelen bir
+  // indirim oranına asla güvenilmez.
+  const manualCode = String(body.code || '').trim()
+  if (manualCode) {
+    const resolved = await resolveDiscountCode(supabaseAdmin, manualCode)
+    if (!resolved.found) {
+      return NextResponse.json({ error: 'Satıcı/kurum kodu artık geçerli değil. Lütfen kodu kaldırıp tekrar deneyin.' }, { status: 400 })
+    }
+    sellerId = resolved.sellerId
+    discountRate = resolved.discountRate
+  } else {
+    // Kod girilmediyse, kayıt olurken bağlanmış olan otomatik satıcı
+    // indirimine düş — Iyzico route'uyla birebir aynı mantık (bkz.
+    // app/api/iyzico/checkout/route.ts).
+    const { data: buyerProfile } = await supabaseAdmin
+      .from('profiles').select('seller_id').eq('id', user.id).maybeSingle()
+    if (buyerProfile?.seller_id) {
+      const { data: seller } = await supabaseAdmin
+        .from('sellers').select('id, discount_rate, active').eq('id', buyerProfile.seller_id).maybeSingle()
+      if (seller?.active) {
+        sellerId = seller.id
+        discountRate = Number(seller.discount_rate) || 0
+      }
     }
   }
 
