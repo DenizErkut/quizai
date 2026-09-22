@@ -22,8 +22,37 @@ export default function TeacherLivePage() {
   const [participants, setParticipants] = useState<any[]>([])
   const [answers, setAnswers] = useState<any[]>([])
   const [leaderboard, setLeaderboard] = useState<any[]>([])
+  // 22 Eylül 2026 — Deniz'in bildirdiği "sonraki soruyu gönderdim ama
+  // öğrencinin önüne düşmedi" hatasının olası kök nedeni: startQuiz/
+  // revealLeaderboard/nextQuestion/finishQuiz PATCH isteğinin başarılı olup
+  // olmadığını hiç kontrol etmeden öğretmenin kendi ekranını iyimser (optimistic)
+  // olarak ilerletiyordu. İstek 401/500 ile sessizce başarısız olursa öğretmen
+  // "sonraki soruyu gönderdim" sanıyor ama DB hiç değişmediği için öğrenci
+  // tarafı (LiveContent.tsx) eski soruda donuk kalıyor. Artık ok kontrolü var.
+  const [actionError, setActionError] = useState('')
+  const lastActionRef = useRef<(() => void) | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const realtimeRef = useRef<any>(null)
+
+  async function patchLiveQuiz(body: any): Promise<boolean> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) return false
+      const res = await fetch('/api/live-quiz', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        console.error('[live-quiz] PATCH başarısız:', body.action, res.status)
+        return false
+      }
+      return true
+    } catch (e) {
+      console.error('[live-quiz] PATCH gönderilemedi:', body.action, e)
+      return false
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -160,12 +189,10 @@ export default function TeacherLivePage() {
   }
 
   async function startQuiz() {
-    const { data: { session } } = await supabase.auth.getSession()
-    await fetch('/api/live-quiz', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ live_quiz_id: liveQuiz.id, action: 'start' }),
-    })
+    setActionError('')
+    lastActionRef.current = startQuiz
+    const ok = await patchLiveQuiz({ live_quiz_id: liveQuiz.id, action: 'start' })
+    if (!ok) { setActionError('Quiz başlatılamadı — bağlantı sorunu olabilir. Tekrar dene.'); return }
     setCurrentQ(0)
     setScreen('active')
     startTimer()
@@ -188,41 +215,41 @@ export default function TeacherLivePage() {
   // revealing=true oluyor (bkz. app/api/live-quiz/route.ts), bu da
   // Realtime/polling ile öğrenci ekranına (LiveContent.tsx) da yansıyor.
   async function revealLeaderboard() {
+    setActionError('')
+    lastActionRef.current = revealLeaderboard
     if (timerRef.current) clearInterval(timerRef.current)
-    const { data: { session } } = await supabase.auth.getSession()
-    await fetch('/api/live-quiz', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ live_quiz_id: liveQuiz.id, action: 'reveal' }),
-    })
+    const ok = await patchLiveQuiz({ live_quiz_id: liveQuiz.id, action: 'reveal' })
+    if (!ok) { setActionError('Sıralama gönderilemedi — bağlantı sorunu olabilir. Tekrar dene.'); return }
     setScreen('reveal')
   }
 
   async function nextQuestion() {
+    setActionError('')
+    lastActionRef.current = nextQuestion
     const nextQ = currentQ + 1
     if (nextQ >= (liveQuiz.questions?.length || 0)) {
       await finishQuiz()
       return
     }
-    const { data: { session } } = await supabase.auth.getSession()
-    await fetch('/api/live-quiz', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ live_quiz_id: liveQuiz.id, action: 'next', current_question: nextQ }),
-    })
+    const ok = await patchLiveQuiz({ live_quiz_id: liveQuiz.id, action: 'next', current_question: nextQ })
+    if (!ok) {
+      // ÖNEMLİ: DB güncellenmediyse öğretmenin ekranını da İLERLETME — aksi
+      // halde öğretmen "sonraki soruyu gönderdim" sanır ama öğrenci eski
+      // soruda kalır (Deniz'in bildirdiği hata tam olarak bu).
+      setActionError('Sonraki soru gönderilemedi — öğrencilere ulaşmadı. Tekrar dene.')
+      return
+    }
     setCurrentQ(nextQ)
     setScreen('active')
     startTimer()
   }
 
   async function finishQuiz() {
+    setActionError('')
+    lastActionRef.current = finishQuiz
     if (timerRef.current) clearInterval(timerRef.current)
-    const { data: { session } } = await supabase.auth.getSession()
-    await fetch('/api/live-quiz', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ live_quiz_id: liveQuiz.id, action: 'finish' }),
-    })
+    const ok = await patchLiveQuiz({ live_quiz_id: liveQuiz.id, action: 'finish' })
+    if (!ok) { setActionError('Quiz bitirilemedi — bağlantı sorunu olabilir. Tekrar dene.'); return }
     setScreen('results')
   }
 
@@ -336,6 +363,12 @@ export default function TeacherLivePage() {
             : `✅ ${participants.length} öğrenci hazır`}
         </div>
 
+        {actionError && (
+          <div style={{ marginBottom: '1rem', padding: '10px 12px', background: '#fff4e5', border: '1px solid rgba(217,119,6,0.25)', borderRadius: '10px', fontSize: '13px', color: '#92400e', textAlign: 'left' }}>
+            ⚠️ {actionError} <button onClick={() => lastActionRef.current?.()} style={{ marginLeft: 6, textDecoration: 'underline', color: '#92400e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '13px', padding: 0 }}>Tekrar dene</button>
+          </div>
+        )}
+
         <button onClick={startQuiz}
           style={{ width: '100%', padding: '18px', borderRadius: '14px', border: 'none',
             background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
@@ -370,6 +403,11 @@ export default function TeacherLivePage() {
         </div>
 
         <div style={{ maxWidth: '640px', margin: '0 auto', padding: '1.25rem 1rem' }}>
+          {actionError && (
+            <div style={{ marginBottom: '1rem', padding: '10px 12px', background: '#fff4e5', border: '1px solid rgba(217,119,6,0.25)', borderRadius: '10px', fontSize: '13px', color: '#92400e' }}>
+              ⚠️ {actionError} <button onClick={() => lastActionRef.current?.()} style={{ marginLeft: 6, textDecoration: 'underline', color: '#92400e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '13px', padding: 0 }}>Tekrar dene</button>
+            </div>
+          )}
           {/* Soru */}
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--primary)', lineHeight: 1.6, marginBottom: '1.25rem' }}>{q.q}</div>
@@ -419,6 +457,12 @@ export default function TeacherLivePage() {
       <main style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #082465, #6366f1)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
         <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '4px' }}>Soru {currentQ + 1}/{liveQuiz.questions.length} sonrası</div>
         <div style={{ fontWeight: 900, fontSize: '26px', color: '#fff', marginBottom: '1.5rem' }}>🏆 İlk 3</div>
+
+        {actionError && (
+          <div style={{ marginBottom: '1rem', padding: '10px 12px', background: '#fff4e5', border: '1px solid rgba(217,119,6,0.25)', borderRadius: '10px', fontSize: '13px', color: '#92400e', maxWidth: 420, width: '100%' }}>
+            ⚠️ {actionError} <button onClick={() => lastActionRef.current?.()} style={{ marginLeft: 6, textDecoration: 'underline', color: '#92400e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '13px', padding: 0 }}>Tekrar dene</button>
+          </div>
+        )}
 
         <div style={{ background: '#fff', borderRadius: '20px', padding: '1.5rem', width: '100%', maxWidth: '420px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', marginBottom: '1.5rem' }}>
           {top3.length === 0 ? (

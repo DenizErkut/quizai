@@ -21,6 +21,13 @@ export default function LiveContent() {
   const [lastAnswerScore, setLastAnswerScore] = useState<number | null>(null)
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState('')
+  // 22 Eylül 2026 — Deniz'in bildirdiği "doğru işaretledim ama hep yanlış
+  // dedi" hatasının kök nedeni: submitAnswer() sunucu yanıtının başarılı
+  // olup olmadığını (res.ok) hiç kontrol etmiyordu. İstek 401/500 ile
+  // dönerse data.is_correct undefined oluyor ve bu her zaman "Yanlış!"
+  // olarak gösteriliyordu — kullanıcı ne tıklarsa tıklasın. answerError
+  // bu durumu ayrı bir "bağlantı sorunu" ekranına ayırıyor.
+  const [answerError, setAnswerError] = useState(false)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const channelRef = useRef<any>(null)
   // Refs — polling/realtime callback'lerinde güncel değerlere erişmek için
@@ -66,7 +73,7 @@ export default function LiveContent() {
     const { data: { session: joinSession } } = await supabase.auth.getSession()
     await fetch(`/api/live-quiz?live_quiz_id=${lq.id}`, {
       headers: { Authorization: `Bearer ${joinSession?.access_token}` }
-    }).catch(() => {}) // Sessizce başarısız ol
+    }).catch((e) => console.error('[live-quiz] katılım marker gönderilemedi:', e)) // UI'ı bloklamaz, sadece loglanır
 
     if (lq.status === 'active') {
       setCurrentQ(lq.current_question)
@@ -80,6 +87,8 @@ export default function LiveContent() {
     }
 
     // Realtime: quiz güncellemelerini dinle
+    // 22 Eylül 2026 — subscribe()'a durum callback'i eklendi: eskiden bağlantı
+    // hatası (CHANNEL_ERROR/TIMED_OUT) tamamen sessizdi, teşhis imkânı yoktu.
     const channel = supabase.channel(`live_student:${lq.id}`)
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'live_quizzes',
@@ -87,16 +96,37 @@ export default function LiveContent() {
       }, (payload: any) => {
         handleQuizUpdate(payload.new)
       })
-      .subscribe()
+      .subscribe((status: string) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.error('[live-quiz] realtime bağlantı sorunu:', status, '— 1sn polling devrede kalıyor')
+        }
+      })
     channelRef.current = channel
 
-    // Polling — Realtime gecikirse 2sn'de bir kontrol et
+    // Polling — Realtime gecikirse/koparsa 1sn'de bir kontrol et.
+    // 22 Eylül 2026 — Deniz'in bildirdiği "öğretmen sonraki soruyu gönderdi
+    // ama öğrencinin önüne düşmedi" hatasının olası kök nedeni: bu sorgu
+    // hata dönerse (oturum/ağ sorunu) eskiden TAMAMEN SESSİZCE hiçbir şey
+    // yapmıyordu — öğrenci ekranı sonsuza kadar donuk kalabiliyordu. Şimdi
+    // hata logluyoruz ki tekrarlarsa Supabase log'larından teşhis edilebilsin.
+    let consecutivePollErrors = 0
     const pollId = setInterval(async () => {
-      const { data: updated } = await supabase
+      const { data: updated, error: pollError } = await supabase
         .from('live_quizzes')
         .select('id, status, current_question, time_per_question, revealing')
         .eq('id', lq.id)
         .single()
+      if (pollError) {
+        consecutivePollErrors++
+        console.error('[live-quiz] polling hatası:', pollError.message, `(art arda ${consecutivePollErrors}. kez)`)
+        // Art arda çok sayıda hata → muhtemelen oturum token'ı bayatlamış.
+        // Sessizce donmak yerine bir kez oturumu tazeleyip devam etmeyi dene.
+        if (consecutivePollErrors === 3) {
+          await supabase.auth.refreshSession().catch(() => {})
+        }
+        return
+      }
+      consecutivePollErrors = 0
       if (updated) handleQuizUpdate(updated)
       if (updated?.status === 'finished') {
         clearInterval(pollId)
@@ -178,18 +208,50 @@ export default function LiveContent() {
     }, 1000)
   }
 
+  // Sunucuya cevabı gönderir; başarısız (network hatası veya res.ok=false)
+  // olursa ok:false döner — ESKİDEN bu durumda data.is_correct undefined
+  // kalıp sessizce "Yanlış!" gösteriliyordu, artık çağıran taraf bunu ayırt
+  // edip kullanıcıya "cevabın gönderilemedi" diyebiliyor.
+  async function sendAnswer(idx: number): Promise<{ ok: boolean; data?: any }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) return { ok: false }
+      const res = await fetch('/api/live-quiz', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ live_quiz_id: liveQuizRef.current?.id, question_index: currentQRef.current, chosen_answer: idx }),
+      })
+      if (!res.ok) return { ok: false }
+      const data = await res.json()
+      if (typeof data?.is_correct !== 'boolean') return { ok: false }
+      return { ok: true, data }
+    } catch (e) {
+      console.error('[live-quiz] cevap gönderilemedi:', e)
+      return { ok: false }
+    }
+  }
+
   async function submitAnswer(idx: number) {
     if (chosen !== null) return
     setChosen(idx)
+    setAnswerError(false)
     if (timerRef.current) clearInterval(timerRef.current)
 
-    const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch('/api/live-quiz', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ live_quiz_id: liveQuizRef.current?.id, question_index: currentQRef.current, chosen_answer: idx }),
-    })
-    const data = await res.json()
+    let result = await sendAnswer(idx)
+    if (!result.ok) {
+      // Geçici bir ağ/oturum sorunu olabilir — kısa bir bekleme sonrası bir
+      // kez daha dene, hemen pes etme.
+      await new Promise(r => setTimeout(r, 500))
+      result = await sendAnswer(idx)
+    }
+
+    if (!result.ok) {
+      setAnswerError(true)
+      setChosen(null)
+      return
+    }
+
+    const data = result.data
     setIsCorrect(data.is_correct)
     setLastAnswerScore(typeof data.score === 'number' ? data.score : null)
 
@@ -284,6 +346,11 @@ export default function LiveContent() {
       </div>
 
       <div style={{ maxWidth: '560px', margin: '0 auto', padding: '1.25rem 1rem' }}>
+        {answerError && (
+          <div style={{ padding: '10px 12px', background: '#fff4e5', border: '1px solid rgba(217,119,6,0.25)', borderRadius: '10px', fontSize: '13px', color: '#92400e', marginBottom: '1rem', lineHeight: 1.5 }}>
+            ⚠️ Cevabın gönderilemedi (bağlantı sorunu olabilir). Lütfen tekrar seç.
+          </div>
+        )}
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--primary)', lineHeight: 1.65, marginBottom: '1.25rem' }}>{q.q}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
