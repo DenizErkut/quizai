@@ -1,12 +1,16 @@
 import Link from 'next/link'
 
-// iyzico web sitesi kriterleri: Teslimat/İade linki + ödeme logoları (resmi
-// iyzico logo paketi, koyu zemin için White varyant) tüm herkese açık
+// Teslimat/İade linki + ödeme sağlayıcı bilgisi tüm herkese açık
 // sayfalarda görünsün diye ortak footer. TEK kaynak — bazı sayfalar
 // (özellikle anasayfa) daha önce bunu kopyalayıp kendi footer'ını
 // yazmıştı, zamanla bu kopyalar birbirinden sapmıştı (ör. anasayfada
 // "Özel Koçluk" linki eksikti). Artık tüm herkese açık sayfalar bu TEK
 // bileşeni kullanmalı.
+//
+// 22 Eylül 2026 — Iyzico'dan PayTR'a geçişle birlikte resmi iyzico logo
+// paketi kaldırıldı. PayTR'ın kendi resmi ödeme logosu paketi henüz repoya
+// eklenmedi (Deniz'in PayTR merchant panelinden indirip eklemesi gerekiyor)
+// — o zamana kadar metin tabanlı bir rozet kullanılıyor.
 export default function SiteFooter() {
   const links = [
     { href: '/hakkimizda', label: 'Hakkımızda' },
@@ -39,11 +43,9 @@ export default function SiteFooter() {
           </div>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          <img
-            src="/payment/iyzico-band-white.svg"
-            alt="iyzico ile öde — Mastercard, Visa, American Express, Troy"
-            style={{ height: '30px', maxWidth: '100%' }}
-          />
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>
+            💳 PayTR ile güvenli ödeme — Mastercard, Visa, Troy
+          </p>
           <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)' }}>
             © 2026 Dumerk Elektronik Sanayi ve Ticaret Limited Şirketi
           </p>

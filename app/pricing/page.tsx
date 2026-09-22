@@ -182,8 +182,8 @@ export default function PricingPage() {
           })}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'center', margin: '0 0 1.5rem' }}>
-          <img src="/payment/iyzico-band.svg" alt="iyzico ile öde — Mastercard, Visa, American Express, Troy" style={{ height: '26px', maxWidth: '100%' }} />
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '0 0 1.5rem', fontSize: '13px', color: 'var(--text2)' }}>
+          💳 PayTR ile güvenli ödeme — Mastercard, Visa, Troy
         </div>
 
         {/* Kullanım durumu */}
@@ -248,7 +248,7 @@ export default function PricingPage() {
         <div className="card anim-up-4">
           <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Sık sorulan sorular</div>
           {[
-            { q: 'Ödeme güvenli mi?', a: 'Evet. Tüm ödemeler iyzico altyapısıyla SSL koruması altında işlenir. Kart bilgileriniz sitemizde saklanmaz.' },
+            { q: 'Ödeme güvenli mi?', a: 'Evet. Tüm ödemeler PayTR altyapısıyla SSL koruması altında işlenir. Kart bilgileriniz sitemizde saklanmaz.' },
             { q: 'İptal edebilir miyim?', a: 'Evet, istediğin zaman iptal edebilirsin. Gümüş, Altın veya Platin süren dolana kadar özelliklerden yararlanmaya devam edersin.' },
             { q: 'Birden fazla sınıfa katılabilir miyim?', a: 'Evet! Matematik, Türkçe, Fen gibi farklı dersler için öğretmenlerinden farklı davet kodları alarak birden fazla sınıfa aynı anda üye olabilirsin.' },
             { q: 'Analiz için kaç test çözmem gerekiyor?', a: 'Analiz ve gelişim planı için en az 10 test çözmen gerekiyor. Daha fazla test çözdükçe analiz daha isabetli olur.' },

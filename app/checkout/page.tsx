@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -89,6 +89,100 @@ function applyDiscount(discountRate: number): Record<keyof typeof PLANS, PlanDis
   return out
 }
 
+// PayTR'ın merchant_ok_url'i (bkz. app/api/paytr/checkout/route.ts) sadece
+// "kart formu tamamlandı" der, planın gerçekten aktive edildiğini garanti
+// etmez — o, PayTR'ın ayrı ve asenkron sunucu-sunucu bildirimiyle olur (bkz.
+// app/api/paytr/callback/route.ts). Bu ekran o bildirim gelene kadar
+// kullanıcıyı bilgilendirip /api/paytr/status'u kısa aralıklarla polluyor.
+function PaytrProcessingScreen({ oid }: { oid: string }) {
+  const [status, setStatus] = useState<'pending' | 'active' | 'failed' | 'not_found'>('pending')
+  const [attempts, setAttempts] = useState(0)
+  const supabase = createClient() as any
+  const MAX_ATTEMPTS = 24 // ~24 × 2.5sn ≈ 60sn
+
+  useEffect(() => {
+    if (status !== 'pending' || attempts >= MAX_ATTEMPTS) return
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
+        const res = await fetch(`/api/paytr/status?oid=${encodeURIComponent(oid)}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        if (cancelled) return
+        if (data.status === 'active' || data.status === 'failed') setStatus(data.status)
+        else setAttempts(a => a + 1)
+      } catch {
+        if (!cancelled) setAttempts(a => a + 1)
+      }
+    }, 2500)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [status, attempts, oid])
+
+  if (status === 'active') return (
+    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: '1.5rem' }}>
+      <div style={{ maxWidth: '440px', textAlign: 'center' }} className="anim-up">
+        <div style={{ fontSize: '64px', marginBottom: '1rem' }}>🎉</div>
+        <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>Ödemen alındı! 🎉</h2>
+        <p style={{ color: 'var(--text2)', fontSize: '15px', marginBottom: '2rem', lineHeight: 1.7 }}>
+          Planın aktive edildi. Hemen teste başlayabilirsin.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '280px', margin: '0 auto' }}>
+          <Link href="/quiz" className="btn btn-primary btn-lg" style={{ justifyContent: 'center' }}>
+            ⚡ Teste başla
+          </Link>
+          <Link href="/dashboard" className="btn btn-lg" style={{ justifyContent: 'center' }}>
+            Dashboard
+          </Link>
+        </div>
+      </div>
+    </main>
+  )
+
+  if (status === 'failed' || status === 'not_found') return (
+    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: '1.5rem' }}>
+      <div style={{ maxWidth: '440px', textAlign: 'center' }} className="anim-up">
+        <div style={{ fontSize: '64px', marginBottom: '1rem' }}>❌</div>
+        <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>Ödeme başarısız</h2>
+        <p style={{ color: 'var(--text2)', fontSize: '15px', marginBottom: '2rem' }}>
+          Ödeme işlemi tamamlanamadı. Tekrar deneyebilirsin.
+        </p>
+        <Link href="/checkout" className="btn btn-primary btn-lg" style={{ justifyContent: 'center' }}>
+          Tekrar dene
+        </Link>
+      </div>
+    </main>
+  )
+
+  // pending — hâlâ bekliyoruz (veya MAX_ATTEMPTS'e ulaşıldı)
+  return (
+    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: '1.5rem' }}>
+      <div style={{ maxWidth: '440px', textAlign: 'center' }} className="anim-up">
+        <div className="spinner" style={{ margin: '0 auto 1.5rem' }} />
+        <h2 className="serif" style={{ fontSize: '24px', marginBottom: '0.75rem' }}>Ödemen işleniyor...</h2>
+        <p style={{ color: 'var(--text2)', fontSize: '14px', lineHeight: 1.7, marginBottom: '1.5rem' }}>
+          {attempts < MAX_ATTEMPTS
+            ? 'PayTR ödemeni onaylıyor, bu birkaç saniye sürebilir. Bu sayfada kalabilirsin.'
+            : 'Bu biraz uzun sürüyor ama ödemen kaybolmadı — onaylandığında hesabına otomatik yansıyacak ve bildirim alacaksın.'}
+        </p>
+        {attempts >= MAX_ATTEMPTS && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '280px', margin: '0 auto' }}>
+            <button className="btn btn-primary btn-lg" onClick={() => setAttempts(0)} style={{ justifyContent: 'center' }}>
+              Tekrar kontrol et
+            </button>
+            <Link href="/dashboard" className="btn btn-lg" style={{ justifyContent: 'center' }}>
+              Dashboard'a dön
+            </Link>
+          </div>
+        )}
+      </div>
+    </main>
+  )
+}
+
 function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -97,14 +191,19 @@ function CheckoutContent() {
   )
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [formHtml, setFormHtml] = useState('')
+  const [paytrToken, setPaytrToken] = useState('')
   const [discountRate, setDiscountRate] = useState(0)
-  const formRef = useRef<HTMLDivElement>(null)
   const supabase = createClient() as any
   const displayPlans = applyDiscount(discountRate)
 
-  // Ödeme sonucu kontrol
+  // Ödeme sonucu kontrol. 'processing': PayTR'ın iframe içinden yaptığı
+  // tarayıcı yönlendirmesi (merchant_ok_url) — bu GÜVENİLİR bir onay DEĞİL,
+  // sadece "ödeme muhtemelen tamamlandı" demek. Asıl aktivasyon PayTR'ın ayrı,
+  // sunucu-sunucu bildirimiyle (bkz. app/api/paytr/callback/route.ts) olur,
+  // bu yüzden aşağıdaki PaytrProcessingScreen bunu /api/paytr/status ile
+  // pollayıp gerçek durumu bekliyor.
   const paymentStatus = searchParams.get('payment')
+  const processingOid = searchParams.get('oid')
 
   useEffect(() => {
     // Satıcı üzerinden gelinmişse (kayıtta ?satici=KOD ile bağlanmış olabilir)
@@ -126,25 +225,21 @@ function CheckoutContent() {
     loadDiscount()
   }, [])
 
-  // iyzico form inject et
+  // PayTR'ın iframe boyutlandırma script'ini bir kez yükle (iframe token
+  // gelince <iframe> zaten DOM'da oluyor, iFrameResize onu bulup sarıyor).
   useEffect(() => {
-    if (!formHtml || !formRef.current) return
-    formRef.current.innerHTML = formHtml
-
-    // iyzico script'ini çalıştır
-    const scripts = formRef.current.querySelectorAll('script')
-    scripts.forEach(oldScript => {
-      const newScript = document.createElement('script')
-      if (oldScript.src) {
-        newScript.src = oldScript.src
-        newScript.async = true
-      } else {
-        newScript.textContent = oldScript.textContent
-      }
-      document.head.appendChild(newScript)
-      oldScript.remove()
-    })
-  }, [formHtml])
+    if (!paytrToken) return
+    if (document.getElementById('paytr-iframe-resizer-script')) {
+      // Zaten yüklü — sadece resize'ı tetikle.
+      ;(window as any).iFrameResize?.({}, '#paytriframe')
+      return
+    }
+    const script = document.createElement('script')
+    script.id = 'paytr-iframe-resizer-script'
+    script.src = 'https://www.paytr.com/js/iframeResizer.min.js'
+    script.onload = () => { (window as any).iFrameResize?.({}, '#paytriframe') }
+    document.body.appendChild(script)
+  }, [paytrToken])
 
   async function startPayment() {
     setError(''); setLoading(true)
@@ -156,7 +251,7 @@ function CheckoutContent() {
         return
       }
 
-      const res = await fetch('/api/iyzico/checkout', {
+      const res = await fetch('/api/paytr/checkout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -168,7 +263,7 @@ function CheckoutContent() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
 
-      setFormHtml(data.checkoutFormContent)
+      setPaytrToken(data.token)
     } catch (e: any) {
       setError(e.message || 'Ödeme başlatılamadı.')
     } finally {
@@ -176,7 +271,11 @@ function CheckoutContent() {
     }
   }
 
-  // Başarılı ödeme
+  // PayTR'ın tarayıcı yönlendirmesi ("muhtemelen tamamlandı" ama henüz
+  // doğrulanmadı) — bkz. PaytrProcessingScreen'in başındaki yorum.
+  if (paymentStatus === 'processing' && processingOid) return <PaytrProcessingScreen oid={processingOid} />
+
+  // Başarılı ödeme (ör. eski/doğrudan ?payment=success ile gelinirse)
   if (paymentStatus === 'success') return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: '1.5rem' }}>
       <div style={{ maxWidth: '440px', textAlign: 'center' }} className="anim-up">
@@ -226,7 +325,7 @@ function CheckoutContent() {
           <Link href="/pricing" className="btn btn-ghost btn-sm">← Planlara dön</Link>
         </nav>
 
-        {!formHtml ? (
+        {!paytrToken ? (
           <>
             {/* Plan seçimi */}
             <div className="anim-up" style={{ textAlign: 'center', marginBottom: '2rem' }}>
@@ -275,7 +374,7 @@ function CheckoutContent() {
             {/* Güven unsurları */}
             <div className="card-sm anim-up-2" style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '1.5rem', fontSize: '12px', color: 'var(--text2)' }}>
               <span>🔒 SSL ile güvenli ödeme</span>
-              <span>💳 iyzico güvencesi</span>
+              <span>💳 PayTR güvencesi</span>
               <span>🔄 İstediğin zaman iptal</span>
               <span>📧 Fatura e-postayla</span>
             </div>
@@ -293,8 +392,8 @@ function CheckoutContent() {
                 : `₺${displayPlans[selectedPlan].price} — Ödemeye geç →`}
             </button>
 
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
-              <img src="/payment/iyzico-band.svg" alt="iyzico ile öde — Mastercard, Visa, American Express, Troy" style={{ height: '30px', maxWidth: '100%' }} />
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', fontSize: '12px', color: 'var(--text3)' }}>
+              PayTR ile öde — Mastercard, Visa, Troy
             </div>
 
             <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text3)', marginTop: '0.75rem' }}>
@@ -303,7 +402,7 @@ function CheckoutContent() {
             </p>
           </>
         ) : (
-          /* iyzico ödeme formu */
+          /* PayTR iframe ödeme formu */
           <div className="anim-up">
             <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
               <h2 className="serif" style={{ fontSize: '24px' }}>Ödeme bilgileri</h2>
@@ -312,9 +411,15 @@ function CheckoutContent() {
               </p>
             </div>
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div ref={formRef} id="iyzipay-checkout-form" className="responsive" />
+              <iframe
+                src={`https://www.paytr.com/odeme/guvenli/${paytrToken}`}
+                id="paytriframe"
+                frameBorder={0}
+                scrolling="no"
+                style={{ width: '100%', minHeight: '600px', border: 'none' }}
+              />
             </div>
-            <button className="btn btn-ghost btn-sm" onClick={() => setFormHtml('')}
+            <button className="btn btn-ghost btn-sm" onClick={() => setPaytrToken('')}
               style={{ marginTop: '1rem', width: '100%', justifyContent: 'center' }}>
               ← Geri dön
             </button>
