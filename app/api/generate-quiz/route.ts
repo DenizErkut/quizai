@@ -35,6 +35,7 @@ import { parsePrioritySubjects, seedScoreForSubject } from '@/lib/onboarding-pri
 import { applyCanonicalObjectiveMappings, learningObjectivePrompt, loadCanonicalObjectiveCandidates } from '@/lib/learning-objective-mapping'
 import { runMistralShadowComparison, MistralAdapter, isProviderConfigured } from '@/lib/ai-gateway'
 import { balanceAnswerPositions, getQuestionBankSet, promoteQuestionsToBank, questionBankKey } from '@/lib/question-bank'
+import { decideQuizProvider, getQuizProviderPolicy, QUIZ_PROVIDER_POLICY_VERSION } from '@/lib/quiz-provider-policy'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -1647,10 +1648,7 @@ export async function POST(req: NextRequest) {
     // ve ~7 kat daha pahalıydı. Varsayılan artık %100 — GPT_PILOT_FRACTION
     // env değişkeniyle Vercel'de anında (redeploy gerekmeden) düşürülebilir,
     // tıpkı MISTRAL_LIVE_FRACTION'daki güvenlik supabı gibi.
-    const configuredFraction = Number(process.env.GPT_PILOT_FRACTION ?? '1.0')
-    const GPT_PILOT_FRACTION = Number.isFinite(configuredFraction)
-      ? Math.min(1, Math.max(0, configuredFraction))
-      : 1.0
+    const providerPolicy = getQuizProviderPolicy()
     // 21 Eylül 2026 — Deniz'in talebiyle: Mistral'i CANLI (gölge değil) bir
     // pilot olarak devreye al. Varsayılan %0 — MISTRAL_LIVE_FRACTION Vercel'de
     // açıkça ayarlanmadan davranış değişmez (Mistral hesabında sadece $10
@@ -1659,13 +1657,9 @@ export async function POST(req: NextRequest) {
     // anahtar, HTTP hatası) bu istek diğer motorlardaki gibi aşağıdaki genel
     // catch bloğuna düşer ve mevcut GPT-4o fallback'i devreye girer — yani
     // Mistral'in başarısız olması öğrenciye asla 500 döndürmez.
-    const configuredMistralFraction = Number(process.env.MISTRAL_LIVE_FRACTION ?? '0')
-    const MISTRAL_LIVE_FRACTION = Number.isFinite(configuredMistralFraction)
-      ? Math.min(1, Math.max(0, configuredMistralFraction))
-      : 0
     // Kullanıcıyı deney boyunca aynı grupta tutan deterministik FNV-1a kovası.
     // Devam parçaları pilot dışında kalır; yalnızca ilk K12 üretimi ölçülür.
-    const experimentKey = `quiz-generation-v1:${user.id}`
+    const experimentKey = `${QUIZ_PROVIDER_POLICY_VERSION}:${user.id}`
     let hash = 2166136261
     for (let i = 0; i < experimentKey.length; i++) {
       hash ^= experimentKey.charCodeAt(i)
@@ -1675,8 +1669,6 @@ export async function POST(req: NextRequest) {
     const pilotEligible = !isUniversityLevel && !continueSessionId
     // Kova 0-9999 üzerinde bölünür: önce Mistral dilimi, sonra GPT dilimi,
     // kalanı kontrol (Claude). Böylece üçü de birbirini dışlar.
-    const mistralBucketEnd = Math.round(MISTRAL_LIVE_FRACTION * 10000)
-    const gptBucketEnd = mistralBucketEnd + Math.round(GPT_PILOT_FRACTION * 10000)
     // forceProviderTest (yalnızca admin) kovadan bağımsız olarak istenen
     // sağlayıcıyı devreye sokar — gerçek A/B istatistiklerini bozmasın diye
     // experimentVariant her zaman null kalıyor, genEngineUsed ayrı
@@ -1693,8 +1685,9 @@ export async function POST(req: NextRequest) {
     const resolvedDifficultyIsHard = resolvedDifficulty === 'zor' || resolvedDifficulty === 'cok zor'
     const isForcedProviderTest = forcedMistral || forcedOpenAI || forcedClaude
     const claudeRequiredForDifficulty = pilotEligible && !isForcedProviderTest && resolvedDifficultyIsHard
-    const useMistralLive = pilotEligible && isProviderConfigured('mistral') && !forcedOpenAI && !forcedClaude && !claudeRequiredForDifficulty && (forcedMistral || experimentBucket < mistralBucketEnd)
-    const useGptPilot = pilotEligible && !useMistralLive && !forcedClaude && !claudeRequiredForDifficulty && (forcedOpenAI || experimentBucket < gptBucketEnd)
+    const measuredDecision = decideQuizProvider({ bucket: experimentBucket, hard: resolvedDifficultyIsHard, mistralConfigured: isProviderConfigured('mistral'), policy: providerPolicy })
+    const useMistralLive = pilotEligible && !forcedOpenAI && !forcedClaude && (forcedMistral || (!claudeRequiredForDifficulty && measuredDecision === 'mistral'))
+    const useGptPilot = pilotEligible && !useMistralLive && !forcedClaude && (forcedOpenAI || (!claudeRequiredForDifficulty && measuredDecision === 'openai'))
     experimentVariant = pilotEligible ? (isForcedProviderTest ? null : (useMistralLive ? 'mistral-live' : useGptPilot ? 'gpt-4.1-mini' : claudeRequiredForDifficulty ? 'claude-hard-difficulty' : 'control')) : null
     genEngineUsed = useMistralLive
       ? (forcedMistral ? 'mistral-admin-test' : 'mistral-large')
@@ -2229,7 +2222,7 @@ export async function POST(req: NextRequest) {
           question_type: questionType,
           gen_engine: bankQuestions.length > 0 ? 'question-bank-hybrid-v2' : genEngineUsed,
           gen_request_id: usageRequestId,
-          gen_experiment: experimentVariant ? 'quiz-generation-v1' : null,
+          gen_experiment: experimentVariant ? QUIZ_PROVIDER_POLICY_VERSION : null,
           gen_experiment_variant: experimentVariant,
           gen_experiment_bucket: experimentVariant ? experimentBucket : null,
           objective_mapping_version: 'v1',

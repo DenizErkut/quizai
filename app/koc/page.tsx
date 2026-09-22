@@ -39,11 +39,38 @@ export default function PratiumKocPage() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [planBlocked, setPlanBlocked] = useState(false)
+  const [speakingId, setSpeakingId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, sending])
+
+  useEffect(() => () => { audioRef.current?.pause() }, [])
+
+  async function speak(messageId?: string) {
+    if (!messageId) return
+    if (speakingId === messageId) { audioRef.current?.pause(); setSpeakingId(null); return }
+    setError('')
+    setSpeakingId(messageId)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const response = await fetch('/api/coach/speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ messageId }),
+      })
+      if (!response.ok) throw new Error('speech_failed')
+      const url = URL.createObjectURL(await response.blob())
+      audioRef.current?.pause()
+      const audio = new Audio(url)
+      audioRef.current = audio
+      audio.onended = () => { URL.revokeObjectURL(url); setSpeakingId(null) }
+      audio.onerror = () => { URL.revokeObjectURL(url); setSpeakingId(null); setError('Ses oynatılamadı.') }
+      await audio.play()
+    } catch { setSpeakingId(null); setError('Koçun sesi şu anda hazırlanamadı.') }
+  }
 
   useEffect(() => {
     async function load() {
@@ -200,6 +227,11 @@ export default function PratiumKocPage() {
                   color: m.role === 'user' ? '#fff' : 'var(--text)',
                 }}>
                   {m.content}
+                  {m.role === 'assistant' && m.id && (
+                    <button onClick={() => speak(m.id)} className="btn btn-ghost" style={{ marginTop: '8px', padding: '5px 9px', fontSize: '12px' }}>
+                      {speakingId === m.id ? '⏸ Sesi durdur' : '🔊 Koçu dinle'}
+                    </button>
+                  )}
                   {m.action?.type === 'start_practice' && (
                     <button
                       onClick={() => startPractice(m.action as CoachAction, m.id)}
@@ -232,6 +264,9 @@ export default function PratiumKocPage() {
         </div>
       )}
 
+      <div style={{ maxWidth: '640px', width: '100%', margin: '0 auto', padding: '0 1.25rem', boxSizing: 'border-box', fontSize: '10.5px', color: 'var(--text3)' }}>
+        🔊 Koç sesi yapay zekâ tarafından üretilir.
+      </div>
       <form
         onSubmit={e => { e.preventDefault(); send() }}
         style={{ display: 'flex', gap: '8px', padding: '1rem 1.25rem', borderTop: '1px solid var(--border)', maxWidth: '640px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}

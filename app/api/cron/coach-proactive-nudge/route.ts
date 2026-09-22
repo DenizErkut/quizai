@@ -1,170 +1,83 @@
-// app/api/cron/coach-proactive-nudge/route.ts
-// Pratium Koç, Faz D: proaktiflik.
-//
-// 17 Eylül 2026 — Faz B/E'de kurulan koç sohbeti tamamen REAKTİF'ti:
-// öğrenci /koc'a kendi girmeden hiçbir şey olmuyordu. Bu cron, mevcut
-// weekly-plan-refresh ve disengagement-check'in izlediği aynı deseni
-// (aday havuzunu tara, sinyale göre üret, notifications'a yaz)
-// kullanarak koçun kendiliğinden "söyleyecek bir şeyi" olduğunda
-// öğrenciye ulaşmasını sağlıyor:
-//   - Disengagement sinyali varsa: kısa, yargılamayan bir "seni özledik"
-//     mesajı + somut bir geri-dönüş adımı.
-//   - Değilse ama sistemin önceliklendirdiği bir çalışma önerisi (goals)
-//     varsa: o öneriyi vurgulayan bir mesaj.
-//   - İkisi de yoksa: HİÇBİR ŞEY üretilmiyor — Faz A'nın "sadece gerçek
-//     veriye dayan" kuralı burada da geçerli, uydurma bir "harika
-//     gidiyorsun" mesajı yazılmıyor.
-//
-// Aynı mesaj hem coach_messages'a (öğrenci /koc'u bir dahaki açışında
-// zaten orada bulur — GET /api/coach/chat'in "hiç mesaj yoksa proaktif
-// açılış üret" mantığı burada devreye girmez, çünkü mesaj zaten var) hem
-// notifications'a (type: coach_nudge, action_url: /koc) yazılır.
-// Kullanıcı başına en fazla MIN_DAYS_BETWEEN_NUDGES günde bir tetiklenir;
-// notification_preferences.coach_nudge=false ile tamamen kapatılabilir.
+import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
-import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
-import { buildCoachContext, CoachContext } from '@/lib/coach-context'
-import { generateCoachReply, CoachTurn } from '@/lib/coach-generation'
+import { getIdentityBySupabaseId } from '@/lib/identity/client'
+import { buildCoachContext, type CoachContext } from '@/lib/coach-context'
+import { generateCoachReply, type CoachTurn } from '@/lib/coach-generation'
+import { isPaidCoachPlan } from '@/lib/coach-access'
 
 export const maxDuration = 120
 export const runtime = 'nodejs'
-
 const MIN_DAYS_BETWEEN_NUDGES = 4
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
+const MAX_ATTEMPTS = 3
+const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!) as any
 type NudgeReason = 'disengagement' | 'recommendation'
+type Job = { id: string; user_id: string; attempts: number }
 
 function decideNudgeReason(ctx: CoachContext): NudgeReason | null {
   if (ctx.disengagement.isDisengaging) return 'disengagement'
-  if (ctx.goals.length > 0) return 'recommendation'
-  return null
+  return ctx.goals.length ? 'recommendation' : null
+}
+const title = (reason: NudgeReason) => reason === 'disengagement' ? '👋 Pratium Koç seni bekliyor' : '✦ Pratium Koç\'tan bir öneri'
+
+async function conversation(userId: string): Promise<string> {
+  const { data } = await db.from('coach_conversations').select('id').eq('user_id', userId).order('last_message_at', { ascending: false }).limit(1).maybeSingle()
+  if (data?.id) return data.id
+  const { data: created, error } = await db.from('coach_conversations').insert({ user_id: userId }).select('id').single()
+  if (error || !created) throw new Error('conversation_create_failed')
+  return created.id
 }
 
-function nudgeTitle(reason: NudgeReason): string {
-  return reason === 'disengagement' ? '👋 Pratium Koç seni bekliyor' : '✦ Pratium Koç\'tan bir öneri'
-}
-
-async function generateNudge(ctx: CoachContext, reason: NudgeReason, userId: string): Promise<CoachTurn | null> {
+async function generate(ctx: CoachContext, reason: NudgeReason, userId: string): Promise<CoachTurn> {
   const instruction = reason === 'disengagement'
-    ? 'Öğrenci bir süredir aktif değil. Onu yargılamadan, sıcak bir dille geri çağıran ve somut TEK bir ilk adım öneren, en fazla 2 cümlelik bir mesaj yaz (bu bir bildirimde görünecek, kısa tut). Önerdiğin adım belirli bir konuysa suggest_practice aracını da çağır.'
-    : 'Sistemin hesapladığı en öncelikli çalışma önerisini vurgulayan, motive edici, en fazla 2 cümlelik bir mesaj yaz (bu bir bildirimde görünecek, kısa tut) ve suggest_practice aracını çağırarak öneriyi doğrudan başlatılabilir hale getir.'
-  try {
-    return await generateCoachReply(ctx, [{ role: 'user', content: instruction }], userId, 'coach-proactive-nudge')
-  } catch (e) {
-    console.error('[coach-proactive-nudge] generation error:', userId, e)
-    return null
-  }
+    ? 'Öğrenciyi yargılamadan geri çağır ve gerçek geçmiş verisine dayanan tek bir ilk adım öner. En fazla 2 cümle yaz.'
+    : 'Hesaplanan en öncelikli çalışma önerisini, geçmiş eğilimiyle ilişkilendir. En fazla 2 cümle yaz ve suggest_practice aracını çağır.'
+  return generateCoachReply(ctx, [{ role: 'user', content: instruction }], userId, 'coach-proactive-nudge')
 }
 
-async function getOrCreateConversationAdmin(userId: string): Promise<string> {
-  const { data: existing } = await supabaseAdmin
-    .from('coach_conversations')
-    .select('id')
-    .eq('user_id', userId)
-    .order('last_message_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (existing?.id) return existing.id as string
+async function finish(id: string, status: 'completed' | 'skipped' | 'failed' | 'pending', fields: Record<string, unknown> = {}) {
+  await db.from('coach_nudge_jobs').update({ status, updated_at: new Date().toISOString(), ...fields }).eq('id', id)
+}
 
-  const { data: created, error } = await supabaseAdmin
-    .from('coach_conversations')
-    .insert({ user_id: userId })
-    .select('id')
-    .single()
-  if (error || !created) throw new Error('coach_conversation_create_failed')
-  return created.id as string
+async function processJob(job: Job) {
+  try {
+    const [{ data: profile }, { data: pref }] = await Promise.all([
+      db.from('profiles').select('grade,language,plan').eq('id', job.user_id).maybeSingle(),
+      db.from('notification_preferences').select('coach_nudge').eq('user_id', job.user_id).maybeSingle(),
+    ])
+    if (!isPaidCoachPlan(profile?.plan) || pref?.coach_nudge === false) return finish(job.id, 'skipped', { reason: 'not_eligible' })
+    const since = new Date(Date.now() - MIN_DAYS_BETWEEN_NUDGES * 86_400_000).toISOString()
+    const { count } = await db.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', job.user_id).eq('type', 'coach_nudge').gte('created_at', since)
+    if ((count ?? 0) > 0) return finish(job.id, 'skipped', { reason: 'recent_nudge' })
+    const identity = await getIdentityBySupabaseId(job.user_id)
+    const ctx = await buildCoachContext(db, job.user_id, { displayName: identity?.full_name ?? 'Öğrenci', grade: profile?.grade, language: profile?.language })
+    const reason = decideNudgeReason(ctx)
+    if (!reason) return finish(job.id, 'skipped', { reason: 'no_signal' })
+    const nudge = await generate(ctx, reason, job.user_id)
+    if (!nudge.text) throw new Error('empty_nudge')
+    const conversationId = await conversation(job.user_id)
+    const { error: messageError } = await db.from('coach_messages').insert({ conversation_id: conversationId, role: 'assistant', content: nudge.text, action: nudge.action })
+    if (messageError) throw messageError
+    await Promise.all([
+      db.from('coach_conversations').update({ last_message_at: new Date().toISOString() }).eq('id', conversationId),
+      db.from('notifications').insert({ user_id: job.user_id, type: 'coach_nudge', title: title(reason), body: nudge.text, read: false, action_url: '/koc' }),
+    ])
+    await finish(job.id, 'completed', { reason })
+  } catch (error: any) {
+    const retry = job.attempts < MAX_ATTEMPTS
+    await finish(job.id, retry ? 'pending' : 'failed', {
+      last_error: String(error?.message ?? error).slice(0, 500),
+      available_at: retry ? new Date(Date.now() + 15 * 60_000).toISOString() : new Date().toISOString(),
+    })
+  }
 }
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
-  }
-
-  // Aday havuzu: weekly-plan-refresh ile aynı — en az 1 tamamlanmış quiz'i
-  // olan kullanıcılar (hiç veri yoksa hesaplanacak/söylenecek bir şey yok).
-  const { data: activeSessions } = await supabaseAdmin
-    .from('quiz_sessions')
-    .select('user_id')
-    .eq('completed', true)
-  const candidateIds = [...new Set((activeSessions ?? []).map((r: any) => r.user_id))]
-  if (!candidateIds.length) {
-    return NextResponse.json({ ok: true, checked: 0, eligible: 0, nudged: 0, skippedNoSignal: 0, failed: 0 })
-  }
-
-  // Tercihinden kapatmış olanları çıkar.
-  const { data: prefs } = await supabaseAdmin
-    .from('notification_preferences')
-    .select('user_id, coach_nudge')
-    .in('user_id', candidateIds)
-  const optedOut = new Set((prefs ?? []).filter((p: any) => p.coach_nudge === false).map((p: any) => p.user_id))
-
-  // Son MIN_DAYS_BETWEEN_NUDGES gün içinde zaten nudge almış olanları çıkar
-  // — aynı kullanıcıyı gün aşırı rahatsız etmemek için.
-  const since = new Date(Date.now() - MIN_DAYS_BETWEEN_NUDGES * 24 * 60 * 60 * 1000).toISOString()
-  const { data: recentNudges } = await supabaseAdmin
-    .from('notifications')
-    .select('user_id')
-    .eq('type', 'coach_nudge')
-    .in('user_id', candidateIds)
-    .gte('created_at', since)
-  const recentlyNudged = new Set((recentNudges ?? []).map((r: any) => r.user_id))
-
-  const eligible = candidateIds.filter(uid => !optedOut.has(uid) && !recentlyNudged.has(uid))
-  if (!eligible.length) {
-    return NextResponse.json({ ok: true, checked: candidateIds.length, eligible: 0, nudged: 0, skippedNoSignal: 0, failed: 0 })
-  }
-
-  const { data: profiles } = await supabaseAdmin.from('profiles').select('id, grade, language').in('id', eligible)
-  const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]))
-  const identities = await getIdentitiesBySupabaseIds(eligible)
-
-  let nudged = 0, skippedNoSignal = 0, failed = 0
-  for (const uid of eligible) {
-    try {
-      const prof = profileMap.get(uid)
-      const identity = (identities as any)[uid]
-      const ctx = await buildCoachContext(supabaseAdmin, uid, {
-        displayName: identity?.full_name ?? 'Öğrenci',
-        grade: prof?.grade,
-        language: prof?.language,
-      })
-
-      const reason = decideNudgeReason(ctx)
-      if (!reason) { skippedNoSignal++; continue }
-
-      const nudge = await generateNudge(ctx, reason, uid)
-      if (!nudge?.text) { failed++; continue }
-
-      const conversationId = await getOrCreateConversationAdmin(uid)
-      await supabaseAdmin.from('coach_messages').insert({ conversation_id: conversationId, role: 'assistant', content: nudge.text, action: nudge.action })
-      await supabaseAdmin.from('coach_conversations').update({ last_message_at: new Date().toISOString() }).eq('id', conversationId)
-      await supabaseAdmin.from('notifications').insert({
-        user_id: uid,
-        type: 'coach_nudge',
-        title: nudgeTitle(reason),
-        body: nudge.text,
-        read: false,
-        action_url: '/koc',
-      })
-      nudged++
-    } catch (e: any) {
-      console.error('[coach-proactive-nudge] user hatasi:', uid, e.message)
-      failed++
-    }
-  }
-
-  return NextResponse.json({
-    ok: true,
-    checked: candidateIds.length,
-    eligible: eligible.length,
-    nudged,
-    skippedNoSignal,
-    failed,
-  })
+  if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  const workerId = randomUUID()
+  const { data, error } = await db.rpc('claim_coach_nudge_jobs', { p_limit: 5, p_worker_id: workerId })
+  if (error) return NextResponse.json({ error: 'Kuyruk alınamadı.' }, { status: 500 })
+  const jobs = (data ?? []) as Job[]
+  await Promise.allSettled(jobs.map(processJob))
+  return NextResponse.json({ ok: true, workerId, claimed: jobs.length })
 }

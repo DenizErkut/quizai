@@ -31,6 +31,11 @@ export const runtime = 'nodejs'
 const MAX_HISTORY_MESSAGES = 20
 const MAX_USER_MESSAGE_LENGTH = 2000
 
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+) as any
+
 function authClient(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
@@ -85,8 +90,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const conversationId = await getOrCreateConversation(supabase, user.id)
-    const { data: messages } = await supabase
+    const conversationId = await getOrCreateConversation(supabaseAdmin, user.id)
+    const { data: messages } = await supabaseAdmin
       .from('coach_messages')
       .select('id, role, content, action, created_at')
       .eq('conversation_id', conversationId)
@@ -94,15 +99,15 @@ export async function GET(req: NextRequest) {
       .limit(MAX_HISTORY_MESSAGES)
 
     if (!messages || messages.length === 0) {
-      const ctx = await loadCoachContext(supabase, user.id)
+      const ctx = await loadCoachContext(supabaseAdmin, user.id)
       const opening = await generateCoachOpening(ctx, user.id, 'coach-chat-opening')
-      const { data: inserted, error } = await supabase
+      const { data: inserted, error } = await supabaseAdmin
         .from('coach_messages')
         .insert({ conversation_id: conversationId, role: 'assistant', content: opening.text, action: opening.action })
         .select('id, role, content, action, created_at')
         .single()
       if (error) throw error
-      await supabase.from('coach_conversations').update({ last_message_at: new Date().toISOString() }).eq('id', conversationId)
+      await supabaseAdmin.from('coach_conversations').update({ last_message_at: new Date().toISOString() }).eq('id', conversationId)
       return NextResponse.json({ conversationId, messages: [inserted] })
     }
 
@@ -134,13 +139,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const conversationId = await getOrCreateConversation(supabase, user.id)
+    const conversationId = await getOrCreateConversation(supabaseAdmin, user.id)
 
     const dailyLimit = getCoachDailyMessageLimit(planRow?.plan)
 
     const startOfDay = new Date()
     startOfDay.setHours(0, 0, 0, 0)
-    const { count: todayCount } = await supabase
+    const { count: todayCount } = await supabaseAdmin
       .from('coach_messages')
       .select('id', { count: 'exact', head: true })
       .eq('conversation_id', conversationId)
@@ -153,14 +158,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Bugünlük koç mesaj sınırına ulaştın, yarın devam edebilirsin.${upsellHint}` }, { status: 429 })
     }
 
-    const { error: insertUserErr } = await supabase
+    const { error: insertUserErr } = await supabaseAdmin
       .from('coach_messages')
       .insert({ conversation_id: conversationId, role: 'user', content: userMessage })
     if (insertUserErr) throw insertUserErr
 
-    const ctx = await loadCoachContext(supabase, user.id)
+    const ctx = await loadCoachContext(supabaseAdmin, user.id)
 
-    const { data: history } = await supabase
+    const { data: history } = await supabaseAdmin
       .from('coach_messages')
       .select('role, content')
       .eq('conversation_id', conversationId)
@@ -169,14 +174,14 @@ export async function POST(req: NextRequest) {
 
     const reply = await generateCoachReply(ctx, (history ?? []) as { role: 'user' | 'assistant'; content: string }[], user.id, 'coach-chat')
 
-    const { data: inserted, error: insertAssistantErr } = await supabase
+    const { data: inserted, error: insertAssistantErr } = await supabaseAdmin
       .from('coach_messages')
       .insert({ conversation_id: conversationId, role: 'assistant', content: reply.text, action: reply.action })
       .select('id, role, content, action, created_at')
       .single()
     if (insertAssistantErr) throw insertAssistantErr
 
-    await supabase.from('coach_conversations').update({ last_message_at: new Date().toISOString() }).eq('id', conversationId)
+    await supabaseAdmin.from('coach_conversations').update({ last_message_at: new Date().toISOString() }).eq('id', conversationId)
 
     return NextResponse.json({ conversationId, message: inserted })
   } catch (err) {

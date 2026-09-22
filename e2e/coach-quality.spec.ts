@@ -1,0 +1,42 @@
+import { expect, test } from '@playwright/test'
+import { summarizeCoachHistory, type CoachSession } from '../lib/coach-context'
+import { decideQuizProvider, getQuizProviderPolicy } from '../lib/quiz-provider-policy'
+
+const NOW = Date.parse('2026-09-22T12:00:00Z')
+const session = (daysAgo: number, topic: string, pct: number): CoachSession => ({
+  topic, pct, score: Math.round(pct / 10), questionCount: 10,
+  createdAt: new Date(NOW - daysAgo * 86_400_000).toISOString(),
+})
+
+test('koç geçmişi haftaları ve konu sinyallerini gerçek oturumlardan özetler', () => {
+  const result = summarizeCoachHistory([
+    session(1, 'Denklemler', 80), session(3, 'Denklemler', 70),
+    session(8, 'Denklemler', 50), session(10, 'Geometri', 60),
+  ], NOW)
+  expect(result.last7Days).toEqual({ sessions: 2, questions: 20, averagePct: 75 })
+  expect(result.previous7Days.averagePct).toBe(55)
+  expect(result.trend).toBe('improving')
+  expect(result.trendPctPoints).toBe(20)
+  expect(result.topics[0].topic).toBe('Denklemler')
+})
+
+test('ölçümlü sağlayıcı politikası GPT gövde, Claude kontrol ve Mistral kapalıdır', () => {
+  const policy = getQuizProviderPolicy({} as NodeJS.ProcessEnv)
+  expect(policy.gptFraction).toBe(0.9)
+  expect(policy.mistralFraction).toBe(0)
+  expect(policy.claudeHoldoutFraction).toBeCloseTo(0.1)
+  expect(decideQuizProvider({ bucket: 100, hard: false, mistralConfigured: true, policy })).toBe('openai')
+  expect(decideQuizProvider({ bucket: 9500, hard: false, mistralConfigured: true, policy })).toBe('claude')
+  expect(decideQuizProvider({ bucket: 100, hard: true, mistralConfigured: true, policy })).toBe('claude')
+})
+
+test('koç ve sıralama APIleri anonim erişimi reddeder', async ({ request }) => {
+  expect((await request.get('/api/coach/chat')).status()).toBe(401)
+  expect((await request.get('/api/leaderboard')).status()).toBe(401)
+  expect((await request.post('/api/coach/speech', { data: { messageId: '00000000-0000-0000-0000-000000000000' } })).status()).toBe(401)
+})
+
+test('koç cron uçları secret olmadan çalışmaz', async ({ request }) => {
+  expect((await request.get('/api/cron/coach-nudge-enqueue')).status()).toBe(401)
+  expect((await request.get('/api/cron/coach-proactive-nudge')).status()).toBe(401)
+})

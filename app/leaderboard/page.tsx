@@ -83,14 +83,16 @@ export default function LeaderboardPage() {
       if (!user) { router.push('/login'); return }
 
       const { data: { session } } = await supabase.auth.getSession()
-      const [{ data: lb }, { data: profile }, badgeResponse] = await Promise.all([
-        supabase.from('leaderboard').select('*').order('points', { ascending: false }).limit(200),
+      const [leaderboardResponse, { data: profile }, badgeResponse] = await Promise.all([
+        fetch('/api/leaderboard', { headers: { Authorization: `Bearer ${session?.access_token}` } }),
         supabase.from('profiles').select('grade').eq('id', user.id).single(),
         fetch('/api/badges/sync', {
           method: 'POST',
           headers: { Authorization: `Bearer ${session?.access_token}` },
         }),
       ])
+      const leaderboardPayload = leaderboardResponse.ok ? await leaderboardResponse.json() : { entries: [] }
+      const lb = leaderboardPayload.entries ?? []
 
       let badgePayload = badgeResponse.ok ? await badgeResponse.json() : null
       if (!badgePayload) {

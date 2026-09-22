@@ -31,8 +31,12 @@
       "schedule": "15 4 * * *"
     },
     {
-      "path": "/api/cron/coach-proactive-nudge",
+      "path": "/api/cron/coach-nudge-enqueue",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/coach-proactive-nudge",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

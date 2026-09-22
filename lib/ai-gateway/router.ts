@@ -37,14 +37,14 @@ export function buildIntelligenceRoutePlan(context: IntelligenceRequestContext):
     }
   }
 
-  // Hedef mimari Mistral-first'tür. Anahtar henüz tanımlı değilse mevcut
-  // Claude üretim yolu korunur; bu durum telemetry'de reasonCode ile görünür.
-  const mistralReady = isProviderConfigured('mistral')
+  // Genel gateway yetenek bazlıdır. Quiz üretimindeki ölçümlü A/B oranları
+  // lib/quiz-provider-policy.ts tarafından ayrıca yönetilir; burada yanlışlıkla
+  // "Mistral-first" üretim politikası ilan edilmez.
   return {
     policyVersion: 'multi-ai-gateway-v3-p0',
-    primary: mistralReady ? mistral : claude,
-    fallbacks: [openai, claude].filter(target => target.provider !== (mistralReady ? 'mistral' : 'anthropic') && isProviderConfigured(target.provider)),
+    primary: isProviderConfigured('openai') ? openai : claude,
+    fallbacks: [claude, mistral].filter(target => target.provider !== (isProviderConfigured('openai') ? 'openai' : 'anthropic') && isProviderConfigured(target.provider)),
     validator: openai,
-    reasonCode: mistralReady ? 'MISTRAL_FIRST' : 'MISTRAL_NOT_CONFIGURED_KEEP_CURRENT_PROVIDER',
+    reasonCode: isProviderConfigured('openai') ? 'MEASURED_OPENAI_PRIMARY' : 'OPENAI_NOT_CONFIGURED_KEEP_CURRENT_PROVIDER',
   }
 }
