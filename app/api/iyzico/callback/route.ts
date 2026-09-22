@@ -1,102 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server-create-client'
-import { generateIyzicoAuthHeader } from '@/lib/iyzico'
-import { BILLING_PLANS, resolveBillingPlanKey } from '@/lib/subscription-plans'
 
-const IYZICO_BASE_URL = process.env.IYZICO_BASE_URL!
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://pratium.com'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-const IYZICO_DETAIL_URI_PATH = '/payment/iyzipos/checkoutform/auth/ecom/detail'
-
-export async function POST(req: NextRequest) {
-  try {
-    const formData = await req.formData()
-    const token = formData.get('token') as string
-    const status = formData.get('status') as string
-
-    if (!token) {
-      return NextResponse.redirect(`${APP_URL}/pricing?payment=error`)
-    }
-
-    // iyzico'dan sonucu doğrula
-    const verifyBody = JSON.stringify({ locale: 'tr', token })
-    const verifyRes = await fetch(
-      `${IYZICO_BASE_URL}/payment/iyzipos/checkoutform/auth/ecom/detail`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: generateIyzicoAuthHeader(IYZICO_DETAIL_URI_PATH, verifyBody),
-        },
-        body: verifyBody,
-      }
-    )
-
-    const result = await verifyRes.json()
-
-    if (result.paymentStatus !== 'SUCCESS') {
-      console.error('Payment failed:', result)
-      return NextResponse.redirect(`${APP_URL}/pricing?payment=failed`)
-    }
-
-    // conversationId'den userId ve plan çıkar
-    const conversationId = result.conversationId as string
-    const isCurrentFormat = conversationId.includes('|')
-    const parts = conversationId.split(isCurrentFormat ? '|' : '_')
-    const userId = parts[0]
-    const planType = resolveBillingPlanKey(parts[1])
-    if (!userId || !planType) {
-      console.error('Invalid payment conversation:', conversationId)
-      return NextResponse.redirect(`${APP_URL}/pricing?payment=error`)
-    }
-    const meta = BILLING_PLANS[planType]
-
-    // Plan aktive et (silver, premium veya unlimited)
-    const expiresAt = new Date()
-    expiresAt.setMonth(expiresAt.getMonth() + meta.months)
-
-    await supabaseAdmin.from('profiles').update({
-      plan: meta.profilePlan,
-      plan_expires_at: expiresAt.toISOString(),
-      monthly_test_count: 0,
-      daily_test_count: 0,
-    }).eq('id', userId)
-
-    // Aktivasyon bildirimi gönder — plan görünen adları: silver=Gümüş,
-    // premium=Altın, unlimited=Platin (6 Eylül 2026 isim değişikliği;
-    // veritabanı değerleri (plan sütunu) DEĞİŞMEDİ, sadece görünen isim).
-    const displayName = meta.tierName
-    const emoji = meta.profilePlan === 'unlimited' ? '👑' : meta.profilePlan === 'silver' ? '🥈' : '⭐'
-    await supabaseAdmin.from('notifications').insert({
-      user_id: userId,
-      type: 'system',
-      title: `${emoji} ${displayName} aktif!`,
-      body: `${displayName} planın başarıyla aktive edildi. İyi çalışmalar!`,
-      read: false,
-      data: { href: '/pricing' },
-    })
-
-    // Subscription güncelle
-    await supabaseAdmin.from('subscriptions').update({
-      status: 'active',
-      current_period_start: new Date().toISOString(),
-      current_period_end: expiresAt.toISOString(),
-      stripe_customer_id: result.paymentId,
-    }).eq('stripe_subscription_id', conversationId)
-
-    return NextResponse.redirect(`${APP_URL}/pricing?payment=success`)
-  } catch (e) {
-    console.error('Callback error:', e)
-    return NextResponse.redirect(`${APP_URL}/pricing?payment=error`)
-  }
+// 22 Eylül 2026 — Iyzico TAMAMEN PASİF edildi (bkz. app/api/iyzico/checkout/route.ts'teki
+// yorum — checkout zaten kapatıldığı için buraya normal akışta hiç
+// düşülmüyor). Devre dışı bırakmadan önce subscriptions'ta
+// provider='iyzico' AND status='pending' sıfır kayıt olduğu doğrulandı,
+// yani beklemede hiçbir Iyzico ödemesi yoktu. Yine de olası çok geç/yanlış
+// yönlendirilmiş bir isteğe patlak bir hata sayfası göstermemek için burası
+// hiçbir şeyi işlemeye ÇALIŞMADAN sessizce /pricing'e yönlendiriyor.
+export async function POST(_req: NextRequest) {
+  console.warn('[iyzico callback] pasif entegrasyona istek geldi — işlenmedi.')
+  return NextResponse.redirect(`${APP_URL}/pricing`)
 }
 
-// GET — iyzico bazen GET ile de callback yapar
-export async function GET(req: NextRequest) {
+export async function GET() {
   return NextResponse.redirect(`${APP_URL}/pricing`)
 }

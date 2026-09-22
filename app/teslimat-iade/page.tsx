@@ -40,7 +40,7 @@ export default function DeliveryReturnPage() {
           },
           {
             title: '5. İade Talebi Nasıl Yapılır?',
-            content: 'İade talebinizi, işlem tarihini ve ilgili hususu belirterek info@pratium.com.tr adresine e-posta ile iletebilirsiniz. Talebiniz en geç 14 iş günü içinde değerlendirilip tarafınıza dönüş yapılır. Onaylanan iadeler, ödemenin yapıldığı kart/hesaba, ödeme altyapı sağlayıcımız (iyzico) üzerinden gerçekleştirilir.',
+            content: 'İade talebinizi, işlem tarihini ve ilgili hususu belirterek info@pratium.com.tr adresine e-posta ile iletebilirsiniz. Talebiniz en geç 14 iş günü içinde değerlendirilip tarafınıza dönüş yapılır. Onaylanan iadeler, ödemenin yapıldığı kart/hesaba, ödeme altyapı sağlayıcımız (PayTR) üzerinden gerçekleştirilir.',
           },
           {
             title: '6. Abonelik İptali',

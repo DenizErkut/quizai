@@ -41,7 +41,7 @@ export default function DistanceSalesPage() {
           },
           {
             title: 'Madde 4 — Ödeme',
-            content: 'Ödemeler, SATICI\'nın anlaşmalı olduğu ödeme kuruluşu iyzico altyapısı üzerinden, kredi/banka kartı ile güvenli şekilde tahsil edilir. Kart bilgileri SATICI sunucularında saklanmaz.',
+            content: 'Ödemeler, SATICI\'nın anlaşmalı olduğu ödeme kuruluşu PayTR altyapısı üzerinden, kredi/banka kartı ile güvenli şekilde tahsil edilir. Kart bilgileri SATICI sunucularında saklanmaz.',
           },
           {
             title: 'Madde 5 — İfa (Teslimat)',

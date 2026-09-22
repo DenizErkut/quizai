@@ -1,158 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server-create-client'
-import { getIdentityBySupabaseId } from '@/lib/identity/client'
-import { generateIyzicoAuthHeader } from '@/lib/iyzico'
-import { BILLING_PLANS, resolveBillingPlanKey } from '@/lib/subscription-plans'
 
-const IYZICO_BASE_URL = process.env.IYZICO_BASE_URL!
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://pratium.com'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-const IYZICO_CHECKOUT_URI_PATH = '/payment/iyzipos/checkoutform/initialize/auth/ecom'
-
-export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
-  }
-  const token = authHeader.slice(7)
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { global: { headers: { Authorization: `Bearer ${token}` } } }
-  ) as any
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Oturum geçersiz.' }, { status: 401 })
-
-  const body = await req.json()
-  const planType = resolveBillingPlanKey(body.plan)
-  if (!planType) return NextResponse.json({ error: 'Geçersiz plan.' }, { status: 400 })
-  const plan = BILLING_PLANS[planType]
-
-  // Fatura için ad-soyad TR-PG kimliğinden
-  const identity = await getIdentityBySupabaseId(user.id)
-  const fullName = identity?.full_name || 'Kullanici'
-
-  // Kullanıcı bir satıcının kodu/linki üzerinden kayıt olduysa (profiles.seller_id),
-  // o satıcının o anki indirim oranını uygula. Oran, satın alma anında
-  // subscriptions'a da kopyalanır — satıcının oranı ileride değişse bile bu
-  // kaydın tarihsel doğruluğu bozulmaz.
-  const { data: buyerProfile } = await supabaseAdmin
-    .from('profiles').select('seller_id').eq('id', user.id).maybeSingle()
-
-  let sellerId: string | null = null
-  let discountRate = 0
-  if (buyerProfile?.seller_id) {
-    const { data: seller } = await supabaseAdmin
-      .from('sellers').select('id, discount_rate, active').eq('id', buyerProfile.seller_id).maybeSingle()
-    if (seller?.active) {
-      sellerId = seller.id
-      discountRate = Number(seller.discount_rate) || 0
-    }
-  }
-
-  const basePrice = plan.price
-  const finalPrice = discountRate > 0
-    ? Math.max(0, basePrice * (1 - discountRate / 100)).toFixed(2)
-    : plan.price.toFixed(2)
-
-  // Plan anahtarlarında alt çizgi bulunduğu için alanları güvenli bir ayraçla taşı.
-  // Callback eski alt çizgili kayıtları da desteklemeye devam ediyor.
-  const conversationId = `${user.id}|${planType}|${Date.now()}`
-  const nameParts = fullName.split(' ')
-  const firstName = nameParts[0] || 'Kullanici'
-  const lastName = nameParts.slice(1).join(' ') || 'Kullanici'
-
-  const requestBody = {
-    locale: 'tr',
-    conversationId,
-    price: finalPrice,
-    paidPrice: finalPrice,
-    currency: 'TRY',
-    basketId: conversationId,
-    paymentGroup: 'SUBSCRIPTION',
-    callbackUrl: `${APP_URL}/api/iyzico/callback`,
-    enabledInstallments: [1, 2, 3, 6, 9, 12],
-    buyer: {
-      id: user.id,
-      name: firstName,
-      surname: lastName,
-      gsmNumber: '+905000000000',
-      email: user.email,
-      identityNumber: '74300864791',
-      registrationAddress: 'Türkiye',
-      ip: req.headers.get('x-forwarded-for') || '127.0.0.1',
-      city: 'Istanbul',
-      country: 'Turkey',
-    },
-    shippingAddress: {
-      contactName: fullName,
-      city: 'Istanbul',
-      country: 'Turkey',
-      address: 'Türkiye',
-    },
-    billingAddress: {
-      contactName: fullName,
-      city: 'Istanbul',
-      country: 'Turkey',
-      address: 'Türkiye',
-    },
-    basketItems: [
-      {
-        id: `pratium_${planType}`,
-        name: discountRate > 0 ? `${plan.displayName} (%${discountRate} indirimli)` : plan.displayName,
-        category1: 'Dijital Ürün',
-        itemType: 'VIRTUAL',
-        price: finalPrice,
-      },
-    ],
-  }
-
-  const bodyStr = JSON.stringify(requestBody)
-
-  try {
-    const response = await fetch(`${IYZICO_BASE_URL}/payment/iyzipos/checkoutform/initialize/auth/ecom`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: generateIyzicoAuthHeader(IYZICO_CHECKOUT_URI_PATH, bodyStr),
-      },
-      body: bodyStr,
-    })
-
-    const data = await response.json()
-
-    if (data.status !== 'success') {
-      console.error('iyzico error:', data)
-      return NextResponse.json({ error: data.errorMessage || 'Ödeme başlatılamadı.' }, { status: 400 })
-    }
-
-    // conversationId'yi Supabase'e kaydet (webhook'ta kullanılacak) —
-    // satıcı ve indirim izi de burada saklanır (satın alma anındaki
-    // anlık görüntü olarak, satıcının oranı sonradan değişse bile bozulmaz).
-    await supabaseAdmin.from('subscriptions').insert({
-      user_id: user.id,
-      plan: planType,
-      status: 'pending',
-      stripe_subscription_id: conversationId, // iyzico conversationId
-      seller_id: sellerId,
-      discount_rate: discountRate,
-      price_paid: parseFloat(finalPrice),
-    })
-
-    return NextResponse.json({
-      checkoutFormContent: data.checkoutFormContent,
-      token: data.token,
-      conversationId,
-    })
-  } catch (e) {
-    console.error('iyzico fetch error:', e)
-    return NextResponse.json({ error: 'Ödeme servisi hatası.' }, { status: 500 })
-  }
+// 22 Eylül 2026 — Deniz'in kararıyla Iyzico TAMAMEN PASİF edildi, yerine
+// PayTR geçti (bkz. app/api/paytr/checkout/route.ts, app/checkout/page.tsx).
+//
+// Bu route bilerek SİLİNMEDİ (denetim/geçmiş referans amaçlı — orijinal
+// mantık git geçmişinde ve burada duruyor) ama artık Iyzico'ya HİÇBİR istek
+// atmıyor ve subscriptions'a HİÇBİR satır yazmıyor. Devre dışı bırakılmadan
+// önce veritabanında provider='iyzico' AND status='pending' olan sıfır kayıt
+// olduğu doğrulandı (22 Eylül 2026), yani bekleyen/tamamlanmamış hiçbir
+// Iyzico ödemesi yoktu.
+//
+// Frontend (app/checkout/page.tsx) zaten sadece /api/paytr/checkout'u
+// çağırıyor — bu route'a normal kullanım akışında hiç ulaşılmıyor. Burası
+// sadece doğrudan/eski bir istemcinin (bookmarklanmış eski bir istek,
+// üçüncü parti bir entegrasyon vb.) bu adrese düşme ihtimaline karşı bir
+// güvenlik ağı.
+export async function POST(_req: NextRequest) {
+  return NextResponse.json(
+    { error: 'Bu ödeme yöntemi artık kullanılmıyor. Lütfen sayfayı yenileyip PayTR ile tekrar deneyin.' },
+    { status: 410 }
+  )
 }
