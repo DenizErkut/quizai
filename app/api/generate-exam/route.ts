@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
-import { logAnthropicUsage } from '@/lib/ai-usage'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { checkMinorConsentBlock } from '@/lib/identity/client'
 import { balanceAnswerPositions } from '@/lib/question-bank'
 import { callOpenAI } from '@/lib/openai'
 import { EXAM_FORMATS, resolveExamFormat, type ExamFormat, type ExamSection } from '@/lib/exam-system'
 import { createHash } from 'node:crypto'
+import { pickQuizEngine, generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
 
-const anthropic = new Anthropic()
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -247,6 +245,18 @@ export async function POST(req: NextRequest) {
   // Demo: her bölümden 4 soru (hızlı) — Freemium demo: her alanda TAM 1 soru
   const countMultiplier = demo ? 0.2 : 1
 
+  // 22 Eylül 2026 — Deniz'in fark ettiği gibi bu uç nokta hâlâ SADECE Claude
+  // kullanıyordu. generate-quiz/route.ts'teki çoklu-sağlayıcı tasarımı (bkz.
+  // lib/ai-gateway/quiz-provider-router.ts) burada da devreye alınıyor.
+  // FARK: burada generate-quiz'deki gibi ÖNCEDEN bilinen bir zorluk seçimi
+  // yok — tek bir bölüm çağrısı zaten %30 kolay/%50 orta/%20 zor karışık
+  // soru üretiyor (bkz. buildSectionPrompt'taki "Zorluk dağılımı" kuralı).
+  // Bu yüzden hardDifficulty hiç kullanılmıyor — sadece GPT-4.1-mini gövde +
+  // Mistral'in mevcut payı uygulanıyor. Karar TÜM sınav isteği için TEK
+  // seferde alınıyor (her bölüm/deneme için ayrı ayrı değil) ki aynı sınavın
+  // farklı bölümleri arasında tutarlı bir motor kullanılsın.
+  const examGenDecision = pickQuizEngine({ bucketKey: `exam-generation-v1:${user.id}` })
+
   try {
     const results: Record<string, any[]> = {}
 
@@ -263,13 +273,26 @@ export async function POST(req: NextRequest) {
             const missing = sectionCount - accepted.length
             const referenceContext = await getBookletReference(format, section)
             const prompt = buildSectionPrompt(section, missing, format, referenceContext)
-            const response = await anthropic.messages.create({
-              model: 'claude-sonnet-4-5', max_tokens: 6000,
-              system: 'Sen Türk eğitim sisteminde sınav soruları hazırlayan bir uzmansın. Sadece geçerli JSON döndür, markdown kullanma.',
-              messages: [{ role: 'user', content: prompt }],
-            })
-            await logAnthropicUsage('generate-exam', 'claude-sonnet-4-5', response, { userId: user.id })
-            const text = response.content[0].type === 'text' ? response.content[0].text : ''
+            const examSystemPrompt = 'Sen Türk eğitim sisteminde sınav soruları hazırlayan bir uzmansın. Sadece geçerli JSON döndür, markdown kullanma.'
+            let text: string
+            try {
+              const result = await generateWithRoutedProvider(examGenDecision, {
+                systemPrompt: examSystemPrompt,
+                userPrompt: prompt,
+                maxTokens: 6000,
+                operationTag: `generate-exam:${examGenDecision.genEngineTag}`,
+                userId: user.id,
+              })
+              text = result.text
+            } catch (primaryError) {
+              console.error(`[generate-exam] section ${section.id} birincil motor (${examGenDecision.engine}) başarısız, Claude fallback:`, primaryError)
+              if (examGenDecision.engine === 'claude-sonnet' || examGenDecision.engine === 'claude-haiku') throw primaryError
+              const fallback = await generateWithRoutedProvider(
+                { engine: 'claude-sonnet', experimentVariant: null, genEngineTag: 'claude-sonnet-fallback' },
+                { systemPrompt: examSystemPrompt, userPrompt: prompt, maxTokens: 6000, operationTag: 'generate-exam:fallback-claude', userId: user.id }
+              )
+              text = fallback.text
+            }
             const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
             const optionCount = format.label === 'LGS' ? 4 : 5
             const structurallyAccepted = uniqueQualityQuestions((parsed.questions || []) as ExamQuestion[], optionCount)

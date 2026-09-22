@@ -11,12 +11,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 60
 export const runtime = 'nodejs'
-import Anthropic from '@anthropic-ai/sdk'
-import { logAnthropicUsage } from '@/lib/ai-usage'
+import { pickQuizEngine, generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { verifyQuestionWithOpenAI } from '@/lib/openai'
 
-const anthropic = new Anthropic()
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -104,20 +102,36 @@ async function searchMebContext(origin: string, subject: string, topic: string, 
   return ''
 }
 
-async function generateWithAI(subject: string, topic: string, grade: string, origin: string) {
+async function generateWithAI(subject: string, topic: string, grade: string, origin: string, userId: string) {
   const effectiveGrade = grade || 'ortaokul 6. sınıf'
   const level = getLevel(effectiveGrade)
   const mebContext = await searchMebContext(origin, subject, topic, effectiveGrade, level)
   const prompt = buildPrompt(level, effectiveGrade, subject, topic, mebContext)
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5',
-    max_tokens: 1500,
-    messages: [{ role: 'user', content: prompt }],
-  })
-    logAnthropicUsage('teacher:create-open-ended', 'claude-sonnet-4-5', response)
-
-  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  // 22 Eylül 2026 — Deniz'in fark ettiği gibi bu uç nokta hâlâ SADECE Claude
+  // kullanıyordu. Aynı çoklu-sağlayıcı tasarım burada da devreye alınıyor
+  // (bkz. lib/ai-gateway/quiz-provider-router.ts) — öğrencinin kendi
+  // üretimiyle (generate-open-ended) aynı mantık, sadece öğretmen tetikliyor.
+  const decision = pickQuizEngine({ bucketKey: `open-ended-v1:${userId}` })
+  let text: string
+  try {
+    const result = await generateWithRoutedProvider(decision, {
+      systemPrompt: '',
+      userPrompt: prompt,
+      maxTokens: 1500,
+      operationTag: `teacher:create-open-ended:${decision.genEngineTag}`,
+      userId,
+    })
+    text = result.text
+  } catch (primaryError) {
+    console.error('[teacher/create-open-ended] birincil motor başarısız, Claude fallback:', decision.engine, primaryError)
+    if (decision.engine === 'claude-sonnet' || decision.engine === 'claude-haiku') throw primaryError
+    const fallback = await generateWithRoutedProvider(
+      { engine: 'claude-sonnet', experimentVariant: null, genEngineTag: 'claude-sonnet-fallback' },
+      { systemPrompt: '', userPrompt: prompt, maxTokens: 1500, operationTag: 'teacher:create-open-ended:fallback-claude', userId }
+    )
+    text = fallback.text
+  }
   let parsed
   try {
     const clean = text.replace(/```json|```/g, '').trim()
@@ -170,7 +184,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Ders ve konu zorunlu.' }, { status: 400 })
       }
       try {
-        const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin)
+        const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin, user.id)
         return NextResponse.json(result)
       } catch (e: any) {
         return NextResponse.json({ error: e?.message || 'Soru üretilemedi, tekrar dene.' }, { status: 500 })
@@ -200,7 +214,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Yapay zeka için ders ve konu zorunlu.' }, { status: 400 })
       }
       try {
-        const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin)
+        const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin, user.id)
         scenario = result.scenario; question = result.question; rubric = result.rubric
       } catch (e: any) {
         return NextResponse.json({ error: e?.message || 'Soru üretilemedi, tekrar dene.' }, { status: 500 })

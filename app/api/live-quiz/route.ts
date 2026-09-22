@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
-import Anthropic from '@anthropic-ai/sdk'
-import { logAnthropicUsage } from '@/lib/ai-usage'
+import { pickQuizEngine, generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
-const anthropic = new Anthropic()
 
 export const maxDuration = 120
 export const runtime = 'nodejs'
@@ -37,15 +35,50 @@ Her soru 4 şıklı (A,B,C,D), MEB müfredatına uygun olsun.
 SADECE geçerli JSON döndür:
 {"questions":[{"q":"Soru metni","opts":["A","B","C","D"],"ans":0,"exp":"Kısa açıklama"}]}`
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5',
-    max_tokens: 4000,
-    system: 'Sadece geçerli JSON döndür, markdown kullanma.',
-    messages: [{ role: 'user', content: prompt }],
+  // 22 Eylül 2026 — Deniz'in fark ettiği gibi bu uç nokta hâlâ SADECE Claude
+  // kullanıyordu. generate-quiz/route.ts'te uygulanan çoklu-sağlayıcı
+  // tasarımı (GPT-4.1-mini gövde, Mistral mevcut payı, Claude sadece 'zor'
+  // zorluk için) burada da devreye alınıyor — bkz.
+  // lib/ai-gateway/quiz-provider-router.ts. Canlı quiz'de öğretmen sadece
+  // kolay/normal/zor seçebiliyor (çok zor yok), o yüzden hardDifficulty
+  // sadece 'zor' için true.
+  const decision = pickQuizEngine({
+    bucketKey: `live-quiz-v1:${user.id}`,
+    hardDifficulty: difficulty === 'zor',
   })
-    await logAnthropicUsage('live-quiz', 'claude-sonnet-4-5', response, { userId: user.id })
+  const systemPrompt = 'Sadece geçerli JSON döndür, markdown kullanma.'
+  let text: string
+  try {
+    const result = await generateWithRoutedProvider(decision, {
+      systemPrompt,
+      userPrompt: prompt,
+      maxTokens: 4000,
+      operationTag: `live-quiz:${decision.genEngineTag}`,
+      userId: user.id,
+    })
+    text = result.text
+  } catch (primaryError) {
+    console.error('[live-quiz] birincil motor başarısız, Claude fallback deneniyor:', decision.engine, primaryError)
+    // Seçilen motor (GPT-4.1-mini/Mistral) ağ/HTTP hatasıyla başarısız
+    // olursa öğretmen elini boş dönmesin diye Claude'a düşülüyor — tıpkı
+    // generate-quiz'deki "seçilen motor başarısız olursa öğrenciye asla 500
+    // dönme" prensibi gibi. Claude zaten seçiliyse (fallback'in kendisi) bu
+    // blok tekrar çalışmaz, hata doğrudan aşağıya (500) düşer.
+    if (decision.engine === 'claude-sonnet' || decision.engine === 'claude-haiku') {
+      return NextResponse.json({ error: 'Soru üretilemedi.' }, { status: 500 })
+    }
+    try {
+      const fallback = await generateWithRoutedProvider(
+        { engine: 'claude-sonnet', experimentVariant: null, genEngineTag: 'claude-sonnet-fallback' },
+        { systemPrompt, userPrompt: prompt, maxTokens: 4000, operationTag: 'live-quiz:fallback-claude', userId: user.id }
+      )
+      text = fallback.text
+    } catch (fallbackError) {
+      console.error('[live-quiz] Claude fallback de başarısız:', fallbackError)
+      return NextResponse.json({ error: 'Soru üretilemedi.' }, { status: 500 })
+    }
+  }
 
-  const text = response.content[0].type === 'text' ? response.content[0].text : ''
   let questions: any[] = []
   try {
     const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())

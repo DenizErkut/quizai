@@ -7,12 +7,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 60
 export const runtime = 'nodejs'
-import Anthropic from '@anthropic-ai/sdk'
-import { logAnthropicUsage } from '@/lib/ai-usage'
+import { pickQuizEngine, generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { checkMinorConsentBlock } from '@/lib/identity/client'
 
-const anthropic = new Anthropic()
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -138,14 +136,32 @@ SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir açıklama eklem
 }
 Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
 
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 1500,
-      messages: [{ role: 'user', content: prompt }],
-    })
-    await logAnthropicUsage('generate-open-ended', 'claude-sonnet-4-5', response, { userId: user.id })
-
-    const text = response.content[0].type === 'text' ? response.content[0].text : ''
+    // 22 Eylül 2026 — Deniz'in fark ettiği gibi bu uç nokta hâlâ SADECE
+    // Claude kullanıyordu. Aynı çoklu-sağlayıcı tasarım burada da devreye
+    // alınıyor (bkz. lib/ai-gateway/quiz-provider-router.ts). Bu uçta
+    // önceden bilinen bir zorluk seçimi yok (sadece sınıf seviyesinden
+    // çıkarılıyor) — bu yüzden hardDifficulty kullanılmıyor, sadece
+    // GPT-4.1-mini gövde + Mistral'in mevcut payı uygulanıyor.
+    const openEndedDecision = pickQuizEngine({ bucketKey: `open-ended-v1:${user.id}` })
+    let text: string
+    try {
+      const result = await generateWithRoutedProvider(openEndedDecision, {
+        systemPrompt: '',
+        userPrompt: prompt,
+        maxTokens: 1500,
+        operationTag: `generate-open-ended:${openEndedDecision.genEngineTag}`,
+        userId: user.id,
+      })
+      text = result.text
+    } catch (primaryError) {
+      console.error('[generate-open-ended] birincil motor başarısız, Claude fallback:', openEndedDecision.engine, primaryError)
+      if (openEndedDecision.engine === 'claude-sonnet' || openEndedDecision.engine === 'claude-haiku') throw primaryError
+      const fallback = await generateWithRoutedProvider(
+        { engine: 'claude-sonnet', experimentVariant: null, genEngineTag: 'claude-sonnet-fallback' },
+        { systemPrompt: '', userPrompt: prompt, maxTokens: 1500, operationTag: 'generate-open-ended:fallback-claude', userId: user.id }
+      )
+      text = fallback.text
+    }
     let parsed
     try {
       const clean = text.replace(/```json|```/g, '').trim()
