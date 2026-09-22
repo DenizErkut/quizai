@@ -378,6 +378,37 @@ function CheckoutContent() {
               <h1 className="serif" style={{ fontSize: '30px' }}>Plan seç</h1>
             </div>
 
+            {/* İndirim kodu / Satıcı kodu / Kurum kodu — planların hemen üstünde, fark edilir yerde */}
+            <div className="card-sm anim-up-1" style={{ marginBottom: '1.25rem', border: '1.5px dashed var(--accent)' }}>
+              {appliedCode ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--green)' }}>
+                    ✓ <strong>{appliedCode.code}</strong> — {appliedCode.label} (%{appliedCode.discountRate} indirim)
+                  </div>
+                  <button className="btn btn-ghost btn-sm" onClick={removeCode}>Kaldır</button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      className="input"
+                      placeholder="İndirim kodu / Satıcı kodu / Kurum kodu"
+                      value={codeInput}
+                      onChange={e => { setCodeInput(e.target.value); setCodeError('') }}
+                      onKeyDown={e => { if (e.key === 'Enter') applyCode() }}
+                      style={{ flex: 1 }}
+                    />
+                    <button className="btn btn-sm" onClick={applyCode} disabled={codeChecking || !codeInput.trim()}>
+                      {codeChecking ? <span className="spinner" style={{ width: 16, height: 16 }} /> : 'Uygula'}
+                    </button>
+                  </div>
+                  {codeError && (
+                    <div style={{ fontSize: '12px', color: 'var(--red)', marginTop: '6px' }}>{codeError}</div>
+                  )}
+                </>
+              )}
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '1.5rem' }} className="anim-up-1">
               {(Object.entries(displayPlans) as [string, PlanDisplay][]).map(([key, plan]) => (
                 <button key={key} onClick={() => setSelectedPlan(key as BillingPlanKey)}
@@ -414,37 +445,6 @@ function CheckoutContent() {
                   </div>
                 </button>
               ))}
-            </div>
-
-            {/* Satıcı/Kurum Kodu */}
-            <div className="card-sm anim-up-1" style={{ marginBottom: '1.5rem' }}>
-              {appliedCode ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                  <div style={{ fontSize: '13px', color: 'var(--green)' }}>
-                    ✓ <strong>{appliedCode.code}</strong> — {appliedCode.label} (%{appliedCode.discountRate} indirim)
-                  </div>
-                  <button className="btn btn-ghost btn-sm" onClick={removeCode}>Kaldır</button>
-                </div>
-              ) : (
-                <>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      className="input"
-                      placeholder="Satıcı veya kurum kodu"
-                      value={codeInput}
-                      onChange={e => { setCodeInput(e.target.value); setCodeError('') }}
-                      onKeyDown={e => { if (e.key === 'Enter') applyCode() }}
-                      style={{ flex: 1 }}
-                    />
-                    <button className="btn btn-sm" onClick={applyCode} disabled={codeChecking || !codeInput.trim()}>
-                      {codeChecking ? <span className="spinner" style={{ width: 16, height: 16 }} /> : 'Uygula'}
-                    </button>
-                  </div>
-                  {codeError && (
-                    <div style={{ fontSize: '12px', color: 'var(--red)', marginTop: '6px' }}>{codeError}</div>
-                  )}
-                </>
-              )}
             </div>
 
             {/* Güven unsurları */}
