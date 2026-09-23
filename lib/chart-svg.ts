@@ -14,8 +14,9 @@
 // öngörülebilir şekilde çizer. AI çağrısı yok, kesilme riski yok, sayılar
 // sorudaki veriyle birebir aynı (çünkü aynı chartData hem soruyu üreten
 // modelden hem çizimden geliyor) — tek risk modelin chartData'yı hiç
-// göndermemesi ya da bozuk göndermesi, bu da validateChartData() ile
-// yakalanıp eski AI-SVG yoluna güvenle geri düşülüyor (route.ts'te).
+// göndermemesi ya da bozuk göndermesi. Bu durum validateChartData() ile
+// yakalanır; route.ts veriyi bir kez yapılandırılmış biçimde onarmayı dener.
+// Onarım mümkün değilse görsel atlanır. Serbest AI-SVG'ye geri dönülmez.
 //
 // Kapsam: yalnızca math_graph kategorisi (koordinat sistemi, sayı doğrusu,
 // çubuk/çizgi/pasta grafik gibi VERİ TEMELLİ, yapısı net olan görseller).
@@ -95,8 +96,8 @@ function svgWrap(body: string, title?: string): string {
 
 // ─── DOĞRULAMA ──────────────────────────────────────────────────────────────
 // Model bozuk/eksik chartData gönderirse (yanlış tip, NaN, boş dizi vb.)
-// burada reddedilir — çağıran taraf (route.ts) bunu eski AI-SVG yoluna
-// güvenle geri düşmek için kullanır.
+// burada reddedilir — çağıran taraf (route.ts) bunu veri onarımına yönlendirmek
+// veya görseli güvenle atlamak için kullanır.
 export function validateChartData(data: any): data is ChartData {
   if (!data || typeof data !== 'object') return false
   switch (data.type) {
