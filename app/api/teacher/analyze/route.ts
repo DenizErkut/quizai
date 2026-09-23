@@ -40,6 +40,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Eksik parametre.' }, { status: 400 })
   }
 
+  // Analiz önbelleğine veya öğrenci verilerine erişmeden önce ödevin
+  // öğretmenin sınıfında olduğunu ve öğrencinin sınıfa kayıtlı olduğunu doğrula.
+  const { data: assignmentAccess } = await supabaseAdmin
+    .from('assignments')
+    .select('id, classroom_id')
+    .eq('id', assignment_id)
+    .maybeSingle()
+  if (!assignmentAccess?.classroom_id) {
+    return NextResponse.json({ error: 'Ödev bulunamadı.' }, { status: 404 })
+  }
+
+  const { data: classroomAccess } = await supabaseAdmin
+    .from('classrooms')
+    .select('id')
+    .eq('id', assignmentAccess.classroom_id)
+    .eq('teacher_id', teacher.id)
+    .maybeSingle()
+  if (!classroomAccess) {
+    return NextResponse.json({ error: 'Bu ödeve erişim yetkiniz yok.' }, { status: 403 })
+  }
+
+  const { data: studentMembership } = await supabaseAdmin
+    .from('classroom_students')
+    .select('student_id')
+    .eq('classroom_id', assignmentAccess.classroom_id)
+    .eq('student_id', student_id)
+    .maybeSingle()
+  if (!studentMembership) {
+    return NextResponse.json({ error: 'Öğrenci bu sınıfta bulunmuyor.' }, { status: 403 })
+  }
+
   // Önbellek: aynı analiz varsa getir
   const { data: cached } = await supabaseAdmin
     .from('teacher_student_analyses')

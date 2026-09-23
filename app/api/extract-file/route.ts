@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { extractPdfText } from '@/lib/pdf-extract'
+import { createClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
@@ -57,16 +58,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   }
 
+  const token = authHeader.slice(7).trim()
+  if (!token) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+
+  const supabaseAuth = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  )
+  const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token)
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Oturum geçersiz.' }, { status: 401 })
+  }
+
   try {
     const formData = await req.formData()
     const chunk = formData.get('chunk') as File
     const chunkIndex = parseInt(formData.get('chunkIndex') as string || '0')
     const totalChunks = parseInt(formData.get('totalChunks') as string || '1')
-    const sessionId = formData.get('sessionId') as string
+    const clientSessionId = formData.get('sessionId') as string
     const ext = (formData.get('ext') as string || '').toLowerCase()
     const filename = formData.get('filename') as string || 'file'
 
-    if (!chunk) return NextResponse.json({ error: 'Chunk bulunamadı.' }, { status: 400 })
+    if (!chunk || !clientSessionId) return NextResponse.json({ error: 'Dosya parçası veya oturum kimliği bulunamadı.' }, { status: 400 })
+    if (!Number.isInteger(chunkIndex) || !Number.isInteger(totalChunks) || totalChunks < 1 || totalChunks > 8 || chunkIndex < 0 || chunkIndex >= totalChunks) {
+      return NextResponse.json({ error: 'Geçersiz dosya parçası.' }, { status: 400 })
+    }
+
+    // Her yüklemeyi kullanıcıya bağla; tahmin edilen sessionId ile başka
+    // bir kullanıcının yüklemesi üzerine yazılamaz veya tamamlanamaz.
+    const sessionId = `${user.id}:${clientSessionId}`
 
     const chunkBuffer = Buffer.from(await chunk.arrayBuffer())
 

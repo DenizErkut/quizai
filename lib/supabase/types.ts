@@ -517,17 +517,27 @@ export type Database = {
           id: string
           referrer_id: string
           referred_id: string
-          rewarded: boolean
+          qualified_at: string | null
+          qualified_subscription_id: string | null
+          rewarded_at: string | null
+          rewarded_months: number | null
           created_at: string
         }
         Insert: {
           id?: string
           referrer_id: string
           referred_id: string
-          rewarded?: boolean
+          qualified_at?: string | null
+          qualified_subscription_id?: string | null
+          rewarded_at?: string | null
+          rewarded_months?: number | null
+          created_at?: string
         }
         Update: {
-          rewarded?: boolean
+          qualified_at?: string | null
+          qualified_subscription_id?: string | null
+          rewarded_at?: string | null
+          rewarded_months?: number | null
         }
       }
       push_subscriptions: {

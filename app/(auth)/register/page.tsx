@@ -332,17 +332,14 @@ function RegisterContent() {
           }
         }
 
-        // Referral — ödül sistemi ile
+        // Kayıt yalnızca davet ilişkisini kurar; ödül ücretli üyelik
+        // PayTR tarafından etkinleştirildiğinde veritabanında tanınır.
         if (ref) {
-          const { data: referrer } = await supabase.from('profiles').select('id').eq('referral_code', ref.toUpperCase()).single()
-          if (referrer && referrer.id !== data.user.id) {
-            await new Promise(r => setTimeout(r, 800))
-            await fetch('/api/referral/reward', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ referrer_id: referrer.id, referred_id: data.user.id }),
-            }).catch(() => {})
-          }
+          await fetch('/api/referral/attribute', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ referral_code: ref }),
+          }).catch(error => console.error('[register] referral attribution failed:', error))
         }
 
         router.push(isSafeNext(next) ? next : '/home')

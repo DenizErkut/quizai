@@ -47,6 +47,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Mesaj boş olamaz.' }, { status: 400 })
   }
 
+  const { data: classroom } = await supabaseAdmin
+    .from('classrooms')
+    .select('id')
+    .eq('id', classroom_id)
+    .eq('teacher_id', teacher.id)
+    .maybeSingle()
+  if (!classroom) {
+    return NextResponse.json({ error: 'Bu sınıfa erişim yetkiniz yok.' }, { status: 403 })
+  }
+
   // Sınıftaki öğrencileri çek
   const { data: students } = await supabaseAdmin
     .from('classroom_students')

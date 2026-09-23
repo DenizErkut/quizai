@@ -189,14 +189,11 @@ export default function CompleteProfilePage() {
       }
 
       if (pending.ref) {
-        const { data: referrer } = await supabase.from('profiles').select('id').eq('referral_code', pending.ref.toUpperCase()).single()
-        if (referrer && referrer.id !== uid) {
-          await fetch('/api/referral/reward', {
+        await fetch('/api/referral/attribute', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ referrer_id: referrer.id, referred_id: uid }),
-          }).catch(() => {})
-        }
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ referral_code: pending.ref }),
+          }).catch(error => console.error('[complete-profile] referral attribution failed:', error))
       }
 
       clearPendingRegistration()

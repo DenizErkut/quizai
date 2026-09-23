@@ -68,6 +68,7 @@ export async function GET(request: NextRequest) {
         .eq('id', user.id)
         .single()
 
+      let needsProfileSetup = false
       if (!existing) {
         // Yeni kullanici - platform verisi (kimlik alanı TR-PG'de, buraya yazılmaz)
         await supabase.from('profiles').insert({
@@ -76,23 +77,34 @@ export async function GET(request: NextRequest) {
           language: 'Türkçe',
         })
 
-        // Referral kodu varsa isle
-        if (ref) {
-          const { data: referrer } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('referral_code', ref)
-            .single()
+        needsProfileSetup = true
+      }
 
-          if (referrer && referrer.id !== user.id) {
-            await supabase.from('referrals').insert({
-              referrer_id: referrer.id,
-              referred_id: user.id,
-            })
+      // Auth trigger profili önceden oluşturmuş olsa bile yeni OAuth
+      // kullanıcılarında referans kodunu ilişkilendir. Eski hesapların
+      // sonradan kendilerine davet yazmasını engellemek için kayıt zamanı
+      // penceresiyle sınırlandırılır.
+      const createdAt = Date.parse(user.created_at)
+      const isNewAccount = Number.isFinite(createdAt) && Date.now() - createdAt < 15 * 60 * 1000
+      if (ref && isNewAccount) {
+        const { data: referrer } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('referral_code', ref.toUpperCase())
+          .maybeSingle()
+
+        if (referrer && referrer.id !== user.id) {
+          const { error: referralError } = await supabase.from('referrals').insert({
+            referrer_id: referrer.id,
+            referred_id: user.id,
+          })
+          if (referralError && referralError.code !== '23505') {
+            console.error('[auth/callback] referral attribution failed:', referralError.message)
           }
         }
+      }
 
-        // Yeni kullanici - profil kurulumuna yonlendir
+      if (needsProfileSetup) {
         const profileUrl = new URL('/profile', requestUrl.origin)
         if (safeNext) profileUrl.searchParams.set('next', safeNext)
         return NextResponse.redirect(profileUrl)
