@@ -203,7 +203,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
 
       {!hidden && open && (
         <div style={{
-          position: 'fixed', bottom: '108px', right: '24px', zIndex: 9998,
+          position: 'fixed', bottom: '108px', left: '24px', zIndex: 9998,
           width: '370px', maxWidth: 'calc(100vw - 32px)',
           background: '#fff', borderRadius: '20px',
           boxShadow: '0 20px 60px rgba(8,36,101,0.18)',
@@ -353,10 +353,10 @@ export default function AIChatBot({ isGuest = false }: Props) {
         <div
           onClick={() => { setOpen(true); setUnread(0) }}
           style={{
-            position: 'fixed', bottom: '108px', right: '24px', zIndex: 9998,
+            position: 'fixed', bottom: '108px', left: '24px', zIndex: 9998,
             maxWidth: '230px',
             background: '#fff',
-            borderRadius: '18px 18px 4px 18px',
+            borderRadius: '18px 18px 18px 4px',
             padding: '12px 16px',
             boxShadow: '0 10px 32px rgba(8,36,101,0.18)',
             border: '1.5px solid rgba(30,207,184,0.25)',
@@ -384,7 +384,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
           </div>
           {/* balon kuyruğu */}
           <div style={{
-            position: 'absolute', bottom: '-8px', right: '28px',
+            position: 'absolute', bottom: '-8px', left: '28px',
             width: 0, height: 0,
             borderLeft: '8px solid transparent',
             borderRight: '8px solid transparent',
@@ -475,8 +475,12 @@ export default function AIChatBot({ isGuest = false }: Props) {
         }
         /* 19 Eylül 2026 — konum artık sarmalayıcıda (drag ile taşınabilir),
            .prati-launcher butonun kendisi konumsuz, sarmalayıcıyı dolduruyor. */
+        /* 23 Eylül 2026 (13. güncelleme) — Deniz'in isteği: Pratium Asistan
+           ve Profesör Prati ikonları aynı köşede üst üste biniyordu (bkz.
+           ekran görüntüsü). Asistan artık sol-altta, Koç sağ-altta (bkz.
+           CoachMascot.tsx — orası değişmedi). */
         .prati-launcher-wrap, .prati-launcher-restore {
-          position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+          position: fixed; bottom: 24px; left: 24px; z-index: 9999;
         }
         .prati-launcher:not(.is-open)::before,
         .prati-launcher:not(.is-open)::after {
