@@ -123,7 +123,14 @@ export default function CoachMascot() {
   const [bubbleDismissed, setBubbleDismissed] = useState(false)
   const [open, setOpen] = useState(false)
   const { pos, style: dragStyle, hidden, hide, show, fabRect, elRef, wasDragged, dragHandlers } =
-    useDraggableMascot('coach_mascot', 84)
+    // 23 Eylül 2026 (13. güncelleme) — Deniz'in bildirdiği "profesör sabit
+    // köşede durmuyor, sayfanın ortasında bir yerde" sorunu: daha önce
+    // sürüklenip bırakılmış bir konum localStorage'da ('coach_mascot_pos')
+    // kalıcı olarak saklı kalmış ve artık geçersiz/uygunsuz bir piksel
+    // konumuna denk geliyordu. Anahtar adı değiştirilerek o eski kayıt
+    // sessizce terk ediliyor — herkes varsayılan sağ-alt köşeden yeniden
+    // başlıyor (isteyen yine sürükleyip yeni bir yere bırakabilir).
+    useDraggableMascot('coach_mascot_v2', 84)
 
   // Panel state — app/koc/page.tsx'teki mantığın aynısı (bkz. 10. güncelleme).
   const [messages, setMessages] = useState<CoachMessage[]>([])
