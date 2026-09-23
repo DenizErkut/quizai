@@ -36,6 +36,7 @@ import { applyCanonicalObjectiveMappings, learningObjectivePrompt, loadCanonical
 import { runMistralShadowComparison, MistralAdapter, isProviderConfigured } from '@/lib/ai-gateway'
 import { balanceAnswerPositions, getQuestionBankSet, promoteQuestionsToBank, questionBankKey } from '@/lib/question-bank'
 import { decideQuizProvider, getQuizProviderPolicy, QUIZ_PROVIDER_POLICY_VERSION } from '@/lib/quiz-provider-policy'
+import { attachQuestionRigorMetadata, summarizeQuestionSetRigor } from '@/lib/question-rigor'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -318,9 +319,21 @@ function rigorInstruction(difficulty: string, count: number, topic: string): str
   const level = normalizeTR(difficulty)
   const hard = /zor|hard|ileri|advanced/.test(level)
   const easy = /kolay|easy|temel|basic/.test(level)
-  const applicationCount = easy ? Math.max(1, Math.ceil(count * 0.4)) : Math.max(1, Math.ceil(count * (hard ? 0.8 : 0.6)))
-  const inferenceCount = easy ? 1 : Math.max(1, Math.ceil(count * (hard ? 0.5 : 0.3)))
-  return `\n\nÖLÇME KALİTESİ VE ZORLUK KURALI (ZORUNLU): "${topic}" için ${count} soru üretirken sadece tanım ezberini veya tek adımlı işlemi ölçme. En az ${applicationCount} soru bilgiyi yeni bir bağlama/senaryoya uygulamayı, verilenleri ayıklamayı veya en az iki akıl yürütme adımını gerektirsin. En az ${inferenceCount} soru ilişki kurma, hata bulma, karşılaştırma ya da sonuç çıkarma ölçsün. Zorluk uzun ve karışık cümlelerden değil, kazanımın gerçekten kullanılmasından gelmeli. Her çoktan seçmeli soruda üç çeldirici öğrencinin yapabileceği gerçek işlem, kavram veya yorum hatasına dayansın; komik, alakasız ya da ilk bakışta elenen seçenekler kullanma. Aynı hesap yöntemi, senaryo veya soru kalıbını tekrarlama. Sınıf seviyesinin dışına çıkma ve soruyu çözülemez hâle getirme. Açıklamada doğru sonuca giden mantığı kısa ama açık biçimde göster.`
+  const applicationCount = Math.max(1, Math.ceil(count * (hard ? 0.9 : easy ? 0.6 : 0.8)))
+  const inferenceCount = Math.max(1, Math.ceil(count * (hard ? 0.7 : easy ? 0.3 : 0.5)))
+  const directLimit = easy ? Math.max(1, Math.floor(count * 0.2)) : 0
+  const hardMixCount = hard ? Math.ceil(count * 0.7) : easy ? 0 : Math.ceil(count * 0.3)
+  const mixRule = hard
+    ? `Soruların en az ${hardMixCount} tanesi zor/çok zor düzeyde, kalanları normal düzeyde olsun; kolay soru üretme.`
+    : easy
+      ? 'Kolay düzey, ezber demek değildir: temel kazanımı yeni bir bağlamda uygulat; en az üç soru normal düzeye yaklaşsın.'
+      : `Soruların en az ${hardMixCount} tanesi zor düzeyde olsun; en fazla ${Math.max(1, Math.floor(count * 0.2))} kolay soru bulunabilir.`
+  return `\n\nÖLÇME KALİTESİ VE ZORLUK KURALI (ZORUNLU): "${topic}" için ${count} soru üretirken sadece tanım ezberini veya tek adımlı işlemi ölçme. En az ${applicationCount} soru bilgiyi yeni bir bağlama/senaryoya uygulamayı, verilenleri ayıklamayı veya en az iki akıl yürütme adımını gerektirsin. En az ${inferenceCount} soru ilişki kurma, hata bulma, karşılaştırma, yanlış çözümü analiz etme ya da sonuç çıkarma ölçsün. ${mixRule} Doğrudan tanım/ezber veya tek işlemle çözülen soru sayısı en fazla ${directLimit} olabilir. Her soruya "difficulty" (kolay|normal|zor|cok zor), "cognitiveLevel" (uygulama|muhakeme) ve gerçek çözüm adımı sayısını gösteren "reasoningSteps" alanlarını ekle. Zorluk uzun ve karışık cümlelerden değil, kazanımın gerçekten kullanılmasından gelmeli. Her çoktan seçmeli soruda üç çeldirici öğrencinin yapabileceği farklı ve gerçek işlem, kavram veya yorum hatasına dayansın; komik, alakasız ya da ilk bakışta elenen seçenekler kullanma. Aynı hesap yöntemi, senaryo veya soru kalıbını tekrarlama. Sınıf seviyesinin dışına çıkma ve soruyu çözülemez hâle getirme. Açıklamada doğru sonuca giden mantığı en az iki açık adımla göster.`
+}
+
+function canonicalQuestionDifficulty(value: unknown, fallback: string): string {
+  const normalized = normalizeTR(String(value || '')).replace(/çok/g, 'cok')
+  return ['kolay', 'normal', 'zor', 'cok zor'].includes(normalized) ? normalized : fallback
 }
 
 function visualQuestionIndexes(questions: any[], category: string | null, requestedCount: number, forceVisuals: boolean): number[] {
@@ -1538,7 +1551,29 @@ export async function POST(req: NextRequest) {
         questionType, difficulty: resolvedDifficulty,
       }, safeQCount, recentQuestionTexts)
 
+      // Eski havuzda "onaylı" olmak, bilişsel derinliğin bugünkü eşiğini
+      // karşıladığı anlamına gelmiyor. Temel/ezber düzeyindeki eski soruları
+      // sessizce tam test olarak sunmak yerine ayır; aşağıdaki hibrit akış
+      // eksik kısmı yeni ve daha güçlü kurallarla tamamlasın.
+      const measuredBankQuestions = attachQuestionRigorMetadata(bankQuestions)
+      const initialBankRigor = summarizeQuestionSetRigor(measuredBankQuestions, resolvedDifficulty)
+      const missingReasoningSlots = Math.max(0, initialBankRigor.targetReasoningCount - initialBankRigor.reasoningCount)
+      const replaceForReasoning = new Set(
+        measuredBankQuestions
+          .map((question, index) => ({ question, index }))
+          .filter(({ question }) => question.qualityCognitiveLevel !== 'muhakeme')
+          .sort((a, b) => Number(a.question.qualityRigorScore || 0) - Number(b.question.qualityRigorScore || 0))
+          .slice(0, missingReasoningSlots)
+          .map(({ index }) => index),
+      )
+      const rejectedBasicBankCount = measuredBankQuestions.filter(question => question.qualityCognitiveLevel === 'temel').length
+      bankQuestions = measuredBankQuestions.filter((question, index) => question.qualityCognitiveLevel !== 'temel' && !replaceForReasoning.has(index))
+      if (rejectedBasicBankCount > 0 || replaceForReasoning.size > 0) {
+        console.warn(`[question-rigor] bank_basic_rejected=${rejectedBasicBankCount} bank_reasoning_replacements=${replaceForReasoning.size} topic=${topic}`)
+      }
+
       if (bankQuestions.length === safeQCount && usageSessionId) {
+        const bankRigorSummary = summarizeQuestionSetRigor(bankQuestions, resolvedDifficulty)
         const mappedCount = bankQuestions.filter((question: any) => question?.objectiveMappingStatus === 'mapped').length
         const { data: bankSession, error: bankSessionError } = await supabase
           .from('quiz_sessions')
@@ -1576,6 +1611,7 @@ export async function POST(req: NextRequest) {
             sessionId: bankSession.id,
             resolvedDifficulty,
             source: 'question-bank',
+            qualitySummary: bankRigorSummary,
             adaptivePolicy: adaptivePolicy || undefined,
             diagnosticStrategy,
           })
@@ -2145,7 +2181,11 @@ export async function POST(req: NextRequest) {
     questions = questions.map((q: any, questionIndex: number) => ({
       ...normalizeQuestionMisconceptions(q),
       subject: canonicalSubject,
-      difficulty: resolvedDifficulty,
+      // Setin istek düzeyini ayrıca korurken modelin her soru için verdiği
+      // geçerli zorluk etiketini ezme. Aksi halde normal testte istenen %30
+      // zor soru üretimi DB'ye yazılırken tekrar "normal"e dönüşüyordu.
+      difficulty: canonicalQuestionDifficulty(q.difficulty, resolvedDifficulty),
+      requestedDifficulty: resolvedDifficulty,
       adaptivePolicyVersion: adaptivePolicy?.version || 'v2',
       adaptiveFocus: adaptivePolicy?.focus || 'standard',
       adaptiveReasonCode: adaptivePolicy?.reasonCode || 'NO_ACTIVE_SIGNAL',
@@ -2159,6 +2199,14 @@ export async function POST(req: NextRequest) {
       masteryConfidenceBefore: diagnosticStrategy.confidenceBefore,
       masteryEvidenceCountBefore: diagnosticStrategy.evidenceCountBefore,
     }))
+    // Sağlayıcının kendi difficulty etiketine güvenmek yerine her soruyu
+    // deterministik olarak bağlam, veri, çıkarım, açıklama ve seçenek yapısı
+    // üzerinden puanla. Düşük puanlı soruları burada silmiyoruz: bu, daha önce
+    // görülen eksik-set/503 döngüsünü geri getirirdi. Ölçümü soru JSON'una
+    // ekleyip üretim kalitesini sağlayıcı ve zaman bazında izlenebilir kılıyoruz.
+    questions = attachQuestionRigorMetadata(questions)
+    const rigorSummary = summarizeQuestionSetRigor(questions, resolvedDifficulty)
+    console.log(`[question-rigor] version=${rigorSummary.version} average=${rigorSummary.averageScore} minimum=${rigorSummary.minimumScore} application=${rigorSummary.applicationCount}/${rigorSummary.targetApplicationCount} reasoning=${rigorSummary.reasoningCount}/${rigorSummary.targetReasoningCount} direct=${rigorSummary.directRecallCount} visual=${rigorSummary.visualCount} target_met=${rigorSummary.meetsTarget}`)
     questions = balanceAnswerPositions(questions)
     const objectiveMapping = applyCanonicalObjectiveMappings(questions, objectiveCandidates)
     questions = objectiveMapping.questions
@@ -2313,6 +2361,7 @@ export async function POST(req: NextRequest) {
       source: bankQuestions.length > 0 ? 'hybrid' : 'ai',
       bankQuestionCount: bankQuestions.length,
       aiQuestionCount: Math.max(0, questions.length - bankQuestions.length),
+      qualitySummary: rigorSummary,
       adaptivePolicy: adaptivePolicy || undefined,
       diagnosticStrategy,
       // 21 Eylül 2026 — admin zorlamalı sağlayıcı testinde, sorular gerçekten
