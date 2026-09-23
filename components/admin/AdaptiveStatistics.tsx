@@ -31,6 +31,7 @@ export default function AdaptiveStatistics() {
   return <div className="card" style={{ marginTop: '1rem' }}>
     <strong style={{ color: 'var(--primary)' }}>📊 İstatistiksel etki raporu</strong>
     <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text3)' }}>Bu rapor, Adaptive Learning'in mevcut (Standard) yönteme göre öğrenmeyi GERÇEKTEN iyileştirip iyileştirmediğini ölçer. Rastgele iki-üç kişinin sonucuyla bunu söylemek mümkün değil — bu yüzden her grupta en az {min} kişi 7 günlük ölçümü tamamlayana kadar aşağıdaki tüm sayılar "henüz güvenilir değil" olarak işaretlenir.</div>
+    {report.isolation_note && <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: '#fff4e5', color: '#8a5200', fontSize: 12, fontWeight: 600 }}>⚠️ {report.isolation_note}</div>}
     <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: report.claim_status === 'supported_by_pilot' ? '#eaf8ef' : '#fff4e5', color: report.claim_status === 'supported_by_pilot' ? '#176b3a' : '#8a5200', fontSize: 12, fontWeight: 700 }}>{report.claim_message}</div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 8, marginTop: 10 }}>{report.cohorts?.map((cohort: any) => <div key={cohort.cohort} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10, fontSize: 12 }}>
       <strong>{cohortLabel(cohort.cohort)}</strong>

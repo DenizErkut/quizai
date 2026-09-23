@@ -27,12 +27,34 @@ const STANDARD_POLICY: AdaptiveLearningPolicy = {
   recommendationId: null, startingDifficulty: null, promptContext: '',
 }
 
+// 23 Eylül 2026 — uyum raporu güncellemesinde tespit edilen boşluk: pilotun
+// cohort='standard' ataması şimdiye kadar SADECE ölçüm tablosuna yazılıyordu,
+// asıl soru üretimini hiç etkilemiyordu — yani "standard" öğrenciler de
+// misconception_review/mastery_practice gibi müdahaleleri alabiliyordu. Bu
+// fonksiyon, öğrencinin şu an aktif bir "standard" pilot atamasının 7 günlük
+// gözlem penceresi içinde olup olmadığını kontrol eder; öyleyse konu/ders
+// fark etmeksizin STANDARD_POLICY zorlanır. sample_version sabit tutuluyor
+// çünkü adaptive_learning_evaluations'ın tek canlı pilotu bu.
+const ADAPTIVE_PILOT_SAMPLE_VERSION = 'adaptive-learning-v3-pilot'
+
+async function isActiveStandardPilotParticipant(supabase: SupabaseClient, studentId: string): Promise<boolean> {
+  const { data } = await supabase.from('adaptive_learning_evaluations')
+    .select('id').eq('student_id', studentId).eq('cohort', 'standard')
+    .eq('sample_version', ADAPTIVE_PILOT_SAMPLE_VERSION)
+    .gt('observation_started_at', new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString())
+    .limit(1).maybeSingle()
+  return !!data
+}
+
 export async function resolveAdaptiveLearningPolicy(
   supabase: SupabaseClient,
   studentId: string,
   topic: string,
   subject?: string
 ): Promise<AdaptiveLearningPolicy> {
+  if (await isActiveStandardPilotParticipant(supabase, studentId).catch(() => false)) {
+    return { ...STANDARD_POLICY, reasonCode: 'PILOT_STANDARD_COHORT', reason: 'Öğrenci adaptive-learning-v3-pilot çalışmasında standart kohorta atanmış; gözlem penceresi boyunca kişiselleştirme bilinçli olarak uygulanmıyor.' }
+  }
   let overrideQuery = supabase.from('adaptive_teacher_overrides').select('id,reason').eq('student_id',studentId).ilike('topic',topic).eq('mode','standard').gt('expires_at',new Date().toISOString()).order('updated_at',{ascending:false}).limit(1)
   if(subject) overrideQuery=overrideQuery.ilike('subject',subject)
   const {data:override}=await overrideQuery.maybeSingle()

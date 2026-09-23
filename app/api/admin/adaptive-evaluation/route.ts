@@ -83,11 +83,15 @@ function computeSegmentBreakdown(rows: any[], field: string) {
 // aldı, hangi yanılgı tipi çözüldü" sorusuna kohort bazında cevap (bkz.
 // 20260923130000_adaptive_evaluation_misconception_crossing.sql).
 //
-// DÜRÜSTLÜK NOTU: lib/adaptive-learning.ts::resolveAdaptiveLearningPolicy()
-// şu an cohort='standard' için ayrıca engellenmiyor — yani standard kohort da
-// misconception_review müdahalesi alabiliyor. Bu yüzden iki kohort arasında
-// bir fark görülse bile "adaptive müdahale sayesinde" diye yorumlanamaz;
-// intervention_rate bu karışıklığı gizlemek yerine raporda gösteriyor.
+// 23 Eylül 2026 (aynı gün, akşam) GÜNCELLEMESİ: bu fonksiyon yazıldığında
+// resolveAdaptiveLearningPolicy() standard kohortu fiilen izole etmiyordu.
+// O boşluk artık kapatıldı (bkz. lib/adaptive-learning.ts ve migration
+// 20260923140000). Bu satırlar artık GET handler'ında isolation_enforced=false
+// olan standard kayıtları hariç tutulduktan SONRAKİ "temiz" örneklemle
+// çağrılıyor. intervention_rate bu yüzden artık bir "beklenen confound"
+// göstergesi değil, bir SAĞLIK KONTROLÜ: izolasyonun etkin olduğu standard
+// kayıtlarında hâlâ müdahale görülüyorsa, bu izolasyon mekanizmasında bir
+// sorun olduğuna işaret eder.
 const MISCONCEPTION_MIN_SAMPLE = 30
 
 function computeMisconceptionOutcomes(rows: any[]) {
@@ -107,14 +111,15 @@ function computeMisconceptionOutcomes(rows: any[]) {
     }
   })
   const interpretable = cohorts.every(row => row.student_sample >= MISCONCEPTION_MIN_SAMPLE)
-  const bothIntervened = cohorts.every(row => (row.intervention_rate ?? 0) > 0)
+  const standardRow = cohorts.find(row => row.cohort === 'standard')
+  const standardLeak = (standardRow?.intervention_rate ?? 0) > 0
   return {
     cohorts,
     minimum_sample: MISCONCEPTION_MIN_SAMPLE,
     interpretable,
     excluded_row_count: rows.length - eligible.length,
-    caveat: bothIntervened
-      ? "Her iki kohort da misconception_review müdahalesi alıyor (bkz. intervention_rate) — bu müdahale şu an cohort='standard' için sistemsel olarak engellenmiyor, dolayısıyla bir fark gözlense bile bunu \"adaptive müdahale sayesinde\" diye yorumlamak yanlış olur."
+    caveat: standardLeak
+      ? "⚠️ İzolasyonun etkin olduğu (isolation_enforced=true) standard-kohort kayıtlarında hâlâ misconception_review müdahalesi görülüyor (intervention_rate > 0). Bu beklenmiyor — resolveAdaptiveLearningPolicy()'deki izolasyon kontrolünde bir sorun olabilir, incelenmeli."
       : null,
   }
 }
@@ -127,18 +132,26 @@ export async function GET(req: NextRequest) {
   const { data: profile } = await db.from('profiles').select('is_admin').eq('id', user.id).maybeSingle()
   if (profile?.is_admin !== true) return NextResponse.json({ error: 'Yasak.' }, { status: 403 })
 
-  const { data, error } = await db.from('adaptive_learning_evaluations').select('cohort,baseline_mastery,followup_mastery,baseline_retention,followup_retention,baseline_pct,followup_pct,observation_started_at,observation_ended_at,day1_mastery,day1_retention,day1_pct,day1_test_count,day1_completion_rate,day1_avg_duration_seconds,day1_measured_at,day7_mastery,day7_retention,day7_pct,day7_test_count,day7_completion_rate,day7_avg_duration_seconds,day7_measured_at,baseline_mastery_tier,baseline_recent_trend,baseline_learning_pace,baseline_misconception_ids,day7_misconceptions_resolved,day7_misconception_interventions').eq('sample_version', 'adaptive-learning-v3-pilot').order('created_at', { ascending: false }).limit(1000)
+  const { data, error } = await db.from('adaptive_learning_evaluations').select('cohort,baseline_mastery,followup_mastery,baseline_retention,followup_retention,baseline_pct,followup_pct,observation_started_at,observation_ended_at,day1_mastery,day1_retention,day1_pct,day1_test_count,day1_completion_rate,day1_avg_duration_seconds,day1_measured_at,day7_mastery,day7_retention,day7_pct,day7_test_count,day7_completion_rate,day7_avg_duration_seconds,day7_measured_at,baseline_mastery_tier,baseline_recent_trend,baseline_learning_pace,baseline_misconception_ids,day7_misconceptions_resolved,day7_misconception_interventions,isolation_enforced').eq('sample_version', 'adaptive-learning-v3-pilot').order('created_at', { ascending: false }).limit(1000)
   if (error) return NextResponse.json({ error: 'Değerlendirme verisi alınamadı.' }, { status: 500 })
 
   const rows = data ?? []
-  const overall = computeCohortReport(rows)
+  // 23 Eylül 2026 (akşam) — isolation_enforced=false olan standard-kohort
+  // satırları (izolasyon düzeltmesinden önce, kısmen veya tamamen atanmış)
+  // TÜM karşılaştırmalardan hariç tutuluyor: o dönemde bu öğrenciler
+  // kişiselleştirme alabiliyordu, dolayısıyla "temiz standart kohort" değiller.
+  // adaptive kayıtları bu filtreden etkilenmiyor.
+  const cleanRows = rows.filter(row => row.cohort !== 'standard' || row.isolation_enforced !== false)
+  const isolationExcludedCount = rows.length - cleanRows.length
+
+  const overall = computeCohortReport(cleanRows)
   const segments = {
-    baseline_mastery_tier: computeSegmentBreakdown(rows, 'baseline_mastery_tier'),
-    baseline_recent_trend: computeSegmentBreakdown(rows, 'baseline_recent_trend'),
-    baseline_learning_pace: computeSegmentBreakdown(rows, 'baseline_learning_pace'),
+    baseline_mastery_tier: computeSegmentBreakdown(cleanRows, 'baseline_mastery_tier'),
+    baseline_recent_trend: computeSegmentBreakdown(cleanRows, 'baseline_recent_trend'),
+    baseline_learning_pace: computeSegmentBreakdown(cleanRows, 'baseline_learning_pace'),
   }
-  const segmentedRowCount = rows.filter(row => row.baseline_mastery_tier != null).length
-  const misconceptionOutcomes = computeMisconceptionOutcomes(rows)
+  const segmentedRowCount = cleanRows.filter(row => row.baseline_mastery_tier != null).length
+  const misconceptionOutcomes = computeMisconceptionOutcomes(cleanRows)
 
   return NextResponse.json({
     sample_version: 'adaptive-learning-v3-pilot',
@@ -147,9 +160,13 @@ export async function GET(req: NextRequest) {
     balance_tolerance: BALANCE_TOLERANCE,
     segments,
     segmented_row_count: segmentedRowCount,
-    segment_note: segmentedRowCount < rows.length
-      ? `${rows.length - segmentedRowCount} kayıt, segment alanları eklenmeden önce oluşturulduğu için segmentli kırılıma dahil değil (üst-seviye rapora dahil).`
+    segment_note: segmentedRowCount < cleanRows.length
+      ? `${cleanRows.length - segmentedRowCount} kayıt, segment alanları eklenmeden önce oluşturulduğu için segmentli kırılıma dahil değil (üst-seviye rapora dahil).`
       : null,
     misconception_outcomes: misconceptionOutcomes,
+    isolation_excluded_row_count: isolationExcludedCount,
+    isolation_note: isolationExcludedCount > 0
+      ? `${isolationExcludedCount} standard-kohort kaydı, resolveAdaptiveLearningPolicy'nin standard kohortu fiilen izole eden düzeltmesinden (23 Eylül 2026 akşam) önce (kısmen veya tamamen) atandığı için TÜM karşılaştırmalardan hariç tutuldu — bu öğrenciler o dönemde kişiselleştirme alabiliyordu.`
+      : null,
   })
 }
