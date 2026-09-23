@@ -386,16 +386,26 @@ export default function AIChatBot({ isGuest = false }: Props) {
       )}
 
       {/* FAB — konumu taşıyan sarmalayıcı sürüklenebilir (bkz.
-          lib/useDraggableMascot.ts); buton kendisi artık pozisyonsuz,
-          sarmalayıcının içini dolduruyor. */}
+          lib/useDraggableMascot.ts).
+          23 Eylül 2026 — Deniz'in bildirdiği hata: "chatbot'a tıkladığımda
+          açılmıyor". Kök neden: ref+dragHandlers (setPointerCapture) SARMALAYICI
+          <div>'de, ama onClick İÇERİDEKİ <button>'daydı. Chromium'da bir
+          elemanda setPointerCapture çağrılınca, o parmak/imleç için üretilen
+          "click" olayı da capture'ı alan elemana yönlendiriliyor — yani click
+          hiçbir zaman iç <button>'a ulaşmıyor, onClick asla tetiklenmiyordu
+          (playwright ile doğrulandı: capture sarmalayıcıdaysa iç butonun click
+          handler'ı hiç çalışmıyor, capture+onClick AYNI elemandaysa çalışıyor).
+          Düzeltme: ref+dragHandlers artık butonun KENDİSİNDE, sarmalayıcı sadece
+          konumu taşıyor. Bu ayrıca "geçici gizle" (×) butonunu da örtük olarak
+          düzeltiyor — o da sarmalayıcının pointerdown'ına takılıyordu. */}
       {!hidden && (
         <div
-          ref={elRef}
           className="prati-launcher-wrap"
-          {...dragHandlers}
-          style={{ width: 84, height: 84, touchAction: 'none', ...dragStyle }}
+          style={{ width: 84, height: 84, ...dragStyle }}
         >
           <button
+            ref={elRef}
+            {...dragHandlers}
             className={`prati-launcher${open ? ' is-open' : ''}`}
             onClick={(e) => { if (wasDragged()) { e.preventDefault(); return } setOpen(v => !v); setUnread(0); setBubbleDismissed(true) }}
             style={{
@@ -403,6 +413,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
               background: open ? 'linear-gradient(135deg, #082465, #1ECFB8)' : '#ffffff',
               border: open ? 'none' : '2px solid rgba(30,207,184,0.25)',
               cursor: 'pointer',
+              touchAction: 'none',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: '0 8px 32px rgba(8,36,101,0.3)',
               transition: 'transform 0.2s, box-shadow 0.2s',
