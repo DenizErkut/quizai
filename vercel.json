@@ -2,46 +2,15 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["dub1"],
   "crons": [
-    {
-      "path": "/api/cron/weekly-parent-summary",
-      "schedule": "0 8 * * 0"
-    },
-    {
-      "path": "/api/cron/weekly-plan-refresh",
-      "schedule": "0 7 * * 1"
-    },
-    {
-      "path": "/api/cron/reconcile-identities",
-      "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/cron/content-quality-scan",
-      "schedule": "0 5 * * *"
-    },
-    {
-      "path": "/api/cron/disengagement-check",
-      "schedule": "0 9 * * 3"
-    },
-    {
-      "path": "/api/cron/agent-quality-alert",
-      "schedule": "30 5 * * *"
-    },
-    {
-      "path": "/api/cron/adaptive-evidence-checkpoints",
-      "schedule": "15 4 * * *"
-    },
-    {
-      "path": "/api/cron/coach-nudge-enqueue",
-      "schedule": "0 7 * * *"
-    },
-    {
-<<<<<<< HEAD
-      "path": "/api/cron/coach-proactive-nudge",
-      "schedule": "*/15 * * * *"
-=======
-      "path": "/api/cron/question-bank-review-sweep",
-      "schedule": "20 5 * * *"
->>>>>>> yapilacaklar-1-4
-    }
+    { "path": "/api/cron/weekly-parent-summary", "schedule": "0 8 * * 0" },
+    { "path": "/api/cron/weekly-plan-refresh", "schedule": "0 7 * * 1" },
+    { "path": "/api/cron/reconcile-identities", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/content-quality-scan", "schedule": "0 5 * * *" },
+    { "path": "/api/cron/disengagement-check", "schedule": "0 9 * * 3" },
+    { "path": "/api/cron/agent-quality-alert", "schedule": "30 5 * * *" },
+    { "path": "/api/cron/adaptive-evidence-checkpoints", "schedule": "15 4 * * *" },
+    { "path": "/api/cron/coach-nudge-enqueue", "schedule": "0 7 * * *" },
+    { "path": "/api/cron/coach-proactive-nudge", "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/question-bank-review-sweep", "schedule": "20 5 * * *" }
   ]
 }
