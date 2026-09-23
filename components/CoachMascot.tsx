@@ -80,6 +80,18 @@
 // hatasından ders: ref+dragHandlers (setPointerCapture) ile onClick AYNI
 // elemanda olmalı — burada da tıklanabilir ana buton tek bir elemanda
 // toplandı, sarmalayıcı sadece sürüklenen konumu taşıyor.
+//
+// 23 Eylül 2026 (11. güncelleme) — Deniz'in düzeltmesi: "vardı ses özelliği
+// koç sayfasında, onu değiştirme, olduğu gibi inline'a taşı." app/koc/
+// page.tsx'e 22 Eylül'de (commit 0ba9934, "Harden coach data, queue
+// nudges, and add voice") zaten gerçek bir sesli özellik eklenmişti — bu
+// bileşeni ilk yazarken sandbox'ımın o commit'i içermeyen eski bir
+// koc/page.tsx kopyasından çalıştığımı fark etmedim ve YANLIŞLIKLA
+// tarayıcı-içi SpeechSynthesis'e dayanan ayrı bir sesli-okuma denemesi
+// uydurdum (o deneme geri alındı). Gerçek özellik ise per-mesaj "🔊 Koçu
+// dinle" butonu + sunucu tarafı /api/coach/speech uç noktası (OpenAI
+// gpt-4o-mini-tts, "cedar" sesi) — burada AYNI mantık, sadece bu panelin
+// state isimlerine (chatError vb.) uyarlanmış haliyle var.
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -121,8 +133,12 @@ export default function CoachMascot() {
   const [sending, setSending] = useState(false)
   const [chatError, setChatError] = useState('')
   const [planBlocked, setPlanBlocked] = useState(false)
+  const [speakingId, setSpeakingId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const supabase = createClient() as any
+
+  useEffect(() => () => { audioRef.current?.pause() }, [])
 
   useEffect(() => {
     if (!user) { setUnread(0); return }
@@ -230,6 +246,35 @@ export default function CoachMascot() {
       setChatError('Bağlantı hatası, lütfen tekrar dene.')
     }
     setSending(false)
+  }
+
+  // app/koc/page.tsx'teki gerçek "Koçu dinle" özelliğinin birebir taşınmış
+  // hali — sunucu tarafı /api/coach/speech (OpenAI gpt-4o-mini-tts, "cedar"
+  // sesi) çağırıyor. Bkz. 11. güncelleme notu (dosya başı).
+  async function speak(messageId?: string) {
+    if (!messageId) return
+    if (speakingId === messageId) { audioRef.current?.pause(); setSpeakingId(null); return }
+    setChatError('')
+    setSpeakingId(messageId)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const response = await fetch('/api/coach/speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ messageId }),
+      })
+      if (!response.ok) throw new Error('speech_failed')
+      const url = URL.createObjectURL(await response.blob())
+      audioRef.current?.pause()
+      const audio = new Audio(url)
+      audioRef.current = audio
+      audio.onended = () => { URL.revokeObjectURL(url); setSpeakingId(null) }
+      audio.onerror = () => { URL.revokeObjectURL(url); setSpeakingId(null); setChatError('Ses oynatılamadı.') }
+      await audio.play()
+    } catch {
+      setSpeakingId(null)
+      setChatError('Koçun sesi şu anda hazırlanamadı.')
+    }
   }
 
   function anchoredPanelStyle(): React.CSSProperties {
@@ -391,6 +436,15 @@ export default function CoachMascot() {
                                   ▶ Çalışmayı başlat: {m.action.topic}
                                 </button>
                               )}
+                              {m.role === 'assistant' && m.id && (
+                                <button
+                                  onClick={() => speak(m.id)}
+                                  className="btn btn-ghost"
+                                  style={{ marginTop: '8px', padding: '5px 9px', fontSize: '12px' }}
+                                >
+                                  {speakingId === m.id ? '⏸ Sesi durdur' : '🔊 Koçu dinle'}
+                                </button>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -413,6 +467,10 @@ export default function CoachMascot() {
                       </div>
                     </div>
                   )}
+
+                  <div style={{ padding: '0 14px', fontSize: '10.5px', color: '#94a3b8' }}>
+                    🔊 Koç sesi yapay zekâ tarafından üretilir.
+                  </div>
 
                   {/* Input */}
                   <form
