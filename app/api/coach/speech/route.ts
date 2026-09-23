@@ -26,11 +26,20 @@ export async function POST(req: NextRequest) {
     headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'gpt-4o-mini-tts',
-      voice: 'cedar',
+      // 23 Eylül 2026 (15. güncelleme) — Deniz'in isteği: "sesi daha insani
+      // hale getirelim, yaşlı bir adamın sesi olsun ama dinç olsun."
+      // 'cedar' sıcak ama belirgin bir yaş/karakter taşımıyordu (OpenAI'nin
+      // "en yüksek kalite" için önerdiği nötr yeni nesil ses). 'onyx' —
+      // düşük perdeli, hafif kalın/pürüzlü dokusuyla — tanıdık bir "olgun,
+      // tecrübeli adam" izlenimi veren, uzun süredir kullanılan bir ses;
+      // ama doğal temposu ölçülü/ağır kaçabiliyor, bu yüzden "dinç" tarafı
+      // instructions'da ve speed'de vurgulanıyor (0.96 yerine 1.0 — yaşlı
+      // ama YORGUN değil).
+      voice: 'onyx',
       input: String(message.content).slice(0, 4096),
-      instructions: 'Türkçe konuş. Yaşlı ama dinç, tecrübeli ve güven veren bir eğitim koçu gibi; sıcak, berrak, enerjik ve doğal bir tempoda seslendir. Abartılı oyunculuk yapma.',
+      instructions: 'Türkçe konuş. Yaşlı, tecrübeli bir eğitim koçusun — sesin derin ve olgun, hafif kalın bir dokuya sahip. Ama ASLA yorgun, ağır, durgun veya bitkin çıkma: dinç, canlı, enerji dolu ve güven verici bir tempoda konuş. Sıcak ve berrak bir anlatım kullan, abartılı oyunculuk yapma.',
       response_format: 'mp3',
-      speed: 0.96,
+      speed: 1.0,
     }),
   })
   if (!response.ok) {
