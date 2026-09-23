@@ -14,6 +14,7 @@ import Link from 'next/link'
 export default function SiteFooter() {
   const links = [
     { href: '/hakkimizda', label: 'Hakkımızda' },
+    { href: '/iletisim', label: 'İletişim' },
     { href: '/for-students', label: 'Öğrenciler İçin' },
     { href: '/for-parents', label: 'Veliler İçin' },
     { href: '/for-teachers', label: 'Öğretmenler İçin' },
