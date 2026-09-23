@@ -76,5 +76,23 @@ export default function AdaptiveStatistics() {
         </div>
       ))}
     </div>}
+    {report.misconception_outcomes && <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+      <strong style={{ color: 'var(--primary)' }}>🧩 Kavram yanılgısı çözümü (misconception_review)</strong>
+      <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text3)' }}>
+        Atama anında öğrencinin doğrulanmış (confirmed) yanılgıları donduruldu. Burada, bunlardan kaçının 7 gün içinde çözüldüğü (resolved) ve öğrencinin bu pencerede en az bir misconception_review-odaklı soru alıp almadığı (intervention_rate) gösteriliyor. Kohort başına en az {report.misconception_outcomes.minimum_sample} öğrenci gerekiyor.
+        {report.misconception_outcomes.excluded_row_count > 0 && <div style={{ marginTop: 4 }}>{report.misconception_outcomes.excluded_row_count} kayıt, baseline&apos;da hiç bilinen yanılgısı olmadığı ya da bu alan eklenmeden önce oluşturulduğu için bu kırılıma dahil değil.</div>}
+      </div>
+      {report.misconception_outcomes.caveat && <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: '#fff4e5', color: '#8a5200', fontSize: 12, fontWeight: 700 }}>⚠️ {report.misconception_outcomes.caveat}</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 8, marginTop: 10 }}>
+        {report.misconception_outcomes.cohorts.map((cohort: any) => <div key={cohort.cohort} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10, fontSize: 12 }}>
+          <strong>{cohortLabel(cohort.cohort)}</strong>
+          <div style={{ marginTop: 4 }}>Öğrenci sayısı: {cohort.student_sample} / {report.misconception_outcomes.minimum_sample} {cohort.student_sample < report.misconception_outcomes.minimum_sample ? '(yetersiz)' : '(eşik geçildi)'}</div>
+          <div style={{ color: 'var(--text3)', marginTop: 3 }}>Baseline yanılgı toplamı: {cohort.baseline_misconception_total} · çözülen: {cohort.resolved_total}</div>
+          <div style={{ marginTop: 4, fontWeight: 700 }}>Çözülme oranı: {cohort.resolution_rate == null ? '—' : `%${cohort.resolution_rate}`}</div>
+          <div style={{ color: 'var(--text3)', marginTop: 3 }}>Müdahale gören öğrenci oranı: {cohort.intervention_rate == null ? '—' : `%${cohort.intervention_rate}`}</div>
+        </div>)}
+      </div>
+      {!report.misconception_outcomes.interpretable && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text3)' }}>Örneklem henüz her iki kohortta da {report.misconception_outcomes.minimum_sample} öğrenciye ulaşmadığı için bu kırılım &quot;henüz güvenilir değil&quot; olarak işaretleniyor.</div>}
+    </div>}
   </div>
 }

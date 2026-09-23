@@ -78,6 +78,47 @@ function computeSegmentBreakdown(rows: any[], field: string) {
   return values.map(value => ({ segment_value: value, ...computeCohortReport(withSegment.filter(row => row[field] === value)) }))
 }
 
+// 23 Eylül 2026 — yapılacaklar listesi madde 4'ün kalan kısmı: misconception_
+// catalog crossing. "Hangi öğrenci hangi misconception_review müdahalesini
+// aldı, hangi yanılgı tipi çözüldü" sorusuna kohort bazında cevap (bkz.
+// 20260923130000_adaptive_evaluation_misconception_crossing.sql).
+//
+// DÜRÜSTLÜK NOTU: lib/adaptive-learning.ts::resolveAdaptiveLearningPolicy()
+// şu an cohort='standard' için ayrıca engellenmiyor — yani standard kohort da
+// misconception_review müdahalesi alabiliyor. Bu yüzden iki kohort arasında
+// bir fark görülse bile "adaptive müdahale sayesinde" diye yorumlanamaz;
+// intervention_rate bu karışıklığı gizlemek yerine raporda gösteriyor.
+const MISCONCEPTION_MIN_SAMPLE = 30
+
+function computeMisconceptionOutcomes(rows: any[]) {
+  const eligible = rows.filter(row => Array.isArray(row.baseline_misconception_ids) && row.baseline_misconception_ids.length > 0 && row.day7_measured_at)
+  const cohorts = ['adaptive', 'standard'].map(cohort => {
+    const group = eligible.filter(row => row.cohort === cohort)
+    const baselineTotal = group.reduce((sum, row) => sum + row.baseline_misconception_ids.length, 0)
+    const resolvedTotal = group.reduce((sum, row) => sum + (row.day7_misconceptions_resolved ?? 0), 0)
+    const withIntervention = group.filter(row => (row.day7_misconception_interventions ?? 0) > 0).length
+    return {
+      cohort,
+      student_sample: group.length,
+      baseline_misconception_total: baselineTotal,
+      resolved_total: resolvedTotal,
+      resolution_rate: baselineTotal ? Math.round(resolvedTotal / baselineTotal * 10000) / 100 : null,
+      intervention_rate: group.length ? Math.round(withIntervention / group.length * 10000) / 100 : null,
+    }
+  })
+  const interpretable = cohorts.every(row => row.student_sample >= MISCONCEPTION_MIN_SAMPLE)
+  const bothIntervened = cohorts.every(row => (row.intervention_rate ?? 0) > 0)
+  return {
+    cohorts,
+    minimum_sample: MISCONCEPTION_MIN_SAMPLE,
+    interpretable,
+    excluded_row_count: rows.length - eligible.length,
+    caveat: bothIntervened
+      ? "Her iki kohort da misconception_review müdahalesi alıyor (bkz. intervention_rate) — bu müdahale şu an cohort='standard' için sistemsel olarak engellenmiyor, dolayısıyla bir fark gözlense bile bunu \"adaptive müdahale sayesinde\" diye yorumlamak yanlış olur."
+      : null,
+  }
+}
+
 export async function GET(req: NextRequest) {
   const token = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '')
   if (!token) return NextResponse.json({ error: 'Yasak.' }, { status: 403 })
@@ -86,7 +127,7 @@ export async function GET(req: NextRequest) {
   const { data: profile } = await db.from('profiles').select('is_admin').eq('id', user.id).maybeSingle()
   if (profile?.is_admin !== true) return NextResponse.json({ error: 'Yasak.' }, { status: 403 })
 
-  const { data, error } = await db.from('adaptive_learning_evaluations').select('cohort,baseline_mastery,followup_mastery,baseline_retention,followup_retention,baseline_pct,followup_pct,observation_started_at,observation_ended_at,day1_mastery,day1_retention,day1_pct,day1_test_count,day1_completion_rate,day1_avg_duration_seconds,day1_measured_at,day7_mastery,day7_retention,day7_pct,day7_test_count,day7_completion_rate,day7_avg_duration_seconds,day7_measured_at,baseline_mastery_tier,baseline_recent_trend,baseline_learning_pace').eq('sample_version', 'adaptive-learning-v3-pilot').order('created_at', { ascending: false }).limit(1000)
+  const { data, error } = await db.from('adaptive_learning_evaluations').select('cohort,baseline_mastery,followup_mastery,baseline_retention,followup_retention,baseline_pct,followup_pct,observation_started_at,observation_ended_at,day1_mastery,day1_retention,day1_pct,day1_test_count,day1_completion_rate,day1_avg_duration_seconds,day1_measured_at,day7_mastery,day7_retention,day7_pct,day7_test_count,day7_completion_rate,day7_avg_duration_seconds,day7_measured_at,baseline_mastery_tier,baseline_recent_trend,baseline_learning_pace,baseline_misconception_ids,day7_misconceptions_resolved,day7_misconception_interventions').eq('sample_version', 'adaptive-learning-v3-pilot').order('created_at', { ascending: false }).limit(1000)
   if (error) return NextResponse.json({ error: 'Değerlendirme verisi alınamadı.' }, { status: 500 })
 
   const rows = data ?? []
@@ -97,6 +138,7 @@ export async function GET(req: NextRequest) {
     baseline_learning_pace: computeSegmentBreakdown(rows, 'baseline_learning_pace'),
   }
   const segmentedRowCount = rows.filter(row => row.baseline_mastery_tier != null).length
+  const misconceptionOutcomes = computeMisconceptionOutcomes(rows)
 
   return NextResponse.json({
     sample_version: 'adaptive-learning-v3-pilot',
@@ -108,5 +150,6 @@ export async function GET(req: NextRequest) {
     segment_note: segmentedRowCount < rows.length
       ? `${rows.length - segmentedRowCount} kayıt, segment alanları eklenmeden önce oluşturulduğu için segmentli kırılıma dahil değil (üst-seviye rapora dahil).`
       : null,
+    misconception_outcomes: misconceptionOutcomes,
   })
 }
