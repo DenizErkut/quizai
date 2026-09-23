@@ -383,7 +383,7 @@ export default function CoachMascot() {
 
           {open && (
             <div style={{
-              position: 'fixed', bottom: '292px', right: '24px', zIndex: 10000,
+              position: 'fixed', bottom: '108px', right: '24px', zIndex: 10000,
               width: '380px', maxWidth: 'calc(100vw - 32px)',
               background: '#fff', borderRadius: '20px',
               boxShadow: '0 20px 60px rgba(41,72,61,0.22)',
@@ -583,13 +583,23 @@ export default function CoachMascot() {
           from { opacity: 0; transform: translateY(16px) scale(0.97); }
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
-        /* Masaüstü (ve mobil olmayan geniş ekranlar): eski sağ-alt yerleşim
-           aynen korunuyor — baloncuk ikonun üstünde dikey istifleniyor. */
+        /* Masaüstü (ve mobil olmayan geniş ekranlar).
+           23 Eylül 2026 (14. güncelleme) — Deniz'in "hâlâ aynı yerde"
+           bildirimi: bottom:208px/292px değerleri, Pratium Asistan HALA
+           sağ-altta (bottom:24px) dururken konulmuştu — Koç, Asistan'ın
+           ikonuyla çakışmasın diye 208px yukarıda "istifleniyordu". Asistan
+           artık sol-alta taşındı (bkz. AIChatBot.tsx, 13. güncelleme) ve
+           sağ-alt köşe boşaldı, ama bu iki değer o zamanki istiflemeden
+           kalma haliyle güncellenmemişti — o yüzden Koç hâlâ sayfanın
+           ortasına yakın, "asılı" duruyordu. Artık gerçek köşeye (bottom:
+           24px) indiriliyor; balon da (bubble) ikonun hemen üstüne (84px
+           ikon yüksekliği + 24px boşluk = 108px) oturuyor — AIChatBot'un
+           kendi bottom:24/108 örüntüsüyle birebir aynı mantık. */
         .coach-bubble {
-          position: fixed; bottom: 292px; right: 24px; z-index: 10000;
+          position: fixed; bottom: 108px; right: 24px; z-index: 10000;
         }
         .coach-launcher-wrap, .coach-launcher-restore {
-          position: fixed; bottom: 208px; right: 24px; z-index: 10000;
+          position: fixed; bottom: 24px; right: 24px; z-index: 10000;
         }
         /* 19 Eylül 2026 — Deniz'in isteği: mobilde sağ-üst köşeye, Navbar'ın
            mobil üst barındaki (top:0, height:58px) profil fotosunun hemen
