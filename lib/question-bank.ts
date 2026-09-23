@@ -52,13 +52,27 @@ function shuffled<T>(items: T[]): T[] {
   return result
 }
 
-function hasVisual(question: Question): boolean {
+// 23 Eylül 2026 — Deniz'in bulduğu hata: bu fonksiyon eskiden son satırda
+// soru METNİNDE "harita/tablo/grafik/..." kelimesi geçiyor mu diye bakıp
+// GERÇEK bir görsel varlığı (svg/chartData) olmasa bile "hasVisual: true"
+// döndürebiliyordu. Sonuç: promoteQuestionsToBank bu soruları havuza
+// "görsel" diye etiketleyerek yazıyordu, selectWithVisualQuota da bunları
+// görsel kotasını doldurmak için seçiyordu — ama öğrenciye giden soruda
+// hiçbir zaman gerçek bir resim/SVG/grafik olmuyordu (üretim anında görsel
+// üretimi başarısız olmuş ya da hiç denenmemiş olabilirdi, buna rağmen metin
+// eşleşmesi yüzünden "görsel" sayılıyordu). Production havuzunda bu, "harita
+// bilgisi" konusundaki 10 sorunun 10'unun da (ve havuz genelinde "hasVisual"
+// işaretli 51 sorudan 50'sinin) hiçbir gerçek svg/chartData taşımadığı
+// anlamına geliyordu. Artık SADECE gerçek bir varlık (eşleşen svg, geçerli
+// chartData veya kendiliğinden görsel olan table_fill tipi) "görsel" sayılır;
+// anahtar kelime eşleşmesi tek başına asla yeterli değildir.
+export function hasRealVisualAsset(question: Question): boolean {
   if (typeof question.svg === 'string' && question.svg.includes('<svg')) {
     return question.visualQuestionText === question.q
   }
+  if (question.chartData && typeof question.chartData === 'object') return true
   if (question.type === 'table_fill') return true
-  const text = questionBankKey(question.q)
-  return /grafik|tablo|sekil|diyagram|koordinat|harita|sema|zaman cizelgesi/.test(text)
+  return false
 }
 
 function isNewGenerationTopic(topic: string): boolean {
@@ -69,7 +83,7 @@ function isNewGenerationTopic(topic: string): boolean {
 function selectWithVisualQuota(rows: any[], count: number, topic: string): any[] {
   const ratio = isNewGenerationTopic(topic) ? 0.5 : 0.3
   const target = Math.min(count, Math.max(1, Math.ceil(count * ratio)))
-  const visualRows = shuffled(rows.filter(row => hasVisual(row.question))).slice(0, target)
+  const visualRows = shuffled(rows.filter(row => hasRealVisualAsset(row.question))).slice(0, target)
   const chosen = new Set(visualRows.map(row => row.id))
   const remaining = shuffled(rows.filter(row => !chosen.has(row.id))).slice(0, count - visualRows.length)
   return shuffled([...visualRows, ...remaining])
@@ -227,7 +241,7 @@ export async function promoteQuestionsToBank(
     .filter(validQuestion)
     .map(question => {
       const clean = reusableQuestion(question)
-      const visual = hasVisual(clean)
+      const visual = hasRealVisualAsset(clean)
       // Görsel soru ile ilişkili SVG aynı question JSON'unda tutulur. Ayrı
       // bir dosya/URL'ye bağımlı olmadığı için havuzdan tekrar sunulduğunda
       // soru ve görsel birlikte gelir.
