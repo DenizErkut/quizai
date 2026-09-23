@@ -215,6 +215,80 @@ function ClassRiskInsight({ classroomId }: { classroomId: string }) {
   )
 }
 
+// 23 Eylül 2026 — haber-analizi raporunun (Tema 2 farkı) kapattığı boşluk:
+// misconception motoru (misconception_catalog → student_misconceptions →
+// counter-evidence → resolveAdaptiveLearningPolicy) uçtan uca çalışıyordu
+// ama sonucu hiçbir öğretmen sayfasına ulaşmıyordu — öğretmen sadece
+// yukarıdaki genel mastery-bazlı risk grubunu görüyordu, "hangi öğrencide
+// hangi SPESİFİK yanılgı var, çözüldü mü" anlatısını hiç görmüyordu.
+// bkz. lib/teacher-misconception-insight.ts.
+function ClassMisconceptionInsight({ classroomId }: { classroomId: string }) {
+  const supabase = createClient() as any
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [expanded, setExpanded] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const params = classroomId ? `?classroomId=${classroomId}` : ''
+        const res = await fetch(`/api/teacher/class-misconceptions${params}`, {
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+        })
+        if (res.ok && !cancelled) setData(await res.json())
+      } catch { /* opsiyonel bölüm, sessiz geç */ }
+      if (!cancelled) setLoading(false)
+    }
+    load()
+    return () => { cancelled = true }
+  }, [classroomId])
+
+  if (loading) return null
+  const summary = data?.summary
+  if (!summary || summary.students.length === 0) return null
+
+  const visibleStudents = expanded ? summary.students : summary.students.slice(0, 5)
+
+  return (
+    <div className="card" style={{ marginBottom: '1.25rem' }}>
+      <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+        🧩 Kavram Yanılgısı Durumu
+      </div>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+        <span className="badge badge-red">🔴 Açık yanılgısı olan: {summary.studentsWithOpen}</span>
+        <span className="badge badge-green">✅ Çözülmüş yanılgısı olan: {summary.studentsWithResolved}</span>
+      </div>
+      {summary.topOpenMisconceptions.length > 0 && (
+        <div style={{ fontSize: '12.5px', color: 'var(--text2)', marginBottom: '12px' }}>
+          Sınıfta en çok tekrar eden açık yanılgı: {summary.topOpenMisconceptions.map((m: any) => `"${m.label}" (${m.studentCount} öğrenci)`).join(', ')}
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {visibleStudents.map((s: any) => (
+          <div key={s.studentId} style={{ fontSize: '13px', lineHeight: 1.6, borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
+            <strong>{s.fullName}</strong>
+            {s.entries.map((e: any) => (
+              <div key={e.misconceptionId} style={{ color: 'var(--text2)', marginLeft: '4px' }}>
+                {e.status === 'resolved'
+                  ? `✅ "${e.label}" yanılgısı çözüldü${e.resolvedAt ? ` (${new Date(e.resolvedAt).toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul' })})` : ''}${e.reopenedAt ? ' — sonra yeniden açıldı' : ''}`
+                  : `🔴 "${e.label}" yanılgısı hâlâ açık (${e.subject} — ${e.topic})`}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      {summary.students.length > 5 && (
+        <button onClick={() => setExpanded(!expanded)} style={{ marginTop: '10px', fontSize: '12px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+          {expanded ? 'Daha az göster' : `Tümünü göster (${summary.students.length})`}
+        </button>
+      )}
+    </div>
+  )
+}
+
 function WeakTopicsPanel({ data, scope, classroomId }: { data: any; scope: string; classroomId: string }) {
   // En yüksek hata oranına sahip ilk 8 konu — grafikte çok kalabalık
   // olmaması için sınırlandırıldı, tablo zaten tüm konuları gösteriyor.
@@ -227,6 +301,7 @@ function WeakTopicsPanel({ data, scope, classroomId }: { data: any; scope: strin
   return (
     <div>
       {scope === 'teacher' && <ClassRiskInsight classroomId={classroomId} />}
+      {scope === 'teacher' && <ClassMisconceptionInsight classroomId={classroomId} />}
       {!data.topics?.length ? empty : (
         <>
           <div className="card" style={{ marginBottom: '1.25rem' }}>
