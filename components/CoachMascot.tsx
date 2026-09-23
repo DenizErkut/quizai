@@ -68,19 +68,61 @@
 // kalıcı), sol üstündeki küçük × ile GEÇİCİ olarak gizlenebiliyor
 // (sessionStorage — sekme kapanınca sıfırlanır, koç tekrar belirir).
 // Konum bir kez değiştirildiyse ilk-tanıtım baloncuğu artık gösterilmiyor.
-import { useEffect, useState } from 'react'
+//
+// 23 Eylül 2026 (10. güncelleme) — Deniz'in isteği: "prof.prati'yi aynı
+// chatbot gibi açılan bir ekran yapsak daha şık olmaz mı?" Eskiden ikona
+// tıklayınca tam sayfa /koc'a (app/koc/page.tsx) yönlendiriyordu — şimdi
+// AIChatBot.tsx ile AYNI desende, ikonun tıklanmasıyla YERİNDE (inline)
+// açılan bir sohbet paneli oluyor (aynı /api/coach/chat uç noktası, aynı
+// mesaj/aksiyon mantığı app/koc/page.tsx'ten buraya taşındı). /koc sayfası
+// olduğu gibi bırakıldı (mobil/derin bağlantı/yer imi için) — panelin
+// başlığında "tam sayfada aç" linki var. Aynı oturumda düzeltilen AIChatBot
+// hatasından ders: ref+dragHandlers (setPointerCapture) ile onClick AYNI
+// elemanda olmalı — burada da tıklanabilir ana buton tek bir elemanda
+// toplandı, sarmalayıcı sadece sürüklenen konumu taşıyor.
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useUser } from '@/lib/user-context'
 import { createClient } from '@/lib/supabase/client'
 import { isPaidCoachPlan } from '@/lib/coach-access'
 import { useDraggableMascot } from '@/lib/useDraggableMascot'
 
+interface CoachAction {
+  type: 'start_practice'
+  topic: string
+  subject?: string
+  questionCount?: number
+  recommendationId?: string
+}
+
+interface CoachMessage {
+  id?: string
+  role: 'user' | 'assistant'
+  content: string
+  action?: CoachAction | null
+  created_at?: string
+}
+
 export default function CoachMascot() {
+  const router = useRouter()
   const { user, profile, loading, isTeacher, isParent, isInstitution } = useUser()
   const [unread, setUnread] = useState(0)
   const [bubbleDismissed, setBubbleDismissed] = useState(false)
-  const { pos, style: dragStyle, hidden, hide, show, elRef, wasDragged, dragHandlers } =
+  const [open, setOpen] = useState(false)
+  const { pos, style: dragStyle, hidden, hide, show, fabRect, elRef, wasDragged, dragHandlers } =
     useDraggableMascot('coach_mascot', 84)
+
+  // Panel state — app/koc/page.tsx'teki mantığın aynısı (bkz. 10. güncelleme).
+  const [messages, setMessages] = useState<CoachMessage[]>([])
+  const [chatLoaded, setChatLoaded] = useState(false)
+  const [chatLoading, setChatLoading] = useState(false)
+  const [input, setInput] = useState('')
+  const [sending, setSending] = useState(false)
+  const [chatError, setChatError] = useState('')
+  const [planBlocked, setPlanBlocked] = useState(false)
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const supabase = createClient() as any
 
   useEffect(() => {
     if (!user) { setUnread(0); return }
@@ -95,6 +137,112 @@ export default function CoachMascot() {
     void loadUnread()
     return () => { cancelled = true }
   }, [user])
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, sending, open])
+
+  // Panel ilk açıldığında sohbet geçmişini çek (bir kez — chatLoaded ile
+  // tekrar tekrar çekmeyi engelliyoruz, tıpkı app/koc/page.tsx gibi).
+  useEffect(() => {
+    if (!open || chatLoaded || !user) return
+    let cancelled = false
+    async function load() {
+      setChatLoading(true)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const res = await fetch('/api/coach/chat', {
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+        })
+        const data = await res.json()
+        if (cancelled) return
+        if (!res.ok) {
+          if (data.code === 'plan_required') { setPlanBlocked(true); setChatLoading(false); setChatLoaded(true); return }
+          setChatError(data.error || 'Koç yüklenemedi.'); setChatLoading(false); setChatLoaded(true); return
+        }
+        setMessages(data.messages || [])
+        // Panel açıldığında proaktif bildirimleri okunmuş işaretle — rozet
+        // (unread) burada sıfırlanmasa "koç seni görmedi" izlenimi kalıyordu.
+        void supabase.from('notifications').update({ read: true })
+          .eq('user_id', user.id).eq('type', 'coach_nudge').eq('read', false)
+        setUnread(0)
+      } catch {
+        if (!cancelled) setChatError('Bağlantı hatası, lütfen tekrar dene.')
+      }
+      if (!cancelled) { setChatLoading(false); setChatLoaded(true) }
+    }
+    void load()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, user])
+
+  async function startPractice(action: CoachAction, messageId?: string) {
+    try {
+      if (user) {
+        void supabase.from('coach_action_clicks').insert({
+          user_id: user.id,
+          message_id: messageId || null,
+          topic: action.topic,
+          recommendation_id: action.recommendationId || null,
+        })
+      }
+    } catch {
+      // analitik kaydı başarısız olabilir, akışı bozmaz
+    }
+    try {
+      if (action.recommendationId) {
+        const { data: { session } } = await supabase.auth.getSession()
+        await fetch('/api/recommendations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ recommendationId: action.recommendationId, action: 'accept' }),
+        })
+      }
+    } catch {
+      // öneri kabul edilemese bile pratiğe başlamayı engelleme
+    }
+    const params = new URLSearchParams()
+    params.set('topic', action.topic)
+    if (action.subject) params.set('subject', action.subject)
+    params.set('count', String(action.questionCount || 8))
+    if (action.recommendationId) params.set('recommendationId', action.recommendationId)
+    router.push(`/quiz?${params.toString()}`)
+  }
+
+  async function send() {
+    const text = input.trim()
+    if (!text || sending) return
+    setInput('')
+    setChatError('')
+    setMessages(m => [...m, { role: 'user', content: text }])
+    setSending(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/coach/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ message: text }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setChatError(data.error || 'Koç yanıt veremedi.'); setSending(false); return }
+      setMessages(m => [...m, data.message])
+    } catch {
+      setChatError('Bağlantı hatası, lütfen tekrar dene.')
+    }
+    setSending(false)
+  }
+
+  function anchoredPanelStyle(): React.CSSProperties {
+    if (!pos || !fabRect || typeof window === 'undefined') return {}
+    const width = Math.min(380, window.innerWidth - 32)
+    const height = Math.min(580, window.innerHeight - 32)
+    let left = fabRect.left + fabRect.width - width
+    let top = fabRect.top - height - 12
+    if (top < 8) top = fabRect.top + fabRect.height + 12
+    left = Math.min(Math.max(left, 8), window.innerWidth - width - 8)
+    top = Math.min(Math.max(top, 8), window.innerHeight - height - 8)
+    return { position: 'fixed', left, top, right: 'auto', bottom: 'auto', width, maxHeight: height }
+  }
 
   // Koç sadece öğrenciler için — öğretmen/veli/kurum hesaplarında
   // gösterilmiyor (bu hesaplar zaten /koc'a erişemez, kendi verisi yok).
@@ -119,9 +267,9 @@ export default function CoachMascot() {
         >🎓</button>
       ) : (
         <>
-          {!bubbleDismissed && !pos && (
+          {!open && !bubbleDismissed && !pos && (
             <div
-              onClick={() => setBubbleDismissed(true)}
+              onClick={() => { setOpen(true); setBubbleDismissed(true) }}
               className="coach-bubble"
               style={{
                 maxWidth: '240px',
@@ -146,16 +294,14 @@ export default function CoachMascot() {
                   cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
                 }}
               >×</button>
-              <Link href="/koc" style={{ textDecoration: 'none' }}>
-                <div style={{ fontSize: '14px', fontWeight: 800, color: '#082465', marginBottom: '5px' }}>
-                  🎓 Profesör Prati
-                </div>
-                <div style={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.55 }}>
-                  Seni tanıyan kişisel AI öğrenme koçun.<br />
-                  Sadece sorularını cevaplamaz —<br />
-                  nasıl öğrendiğini anlar.
-                </div>
-              </Link>
+              <div style={{ fontSize: '14px', fontWeight: 800, color: '#082465', marginBottom: '5px' }}>
+                🎓 Profesör Prati
+              </div>
+              <div style={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.55 }}>
+                Seni tanıyan kişisel AI öğrenme koçun.<br />
+                Sadece sorularını cevaplamaz —<br />
+                nasıl öğrendiğini anlar.
+              </div>
               {/* balon kuyruğu */}
               <div style={{
                 position: 'absolute', bottom: '-8px', right: '28px',
@@ -168,21 +314,169 @@ export default function CoachMascot() {
             </div>
           )}
 
-          <Link href="/koc" aria-label="Prof. Prati ile sohbet et"
-            ref={elRef}
-            onClick={(e) => { if (wasDragged()) { e.preventDefault(); return } setBubbleDismissed(true) }}
-            onPointerDown={dragHandlers.onPointerDown}
-            onPointerMove={dragHandlers.onPointerMove}
-            onPointerUp={dragHandlers.onPointerUp}
-            className="coach-launcher"
-            style={{
-              width: 84, height: 84, borderRadius: '22px',
-              background: '#fff', border: '2px solid rgba(168,85,247,0.3)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 8px 28px rgba(41,72,61,0.25)', textDecoration: 'none',
-              touchAction: 'none',
-              ...dragStyle,
-            }}>
+          {open && (
+            <div style={{
+              position: 'fixed', bottom: '292px', right: '24px', zIndex: 10000,
+              width: '380px', maxWidth: 'calc(100vw - 32px)',
+              background: '#fff', borderRadius: '20px',
+              boxShadow: '0 20px 60px rgba(41,72,61,0.22)',
+              border: '1px solid #e2e8f0',
+              display: 'flex', flexDirection: 'column',
+              maxHeight: '580px',
+              animation: 'coachPanelUp 0.2s ease',
+              ...anchoredPanelStyle(),
+            }} className="coach-panel-mobile">
+              {/* Header */}
+              <div style={{
+                background: 'linear-gradient(135deg, #6d28d9, #a855f7)',
+                borderRadius: '20px 20px 0 0',
+                padding: '14px 16px',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '5px' }}>
+                    <img src="/mascot-coach-human.webp" alt="Profesör Prati" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                  <div>
+                    <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>Profesör Prati</div>
+                    <Link href="/koc" style={{ color: 'rgba(255,255,255,0.8)', fontSize: '11px', textDecoration: 'underline' }}>
+                      Tam sayfada aç ↗
+                    </Link>
+                  </div>
+                </div>
+                <button onClick={() => setOpen(false)} aria-label="Sohbeti kapat" style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', fontSize: '22px', lineHeight: 1, padding: '4px' }}>×</button>
+              </div>
+
+              {planBlocked ? (
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1.25rem', textAlign: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '32px', marginBottom: '10px' }}>🎓</div>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#082465', marginBottom: '8px' }}>
+                      Profesör Prati ücretli üyelere özel
+                    </div>
+                    <p style={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.6, marginBottom: '16px' }}>
+                      Seni tanıyan, verine dayanan kişisel bir öğrenme koçu istiyorsan bir plana geçmen gerekiyor.
+                    </p>
+                    <button className="btn btn-primary" onClick={() => { setOpen(false); router.push('/checkout') }}>
+                      Planları görüntüle
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Mesajlar */}
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px', minHeight: 0 }}>
+                    {chatLoading ? (
+                      <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '2rem' }}><div className="spinner" /></div>
+                    ) : (
+                      <>
+                        {messages.map((m, i) => (
+                          <div key={m.id || i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                            <div style={{
+                              maxWidth: '82%', padding: '10px 13px',
+                              borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                              background: m.role === 'user' ? 'linear-gradient(135deg, #6d28d9, #a855f7)' : '#f8fafc',
+                              color: m.role === 'user' ? '#fff' : '#0F172A',
+                              fontSize: '13px', lineHeight: 1.6,
+                              border: m.role === 'assistant' ? '1px solid #e2e8f0' : 'none',
+                              whiteSpace: 'pre-line',
+                            }}>
+                              {m.content}
+                              {m.action?.type === 'start_practice' && (
+                                <button
+                                  onClick={() => startPractice(m.action as CoachAction, m.id)}
+                                  className="btn btn-primary"
+                                  style={{ marginTop: '10px', width: '100%', fontSize: '12.5px', padding: '8px 12px', background: 'linear-gradient(135deg, #6d28d9, #a855f7)' }}
+                                >
+                                  ▶ Çalışmayı başlat: {m.action.topic}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        {sending && (
+                          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                            <div style={{ padding: '10px 14px', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '13px', color: '#64748b' }}>
+                              ⏳ yazıyor…
+                            </div>
+                          </div>
+                        )}
+                        <div ref={bottomRef} />
+                      </>
+                    )}
+                  </div>
+
+                  {chatError && (
+                    <div style={{ padding: '0 14px 8px' }}>
+                      <div style={{ padding: '8px 12px', borderRadius: '10px', background: '#fef2f2', color: '#dc2626', fontSize: '12px' }}>
+                        {chatError}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Input */}
+                  <form
+                    onSubmit={e => { e.preventDefault(); send() }}
+                    style={{ padding: '12px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '8px' }}
+                  >
+                    <input
+                      value={input}
+                      onChange={e => setInput(e.target.value)}
+                      placeholder="Koça bir şey sor…"
+                      disabled={chatLoading || sending}
+                      style={{
+                        flex: 1, padding: '10px 14px', borderRadius: '20px',
+                        border: '1.5px solid #e2e8f0', background: '#f8fafc',
+                        fontSize: '13px', fontFamily: 'var(--font-sans)',
+                        outline: 'none', color: '#0F172A',
+                      }}
+                      onFocus={e => (e.target.style.borderColor = '#a855f7')}
+                      onBlur={e => (e.target.style.borderColor = '#e2e8f0')}
+                    />
+                    <button type="submit" disabled={chatLoading || sending || !input.trim()} style={{
+                      width: 38, height: 38, borderRadius: '50%',
+                      background: input.trim() ? 'linear-gradient(135deg, #6d28d9, #a855f7)' : '#e2e8f0',
+                      border: 'none', cursor: input.trim() ? 'pointer' : 'default',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '16px', color: '#fff', flexShrink: 0,
+                    }}>↑</button>
+                  </form>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* 23 Eylül 2026 — "geçici gizle" (×) butonu artık ana butonun
+              İÇİNDE değil, sarmalayıcının bir KARDEŞİ (sibling). Görsel
+              konumu aynı (× zaten position:absolute ile sarmalayıcıya göre
+              konumlanıyordu), ama artık ana butonun (setPointerCapture alan
+              eleman) DOM alt ağacında değil — böylece ana butonun sürükleme/
+              tıklama mantığıyla hiç karışmıyor, kendi click'i her zaman
+              güvenilir şekilde çalışıyor. */}
+          <div className="coach-launcher-wrap" style={{ width: 84, height: 84, ...dragStyle }}>
+            <button
+              ref={elRef}
+              {...dragHandlers}
+              aria-label={open ? "Profesör Prati'yi kapat" : 'Prof. Prati ile sohbet et'}
+              onClick={(e) => { if (wasDragged()) { e.preventDefault(); return } setOpen(v => !v); setBubbleDismissed(true) }}
+              className="coach-launcher"
+              style={{
+                width: 84, height: 84, borderRadius: '22px',
+                background: '#fff', border: '2px solid rgba(168,85,247,0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 8px 28px rgba(41,72,61,0.25)',
+                touchAction: 'none', cursor: 'pointer',
+              }}
+            >
+              <span className="coach-mascot-live" style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', padding: '6px' }}>
+                <img src="/mascot-coach-human.webp" alt="Prof. Prati" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              </span>
+              {!open && unread > 0 && (
+                <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 20, height: 20, padding: '0 4px', borderRadius: '999px', background: '#a855f7', color: '#fff', fontSize: '11px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
+                  {unread}
+                </span>
+              )}
+            </button>
             <button
               onClick={e => { e.preventDefault(); e.stopPropagation(); hide(); setBubbleDismissed(true) }}
               aria-label="Koç'u geçici olarak gizle"
@@ -196,15 +490,7 @@ export default function CoachMascot() {
                 cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.12)', zIndex: 1,
               }}
             >×</button>
-            <span className="coach-mascot-live" style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', padding: '6px' }}>
-              <img src="/mascot-coach-human.webp" alt="Prof. Prati" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-            </span>
-            {unread > 0 && (
-              <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 20, height: 20, padding: '0 4px', borderRadius: '999px', background: '#a855f7', color: '#fff', fontSize: '11px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
-                {unread}
-              </span>
-            )}
-          </Link>
+          </div>
         </>
       )}
 
@@ -213,12 +499,16 @@ export default function CoachMascot() {
           from { opacity: 0; transform: translateY(16px) scale(0.97); }
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
+        @keyframes coachPanelUp {
+          from { opacity: 0; transform: translateY(16px) scale(0.97); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
         /* Masaüstü (ve mobil olmayan geniş ekranlar): eski sağ-alt yerleşim
            aynen korunuyor — baloncuk ikonun üstünde dikey istifleniyor. */
         .coach-bubble {
           position: fixed; bottom: 292px; right: 24px; z-index: 10000;
         }
-        .coach-launcher, .coach-launcher-restore {
+        .coach-launcher-wrap, .coach-launcher-restore {
           position: fixed; bottom: 208px; right: 24px; z-index: 10000;
         }
         /* 19 Eylül 2026 — Deniz'in isteği: mobilde sağ-üst köşeye, Navbar'ın
@@ -228,8 +518,16 @@ export default function CoachMascot() {
           .coach-bubble {
             top: 68px; bottom: auto; right: 12px;
           }
-          .coach-launcher, .coach-launcher-restore {
+          .coach-launcher-wrap, .coach-launcher-restore {
             top: 156px; bottom: auto; right: 12px;
+          }
+          /* 23 Eylül 2026 — panel mobilde ikonun altına sığmayabilir; ekranı
+             kaplayan bir alt-sayfa gibi davransın (AIChatBot'un mobil
+             davranışıyla tutarlı bir basitleştirme). */
+          .coach-panel-mobile {
+            top: 68px !important; bottom: 12px !important; left: 12px !important;
+            right: 12px !important; width: auto !important; max-width: none !important;
+            max-height: none !important; height: auto !important;
           }
         }
         /* Deniz'in isteği: ikon "canlı" dursun (hafif sürekli hareket) ve

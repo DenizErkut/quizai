@@ -14,6 +14,21 @@
 // - Kullanıcı bir kez konumunu değiştirdiyse, o andan sonra ilk-tanıtım
 //   baloncuğu (intro bubble) bir daha gösterilmiyor — zaten maskotla
 //   etkileşime girmiş demektir (bkz. tüketen bileşenlerdeki `!pos` şartı).
+//
+// 23 Eylül 2026 — Deniz'in bildirdiği "chatbot'a tıkladığımda açılmıyor"
+// hatasının kök nedeni burada bulundu: setPointerCapture pointerDOWN anında
+// (yani her sıradan tıklamada da) çağrılıyordu. Playwright ile doğrulandı:
+// bir eleman pointer capture aldığında, o an gerçekleşen "click" olayının
+// nereye dispatch edildiği — özellikle butonun kendi iç içe span/img
+// çocukları söz konusu olduğunda — güvenilmez hale geliyor. Düzeltme:
+// capture artık pointerDOWN'da değil, gerçek bir sürükleme hareketi (5px
+// eşiği) tespit edildiğinde onPointerMove içinde TEMBEL (lazy) alınıyor.
+// Böylece sıradan bir dokunuş/tıklamada capture HİÇ devreye girmiyor —
+// tarayıcının normal click/bubbling davranışı hiç bozulmuyor. Sürükleme
+// sırasında (movedRef=true olduktan sonra) capture alınması, parmak/imleç
+// elemanın dışına çıksa bile hareketi takip etmeye devam etmesini sağlıyor;
+// o senaryoda zaten onClick'teki wasDragged() koruması click'i görmezden
+// geliyor, dolayısıyla capture'ın click dispatch'ini etkilemesinin önemi yok.
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 export interface DragPos { x: number; y: number }
@@ -66,9 +81,13 @@ export function useDraggableMascot(key: string, size: number) {
     return () => window.removeEventListener('resize', measure)
   }, [measure, pos, hidden])
 
+  const captureElRef = useRef<HTMLElement | null>(null)
+
   function onPointerDown(e: React.PointerEvent) {
     const el = e.currentTarget as HTMLElement
-    try { el.setPointerCapture(e.pointerId) } catch {}
+    // Not: setPointerCapture BURADA çağrılmıyor artık — bkz. dosya başındaki
+    // 23 Eylül 2026 notu. Sadece sürükleme başlangıcını ölçüyoruz.
+    captureElRef.current = el
     draggingRef.current = true
     movedRef.current = false
     const rect = el.getBoundingClientRect()
@@ -79,7 +98,12 @@ export function useDraggableMascot(key: string, size: number) {
     if (!draggingRef.current) return
     const dx = e.clientX - startRef.current.pointerX
     const dy = e.clientY - startRef.current.pointerY
-    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) movedRef.current = true
+    if (!movedRef.current && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+      movedRef.current = true
+      // Gerçek bir sürükleme başladığı doğrulandı — imleç/parmak elemanın
+      // dışına çıksa bile hareketi kaçırmamak için şimdi capture alıyoruz.
+      try { captureElRef.current?.setPointerCapture(e.pointerId) } catch {}
+    }
     if (!movedRef.current) return
     const next = clamp({ x: startRef.current.baseX + dx, y: startRef.current.baseY + dy })
     posRef.current = next
