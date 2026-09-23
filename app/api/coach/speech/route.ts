@@ -6,6 +6,37 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!) as any
 
+// 23 Eylül 2026 (16. güncelleme) — Deniz'in bildirdiği hata: "ikonları da
+// seslendiriyor, yapmasın." coach_messages.content, sohbet balonunda
+// GÖRÜNTÜLENMEK için markdown (**kalın**, madde imleri, başlıklar) ve
+// emoji/sembol (📊 ✅ ⚠️ ➡️ ▶ vb.) içeriyor — bunlar ekranda güzel duruyor
+// ama TTS modeline OLDUĞU GİBİ gönderilince model onları harfi harfine
+// seslendirmeye/tarif etmeye çalışıyordu. Çözüm: TTS'e giden metni ayrı
+// bir "konuşma metnine" temizliyoruz — coach_messages.content'in kendisi
+// (sohbet ekranındaki görünüm) HİÇ değişmiyor, sadece bu endpoint'ten
+// OpenAI'ye giden kopya temizleniyor.
+function sanitizeForSpeech(raw: string): string {
+  return raw
+    // Emoji + sembol/dingbat/ok/geometrik şekil blokları (📊 ✅ ⚠️ ➡️ ▶ ★ vb.)
+    .replace(/[\u{1F000}-\u{1FFFF}\u{2190}-\u{21FF}\u{2300}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu, '')
+    // Kod blokları / satır içi kod işaretleri
+    .replace(/`{1,3}/g, '')
+    // Markdown başlıkları ("## Başlık" → "Başlık")
+    .replace(/^#{1,6}\s*/gm, '')
+    // Madde imleri ve numaralı liste önekleri (satır başındaki "- ", "• ", "1. ")
+    .replace(/^[ \t]*[-•*]\s+/gm, '')
+    .replace(/^[ \t]*\d+\.\s+/gm, '')
+    // Kalın/italik işaretleri — metni koru, sadece işaretleri kaldır
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/_(.+?)_/g, '$1')
+    // Boşluk/satır sonu fazlalıklarını sadeleştir
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 export async function POST(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
   if (!token) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
@@ -36,10 +67,13 @@ export async function POST(req: NextRequest) {
       // instructions'da ve speed'de vurgulanıyor (0.96 yerine 1.0 — yaşlı
       // ama YORGUN değil).
       voice: 'onyx',
-      input: String(message.content).slice(0, 4096),
-      instructions: 'Türkçe konuş. Yaşlı, tecrübeli bir eğitim koçusun — sesin derin ve olgun, hafif kalın bir dokuya sahip. Ama ASLA yorgun, ağır, durgun veya bitkin çıkma: dinç, canlı, enerji dolu ve güven verici bir tempoda konuş. Sıcak ve berrak bir anlatım kullan, abartılı oyunculuk yapma.',
+      input: sanitizeForSpeech(String(message.content)).slice(0, 4096),
+      // 16. güncelleme — Deniz'in isteği: "biraz daha insani ve hızlı
+      // konuşabilir." Ölçülü/resmi bir anlatımdan gerçek bir insanın günlük
+      // konuşma temposuna çekildi; speed de 1.0 → 1.08.
+      instructions: 'Türkçe konuş. Yaşlı, tecrübeli bir eğitim koçusun — sesin derin ve olgun, hafif kalın bir dokuya sahip. Ama ASLA yorgun, ağır, durgun veya bitkin çıkma: dinç, canlı, enerji dolu bir tempoda konuş. Gerçek bir insanın günlük sohbet temposunda, doğal vurgularla ve akıcı konuş — yapay, resmi bir spiker tonu veya gereksiz duraklamalar OLMASIN. Sıcak ve berrak bir anlatım kullan, abartılı oyunculuk yapma.',
       response_format: 'mp3',
-      speed: 1.0,
+      speed: 1.08,
     }),
   })
   if (!response.ok) {
