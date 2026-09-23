@@ -91,12 +91,20 @@ export async function GET(req: NextRequest) {
 
   try {
     const conversationId = await getOrCreateConversation(supabaseAdmin, user.id)
-    const { data: messages } = await supabaseAdmin
+    // 23 Eylül 2026 (12. güncelleme) — Deniz'in bildirdiği "ne dersem
+    // diyeyim hep aynı cevabı veriyor" hatasının kök nedeni: burada
+    // ascending sırayla çekip limit uygulanıyordu, bu da 20 mesajı AŞAN
+    // her konuşmada panel her açıldığında hep konuşmanın en BAŞINDAKİ 20
+    // mesajı gösteriyordu (Postgres ORDER BY ASC + LIMIT en eski N satırı
+    // döner) — son mesajlar hiç görünmüyordu. Düzeltme: en yeni N mesajı
+    // (descending + limit) çekip sonra kronolojik sıraya çeviriyoruz.
+    const { data: messagesDesc } = await supabaseAdmin
       .from('coach_messages')
       .select('id, role, content, action, created_at')
       .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(MAX_HISTORY_MESSAGES)
+    const messages = (messagesDesc ?? []).slice().reverse()
 
     if (!messages || messages.length === 0) {
       const ctx = await loadCoachContext(supabaseAdmin, user.id)
@@ -165,14 +173,19 @@ export async function POST(req: NextRequest) {
 
     const ctx = await loadCoachContext(supabaseAdmin, user.id)
 
-    const { data: history } = await supabaseAdmin
+    // Aynı düzeltme burada da geçerli: Claude'a gönderilen "history" bu
+    // sorgudan geliyor — descending + limit ile en YENİ mesajları çekip
+    // kronolojik sıraya çevirmezsek, model az önce eklenen kullanıcı
+    // mesajını bile göremeyebiliyordu (konuşma 20 mesajı geçtiğinde).
+    const { data: historyDesc } = await supabaseAdmin
       .from('coach_messages')
       .select('role, content')
       .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(MAX_HISTORY_MESSAGES)
+    const history = (historyDesc ?? []).slice().reverse()
 
-    const reply = await generateCoachReply(ctx, (history ?? []) as { role: 'user' | 'assistant'; content: string }[], user.id, 'coach-chat')
+    const reply = await generateCoachReply(ctx, history as { role: 'user' | 'assistant'; content: string }[], user.id, 'coach-chat')
 
     const { data: inserted, error: insertAssistantErr } = await supabaseAdmin
       .from('coach_messages')

@@ -109,15 +109,24 @@ export default function AIChatBot({ isGuest = false }: Props) {
   const { pos, style: dragStyle, hidden, hide, show, fabRect, elRef, wasDragged, dragHandlers } =
     useDraggableMascot('prati_mascot', 84)
 
+  // 23 Eylül 2026 (12. güncelleme) — CoachMascot.tsx'teki "panel Navbar'ın
+  // altında kalıyor" düzeltmesiyle aynı kök neden burada da vardı (bkz. o
+  // dosyadaki ayrıntılı açıklama): height pencereye yakın olduğunda üst
+  // sınır ~24px'e düşüyor, bu da Navbar'dan (mobil ~58-68px) daha az.
+  // Burada CoachMascot'un aksine mobile-özel bir CSS override'ı da yok,
+  // yani bu JS hesaplaması TEK güvence — SAFE_TOP tabanı bu yüzden burada
+  // daha da kritik.
   function anchoredPanelStyle(): React.CSSProperties {
     if (!pos || !fabRect || typeof window === 'undefined') return {}
+    const SAFE_TOP = 76
+    const BOTTOM_MARGIN = 16
     const width = Math.min(370, window.innerWidth - 32)
-    const height = Math.min(560, window.innerHeight - 32)
+    const height = Math.min(560, window.innerHeight - SAFE_TOP - BOTTOM_MARGIN)
     let left = fabRect.left + fabRect.width - width
     let top = fabRect.top - height - 12
-    if (top < 8) top = fabRect.top + fabRect.height + 12
+    if (top < SAFE_TOP) top = fabRect.top + fabRect.height + 12
     left = Math.min(Math.max(left, 8), window.innerWidth - width - 8)
-    top = Math.min(Math.max(top, 8), window.innerHeight - height - 8)
+    top = Math.min(Math.max(top, SAFE_TOP), window.innerHeight - height - 8)
     return { position: 'fixed', left, top, right: 'auto', bottom: 'auto', width, maxHeight: height }
   }
 

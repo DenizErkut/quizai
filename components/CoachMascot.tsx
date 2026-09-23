@@ -277,15 +277,30 @@ export default function CoachMascot() {
     }
   }
 
+  // 23 Eylül 2026 (12. güncelleme) — Deniz'in bildirdiği "panelin tepesi
+  // navbar'ın altında kalıyor" hatası: height, neredeyse tüm pencere
+  // yüksekliğini kapladığında (mobilde window.innerHeight-32), üst sınır
+  // olan (window.innerHeight - height - 8) çok küçük bir sayıya (~24px)
+  // düşüyordu — bu da Navbar'ın mobil üst barından (58px) daha az, yani
+  // panel Navbar'ın ARKASINDA/ALTINDA başlıyordu. .coach-panel-mobile
+  // CSS'i (max-width:768px) bunu normalde !important ile eziyor, ama bazı
+  // uygulama-içi tarayıcılar (webview) o medya sorgusunu tetiklemeyen bir
+  // viewport genişliği bildirebiliyor — o zaman devreye SADECE bu JS
+  // hesaplaması giriyordu. Düzeltme: SAFE_TOP tabanını hem alt sınırda HEM
+  // yükseklik hesabında kullanarak, hangi kod yolu çalışırsa çalışsın
+  // panelin Navbar'ın her zaman altında (görsel olarak) başlamasını
+  // garanti ediyoruz.
   function anchoredPanelStyle(): React.CSSProperties {
     if (!pos || !fabRect || typeof window === 'undefined') return {}
+    const SAFE_TOP = 76 // Navbar'ın en kalın halinden (mobil ~58-68px) bile güvenli pay
+    const BOTTOM_MARGIN = 16
     const width = Math.min(380, window.innerWidth - 32)
-    const height = Math.min(580, window.innerHeight - 32)
+    const height = Math.min(580, window.innerHeight - SAFE_TOP - BOTTOM_MARGIN)
     let left = fabRect.left + fabRect.width - width
     let top = fabRect.top - height - 12
-    if (top < 8) top = fabRect.top + fabRect.height + 12
+    if (top < SAFE_TOP) top = fabRect.top + fabRect.height + 12
     left = Math.min(Math.max(left, 8), window.innerWidth - width - 8)
-    top = Math.min(Math.max(top, 8), window.innerHeight - height - 8)
+    top = Math.min(Math.max(top, SAFE_TOP), window.innerHeight - height - 8)
     return { position: 'fixed', left, top, right: 'auto', bottom: 'auto', width, maxHeight: height }
   }
 
