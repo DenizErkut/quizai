@@ -47,5 +47,34 @@ export default function AdaptiveStatistics() {
         <span title="Gerçek fark muhtemelen bu aralıkta bir yerde. Aralık sıfırı içine alıyorsa (ör. [-5, 5]) fark istatistiksel olarak anlamlı değildir — henüz 'adaptive daha iyi' ya da 'standard daha iyi' denemez."> · %95 olası aralık: [{row.confidence_interval_95.join(', ')}] (?)</span>
       </div>
     </div>)}</div>
+    {report.segments && <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+      <strong style={{ color: 'var(--primary)' }}>🔍 Öğrenci profiline göre kırılım</strong>
+      <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text3)' }}>
+        "Adaptive herkes için mi işe yarıyor, yoksa belirli bir öğrenci profilinde mi?" sorusu için. Segment bilgisi öğrencinin pilota ATANDIĞI andaki durumundan (canlı profilinden değil) donduruldu. Her alt grup ayrıca en az {min} tamamlanmış kişi gerektirir — bu yüzden çoğu satır şu an "henüz yetersiz" görünecektir, bu beklenen bir durumdur.
+        {report.segment_note && <div style={{ marginTop: 4 }}>{report.segment_note}</div>}
+      </div>
+      {([
+        ['baseline_mastery_tier', 'Başlangıç mastery düzeyi', { low: 'Düşük', medium: 'Orta', high: 'Yüksek', unknown: 'Bilinmiyor' }],
+        ['baseline_recent_trend', 'Başlangıçtaki eğilim', { improving: 'Yükseliyordu', stable: 'Sabitti', declining: 'Düşüyordu' }],
+        ['baseline_learning_pace', 'Öğrenme hızı', { fast: 'Hızlı', medium: 'Orta', deliberate: 'Temkinli', unknown: 'Bilinmiyor' }],
+      ] as const).map(([field, title, valueLabels]) => (
+        <div key={field} style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 12, fontWeight: 700 }}>{title}</div>
+          {!report.segments[field]?.length && <div style={{ fontSize: 12, color: 'var(--text3)' }}>Henüz bu boyutta veri yok.</div>}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 6, marginTop: 4 }}>
+            {report.segments[field]?.map((seg: any) => {
+              const minCompletedSeg = Math.min(...(seg.cohorts?.map((c: any) => c.completed_sample) ?? [0]))
+              return <div key={seg.segment_value} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 8, fontSize: 12 }}>
+                <div style={{ fontWeight: 700 }}>{(valueLabels as any)[seg.segment_value] || seg.segment_value}</div>
+                <div style={{ color: 'var(--text3)', marginTop: 2 }}>{seg.cohorts.map((c: any) => `${c.cohort === 'adaptive' ? 'Adaptive' : 'Standard'}: ${c.completed_sample}`).join(' · ')}</div>
+                <div style={{ marginTop: 3, color: seg.interpretable ? 'inherit' : 'var(--text3)', fontWeight: seg.interpretable ? 700 : 400 }}>
+                  {seg.interpretable ? seg.claim_message : `Henüz güvenilir değil (${minCompletedSeg}/${min}).`}
+                </div>
+              </div>
+            })}
+          </div>
+        </div>
+      ))}
+    </div>}
   </div>
 }

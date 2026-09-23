@@ -35,8 +35,13 @@
       "schedule": "0 7 * * *"
     },
     {
+<<<<<<< HEAD
       "path": "/api/cron/coach-proactive-nudge",
       "schedule": "*/15 * * * *"
+=======
+      "path": "/api/cron/question-bank-review-sweep",
+      "schedule": "20 5 * * *"
+>>>>>>> yapilacaklar-1-4
     }
   ]
 }

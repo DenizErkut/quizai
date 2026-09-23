@@ -35,6 +35,10 @@ export async function POST(req: NextRequest) {
       report_count: Number(row.report_count || 0) + 1,
       // Schema'daki inceleme bekleyen durumun adı `candidate`.
       review_status: 'candidate',
+      // Öğrenci raporu sonrası bu satır ASLA gölge-süresi otomatik
+      // yükseltmesine (bkz. 20260923090000_question_bank_shadow_review.sql)
+      // girmemeli — yalnızca bir insan approved/rejected kararı verebilir.
+      awaiting_expert_review: true,
       updated_at: new Date().toISOString(),
     }).eq('id', row.id)
   }
