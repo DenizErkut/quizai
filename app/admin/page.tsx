@@ -27,6 +27,7 @@ import PredictiveRiskCalibration from '@/components/admin/PredictiveRiskCalibrat
 import PipelineHealth from '@/components/admin/PipelineHealth'
 import CoachAnalytics from '@/components/admin/CoachAnalytics'
 import CoachUsage from '@/components/admin/CoachUsage'
+import UnitEconomics from '@/components/admin/UnitEconomics'
 import QuestionBankEditor from '@/components/QuestionBankEditor'
 import DailyHabitMetrics from '@/components/admin/DailyHabitMetrics'
 
@@ -68,7 +69,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'question-books' | 'exam-books' | 'question-bank' | 'curriculum' | 'kvkk' | 'adaptive' | 'risk' | 'coaching' | 'coach-usage'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'question-books' | 'exam-books' | 'question-bank' | 'curriculum' | 'kvkk' | 'adaptive' | 'risk' | 'coaching' | 'coach-usage' | 'unit-economics'>('users')
   const [identityMissing, setIdentityMissing] = useState<number | null>(null)
   const [identityScanning, setIdentityScanning] = useState(false)
   const [identityFixing, setIdentityFixing] = useState(false)
@@ -623,6 +624,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '1.5rem' }}>
           {([
             { key: 'users', label: '👥 Kullanıcılar' },
+            { key: 'unit-economics', label: '💰 Birim Ekonomisi' },
             { key: 'stats', label: '📊 İstatistikler' },
             { key: 'errors', label: `⚠️ Hata Bildirimleri${pendingCount > 0 ? ` (${pendingCount})` : ''}` },
             { key: 'teachers', label: `🎓 Öğretmen Başvuruları${pendingTeachers > 0 ? ` (${pendingTeachers})` : ''}` },
@@ -686,6 +688,18 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               </div>
             </div>
             <DailyHabitMetrics />
+          </div>
+        )}
+
+        {/* Birim Ekonomisi tab — 23 Eylül 2026, haber-analizi raporunun
+            Tema 5 farkı: maliyet/kullanım/öğrenme-sonucu tek anlatıda */}
+        {tab === 'unit-economics' && (
+          <div className="anim-up">
+            <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)', marginBottom: '1rem' }}>💰 Birim Ekonomisi</h2>
+            <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1rem' }}>
+              Maliyet, kullanım ve öğrenme-sonucu verilerini tek bir anlatıda birleştirir — okul/yatırımcı sunumu için tek bakışta özet.
+            </p>
+            <UnitEconomics />
           </div>
         )}
 
