@@ -34,10 +34,14 @@ import { resolveDiagnosticQuestionStrategy } from '@/lib/diagnostic-question-str
 import { parsePrioritySubjects, seedScoreForSubject } from '@/lib/onboarding-priorities'
 import { applyCanonicalObjectiveMappings, learningObjectivePrompt, loadCanonicalObjectiveCandidates } from '@/lib/learning-objective-mapping'
 import { runMistralShadowComparison, MistralAdapter, isProviderConfigured } from '@/lib/ai-gateway'
+<<<<<<< HEAD
 import { balanceAnswerPositions, getQuestionBankSet, promoteQuestionsToBank, questionBankKey } from '@/lib/question-bank'
 import { decideQuizProvider, getQuizProviderPolicy, QUIZ_PROVIDER_POLICY_VERSION } from '@/lib/quiz-provider-policy'
 import { attachQuestionRigorMetadata, summarizeQuestionSetRigor } from '@/lib/question-rigor'
 import { verifyVisualWithMistral } from '@/lib/mistral-quality'
+=======
+import { balanceAnswerPositions, getQuestionBankSet, hasRealVisualAsset, promoteQuestionsToBank, questionBankKey } from '@/lib/question-bank'
+>>>>>>> gorsel-havuz-duzeltmesi
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -1596,6 +1600,7 @@ export async function POST(req: NextRequest) {
     const bankEligible = !fileContent && !continueSessionId && !dailyChallenge && !isUniversityLevel && !forcedMistral && !forcedOpenAI && !forcedClaude
     let bankQuestions: any[] = []
     if (bankEligible) {
+<<<<<<< HEAD
       bankQuestions = await getQuestionBankSet(supabase, {
         subject, topic, grade, language: effectiveLang,
         questionType, difficulty: resolvedDifficulty,
@@ -1625,6 +1630,45 @@ export async function POST(req: NextRequest) {
       if (bankQuestions.length === safeQCount && usageSessionId) {
         const bankRigorSummary = summarizeQuestionSetRigor(bankQuestions, resolvedDifficulty)
         const mappedCount = bankQuestions.filter((question: any) => question?.objectiveMappingStatus === 'mapped').length
+=======
+      bankQuestions = await getQuestionBankSet(supabase, {
+        subject, topic, grade, language: effectiveLang,
+        questionType, difficulty: resolvedDifficulty,
+      }, safeQCount, recentQuestionTexts)
+
+      // 23 Eylül 2026 — Deniz'in bulduğu hata: "tam vuruş" (bankQuestions.length
+      // === safeQCount) durumunda aşağıdaki blok direkt döndüğü için AI/görsel
+      // üretimi HİÇ tetiklenmiyordu. lib/question-bank.ts'teki eski hasVisual()
+      // anahtar-kelime hatası yüzünden bazı konularda (ör. "Harita bilgisi")
+      // havuzdaki eşleşen tüm sorular yanlışlıkla "görsel" sayılıyordu — o hata
+      // artık düzeltildi (hasRealVisualAsset), ama düzeltme tek başına yeterli
+      // değil: onunla dürüstleşen havuz artık bu konularda GERÇEKTEN 0 görsel
+      // taşıdığını doğru bildirecek, ama tam-vuruş yolu bunu hiç sormadan yine
+      // de anında dönerdi. Bu yüzden tam vuruşu kabul etmeden önce hedeflenen
+      // görsel oranını (selectWithVisualQuota'daki aynı oran) gerçek varlığa
+      // göre kontrol ediyoruz; yetersizse havuzdan o kadar görselsiz soru
+      // çıkarıp yerini aşağıda zaten var olan kısmi-vuruş + AI tamamlama
+      // yoluna (aiQuestionCount) bırakıyoruz — yeni bir mekanizma değil, var
+      // olanın artık doğru koşulda devreye girmesi.
+      const bankVisualCategory = detectVisualCategory(topic)
+      if (bankQuestions.length === safeQCount && bankVisualCategory) {
+        const targetVisualRatio = isNewGenerationRequest(topic) ? 0.5 : 0.3
+        const neededReal = Math.max(1, Math.ceil(safeQCount * targetVisualRatio))
+        const realCount = bankQuestions.filter(hasRealVisualAsset).length
+        const deficit = Math.max(0, neededReal - realCount)
+        if (deficit > 0) {
+          let removed = 0
+          bankQuestions = bankQuestions.filter((question: any) => {
+            if (removed < deficit && !hasRealVisualAsset(question)) { removed++; return false }
+            return true
+          })
+          console.log(`[question-bank] konu="${topic}" gerçek görsel oranı yetersiz (real=${realCount}, hedef=${neededReal}); ${removed} görselsiz soru çıkarılıp AI tamamlamasına bırakıldı`)
+        }
+      }
+
+      if (bankQuestions.length === safeQCount && usageSessionId) {
+        const mappedCount = bankQuestions.filter((question: any) => question?.objectiveMappingStatus === 'mapped').length
+>>>>>>> gorsel-havuz-duzeltmesi
         const { data: bankSession, error: bankSessionError } = await supabase
           .from('quiz_sessions')
           .insert({
