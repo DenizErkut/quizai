@@ -153,6 +153,11 @@ export type Database = {
           difficulty: string
           question: Json
           review_status: 'candidate' | 'approved' | 'rejected' | 'retired'
+          awaiting_expert_review: boolean
+          ai_provider: string | null
+          ai_model: string | null
+          ai_policy_version: string | null
+          promoted_at: string | null
           quality_score: number
           source_session_id: string | null
           source_engine: string | null
@@ -173,6 +178,11 @@ export type Database = {
           difficulty: string
           question: Json
           review_status?: 'candidate' | 'approved' | 'rejected' | 'retired'
+          awaiting_expert_review?: boolean
+          ai_provider?: string | null
+          ai_model?: string | null
+          ai_policy_version?: string | null
+          promoted_at?: string | null
           quality_score?: number
           source_session_id?: string | null
           source_engine?: string | null
@@ -184,6 +194,8 @@ export type Database = {
         }
         Update: {
           review_status?: 'candidate' | 'approved' | 'rejected' | 'retired'
+          awaiting_expert_review?: boolean
+          promoted_at?: string | null
           quality_score?: number
           use_count?: number
           report_count?: number
@@ -613,6 +625,10 @@ export type Database = {
       mark_question_bank_used: {
         Args: { p_ids: string[] }
         Returns: undefined
+      }
+      promote_shadow_reviewed_question_bank_candidates: {
+        Args: { p_shadow_hours?: number }
+        Returns: number
       }
       refresh_student_learning_profile: {
         Args: { p_student_id: string }

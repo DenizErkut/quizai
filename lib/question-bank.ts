@@ -195,6 +195,28 @@ export async function getQuestionBankSet(
   })))
 }
 
+// source.engine'deki kaba etiketten (örn. 'claude-sonnet', 'gpt-4.1-mini',
+// 'mistral-large') sağlayıcıyı çıkarır — provenance için. Bilinmeyen/boş
+// etiketlerde null döner, hiçbir şey uydurulmaz.
+function providerFromEngine(engine: string | undefined): string | null {
+  const key = String(engine || '').toLocaleLowerCase('tr-TR')
+  if (key.startsWith('claude')) return 'anthropic'
+  if (key.startsWith('gpt')) return 'openai'
+  if (key.startsWith('mistral')) return 'mistral'
+  if (key.startsWith('gemini')) return 'google'
+  return null
+}
+
+// 23 Eylül 2026 — Pratium uyum raporu (Tema 3, agent kimlik/izin ayrımı):
+// bu fonksiyon AI-üretimi soruları artık DOĞRUDAN 'approved' yazmıyor.
+// learning-graph-suggest'teki "AI asla canlıya kendi başına yazmaz"
+// deseninin bir benzeri: yeni sorular 'candidate' + awaiting_expert_review
+// = false olarak yazılır; supabase/migrations/20260923090000_question_bank_
+// shadow_review.sql'deki RPC, hiç rapor almadan gölge süresini (varsayılan
+// 48 saat) dolduran satırları otomatik 'approved'a yükseltir. Bir öğrenci
+// raporu (report-question) veya öğretmen düzeltmesi (question-bank-review)
+// bu satırı awaiting_expert_review=true ile candidate'e düşürürse, artık
+// SADECE bir insan approved/rejected kararı verebilir.
 export async function promoteQuestionsToBank(
   db: AnyDb,
   dimensions: QuestionBankDimensions,
@@ -223,7 +245,11 @@ export async function promoteQuestionsToBank(
         question_type: dimensions.questionType,
         difficulty: dimensions.difficulty,
         question: bankQuestion,
-        review_status: 'approved',
+        review_status: 'candidate',
+        awaiting_expert_review: false,
+        ai_provider: providerFromEngine(source.engine),
+        ai_model: source.engine || null,
+        ai_policy_version: 'question-bank-shadow-review-v1',
         quality_score: 1,
         source_session_id: source.sessionId || null,
         source_engine: source.engine || null,
