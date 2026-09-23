@@ -37,6 +37,7 @@ import { runMistralShadowComparison, MistralAdapter, isProviderConfigured } from
 import { balanceAnswerPositions, getQuestionBankSet, promoteQuestionsToBank, questionBankKey } from '@/lib/question-bank'
 import { decideQuizProvider, getQuizProviderPolicy, QUIZ_PROVIDER_POLICY_VERSION } from '@/lib/quiz-provider-policy'
 import { attachQuestionRigorMetadata, summarizeQuestionSetRigor } from '@/lib/question-rigor'
+import { verifyVisualWithMistral } from '@/lib/mistral-quality'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -416,13 +417,14 @@ The student must figure out the answer from the question, NOT from your diagram.
 
 type VisualContextQuality = { passed: boolean; score: number; reason: string }
 
-async function visualMatchesQuestion(questionText: string, svg: string): Promise<VisualContextQuality> {
+async function visualMatchesQuestion(questionText: string, svg: string, correctAnswer: string): Promise<VisualContextQuality> {
   try {
     // Genel konu benzerliği yeterli değildir: bağlam, soru ve SVG'nin
     // nesne/sayı/birim/etiket ilişkisi 100 üzerinden ayrı denetlenir.
-    const raw = await callOpenAI([
+    const [raw, mistralReview] = await Promise.all([
+      callOpenAI([
       { role: 'system', content: 'You are a strict K-12 visual-question QA gate. Return only valid JSON.' },
-      { role: 'user', content: `Score the SVG against the exact question. Check scenario/context, every object, quantity, unit, label and relationship. A generic topic match is NOT enough. The SVG must not reveal the answer. Return exactly {"score":0-100,"contextMatch":boolean,"answerLeak":boolean,"reason":"short Turkish reason"}.\n\nQUESTION:\n${questionText}\n\nSVG:\n${svg.slice(0, 9000)}` },
+      { role: 'user', content: `Score the SVG against the exact question. Check scenario/context, every object, quantity, unit, label and relationship. Verify graph/axis values mathematically. A generic topic match is NOT enough. The SVG must not reveal the answer and must add useful information instead of merely repeating the question. Return exactly {"score":0-100,"contextMatch":boolean,"answerLeak":boolean,"useful":boolean,"reason":"short Turkish reason"}.\n\nQUESTION:\n${questionText}\n\nCORRECT ANSWER (must not be shown):\n${correctAnswer}\n\nSVG:\n${svg.slice(0, 9000)}` },
     ], {
       model: process.env.OPENAI_VISUAL_VALIDATOR_MODEL || process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini',
       max_tokens: 120,
@@ -430,13 +432,20 @@ async function visualMatchesQuestion(questionText: string, svg: string): Promise
       operation: 'visual-question:validate',
       timeoutMs: 15000,
       json: true,
-    })
-    const result = JSON.parse(raw) as { score?: unknown; contextMatch?: unknown; answerLeak?: unknown; reason?: unknown }
+      }),
+      verifyVisualWithMistral({ questionText, correctAnswer, svg }),
+    ])
+    const result = JSON.parse(raw) as { score?: unknown; contextMatch?: unknown; answerLeak?: unknown; useful?: unknown; reason?: unknown }
     const score = Number(result.score)
     const reason = typeof result.reason === 'string' ? result.reason.slice(0, 240) : 'Görsel bağlamı doğrulanamadı.'
-    const passed = Number.isFinite(score) && score >= 90 && result.contextMatch === true && result.answerLeak !== true
-    if (!passed) console.warn(`[visual-validation] OpenAI rejected SVG score=${score}: ${reason}`)
-    return { passed, score: Number.isFinite(score) ? score : 0, reason }
+    const openAIPassed = Number.isFinite(score) && score >= 90 && result.contextMatch === true && result.answerLeak !== true && result.useful !== false
+    const passed = openAIPassed && (mistralReview?.passed ?? true)
+    const combinedScore = mistralReview ? Math.min(Number.isFinite(score) ? score : 0, mistralReview.score) : (Number.isFinite(score) ? score : 0)
+    const combinedReason = mistralReview
+      ? `OpenAI: ${reason} | Mistral: ${mistralReview.reason}`.slice(0, 480)
+      : reason
+    if (!passed) console.warn(`[visual-validation] rejected SVG openai=${score} mistral=${mistralReview?.score ?? 'unavailable'}: ${combinedReason}`)
+    return { passed, score: combinedScore, reason: combinedReason }
   } catch (error) {
     console.error('[visual-validation] error:', error)
     return { passed: false, score: 0, reason: 'Görsel kalite denetimi tamamlanamadı.' }
@@ -488,16 +497,23 @@ async function generateVisualForQuestion(
     if (q.type === 'true_false' || q.type === 'short_answer' || q.type === 'multi_true_false') {
       return null
     }
+    // Doğru cevabı iki bağımsız görsel denetçiye veririz; ikisi de cevabın
+    // görselde açıkça görünmediğini kontrol eder.
+    const correctAnswer = q.opts?.[q.ans] || q.blank || q.correctOrder || ''
     // 21 Eylül 2026 — DETERMİNİSTİK GRAFİK YOLU (bkz. lib/chart-svg.ts): model
     // bu soru için geçerli bir "chartData" ürettiyse, AI'ya hiç SVG
     // yazdırmadan, doğrudan bu veriden çizilir. AI çağrısı yok → kesilme,
-    // bağlam uyuşmazlığı veya cevap ifşası riski yok, bu yüzden ayrıca
-    // visualMatchesQuestion QA çağrısına da gerek yok (veri zaten sorunun
-    // kendisinden geliyor). chartData YOKSA ya da bozuksa (validateChartData
-    // reddeder) sessizce aşağıdaki eski AI-SVG yoluna düşülür — regresyon yok.
+    // çizim kayması riskini düşürür. Ancak chartData da model çıktısı olduğu
+    // için soru ile semantik uyumu artık OpenAI + Mistral Vision tarafından
+    // render edilmiş gerçek PNG üzerinden doğrulanır.
     if (category === 'math_graph' && q.chartData && validateChartData(q.chartData)) {
       const svg = renderChartSVG(q.chartData)
-      if (svg) return { svg, contextQuality: { passed: true, score: 100, reason: 'deterministic-chart' } }
+      if (svg) {
+        const contextQuality = await visualMatchesQuestion(q.q, svg, String(correctAnswer))
+        if (contextQuality.passed) return { svg, contextQuality }
+        console.warn('[generate-visual] deterministic chart rejected by visual validators')
+        return null
+      }
     }
     // Soru metni şekil/görsel gerektiriyor mu kontrol et
     const qText = (q.q || '').toLowerCase()
@@ -507,8 +523,6 @@ async function generateVisualForQuestion(
     if (category !== 'math_graph' && !needsVisual && !hasShape) {
       return null
     }
-    // Doğru cevabı prompt'a ekle — "bunu YAZMA" diye belirt
-    const correctAnswer = q.opts?.[q.ans] || q.blank || q.correctOrder || ''
     const prompt = buildSVGPrompt(category, topic, q.q, grade, String(correctAnswer))
     // Soruya özgü eğitim görsellerinin üretimi OpenAI'ye taşındı. SVG, grafik,
     // tablo ve denklem gibi ölçülebilir içeriklerde raster görsele göre sayısal
@@ -561,7 +575,7 @@ async function generateVisualForQuestion(
     // SVG'yi temizle — sadece <svg...></svg> al
     const match = text.match(/<svg[\s\S]*<\/svg>/i)
     if (match) {
-      const contextQuality = await visualMatchesQuestion(q.q, match[0])
+      const contextQuality = await visualMatchesQuestion(q.q, match[0], String(correctAnswer))
       if (contextQuality.passed) return { svg: match[0], contextQuality }
     }
     if (match) console.warn('[generate-visual] rejected unrelated, low-context, or answer-revealing SVG')

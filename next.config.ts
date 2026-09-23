@@ -6,7 +6,8 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '25mb',
     },
   },
-  serverExternalPackages: ['pdf-parse'],
+  // Native Node bindings must stay external to Turbopack's ESM chunks.
+  serverExternalPackages: ['pdf-parse', '@resvg/resvg-js'],
 }
 
 export default nextConfig

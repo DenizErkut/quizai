@@ -9,6 +9,7 @@ import { verifyQuestionWithOpenAI } from '@/lib/openai'
 import { verifyQuestionWithGemini } from '@/lib/verify-gemini'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { decideQuestionQuality, evaluateQuestionStructure, providerQualitySignal } from '@/lib/ai-gateway'
+import { verifyQuestionWithMistral } from '@/lib/mistral-quality'
 
 const anthropic = new Anthropic()
 
@@ -35,10 +36,12 @@ Explanation: ${q.exp || '—'}
 Check:
 1. Is the question clear and unambiguous?
 2. Is the claimed answer actually correct?
-3. Are the wrong options plausible but clearly wrong?
-4. Are the question and options predominantly in the expected language?
-5. Is every referenced underline/highlight visibly marked with [square brackets]?
-6. Does the question require meaningful use of the target knowledge rather than a trivial wording/recall trick, and are all distractors realistic student misconceptions? Reject trivial or implausible-option questions.
+3. Is there EXACTLY ONE defensible correct option? Reject if two options express the same valid reason from different angles.
+4. Does the wording of the claimed option agree with the explanation? Reject when the explanation describes the opposite operation/error from the selected option.
+5. Are the wrong options plausible but clearly wrong?
+6. Are the question and options predominantly in the expected language?
+7. Is every referenced underline/highlight visibly marked with [square brackets]?
+8. Does the question require meaningful use of the target knowledge rather than a trivial wording/recall trick, and are all distractors realistic student misconceptions? Reject trivial or implausible-option questions.
 
 Respond ONLY with JSON: {"ok": true} or {"ok": false, "reason": "brief reason", "fix": "correct answer if wrong"}`
 
@@ -221,7 +224,7 @@ export async function POST(req: NextRequest) {
           // PARALEL calistir - sirali calistirmak toplam gecikmeyi ikiye
           // katliyordu ve generate-quiz'in 60sn'lik zaman asimina neden
           // oluyordu.
-          const [primaryCheck, geminiCheck] = await Promise.all([
+          const [primaryCheck, geminiCheck, mistralCheck] = await Promise.all([
             isMathQuestion(q)
               ? verifyQuestionWithOpenAI(verifyPrompt)
               : (async () => {
@@ -236,11 +239,13 @@ export async function POST(req: NextRequest) {
                   return match ? JSON.parse(match[0]) : { ok: true }
                 })(),
             verifyQuestionWithGemini(verifyPrompt),
+            verifyQuestionWithMistral(verifyPrompt),
           ])
 
           const providerDecision = decideQuestionQuality([
             providerQualitySignal(isMathQuestion(q) ? 'openai-validator' : 'anthropic-validator', primaryCheck),
             providerQualitySignal('gemini-validator', geminiCheck),
+            providerQualitySignal('mistral-validator', mistralCheck),
           ])
 
           if (providerDecision.verdict === 'reject') {
@@ -286,7 +291,16 @@ Return ONLY valid JSON:
         const rMatch = rText.replace(/```json|```/g, '').trim().match(/\{[\s\S]*\}/)
         if (rMatch) {
           const parsed = JSON.parse(rMatch[0])
-          replacements = (parsed.questions || []).filter((q: any) => quickMathCheck(q))
+          const replacementCandidates = (parsed.questions || []).filter((q: any) =>
+            quickMathCheck(q) && evaluateQuestionStructure(q).verdict === 'accept'
+          )
+          const checkedReplacements = await Promise.all(replacementCandidates.map(async (q: any) => ({
+            question: q,
+            review: await verifyQuestionWithMistral(buildVerifyPrompt(q, lang)),
+          })))
+          replacements = checkedReplacements
+            .filter(({ review }) => review?.ok !== false)
+            .map(({ question }) => question)
         }
       } catch {
         // Replacement failed

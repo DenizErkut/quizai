@@ -1,12 +1,17 @@
 import { logAIUsage } from '@/lib/ai-usage'
 import type { AIProviderAdapter, IntelligenceRequestContext } from '../contracts'
 
+export type MistralContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: string }
+
 export interface MistralChatRequest {
-  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string | MistralContentPart[] }>
   model?: string
   maxTokens?: number
   temperature?: number
   json?: boolean
+  timeoutMs?: number
 }
 
 export interface MistralChatResponse {
@@ -39,7 +44,7 @@ export class MistralAdapter implements AIProviderAdapter<MistralChatRequest, Mis
         temperature: request.temperature ?? 0.3,
         response_format: request.json ? { type: 'json_object' } : undefined,
       }),
-      signal: AbortSignal.timeout(45000),
+      signal: AbortSignal.timeout(request.timeoutMs || 45000),
     })
     if (!response.ok) throw new Error(`MISTRAL_HTTP_${response.status}`)
     const data = await response.json()
