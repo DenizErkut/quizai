@@ -124,3 +124,4 @@ CREATE TRIGGER qualify_referral_after_paid_subscription
   FOR EACH ROW
   WHEN (OLD.status IS DISTINCT FROM 'active' AND NEW.status = 'active')
   EXECUTE FUNCTION public.qualify_referral_on_paid_subscription();
+
