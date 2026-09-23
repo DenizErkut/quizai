@@ -291,9 +291,9 @@ function visualPedagogyInstruction(topic: string, count: number): string {
 // (bkz. lib/chart-svg.ts açıklaması) — bunun yerine küçük, kesin bir
 // "chartData" JSON nesnesi istiyoruz, bir çizim motoru bunu HER ZAMAN doğru
 // ve tutarlı şekilde çiziyor. chartData göndermezse ya da bozuk gönderirse
-// (validateChartData reddeder) eski AI-SVG yoluna otomatik geri düşülüyor —
-// bu yüzden bu talimat SADECE math_graph'ta ekleniyor ve diğer tüm kategori/
-// soru tiplerinde hiçbir token maliyeti eklemiyor.
+// üretim sonrasında yalnızca veri nesnesi bir kez onarılır; math_graph için
+// serbest AI-SVG yoluna geri dönülmez. Böylece yanlış eksen/değer uyduran
+// görseller sırf görsel kotasını doldurmak için öğrenciye gösterilemez.
 function chartDataInstruction(category: string | null): string {
   if (category !== 'math_graph') return ''
   return `\n\nGRAFİK VERİSİ (chartData) KURALI: Bu konu koordinat/sayı doğrusu/istatistik grafiği kategorisinde. Görsel gerektirdiğini belirttiğin HER soruya, sorunun içeriğiyle BİREBİR uyumlu bir "chartData" alanı ekle — bu veri bir çizim motoru tarafından OTOMATİK çizilecek, SEN SVG/ÇİZİM ÜRETMEYECEKSİN, sadece veriyi ver. chartData eklemediğin sorularda görsel üretilmeyecek. Tam olarak şu 5 tipten birini kullan, başka alan/tip EKLEME:
@@ -417,6 +417,33 @@ The student must figure out the answer from the question, NOT from your diagram.
 
 type VisualContextQuality = { passed: boolean; score: number; reason: string }
 
+async function repairChartDataForQuestion(q: any, topic: string, grade: string): Promise<any | null> {
+  try {
+    const raw = await callOpenAI([
+      {
+        role: 'system',
+        content: 'You convert an exact Turkish K-12 question into strict chart data. Return only valid JSON. Never invent a value or reveal the answer.',
+      },
+      {
+        role: 'user',
+        content: `QUESTION: ${String(q.q || '')}\nOPTIONS: ${JSON.stringify(q.opts || [])}\nTOPIC: ${topic}\nGRADE: ${grade}\n\nReturn {"chartData":...} using exactly one supported shape below, but ONLY when the question can be meaningfully solved/interpreted with that chart. Every value and label must already be explicitly given in the question. Do not plot the unknown or correct answer. If no faithful chart can be made, return {"chartData":null}.\n\nSupported shapes:\n1) {"type":"numberline","min":-10,"max":10,"points":[{"value":-3,"label":"A"}]}\n2) {"type":"coordinate","xMin":-5,"xMax":5,"yMin":-5,"yMax":5,"points":[{"x":2,"y":3,"label":"A"}],"lines":[{"points":[{"x":-5,"y":-5},{"x":5,"y":5}],"label":"y=x"}]}\n3) {"type":"bar","categories":["Pzt","Sal"],"series":[{"label":"Satış","values":[12,18]}],"unit":"adet"}\n4) {"type":"line","categories":["2021","2022"],"series":[{"label":"Nüfus","values":[100,120]}],"unit":"bin kişi"}\n5) {"type":"pie","segments":[{"label":"Elma","value":40},{"label":"Armut","value":60}]}`,
+      },
+    ], {
+      model: process.env.OPENAI_CHART_DATA_MODEL || process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini',
+      max_tokens: 550,
+      temperature: 0,
+      operation: 'visual-question:repair-chart-data',
+      timeoutMs: 15000,
+      json: true,
+    })
+    const parsed = JSON.parse(raw) as { chartData?: unknown }
+    return validateChartData(parsed.chartData) ? parsed.chartData : null
+  } catch (error) {
+    console.warn('[generate-visual] chartData repair failed:', error)
+    return null
+  }
+}
+
 async function visualMatchesQuestion(questionText: string, svg: string, correctAnswer: string): Promise<VisualContextQuality> {
   try {
     // Genel konu benzerliği yeterli değildir: bağlam, soru ve SVG'nin
@@ -500,20 +527,29 @@ async function generateVisualForQuestion(
     // Doğru cevabı iki bağımsız görsel denetçiye veririz; ikisi de cevabın
     // görselde açıkça görünmediğini kontrol eder.
     const correctAnswer = q.opts?.[q.ans] || q.blank || q.correctOrder || ''
-    // 21 Eylül 2026 — DETERMİNİSTİK GRAFİK YOLU (bkz. lib/chart-svg.ts): model
-    // bu soru için geçerli bir "chartData" ürettiyse, AI'ya hiç SVG
-    // yazdırmadan, doğrudan bu veriden çizilir. AI çağrısı yok → kesilme,
-    // çizim kayması riskini düşürür. Ancak chartData da model çıktısı olduğu
-    // için soru ile semantik uyumu artık OpenAI + Mistral Vision tarafından
-    // render edilmiş gerçek PNG üzerinden doğrulanır.
-    if (category === 'math_graph' && q.chartData && validateChartData(q.chartData)) {
-      const svg = renderChartSVG(q.chartData)
+    // 21 Eylül 2026 — DETERMİNİSTİK GRAFİK YOLU (bkz. lib/chart-svg.ts).
+    // Ana üretim chartData'yı atladıysa veriyi bir kez yapılandırılmış JSON
+    // olarak onarırız. Onarım da mümkün değilse görseli atlarız; math_graph
+    // kategorisinde serbest SVG'ye düşmek yasaktır.
+    if (category === 'math_graph') {
+      let chartData = validateChartData(q.chartData) ? q.chartData : null
+      if (!chartData && !q.__chartDataRepairAttempted) {
+        Object.defineProperty(q, '__chartDataRepairAttempted', { value: true, writable: true, enumerable: false })
+        chartData = await repairChartDataForQuestion(q, topic, grade)
+        if (chartData) q.chartData = chartData
+      }
+      if (!chartData) {
+        console.warn('[generate-visual] math_graph question has no faithful chartData; free-form SVG fallback disabled')
+        return null
+      }
+      const svg = renderChartSVG(chartData)
       if (svg) {
         const contextQuality = await visualMatchesQuestion(q.q, svg, String(correctAnswer))
         if (contextQuality.passed) return { svg, contextQuality }
         console.warn('[generate-visual] deterministic chart rejected by visual validators')
         return null
       }
+      return null
     }
     // Soru metni şekil/görsel gerektiriyor mu kontrol et
     const qText = (q.q || '').toLowerCase()
