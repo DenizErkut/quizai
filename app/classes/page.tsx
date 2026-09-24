@@ -10,7 +10,6 @@ interface ClassRoom {
   name: string
   subject: string
   description: string | null
-  invite_code: string
   created_at: string
   teacher_id: string
   teacher_name?: string
@@ -60,46 +59,24 @@ export default function ClassesPage() {
     if (!user) { router.push('/login'); return }
     setMyUserId(user.id)
 
-    // classroom_students üzerinden katıldığım sınıfları bul
-    const { data: memberships } = await supabase
-      .from('classroom_students')
-      .select('classroom_id, joined_at')
-      .eq('student_id', user.id)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { setLoading(false); router.push('/login'); return }
+    const response = await fetch('/api/classrooms/membership?includeRoster=1', {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+    if (!response.ok) { setLoading(false); return }
+    const { classes: classData = [] } = await response.json()
+    if (!classData.length) { setLoading(false); return }
 
-    if (!memberships?.length) { setLoading(false); return }
-
-    const classIds = memberships.map((m: any) => m.classroom_id)
-
-    // classrooms tablosundan sınıf bilgilerini çek
-    const { data: classData } = await supabase
-      .from('classrooms')
-      .select('*')
-      .in('id', classIds)
-      .order('created_at', { ascending: false })
-
-    if (!classData?.length) { setLoading(false); return }
-
-    // Her sınıf için öğrenci listesini ve öğretmen adını çek
-    // (isimler TR-PG'den, grade/plan Supabase'den)
-    const enriched = await Promise.all(classData.map(async (cls: any) => {
-      const { data: students } = await supabase.from('classroom_students')
-        .select('student_id, joined_at, profiles(grade, plan)')
-        .eq('classroom_id', cls.id)
-
-      const identities = await resolveIdentities(supabase, [cls.teacher_id, ...(students || []).map((s: any) => s.student_id)])
-
-      return {
-        ...cls,
-        teacher_name: identities[cls.teacher_id]?.full_name || '—',
-        student_count: students?.length || 0,
-        students: (students || []).map((s: any) => ({
-          id: s.student_id,
-          name: identities[s.student_id]?.full_name || 'İsimsiz',
-          grade: s.profiles?.grade || '—',
-          plan: s.profiles?.plan || 'free',
-          joined_at: s.joined_at,
-        })),
-      }
+    const userIds = classData.flatMap(cls => [cls.teacher_id, ...(cls.students || []).map(student => student.id)])
+    const identities = await resolveIdentities(supabase, userIds)
+    const enriched = classData.map(cls => ({
+      ...cls,
+      teacher_name: identities[cls.teacher_id]?.full_name || '—',
+      students: (cls.students || []).map(student => ({
+        ...student,
+        name: identities[student.id]?.full_name || 'İsimsiz',
+      })),
     }))
 
     setClasses(enriched)
@@ -111,42 +88,18 @@ export default function ClassesPage() {
     setJoinError('')
     setJoinLoading(true)
 
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { router.push('/login'); setJoinLoading(false); return }
     const code = joinCode.trim().toUpperCase()
-
-    const { data: cls } = await supabase
-      .from('classrooms')
-      .select('id, name, subject')
-      .eq('invite_code', code)
-      .maybeSingle()
-
-    if (!cls) {
-      setJoinError('Geçersiz kod. Öğretmeninden doğru kodu iste.')
-      setJoinLoading(false)
-      return
-    }
-
-    const { data: existing } = await supabase
-      .from('classroom_students')
-      .select('classroom_id')
-      .eq('classroom_id', cls.id)
-      .eq('student_id', user.id)
-      .maybeSingle()
-
-    if (existing) {
-      setJoinError('Bu sınıfa zaten kayıtlısın.')
-      setJoinLoading(false)
-      return
-    }
-
-    const { error } = await supabase.from('classroom_students').insert({
-      classroom_id: cls.id,
-      student_id: user.id,
+    const response = await fetch('/api/classrooms/join', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
     })
-
-    if (error) {
-      setJoinError('Bir hata oluştu, tekrar dene.')
-    } else {
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok) setJoinError(result.error || 'Bir hata oluştu, tekrar dene.')
+    else if (result.alreadyJoined) setJoinError('Bu sınıfa zaten kayıtlısın.')
+    else {
       setJoinCode('')
       setShowJoin(false)
       await loadClasses()

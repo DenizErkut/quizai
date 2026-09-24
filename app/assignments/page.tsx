@@ -19,21 +19,21 @@ export default function StudentAssignmentsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    // My classrooms
-    const { data: memberships } = await supabase
-      .from('classroom_students')
-      .select('classroom_id, classrooms(id, name, teacher_id)')
-      .eq('student_id', user.id)
-
-    const classroomIds = (memberships || []).map((m: any) => m.classroom_id)
-    setMyClasses((memberships || []).map((m: any) => m.classrooms))
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { setLoading(false); router.push('/login'); return }
+    const membershipsResponse = await fetch('/api/classrooms/membership', {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+    const { classes = [] } = membershipsResponse.ok ? await membershipsResponse.json() : {}
+    const classroomIds = classes.map(classroom => classroom.id)
+    setMyClasses(classes)
 
     if (classroomIds.length === 0) { setLoading(false); return }
 
     // Assignments for my classrooms
     const { data: asgn } = await supabase
       .from('assignments')
-      .select('*, classrooms(name)')
+      .select('*')
       .in('classroom_id', classroomIds)
       .order('created_at', { ascending: false })
 
@@ -44,7 +44,11 @@ export default function StudentAssignmentsPage() {
       .eq('student_id', user.id)
 
     const completedIds = new Set((comp || []).map((c: any) => c.assignment_id))
-    const active = (asgn || []).filter((a: any) => !completedIds.has(a.id))
+    const classNames = new Map(classes.map(classroom => [classroom.id, classroom.name]))
+    const active = (asgn || []).map(assignment => ({
+      ...assignment,
+      classrooms: { name: classNames.get(assignment.classroom_id) || 'Sınıf' },
+    })).filter((a: any) => !completedIds.has(a.id))
     const completed = (comp || [])
 
     setAssignments(active)

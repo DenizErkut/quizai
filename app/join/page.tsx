@@ -25,21 +25,20 @@ function JoinContent() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setCheckingMembership(false); return }
 
-    // Get classes the user is a member of (öğretmen adı TR-PG'den)
-    const { data: memberships } = await supabase
-      .from('classroom_students')
-      .select('classroom_id, joined_at, classrooms(id, name, invite_code, grade, teachers(user_id, school))')
-      .eq('student_id', user.id)
-
-    const teacherUserIds = (memberships || []).map((m: any) => m.classrooms?.teachers?.user_id).filter(Boolean)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { setCheckingMembership(false); return }
+    const response = await fetch('/api/classrooms/membership', {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+    const { classes = [] } = response.ok ? await response.json() : {}
+    const teacherUserIds = classes.map(classroom => classroom.teachers?.user_id).filter(Boolean)
     const teacherIdentities = await resolveIdentities(supabase, teacherUserIds)
 
-    setMyClasses((memberships || []).map((m: any) => ({
-      ...m.classrooms,
-      teachers: m.classrooms?.teachers
-        ? { ...m.classrooms.teachers, name: teacherIdentities[m.classrooms.teachers.user_id]?.full_name || null }
+    setMyClasses(classes.map(classroom => ({
+      ...classroom,
+      teachers: classroom.teachers
+        ? { ...classroom.teachers, name: teacherIdentities[classroom.teachers.user_id]?.full_name || null }
         : null,
-      joined_at: m.joined_at,
     })))
     setCheckingMembership(false)
 
@@ -53,16 +52,21 @@ function JoinContent() {
     if (!joinCode || joinCode.length < 4) { setError('Geçerli bir kod gir.'); return }
     setLoading(true); setError('')
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { router.push('/login'); setLoading(false); return }
 
-    const { data: classroomRaw } = await supabase
-      .from('classrooms')
-      .select('*, teachers(user_id, school)')
-      .eq('invite_code', joinCode)
-      .single()
-
-    if (!classroomRaw) { setError('Bu koda ait sınıf bulunamadı.'); setLoading(false); return }
+    const response = await fetch('/api/classrooms/join', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: joinCode }),
+    })
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok || !result.classroom) {
+      setError(result.error || 'Sınıfa katılım tamamlanamadı.')
+      setLoading(false)
+      return
+    }
+    const classroomRaw = result.classroom
 
     // Öğretmen adı TR-PG'den
     const teacherName = classroomRaw.teachers?.user_id
@@ -73,18 +77,7 @@ function JoinContent() {
       teachers: classroomRaw.teachers ? { ...classroomRaw.teachers, name: teacherName } : null,
     }
 
-    const { data: existing } = await supabase
-      .from('classroom_students')
-      .select('classroom_id')
-      .eq('classroom_id', classroom.id)
-      .eq('student_id', user.id)
-      .single()
-
-    if (existing) { setAlreadyJoined(true); setSuccess(classroom); setLoading(false); return }
-
-    await supabase.from('classroom_students').insert({
-      classroom_id: classroom.id, student_id: user.id
-    })
+    if (result.alreadyJoined) { setAlreadyJoined(true); setSuccess(classroom); setLoading(false); return }
 
     setSuccess(classroom)
     setMyClasses(prev => [...prev, { ...classroom, joined_at: new Date().toISOString() }])
@@ -170,7 +163,7 @@ function JoinContent() {
                     <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)' }}>{cls.name}</div>
                     <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>
                       {cls.teachers?.name && `${cls.teachers.name} · `}
-                      Kod: <span style={{ fontWeight: 700, letterSpacing: '0.1em' }}>{cls.invite_code}</span>
+                      {cls.subject || 'Sınıf'}
                     </div>
                   </div>
                   <button onClick={() => leaveClass(cls.id)}
