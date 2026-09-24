@@ -9,6 +9,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { buildIntelligenceRoutePlan } from '@/lib/ai-gateway'
 import { logAnthropicUsage } from '@/lib/ai-usage'
+import { requireAgentCapability, writeAgentDecisionAudit } from '@/lib/agent-security-policy'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -63,6 +64,9 @@ SADECE şu JSON formatında yanıt ver, başka hiçbir metin ekleme:
 }
 
 export async function POST(req: NextRequest) {
+  const agent = 'learning-graph-proposer-v1' as const
+  requireAgentCapability(agent, 'read_curriculum')
+  requireAgentCapability(agent, 'propose_content_draft')
   const user = await getAdminUser()
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
@@ -142,6 +146,7 @@ export async function POST(req: NextRequest) {
     const droppedCount = (parsed.relations?.length || 0) - validRelations.length
 
     if (validRelations.length === 0) {
+      await writeAgentDecisionAudit(adminDb, { actor_id: user.id, agent_name: agent, policy_version: 'expert-package-only-v1', input_summary: { curriculum_id: curriculum.id, candidate_count: parsed.relations?.length || 0 }, decision_summary: { inserted: 0, dropped: droppedCount, requires_human_approval: true } })
       return NextResponse.json({
         success: true, inserted: 0, dropped: droppedCount,
         message: 'AI hiçbir geçerli ön koşul ilişkisi önermedi (ya da tüm öneriler listede olmayan konular içerdiği için elendi).',
@@ -164,6 +169,14 @@ export async function POST(req: NextRequest) {
     if (provenanceError) {
       await adminDb.from('learning_graph_prerequisite_packages').delete().eq('id', packageId)
       return NextResponse.json({ error: `AI kaynak kaydı oluşturulamadı: ${provenanceError.message}` }, { status: 500 })
+    }
+
+    try {
+      await writeAgentDecisionAudit(adminDb, { actor_id: user.id, agent_name: agent, policy_version: 'expert-package-only-v1', input_summary: { curriculum_id: curriculum.id, candidate_count: parsed.relations?.length || 0 }, decision_summary: { inserted: validRelations.length, dropped: droppedCount, requires_human_approval: true } })
+    } catch {
+      const { error: rollbackError } = await adminDb.from('learning_graph_prerequisite_packages').delete().eq('id', packageId)
+      console.error('[learning-graph-suggest] audit write failed; pending package rollback:', rollbackError?.message || 'ok')
+      return NextResponse.json({ error: rollbackError ? 'Denetim kaydı yazılamadı; öneri paketi temizlenemedi ve insan incelemesi yapılmadan kullanılmamalı.' : 'Denetim kaydı yazılamadığı için öneri paketi iptal edildi.' }, { status: 503 })
     }
 
     return NextResponse.json({

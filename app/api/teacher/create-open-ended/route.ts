@@ -86,11 +86,11 @@ SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir açıklama eklem
 Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
 }
 
-async function searchMebContext(origin: string, subject: string, topic: string, grade: string, level: string): Promise<string> {
+async function searchMebContext(origin: string, subject: string, topic: string, grade: string, level: string, accessToken: string): Promise<string> {
   try {
     const mebRes = await fetch(`${origin}/api/meb-search`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({ topic, grade, subject, unit: topic, level, limit: 2 }),
       signal: AbortSignal.timeout(3000),
     })
@@ -102,10 +102,10 @@ async function searchMebContext(origin: string, subject: string, topic: string, 
   return ''
 }
 
-async function generateWithAI(subject: string, topic: string, grade: string, origin: string, userId: string) {
+async function generateWithAI(subject: string, topic: string, grade: string, origin: string, userId: string, accessToken: string) {
   const effectiveGrade = grade || 'ortaokul 6. sınıf'
   const level = getLevel(effectiveGrade)
-  const mebContext = await searchMebContext(origin, subject, topic, effectiveGrade, level)
+  const mebContext = await searchMebContext(origin, subject, topic, effectiveGrade, level, accessToken)
   const prompt = buildPrompt(level, effectiveGrade, subject, topic, mebContext)
 
   // 22 Eylül 2026 — Deniz'in fark ettiği gibi bu uç nokta hâlâ SADECE Claude
@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Ders ve konu zorunlu.' }, { status: 400 })
       }
       try {
-        const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin, user.id)
+        const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin, user.id, token)
         return NextResponse.json(result)
       } catch (e: any) {
         return NextResponse.json({ error: e?.message || 'Soru üretilemedi, tekrar dene.' }, { status: 500 })
@@ -214,7 +214,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Yapay zeka için ders ve konu zorunlu.' }, { status: 400 })
       }
       try {
-        const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin, user.id)
+        const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin, user.id, token)
         scenario = result.scenario; question = result.question; rubric = result.rubric
       } catch (e: any) {
         return NextResponse.json({ error: e?.message || 'Soru üretilemedi, tekrar dene.' }, { status: 500 })

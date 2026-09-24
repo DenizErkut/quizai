@@ -5,6 +5,7 @@ import { getIdentityBySupabaseId } from '@/lib/identity/client'
 import { buildCoachContext, type CoachContext } from '@/lib/coach-context'
 import { generateCoachReply, type CoachTurn } from '@/lib/coach-generation'
 import { isPaidCoachPlan } from '@/lib/coach-access'
+import { requireAgentCapability, writeAgentDecisionAudit } from '@/lib/agent-security-policy'
 
 export const maxDuration = 120
 export const runtime = 'nodejs'
@@ -48,10 +49,15 @@ async function finish(id: string, workerId: string, status: 'completed' | 'skipp
 
 async function processJob(job: Job, workerId: string) {
   try {
-    const [{ data: profile }, { data: pref }] = await Promise.all([
+    const agent = 'student-coach-v1' as const
+    requireAgentCapability(agent, 'send_preference_enabled_in_app_nudge')
+    const [{ data: profile, error: profileError }, { data: pref, error: prefError }] = await Promise.all([
       db.from('profiles').select('grade,language,plan').eq('id', job.user_id).maybeSingle(),
       db.from('notification_preferences').select('coach_nudge').eq('user_id', job.user_id).maybeSingle(),
     ])
+    // Fail closed when preferences or profile cannot be read; never infer consent from an error.
+    if (profileError || prefError) throw new Error('profile_or_notification_preference_read_failed')
+    if (!profile) return finish(job.id, workerId, 'skipped', { reason: 'missing_profile' })
     if (!isPaidCoachPlan(profile?.plan) || pref?.coach_nudge === false) return finish(job.id, workerId, 'skipped', { reason: 'not_eligible' })
     const since = new Date(Date.now() - MIN_DAYS_BETWEEN_NUDGES * 86_400_000).toISOString()
     const { count } = await db.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', job.user_id).eq('type', 'coach_nudge').gte('created_at', since)
@@ -62,6 +68,13 @@ async function processJob(job: Job, workerId: string) {
     if (!reason) return finish(job.id, workerId, 'skipped', { reason: 'no_signal' })
     const nudge = await generate(ctx, reason, job.user_id)
     if (!nudge.text) throw new Error('empty_nudge')
+    await writeAgentDecisionAudit(db, {
+      actor_id: job.user_id,
+      agent_name: agent,
+      policy_version: 'coach-nudge-opt-in-v1',
+      input_summary: { event: 'in_app_nudge', reason, history_topic_count: ctx.history.topics.length },
+      decision_summary: { message_length: nudge.text.length, action_type: nudge.action?.type ?? null, target_user_id: job.user_id, cooldown_days: MIN_DAYS_BETWEEN_NUDGES },
+    })
     const conversationId = await conversation(job.user_id)
     const { error: messageError } = await db.from('coach_messages').insert({ conversation_id: conversationId, role: 'assistant', content: nudge.text, action: nudge.action })
     if (messageError) throw messageError

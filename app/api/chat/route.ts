@@ -6,18 +6,22 @@ import { createClient } from '@/lib/supabase/server-create-client'
 import { getTopicMastery } from '@/lib/mastery'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { inspectTutorInput, inspectTutorOutput } from '@/lib/tutor-safety'
+import { requireAgentCapability, requireOwnStudentScope, writeAgentDecisionAudit } from '@/lib/agent-security-policy'
 
 const client = new Anthropic()
 type TutorQuestion = { q: string; opts: string[]; ans: number; exp?: string; userAns?: number }
 type TutorAnswer = { userAns?: number; correct?: boolean }
 
 export async function POST(req: NextRequest) {
+  const agent = 'ai-tutor-v1' as const
+  requireAgentCapability(agent, 'return_user_facing_output')
   const authHeader = req.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   const token = authHeader.slice(7)
   const sbAuth = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
   const { data: { user } } = await sbAuth.auth.getUser(token)
   if (!user) return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 })
+  requireOwnStudentScope(agent, user.id, user.id)
   const adminDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
   // Rate limiting — 30 istek/gün
@@ -45,7 +49,11 @@ export async function POST(req: NextRequest) {
     const lastUserMessage = [...safeMessages].reverse().find(message => message.role === 'user')?.content || ''
     const inputSafety = inspectTutorInput(lastUserMessage)
     if ('code' in inputSafety) {
-      await adminDb.from('agent_decision_audit').insert({ actor_id:user.id, agent_name:'ai-tutor-v1', policy_version:'tutor-safety-v2', input_summary:{ safety_code:inputSafety.code, message_count:safeMessages.length }, decision_summary:{ blocked:true } })
+      try {
+        await writeAgentDecisionAudit(adminDb, { actor_id:user.id, agent_name:agent, policy_version:'tutor-safety-v2', input_summary:{ safety_code:inputSafety.code, message_count:safeMessages.length }, decision_summary:{ blocked:true } })
+      } catch {
+        return NextResponse.json({ error: 'Güvenlik kaydı yazılamadığı için yanıt durduruldu.' }, { status: 503 })
+      }
       return NextResponse.json({ reply:inputSafety.reply, policy_version:'tutor-safety-v2', safety_intervention:inputSafety.code, requires_teacher_review:inputSafety.code==='self_harm' })
     }
 
@@ -150,9 +158,9 @@ SOKRATİK ÖĞRETİM KURALLARI (interaktif sohbette geçerli — tek seferlik an
     const outputSafety = inspectTutorOutput(rawReply)
     const reply = 'code' in outputSafety ? outputSafety.reply : rawReply
     const requiresTeacherReview = /öğretmen onayı|not değiştir|puan değiştir|ödev ata|sınıf planı/i.test(reply)
+    await writeAgentDecisionAudit(adminDb, { actor_id: user.id, agent_name:agent, policy_version: 'tutor-safety-v3', input_summary: { topic, has_quiz_context: hasQuizContext, message_count: safeMessages.length, wrong_question_count: wrongQuestions.length }, decision_summary: { response_length: reply.length, requires_teacher_review: requiresTeacherReview, output_blocked:'code' in outputSafety } })
     await Promise.allSettled([
-      logAnthropicUsage('tutor-response', 'claude-sonnet-4-5', response, { userId: user.id, durationMs: Date.now() - startedAt, meta: { policy_version: 'tutor-safety-v2', has_quiz_context: hasQuizContext } }),
-      adminDb.from('agent_decision_audit').insert({ actor_id: user.id, agent_name: 'ai-tutor-v1', policy_version: 'tutor-safety-v2', input_summary: { topic, has_quiz_context: hasQuizContext, message_count: safeMessages.length, wrong_question_count: wrongQuestions.length }, decision_summary: { response_length: reply.length, requires_teacher_review: requiresTeacherReview, output_blocked:'code' in outputSafety } }),
+      logAnthropicUsage('tutor-response', 'claude-sonnet-4-5', response, { userId: user.id, durationMs: Date.now() - startedAt, meta: { policy_version: 'tutor-safety-v3', has_quiz_context: hasQuizContext } }),
     ])
     return NextResponse.json({ reply, policy_version: 'tutor-safety-v2', requires_teacher_review: requiresTeacherReview, safety_intervention:'code' in outputSafety?outputSafety.code:null })
   } catch (error) {

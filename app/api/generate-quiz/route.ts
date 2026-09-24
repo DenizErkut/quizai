@@ -1539,7 +1539,7 @@ export async function POST(req: NextRequest) {
       try {
         const mebRes = await fetch(`${req.nextUrl.origin}/api/meb-search`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ topic, grade, subject, unit: topic, level, limit: 2 }),
           signal: AbortSignal.timeout(3000), // 3sn — daha agresif timeout
         })
@@ -2003,7 +2003,7 @@ export async function POST(req: NextRequest) {
     const verifyResult = questions.length > 0
       ? await fetch(`${req.nextUrl.origin}/api/verify-questions`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ questions, topic, grade, language: effectiveLang, questionType }),
           signal: AbortSignal.timeout(40000),
         }).then(r => r.ok ? r.json() : null).catch(() => null)

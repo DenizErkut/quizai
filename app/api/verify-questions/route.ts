@@ -10,8 +10,11 @@ import { verifyQuestionWithGemini } from '@/lib/verify-gemini'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { decideQuestionQuality, evaluateQuestionStructure, providerQualitySignal } from '@/lib/ai-gateway'
 import { verifyQuestionWithMistral } from '@/lib/mistral-quality'
+import { requireAgentCapability, writeAgentDecisionAudit } from '@/lib/agent-security-policy'
+import { createClient } from '@supabase/supabase-js'
 
 const anthropic = new Anthropic()
+const auditDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 // Matematik icerikli soru mu - varsa bagimsiz kontrol icin OpenAI'a yonlendirilir
 // (Claude'un kendi urettigini yine Claude'a kontrol ettirmek yerine)
@@ -147,18 +150,15 @@ function checkBasamakQuestion(q: any): { ok: boolean; gercekCevap: string } | nu
 }
 
 export async function POST(req: NextRequest) {
-  // Internal secret (server-to-server) VEYA Bearer token kabul edilir
-  const internalSecret = req.headers.get('x-internal-secret')
-  const isInternal = internalSecret && internalSecret === (process.env.CRON_SECRET || 'internal')
-  if (!isInternal) {
-    const authHeader = req.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
-    const token = authHeader.slice(7)
-    const { createClient: cc } = require('@supabase/supabase-js')
-    const sbAuth = cc(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-    const { data: { user } } = await sbAuth.auth.getUser(token)
-    if (!user) return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 })
-  }
+  const agent = 'question-verifier-v1' as const
+  requireAgentCapability(agent, 'verify_content')
+  // Only a verified user token is accepted; do not use a service-role bypass here.
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  const token = authHeader.slice(7)
+  const sbAuth = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  const { data: { user } } = await sbAuth.auth.getUser(token)
+  if (!user) return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 })
 
   try {
     const { questions, topic, grade, language, questionType } = await req.json()
@@ -168,7 +168,9 @@ export async function POST(req: NextRequest) {
     // deterministik şema kontrolünden geçer.
     if (questionType === 'mixed') {
       const accepted = questions.filter((question: any) => evaluateQuestionStructure(question).verdict === 'accept')
-      return NextResponse.json({ questions: accepted, stats: { policyVersion: 'quality-engine-v1', original: questions.length, verified: accepted.length, rejected: questions.length - accepted.length, replacements: 0, final: accepted.length } })
+      const stats = { policyVersion: 'quality-engine-v1', original: questions.length, verified: accepted.length, rejected: questions.length - accepted.length, replacements: 0, final: accepted.length }
+      await writeAgentDecisionAudit(auditDb, { actor_id: user.id, agent_name: agent, policy_version: 'question-verification-boundary-v1', input_summary: { question_count: questions.length, question_type: 'mixed' }, decision_summary: { verified: accepted.length, rejected: stats.rejected } })
+      return NextResponse.json({ questions: accepted, stats })
     }
 
     const lang = language || 'Türkçe'
@@ -309,6 +311,8 @@ Return ONLY valid JSON:
 
     const final = [...verified, ...replacements].slice(0, questions.length)
 
+    await writeAgentDecisionAudit(auditDb, { actor_id: user.id, agent_name: agent, policy_version: 'question-verification-boundary-v1', input_summary: { question_count: questions.length, question_type: questionType || 'multiple_choice' }, decision_summary: { verified: verified.length, rejected: rejected.length, replacements: replacements.length, final: final.length } })
+
     return NextResponse.json({
       questions: final,
       stats: {
@@ -323,8 +327,6 @@ Return ONLY valid JSON:
     })
   } catch (error: any) {
     console.error('[verify-questions] error:', error?.message)
-    // Hata durumunda orijinal soruları döndür
-    const { questions } = await req.json().catch(() => ({ questions: [] }))
-    return NextResponse.json({ questions: questions || [] })
+    return NextResponse.json({ error: 'Soru doğrulaması veya denetim kaydı tamamlanamadı.' }, { status: 503 })
   }
 }
