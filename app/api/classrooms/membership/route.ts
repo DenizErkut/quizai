@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
 
   const { data: memberships, error } = await db
     .from('classroom_students')
-    .select('classroom_id, joined_at, classrooms(id, name, grade, subject, description, created_at, teacher_id, teachers(user_id, school))')
+    .select('classroom_id, joined_at, classrooms(id, name, grade, subject, created_at, teacher_id, teachers(user_id, school))')
     .eq('student_id', user.id)
     .order('joined_at', { ascending: false })
     .limit(100)
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
     const related = Array.isArray(membership.classrooms) ? membership.classrooms[0] : membership.classrooms
     if (!related) return []
     const teacher = Array.isArray(related.teachers) ? related.teachers[0] ?? null : related.teachers
-    return [{ ...related, teachers: teacher, joined_at: membership.joined_at }]
+    return [{ ...related, description: null, teachers: teacher, joined_at: membership.joined_at }]
   })
 
   if (req.nextUrl.searchParams.get('includeRoster') !== '1' || classes.length === 0) {
