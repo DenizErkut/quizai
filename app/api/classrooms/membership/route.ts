@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+export const dynamic = 'force-dynamic'
+
+function jsonNoStore(body: unknown, status = 200) {
+  return NextResponse.json(body, {
+    status,
+    headers: { 'Cache-Control': 'private, no-store, max-age=0' },
+  })
+}
 
 type TeacherRecord = { user_id: string; school: string | null } | null
 type ClassroomRecord = {
@@ -25,10 +33,10 @@ type RosterStudent = { id: string; joined_at: string; grade: string; plan: strin
 
 export async function GET(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  if (!token) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  if (!token) return jsonNoStore({ error: 'Yetkisiz.' }, 401)
 
   const { data: { user }, error: authError } = await db.auth.getUser(token)
-  if (authError || !user) return NextResponse.json({ error: 'Oturum geçersiz.' }, { status: 401 })
+  if (authError || !user) return jsonNoStore({ error: 'Oturum geçersiz.' }, 401)
 
   const { data: memberships, error } = await db
     .from('classroom_students')
@@ -39,7 +47,7 @@ export async function GET(req: NextRequest) {
 
   if (error) {
     console.error('[classrooms/membership] membership lookup failed:', error.message)
-    return NextResponse.json({ error: 'Sınıf bilgileri alınamadı.' }, { status: 500 })
+    return jsonNoStore({ error: 'Sınıf bilgileri alınamadı.' }, 500)
   }
 
   const membershipRows = (memberships ?? []) as MembershipRecord[]
@@ -51,7 +59,7 @@ export async function GET(req: NextRequest) {
   })
 
   if (req.nextUrl.searchParams.get('includeRoster') !== '1' || classes.length === 0) {
-    return NextResponse.json({ classes })
+    return jsonNoStore({ classes })
   }
 
   const classIds = classes.map((classroom) => classroom.id)
@@ -64,7 +72,7 @@ export async function GET(req: NextRequest) {
 
   if (rosterError) {
     console.error('[classrooms/membership] roster lookup failed:', rosterError.message)
-    return NextResponse.json({ error: 'Sınıf listesi alınamadı.' }, { status: 500 })
+    return jsonNoStore({ error: 'Sınıf listesi alınamadı.' }, 500)
   }
 
   const byClass = new Map<string, RosterStudent[]>()
@@ -80,7 +88,7 @@ export async function GET(req: NextRequest) {
     byClass.set(row.classroom_id, students)
   }
 
-  return NextResponse.json({
+  return jsonNoStore({
     classes: classes.map((classroom) => {
       const students = byClass.get(classroom.id) ?? []
       return { ...classroom, student_count: students.length, students }

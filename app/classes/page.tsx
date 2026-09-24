@@ -17,6 +17,10 @@ interface ClassRoom {
   students?: { id: string; name: string; grade: string; plan: string; joined_at: string }[]
 }
 
+type MembershipClass = Omit<ClassRoom, 'students'> & {
+  students?: { id: string; grade: string; plan: string; joined_at: string }[]
+}
+
 const SUBJECT_COLORS: Record<string, { bg: string; color: string; border: string }> = {
   'Matematik':  { bg: 'rgba(37,99,235,0.08)',  color: '#2563eb', border: 'rgba(37,99,235,0.2)' },
   'Türkçe':    { bg: 'rgba(124,58,237,0.08)', color: '#7c3aed', border: 'rgba(124,58,237,0.2)' },
@@ -43,6 +47,7 @@ export default function ClassesPage() {
   const router = useRouter()
   const [classes, setClasses] = useState<ClassRoom[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [myUserId, setMyUserId] = useState<string | null>(null)
   const [selectedClass, setSelectedClass] = useState<ClassRoom | null>(null)
   const [joinCode, setJoinCode] = useState('')
@@ -50,37 +55,50 @@ export default function ClassesPage() {
   const [joinLoading, setJoinLoading] = useState(false)
   const [showJoin, setShowJoin] = useState(false)
   const [shareResult, setShareResult] = useState(false)
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   useEffect(() => { loadClasses() }, [])
 
   async function loadClasses() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
-    setMyUserId(user.id)
+    setLoading(true)
+    setLoadError('')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+      setMyUserId(user.id)
 
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { setLoading(false); router.push('/login'); return }
-    const response = await fetch('/api/classrooms/membership?includeRoster=1', {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    })
-    if (!response.ok) { setLoading(false); return }
-    const { classes: classData = [] } = await response.json()
-    if (!classData.length) { setLoading(false); return }
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.push('/login'); return }
+      const response = await fetch('/api/classrooms/membership?includeRoster=1', {
+        cache: 'no-store',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}))
+        throw new Error(result.error || 'Sınıf bilgileri şu anda alınamıyor.')
+      }
+      const payload = await response.json() as { classes?: MembershipClass[] }
+      const classData = payload.classes ?? []
+      if (!classData.length) { setClasses([]); return }
 
-    const userIds = classData.flatMap(cls => [cls.teacher_id, ...(cls.students || []).map(student => student.id)])
-    const identities = await resolveIdentities(supabase, userIds)
-    const enriched = classData.map(cls => ({
-      ...cls,
-      teacher_name: identities[cls.teacher_id]?.full_name || '—',
-      students: (cls.students || []).map(student => ({
-        ...student,
-        name: identities[student.id]?.full_name || 'İsimsiz',
-      })),
-    }))
+      const userIds = classData.flatMap(cls => [cls.teacher_id, ...(cls.students || []).map(student => student.id)])
+      const identities = await resolveIdentities(supabase, userIds)
+      const enriched = classData.map(cls => ({
+        ...cls,
+        teacher_name: identities[cls.teacher_id]?.full_name || '—',
+        students: (cls.students || []).map(student => ({
+          ...student,
+          name: identities[student.id]?.full_name || 'İsimsiz',
+        })),
+      }))
 
-    setClasses(enriched)
-    setLoading(false)
+      setClasses(enriched)
+    } catch (error) {
+      console.error('[classes] sınıf listesi alınamadı:', error)
+      setLoadError(error instanceof Error ? error.message : 'Sınıf bilgileri şu anda alınamıyor.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function joinClass() {
@@ -233,7 +251,13 @@ export default function ClassesPage() {
           </div>
         )}
 
-        {classes.length === 0 ? (
+        {loadError ? (
+          <div className="card anim-up-1" role="alert" style={{ textAlign: 'center', padding: '2rem 1.5rem' }}>
+            <h3 className="serif" style={{ fontSize: '20px', marginBottom: '0.5rem' }}>Sınıflar yüklenemedi</h3>
+            <p style={{ color: 'var(--text2)', fontSize: '14px', lineHeight: 1.7, marginBottom: '1rem' }}>{loadError}</p>
+            <button className="btn btn-primary" onClick={loadClasses}>Tekrar dene</button>
+          </div>
+        ) : classes.length === 0 ? (
           <div className="card anim-up-1" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
             <div style={{ fontSize: '48px', marginBottom: '1rem' }}>🏫</div>
             <h3 className="serif" style={{ fontSize: '22px', marginBottom: '0.5rem' }}>Henüz bir sınıfa dahil değilsin</h3>
