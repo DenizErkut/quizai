@@ -7,6 +7,7 @@ import GradeImportWizard from '@/components/GradeImportWizard'
 import ReportsHub from '@/components/ReportsHub'
 import LearningRiskOverview from '@/components/LearningRiskOverview'
 import InstitutionComparisons from '@/components/institution/InstitutionComparisons'
+import InstitutionTeachers from '@/components/institution/InstitutionTeachers'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Cell
@@ -34,7 +35,7 @@ export default function InstitutionPage() {
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'analytics' | 'risk' | 'import' | 'reports' | 'profile'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'teachers' | 'analytics' | 'risk' | 'import' | 'reports' | 'profile'>('overview')
   const [sortBy, setSortBy] = useState<'name' | 'avgPct' | 'totalTests' | 'streak'>('avgPct')
   const [regenerating, setRegenerating] = useState(false)
   const [regenMsg, setRegenMsg] = useState('')
@@ -199,6 +200,7 @@ export default function InstitutionPage() {
   const TABS = [
     { key: 'overview',   label: '📊 Genel Bakış' },
     { key: 'students',   label: '👥 Öğrenciler' },
+    { key: 'teachers',   label: '👩‍🏫 Öğretmenlerimiz' },
     { key: 'analytics',  label: '📈 Analitik' },
     { key: 'risk',       label: `⚠️ Risk${analytics?.riskStudents?.length ? ` (${analytics.riskStudents.length})` : ''}` },
     { key: 'reports',    label: '📋 RAPORLAR' },
@@ -597,6 +599,8 @@ export default function InstitutionPage() {
           </div>
         )}
 
+        {/* ── KURUM ÖĞRETMENLERİ ─────────────────────────────────────────── */}
+        {activeTab === 'teachers' && <InstitutionTeachers />}
         {/* ── RİSK ALARMI ─────────────────────────────────────────────────── */}
         {activeTab === 'risk' && (
           <div>

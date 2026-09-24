@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
     .select('institution_id, joined_at')
     .eq('user_id', auth.user.id)
     .eq('role', 'teacher')
+    .eq('is_active', true)
     .order('joined_at', { ascending: true })
 
   if (membershipError) return NextResponse.json({ error: 'Kurum bağlantıları alınamadı.' }, { status: 500 })
@@ -71,11 +72,14 @@ export async function POST(req: NextRequest) {
   if (!institution) return NextResponse.json({ error: 'Aktif bir kurumla eşleşen kod bulunamadı.' }, { status: 404 })
 
   const { data: existing, error: existingError } = await db
-    .from('institution_users').select('role')
+    .from('institution_users').select('role, is_active')
     .eq('institution_id', institution.id).eq('user_id', auth.user.id).maybeSingle()
   if (existingError) return NextResponse.json({ error: 'Kurum üyeliği kontrol edilemedi.' }, { status: 500 })
 
   if (existing?.role === 'teacher') {
+    if (existing.is_active === false) {
+      return NextResponse.json({ error: 'Bu kurum bağlantısı pasif. Yeniden etkinleştirme için kurum yöneticinizle görüşün.' }, { status: 409 })
+    }
     return NextResponse.json({ success: true, already_member: true, institution_name: institution.name })
   }
   if (existing) {
@@ -94,9 +98,12 @@ export async function POST(req: NextRequest) {
   })
 
   if (insertError?.code === '23505') {
-    const { data: racedMembership } = await db.from('institution_users').select('role')
+    const { data: racedMembership } = await db.from('institution_users').select('role, is_active')
       .eq('institution_id', institution.id).eq('user_id', auth.user.id).maybeSingle()
     if (racedMembership?.role === 'teacher') {
+      if (racedMembership.is_active === false) {
+        return NextResponse.json({ error: 'Bu kurum bağlantısı pasif. Yeniden etkinleştirme için kurum yöneticinizle görüşün.' }, { status: 409 })
+      }
       return NextResponse.json({ success: true, already_member: true, institution_name: institution.name })
     }
     return NextResponse.json({ error: 'Bu kurumdaki mevcut rolünüz değiştirilemedi.' }, { status: 409 })

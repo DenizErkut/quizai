@@ -30,6 +30,9 @@ export type Database = {
           user_id: string
           role: string | null
           joined_at: string | null
+          is_active: boolean
+          deactivated_at: string | null
+          deactivated_by: string | null
         }
         Insert: Record<string, never>
         Update: Record<string, never>
