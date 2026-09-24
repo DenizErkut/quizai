@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
   const dbProbeStarted = Date.now()
   const [usageResult, sessionResult, eventResult, bankEventResult, dbProbe] = await Promise.all([
-    db.from('ai_usage_logs').select('duration_ms,user_id,quiz_session_id,cost_usd,created_at,operation,provider,model').gte('created_at', since).limit(30000),
+    db.from('ai_usage_logs').select('duration_ms,user_id,quiz_session_id,cost_usd,created_at,operation,provider,model,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,pricing_version').gte('created_at', since).limit(30000),
     db.from('quiz_sessions').select('id,user_id,topic,question_count,completed,created_at,gen_engine').gte('created_at', since).limit(30000),
     db.from('learning_events').select('source_id,created_at').gte('created_at', since).limit(30000),
     db.from('question_bank_events').select('topic_key,requested_count,bank_count,ai_count,outcome,created_at').gte('created_at', since).limit(30000),
@@ -39,7 +39,15 @@ export async function GET(req: NextRequest) {
   const linkedUsage = usage.filter(row => row.quiz_session_id && sessionById.has(row.quiz_session_id))
   const totalCost = linkedUsage.reduce((sum, row) => sum + Number(row.cost_usd || 0), 0)
   const platformCost = usage.reduce((sum, row) => sum + Number(row.cost_usd || 0), 0)
-  const activeStudents = new Set(sessions.map(row => row.user_id).filter(Boolean)).size
+  const usageBackedSessions = new Set(linkedUsage.map(row => row.quiz_session_id).filter(Boolean))
+  const studentLinkedUsage = linkedUsage.filter(row => row.user_id)
+  const usageBackedStudents = new Set(studentLinkedUsage.map(row => row.user_id))
+  const studentLinkedCost = studentLinkedUsage.reduce((sum, row) => sum + Number(row.cost_usd || 0), 0)
+  // An unknown model is logged with cost_usd=0 so it never blocks learning.
+  // Do not let that zero masquerade as free usage in unit-economics reports.
+  const unknownPricing = usage.filter(row => row.pricing_version === 'unknown')
+  const pricedCalls = usage.filter(row => Boolean(row.pricing_version) && row.pricing_version !== 'unknown').length
+  const unknownTokens = unknownPricing.reduce((sum, row) => sum + Number(row.input_tokens || 0) + Number(row.output_tokens || 0) + Number(row.cache_read_tokens || 0) + Number(row.cache_write_tokens || 0), 0)
   const topicCosts = new Map<string, { cost: number; calls: number; tests: Set<string> }>()
   for (const row of linkedUsage) {
     const session = row.quiz_session_id ? sessionById.get(row.quiz_session_id) : null
@@ -77,6 +85,6 @@ export async function GET(req: NextRequest) {
     dbProbeMs > 2000 ? { code: 'DB_CONNECTION_LATENCY', severity: 'high', message: `Supabase sağlık sorgusu ${Math.round(dbProbeMs)} ms sürdü.` } : null,
   ].filter(Boolean)
 
-  return NextResponse.json({ period_hours: 720, generated_at: new Date().toISOString(), ai: { calls: linkedUsage.length, p95_duration_ms: p95, cost_usd: totalCost, platform_cost_usd: platformCost, missing_context: missingContext, cost_per_test_usd: sessions.length ? totalCost / sessions.length : null, cost_per_student_usd: activeStudents ? totalCost / activeStudents : null, projected_cost_per_1000_tests_usd: sessions.length ? totalCost / sessions.length * 1000 : null, by_topic: costByTopic, by_operation: costByOperation.slice(0, 15), coach: { cost_usd: coachCost, calls: coachCalls, share_of_platform: platformCost > 0 ? coachCost / platformCost : null } }, database: { probe_ms: dbProbeMs, healthy: !dbProbe.error }, question_bank: { observed_requests: bankEvents.length, full_hits: bankEvents.filter(row => row.outcome === 'full').length, partial_hits: bankEvents.filter(row => row.outcome === 'partial').length, misses: bankEvents.filter(row => row.outcome === 'miss').length, served_questions: bankServed, requested_questions: bankRequested, question_hit_rate: bankRequested ? bankServed / bankRequested : null }, learning: { completed_sessions: completed.length, covered_sessions: covered, event_count: events.length, coverage_rate: coverage }, alerts })
+  return NextResponse.json({ period_hours: 720, generated_at: new Date().toISOString(), ai: { calls: usage.length, quiz_linked_calls: linkedUsage.length, p95_duration_ms: p95, cost_usd: totalCost, platform_cost_usd: platformCost, missing_context: missingContext, cost_per_test_usd: usageBackedSessions.size ? totalCost / usageBackedSessions.size : null, cost_per_student_usd: usageBackedStudents.size ? studentLinkedCost / usageBackedStudents.size : null, cost_per_test_sample: usageBackedSessions.size, cost_per_student_sample: usageBackedStudents.size, pricing: { total_calls: usage.length, priced_calls: pricedCalls, unknown_pricing_calls: unknownPricing.length, legacy_unclassified_calls: usage.length - pricedCalls - unknownPricing.length, pricing_coverage: usage.length ? pricedCalls / usage.length : null, unknown_pricing_tokens: unknownTokens }, projected_cost_per_1000_tests_usd: usageBackedSessions.size ? totalCost / usageBackedSessions.size * 1000 : null, by_topic: costByTopic, by_operation: costByOperation.slice(0, 15), coach: { cost_usd: coachCost, calls: coachCalls, share_of_platform: platformCost > 0 ? coachCost / platformCost : null } }, database: { probe_ms: dbProbeMs, healthy: !dbProbe.error }, question_bank: { observed_requests: bankEvents.length, full_hits: bankEvents.filter(row => row.outcome === 'full').length, partial_hits: bankEvents.filter(row => row.outcome === 'partial').length, misses: bankEvents.filter(row => row.outcome === 'miss').length, served_questions: bankServed, requested_questions: bankRequested, question_hit_rate: bankRequested ? bankServed / bankRequested : null }, learning: { completed_sessions: completed.length, covered_sessions: covered, event_count: events.length, coverage_rate: coverage }, alerts })
 }
 

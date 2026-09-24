@@ -24,7 +24,34 @@ import { createClient } from '@/lib/supabase/server-create-client'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
-async function callInternal(origin: string, path: string, authHeader: string): Promise<any | null> {
+type PipelinePayload = {
+  ai?: {
+    platform_cost_usd?: number | null
+    cost_per_test_usd?: number | null
+    cost_per_student_usd?: number | null
+    cost_per_test_sample?: number | null
+    cost_per_student_sample?: number | null
+    projected_cost_per_1000_tests_usd?: number | null
+    pricing?: Record<string, number | null> | null
+    coach?: { share_of_platform?: number | null }
+  }
+}
+type CoachPayload = {
+  adoption?: { adoption_rate?: number | null; eligible_students?: number | null }
+  engagement?: { active_users_30d?: number | null; avg_messages_per_active_user?: number | null }
+  actions?: { click_through_rate?: number | null }
+}
+type AdaptivePayload = {
+  claim_status?: string | null
+  claim_message?: string | null
+  interpretable?: boolean | null
+  cohorts?: Array<{ cohort: string; completed_sample: number }>
+  statistics?: Array<{ metric: string; difference: number; confidence_interval_95: number[]; classification: string }>
+  minimum_interpretation_sample?: number | null
+  isolation_note?: string | null
+}
+
+async function callInternal<T>(origin: string, path: string, authHeader: string): Promise<T | null> {
   try {
     const res = await fetch(`${origin}${path}`, { headers: { Authorization: authHeader } })
     if (!res.ok) return null
@@ -39,10 +66,10 @@ function formatUsd(value: number | null | undefined): string {
   return `$${value.toFixed(value < 1 ? 4 : 2)}`
 }
 
-function buildNarrative(pipeline: any, coach: any, adaptive: any): string {
+function buildNarrative(pipeline: PipelinePayload | null, coach: CoachPayload | null, adaptive: AdaptivePayload | null): string {
   const parts: string[] = []
   if (pipeline?.ai) {
-    parts.push(`Son 30 günde platform toplam ${formatUsd(pipeline.ai.platform_cost_usd)} AI maliyeti oluşturdu — test başına ${formatUsd(pipeline.ai.cost_per_test_usd)}, aktif öğrenci başına ${formatUsd(pipeline.ai.cost_per_student_usd)}.`)
+    parts.push(`Son 30 günde kayıtlara geçen AI maliyeti ${formatUsd(pipeline.ai.platform_cost_usd)} — AI kullanılan test başına ${formatUsd(pipeline.ai.cost_per_test_usd)}, AI kullanan öğrenci başına ${formatUsd(pipeline.ai.cost_per_student_usd)}.`)
   }
   if (coach?.adoption) {
     const rate = coach.adoption.adoption_rate
@@ -67,9 +94,9 @@ export async function GET(req: NextRequest) {
 
   const origin = req.nextUrl.origin
   const [pipeline, coach, adaptive] = await Promise.all([
-    callInternal(origin, '/api/admin/pipeline-health', authHeader),
-    callInternal(origin, '/api/admin/coach-analytics', authHeader),
-    callInternal(origin, '/api/admin/adaptive-evaluation', authHeader),
+    callInternal<PipelinePayload>(origin, '/api/admin/pipeline-health', authHeader),
+    callInternal<CoachPayload>(origin, '/api/admin/coach-analytics', authHeader),
+    callInternal<AdaptivePayload>(origin, '/api/admin/adaptive-evaluation', authHeader),
   ])
 
   return NextResponse.json({
@@ -79,6 +106,9 @@ export async function GET(req: NextRequest) {
       platform_cost_usd_30d: pipeline.ai.platform_cost_usd,
       cost_per_test_usd: pipeline.ai.cost_per_test_usd,
       cost_per_student_usd: pipeline.ai.cost_per_student_usd,
+      cost_per_test_sample: pipeline.ai.cost_per_test_sample ?? null,
+      cost_per_student_sample: pipeline.ai.cost_per_student_sample ?? null,
+      pricing: pipeline.ai.pricing ?? null,
       coach_share_of_platform: pipeline.ai.coach?.share_of_platform ?? null,
       projected_cost_per_1000_tests_usd: pipeline.ai.projected_cost_per_1000_tests_usd,
     } : null,
@@ -93,9 +123,22 @@ export async function GET(req: NextRequest) {
       claim_status: adaptive.claim_status ?? null,
       claim_message: adaptive.claim_message ?? null,
       interpretable: adaptive.interpretable ?? null,
-      cohort_sample_sizes: (adaptive.cohorts ?? []).map((c: any) => ({ cohort: c.cohort, completed_sample: c.completed_sample })),
+      cohort_sample_sizes: (adaptive.cohorts ?? []).map(c => ({ cohort: c.cohort, completed_sample: c.completed_sample })),
+      primary_metrics: (adaptive.statistics ?? [])
+        .filter(metric => ['mastery', 'retention', 'test_pct'].includes(metric.metric))
+        .map(metric => ({
+          metric: metric.metric,
+          difference: metric.difference,
+          confidence_interval_95: metric.confidence_interval_95,
+          classification: metric.classification,
+        })),
+      minimum_interpretation_sample: adaptive.minimum_interpretation_sample ?? null,
       isolation_note: adaptive.isolation_note ?? null,
     } : null,
+    financial_completeness: {
+      revenue_included: false,
+      note: 'Bu görünüm şu an AI maliyetini ölçer; ödeme geliri, PayTR komisyonu/iade ve brüt marj henüz birleştirilmedi.',
+    },
     // Kaynak eksikse (bir alt-route hata verdiyse) şeffafça belirt —
     // sessizce eksik veriyle "tam" bir görünüm sunmuyoruz.
     missing_sources: [
