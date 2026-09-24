@@ -19,7 +19,7 @@ type ExamKey = keyof typeof EXAM_FORMATS
 
 // 18 Ağustos 2026'da bulundu: generate-quiz/route.ts'te ("Serbest Pratik"
 // testleri) İngilizce dersi için önce eklenen dil kuralı, bu dosyadaki
-// (LGS/TYT/AYT/KPSS sınav SİMÜLASYONU) soru üretimine HİÇ uygulanmamıştı —
+// (LGS/TYT/AYT/YDT sınav SİMÜLASYONU) soru üretimine HİÇ uygulanmamıştı —
 // buradaki prompt tamamen ayrı ve dil farkındalığı sıfırdı, LGS'nin
 // "İngilizce" bölümü dahil her şey doğrudan Türkçe üretiliyordu. Kullanıcı
 // geri bildirimiyle bulundu, aynı kural burada da uygulanıyor.

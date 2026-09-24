@@ -27,7 +27,6 @@ const EXAM_META = {
   TYT:        { emoji: '🎓', badge: 'Lise',        color: '#0ea5e9', bg: 'rgba(14,165,233,0.08)'  },
   AYT:        { emoji: '🏆', badge: 'YKS',         color: '#f59e0b', bg: 'rgba(245,158,11,0.08)'  },
   YDT:        { emoji: '🌍', badge: 'YKS',         color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)'  },
-  KPSS_GENEL: { emoji: '📋', badge: 'Mezun',       color: '#10b981', bg: 'rgba(16,185,129,0.08)'  },
 }
 
 // ─── YARDIMCI ────────────────────────────────────────────────────────────────
@@ -476,7 +475,7 @@ export default function ExamPage() {
                   <div style={{ fontSize: '28px' }}>{meta.emoji}</div>
                   <span style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '99px', background: meta.bg, color: meta.color, fontWeight: 600, border: `1px solid ${meta.color}33` }}>{meta.badge}</span>
                 </div>
-                <div style={{ fontWeight: 800, fontSize: '20px', color: isSelected ? meta.color : 'var(--primary)', marginBottom: '4px' }}>{key === 'KPSS_GENEL' ? 'KPSS' : key}</div>
+                <div style={{ fontWeight: 800, fontSize: '20px', color: isSelected ? meta.color : 'var(--primary)', marginBottom: '4px' }}>{key}</div>
                 <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '10px' }}>{fmt?.fullName || key}</div>
                 <div style={{ fontSize: '11px', color: 'var(--text3)', padding: '8px', borderRadius: '8px', background: 'var(--bg)', border: '1px solid var(--border)' }}>
                   {fmt?.description || '...'}
@@ -531,7 +530,7 @@ export default function ExamPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--primary)' }}>
-                  {demoMode ? '⚡ Demo' : '📋 Tam'} {selectedExam === 'KPSS_GENEL' ? 'KPSS' : selectedExam} sınavı hazır
+                  {demoMode ? '⚡ Demo' : '📋 Tam'} {selectedExam} sınavı hazır
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--text2)', marginTop: '3px' }}>
                   {demoMode
@@ -616,7 +615,7 @@ export default function ExamPage() {
         }}>
           {/* Sınav adı */}
           <div style={{ fontWeight: 800, fontSize: '14px', color: '#fff', flexShrink: 0 }}>
-            {selectedExam === 'KPSS_GENEL' ? 'KPSS' : selectedExam}
+            {selectedExam}
           </div>
 
           {/* İlerleme barı */}

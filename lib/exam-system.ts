@@ -72,15 +72,6 @@ const AYT_TRACK_SECTIONS: Record<ExamTrack, string[]> = {
   SOZ: ['edebiyat', 'tarih1', 'cografya1', 'tarih2', 'cografya2', 'felsefe', 'din'],
 }
 
-const KPSS_SECTIONS: ExamSection[] = [
-  { id: 'turkce', label: 'Türkçe', count: 30, subject: 'Türkçe', grade: 'universite mezun', netCoef: 1 },
-  { id: 'matematik', label: 'Matematik', count: 30, subject: 'Matematik', grade: 'universite mezun', netCoef: 1 },
-  { id: 'tarih', label: 'Tarih', count: 16, subject: 'Türk Tarihi', grade: 'universite mezun', netCoef: 1 },
-  { id: 'cografya', label: 'Coğrafya', count: 7, subject: 'Coğrafya', grade: 'universite mezun', netCoef: 1 },
-  { id: 'vatandaslik', label: 'Vatandaşlık', count: 7, subject: 'Vatandaşlık', grade: 'universite mezun', netCoef: 1 },
-  { id: 'ataturk', label: 'Atatürk İlkeleri', count: 10, subject: 'Atatürk İlkeleri', grade: 'universite mezun', netCoef: 1 },
-]
-
 function oneSession(label: string, duration: number, sections: ExamSection[]): ExamSessionPhase[] {
   return [{ id: 'main', label, duration, sectionIds: sections.map(section => section.id) }]
 }
@@ -115,13 +106,6 @@ export const EXAM_FORMATS: Record<string, ExamFormat> = {
     scoring: { correct: 1, wrong: -0.25, base: 0 }, maxScore: 500,
     description: 'Dilini seç · 80 soru · 120 dakika · 5 seçenek', targetAudience: 'lise', color: '#8b5cf6',
     examYear: EXAM_YEAR, curriculumVersion: 'OSYM-YDT-2026',
-  },
-  KPSS_GENEL: {
-    label: 'KPSS', fullName: 'KPSS Genel Yetenek / Genel Kültür', duration: 120, sections: KPSS_SECTIONS,
-    sessions: oneSession('KPSS Oturumu', 120, KPSS_SECTIONS),
-    scoring: { correct: 1, wrong: -0.25, base: 0 }, maxScore: 100,
-    description: '100 soru · 120 dakika · 5 seçenek', targetAudience: 'universite', color: '#10b981',
-    examYear: EXAM_YEAR, curriculumVersion: 'OSYM-KPSS-2026',
   },
 }
 
