@@ -50,7 +50,7 @@ export default function TeacherInstitutionMemberships() {
     setError('')
     setNotice('')
     const code = institutionCode.trim().toUpperCase()
-    if (!/^[A-Z2-9]{8}$/.test(code)) {
+    if (!/^[A-Z0-9]{8}$/.test(code)) {
       setError('Kurum kodu 8 harf veya rakamdan oluşmalı.')
       return
     }

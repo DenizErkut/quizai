@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '8 karakterli kurum kodunu girin.' }, { status: 400 })
   }
   const institutionCode = body.institution_code.trim().toUpperCase()
-  if (!/^[A-Z2-9]{8}$/.test(institutionCode)) {
+  if (!/^[A-Z0-9]{8}$/.test(institutionCode)) {
     return NextResponse.json({ error: 'Kurum kodu 8 harf veya rakamdan oluşmalı.' }, { status: 400 })
   }
 
