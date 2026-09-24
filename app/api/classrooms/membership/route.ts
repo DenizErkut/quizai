@@ -27,8 +27,8 @@ type RosterRecord = {
   classroom_id: string
   student_id: string
   joined_at: string
-  profiles: { grade: string | null; plan: string | null } | { grade: string | null; plan: string | null }[] | null
 }
+type StudentProfileRecord = { id: string; grade: string | null; plan: string | null }
 type RosterStudent = { id: string; joined_at: string; grade: string; plan: string }
 
 export async function GET(req: NextRequest) {
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
   const classIds = classes.map((classroom) => classroom.id)
   const { data: roster, error: rosterError } = await db
     .from('classroom_students')
-    .select('classroom_id, student_id, joined_at, profiles(grade, plan)')
+    .select('classroom_id, student_id, joined_at')
     .in('classroom_id', classIds)
     .order('joined_at', { ascending: true })
     .limit(5000)
@@ -75,10 +75,33 @@ export async function GET(req: NextRequest) {
     return jsonNoStore({ error: 'Sınıf listesi alınamadı.' }, 500)
   }
 
+  const rosterRows = (roster ?? []) as RosterRecord[]
+  const studentIds = [...new Set(rosterRows.map((row) => row.student_id))]
+  const profilesById = new Map<string, StudentProfileRecord>()
+
+  // classroom_students.student_id intentionally has no FK to profiles, so
+  // PostgREST cannot embed profiles in the roster query. Resolve them by ID.
+  for (let offset = 0; offset < studentIds.length; offset += 250) {
+    const ids = studentIds.slice(offset, offset + 250)
+    const { data: profiles, error: profilesError } = await db
+      .from('profiles')
+      .select('id, grade, plan')
+      .in('id', ids)
+
+    if (profilesError) {
+      console.error('[classrooms/membership] student profile lookup failed:', profilesError.message)
+      return jsonNoStore({ error: 'Öğrenci bilgileri alınamadı.' }, 500)
+    }
+
+    for (const profile of (profiles ?? []) as StudentProfileRecord[]) {
+      profilesById.set(profile.id, profile)
+    }
+  }
+
   const byClass = new Map<string, RosterStudent[]>()
-  for (const row of (roster ?? []) as RosterRecord[]) {
+  for (const row of rosterRows) {
     const students = byClass.get(row.classroom_id) ?? []
-    const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
+    const profile = profilesById.get(row.student_id)
     students.push({
       id: row.student_id,
       joined_at: row.joined_at,
