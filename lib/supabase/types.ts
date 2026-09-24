@@ -9,6 +9,31 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      institutions: {
+        Row: {
+          id: string
+          name: string
+          code: string
+          admin_email: string | null
+          active: boolean | null
+          created_at: string | null
+          discount_rate: number | null
+          seller_id: string | null
+        }
+        Insert: Record<string, never>
+        Update: Record<string, never>
+      }
+      institution_users: {
+        Row: {
+          id: string
+          institution_id: string
+          user_id: string
+          role: string | null
+          joined_at: string | null
+        }
+        Insert: Record<string, never>
+        Update: Record<string, never>
+      }
       profiles: {
         Row: {
           id: string
@@ -621,6 +646,77 @@ export type Database = {
           answer_key?: string | null
         }
       }
+      partner_integrations: {
+        Row: {
+          id: string
+          institution_id: string
+          name: string
+          token_hash: string
+          pseudonym_key: string
+          scopes: string[]
+          created_by: string
+          created_at: string
+          expires_at: string | null
+          revoked_at: string | null
+        }
+        Insert: {
+          id?: string
+          institution_id: string
+          name: string
+          token_hash: string
+          pseudonym_key: string
+          scopes?: string[]
+          created_by: string
+          created_at?: string
+          expires_at?: string | null
+          revoked_at?: string | null
+        }
+        Update: {
+          name?: string
+          scopes?: string[]
+          expires_at?: string | null
+          revoked_at?: string | null
+        }
+      }
+      partner_integration_audit: {
+        Row: {
+          id: number
+          integration_id: string
+          institution_id: string
+          action: string
+          endpoint: string
+          status_code: number
+          request_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          integration_id: string
+          institution_id: string
+          action: string
+          endpoint: string
+          status_code: number
+          request_id: string
+          created_at?: string
+        }
+        Update: Record<string, never>
+      }
+      partner_integration_rate_limits: {
+        Row: {
+          integration_id: string
+          window_start: string
+          request_count: number
+        }
+        Insert: {
+          integration_id: string
+          window_start: string
+          request_count?: number
+        }
+        Update: {
+          window_start?: string
+          request_count?: number
+        }
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -654,6 +750,10 @@ export type Database = {
       }
       refresh_student_recommendations: {
         Args: { p_student_id: string }
+        Returns: number
+      }
+      consume_partner_integration_rate_limit: {
+        Args: { p_integration_id: string; p_window_start: string }
         Returns: number
       }
     }

@@ -28,4 +28,18 @@ test.describe('tenant isolation security contract', () => {
     const response = await request.get('/api/admin/agent-quality?userId=other-tenant', { headers: { Authorization: 'Bearer forged-token' } })
     expect([401, 403]).toContain(response.status())
   })
+
+  test('partner institution endpoint rejects malformed integration credentials', async ({ request }) => {
+    const response = await request.get('/api/integrations/v1/institution', {
+      headers: { Authorization: 'Bearer forged-token' },
+    })
+    expect(response.status()).toBe(401)
+  })
+
+  test('partner students endpoint rejects malformed integration credentials', async ({ request }) => {
+    const response = await request.get('/api/integrations/v1/students?limit=3', {
+      headers: { Authorization: 'Bearer forged-token' },
+    })
+    expect(response.status()).toBe(401)
+  })
 })

@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     isAdmin: !!instUser,
+    institutionId: instUser?.institution_id ?? null,
     institution: instUser?.institutions ?? null,
   })
 }
