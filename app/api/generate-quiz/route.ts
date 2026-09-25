@@ -38,6 +38,7 @@ import { balanceAnswerPositions, getQuestionBankSet, hasRealVisualAsset, promote
 import { decideQuizProvider, getQuizProviderPolicy, QUIZ_PROVIDER_POLICY_VERSION } from '@/lib/quiz-provider-policy'
 import { attachQuestionRigorMetadata, summarizeQuestionSetRigor } from '@/lib/question-rigor'
 import { verifyVisualWithMistral } from '@/lib/mistral-quality'
+import { verifyVisualWithGemini } from '@/lib/gemini-visual-quality'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -448,7 +449,7 @@ async function visualMatchesQuestion(questionText: string, svg: string, correctA
   try {
     // Genel konu benzerliği yeterli değildir: bağlam, soru ve SVG'nin
     // nesne/sayı/birim/etiket ilişkisi 100 üzerinden ayrı denetlenir.
-    const [raw, mistralReview] = await Promise.all([
+    const [raw, mistralReview, geminiReview] = await Promise.all([
       callOpenAI([
       { role: 'system', content: 'You are a strict K-12 visual-question QA gate. Return only valid JSON.' },
       { role: 'user', content: `Score the SVG against the exact question. Check scenario/context, every object, quantity, unit, label and relationship. Verify graph/axis values mathematically. A generic topic match is NOT enough. The SVG must not reveal the answer and must add useful information instead of merely repeating the question. Return exactly {"score":0-100,"contextMatch":boolean,"answerLeak":boolean,"useful":boolean,"reason":"short Turkish reason"}.\n\nQUESTION:\n${questionText}\n\nCORRECT ANSWER (must not be shown):\n${correctAnswer}\n\nSVG:\n${svg.slice(0, 9000)}` },
@@ -461,17 +462,25 @@ async function visualMatchesQuestion(questionText: string, svg: string, correctA
       json: true,
       }),
       verifyVisualWithMistral({ questionText, correctAnswer, svg }),
+      verifyVisualWithGemini({ questionText, correctAnswer, svg }),
     ])
     const result = JSON.parse(raw) as { score?: unknown; contextMatch?: unknown; answerLeak?: unknown; useful?: unknown; reason?: unknown }
     const score = Number(result.score)
     const reason = typeof result.reason === 'string' ? result.reason.slice(0, 240) : 'Görsel bağlamı doğrulanamadı.'
     const openAIPassed = Number.isFinite(score) && score >= 90 && result.contextMatch === true && result.answerLeak !== true && result.useful !== false
-    const passed = openAIPassed && (mistralReview?.passed ?? true)
-    const combinedScore = mistralReview ? Math.min(Number.isFinite(score) ? score : 0, mistralReview.score) : (Number.isFinite(score) ? score : 0)
-    const combinedReason = mistralReview
-      ? `OpenAI: ${reason} | Mistral: ${mistralReview.reason}`.slice(0, 480)
-      : reason
-    if (!passed) console.warn(`[visual-validation] rejected SVG openai=${score} mistral=${mistralReview?.score ?? 'unavailable'}: ${combinedReason}`)
+    const passed = openAIPassed && (mistralReview?.passed ?? true) && (geminiReview?.passed ?? true)
+    const reviews = [
+      `OpenAI: ${reason}`,
+      ...(mistralReview ? [`Mistral: ${mistralReview.reason}`] : []),
+      ...(geminiReview ? [`Gemini: ${geminiReview.reason}`] : []),
+    ]
+    const combinedScore = Math.min(
+      Number.isFinite(score) ? score : 0,
+      ...(mistralReview ? [mistralReview.score] : []),
+      ...(geminiReview ? [geminiReview.score] : []),
+    )
+    const combinedReason = reviews.join(' | ').slice(0, 480)
+    if (!passed) console.warn(`[visual-validation] rejected SVG openai=${score} mistral=${mistralReview?.score ?? 'unavailable'} gemini=${geminiReview?.score ?? 'unavailable'}: ${combinedReason}`)
     return { passed, score: combinedScore, reason: combinedReason }
   } catch (error) {
     console.error('[visual-validation] error:', error)
@@ -524,7 +533,7 @@ async function generateVisualForQuestion(
     if (q.type === 'true_false' || q.type === 'short_answer' || q.type === 'multi_true_false') {
       return null
     }
-    // Doğru cevabı iki bağımsız görsel denetçiye veririz; ikisi de cevabın
+    // Doğru cevabı bağımsız görsel denetçilere veririz; hepsi cevabın
     // görselde açıkça görünmediğini kontrol eder.
     const correctAnswer = q.opts?.[q.ans] || q.blank || q.correctOrder || ''
     // 21 Eylül 2026 — DETERMİNİSTİK GRAFİK YOLU (bkz. lib/chart-svg.ts).
