@@ -39,4 +39,9 @@ test.describe('bounded agent security', () => {
     const response = await request.post('/api/chat', { data: { messages: [], topic: 'Matematik', language: 'Türkçe' } })
     expect(response.status()).toBe(401)
   })
+
+  test('teacher notifications reject anonymous access before creating audit or delivery events', async ({ request }) => {
+    const response = await request.post('/api/teacher/notify', { data: { classroom_id: 'not-a-real-class', message: 'test' } })
+    expect(response.status()).toBe(401)
+  })
 })

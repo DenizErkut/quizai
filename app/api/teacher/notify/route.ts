@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import webpush from 'web-push'
+import { randomUUID } from 'node:crypto'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,13 +39,12 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const { classroom_id, message, title } = body
-  console.log('[notify] body:', { classroom_id, message: message?.slice(0,20), teacher_id: teacher?.id })
 
   if (!classroom_id) {
     return NextResponse.json({ error: 'Sınıf seçilmedi. Lütfen bir sınıf seçin.', debug: { classroom_id, teacher_approved: teacher?.approved } }, { status: 400 })
   }
-  if (!message?.trim()) {
-    return NextResponse.json({ error: 'Mesaj boş olamaz.' }, { status: 400 })
+  if (!message?.trim() || message.trim().length > 2000) {
+    return NextResponse.json({ error: 'Mesaj boş olamaz ve 2000 karakteri aşamaz.' }, { status: 400 })
   }
 
   const { data: classroom } = await supabaseAdmin
@@ -63,17 +63,51 @@ export async function POST(req: NextRequest) {
     .select('student_id')
     .eq('classroom_id', classroom_id)
 
-  const studentIds = (students ?? []).map((s: any) => s.student_id)
+  const studentIds = ((students ?? []) as Array<{ student_id: string }>).map(s => s.student_id)
+  const requestId = randomUUID()
+  const writeAudit = async (event: {
+    event_type: 'attempted' | 'completed' | 'failed'
+    recipient_count?: number
+    push_delivered_count?: number
+    reason_code: 'dispatch_started' | 'no_recipients' | 'completed' | 'partial_push_failure' | 'in_app_delivery_failed' | 'notification_history_write_failed'
+    metadata?: Record<string, unknown>
+  }) => {
+    const { error } = await supabaseAdmin.from('teacher_notification_audit').insert({
+      request_id: requestId,
+      actor_id: user.id,
+      teacher_id: teacher.id,
+      classroom_id,
+      ...event,
+      metadata: event.metadata ?? {},
+    })
+    if (error) throw new Error(`teacher_notification_audit_write_failed:${error.code || 'unknown'}`)
+  }
+
+  // Fail closed before sending: if the attempt cannot be durably audited,
+  // do not dispatch notifications. The audit contains no message or student IDs.
+  try {
+    await writeAudit({ event_type: 'attempted', recipient_count: studentIds.length, reason_code: 'dispatch_started' })
+  } catch (error) {
+    console.error('[notify] audit attempt could not be persisted', error)
+    return NextResponse.json({ error: 'Bildirim güvenli biçimde başlatılamadı.' }, { status: 500 })
+  }
 
   if (studentIds.length === 0) {
     // Yine de geçmişe kaydet
-    await supabaseAdmin.from('teacher_notifications').insert({
+    const { error: historyError } = await supabaseAdmin.from('teacher_notifications').insert({
       teacher_id: teacher.id,
       classroom_id,
       message: message.trim(),
       recipient_count: 0,
       delivered_count: 0,
     })
+    await writeAudit({
+      event_type: historyError ? 'failed' : 'completed',
+      recipient_count: 0,
+      push_delivered_count: 0,
+      reason_code: historyError ? 'notification_history_write_failed' : 'no_recipients',
+    })
+    if (historyError) return NextResponse.json({ error: 'Bildirim kaydı oluşturulamadı.' }, { status: 500 })
     return NextResponse.json({ success: true, recipientCount: 0, deliveredCount: 0 })
   }
 
@@ -87,10 +121,16 @@ export async function POST(req: NextRequest) {
     data: { classroom_id },
   }))
 
-  await supabaseAdmin.from('notifications').insert(notificationRows)
+  const { error: deliveryError } = await supabaseAdmin.from('notifications').insert(notificationRows)
+  if (deliveryError) {
+    await writeAudit({ event_type: 'failed', recipient_count: studentIds.length, reason_code: 'in_app_delivery_failed' })
+    return NextResponse.json({ error: 'Bildirimler gönderilemedi.' }, { status: 500 })
+  }
 
   // ✅ Web push — subscription varsa gönder (opsiyonel, başarısız olsa da devam et)
   let pushDelivered = 0
+  let pushFailed = 0
+  let pushUnavailable = false
 
   try {
     webpush.setVapidDetails(
@@ -116,6 +156,7 @@ export async function POST(req: NextRequest) {
         )
         pushDelivered++
       } catch {
+        pushFailed++
         // Geçersiz subscription — sil
         await supabaseAdmin
           .from('push_subscriptions')
@@ -124,6 +165,7 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch {
+    pushUnavailable = true
     // VAPID ayarı yoksa push atla, in-app yeterli
   }
 
@@ -139,6 +181,26 @@ export async function POST(req: NextRequest) {
     })
     .select('*, classrooms(name)')
     .single()
+
+  // Completion is a second append-only event. The durable attempted event is
+  // retained if this write fails, avoiding a duplicate-send retry response.
+  try {
+    await writeAudit({
+      event_type: 'completed',
+      recipient_count: studentIds.length,
+      push_delivered_count: pushDelivered,
+      reason_code: pushFailed > 0 || pushUnavailable
+        ? 'partial_push_failure'
+        : notifRecord ? 'completed' : 'notification_history_write_failed',
+      metadata: {
+        push_failure_count: pushFailed,
+        push_unavailable: pushUnavailable,
+        notification_history_saved: Boolean(notifRecord),
+      },
+    })
+  } catch (error) {
+    console.error('[notify] completion audit could not be persisted', error)
+  }
 
   return NextResponse.json({
     success: true,
