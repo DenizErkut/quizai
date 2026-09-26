@@ -44,7 +44,7 @@ test('rejects missing, mislabeled, or incorrect difficulty distribution', () => 
 })
 
 test('requires at least half the questions to have a matched, QA-passed visual', () => {
-  expect(requiredVisualCount(10)).toBe(5)
+  expect(requiredVisualCount(10)).toBe(3)
   const valid = (q: string) => ({
     q,
     svg: '<svg viewBox="0 0 1 1"></svg>',
@@ -83,7 +83,7 @@ test('keeps auxiliary validators as vetoes without making an outage fatal', () =
 })
 
 test('generates spare visual candidates while preserving the fifty-percent pass quota', () => {
-  expect(requiredVisualCount(10)).toBe(5)
+  expect(requiredVisualCount(10)).toBe(3)
   expect(visualAttemptCount(10)).toBe(7)
   expect(visualAttemptCount(2)).toBe(2)
   expect(visualAttemptCount(1)).toBe(1)

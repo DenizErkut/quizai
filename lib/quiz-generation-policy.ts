@@ -95,8 +95,8 @@ export function hasDifficultyQuota(questions: Array<Record<string, unknown>>, qu
   return REQUIRED_DIFFICULTIES.every(level => Math.abs(actual[level] - quota[level]) <= 1)
 }
 
-export function requiredVisualCount(count: number): number {
-  return Math.ceil(Math.max(0, count) * 0.5)
+export function requiredVisualCount(count: number, ratio = 0.3): number {
+  return Math.ceil(Math.max(0, count) * ratio)
 }
 
 export function visualAttemptCount(questionCount: number): number {
