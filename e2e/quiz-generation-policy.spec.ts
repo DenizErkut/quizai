@@ -68,7 +68,8 @@ test('requires each item to map to an approved canonical outcome and have strict
 test('keeps auxiliary validators as vetoes without making an outage fatal', () => {
   const primary = { ok: true, difficultyMatches: true, objectiveMatches: true }
   expect(evaluateStrictQuestionReview({ primary, secondary: [null, undefined], objectiveRequired: true }).passed).toBe(true)
-  expect(evaluateStrictQuestionReview({ primary, secondary: [{ ok: false }], objectiveRequired: true }).passed).toBe(false)
+  expect(evaluateStrictQuestionReview({ primary, secondary: [{ ok: false }], objectiveRequired: true }).passed).toBe(true)
+  expect(evaluateStrictQuestionReview({ primary, secondary: [{ ok: false }, { ok: false }], objectiveRequired: true }).passed).toBe(false)
   expect(evaluateStrictQuestionReview({ primary, secondary: [{ ok: true, objectiveMatches: false }], objectiveRequired: true }).passed).toBe(false)
   // Older/temporarily degraded validators may return only {ok:true}; missing
   // optional evidence is unavailable, not a hard rejection.

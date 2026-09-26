@@ -29,9 +29,13 @@ export function evaluateStrictQuestionReview(args: {
   const primaryAccepted = args.primary?.ok === true
     && args.primary?.difficultyMatches !== false
     && (!args.objectiveRequired || args.primary?.objectiveMatches !== false)
-  const secondaryRejected = args.secondary.some(review => review?.ok === false
+  const secondaryRejections = args.secondary.filter(review => review?.ok === false
     || review?.difficultyMatches === false
-    || (args.objectiveRequired && review?.objectiveMatches === false))
+    || (args.objectiveRequired && review?.objectiveMatches === false)).length
+  // Gemini and Mistral are auxiliary cross-checks. A single provider can be
+  // over-conservative or operate with a different rubric; require agreement
+  // from two auxiliary providers before vetoing an otherwise accepted item.
+  const secondaryRejected = secondaryRejections >= 2
   const passed = primaryAccepted && !secondaryRejected
   return {
     passed,
