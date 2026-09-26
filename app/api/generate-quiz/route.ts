@@ -1358,7 +1358,7 @@ export async function POST(req: NextRequest) {
 
     const MAX_QCOUNT: Record<string, number> = { free: 5, silver: 10, premium: 20, unlimited: 20 }
     const maxQ = MAX_QCOUNT[plan] ?? 0
-    const safeQCount = isDailyChallengeRequest ? Math.min(questionCount, 10) : Math.min(questionCount, maxQ)
+    let safeQCount = isDailyChallengeRequest ? Math.min(questionCount, 10) : Math.min(questionCount, maxQ)
     usageRequestId = crypto.randomUUID()
     // Yeni oturumun kimliği üretimden önce bilinir; böylece AI maliyet kaydı
     // kullanıcı ve oturumla atomik olmayan bir sonradan eşleştirmeye ihtiyaç duymaz.
@@ -1699,7 +1699,7 @@ export async function POST(req: NextRequest) {
       }
     }
     const aiQuestionCount = Math.max(0, safeQCount - bankQuestions.length)
-    const targetDifficultyQuota = buildAdaptiveDifficultyQuota(safeQCount, resolvedDifficulty)
+    let targetDifficultyQuota = buildAdaptiveDifficultyQuota(safeQCount, resolvedDifficulty)
     // chartDataInstruction: yalnızca math_graph'ta ek talimat üretir (bkz.
     // fonksiyon tanımı) — burada erken hesaplamak için detectVisualCategory
     // tekrar çağrılıyor (saf/yan etkisiz fonksiyon, aşağıda zaten tekrar
@@ -2178,6 +2178,14 @@ export async function POST(req: NextRequest) {
     // başlatmaya çalışıyordu. Bu kontrol kota/session değişikliklerinden
     // ÖNCE çalışır; öğrenciye yeniden deneme seçeneği verir ve bozuk oturum
     // bırakmaz.
+    if (questions.length !== safeQCount && questions.length >= 3) {
+      // Provider latency/format drift can leave a smaller but still useful
+      // validated set after recovery. Persist that set instead of discarding
+      // the entire test; one- or two-question remnants remain rejected.
+      console.warn(`[generate-quiz] recovery produced ${questions.length}/${safeQCount}; accepting validated subset`)
+      safeQCount = questions.length
+      targetDifficultyQuota = buildAdaptiveDifficultyQuota(safeQCount, resolvedDifficulty)
+    }
     if (questions.length !== safeQCount) {
       console.error(`[generate-quiz] incomplete_set requested=${safeQCount} delivered=${questions.length} topic=${topic}`)
       return NextResponse.json({
