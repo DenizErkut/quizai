@@ -251,7 +251,11 @@ function detectVisualCategory(topic: string): string | null {
   if (/tarih|osmanli|cumhuriyet|savas|anlasma|kronoloji|zaman cetveli|donem|yuzyil/.test(t)) return 'timeline'
   if (/matematik|sayi|kesir|ondalik|oran|yuzde|istatistik|olasilik|ortalama/.test(t)) return 'math_graph'
 
-  return 'general'
+  // Ordinary reading/history/language topics do not require a diagram. The
+  // previous fallback returned `general`, which activated the 50% visual
+  // quota for virtually every quiz and produced a false "visual quota"
+  // failure when no visual was pedagogically needed.
+  return null
 }
 
 function isNewGenerationRequest(topic: string): boolean {
