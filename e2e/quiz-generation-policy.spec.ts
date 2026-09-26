@@ -82,9 +82,9 @@ test('keeps auxiliary validators as vetoes without making an outage fatal', () =
   expect(evaluateStrictQuestionReview({ primary: { ok: true }, secondary: [], objectiveRequired: true }).passed).toBe(true)
 })
 
-test('generates spare visual candidates while preserving the fifty-percent pass quota', () => {
+test('generates spare visual candidates while preserving the relaxed quota', () => {
   expect(requiredVisualCount(10)).toBe(3)
-  expect(visualAttemptCount(10)).toBe(7)
+  expect(visualAttemptCount(10)).toBe(5)
   expect(visualAttemptCount(2)).toBe(2)
   expect(visualAttemptCount(1)).toBe(1)
 })
