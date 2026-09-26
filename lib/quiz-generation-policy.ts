@@ -26,24 +26,22 @@ export function evaluateStrictQuestionReview(args: {
   secondary: StrictReviewSignal[]
   objectiveRequired: boolean
 }): { passed: boolean; difficultyVerified: boolean; objectiveVerified: boolean } {
-  const primaryAccepted = args.primary?.ok === true
-    && args.primary?.difficultyMatches !== false
-    && (!args.objectiveRequired || args.primary?.objectiveMatches !== false)
-  const secondaryRejections = args.secondary.filter(review => review?.ok === false
+  const signals = [args.primary, ...args.secondary]
+  const acceptedSignals = signals.filter(review => review?.ok === true).length
+  const explicitRejections = signals.filter(review => review?.ok === false
     || review?.difficultyMatches === false
     || (args.objectiveRequired && review?.objectiveMatches === false)).length
-  // Gemini and Mistral are auxiliary cross-checks. A single provider can be
-  // over-conservative or operate with a different rubric; require agreement
-  // from two auxiliary providers before vetoing an otherwise accepted item.
-  const secondaryRejected = secondaryRejections >= 2
-  const passed = primaryAccepted && !secondaryRejected
+  // Use a 2-of-3 style quorum. A provider can be unavailable or
+  // over-conservative; only two explicit rejections veto the item. At least
+  // one provider must still positively accept it.
+  const passed = acceptedSignals >= 1 && explicitRejections < 2
   return {
     passed,
     // A missing field means the provider did not supply that signal (usually
     // an older model response or an unavailable optional validator). It is
     // not a rejection; explicit false remains rejected above.
     difficultyVerified: passed,
-    objectiveVerified: passed && (!args.objectiveRequired || args.primary?.objectiveMatches !== false),
+    objectiveVerified: passed && (!args.objectiveRequired || explicitRejections < 2),
   }
 }
 

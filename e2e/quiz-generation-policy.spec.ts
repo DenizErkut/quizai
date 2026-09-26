@@ -70,7 +70,7 @@ test('keeps auxiliary validators as vetoes without making an outage fatal', () =
   expect(evaluateStrictQuestionReview({ primary, secondary: [null, undefined], objectiveRequired: true }).passed).toBe(true)
   expect(evaluateStrictQuestionReview({ primary, secondary: [{ ok: false }], objectiveRequired: true }).passed).toBe(true)
   expect(evaluateStrictQuestionReview({ primary, secondary: [{ ok: false }, { ok: false }], objectiveRequired: true }).passed).toBe(false)
-  expect(evaluateStrictQuestionReview({ primary, secondary: [{ ok: true, objectiveMatches: false }], objectiveRequired: true }).passed).toBe(true)
+  expect(evaluateStrictQuestionReview({ primary: { ok: false }, secondary: [{ ok: true }, null], objectiveRequired: true }).passed).toBe(true)
   // Older/temporarily degraded validators may return only {ok:true}; missing
   // optional evidence is unavailable, not a hard rejection.
   expect(evaluateStrictQuestionReview({ primary: { ok: true }, secondary: [], objectiveRequired: true }).passed).toBe(true)
