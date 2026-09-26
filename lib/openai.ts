@@ -110,7 +110,7 @@ export async function verifyMathWithOpenAI(question: string, answer: string, lan
 // 4. Genel soru doğrulama — bağımsız çapraz kontrol için (matematik odaklı,
 // Claude'un kendi ürettiğini yine Claude'a kontrol ettirmek yerine farklı
 // bir modelle gerçek bağımsız doğrulama sağlar)
-export async function verifyQuestionWithOpenAI(prompt: string): Promise<{ ok: boolean; reason?: string; fix?: string }> {
+export async function verifyQuestionWithOpenAI(prompt: string): Promise<{ ok: boolean; reason?: string; fix?: string; difficultyMatches?: boolean; objectiveMatches?: boolean }> {
   try {
     const result = await callOpenAI([
       { role: 'system', content: 'You are a strict educational content verifier. Respond only with valid JSON.' },

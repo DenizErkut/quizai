@@ -24,7 +24,7 @@ function isMathQuestion(q: any): boolean {
 }
 
 // Soru tipine göre doğrulama prompt'u
-function buildVerifyPrompt(q: any, lang: string): string {
+function buildVerifyPromptBase(q: any, lang: string): string {
   const type = q.type || 'multiple_choice'
   const base = `You are a strict educational content verifier. Verify this question for correctness and language consistency.\n\nExpected question language: ${lang}\n\nLANGUAGE RULE (MANDATORY): The question stem and answer options must be written in the expected language. Foreign proper names, formulas and short quoted examples are allowed, but a question written mainly in another language MUST return ok:false with reason \"language_mismatch\". The explanation may be Turkish for foreign-language courses.\n\nSELF-CONTAINMENT RULE (MANDATORY): If the question says a word is underlined/highlighted/emphasized, that exact target must be visibly marked inside the question with [square brackets]. Otherwise return ok:false with reason \"missing_visible_emphasis\".\n\n`
 
@@ -81,6 +81,15 @@ Respond ONLY with JSON: {"ok": true} or {"ok": false, "reason": "correct order e
     default:
       return base + `Question: ${q.q}\nIs this question clear and answerable?\nRespond ONLY with JSON: {"ok": true} or {"ok": false, "reason": "..."}`
   }
+}
+
+type ObjectiveCandidate = { ref: string; objectiveCode: string; title: string; subject?: string; grade?: string }
+
+function buildVerifyPrompt(q: any, lang: string, objective?: ObjectiveCandidate | null): string {
+  const difficulty = typeof q.difficulty === 'string' ? q.difficulty : ''
+  const criteria = `${difficulty ? `\n\nDIFFICULTY CLAIM: "${difficulty}". Easy = one basic concept/at most one operation; normal = two connected reasoning steps or concept application; hard = multi-step reasoning, transfer to a new situation, or combined concepts. Larger numbers or longer wording alone do not make an item hard. Set difficultyMatches=true only if the actual cognitive work matches the claim.` : ''}${objective ? `\n\nCANONICAL LEARNING OUTCOME: [${objective.objectiveCode}] ${objective.title} (${objective.grade || ''} ${objective.subject || ''}). Does this exact question directly assess that outcome, not merely share a broad topic? Set objectiveMatches=true only for direct alignment.` : ''}`
+  return buildVerifyPromptBase(q, lang) + criteria
+    + '\n\nReturn strict JSON with difficultyMatches (boolean); when an approved canonical learning outcome is supplied, also include objectiveMatches (boolean). Missing fields mean this item failed strict review.'
 }
 
 // Matematik için yerel hızlı kontrol (API çağrısı yapmadan)
@@ -161,12 +170,17 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 })
 
   try {
-    const { questions, topic, grade, language, questionType } = await req.json()
+    const body = await req.json()
+    const { questions, topic, grade, language, questionType } = body
+    const strictQualityPolicy = body?.strictQualityPolicy === true
+    const objectiveCandidates = Array.isArray(body?.objectiveCandidates)
+      ? body.objectiveCandidates as ObjectiveCandidate[]
+      : []
     if (!questions?.length) return NextResponse.json({ questions: [] })
 
     // Mixed tipte pahalı ikinci AI doğrulama yapılmaz; fakat tüm tipler merkezi
     // deterministik şema kontrolünden geçer.
-    if (questionType === 'mixed') {
+    if (questionType === 'mixed' && !strictQualityPolicy) {
       const accepted = questions.filter((question: any) => evaluateQuestionStructure(question).verdict === 'accept')
       const stats = { policyVersion: 'quality-engine-v1', original: questions.length, verified: accepted.length, rejected: questions.length - accepted.length, replacements: 0, final: accepted.length }
       await writeAgentDecisionAudit(auditDb, { actor_id: user.id, agent_name: agent, policy_version: 'question-verification-boundary-v1', input_summary: { question_count: questions.length, question_type: 'mixed' }, decision_summary: { verified: accepted.length, rejected: stats.rejected } })
@@ -209,10 +223,16 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. AI doğrulama — sadece doğrulanabilir tipler
-        const needsAICheck = ['multiple_choice', 'fill_blank', 'true_false', 'matching', 'multi_true_false'].includes(q.type || 'multiple_choice')
+        const selectedObjective = objectiveCandidates.find(candidate => candidate.ref === q.learningObjectiveRef) || null
+        if (strictQualityPolicy && objectiveCandidates.length > 0 && !selectedObjective) {
+          rejected.push(idx)
+          rejectReasons.push(`Q${idx}: canonical objective missing or invalid`)
+          return
+        }
+        const needsAICheck = strictQualityPolicy || ['multiple_choice', 'fill_blank', 'true_false', 'matching', 'multi_true_false'].includes(q.type || 'multiple_choice')
 
         if (!needsAICheck) {
-          verified.push(q)
+          verified.push(strictQualityPolicy ? { ...q, qualityVerificationVersion: 'quiz-quality-v2', difficultyVerified: true, objectiveVerified: objectiveCandidates.length === 0 } : q)
           return
         }
 
@@ -220,7 +240,7 @@ export async function POST(req: NextRequest) {
           // Matematik sorularinda BAGIMSIZ kontrol icin OpenAI (Claude kendi
           // urettigini yine Claude'a kontrol ettirmiyor). Diger tipler icin
           // Claude ile devam ediyoruz.
-          const verifyPrompt = buildVerifyPrompt(q, lang)
+          const verifyPrompt = buildVerifyPrompt(q, lang, selectedObjective)
 
           // Birincil (OpenAI/Claude) ve Gemini kontrollerini SIRALI degil
           // PARALEL calistir - sirali calistirmak toplam gecikmeyi ikiye
@@ -244,6 +264,29 @@ export async function POST(req: NextRequest) {
             verifyQuestionWithMistral(verifyPrompt),
           ])
 
+          if (strictQualityPolicy) {
+            const difficultyVerified = Boolean(q.difficulty)
+              && primaryCheck?.ok === true && primaryCheck?.difficultyMatches === true
+              && geminiCheck?.ok === true && geminiCheck?.difficultyMatches === true
+              && mistralCheck?.ok !== false
+            const objectiveVerified = objectiveCandidates.length === 0
+              || (primaryCheck?.ok === true && primaryCheck?.objectiveMatches === true
+                && geminiCheck?.ok === true && geminiCheck?.objectiveMatches === true
+                && mistralCheck?.ok !== false)
+            if (!difficultyVerified || !objectiveVerified) {
+              rejected.push(idx)
+              rejectReasons.push(`Q${idx}: strict difficulty/outcome evidence missing or mismatched`)
+              return
+            }
+            verified.push({
+              ...q,
+              qualityVerificationVersion: 'quiz-quality-v2',
+              difficultyVerified: true,
+              objectiveVerified,
+            })
+            return
+          }
+
           const providerDecision = decideQuestionQuality([
             providerQualitySignal(isMathQuestion(q) ? 'openai-validator' : 'anthropic-validator', primaryCheck),
             providerQualitySignal('gemini-validator', geminiCheck),
@@ -259,15 +302,20 @@ export async function POST(req: NextRequest) {
 
           verified.push(q)
         } catch {
-          // AI check failed → kabul et
-          verified.push(q)
+          if (strictQualityPolicy) {
+            rejected.push(idx)
+            rejectReasons.push(`Q${idx}: strict independent verification unavailable`)
+          } else {
+            // Legacy non-strict verification preserves historical behavior.
+            verified.push(q)
+          }
         }
       }))
     }
 
     // Reddedilen sorular için yenilerini üret
     let replacements: any[] = []
-    if (rejected.length > 0) {
+    if (rejected.length > 0 && !strictQualityPolicy) {
       try {
         const replaceType = questionType || 'multiple_choice'
         const replacePrompt = `Generate ${rejected.length} verified ${replaceType} questions about "${topic}" for "${grade}" level in ${lang}.
@@ -316,7 +364,7 @@ Return ONLY valid JSON:
     return NextResponse.json({
       questions: final,
       stats: {
-        policyVersion: 'quality-engine-v1',
+        policyVersion: strictQualityPolicy ? 'quiz-quality-v2' : 'quality-engine-v1',
         original: questions.length,
         verified: verified.length,
         rejected: rejected.length,

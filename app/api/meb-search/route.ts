@@ -7,11 +7,16 @@ import {
   isKazanimListesi,
   findContentStart,
 } from '@/lib/content-filters'
+import { isSameGradeSource } from '@/lib/meb-source-scope'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+function normalizeTR(value: unknown): string {
+  return String(value || '').normalize('NFKC').toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ').trim()
+}
 
 async function embedQuery(text: string): Promise<number[] | null> {
   const apiKey = process.env.GEMINI_API_KEY
@@ -68,7 +73,9 @@ export async function POST(req: NextRequest) {
       if (chunks?.length) {
         // Semantic search bazen ön sayfa chunk'larını da (embedding'i
         // yanlışlıkla konuya yakın çıkabiliyor) döndürebiliyor — filtrele.
-        const cleanChunks = chunks.filter((c: any) => !isNonContent(c.content || ''))
+        const cleanChunks = chunks.filter((c: any) => isSameGradeSource(grade, c.grade)
+          && (!subject || !c.subject || normalizeTR(c.subject) === normalizeTR(subject))
+          && !isNonContent(c.content || ''))
         if (cleanChunks.length > 0) {
           context = cleanChunks.map((c: any, i: number) =>
             `[MEB Kaynak ${i + 1} - ${c.subject}/${c.unit}]\n${c.content}`
@@ -100,19 +107,12 @@ export async function POST(req: NextRequest) {
         // düzeltiyor: `unit` parametresi verildiğinde grade HİÇ kontrol
         // edilmiyordu (yukarıdaki if/else if zinciri) — bu yüzden 6. sınıf
         // bir öğrenci, aynı isimli 5. sınıf ünitesinden içerik alabiliyordu.
-        const extractGradeNum = (g: string | null | undefined): number | null => {
-          const m = (g || '').match(/(\d+)\s*\.?\s*s[ıi]n[ıi]f/i)
-          return m ? parseInt(m[1], 10) : null
-        }
-        const requestedGradeNum = extractGradeNum(grade)
-        let gradeFiltered = allResources
-        if (requestedGradeNum !== null) {
-          const matching = allResources.filter((r: any) => extractGradeNum(r.grade) === requestedGradeNum)
-          // Eşleşen varsa SADECE onları kullan; hiç yoksa (ör. o sınıf seviyesi
-          // için hiç kaynak yüklenmemiş) tüm adaylara geri dön — hiç içerik
-          // dönmemesindense yanlış sınıftan da olsa içerik dönmesi tercih edilir.
-          if (matching.length > 0) gradeFiltered = matching
-        }
+        // Never widen to another grade. Missing/unknown request grades or no
+        // exact same-grade resource means this source path contributes nothing.
+        const gradeFiltered = grade
+          ? allResources.filter((r: any) => isSameGradeSource(grade, r.grade)
+            && (!subject || !r.subject || normalizeTR(r.subject) === normalizeTR(subject)))
+          : []
 
         // Bazı yüklenen kaynaklar sadece MÜFREDAT KAZANIM KODU LİSTESİ
         // (örn. "SB.6.4.1. ... a) ... b) ...") - bunlar ogretmene yonelik
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
     if (subject || topic) {
       let examQ = adminDb
         .from('exam_chunks')
-        .select('content, subject, exam_type, year')
+        .select('content, subject, exam_type, year, grade')
         .limit(12) // Madde 4: filtreden sonra 3'e ineceği için fazladan çek
 
       if (subject) examQ = examQ.ilike('subject', `%${subject}%`)
@@ -172,6 +172,7 @@ export async function POST(req: NextRequest) {
         // desenli, daha hedefli) olduğu gibi kalıyor.
         const examChunks = examChunksRaw
           .filter((c: any) => {
+            if (!isSameGradeSource(grade, c.grade)) return false
             const content = c.content || ''
             return !isNonContent(content) && !isKazanimListesi(content)
           })

@@ -39,6 +39,8 @@ import { decideQuizProvider, getQuizProviderPolicy, QUIZ_PROVIDER_POLICY_VERSION
 import { attachQuestionRigorMetadata, summarizeQuestionSetRigor } from '@/lib/question-rigor'
 import { verifyVisualWithMistral } from '@/lib/mistral-quality'
 import { verifyVisualWithGemini } from '@/lib/gemini-visual-quality'
+import { buildAdaptiveDifficultyQuota, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, requiredVisualCount } from '@/lib/quiz-generation-policy'
+import { isSameGradeSource } from '@/lib/meb-source-scope'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -249,7 +251,7 @@ function detectVisualCategory(topic: string): string | null {
   if (/tarih|osmanli|cumhuriyet|savas|anlasma|kronoloji|zaman cetveli|donem|yuzyil/.test(t)) return 'timeline'
   if (/matematik|sayi|kesir|ondalik|oran|yuzde|istatistik|olasilik|ortalama/.test(t)) return 'math_graph'
 
-  return null
+  return 'general'
 }
 
 function isNewGenerationRequest(topic: string): boolean {
@@ -273,6 +275,7 @@ function visualFormatGuidance(category: string | null): string {
     space: 'bir gök cismi/gezegen büyüklük veya konum karşılaştırması',
     ecosystem: 'bir besin zinciri/ağı diyagramı',
     timeline: 'yatay, olayları işaretlerle gösteren bir zaman çizelgesi',
+    general: 'soruda adı geçen nesneleri ve ilişkileri gösteren sade bir kavram/karşılaştırma şeması',
   }
   return category ? (guides[category] || guides.geometry) : 'somut bir şekil, harita veya ölçüm diyagramı'
 }
@@ -284,7 +287,8 @@ function visualPedagogyInstruction(topic: string, count: number): string {
     const maxTables = Math.max(1, Math.floor(minimum / 3))
     return `\n\nYENİ NESİL / BECERİ TEMELLİ SORU KURALI (ZORUNLU): Kullanıcı bunu açıkça istedi. Soruları kısa işlem, tanım veya ezber sorusu olarak kurma. En az ${minimum} soru; öğrencinin verilen bir grafik, tablo, şema, koordinat sistemi, ölçüm çizimi veya gerçek yaşam veri setini yorumlayıp en az iki akıl yürütme adımıyla sonuca ulaşmasını gerektirmelidir. Soruya yalnızca uzun bir hikâye eklemek yeni nesil sayılmaz. Her görseldeki nesneler, sayılar, birimler ve etiketler soru metnindeki senaryoyla BİREBİR aynı olmalıdır; meyve sorusuna hayvan, başka denklem veya genel konu görseli koyma. Görsel soruyu tekrar etmemeli, cevabı göstermemeli ve çözüm için anlamlı veri taşımalıdır. GÖRSEL FORMAT ÖNCELİĞİ: bu görsel soruların EN FAZLA ${maxTables} tanesi metne gömülü Markdown tablo olabilir; geri kalanı ${formatHint} gibi öğrencinin GERÇEKTEN GÖRDÜĞÜ somut bir sahne olmalı, sadece sayıların satır satır dizildiği bir veri tablosu değil. Aynı görsel fikri (ör. aynı "üç günlük satış" kurgusu) birden fazla soruda tekrar etme — her görsel soru farklı bir sahne/senaryo kullanmalı. Geçerli Markdown tablo kullanılıyorsa başlık, ayraç ve her veri satırı ayrı \\n satırında olmalı, hiçbir hücre boş bırakılmamalı (bilinmeyen değer için "?" yaz, hücreyi atlama). Bu koşulları karşılamayan soruyu çıktı listesine alma.`
   }
-  return `\n\nGÖRSEL SORU ÇEŞİTLİLİĞİ: Konu uygunsa soruların yaklaşık %30'unu grafik, tablo, şekil, koordinat sistemi, deney düzeneği, harita veya zaman çizelgesi üzerinden yorumlama gerektirecek biçimde kur. Gerekli bütün veri ve etiketler sorunun içinde bulunmalı; görünmeyen bir görsele "yukarıdaki" diye atıf yapma. GÖRSEL FORMAT ÖNCELİĞİ: bu görsel sorulardan en fazla 1 tanesi metne gömülü Markdown tablo olsun; diğerleri ${formatHint} gibi somut bir sahne olmalı. Metin içinde tablo gerekiyorsa her satırı \\n ile ayıran geçerli Markdown tablo biçimi kullan, tablo ayraçlarını ve satırları tek satırda birbirine yapıştırma, hiçbir hücreyi boş bırakma (bilinmeyen değer için "?" yaz).`
+  const minimum = requiredVisualCount(count)
+  return `\n\nZORUNLU GÖRSEL KOTASI: En az ${minimum}/${count} soruda öğrenci oluşturulan görseli gerçekten inceleyerek çözüm yapmalı. Görsel yalnızca süs olamaz; sorudaki varlıklar, sayılar, birimler, etiketler ve ilişkiler birebir aynı olmalı, cevabı açığa çıkarmamalı. Görsel soruya yeni çözüm verisi katmalı. En fazla ${Math.max(1, Math.floor(minimum / 3))} görsel soru Markdown tablosu olabilir; diğerleri ${formatHint} gibi gerçek bir SVG/çizim olmalıdır. Herhangi bir görsel kalite eşiğini geçemezse test oluşturulmaz.`
 }
 
 // 21 Eylül 2026 — Deniz'in isteğiyle: "grafik oluşturmada eksiğiz" sorununa
@@ -309,7 +313,7 @@ KRİTİK KURALLAR: (a) chartData içindeki TÜM sayı ve etiket, sorunun "q" met
 }
 
 function visualQuestionCandidate(question: any, category: string | null): boolean {
-  if (!question || question.type === 'true_false' || question.type === 'short_answer' || question.type === 'multi_true_false') return false
+  if (!question) return false
   const text = normalizeTR(String(question.q || ''))
   const explicitVisual = /sekil|grafik|tablo|diyagram|koordinat|venn|sema|harita|zaman cizelgesi|veri/.test(text)
   const shape = /kare|dikdortgen|ucgen|daire|cember|cokgen|prizma|kup|silindir|koni|kure|paralelkenar/.test(text)
@@ -324,12 +328,8 @@ function rigorInstruction(difficulty: string, count: number, topic: string): str
   const applicationCount = Math.max(1, Math.ceil(count * (hard ? 0.9 : easy ? 0.6 : 0.8)))
   const inferenceCount = Math.max(1, Math.ceil(count * (hard ? 0.7 : easy ? 0.3 : 0.5)))
   const directLimit = easy ? Math.max(1, Math.floor(count * 0.2)) : 0
-  const hardMixCount = hard ? Math.ceil(count * 0.7) : easy ? 0 : Math.ceil(count * 0.3)
-  const mixRule = hard
-    ? `Soruların en az ${hardMixCount} tanesi zor/çok zor düzeyde, kalanları normal düzeyde olsun; kolay soru üretme.`
-    : easy
-      ? 'Kolay düzey, ezber demek değildir: temel kazanımı yeni bir bağlamda uygulat; en az üç soru normal düzeye yaklaşsın.'
-      : `Soruların en az ${hardMixCount} tanesi zor düzeyde olsun; en fazla ${Math.max(1, Math.floor(count * 0.2))} kolay soru bulunabilir.`
+  const adaptiveQuota = buildAdaptiveDifficultyQuota(count, difficulty)
+  const mixRule = `Bu testte zorluk etiketleri tam olarak ${formatDifficultyQuota(adaptiveQuota)} olmalı. Öğrencinin adaptif başlangıç seviyesi (${difficulty}) oranların ağırlığını belirler; kolay, normal ve zor düzeylerinin hepsi temsil edilmeli.`
   return `\n\nÖLÇME KALİTESİ VE ZORLUK KURALI (ZORUNLU): "${topic}" için ${count} soru üretirken sadece tanım ezberini veya tek adımlı işlemi ölçme. En az ${applicationCount} soru bilgiyi yeni bir bağlama/senaryoya uygulamayı, verilenleri ayıklamayı veya en az iki akıl yürütme adımını gerektirsin. En az ${inferenceCount} soru ilişki kurma, hata bulma, karşılaştırma, yanlış çözümü analiz etme ya da sonuç çıkarma ölçsün. ${mixRule} Doğrudan tanım/ezber veya tek işlemle çözülen soru sayısı en fazla ${directLimit} olabilir. Her soruya "difficulty" (kolay|normal|zor|cok zor), "cognitiveLevel" (uygulama|muhakeme) ve gerçek çözüm adımı sayısını gösteren "reasoningSteps" alanlarını ekle. Zorluk uzun ve karışık cümlelerden değil, kazanımın gerçekten kullanılmasından gelmeli. Her çoktan seçmeli soruda üç çeldirici öğrencinin yapabileceği farklı ve gerçek işlem, kavram veya yorum hatasına dayansın; komik, alakasız ya da ilk bakışta elenen seçenekler kullanma. Aynı hesap yöntemi, senaryo veya soru kalıbını tekrarlama. Sınıf seviyesinin dışına çıkma ve soruyu çözülemez hâle getirme. Açıklamada doğru sonuca giden mantığı en az iki açık adımla göster.`
 }
 
@@ -338,19 +338,9 @@ function canonicalQuestionDifficulty(value: unknown, fallback: string): string {
   return ['kolay', 'normal', 'zor', 'cok zor'].includes(normalized) ? normalized : fallback
 }
 
-function visualQuestionIndexes(questions: any[], category: string | null, requestedCount: number, forceVisuals: boolean): number[] {
+function visualQuestionIndexes(questions: any[], category: string | null, requestedCount: number): number[] {
   if (!category || requestedCount <= 0) return []
-  // 21 Eylül 2026 — kapsamı artırma: math_graph artık çoğunlukla deterministik
-  // chart-svg.ts ile (AI çağrısı YOK, maliyet/gecikme/kesilme riski yok)
-  // çiziliyor, bu yüzden eski AI-SVG kategorileri için konan temkinli min(3,...)
-  // sınırı math_graph'ta gereksiz — daha yüksek bir tavanla (6) kapsam artıyor.
-  // Diğer kategoriler (hâlâ her görsel için gerçek bir AI çağrısı gerektiriyor)
-  // eski, temkinli sınırda kalıyor.
-  const cap = category === 'math_graph' ? 6 : 3
-  const ratio = category === 'math_graph' ? 0.5 : 0.3
-  const target = forceVisuals
-    ? Math.max(1, Math.ceil(requestedCount * 0.5))
-    : Math.min(cap, Math.max(1, Math.ceil(requestedCount * ratio)))
+  const target = requiredVisualCount(requestedCount)
   const preferred = questions
     .map((question, index) => ({ question, index }))
     .filter(({ question }) => visualQuestionCandidate(question, category))
@@ -411,6 +401,7 @@ The student must figure out the answer from the question, NOT from your diagram.
     space: `Draw the relevant space object(s) with labels showing size relationships, orbital paths, or key features.`,
     ecosystem: `Draw a simple food chain or ecosystem diagram with arrows showing energy flow. Include 3-4 organisms with clear labels.`,
     timeline: `Draw a horizontal timeline with 4-6 key events marked. Use dots/markers and year labels below, event descriptions above.`,
+    general: `Draw a minimal concept, comparison, or process diagram using only entities and relationships stated in the exact question.`,
   }
 
   return `${base}\n\nDIAGRAM INSTRUCTIONS:\n${guides[category] || guides.geometry}\n\nMake it directly relevant to the specific question being asked. The student should understand the concept better by seeing this diagram.`
@@ -468,7 +459,7 @@ async function visualMatchesQuestion(questionText: string, svg: string, correctA
     const score = Number(result.score)
     const reason = typeof result.reason === 'string' ? result.reason.slice(0, 240) : 'Görsel bağlamı doğrulanamadı.'
     const openAIPassed = Number.isFinite(score) && score >= 90 && result.contextMatch === true && result.answerLeak !== true && result.useful !== false
-    const passed = openAIPassed && (mistralReview?.passed ?? true) && (geminiReview?.passed ?? true)
+    const passed = openAIPassed && geminiReview?.passed === true && (mistralReview?.passed ?? true)
     const reviews = [
       `OpenAI: ${reason}`,
       ...(mistralReview ? [`Mistral: ${mistralReview.reason}`] : []),
@@ -528,11 +519,6 @@ async function generateVisualForQuestion(
   grade: string
 ): Promise<{ svg: string; contextQuality: VisualContextQuality } | null> {
   try {
-    // Soru tipine göre SVG uygunluk kontrolü
-    // true_false ve short_answer sorularında SVG üretme
-    if (q.type === 'true_false' || q.type === 'short_answer' || q.type === 'multi_true_false') {
-      return null
-    }
     // Doğru cevabı bağımsız görsel denetçilere veririz; hepsi cevabın
     // görselde açıkça görünmediğini kontrol eder.
     const correctAnswer = q.opts?.[q.ans] || q.blank || q.correctOrder || ''
@@ -561,13 +547,6 @@ async function generateVisualForQuestion(
       return null
     }
     // Soru metni şekil/görsel gerektiriyor mu kontrol et
-    const qText = (q.q || '').toLowerCase()
-    const needsVisual = /şekil|grafik|tablo|diyagram|geometr|koordinat|venn|kesir|şema|harita|ok.*diyagram|ağaç/.test(qText)
-    const hasShape = /kare|dikdörtgen|üçgen|daire|çember|çokgen|prizma|küp|silindir|koni|küre|paralelkenar|eşkenar|ikizkenar/.test(qText)
-    // Sadece görsel gerektiren sorularda SVG üret
-    if (category !== 'math_graph' && !needsVisual && !hasShape) {
-      return null
-    }
     const prompt = buildSVGPrompt(category, topic, q.q, grade, String(correctAnswer))
     // Soruya özgü eğitim görsellerinin üretimi OpenAI'ye taşındı. SVG, grafik,
     // tablo ve denklem gibi ölçülebilir içeriklerde raster görsele göre sayısal
@@ -1075,15 +1054,15 @@ async function loadAnonymousBookletContext(subject: string, grade: string, topic
     .limit(12)
   if (error || !data?.length) return ''
   const subjectKey = normalizeTR(subject)
-  const gradeKey = normalizeTR(grade)
   const topicKey = normalizeTR(topic)
   const matches = data.filter((row: any) => {
     const rowSubject = normalizeTR(String(row.subject || ''))
-    const rowGrade = normalizeTR(String(row.grade || ''))
+    const rowGrade = typeof row.grade === 'string' ? row.grade : ''
     const rowTopic = normalizeTR(String(row.topic || row.subtopic || ''))
-    return (!rowSubject || rowSubject.includes(subjectKey) || subjectKey.includes(rowSubject))
-      && (!rowGrade || gradeKey.includes(rowGrade) || rowGrade.includes(gradeKey))
-      && (!rowTopic || rowTopic.includes(topicKey) || topicKey.includes(rowTopic))
+    return Boolean(rowSubject && rowTopic && rowGrade)
+      && isSameGradeSource(grade, rowGrade)
+      && (rowSubject.includes(subjectKey) || subjectKey.includes(rowSubject))
+      && (rowTopic.includes(topicKey) || topicKey.includes(rowTopic))
   }).slice(0, 2)
   if (!matches.length) return ''
   return `\n\nANONİM SORU KİTAPÇIĞI REFERANSI — KOPYALAMA YASAK:\n${matches.map((row: any) => String(row.raw_text || '').slice(0, 2500)).join('\n---\n')}\nBu kaynak yalnızca ölçülen kavram, soru mantığı ve zorluk seviyesini anlamak içindir. Kaynaktaki soru cümlesini, sayıları, özel isimleri, seçenekleri veya kurguyu aynen kullanma. Öğrencinin karşısına tamamen yeni fakat aynı kazanımı ölçen benzer bir soru çıkar.`
@@ -1262,6 +1241,7 @@ export async function POST(req: NextRequest) {
   // erken durur — az sayıda soru eksik dönmek, hiç dönmemekten iyidir.
   const requestStartTime = Date.now()
   let promptStr = ''
+  const strictQualityPolicyActive = true
   let countRef = 5
   // 5 Eylül 2026 — GPT-4.1-mini pilotu: bu istekte ana üretim için hangi
   // motor kullanıldı (quiz_sessions.gen_engine'e yazılacak, kalite/maliyet
@@ -1591,6 +1571,9 @@ export async function POST(req: NextRequest) {
       console.warn('[generate-quiz] canonical objective candidates unavailable:', error?.message || 'unknown')
       return []
     })
+    if (!isUniversityLevel && !fileContent && objectiveCandidates.length === 0) {
+      return NextResponse.json({ error: 'quality_policy_failed', reason: 'canonical_objectives_unavailable', message: 'Bu sınıf, ders ve konu için doğrulanmış aktif kazanım bulunamadığından test oluşturulamadı.' }, { status: 503 })
+    }
     const objectiveInstruction = learningObjectivePrompt(objectiveCandidates)
 
     // Question Bank v1: only a complete, server-approved set bypasses AI.
@@ -1602,7 +1585,10 @@ export async function POST(req: NextRequest) {
     // bankadan dönüyordu — üç sağlayıcı da aslında aynı bankadaki soruları
     // gösteriyordu. Zorlamalı testlerde bankayı tamamen devre dışı bırakıyoruz
     // ki gerçekten o sağlayıcının o anki çıktısı görülsün.
-    const bankEligible = !fileContent && !continueSessionId && !dailyChallenge && !isUniversityLevel && !forcedMistral && !forcedOpenAI && !forcedClaude
+    // Legacy question-bank rows lack per-item strict review evidence and often
+    // carry one requested difficulty for the whole set. Do not bypass the
+    // adaptive quota or visual/outcome gates with these rows.
+    const bankEligible = false
     let bankQuestions: any[] = []
     if (bankEligible) {
       bankQuestions = await getQuestionBankSet(supabase, {
@@ -1706,6 +1692,7 @@ export async function POST(req: NextRequest) {
       }
     }
     const aiQuestionCount = Math.max(0, safeQCount - bankQuestions.length)
+    const targetDifficultyQuota = buildAdaptiveDifficultyQuota(safeQCount, resolvedDifficulty)
     // chartDataInstruction: yalnızca math_graph'ta ek talimat üretir (bkz.
     // fonksiyon tanımı) — burada erken hesaplamak için detectVisualCategory
     // tekrar çağrılıyor (saf/yan etkisiz fonksiyon, aşağıda zaten tekrar
@@ -2001,7 +1988,6 @@ export async function POST(req: NextRequest) {
     }
 
     let questions = (parsed.questions || []).map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
-    let externalValidationPassed = false
 
     // Önce soru doğrulanır, sonra görsel doğrulanmış kesin soru metninden
     // üretilir. Eski paralel akışta doğrulayıcı soruların sırasını/metnini
@@ -2009,19 +1995,8 @@ export async function POST(req: NextRequest) {
     const visualCategory = detectVisualCategory(topic)
     console.log(`[generate-quiz] topic="${topic}" visualCategory=${visualCategory} includeVisuals=${includeVisuals}`)
 
-    const verifyResult = questions.length > 0
-      ? await fetch(`${req.nextUrl.origin}/api/verify-questions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ questions, topic, grade, language: effectiveLang, questionType }),
-          signal: AbortSignal.timeout(40000),
-        }).then(r => r.ok ? r.json() : null).catch(() => null)
-      : null
-
-    if (verifyResult?.questions?.length > 0) {
-      questions = verifyResult.questions.map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
-      externalValidationPassed = true
-    }
+    // Independent strict review runs once, after all top-up rounds, so every
+    // question that reaches storage has identical review coverage.
 
     // Kaynağın kendisi (yazar, ISBN, künye) hakkında soru üretilmesini
     // engellemek için prompt'a talimat eklendi (bkz. yukarı) — ama LLM'ler
@@ -2050,7 +2025,7 @@ export async function POST(req: NextRequest) {
     // Only this externally validated slice may enter the shared bank. Top-up
     // questions are generated later and are intentionally excluded until they
     // pass the same independent validation path in a future request.
-    const validatedQuestionsForBank = externalValidationPassed ? questions.slice() : []
+    let validatedQuestionsForBank: any[] = []
 
     // 14 Ağustos 2026'da öğretmen geri bildirimiyle bulunan ayrı bir hata:
     // istenen soru sayısı ile üretilen soru sayısı SIK SIK uyuşmuyordu
@@ -2092,7 +2067,18 @@ export async function POST(req: NextRequest) {
         const missing = aiQuestionCount - questions.length
         const beforeRoundCount = questions.length
         try {
-          const topupPrompt = `${prompt}\n\nÖNEMLİ: Bu sefer TAM OLARAK ${missing} adet YENİ ve BİRBİRİNDEN FARKLI soru üret (ne bir eksik ne bir fazla). Daha önce üretilenlerle aynı/benzer soru üretme. Yanıtın SADECE geçerli, TAMAMLANMIŞ (yarıda kesilmemiş) JSON olmalı.`
+          const currentDifficultyCounts = { kolay: 0, normal: 0, zor: 0 }
+          for (const question of questions) {
+            const level = String(question.difficulty || '').trim().toLocaleLowerCase('tr-TR').replace(/çok/g, 'cok')
+            if (level === 'kolay' || level === 'normal' || level === 'zor') currentDifficultyCounts[level]++
+            else if (level === 'cok zor') currentDifficultyCounts.zor++
+          }
+          const remainingDifficultyQuota = {
+            kolay: Math.max(0, targetDifficultyQuota.kolay - currentDifficultyCounts.kolay),
+            normal: Math.max(0, targetDifficultyQuota.normal - currentDifficultyCounts.normal),
+            zor: Math.max(0, targetDifficultyQuota.zor - currentDifficultyCounts.zor),
+          }
+          const topupPrompt = `${prompt}\n\nÖNEMLİ: Bu sefer TAM OLARAK ${missing} adet YENİ ve BİRBİRİNDEN FARKLI soru üret. Eksik zorluk kotası tam olarak ${formatDifficultyQuota(remainingDifficultyQuota)}. Daha önce üretilenlerle aynı/benzer soru üretme. Yanıtın SADECE geçerli, TAMAMLANMIŞ JSON olmalı.`
           // 21 Eylül 2026 — ana çağrıdaki aynı zaman aşımı düzeltmesi: SDK'nın
           // 10 dakikalık varsayılan zaman aşımı + otomatik tekrar denemeleri
           // burada da fonksiyonu Vercel'in sessizce öldürmesine yol açabilir.
@@ -2189,7 +2175,49 @@ export async function POST(req: NextRequest) {
       }, { status: 503 })
     }
 
-    // Görsel üretimi TAM soru seti oluşmadan çalıştırılmaz. Önceki sıralamada
+    const strictVerifyResult = await fetch(`${req.nextUrl.origin}/api/verify-questions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        questions,
+        topic,
+        grade,
+        language: effectiveLang,
+        questionType,
+        strictQualityPolicy: true,
+        objectiveCandidates: objectiveCandidates.map(candidate => ({
+          ref: candidate.ref,
+          objectiveCode: candidate.objectiveCode,
+          title: candidate.title,
+          subject: candidate.subject,
+          grade: candidate.grade,
+        })),
+      }),
+      signal: AbortSignal.timeout(50000),
+    }).then(async response => response.ok ? response.json() : null).catch(() => null)
+
+    if (!Array.isArray(strictVerifyResult?.questions) || strictVerifyResult.questions.length !== safeQCount) {
+      console.error(`[generate-quiz] strict_verification_failed verified=${strictVerifyResult?.questions?.length || 0}/${safeQCount}`)
+      return NextResponse.json({ error: 'quality_policy_failed', reason: 'independent_verification', message: 'Testin tüm soruları bağımsız kalite kontrolünden geçemediği için oluşturulmadı.' }, { status: 503 })
+    }
+    questions = strictVerifyResult.questions.map((question: any) => normalizeInteractiveQuestionShape(question, effectiveLang))
+    if (!hasStrictQuestionReview(questions, objectiveCandidates)) {
+      return NextResponse.json({ error: 'quality_policy_failed', reason: 'verification_evidence_missing', message: 'Soru kalite kontrol kanıtı eksik olduğu için test oluşturulmadı.' }, { status: 503 })
+    }
+    if (!hasDifficultyQuota(questions, targetDifficultyQuota)) {
+      console.error(`[generate-quiz] difficulty_quota_failed expected=${formatDifficultyQuota(targetDifficultyQuota)}`)
+      return NextResponse.json({ error: 'quality_policy_failed', reason: 'difficulty_distribution', message: 'Kolay, normal ve zor soru dağılımı adaptif kota ile eşleşmediği için test oluşturulmadı.' }, { status: 503 })
+    }
+    const objectiveMapping = applyCanonicalObjectiveMappings(questions, objectiveCandidates)
+    questions = objectiveMapping.questions
+    if (!hasCanonicalObjectiveCoverage(questions, objectiveCandidates)) {
+      console.error(`[generate-quiz] objective_mapping_failed mapped=${objectiveMapping.mappedCount}/${questions.length} candidates=${objectiveCandidates.length}`)
+      return NextResponse.json({ error: 'quality_policy_failed', reason: 'objective_mapping', message: 'Soruların tümü aynı sınıf ve konuya ait doğrulanmış kazanımlarla eşleşmediği için test oluşturulmadı.' }, { status: 503 })
+    }
+    validatedQuestionsForBank = questions.slice()
+
+    // Görsel üretimi kalite kontrollerinden geçmiş TAM soru seti üzerinde çalışır.
+    // Önceki sıralamada
     // doğrulama sonrası eksik kalan sorular tamamlanmadan 5+ SVG isteği
     // başlıyor, 120 saniyelik isteğin bütçesini tüketiyor ve öğrenciye
     // "Sorular tamamlanamadı" hatası dönüyordu. Görsel hiçbir zaman testin
@@ -2213,10 +2241,10 @@ export async function POST(req: NextRequest) {
     // isteğin gerçekte sahip olduğundan fazla zaman harcayamaz.
     const REQUEST_HARD_DEADLINE_MS = 112000 // 120sn'den DB yazımı/response için pay bırak
     const visualBudgetMs = REQUEST_HARD_DEADLINE_MS - (Date.now() - requestStartTime)
-    const visualIndexes = visualQuestionIndexes(questions, visualCategory, safeQCount, isNewGenerationRequest(topic))
-    const shouldGenerateVisuals = includeVisuals && visualCategory && visualIndexes.length > 0 && visualBudgetMs > 15000
-    if (includeVisuals && visualCategory && visualIndexes.length > 0 && !shouldGenerateVisuals) {
-      console.warn(`[generate-quiz] zaman bütçesi görseller için yetersiz (${visualBudgetMs}ms kaldı), görseller atlanıyor`)
+    const visualIndexes = visualQuestionIndexes(questions, visualCategory, safeQCount)
+    const shouldGenerateVisuals = Boolean(visualCategory && visualIndexes.length > 0 && visualBudgetMs > 15000)
+    if (visualCategory && visualIndexes.length > 0 && !shouldGenerateVisuals) {
+      console.warn(`[generate-quiz] required visual quota skipped: insufficient time (${visualBudgetMs}ms)`)
     }
     const svgResults = shouldGenerateVisuals
       ? await Promise.all(visualIndexes.map(i =>
@@ -2234,6 +2262,12 @@ export async function POST(req: NextRequest) {
         }
         console.log(`[generate-quiz] visual generated for q[${i}] contextScore=${visual.contextQuality.score}`)
       }
+    }
+
+    if (!hasVisualQuota(questions, requiredVisualCount(safeQCount))) {
+      const actual = questions.filter(question => hasVisualQuota([question], 1)).length
+      console.error(`[generate-quiz] visual_quota_failed required=${requiredVisualCount(safeQCount)} actual=${actual} topic=${topic}`)
+      return NextResponse.json({ error: 'quality_policy_failed', reason: 'visual_quota', message: 'Soruların en az yarısı için birebir eşleşen ve bağımsız kontrolden geçmiş görsel üretilemediği için test oluşturulmadı.' }, { status: 503 })
     }
 
     // 26 Ağustos 2026 — kaynak metni öğrenciye de gönder (yukarıdaki nota bkz.).
@@ -2294,9 +2328,6 @@ export async function POST(req: NextRequest) {
     const rigorSummary = summarizeQuestionSetRigor(questions, resolvedDifficulty)
     console.log(`[question-rigor] version=${rigorSummary.version} average=${rigorSummary.averageScore} minimum=${rigorSummary.minimumScore} application=${rigorSummary.applicationCount}/${rigorSummary.targetApplicationCount} reasoning=${rigorSummary.reasoningCount}/${rigorSummary.targetReasoningCount} direct=${rigorSummary.directRecallCount} visual=${rigorSummary.visualCount} target_met=${rigorSummary.meetsTarget}`)
     questions = balanceAnswerPositions(questions)
-    const objectiveMapping = applyCanonicalObjectiveMappings(questions, objectiveCandidates)
-    questions = objectiveMapping.questions
-
     // continueSessionId: adaptif akışta ikinci/sonraki parça — aynı testin
     // devamı, YENİ bir test değil. Bu yüzden kota (monthly_test_count) TEKRAR
     // artırılmıyor ve DB'ye ayrı bir session satırı yazılmıyor; mevcut
@@ -2459,6 +2490,15 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     console.error('Generate quiz error, trying OpenAI fallback:', error?.message)
+    // Once the strict production policy is active, never return an unscreened
+    // fallback set. A provider/verification outage must fail closed.
+    if (strictQualityPolicyActive) {
+      return NextResponse.json({
+        error: 'quality_policy_failed',
+        reason: 'generation_or_validation_unavailable',
+        message: 'Kalite ve kazanım kontrolleri tamamlanamadığı için test güvenli biçimde oluşturulamadı. Lütfen tekrar dene.',
+      }, { status: 503 })
+    }
     // GPT-4o yedek model
     try {
       if (!promptStr) throw new Error('No prompt')

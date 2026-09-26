@@ -20,7 +20,7 @@ import { logGeminiUsage } from '@/lib/ai-usage'
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 
-export async function verifyQuestionWithGemini(prompt: string): Promise<{ ok: boolean; reason?: string } | null> {
+export async function verifyQuestionWithGemini(prompt: string): Promise<{ ok: boolean; reason?: string; difficultyMatches?: boolean; objectiveMatches?: boolean } | null> {
   if (!GEMINI_API_KEY) return null // Anahtar gerçekten yoksa — bu katman aktif değil
 
   try {
