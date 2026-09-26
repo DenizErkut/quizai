@@ -2094,7 +2094,13 @@ export async function POST(req: NextRequest) {
             // daha güvenilir olan Sonnet ile yapılır — burada hız değil
             // doğru sayıya ulaşmak öncelikli.
             model: 'claude-sonnet-4-5',
-            max_tokens: Math.min(4000, Math.max(2000, missing * 600)),
+            // A 10-question recovery previously hit a hard 4000-token cap.
+            // With the rubric, objective refs and explanations that cap often
+            // cut the JSON after 5–6 items, causing every recovery round to
+            // repeat and eventually return "Sorular tamamlanamadı". Give the
+            // recovery call enough room for the requested missing set; the
+            // outer time budget still bounds the request.
+            max_tokens: Math.min(8000, Math.max(3000, missing * 700)),
             // 5 Eylül 2026 — P0 prompt caching: `prompt` değişkeni artık K12
             // yolunda zaten SIKIŞTIRILMIŞ (statik kısımlar çıkarılmış) hâlde,
             // bu yüzden topupPrompt de otomatik olarak küçük kalıyor. Aynı
