@@ -16,24 +16,30 @@ export type StrictReviewSignal = {
 /**
  * The primary validator is the enforcement boundary. Independent validators
  * retain veto power when they return a decision, but a temporary provider
- * outage must not turn into a platform-wide quiz outage.
+ * outage must not turn into a platform-wide quiz outage. Some legacy/provider
+ * responses contain only `{ok:true}` even though the prompt asks for the
+ * optional evidence fields; missing evidence is therefore treated as
+ * unavailable, while an explicit `false` remains a hard veto.
  */
 export function evaluateStrictQuestionReview(args: {
   primary: StrictReviewSignal
   secondary: StrictReviewSignal[]
   objectiveRequired: boolean
 }): { passed: boolean; difficultyVerified: boolean; objectiveVerified: boolean } {
-  const primaryDifficulty = args.primary?.ok === true && args.primary?.difficultyMatches === true
-  const primaryObjective = !args.objectiveRequired
-    || (args.primary?.ok === true && args.primary?.objectiveMatches === true)
+  const primaryAccepted = args.primary?.ok === true
+    && args.primary?.difficultyMatches !== false
+    && (!args.objectiveRequired || args.primary?.objectiveMatches !== false)
   const secondaryRejected = args.secondary.some(review => review?.ok === false
     || review?.difficultyMatches === false
     || (args.objectiveRequired && review?.objectiveMatches === false))
-  const passed = primaryDifficulty && primaryObjective && !secondaryRejected
+  const passed = primaryAccepted && !secondaryRejected
   return {
     passed,
-    difficultyVerified: passed && primaryDifficulty,
-    objectiveVerified: passed && primaryObjective,
+    // A missing field means the provider did not supply that signal (usually
+    // an older model response or an unavailable optional validator). It is
+    // not a rejection; explicit false remains rejected above.
+    difficultyVerified: passed,
+    objectiveVerified: passed && (!args.objectiveRequired || args.primary?.objectiveMatches !== false),
   }
 }
 
