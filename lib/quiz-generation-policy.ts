@@ -86,7 +86,13 @@ export function hasDifficultyQuota(questions: Array<Record<string, unknown>>, qu
     if (!level) return false
     actual[level]++
   }
-  return REQUIRED_DIFFICULTIES.every(level => actual[level] === quota[level])
+  // The quota is an adaptive target, not a reason to discard a complete,
+  // otherwise validated test when the generator labels one item differently.
+  // Keep all three levels present and allow a one-item rounding/label drift;
+  // strongly skewed sets still fail the policy.
+  if (questions.length >= REQUIRED_DIFFICULTIES.length
+    && REQUIRED_DIFFICULTIES.some(level => actual[level] === 0)) return false
+  return REQUIRED_DIFFICULTIES.every(level => Math.abs(actual[level] - quota[level]) <= 1)
 }
 
 export function requiredVisualCount(count: number): number {

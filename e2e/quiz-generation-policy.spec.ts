@@ -35,6 +35,12 @@ test('rejects missing, mislabeled, or incorrect difficulty distribution', () => 
   expect(formatDifficultyQuota(quota)).toContain('zor:')
   expect(hasDifficultyQuota(questions, quota)).toBe(true)
   expect(hasDifficultyQuota([...questions.slice(0, -1), { difficulty: 'kolay' }], quota)).toBe(false)
+  expect(hasDifficultyQuota([
+    { difficulty: 'kolay' }, { difficulty: 'kolay' }, { difficulty: 'kolay' },
+    { difficulty: 'normal' }, { difficulty: 'normal' }, { difficulty: 'normal' },
+    { difficulty: 'normal' }, { difficulty: 'zor' }, { difficulty: 'zor' }, { difficulty: 'zor' },
+  ], buildAdaptiveDifficultyQuota(10, 'normal'))).toBe(true)
+  expect(hasDifficultyQuota(Array.from({ length: 10 }, (_, i) => ({ difficulty: i === 0 ? 'kolay' : i === 9 ? 'zor' : 'normal' })), buildAdaptiveDifficultyQuota(10, 'normal'))).toBe(false)
 })
 
 test('requires at least half the questions to have a matched, QA-passed visual', () => {
