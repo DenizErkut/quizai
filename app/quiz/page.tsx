@@ -535,13 +535,30 @@ function QuizPageContent() {
   const hasFiles = uploadedFiles.length > 0
 
   // ── HATA MESAJLARI ──
-  function getErrorInfo(errorCode: string, status?: number): {code: string; title: string; desc: string; retry: boolean} {
+  function getErrorInfo(errorCode: string, status?: number, reason?: string, serverMessage?: string): {code: string; title: string; desc: string; retry: boolean} {
     if (status === 429 || errorCode === 'daily_limit_reached') return { code: 'daily_limit', title: "⏰ Günlük limit doldu", desc: "Bugünkü test hakkını kullandın. Yarın yenilenir ya da Altın'a geçerek sınırsız test çöz.", retry: false }
     if (errorCode === 'limit_reached') return { code: 'monthly_limit', title: "📚 Aylık limit doldu", desc: "Bu ay için test hakkın bitti. Sınırsız test için Altın'a geç.", retry: false }
     if (errorCode === 'out_of_curriculum') return { code: 'curriculum', title: "📖 Müfredat dışı konu", desc: "Bu konu MEB müfredatında yer almıyor. Başka bir konu dene ya da Altın ile tüm konulara eriş.", retry: false }
     if (errorCode === 'pdf_too_long') return { code: 'pdf', title: "📄 PDF çok uzun", desc: "PDF dosyan 100 sayfadan fazla. Daha kısa bir bölüm yükle ya da metni kopyalayıp yapıştır.", retry: false }
     if (errorCode === 'pdf_image_only') return { code: 'pdf', title: "🖼️ PDF okunemiyor", desc: "Bu PDF taranmış görsel içeriyor, metin çıkarılamıyor. Word veya metin dosyası yükle.", retry: false }
     if (errorCode === 'insufficient_questions') return { code: 'insufficient_questions', title: "🧩 Sorular tamamlanamadı", desc: "Kalite kontrolünden geçen soru sayısı yeterli değildi. Test kaydedilmedi; birkaç saniye sonra yeniden deneyebilirsin.", retry: true }
+    if (errorCode === 'quality_policy_failed') {
+      const titles: Record<string, string> = {
+        canonical_objectives_unavailable: '📚 Kazanım bulunamadı',
+        independent_verification: '🧪 Sorular doğrulanamadı',
+        verification_evidence_missing: '🧪 Kontrol kanıtı eksik',
+        difficulty_distribution: '📊 Zorluk dağılımı kurulamadı',
+        objective_mapping: '🎯 Kazanım eşleşmesi kurulamadı',
+        visual_quota: '🖼️ Görsel kotası tamamlanamadı',
+        generation_or_validation_unavailable: '⏱️ Kalite kontrolü tamamlanamadı',
+      }
+      return {
+        code: reason || 'quality_policy',
+        title: titles[reason || ''] || '🧪 Kalite kontrolü tamamlanamadı',
+        desc: serverMessage || 'Test kalite kurallarının tamamını karşılamadı ve kaydedilmedi. Lütfen yeniden dene.',
+        retry: true,
+      }
+    }
     if (status === 503 || status === 502 || status === 504) return { code: 'server', title: "🔧 Sunucu meşgul", desc: "Sunucularımız şu an yoğun. Birkaç saniye bekleyip tekrar dene.", retry: true }
     if (errorCode?.includes('invalid response')) return { code: 'ai_error', title: "🤖 AI yanıt hatası", desc: "Yapay zeka bu konu için geçerli soru üretemedi. Farklı bir konu veya daha kısa içerik dene.", retry: true }
     if (errorCode?.includes('timeout') || errorCode?.includes('abort')) return { code: 'timeout', title: "⏱️ Zaman aşımı", desc: "Sorular üretilirken zaman doldu. Daha az soru sayısı seç veya tekrar dene.", retry: true }
@@ -621,7 +638,7 @@ function QuizPageContent() {
           setTimeout(() => setScreen('topic'), 8000)
           return
         }
-        const errInfo = getErrorInfo(data.error || 'unknown', res.status)
+        const errInfo = getErrorInfo(data.error || 'unknown', res.status, data.reason, data.message)
         setQuizError(errInfo)
         setScreen('error')
         clearInterval(iv)

@@ -39,7 +39,7 @@ import { decideQuizProvider, getQuizProviderPolicy, QUIZ_PROVIDER_POLICY_VERSION
 import { attachQuestionRigorMetadata, summarizeQuestionSetRigor } from '@/lib/question-rigor'
 import { verifyVisualWithMistral } from '@/lib/mistral-quality'
 import { verifyVisualWithGemini } from '@/lib/gemini-visual-quality'
-import { buildAdaptiveDifficultyQuota, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, requiredVisualCount } from '@/lib/quiz-generation-policy'
+import { buildAdaptiveDifficultyQuota, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, requiredVisualCount, visualAttemptCount } from '@/lib/quiz-generation-policy'
 import { isSameGradeSource } from '@/lib/meb-source-scope'
 
 const anthropic = new Anthropic()
@@ -340,7 +340,7 @@ function canonicalQuestionDifficulty(value: unknown, fallback: string): string {
 
 function visualQuestionIndexes(questions: any[], category: string | null, requestedCount: number): number[] {
   if (!category || requestedCount <= 0) return []
-  const target = requiredVisualCount(requestedCount)
+  const target = visualAttemptCount(requestedCount)
   const preferred = questions
     .map((question, index) => ({ question, index }))
     .filter(({ question }) => visualQuestionCandidate(question, category))
@@ -459,7 +459,10 @@ async function visualMatchesQuestion(questionText: string, svg: string, correctA
     const score = Number(result.score)
     const reason = typeof result.reason === 'string' ? result.reason.slice(0, 240) : 'Görsel bağlamı doğrulanamadı.'
     const openAIPassed = Number.isFinite(score) && score >= 90 && result.contextMatch === true && result.answerLeak !== true && result.useful !== false
-    const passed = openAIPassed && geminiReview?.passed === true && (mistralReview?.passed ?? true)
+    // OpenAI is the mandatory enforcement boundary. Gemini and Mistral keep
+    // veto power when they return a decision, while a temporary timeout/quota
+    // issue in either auxiliary provider does not take the whole quiz offline.
+    const passed = openAIPassed && (geminiReview?.passed ?? true) && (mistralReview?.passed ?? true)
     const reviews = [
       `OpenAI: ${reason}`,
       ...(mistralReview ? [`Mistral: ${mistralReview.reason}`] : []),

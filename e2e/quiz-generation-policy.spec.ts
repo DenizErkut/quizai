@@ -1,12 +1,14 @@
 import { expect, test } from '@playwright/test'
 import {
   buildAdaptiveDifficultyQuota,
+  evaluateStrictQuestionReview,
   formatDifficultyQuota,
   hasCanonicalObjectiveCoverage,
   hasDifficultyQuota,
   hasStrictQuestionReview,
   hasVisualQuota,
   requiredVisualCount,
+  visualAttemptCount,
 } from '../lib/quiz-generation-policy'
 
 test('adaptive quota preserves all difficulty levels and weights them by mastery', () => {
@@ -61,4 +63,19 @@ test('requires each item to map to an approved canonical outcome and have strict
   expect(hasStrictQuestionReview([approvedQuestion], candidates)).toBe(true)
   expect(hasCanonicalObjectiveCoverage([{ ...approvedQuestion, learningObjectiveId: 'invented' }], candidates)).toBe(false)
   expect(hasStrictQuestionReview([{ ...approvedQuestion, objectiveVerified: false }], candidates)).toBe(false)
+})
+
+test('keeps auxiliary validators as vetoes without making an outage fatal', () => {
+  const primary = { ok: true, difficultyMatches: true, objectiveMatches: true }
+  expect(evaluateStrictQuestionReview({ primary, secondary: [null, undefined], objectiveRequired: true }).passed).toBe(true)
+  expect(evaluateStrictQuestionReview({ primary, secondary: [{ ok: false }], objectiveRequired: true }).passed).toBe(false)
+  expect(evaluateStrictQuestionReview({ primary, secondary: [{ ok: true, objectiveMatches: false }], objectiveRequired: true }).passed).toBe(false)
+  expect(evaluateStrictQuestionReview({ primary: { ok: true }, secondary: [], objectiveRequired: true }).passed).toBe(false)
+})
+
+test('generates spare visual candidates while preserving the fifty-percent pass quota', () => {
+  expect(requiredVisualCount(10)).toBe(5)
+  expect(visualAttemptCount(10)).toBe(7)
+  expect(visualAttemptCount(2)).toBe(2)
+  expect(visualAttemptCount(1)).toBe(1)
 })

@@ -11,6 +11,7 @@ import { logAnthropicUsage } from '@/lib/ai-usage'
 import { decideQuestionQuality, evaluateQuestionStructure, providerQualitySignal } from '@/lib/ai-gateway'
 import { verifyQuestionWithMistral } from '@/lib/mistral-quality'
 import { requireAgentCapability, writeAgentDecisionAudit } from '@/lib/agent-security-policy'
+import { evaluateStrictQuestionReview } from '@/lib/quiz-generation-policy'
 import { createClient } from '@supabase/supabase-js'
 
 const anthropic = new Anthropic()
@@ -265,15 +266,12 @@ export async function POST(req: NextRequest) {
           ])
 
           if (strictQualityPolicy) {
-            const difficultyVerified = Boolean(q.difficulty)
-              && primaryCheck?.ok === true && primaryCheck?.difficultyMatches === true
-              && geminiCheck?.ok === true && geminiCheck?.difficultyMatches === true
-              && mistralCheck?.ok !== false
-            const objectiveVerified = objectiveCandidates.length === 0
-              || (primaryCheck?.ok === true && primaryCheck?.objectiveMatches === true
-                && geminiCheck?.ok === true && geminiCheck?.objectiveMatches === true
-                && mistralCheck?.ok !== false)
-            if (!difficultyVerified || !objectiveVerified) {
+            const strictReview = evaluateStrictQuestionReview({
+              primary: primaryCheck,
+              secondary: [geminiCheck, mistralCheck],
+              objectiveRequired: objectiveCandidates.length > 0,
+            })
+            if (!Boolean(q.difficulty) || !strictReview.passed) {
               rejected.push(idx)
               rejectReasons.push(`Q${idx}: strict difficulty/outcome evidence missing or mismatched`)
               return
@@ -281,8 +279,8 @@ export async function POST(req: NextRequest) {
             verified.push({
               ...q,
               qualityVerificationVersion: 'quiz-quality-v2',
-              difficultyVerified: true,
-              objectiveVerified,
+              difficultyVerified: strictReview.difficultyVerified,
+              objectiveVerified: strictReview.objectiveVerified,
             })
             return
           }

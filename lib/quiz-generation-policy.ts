@@ -7,6 +7,36 @@ export interface DifficultyQuota {
   zor: number
 }
 
+export type StrictReviewSignal = {
+  ok?: boolean
+  difficultyMatches?: boolean
+  objectiveMatches?: boolean
+} | null | undefined
+
+/**
+ * The primary validator is the enforcement boundary. Independent validators
+ * retain veto power when they return a decision, but a temporary provider
+ * outage must not turn into a platform-wide quiz outage.
+ */
+export function evaluateStrictQuestionReview(args: {
+  primary: StrictReviewSignal
+  secondary: StrictReviewSignal[]
+  objectiveRequired: boolean
+}): { passed: boolean; difficultyVerified: boolean; objectiveVerified: boolean } {
+  const primaryDifficulty = args.primary?.ok === true && args.primary?.difficultyMatches === true
+  const primaryObjective = !args.objectiveRequired
+    || (args.primary?.ok === true && args.primary?.objectiveMatches === true)
+  const secondaryRejected = args.secondary.some(review => review?.ok === false
+    || review?.difficultyMatches === false
+    || (args.objectiveRequired && review?.objectiveMatches === false))
+  const passed = primaryDifficulty && primaryObjective && !secondaryRejected
+  return {
+    passed,
+    difficultyVerified: passed && primaryDifficulty,
+    objectiveVerified: passed && primaryObjective,
+  }
+}
+
 function normalizeDifficulty(value: unknown): RequiredDifficulty | null {
   if (typeof value !== 'string') return null
   const normalized = value.trim().toLocaleLowerCase('tr-TR').replace(/çok/g, 'cok')
@@ -53,6 +83,12 @@ export function hasDifficultyQuota(questions: Array<Record<string, unknown>>, qu
 
 export function requiredVisualCount(count: number): number {
   return Math.ceil(Math.max(0, count) * 0.5)
+}
+
+export function visualAttemptCount(questionCount: number): number {
+  const size = Math.max(0, Math.trunc(questionCount))
+  if (!size) return 0
+  return Math.min(size, requiredVisualCount(size) + Math.min(2, Math.floor(size / 2)))
 }
 
 export function hasValidatedQuestionVisual(question: Record<string, unknown>): boolean {
