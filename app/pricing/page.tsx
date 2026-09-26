@@ -21,7 +21,6 @@ export default function PricingPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [referralCount, setReferralCount] = useState(0)
   const [copied, setCopied] = useState(false)
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly')
 
   useEffect(() => {
     async function load() {
@@ -55,8 +54,8 @@ export default function PricingPage() {
     {
       id: 'silver',
       label: 'Gümüş',
-      price: billingCycle === 'monthly' ? '₺299' : '₺2.490',
-      sub: billingCycle === 'monthly' ? 'aylık' : 'yıllık',
+      price: '₺2.490',
+      sub: 'yıllık',
       color: '#64748b',
       accent: false,
       features: [
@@ -69,13 +68,13 @@ export default function PricingPage() {
         'Davet ile Altın kazan',
       ],
       cta: 'Gümüş\'e geç →',
-      ctaHref: `/checkout?plan=silver_${billingCycle}`,
+      ctaHref: '/checkout?plan=silver_yearly',
     },
     {
       id: 'premium',
       label: 'Altın',
-      price: billingCycle === 'monthly' ? '₺499' : '₺4.490',
-      sub: billingCycle === 'monthly' ? 'aylık' : 'yıllık',
+      price: '₺4.490',
+      sub: 'yıllık',
       color: '#2563eb',
       accent: true,
       badge: 'En popüler',
@@ -91,13 +90,13 @@ export default function PricingPage() {
         'Öncelikli destek',
       ],
       cta: 'Altın\'a geç →',
-      ctaHref: `/checkout?plan=gold_${billingCycle}`,
+      ctaHref: '/checkout?plan=gold_yearly',
     },
     {
       id: 'unlimited',
       label: 'Platin',
-      price: billingCycle === 'monthly' ? '₺2.399' : '₺19.990',
-      sub: billingCycle === 'monthly' ? 'aylık' : 'yıllık',
+      price: '₺19.990',
+      sub: 'yıllık',
       color: '#0d9488',
       accent: false,
       features: [
@@ -112,7 +111,7 @@ export default function PricingPage() {
         'Öncelikli & telefon desteği',
       ],
       cta: 'Platin\'e geç →',
-      ctaHref: `/checkout?plan=platinum_${billingCycle}`,
+      ctaHref: '/checkout?plan=platinum_yearly',
     },
   ]
 
@@ -129,15 +128,6 @@ export default function PricingPage() {
           <p style={{ color: 'var(--text2)', fontSize: '16px' }}>
             İhtiyacına uygun planı seç, hemen başla.
           </p>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'center', margin: '-1rem 0 1.75rem' }}>
-          <div style={{ display: 'inline-flex', padding: 4, borderRadius: 999, border: '1px solid var(--border)', background: 'var(--bg2)' }}>
-            {(['monthly', 'yearly'] as const).map(cycle => <button key={cycle} onClick={() => setBillingCycle(cycle)}
-              style={{ border: 0, borderRadius: 999, padding: '8px 18px', cursor: 'pointer', fontWeight: 700, fontFamily: 'var(--font-sans)', background: billingCycle === cycle ? 'var(--primary)' : 'transparent', color: billingCycle === cycle ? '#fff' : 'var(--text2)' }}>
-              {cycle === 'monthly' ? 'Aylık' : 'Yıllık'}
-            </button>)}
-          </div>
         </div>
 
         {/* Plan cards */}
