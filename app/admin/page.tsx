@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities } from '@/lib/identity/resolve-client'
@@ -107,6 +107,14 @@ export default function AdminPage() {
     kind: 'meb' | 'exam'; id: string; title: string; content: string; loading: boolean
   } | null>(null)
   const [deleteConfirming, setDeleteConfirming] = useState(false)
+  const [resourceEditor, setResourceEditor] = useState<{
+    id: string; title: string; grade: string; subject: string; unit: string; level: string
+    source_type: string; file_url: string | null; raw_text: string
+    mode: 'view' | 'edit'; loading: boolean; saving: boolean; error: string
+  } | null>(null)
+  const [objectiveExtractingId, setObjectiveExtractingId] = useState<string | null>(null)
+  const [objectiveBatchToOpen, setObjectiveBatchToOpen] = useState<string | null>(null)
+  const clearObjectiveBatchToOpen = useCallback(() => setObjectiveBatchToOpen(null), [])
 
   // Madde 6: MEB kaynakları geriye dönük sağlık taraması
   const [healthScan, setHealthScan] = useState<any | null>(null)
@@ -148,6 +156,73 @@ export default function AdminPage() {
   const supabase = createClient() as any
 
   const [isAdmin, setIsAdmin] = useState(false)
+
+  async function openMebResource(id: string, mode: 'view' | 'edit') {
+    setResourceEditor({ id, title: '', grade: '', subject: '', unit: '', level: 'ortaokul', source_type: '', file_url: null, raw_text: '', mode, loading: true, saving: false, error: '' })
+    try {
+      const response = await fetch(`/api/admin/meb-upload?id=${encodeURIComponent(id)}`)
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Kaynak açılamadı.')
+      setResourceEditor({
+        id: data.resource.id,
+        title: data.resource.title || '',
+        grade: data.resource.grade || '',
+        subject: data.resource.subject || '',
+        unit: data.resource.unit || '',
+        level: data.resource.level || 'ortaokul',
+        source_type: data.resource.source_type || '',
+        file_url: data.resource.file_url || null,
+        raw_text: data.resource.raw_text || '',
+        mode, loading: false, saving: false, error: '',
+      })
+    } catch (error) {
+      setResourceEditor(current => current ? { ...current, loading: false, error: error instanceof Error ? error.message : 'Kaynak açılamadı.' } : current)
+    }
+  }
+
+  async function saveMebResource() {
+    if (!resourceEditor || resourceEditor.mode !== 'edit') return
+    setResourceEditor(current => current ? { ...current, saving: true, error: '' } : current)
+    try {
+      const response = await fetch('/api/admin/meb-upload', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: resourceEditor.id, title: resourceEditor.title, grade: resourceEditor.grade,
+          subject: resourceEditor.subject, unit: resourceEditor.unit, level: resourceEditor.level,
+          raw_text: resourceEditor.raw_text,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Kaynak güncellenemedi.')
+      setMebResources(current => current.map(item => item.id === resourceEditor.id
+        ? { ...item, title: resourceEditor.title, grade: resourceEditor.grade, subject: resourceEditor.subject, unit: resourceEditor.unit, level: resourceEditor.level, preview: resourceEditor.raw_text.slice(0, 200), char_count: data.char_count }
+        : item))
+      setResourceEditor(current => current ? { ...current, mode: 'view', saving: false, error: '' } : current)
+      setMebMsg(`✅ Kaynak güncellendi; ${data.chunks} arama parçası yenilendi. Orijinal PDF dosyası korunmuştur.`)
+    } catch (error) {
+      setResourceEditor(current => current ? { ...current, saving: false, error: error instanceof Error ? error.message : 'Kaynak güncellenemedi.' } : current)
+    }
+  }
+
+  async function extractMebObjectives(resourceId: string) {
+    setObjectiveExtractingId(resourceId)
+    setMebMsg('')
+    try {
+      const response = await fetch('/api/admin/meb-objective-extract', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resourceId }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Kazanım taslağı çıkarılamadı.')
+      setObjectiveBatchToOpen(data.batchId)
+      setTab('curriculum')
+      setMebMsg(`✅ ${data.extractedCount} kazanım satırı inceleme taslağına alındı. Öğrenciye açılmadı; onay bekliyor.`)
+    } catch (error) {
+      setMebMsg(`❌ ${error instanceof Error ? error.message : 'Kazanım taslağı çıkarılamadı.'}`)
+    } finally {
+      setObjectiveExtractingId(null)
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -1593,7 +1668,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             )}
           </div>
           <LearningCatalogReview />
-          <LearningObjectiveImport />
+          <LearningObjectiveImport openBatchId={objectiveBatchToOpen} onBatchOpened={clearObjectiveBatchToOpen} />
           <CurriculumLifecycleManager />
           <LearningGraphQuality />
           <LearningGraphPrerequisitePackages />
@@ -2152,20 +2227,25 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                           </div>
                         )}
                       </div>
-                      <button onClick={async () => {
-                        // "Önce gör, sonra sil": window.confirm(title) yerine artık
-                        // TAM raw_text içeriğini çekip modal'da gösteriyoruz.
-                        setDeletePreview({ kind: 'meb', id: r.id, title: r.title, content: '', loading: true })
-                        try {
-                          const res = await fetch(`/api/admin/meb-upload?id=${r.id}`)
-                          const data = await res.json()
-                          setDeletePreview({ kind: 'meb', id: r.id, title: r.title, content: res.ok ? (data.resource?.raw_text || '(içerik boş)') : `Hata: ${data.error}`, loading: false })
-                        } catch (e: any) {
-                          setDeletePreview({ kind: 'meb', id: r.id, title: r.title, content: `Hata: ${e.message}`, loading: false })
-                        }
-                      }} style={{ padding: '5px 10px', borderRadius: '7px', border: '1px solid rgba(220,38,38,0.3)', background: 'var(--red-bg)', color: 'var(--red)', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0, marginLeft: '12px' }}>
-                        🗑️ Sil
-                      </button>
+                      <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', justifyContent: 'flex-end', marginLeft: '12px' }}>
+                        <button onClick={() => openMebResource(r.id, 'view')} className="btn btn-sm" style={{ fontSize: '11px', padding: '5px 8px' }}>👁 Görüntüle</button>
+                        <button onClick={() => openMebResource(r.id, 'edit')} className="btn btn-sm" style={{ fontSize: '11px', padding: '5px 8px' }}>✏️ Düzenle</button>
+                        <button onClick={() => extractMebObjectives(r.id)} disabled={objectiveExtractingId === r.id} className="btn btn-sm" style={{ fontSize: '11px', padding: '5px 8px', background: '#e8f5ef', color: '#176b4d', borderColor: '#b9dfcc' }}>
+                          {objectiveExtractingId === r.id ? '⏳ Çıkarılıyor…' : '🎯 Kazanım taslağı çıkar'}
+                        </button>
+                        <button onClick={async () => {
+                          setDeletePreview({ kind: 'meb', id: r.id, title: r.title, content: '', loading: true })
+                          try {
+                            const res = await fetch(`/api/admin/meb-upload?id=${r.id}`)
+                            const data = await res.json()
+                            setDeletePreview({ kind: 'meb', id: r.id, title: r.title, content: res.ok ? (data.resource?.raw_text || '(içerik boş)') : `Hata: ${data.error}`, loading: false })
+                          } catch (error) {
+                            setDeletePreview({ kind: 'meb', id: r.id, title: r.title, content: `Hata: ${error instanceof Error ? error.message : 'Kaynak açılamadı.'}`, loading: false })
+                          }
+                        }} style={{ padding: '5px 8px', borderRadius: '7px', border: '1px solid rgba(220,38,38,0.3)', background: 'var(--red-bg)', color: 'var(--red)', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                          🗑️ Sil
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -2358,6 +2438,50 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           Bkz. pratium-bekleyen-isler-uygulama-plani.md Madde 5: hiçbir DELETE
           isteği, TAM içerik (sadece ilk 50-70 karakter değil) görülmeden ve
           açık onay verilmeden gönderilmez. */}
+      {resourceEditor && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1900, padding: '1rem' }}>
+          <div className="card" style={{ maxWidth: '920px', width: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--primary)' }}>{resourceEditor.mode === 'edit' ? '✏️ MEB Kaynağını Düzenle' : '📄 MEB Kaynağını Görüntüle'}</div>
+                <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '4px' }}>Metin değişiklikleri arama parçalarına atomik olarak uygulanır; yüklenen orijinal PDF dosyası korunur.</div>
+              </div>
+              <button className="btn btn-sm" onClick={() => setResourceEditor(null)} disabled={resourceEditor.saving}>✕ Kapat</button>
+            </div>
+            {resourceEditor.file_url && <a href={resourceEditor.file_url} target="_blank" rel="noreferrer" style={{ fontSize: '12px', color: 'var(--accent)' }}>Orijinal dosyayı yeni sekmede aç ↗</a>}
+            {resourceEditor.loading ? <div className="spinner" /> : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
+                  {([
+                    ['title', 'Başlık'], ['level', 'Seviye'], ['grade', 'Sınıf'], ['subject', 'Ders'], ['unit', 'Ünite'],
+                  ] as const).map(([key, label]) => (
+                    <label key={key} style={{ fontSize: '11px', color: 'var(--text3)' }}>
+                      {label}
+                      <input value={resourceEditor[key]} disabled={resourceEditor.mode === 'view' || resourceEditor.saving}
+                        onChange={event => setResourceEditor(current => current ? { ...current, [key]: event.target.value } : current)}
+                        style={{ display: 'block', width: '100%', marginTop: '4px', padding: '8px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', boxSizing: 'border-box' }} />
+                    </label>
+                  ))}
+                </div>
+                <label style={{ fontSize: '11px', color: 'var(--text3)' }}>
+                  Kaynaktan çıkarılan / düzenlenebilir metin
+                  <textarea value={resourceEditor.raw_text} disabled={resourceEditor.mode === 'view' || resourceEditor.saving}
+                    onChange={event => setResourceEditor(current => current ? { ...current, raw_text: event.target.value } : current)}
+                    rows={16} spellCheck={false}
+                    style={{ display: 'block', width: '100%', marginTop: '4px', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'monospace', fontSize: '12px', lineHeight: 1.5 }} />
+                </label>
+                <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{resourceEditor.raw_text.length.toLocaleString('tr-TR')} karakter · Kaynak tipi: {resourceEditor.source_type || 'belirtilmemiş'}</div>
+              </>
+            )}
+            {resourceEditor.error && <div style={{ color: 'var(--red)', fontSize: '12px' }}>{resourceEditor.error}</div>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              {resourceEditor.mode === 'view' && !resourceEditor.loading && <button className="btn btn-sm" onClick={() => setResourceEditor(current => current ? { ...current, mode: 'edit', error: '' } : current)}>Düzenlemeyi aç</button>}
+              {resourceEditor.mode === 'edit' && <button className="btn btn-sm" onClick={() => void saveMebResource()} disabled={resourceEditor.loading || resourceEditor.saving || !resourceEditor.raw_text.trim()}>{resourceEditor.saving ? 'Kaydediliyor…' : 'Kaydet ve aramayı yenile'}</button>}
+              <button className="btn btn-sm" onClick={() => setResourceEditor(null)} disabled={resourceEditor.saving}>Kapat</button>
+            </div>
+          </div>
+        </div>
+      )}
       {deletePreview && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem' }}>
           <div className="card" style={{ maxWidth: '640px', width: '100%', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
