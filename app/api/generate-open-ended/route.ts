@@ -7,7 +7,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 60
 export const runtime = 'nodejs'
-import { pickQuizEngine, generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
+import { generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
+import { pickMeasuredQuizEngine } from '@/lib/ai-gateway/measured-quiz-router'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { checkMinorConsentBlock } from '@/lib/identity/client'
 
@@ -150,7 +151,7 @@ Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
     // önceden bilinen bir zorluk seçimi yok (sadece sınıf seviyesinden
     // çıkarılıyor) — bu yüzden hardDifficulty kullanılmıyor, sadece
     // GPT-4.1-mini gövde + Mistral'in mevcut payı uygulanıyor.
-    const openEndedDecision = pickQuizEngine({ bucketKey: `open-ended-v1:${user.id}` })
+    const openEndedDecision = await pickMeasuredQuizEngine({ bucketKey: `open-ended-v1:${user.id}` })
     let text: string
     try {
       const result = await generateWithRoutedProvider(openEndedDecision, {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
-import { pickQuizEngine, generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
+import { generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
+import { pickMeasuredQuizEngine } from '@/lib/ai-gateway/measured-quiz-router'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -42,7 +43,7 @@ SADECE geçerli JSON döndür:
   // lib/ai-gateway/quiz-provider-router.ts. Canlı quiz'de öğretmen sadece
   // kolay/normal/zor seçebiliyor (çok zor yok), o yüzden hardDifficulty
   // sadece 'zor' için true.
-  const decision = pickQuizEngine({
+  const decision = await pickMeasuredQuizEngine({
     bucketKey: `live-quiz-v1:${user.id}`,
     hardDifficulty: difficulty === 'zor',
   })

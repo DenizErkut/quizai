@@ -5,7 +5,8 @@ import { balanceAnswerPositions } from '@/lib/question-bank'
 import { callOpenAI } from '@/lib/openai'
 import { EXAM_FORMATS, resolveExamFormat, type ExamFormat, type ExamSection } from '@/lib/exam-system'
 import { createHash } from 'node:crypto'
-import { pickQuizEngine, generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
+import { generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
+import { pickMeasuredQuizEngine } from '@/lib/ai-gateway/measured-quiz-router'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -255,7 +256,7 @@ export async function POST(req: NextRequest) {
   // Mistral'in mevcut payı uygulanıyor. Karar TÜM sınav isteği için TEK
   // seferde alınıyor (her bölüm/deneme için ayrı ayrı değil) ki aynı sınavın
   // farklı bölümleri arasında tutarlı bir motor kullanılsın.
-  const examGenDecision = pickQuizEngine({ bucketKey: `exam-generation-v1:${user.id}` })
+  const examGenDecision = await pickMeasuredQuizEngine({ bucketKey: `exam-generation-v1:${user.id}` })
 
   try {
     const results: Record<string, any[]> = {}

@@ -79,6 +79,21 @@ test('provider observability reports real usage cost and qualified quality sampl
   expect(admin).toContain('<ProviderObservability />')
 })
 
+test('measured router uses quality cost and volume without overriding protected roles', () => {
+  const router = readFileSync(join(process.cwd(), 'lib/ai-gateway/measured-quiz-router.ts'), 'utf8')
+  const live = readFileSync(join(process.cwd(), 'app/api/live-quiz/route.ts'), 'utf8')
+  const exam = readFileSync(join(process.cwd(), 'app/api/generate-exam/route.ts'), 'utf8')
+  expect(router).toContain("from('ai_usage_logs')")
+  expect(router).toContain('current.calls < 20')
+  expect(router).toContain('current.qualitySample < 10')
+  expect(router).toContain('current.successRate < 0.7')
+  expect(router).toContain('current.costPerCall > cheapestComparable.costPerCall * 2.5')
+  expect(router).toContain("opts.hardDifficulty === true")
+  expect(router).toContain("routingReason: 'METRICS_UNAVAILABLE_FAIL_SAFE'")
+  expect(live).toContain('await pickMeasuredQuizEngine')
+  expect(exam).toContain('await pickMeasuredQuizEngine')
+})
+
 test('database plan constraint accepts every checkout profile plan', () => {
   const migration = readFileSync(join(process.cwd(), 'supabase/migrations/20260927150931_allow_current_profile_plans.sql'), 'utf8')
   for (const plan of ['free', 'silver', 'premium', 'unlimited']) expect(migration).toContain(`'${plan}'::text`)

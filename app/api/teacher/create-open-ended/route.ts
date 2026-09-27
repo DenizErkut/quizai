@@ -11,7 +11,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 60
 export const runtime = 'nodejs'
-import { pickQuizEngine, generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
+import { generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
+import { pickMeasuredQuizEngine } from '@/lib/ai-gateway/measured-quiz-router'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { verifyQuestionWithOpenAI } from '@/lib/openai'
 
@@ -120,7 +121,7 @@ async function generateWithAI(subject: string, topic: string, grade: string, ori
   // kullanıyordu. Aynı çoklu-sağlayıcı tasarım burada da devreye alınıyor
   // (bkz. lib/ai-gateway/quiz-provider-router.ts) — öğrencinin kendi
   // üretimiyle (generate-open-ended) aynı mantık, sadece öğretmen tetikliyor.
-  const decision = pickQuizEngine({ bucketKey: `open-ended-v1:${userId}` })
+  const decision = await pickMeasuredQuizEngine({ bucketKey: `open-ended-v1:${userId}` })
   let text: string
   try {
     const result = await generateWithRoutedProvider(decision, {
