@@ -14,6 +14,7 @@ test('only adaptive continuation may accept a non-empty verified subset', () => 
   expect(route).toContain("body?.adaptiveCandidateBatch === true")
   expect(route).toContain("typeof body?.continueSessionId === 'string'")
   expect(route).toContain('adaptiveCandidateBatch && verifiedCandidateCount > 0')
+  expect(route).toContain('adaptiveCandidateBatch && questions.length > 0')
   expect(route).toContain('combinedMinimum = requiredVisualCount(existingQuestions.length + safeQCount)')
   expect(route).toContain('batchVisualMinimum = Math.max(0, combinedMinimum - existingVisualCount)')
 })

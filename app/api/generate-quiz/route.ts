@@ -2345,10 +2345,12 @@ export async function POST(req: NextRequest) {
     // başlatmaya çalışıyordu. Bu kontrol kota/session değişikliklerinden
     // ÖNCE çalışır; öğrenciye yeniden deneme seçeneği verir ve bozuk oturum
     // bırakmaz.
-    if (questions.length !== safeQCount && questions.length >= 3) {
+    if (questions.length !== safeQCount
+      && ((adaptiveCandidateBatch && questions.length > 0) || questions.length >= 3)) {
       // Provider latency/format drift can leave a smaller but still useful
-      // validated set after recovery. Persist that set instead of discarding
-      // the entire test; one- or two-question remnants remain rejected.
+      // candidate set after recovery. Normal testlerde bir-iki soruluk artık
+      // hâlâ reddedilir; adaptif devamda ise bunlar henüz öğrenciye açılmaz,
+      // aşağıdaki bağımsız doğrulamaya aday olarak ilerler.
       console.warn(`[generate-quiz] recovery produced ${questions.length}/${safeQCount}; accepting validated subset`)
       safeQCount = questions.length
       targetDifficultyQuota = quotaForCount(safeQCount)
