@@ -9,6 +9,7 @@ import {
   hasDifficultyQuota,
   hasStrictQuestionReview,
   hasVisualQuota,
+  minimumVerifiedQuestionCount,
   requiredVisualCount,
   normalizeRequestedQuestionType,
   visualAttemptCount,
@@ -86,6 +87,14 @@ test('requires thirty percent matched visuals with a seventy percent QA score', 
     { ...valid('Q6'), svg: 'not svg' }]
   expect(hasVisualQuota(questions, 3)).toBe(true)
   expect(hasVisualQuota(questions, 4)).toBe(false)
+})
+
+test('keeps the seventy-percent quality target usable for small batches', () => {
+  expect(minimumVerifiedQuestionCount(0)).toBe(0)
+  expect(minimumVerifiedQuestionCount(1)).toBe(1)
+  expect(minimumVerifiedQuestionCount(2)).toBe(1)
+  expect(minimumVerifiedQuestionCount(3)).toBe(2)
+  expect(minimumVerifiedQuestionCount(10)).toBe(7)
 })
 
 test('requires each item to map to an approved canonical outcome and have strict-review evidence', () => {

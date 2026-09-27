@@ -14,7 +14,7 @@ test('quality gate accepts a verified seventy-percent subset without relaxing ob
   const route = readFileSync(join(process.cwd(), 'app/api/generate-quiz/route.ts'), 'utf8')
   expect(route).toContain("body?.adaptiveCandidateBatch === true")
   expect(route).toContain("typeof body?.continueSessionId === 'string'")
-  expect(route).toContain('Math.ceil(safeQCount * 0.70)')
+  expect(route).toContain('minimumVerifiedQuestionCount(safeQCount)')
   expect(route).toContain('verifiedCandidateCount >= minimumVerifiedCount')
   expect(route).toContain('adaptiveCandidateBatch && questions.length > 0')
   expect(route).toContain('combinedMinimum = requiredVisualCount(existingQuestions.length + safeQCount)')

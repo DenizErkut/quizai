@@ -39,7 +39,7 @@ import { decideQuizProvider, getQuizProviderPolicy, QUIZ_PROVIDER_POLICY_VERSION
 import { attachQuestionRigorMetadata, summarizeQuestionSetRigor } from '@/lib/question-rigor'
 import { verifyVisualWithMistral } from '@/lib/mistral-quality'
 import { verifyVisualWithGemini } from '@/lib/gemini-visual-quality'
-import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
+import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, minimumVerifiedQuestionCount, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
 import { isSameGradeSource } from '@/lib/meb-source-scope'
 
 const anthropic = new Anthropic()
@@ -2450,7 +2450,7 @@ export async function POST(req: NextRequest) {
     }).then(async response => response.ok ? response.json() : null).catch(() => null)
 
     const verifiedCandidateCount = Array.isArray(strictVerifyResult?.questions) ? strictVerifyResult.questions.length : 0
-    const minimumVerifiedCount = Math.max(1, Math.ceil(safeQCount * 0.70))
+    const minimumVerifiedCount = minimumVerifiedQuestionCount(safeQCount)
     if (verifiedCandidateCount >= minimumVerifiedCount && verifiedCandidateCount < safeQCount) {
       console.warn(`[generate-quiz] quality_threshold_subset accepted=${verifiedCandidateCount}/${safeQCount} minimum=${minimumVerifiedCount}`)
       safeQCount = verifiedCandidateCount

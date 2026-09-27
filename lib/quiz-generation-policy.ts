@@ -172,6 +172,20 @@ export function requiredVisualCount(count: number, ratio = 0.3): number {
   return Math.ceil(Math.max(0, count) * ratio)
 }
 
+/**
+ * Convert the 70% quality target into a usable integer threshold.
+ *
+ * `ceil` made a two-question starter batch require 2/2 accepted questions,
+ * turning the configured 70% target into a hidden 100% gate. Rounding keeps
+ * the closest whole-question target (2 -> 1, 3 -> 2, 10 -> 7), while still
+ * requiring at least one independently verified question.
+ */
+export function minimumVerifiedQuestionCount(count: number, ratio = 0.7): number {
+  const size = Math.max(0, Math.trunc(count))
+  if (!size) return 0
+  return Math.max(1, Math.round(size * ratio))
+}
+
 export function visualAttemptCount(questionCount: number): number {
   const size = Math.max(0, Math.trunc(questionCount))
   if (!size) return 0
