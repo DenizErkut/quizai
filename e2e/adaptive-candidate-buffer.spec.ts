@@ -126,6 +126,8 @@ test('question booklet records can be viewed, edited and safely deleted by admin
   expect(admin).toContain('👁️ Görüntüle')
   expect(admin).toContain('✏️ Düzelt')
   expect(admin).toContain('🗑️ Sil')
+  expect(admin).toContain('✓ Onayla — referans kullan')
+  expect(admin).toContain('yalnızca benzer/özgün soru üretiminde referans olarak kullanılacak')
   expect(admin).toContain('orijinal PDF korunur')
   expect(migration).toContain('security invoker')
   expect(migration).toContain('from public, anon, authenticated')

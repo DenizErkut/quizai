@@ -1956,11 +1956,16 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '99px', background: ex.source_type === 'teacher' ? 'rgba(22,163,74,0.1)' : 'rgba(99,102,241,0.1)', color: ex.source_type === 'teacher' ? '#15803d' : '#6366f1', fontWeight: 600 }}>{ex.source_type === 'teacher' ? 'Öğretmen' : 'Anonim'} · {ex.review_status === 'approved' ? 'Onaylı' : 'Bekliyor'}</span>
                     <button onClick={() => void openExamResource(ex.id, 'view')} className="btn btn-sm" style={{ flexShrink: 0 }}>👁️ Görüntüle</button>
                     <button onClick={() => void openExamResource(ex.id, 'edit')} className="btn btn-sm" style={{ flexShrink: 0 }}>✏️ Düzelt</button>
-                    {ex.source_type === 'teacher' && ex.review_status !== 'approved' && <button onClick={async () => {
+                    {ex.review_status !== 'approved' && <button onClick={async () => {
                       const res = await fetch('/api/admin/exam-upload', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: ex.id, review_status: 'approved' }) })
                       const data = await res.json()
-                      setExamMsg(res.ok ? `✅ Onaylandı; ${data.promoted || 0} soru anlık test havuzuna aktarıldı.` : `❌ ${data.error || 'Onay başarısız'}`)
-                    }} style={{ padding: '5px 9px', borderRadius: '7px', border: '1px solid rgba(22,163,74,0.3)', background: 'rgba(22,163,74,0.08)', color: '#15803d', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>✓ Onayla ve havuza aktar</button>}
+                      if (res.ok) {
+                        setExamList(current => current.map(item => item.id === ex.id ? { ...item, review_status: 'approved' } : item))
+                        setExamMsg(ex.source_type === 'teacher'
+                          ? `✅ Onaylandı; ${data.promoted || 0} soru anlık test havuzuna aktarıldı.`
+                          : '✅ Anonim kitapçık onaylandı; yalnızca benzer/özgün soru üretiminde referans olarak kullanılacak.')
+                      } else setExamMsg(`❌ ${data.error || 'Onay başarısız'}`)
+                    }} style={{ padding: '5px 9px', borderRadius: '7px', border: '1px solid rgba(22,163,74,0.3)', background: 'rgba(22,163,74,0.08)', color: '#15803d', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>{ex.source_type === 'teacher' ? '✓ Onayla ve havuza aktar' : '✓ Onayla — referans kullan'}</button>}
                     <button onClick={async () => {
                       // "Önce gör, sonra sil" — exam_chunks için ilk defa buradan
                       // silinebiliyor (önceden repo dışı, elle SQL ile yapılıyordu).
