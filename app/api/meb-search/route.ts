@@ -87,17 +87,25 @@ export async function POST(req: NextRequest) {
 
     // meb_resources.raw_text'ten direkt ara (chunk'sız — disk IO tasarrufu)
     if (!context) {
-      let q = adminDb
-        .from('meb_resources')
-        .select('title, subject, unit, grade, raw_text')
-        .limit(5) // birkaç fazla cek, asagida en zengin olanlari secelim
+      const selectFields = 'title, subject, unit, grade, raw_text, health_flag'
+      let exactQuery = adminDb.from('meb_resources').select(selectFields).limit(50)
+      if (subject) exactQuery = exactQuery.ilike('subject', `%${subject}%`)
+      if (unit) exactQuery = exactQuery.ilike('unit', `%${unit}%`)
+      const { data: exactResources } = await exactQuery
 
-      // Önce unit eşleştir
-      if (unit) q = q.ilike('unit', `%${unit}%`)
-      else if (subject) q = q.ilike('subject', `%${subject}%`)
-      else if (grade) q = q.eq('grade', grade)
-
-      const { data: allResources } = await q
+      // Kazanım kataloğu kanonik başlığı (örn. "Fizik Bilimi Ve Kariyer
+      // Keşfi") kullanırken kaynak belgesi "1. Ünite: ..." taşıyabilir.
+      // Tam ünite sorgusu sonuç üretmezse yalnız AYNI ders içindeki kaynakları
+      // genişlet; sınıf filtresi aşağıda fail-closed uygulanmaya devam eder.
+      let allResources = exactResources || []
+      if (allResources.length === 0 && subject) {
+        const { data: subjectResources } = await adminDb
+          .from('meb_resources')
+          .select(selectFields)
+          .ilike('subject', `%${subject}%`)
+          .limit(200)
+        allResources = subjectResources || []
+      }
 
       if (allResources?.length) {
         // Grade formatları veritabanında çok tutarsız ("Ortaokul 6. Sınıf",
@@ -123,13 +131,22 @@ export async function POST(req: NextRequest) {
         // olan kaynaklari, gercek anlatisal/orneklerle dolu icerik
         // varsa ELE. Yoksa (tek secenek buysa) yine kullan.
         // (isKazanimListesi artık lib/content-filters.ts'ten import ediliyor.)
-        const narrative = gradeFiltered.filter((r: any) => !isKazanimListesi(r.raw_text || ''))
-        const pool = narrative.length > 0 ? narrative : gradeFiltered
+        const healthy = gradeFiltered.filter((r: any) => !r.health_flag)
+        const healthyPool = healthy.length > 0 ? healthy : gradeFiltered
+        const narrative = healthyPool.filter((r: any) => !isKazanimListesi(r.raw_text || ''))
+        const pool = narrative.length > 0 ? narrative : healthyPool
 
         // En zengin (en uzun) icerigi one al - daha cok ornek/hikaye/haber
         // demek, sorulari cesitlendirmek icin daha fazla malzeme demek
+        const topicKey = normalizeTR(unit || topic)
         const resources = pool
-          .sort((a: any, b: any) => (b.raw_text?.length || 0) - (a.raw_text?.length || 0))
+          .sort((a: any, b: any) => {
+            const aHaystack = normalizeTR(`${a.unit || ''} ${a.raw_text || ''}`)
+            const bHaystack = normalizeTR(`${b.unit || ''} ${b.raw_text || ''}`)
+            const aRelevant = topicKey && aHaystack.includes(topicKey) ? 1 : 0
+            const bRelevant = topicKey && bHaystack.includes(topicKey) ? 1 : 0
+            return bRelevant - aRelevant || (b.raw_text?.length || 0) - (a.raw_text?.length || 0)
+          })
           .slice(0, 3)
 
         context = resources.map((r: any, i: number) => {
