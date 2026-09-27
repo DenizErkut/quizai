@@ -98,3 +98,16 @@ test('teacher booklets ground generation and approved exact questions re-enter t
   expect(bank).toContain("contains('question', { sourcePolicy: 'teacher_exact' })")
   expect(bank).toContain('hasRealVisualAsset(clean)')
 })
+
+test('open-ended grading accepts age-appropriate concise student language', () => {
+  const generate = readFileSync(join(process.cwd(), 'app/api/generate-open-ended/route.ts'), 'utf8')
+  const grade = readFileSync(join(process.cwd(), 'app/api/grade-open-ended/route.ts'), 'utf8')
+  const teacher = readFileSync(join(process.cwd(), 'app/api/teacher/create-open-ended/route.ts'), 'utf8')
+  expect(generate).toContain('YAŞA UYGUN CEVAP STANDARDI — ZORUNLU')
+  expect(generate).toContain('Ortaokul için 1-3 kısa ve açık cümle')
+  expect(teacher).toContain('YAŞA UYGUN CEVAP STANDARDI — ZORUNLU')
+  expect(grade).toContain('YAŞA UYGUN PUANLAMA KURALI — EN ÖNCELİKLİ KURAL')
+  expect(grade).toContain("gradeKey.includes('lise') ? 20 : 12")
+  expect(grade).not.toContain('en az 50 karakter olmalı')
+  expect(grade).toContain('teknik sözcükleri birebir kullanma şartı arama')
+})

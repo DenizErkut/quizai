@@ -118,6 +118,14 @@ export async function POST(req: NextRequest) {
 2) Bu senaryoya dayanan, öğrencinin ELEŞTİRİEL/ANALİTİK DÜŞÜNMESİNİ gerektiren, kendi cümleleriyle cevaplayacağı AÇIK UÇLU bir soru sorulur (şık YOKTUR, çoktan seçmeli DEĞİLDİR).
 3) Sorunun değerlendirilmesi için 3-4 kriterden oluşan DERECELİ PUANLAMA ANAHTARI (rubrik) hazırlanır, toplam 100 puan.
 
+YAŞA UYGUN CEVAP STANDARDI — ZORUNLU:
+- Beklenen cevap bir akademisyen/uzman cevabı değil, ${grade} öğrencisinin kendi kurabileceği doğal cümleler olmalıdır.
+- Ortaokul için 1-3 kısa ve açık cümle; lise için 2-4 açık cümle tam puan almaya yeterli olabilmelidir.
+- Rubrik, teknik terimi birebir söylemeyi değil doğru düşünceyi/kavramı ölçsün. Öğrenci doğru fikri gündelik ve basit sözcüklerle anlatırsa tam puan verilebilsin.
+- Yazım, noktalama ve anlatım kusurları; ders Türkçe/yabancı dil değilse ve anlamı bozmuyorsa puan kaybettirmesin.
+- Rubrik açıklamalarına üniversite düzeyi ayrıntı, kaynak dili, profesyonel terminoloji veya soruda istenmeyen ek gerekçe koyma.
+- Her kriter tek, gözlenebilir ve yaşa uygun bir beklenti içersin; aynı bilgi farklı kriterlerde tekrar puanlanmasın.
+
 Seviye: ${level} (${grade})
 Ders: ${subject}
 Konu: ${topic}
@@ -131,7 +139,7 @@ SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir açıklama eklem
   "scenario": "Senaryo/durum metni (2-4 cümle, ${isForeignLanguageSubject(subject) ? subject : 'Türkçe'})",
   "question": "Senaryoya dayanan açık uçlu soru (${isForeignLanguageSubject(subject) ? subject : 'Türkçe'})",
   "rubric": [
-    { "criterion": "Kriter adı (kısa, Türkçe)", "maxPoints": 30, "description": "Bu kriterden tam puan almak için cevapta ne olmalı (1 cümle, Türkçe)" }
+    { "criterion": "Kriter adı (kısa, Türkçe)", "maxPoints": 30, "description": "${grade} öğrencisinin basit cümlelerle karşılayabileceği tek ve somut tam puan koşulu (1 cümle, Türkçe)" }
   ]
 }
 Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`

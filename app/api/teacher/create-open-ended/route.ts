@@ -57,6 +57,14 @@ function buildPrompt(level: string, grade: string, subject: string, topic: strin
 2) Bu senaryoya dayanan, öğrencinin ELEŞTİRİEL/ANALİTİK DÜŞÜNMESİNİ gerektiren, kendi cümleleriyle cevaplayacağı AÇIK UÇLU bir soru sorulur (şık YOKTUR, çoktan seçmeli DEĞİLDİR).
 3) Sorunun değerlendirilmesi için 3-4 kriterden oluşan DERECELİ PUANLAMA ANAHTARI (rubrik) hazırlanır, toplam 100 puan.
 
+YAŞA UYGUN CEVAP STANDARDI — ZORUNLU:
+- Beklenen cevap bir akademisyen/uzman cevabı değil, ${grade} öğrencisinin kendi kurabileceği doğal cümleler olmalıdır.
+- Ortaokul için 1-3 kısa ve açık cümle; lise için 2-4 açık cümle tam puan almaya yeterli olabilmelidir.
+- Rubrik teknik terimi birebir söylemeyi değil doğru düşünceyi/kavramı ölçsün; doğru fikir basit ve gündelik sözcüklerle anlatılmışsa tam puan verilebilsin.
+- Yazım, noktalama ve anlatım kusurları; ders Türkçe/yabancı dil değilse ve anlamı bozmuyorsa puan kaybettirmesin.
+- Üniversite düzeyi ayrıntı, profesyonel terminoloji veya soruda istenmeyen ek gerekçeler bekleme.
+- Her kriter tek ve gözlenebilir beklenti içersin; aynı bilgiyi iki kriterde tekrar puanlama.
+
 📐 MEB SORU DİLİ VE STİLİ (harici bir MEB uygunluk değerlendirmesiyle doğrulanmış kurallar):
 - Senaryo ASLA çıplak bir işlem talimatı olmasın (ör. "3/4 + 2/3 + 1/2 işlemini yapınız" YANLIŞ). Bunun yerine öğrenciyi günlük yaşam bağlamına yerleştir: alışveriş, yemek tarifi, boya/badana, bahçe, su tüketimi, yol/mesafe, zaman planlama gibi somut, tanıdık durumlar kullan.
 - Senaryoda "...nasıl [işlem yapacağını/çözeceğini] düşünüyor" gibi ifadelerle öğrenciyi bağlamsallaştır — doğrudan sonuca değil, DÜŞÜNME SÜRECİNE yönlendir.
@@ -80,7 +88,7 @@ SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir açıklama eklem
   "scenario": "Senaryo/durum metni (2-4 cümle, ${isForeignLanguageSubject(subject) ? subject : 'Türkçe'})",
   "question": "Senaryoya dayanan açık uçlu soru (${isForeignLanguageSubject(subject) ? subject : 'Türkçe'})",
   "rubric": [
-    { "criterion": "Kriter adı (kısa, Türkçe)", "maxPoints": 30, "description": "Bu kriterden tam puan almak için cevapta ne olmalı (1 cümle, Türkçe)" }
+    { "criterion": "Kriter adı (kısa, Türkçe)", "maxPoints": 30, "description": "${grade} öğrencisinin basit cümlelerle karşılayabileceği tek ve somut tam puan koşulu (1 cümle, Türkçe)" }
   ]
 }
 Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
@@ -252,7 +260,7 @@ export async function POST(req: NextRequest) {
     // kendi ürettiğini yine Claude'a kontrol ettirmek yerine) kontrol
     // edilir. Sadece onay alırsa kaydedilip öğrenciye gösterilir.
     const rubricSummary = rubric.map(r => `${r.criterion} (${r.maxPoints}p)`).join(', ')
-    const verifyPrompt = `Bir öğretmen, ${grade || 'belirtilmemiş'} seviyesindeki öğrencilerine "${subject || 'belirtilmemiş'}" dersinde şu açık uçlu soruyu ödev olarak atamak istiyor. Bu içeriği Türkiye MEB müfredatına uygunluk, yaş grubuna uygunluk, bilimsel/faktüel doğruluk ve genel eğitim içeriği güvenliği açısından değerlendir.
+    const verifyPrompt = `Bir öğretmen, ${grade || 'belirtilmemiş'} seviyesindeki öğrencilerine "${subject || 'belirtilmemiş'}" dersinde şu açık uçlu soruyu ödev olarak atamak istiyor. Bu içeriği Türkiye MEB müfredatına uygunluk, yaş grubuna uygunluk, bilimsel/faktüel doğruluk ve genel eğitim içeriği güvenliği açısından değerlendir. Rubriğin bir uzman/akademisyen cevabı istemediğini; öğrencinin basit, doğal ve yaşına uygun cümlelerle tam puana ulaşabilmesini de doğrula. Ortaokul için 1-3, lise için 2-4 açık cümle yeterli olabilmelidir.
 
 SENARYO: "${scenario}"
 SORU: "${question}"
