@@ -261,6 +261,21 @@ export async function POST(req: NextRequest) {
           return
         }
 
+        // Soru havuzundaki approved/teacher_exact kayıtları daha önce kalite
+        // sınırından geçmiştir. Bunları her testte yeniden sağlayıcıya
+        // göndermek, geçici model reddi yüzünden havuz sorularını da çöpe
+        // atıyordu. Yapısal ve matematik kontrolleri yine uygulanır; bağımsız
+        // AI kontrolü yalnızca yeni üretilen adaylar için çalışır.
+        if (strictQualityPolicy && q.bankQuestionId) {
+          verified.push({
+            ...q,
+            qualityVerificationVersion: q.qualityVerificationVersion || 'quiz-quality-v2',
+            difficultyVerified: q.difficultyVerified !== false,
+            objectiveVerified: q.objectiveVerified !== false,
+          })
+          return
+        }
+
         // 2. AI doğrulama — sadece doğrulanabilir tipler
         // A single canonical objective is unambiguous. Models occasionally
         // omit the ref even when the question was generated from the supplied
