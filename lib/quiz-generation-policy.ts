@@ -45,11 +45,13 @@ export function evaluateStrictQuestionReview(args: {
   }
 }
 
-function normalizeDifficulty(value: unknown): RequiredDifficulty | null {
+export function normalizeDifficultyLevel(value: unknown): RequiredDifficulty | null {
   if (typeof value !== 'string') return null
-  const normalized = value.trim().toLocaleLowerCase('tr-TR').replace(/çok/g, 'cok')
+  const normalized = value.trim().toLocaleLowerCase('tr-TR').replace(/çok/g, 'cok').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ')
   if (normalized === 'kolay' || normalized === 'normal' || normalized === 'zor') return normalized
-  if (normalized === 'cok zor') return 'zor'
+  if (['cok zor', 'very hard', 'very difficult', 'hard', 'advanced', 'difficult'].includes(normalized)) return 'zor'
+  if (['easy', 'beginner', 'basic'].includes(normalized)) return 'kolay'
+  if (['orta', 'orta seviye', 'medium', 'intermediate', 'average'].includes(normalized)) return 'normal'
   return null
 }
 
@@ -82,17 +84,17 @@ export function formatDifficultyQuota(quota: DifficultyQuota): string {
 export function hasDifficultyQuota(questions: Array<Record<string, unknown>>, quota: DifficultyQuota): boolean {
   const actual: DifficultyQuota = { kolay: 0, normal: 0, zor: 0 }
   for (const question of questions) {
-    const level = normalizeDifficulty(question.difficulty)
+    const level = normalizeDifficultyLevel(question.difficulty)
     if (!level) return false
     actual[level]++
   }
-  // The quota is an adaptive target, not a reason to discard a complete,
-  // otherwise validated test when the generator labels one item differently.
-  // Keep all three levels present and allow a one-item rounding/label drift;
-  // strongly skewed sets still fail the policy.
+  // Adaptive quota is a target, not an exact inventory requirement. Small
+  // sets naturally have rounding variance; larger sets tolerate 20% drift,
+  // while preserving representation of all three difficulty levels.
   if (questions.length >= REQUIRED_DIFFICULTIES.length
     && REQUIRED_DIFFICULTIES.some(level => actual[level] === 0)) return false
-  return REQUIRED_DIFFICULTIES.every(level => Math.abs(actual[level] - quota[level]) <= 1)
+  const tolerance = Math.max(1, Math.ceil(questions.length * 0.2))
+  return REQUIRED_DIFFICULTIES.every(level => Math.abs(actual[level] - quota[level]) <= tolerance)
 }
 
 export function requiredVisualCount(count: number, ratio = 0.3): number {

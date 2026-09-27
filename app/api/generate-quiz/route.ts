@@ -39,7 +39,7 @@ import { decideQuizProvider, getQuizProviderPolicy, QUIZ_PROVIDER_POLICY_VERSION
 import { attachQuestionRigorMetadata, summarizeQuestionSetRigor } from '@/lib/question-rigor'
 import { verifyVisualWithMistral } from '@/lib/mistral-quality'
 import { verifyVisualWithGemini } from '@/lib/gemini-visual-quality'
-import { buildAdaptiveDifficultyQuota, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, requiredVisualCount, visualAttemptCount } from '@/lib/quiz-generation-policy'
+import { buildAdaptiveDifficultyQuota, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, normalizeDifficultyLevel, requiredVisualCount, visualAttemptCount } from '@/lib/quiz-generation-policy'
 import { isSameGradeSource } from '@/lib/meb-source-scope'
 
 const anthropic = new Anthropic()
@@ -333,7 +333,7 @@ function rigorInstruction(difficulty: string, count: number, topic: string): str
   const inferenceCount = Math.max(1, Math.ceil(count * (hard ? 0.7 : easy ? 0.3 : 0.5)))
   const directLimit = easy ? Math.max(1, Math.floor(count * 0.2)) : 0
   const adaptiveQuota = buildAdaptiveDifficultyQuota(count, difficulty)
-  const mixRule = `Bu testte zorluk etiketleri tam olarak ${formatDifficultyQuota(adaptiveQuota)} olmalı. Öğrencinin adaptif başlangıç seviyesi (${difficulty}) oranların ağırlığını belirler; kolay, normal ve zor düzeylerinin hepsi temsil edilmeli.`
+  const mixRule = `Hedef zorluk dağılımı ${formatDifficultyQuota(adaptiveQuota)}. Bu dağılım adaptif başlangıç seviyesi (${difficulty}) için yaklaşık hedeftir; soru sayısına göre her seviyede 1-2 soru sapma kabul edilir. Kolay, normal ve zor düzeylerinin hepsi temsil edilmeli; etiketleri kota doldurmak için değil, sorunun gerçek bilişsel yüküne göre belirle.`
   return `\n\nÖLÇME KALİTESİ VE ZORLUK KURALI (ZORUNLU): "${topic}" için ${count} soru üretirken sadece tanım ezberini veya tek adımlı işlemi ölçme. En az ${applicationCount} soru bilgiyi yeni bir bağlama/senaryoya uygulamayı, verilenleri ayıklamayı veya en az iki akıl yürütme adımını gerektirsin. En az ${inferenceCount} soru ilişki kurma, hata bulma, karşılaştırma, yanlış çözümü analiz etme ya da sonuç çıkarma ölçsün. ${mixRule} Doğrudan tanım/ezber veya tek işlemle çözülen soru sayısı en fazla ${directLimit} olabilir. Her soruya "difficulty" (kolay|normal|zor|cok zor), "cognitiveLevel" (uygulama|muhakeme) ve gerçek çözüm adımı sayısını gösteren "reasoningSteps" alanlarını ekle. Zorluk uzun ve karışık cümlelerden değil, kazanımın gerçekten kullanılmasından gelmeli. Her çoktan seçmeli soruda üç çeldirici öğrencinin yapabileceği farklı ve gerçek işlem, kavram veya yorum hatasına dayansın; komik, alakasız ya da ilk bakışta elenen seçenekler kullanma. Aynı hesap yöntemi, senaryo veya soru kalıbını tekrarlama. Sınıf seviyesinin dışına çıkma ve soruyu çözülemez hâle getirme. Açıklamada doğru sonuca giden mantığı en az iki açık adımla göster.`
 }
 
@@ -1080,6 +1080,8 @@ async function loadAnonymousBookletContext(subject: string, grade: string, topic
 // özellikle true_false sorularında opts'un atlanması sonuç ekranını çökertebilir.
 function normalizeInteractiveQuestionShape(q: any, language: string): any {
   const normalized = { ...q }
+  const canonicalDifficulty = normalizeDifficultyLevel(normalized.difficulty)
+  if (canonicalDifficulty) normalized.difficulty = canonicalDifficulty
   if (normalized.type === 'true_false' && (!Array.isArray(normalized.opts) || normalized.opts.length < 2)) {
     const lang = String(language || '').toLocaleLowerCase('tr')
     normalized.opts = lang.includes('türk') ? ['Doğru', 'Yanlış'] : ['True', 'False']
@@ -2076,9 +2078,8 @@ export async function POST(req: NextRequest) {
         try {
           const currentDifficultyCounts = { kolay: 0, normal: 0, zor: 0 }
           for (const question of questions) {
-            const level = String(question.difficulty || '').trim().toLocaleLowerCase('tr-TR').replace(/çok/g, 'cok')
-            if (level === 'kolay' || level === 'normal' || level === 'zor') currentDifficultyCounts[level]++
-            else if (level === 'cok zor') currentDifficultyCounts.zor++
+            const level = normalizeDifficultyLevel(question.difficulty)
+            if (level) currentDifficultyCounts[level]++
           }
           const remainingDifficultyQuota = {
             kolay: Math.max(0, targetDifficultyQuota.kolay - currentDifficultyCounts.kolay),
@@ -2226,7 +2227,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'quality_policy_failed', reason: 'verification_evidence_missing', message: 'Soru kalite kontrol kanıtı eksik olduğu için test oluşturulmadı.' }, { status: 503 })
     }
     if (!hasDifficultyQuota(questions, targetDifficultyQuota)) {
-      console.error(`[generate-quiz] difficulty_quota_failed expected=${formatDifficultyQuota(targetDifficultyQuota)}`)
+      const actualDifficultyCounts = { kolay: 0, normal: 0, zor: 0, bilinmeyen: 0 }
+      for (const question of questions) {
+        const level = normalizeDifficultyLevel(question.difficulty)
+        if (level) actualDifficultyCounts[level]++
+        else actualDifficultyCounts.bilinmeyen++
+      }
+      console.error(`[generate-quiz] difficulty_quota_failed expected=${formatDifficultyQuota(targetDifficultyQuota)} actual=${JSON.stringify(actualDifficultyCounts)} tolerance=${Math.max(1, Math.ceil(questions.length * 0.2))}`)
       return NextResponse.json({ error: 'quality_policy_failed', reason: 'difficulty_distribution', message: 'Kolay, normal ve zor soru dağılımı adaptif kota ile eşleşmediği için test oluşturulmadı.' }, { status: 503 })
     }
     const objectiveMapping = applyCanonicalObjectiveMappings(questions, objectiveCandidates)
