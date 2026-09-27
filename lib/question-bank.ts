@@ -125,7 +125,7 @@ export function balanceAnswerPositions(questions: Question[]): Question[] {
       ? question.distractorMisconceptions
       : null
     const correctOption = question.opts[question.ans]
-    const distractors = shuffled(question.opts
+    const distractors: Array<{ option: unknown; misconception: unknown; index: number }> = shuffled((question.opts as unknown[])
       .map((option: unknown, index: number) => ({ option, misconception: misconceptions?.[index] ?? null, index }))
       .filter((entry: { index: number }) => entry.index !== question.ans))
     const opts: unknown[] = []
