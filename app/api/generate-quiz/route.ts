@@ -234,20 +234,57 @@ function isInCurriculum(topic: string, plan: string, grade: string): boolean {
 }
 
 // ─── GÖRSEL KATEGORI TESPİTİ ──────────────────────────────────────────────────
+// 27 Eylül 2026 — kalite denetimi: "Veriden Olasılığa" konusundaki sorularda
+// alakasız Türkiye haritası SVG'leri üretildiği tespit edildi. Kök neden:
+// aşağıdaki anahtar kelime kontrolleri sınır (word-boundary) KULLANMADAN
+// substring testi yapıyordu — bare "il" alternative'i normalizeTR sonrası
+// "olasiliga" (olasılığa) içindeki "...olas-IL-iga..." alt dizisiyle eşleşip
+// konuyu yanlışlıkla 'map' kategorisine düşürüyordu.
+//
+// İlk denemede TÜM anahtar kelimeleri \b...\b (her iki uçtan sınırlı) yaptım,
+// ancak bu Türkçe'nin sondan eklemeli yapısıyla çatışıyor: ekler kök kelimeye
+// boşluksuz yapışır ("ucgen"+"ler"="ucgenler"), bu yüzden sona sınır koymak
+// "Üçgenler", "Dörtgenler", "Fonksiyonlar", "Sayılar" gibi TÜM çekimli/çoğul
+// biçimleri kırıyordu (geometry/math_graph kategorileri neredeyse hiç
+// eşleşmiyordu — orijinal bug'dan daha geniş bir regresyon).
+//
+// Kalıcı çözüm: yalnızca kısa/jenerik anahtar kelimeler (<=3 karakter — "il",
+// "aci", "gen", "dag", "kup", "zar", "baz", "ay" gibi çarpışmaya çok açık
+// olanlar) tam kelime (\b...\b) eşleşmesi ister; 3 karakterden uzun kelimeler
+// ("geometri", "ucgen", "matematik", "sayi", "olasilik" vb.) ORİJİNAL substring
+// davranışını korur — bunlar zaten yeterince ayırt edici olduğu için yanlışlıkla
+// başka bir kelimenin içinde çıkma riski yok, ve substring olduğu için Türkçe
+// çekim ekleriyle de sorunsuz çalışırlar. Böylece asıl bug (kısa "il" kelimesinin
+// "olasılığa" içine sızması) düzelirken, uzun kelimelerde SIFIR davranış
+// değişikliği garanti edilir.
+function matchesAnyKeyword(normalizedText: string, keywords: string[]): boolean {
+  return keywords.some(keyword => {
+    const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    if (keyword.length <= 3 && !keyword.includes(' ')) {
+      return new RegExp(`\\b${escaped}\\b`).test(normalizedText)
+    }
+    return normalizedText.includes(keyword)
+  })
+}
+
+const VISUAL_CATEGORY_KEYWORDS: Array<{ category: string; keywords: string[] }> = [
+  { category: 'geometry', keywords: ['ucgen','kare','dortgen','daire','cember','geometri','alan','cevre','hacim','piramit','kup','silindir','prizma','aci','kenar','kose','kosegen','eskenar','ikizkenar','scalene','dikdortgen','trapez','paralelkenar'] },
+  { category: 'math_graph', keywords: ['koordinat','grafik','fonksiyon','turev','integral','sinusoidal','parabolik','dogrusal','eksponansiyel','cebir','denklem','eksik'] },
+  { category: 'map', keywords: ['harita','turkiye','bolge','il','sehir','cografya','iklim','akarsu','dag','deniz','kiyi','nufus','yeryuzu','kita','okyanuslar','enlem','boylam'] },
+  { category: 'biology', keywords: ['hucre','organell','organel','mitokondri','ribozom','kloroplast','dna','gen','kromozom','zar','sitoplazma','biyoloji','bakteri','virus','bitki hucresi','hayvan hucresi'] },
+  { category: 'chemistry', keywords: ['atom','element','periyodik','molekul','kimyasal','bagli','orbital','elektron','proton','notron','asit','baz','reaksiyon'] },
+  { category: 'physics', keywords: ['kuvvet','hareket','enerji','elektrik','devre','magnet','miknatis','optik','ses dalgasi','fizik','newton','ivme','hiz','momentum','dalga'] },
+  { category: 'space', keywords: ['gunes sistemi','gezegen','ay','dunya','uzay','yildiz','galaksi','asteroid','kuyruklu yildiz'] },
+  { category: 'ecosystem', keywords: ['besin zinciri','ekosistem','gida agi','fotosent','solunum','populasyon','biyom','biyocevre'] },
+  { category: 'timeline', keywords: ['tarih','osmanli','cumhuriyet','savas','anlasma','kronoloji','zaman cetveli','donem','yuzyil'] },
+  { category: 'math_graph', keywords: ['matematik','sayi','kesir','ondalik','oran','yuzde','istatistik','olasilik','ortalama'] },
+]
+
 function detectVisualCategory(topic: string): string | null {
   const t = normalizeTR(topic)
-
-  if (/ucgen|kare|dortgen|daire|cember|geometri|alan|cevre|hacim|piramit|kup|silindir|prizma|aci|kenar|kose|kosegen|eskenar|ikizkenar|scalene|dikdortgen|trapez|paralelkenar/.test(t)) return 'geometry'
-  if (/koordinat|grafik|fonksiyon|turev|integral|sinusoidal|parabolik|dogrusal|eksponansiyel|cebir|denklem|eksik/.test(t)) return 'math_graph'
-  if (/harita|turkiye|bolge|il|sehir|cografya|iklim|akarsu|dag|deniz|kiyi|nufus|yeryuzu|kita|okyanuslar|enlem|boylam/.test(t)) return 'map'
-  if (/hucre|organell|organel|mitokondri|ribozom|kloroplast|dna|gen|kromozom|zar|sitoplazma|biyoloji|bakteri|virus|bitki hucresi|hayvan hucresi/.test(t)) return 'biology'
-  if (/atom|element|periyodik|molekul|kimyasal|bagli|orbital|elektron|proton|notron|asit|baz|reaksiyon/.test(t)) return 'chemistry'
-  if (/kuvvet|hareket|enerji|elektrik|devre|magnet|miknatis|optik|ses dalgasi|fizik|newton|ivme|hiz|momentum|dalga/.test(t)) return 'physics'
-  if (/gunes sistemi|gezegen|ay|dunya|uzay|yildiz|galaksi|asteroid|kuyruklu yildiz/.test(t)) return 'space'
-  if (/besin zinciri|ekosistem|gida agi|fotosent|solunum|populasyon|biyom|biyocevre/.test(t)) return 'ecosystem'
-  if (/tarih|osmanli|cumhuriyet|savas|anlasma|kronoloji|zaman cetveli|donem|yuzyil/.test(t)) return 'timeline'
-  if (/matematik|sayi|kesir|ondalik|oran|yuzde|istatistik|olasilik|ortalama/.test(t)) return 'math_graph'
-
+  for (const { category, keywords } of VISUAL_CATEGORY_KEYWORDS) {
+    if (matchesAnyKeyword(t, keywords)) return category
+  }
   return null
 }
 
