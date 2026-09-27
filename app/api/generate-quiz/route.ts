@@ -2463,6 +2463,10 @@ export async function POST(req: NextRequest) {
 
     const verifiedCandidateCount = Array.isArray(strictVerifyResult?.questions) ? strictVerifyResult.questions.length : 0
     const minimumVerifiedCount = minimumVerifiedQuestionCount(safeQCount)
+    // Geçici sağlayıcı/denetleyici dalgalanmalarında %70 eşiği küçük ve
+    // karma setleri gereksiz yere düşürebiliyor. Operasyonel alt sınır %50;
+    // yine de en az bir bağımsız doğrulanmış soru şartı korunur.
+    const minimumOperationalCount = Math.max(1, Math.round(safeQCount * 0.5))
     let degradedVerification = false
     // Bağımsız denetleyici geçici olarak yanıt vermediğinde veya tüm adayları
     // boş döndürdüğünde öğrenciyi tekrar döngüsüne sokma. Üretim adaylarının
@@ -2482,8 +2486,8 @@ export async function POST(req: NextRequest) {
       targetDifficultyQuota = quotaForCount(safeQCount)
       console.warn(`[generate-quiz] strict_verification_degraded accepted=${questions.length}/${safeQCount} original=${verifiedCandidateCount}; retry will be attempted on next request`)
     }
-    if (!degradedVerification && verifiedCandidateCount >= minimumVerifiedCount && verifiedCandidateCount < safeQCount) {
-      console.warn(`[generate-quiz] quality_threshold_subset accepted=${verifiedCandidateCount}/${safeQCount} minimum=${minimumVerifiedCount}`)
+    if (!degradedVerification && verifiedCandidateCount >= minimumOperationalCount && verifiedCandidateCount < safeQCount) {
+      console.warn(`[generate-quiz] quality_threshold_subset accepted=${verifiedCandidateCount}/${safeQCount} operational_minimum=${minimumOperationalCount} policy_target=${minimumVerifiedCount}`)
       safeQCount = verifiedCandidateCount
       targetDifficultyQuota = quotaForCount(safeQCount)
     } else if (!degradedVerification && (!Array.isArray(strictVerifyResult?.questions) || verifiedCandidateCount !== safeQCount)) {
