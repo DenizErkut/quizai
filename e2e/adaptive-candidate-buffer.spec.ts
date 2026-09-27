@@ -83,3 +83,18 @@ test('database plan constraint accepts every checkout profile plan', () => {
   const migration = readFileSync(join(process.cwd(), 'supabase/migrations/20260927150931_allow_current_profile_plans.sql'), 'utf8')
   for (const plan of ['free', 'silver', 'premium', 'unlimited']) expect(migration).toContain(`'${plan}'::text`)
 })
+
+test('teacher booklets ground generation and approved exact questions re-enter the live bank', () => {
+  const route = readFileSync(join(process.cwd(), 'app/api/generate-quiz/route.ts'), 'utf8')
+  const upload = readFileSync(join(process.cwd(), 'app/api/admin/exam-upload/route.ts'), 'utf8')
+  const bank = readFileSync(join(process.cwd(), 'lib/question-bank.ts'), 'utf8')
+  expect(route).toContain('ÖĞRETMEN İMZALI SORU KİTAPÇIĞI REFERANSI')
+  expect(route).toContain('const bankEligible = bankWriteEligible && !continueSessionId')
+  expect(route).toContain('validatedQuestionsForBank = questions.slice()')
+  expect(route.indexOf('validatedQuestionsForBank = questions.slice()')).toBeGreaterThan(route.indexOf('questions = balanceAnswerPositions(questions)'))
+  expect(upload).toContain("sourcePolicy: 'teacher_exact'")
+  expect(upload).toContain("difficulty: q.difficulty === 'easy' ? 'kolay'")
+  expect(bank).toContain("row.question?.sourcePolicy === 'teacher_exact'")
+  expect(bank).toContain("contains('question', { sourcePolicy: 'teacher_exact' })")
+  expect(bank).toContain('hasRealVisualAsset(clean)')
+})

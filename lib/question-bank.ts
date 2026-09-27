@@ -83,10 +83,14 @@ function isNewGenerationTopic(topic: string): boolean {
 function selectWithVisualQuota(rows: any[], count: number, topic: string): any[] {
   const ratio = isNewGenerationTopic(topic) ? 0.5 : 0.3
   const target = Math.min(count, Math.max(1, Math.ceil(count * ratio)))
-  const visualRows = shuffled(rows.filter(row => hasRealVisualAsset(row.question))).slice(0, target)
-  const chosen = new Set(visualRows.map(row => row.id))
-  const remaining = shuffled(rows.filter(row => !chosen.has(row.id))).slice(0, count - visualRows.length)
-  return shuffled([...visualRows, ...remaining])
+  const teacherRows = shuffled(rows.filter(row => row.question?.sourcePolicy === 'teacher_exact')).slice(0, count)
+  const chosen = new Set(teacherRows.map(row => row.id))
+  const teacherVisualCount = teacherRows.filter(row => hasRealVisualAsset(row.question)).length
+  const visualRows = shuffled(rows.filter(row => !chosen.has(row.id) && hasRealVisualAsset(row.question)))
+    .slice(0, Math.max(0, target - teacherVisualCount))
+  visualRows.forEach(row => chosen.add(row.id))
+  const remaining = shuffled(rows.filter(row => !chosen.has(row.id))).slice(0, count - teacherRows.length - visualRows.length)
+  return shuffled([...teacherRows, ...visualRows, ...remaining])
 }
 
 export function balanceAnswerPositions(questions: Question[]): Question[] {
@@ -164,7 +168,7 @@ export async function getQuestionBankSet(
   if (count <= 0) return []
   const excluded = new Set(excludedTexts.map(questionBankKey).filter(Boolean))
   const query = (includeSubject: boolean) => {
-    let request = db.from('question_bank').select('id, question, fingerprint, use_count')
+    let request = db.from('question_bank').select('id, question, fingerprint, use_count, subject_key, topic_key')
       .eq('topic_key', questionBankKey(dimensions.topic))
       .eq('grade_key', questionBankKey(dimensions.grade))
       .eq('language_key', questionBankKey(dimensions.language))
@@ -187,6 +191,42 @@ export async function getQuestionBankSet(
       const unique = new Map([...(data || []), ...fallback.data].map((row: any) => [row.id, row]))
       data = [...unique.values()]
     }
+  }
+
+  // Öğretmen imzalı kitapçık soruları insan onaylıdır ve öğrenciye birebir
+  // gösterilmesi istenir. Eski kayıtların difficulty/topic anahtarları bugünkü
+  // normalizasyondan önce yazılmış olabileceği için yalnızca tam difficulty
+  // filtresine bağlı kalma; aynı sınıf/dil/tip içindeki öğretmen sorularını
+  // getirip konu ve ders eşleşmesini uygulama tarafında yeniden doğrula.
+  const teacherRows = await db.from('question_bank')
+    .select('id, question, fingerprint, use_count, subject_key, topic_key')
+    .eq('grade_key', questionBankKey(dimensions.grade))
+    .eq('review_status', 'approved')
+    .eq('report_count', 0)
+    .contains('question', { sourcePolicy: 'teacher_exact' })
+    .order('use_count', { ascending: true })
+    .limit(100)
+  if (!teacherRows.error && Array.isArray(teacherRows.data)) {
+    const requestedSubject = questionBankKey(dimensions.subject || 'genel')
+    const requestedTopic = questionBankKey(dimensions.topic)
+    const matchingTeacherRows = teacherRows.data.filter((row: any) => {
+      const rowSubject = questionBankKey(row.subject_key || row.question?.subject || 'genel')
+      const rowTopic = questionBankKey(row.question?.objective || row.topic_key)
+      const subjectMatches = rowSubject === requestedSubject
+        || rowSubject === 'genel'
+        || requestedSubject.includes(rowSubject)
+        || rowSubject.includes(requestedSubject)
+      const topicMatches = rowTopic === requestedTopic
+        || rowTopic.includes(requestedTopic)
+        || requestedTopic.includes(rowTopic)
+      const requestedType = questionBankKey(dimensions.questionType)
+      const typeMatches = requestedType === 'mixed'
+        || requestedType === 'karisik'
+        || requestedType === 'multiple choice'
+      return subjectMatches && topicMatches && typeMatches
+    })
+    const unique = new Map([...(matchingTeacherRows || []), ...(data || [])].map((row: any) => [row.id, row]))
+    data = [...unique.values()]
   }
 
   if (error || !Array.isArray(data)) return []

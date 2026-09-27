@@ -1058,11 +1058,10 @@ async function generateVisualWithRetry(q: any, category: string, topic: string, 
   })(), maxMs, null)
 }
 
-async function loadAnonymousBookletContext(subject: string, grade: string, topic: string): Promise<string> {
+async function loadBookletContext(subject: string, grade: string, topic: string): Promise<string> {
   const { data, error } = await supabase.from('exam_resources')
-    .select('raw_text,subject,grade,topic,subtopic')
+    .select('raw_text,subject,grade,topic,subtopic,source_type,review_status')
     .eq('purpose', 'instant_test')
-    .eq('source_type', 'anonymous')
     .neq('review_status', 'rejected')
     .limit(12)
   if (error || !data?.length) return ''
@@ -1076,9 +1075,18 @@ async function loadAnonymousBookletContext(subject: string, grade: string, topic
       && isSameGradeSource(grade, rowGrade)
       && (rowSubject.includes(subjectKey) || subjectKey.includes(rowSubject))
       && (rowTopic.includes(topicKey) || topicKey.includes(rowTopic))
-  }).slice(0, 2)
+  })
   if (!matches.length) return ''
-  return `\n\nANONİM SORU KİTAPÇIĞI REFERANSI — KOPYALAMA YASAK:\n${matches.map((row: any) => String(row.raw_text || '').slice(0, 2500)).join('\n---\n')}\nBu kaynak yalnızca ölçülen kavram, soru mantığı ve zorluk seviyesini anlamak içindir. Kaynaktaki soru cümlesini, sayıları, özel isimleri, seçenekleri veya kurguyu aynen kullanma. Öğrencinin karşısına tamamen yeni fakat aynı kazanımı ölçen benzer bir soru çıkar.`
+  const teacher = matches.filter((row: any) => row.source_type === 'teacher' && row.review_status === 'approved').slice(0, 2)
+  const anonymous = matches.filter((row: any) => row.source_type !== 'teacher').slice(0, 2)
+  const blocks: string[] = []
+  if (teacher.length) {
+    blocks.push(`ÖĞRETMEN İMZALI SORU KİTAPÇIĞI REFERANSI:\n${teacher.map((row: any) => String(row.raw_text || '').slice(0, 3500)).join('\n---\n')}\nYeni soru üretirken bu soruların ölçtüğü kazanımı, çözüm mantığını, bilişsel seviyeyi ve seçenek tasarımını MUTLAKA temel al. Yeni üretilen soru özgün olmalı; ancak konu ve ölçme yaklaşımı bu öğretmen sorularıyla açıkça aynı çizgide kalmalı. Öğretmen imzalı sorular ayrıca onaylı soru havuzundan öğrenciye birebir sunulabilir.`)
+  }
+  if (anonymous.length) {
+    blocks.push(`ANONİM SORU KİTAPÇIĞI REFERANSI — KOPYALAMA YASAK:\n${anonymous.map((row: any) => String(row.raw_text || '').slice(0, 2500)).join('\n---\n')}\nBu kaynak yalnızca ölçülen kavram, soru mantığı ve zorluk seviyesini anlamak içindir. Kaynaktaki soru cümlesini, sayıları, özel isimleri, seçenekleri veya kurguyu aynen kullanma. Öğrencinin karşısına tamamen yeni fakat aynı kazanımı ölçen benzer bir soru çıkar.`)
+  }
+  return blocks.length ? `\n\n${blocks.join('\n\n')}` : ''
 }
 
 // Model/provider çıktısı UI'ya ulaşmadan önce soru tiplerinin zorunlu alanlarını
@@ -1688,9 +1696,10 @@ export async function POST(req: NextRequest) {
       previousQuestionsNote += `\n\n⚠️ KAYNAK METİN SÜREKLİLİĞİ: Bu, aynı kaynak metne dayanan bir testin İKİNCİ (veya sonraki) parçası. Yukarıda listelenen önceki sorular, kaynak metnin BELİRLİ cümlelerini/olgularını zaten kullandı. Bu parçada o AYNI cümleleri/olguları FARKLI bir ifadeyle, farklı bir soru formatıyla, ya da "doğru mu yanlış mı" gibi tersinden bile olsa TEKRAR HEDEFLEME — bu, öğretmen tarafından "aynı bilgi 6-7 kez soruldu" diye eleştirilen bilinen bir hata deseni. Bunun yerine: (a) kaynak metnin önceki parçada HİÇ değinilmemiş başka bir cümlesini/paragrafını kullan, VEYA (b) konunun (topic) kendisi hakkında, kaynak metne dayanmayan, genel kavramsal bir soru sor (ör. temel itikat/tanım sorusu) — bu ikinci seçenek özellikle kaynak metin kısaysa ve tüm cümleleri önceki parçada tükenmişse tercih edilmeli.`
     }
 
-    const anonymousBookletContext = !fileContent
-      ? await loadAnonymousBookletContext(subject, grade, topic).catch(() => '')
+    const bookletContext = !fileContent
+      ? await loadBookletContext(subject, grade, topic).catch(() => '')
       : ''
+    if (bookletContext) mebContext += bookletContext
     const isUniversityLevel = level === 'universite'
     const objectiveCandidates = await loadCanonicalObjectiveCandidates(supabase, {
       subject, grade, topic,
@@ -1715,7 +1724,11 @@ export async function POST(req: NextRequest) {
     // Legacy question-bank rows lack per-item strict review evidence and often
     // carry one requested difficulty for the whole set. Do not bypass the
     // adaptive quota or visual/outcome gates with these rows.
-    const bankEligible = false
+    const bankWriteEligible = !fileContent
+      && !isUniversityLevel
+      && !dailyChallenge
+      && forceProviderTest === null
+    const bankEligible = bankWriteEligible && !continueSessionId
     let bankQuestions: any[] = []
     if (bankEligible) {
       bankQuestions = await getQuestionBankSet(supabase, {
@@ -1771,7 +1784,10 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      if (bankQuestions.length === safeQCount && usageSessionId) {
+      if (bankQuestions.length === safeQCount
+        && usageSessionId
+        && hasStrictQuestionReview(bankQuestions, objectiveCandidates)
+        && hasCanonicalObjectiveCoverage(bankQuestions, objectiveCandidates)) {
         const bankRigorSummary = summarizeQuestionSetRigor(bankQuestions, resolvedDifficulty)
         const mappedCount = bankQuestions.filter((question) => question?.objectiveMappingStatus === 'mapped').length
         const { data: bankSession, error: bankSessionError } = await supabase
@@ -1860,9 +1876,8 @@ export async function POST(req: NextRequest) {
       + diagnosticStrategy.promptContext
       + (isUniversityLevel ? misconceptionMetadataInstruction(questionType) : '') // K12'de artık statik blokta
       + objectiveInstruction
-      + anonymousBookletContext
       + previousQuestionsNote
-    promptStr = fullPrompt + (adaptivePolicy?.promptContext || '') + diagnosticStrategy.promptContext + misconceptionMetadataInstruction(questionType) + objectiveInstruction + anonymousBookletContext + previousQuestionsNote // fallback için TAM metin saklanır
+    promptStr = fullPrompt + (adaptivePolicy?.promptContext || '') + diagnosticStrategy.promptContext + misconceptionMetadataInstruction(questionType) + objectiveInstruction + previousQuestionsNote // fallback için TAM metin saklanır
     countRef = aiQuestionCount
 
     // Hız optimizasyonu: az soru → Haiku (3x hızlı), çok soru → Sonnet
@@ -2423,8 +2438,6 @@ export async function POST(req: NextRequest) {
       console.error(`[generate-quiz] objective_mapping_failed mapped=${objectiveMapping.mappedCount}/${questions.length} candidates=${objectiveCandidates.length}`)
       return NextResponse.json({ error: 'quality_policy_failed', reason: 'objective_mapping', message: 'Soruların tümü aynı sınıf ve konuya ait doğrulanmış kazanımlarla eşleşmediği için test oluşturulmadı.' }, { status: 503 })
     }
-    validatedQuestionsForBank = questions.slice()
-
     // Görsel üretimi kalite kontrollerinden geçmiş TAM soru seti üzerinde çalışır.
     // Önceki sıralamada
     // doğrulama sonrası eksik kalan sorular tamamlanmadan 5+ SVG isteği
@@ -2560,6 +2573,10 @@ export async function POST(req: NextRequest) {
     const rigorSummary = summarizeQuestionSetRigor(questions, resolvedDifficulty)
     console.log(`[question-rigor] version=${rigorSummary.version} average=${rigorSummary.averageScore} minimum=${rigorSummary.minimumScore} application=${rigorSummary.applicationCount}/${rigorSummary.targetApplicationCount} reasoning=${rigorSummary.reasoningCount}/${rigorSummary.targetReasoningCount} direct=${rigorSummary.directRecallCount} visual=${rigorSummary.visualCount} target_met=${rigorSummary.meetsTarget}`)
     questions = balanceAnswerPositions(questions)
+    // Havuza doğrulama öncesi kopyayı değil, son görseli ve son metadata'sı
+    // eklenmiş öğrenciye sunulan nihai soruyu yaz. Böylece SVG/chartData soru
+    // ile aynı JSON kaydında kalır ve tekrar kullanımda kaybolmaz.
+    validatedQuestionsForBank = questions.slice()
     // continueSessionId: adaptif akışta ikinci/sonraki parça — aynı testin
     // devamı, YENİ bir test değil. Bu yüzden kota (monthly_test_count) TEKRAR
     // artırılmıyor ve DB'ye ayrı bir session satırı yazılmıyor; mevcut
@@ -2695,7 +2712,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    if (bankEligible && sessionId) {
+    if (bankWriteEligible && sessionId) {
       after(async () => {
         const promoted = await promoteQuestionsToBank(supabase, {
           subject, topic, grade, language: effectiveLang,
