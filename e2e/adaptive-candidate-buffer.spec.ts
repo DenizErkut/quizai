@@ -46,3 +46,12 @@ test('completed learning events schedule delayed transfer checks', () => {
   expect(route).toContain('transfer_result')
   expect(route).toContain('prompt_context?.sourceQuestionType')
 })
+
+test('transfer report separates independent transfer from baseline performance', () => {
+  const route = readFileSync(join(process.cwd(), 'app/api/student/transfer-report/route.ts'), 'utf8')
+  expect(route).toContain("eq('status', 'completed')")
+  expect(route).toContain("neq('source_type', 'transfer_check')")
+  expect(route).toContain('independentRate')
+  expect(route).toContain('impactDelta')
+  expect(route).toContain('transferRate')
+})
