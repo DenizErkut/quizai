@@ -11,7 +11,7 @@ export interface CanonicalObjectiveCandidate {
   topic: string | null
   curriculumVersionId: string
   revisionId: string
-  matchBasis: 'topic_exact' | 'unit_exact' | 'reviewed_alias'
+  matchBasis: 'topic_exact' | 'title_keyword' | 'unit_exact' | 'reviewed_alias'
 }
 
 interface ObjectiveRow {
@@ -24,7 +24,7 @@ interface ObjectiveRow {
   topic: string | null
   curriculum_version_id: string
   current_revision_id: string
-  match_basis: 'topic_exact' | 'unit_exact' | 'reviewed_alias'
+  match_basis: 'topic_exact' | 'title_keyword' | 'unit_exact' | 'reviewed_alias'
 }
 
 function dimensionKey(value: unknown): string {
