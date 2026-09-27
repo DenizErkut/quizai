@@ -295,6 +295,48 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// Admin-only document editor. The original PDF stays untouched; only the
+// metadata and extracted text used by search/question grounding are replaced.
+// The RPC updates the resource and all searchable chunks atomically.
+export async function PUT(req: NextRequest) {
+  const user = await getAdminUser()
+  if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const body = await req.json().catch(() => null)
+  const id = typeof body?.id === 'string' ? body.id : ''
+  const title = typeof body?.title === 'string' ? body.title.trim() : ''
+  const grade = typeof body?.grade === 'string' ? body.grade.trim() : ''
+  const subject = typeof body?.subject === 'string' ? body.subject.trim() : ''
+  const topic = typeof body?.topic === 'string' ? body.topic.trim() : ''
+  const rawText = typeof body?.raw_text === 'string' ? body.raw_text : ''
+
+  if (!id || title.length < 2 || title.length > 300 || !grade || !subject || !topic) {
+    return NextResponse.json({ error: 'Kitapçık kimliği, başlık, sınıf, ders ve ünite/konu zorunludur.' }, { status: 400 })
+  }
+  if (!rawText.trim() || rawText.length > 500_000) {
+    return NextResponse.json({ error: 'Kitapçık metni boş olamaz ve 500.000 karakteri aşamaz.' }, { status: 400 })
+  }
+  const chunks = chunkText(rawText)
+  if (!chunks.length || chunks.length > 500) {
+    return NextResponse.json({ error: 'Kitapçık metni aranabilir parçalara ayrılamadı.' }, { status: 400 })
+  }
+
+  const { data, error } = await adminDb.rpc('update_exam_resource_document_v1', {
+    p_resource_id: id,
+    p_title: title,
+    p_grade: grade,
+    p_subject: subject,
+    p_topic: topic,
+    p_raw_text: rawText,
+    p_chunks: chunks,
+  })
+  if (error) {
+    const status = /not found/i.test(error.message) ? 404 : 400
+    return NextResponse.json({ error: status === 404 ? 'Kitapçık bulunamadı.' : error.message }, { status })
+  }
+  return NextResponse.json({ success: true, chunks: data, char_count: rawText.length })
+}
+
 export async function PATCH(req: NextRequest) {
   const user = await getAdminUser()
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

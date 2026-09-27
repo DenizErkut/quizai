@@ -101,6 +101,11 @@ export default function AdminPage() {
   const [examForm, setExamForm] = useState({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '' })
   const [examList, setExamList] = useState<any[]>([])
   const [examListLoading, setExamListLoading] = useState(false)
+  const [examEditor, setExamEditor] = useState<{
+    id: string; title: string; grade: string; subject: string; topic: string
+    source_type: string; file_url: string | null; raw_text: string
+    mode: 'view' | 'edit'; loading: boolean; saving: boolean; error: string
+  } | null>(null)
 
   // "Önce gör, sonra sil" kontrol listesi state'i (bkz.
   // pratium-bekleyen-isler-uygulama-plani.md Madde 5) — meb/exam
@@ -203,6 +208,46 @@ export default function AdminPage() {
       setMebMsg(`✅ Kaynak güncellendi; ${data.chunks} arama parçası yenilendi. Orijinal PDF dosyası korunmuştur.`)
     } catch (error) {
       setResourceEditor(current => current ? { ...current, saving: false, error: error instanceof Error ? error.message : 'Kaynak güncellenemedi.' } : current)
+    }
+  }
+
+  async function openExamResource(id: string, mode: 'view' | 'edit') {
+    setExamEditor({ id, title: '', grade: '', subject: '', topic: '', source_type: '', file_url: null, raw_text: '', mode, loading: true, saving: false, error: '' })
+    try {
+      const response = await fetch(`/api/admin/exam-upload?id=${encodeURIComponent(id)}`)
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Kitapçık açılamadı.')
+      const exam = data.exam || {}
+      setExamEditor({
+        id: exam.id, title: exam.title || '', grade: exam.grade || '', subject: exam.subject || '',
+        topic: exam.topic || exam.subtopic || '', source_type: exam.source_type || '', file_url: exam.file_url || null,
+        raw_text: exam.raw_text || '', mode, loading: false, saving: false, error: '',
+      })
+    } catch (error) {
+      setExamEditor(current => current ? { ...current, loading: false, error: error instanceof Error ? error.message : 'Kitapçık açılamadı.' } : current)
+    }
+  }
+
+  async function saveExamResource() {
+    if (!examEditor || examEditor.mode !== 'edit') return
+    setExamEditor(current => current ? { ...current, saving: true, error: '' } : current)
+    try {
+      const response = await fetch('/api/admin/exam-upload', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: examEditor.id, title: examEditor.title, grade: examEditor.grade,
+          subject: examEditor.subject, topic: examEditor.topic, raw_text: examEditor.raw_text,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Kitapçık güncellenemedi.')
+      setExamList(current => current.map(item => item.id === examEditor.id
+        ? { ...item, title: examEditor.title, grade: examEditor.grade, subject: examEditor.subject, topic: examEditor.topic, subtopic: examEditor.topic, chunk_count: data.chunks }
+        : item))
+      setExamEditor(current => current ? { ...current, mode: 'view', saving: false, error: '' } : current)
+      setExamMsg(`✅ Kitapçık güncellendi; ${data.chunks} arama parçası yenilendi. Orijinal PDF korundu.`)
+    } catch (error) {
+      setExamEditor(current => current ? { ...current, saving: false, error: error instanceof Error ? error.message : 'Kitapçık güncellenemedi.' } : current)
     }
   }
 
@@ -1885,6 +1930,8 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                       <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Anlık test kaynağı · {ex.grade ? `${ex.grade}. sınıf · ` : ''}{ex.subject || 'Ders belirtilmedi'}{(ex.topic || ex.subtopic) ? ` · ${ex.topic || ex.subtopic}` : ''} · {ex.chunk_count || 0} parça</div>
                     </div>
                     <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '99px', background: ex.source_type === 'teacher' ? 'rgba(22,163,74,0.1)' : 'rgba(99,102,241,0.1)', color: ex.source_type === 'teacher' ? '#15803d' : '#6366f1', fontWeight: 600 }}>{ex.source_type === 'teacher' ? 'Öğretmen' : 'Anonim'} · {ex.review_status === 'approved' ? 'Onaylı' : 'Bekliyor'}</span>
+                    <button onClick={() => void openExamResource(ex.id, 'view')} className="btn btn-sm" style={{ flexShrink: 0 }}>👁️ Görüntüle</button>
+                    <button onClick={() => void openExamResource(ex.id, 'edit')} className="btn btn-sm" style={{ flexShrink: 0 }}>✏️ Düzelt</button>
                     {ex.source_type === 'teacher' && ex.review_status !== 'approved' && <button onClick={async () => {
                       const res = await fetch('/api/admin/exam-upload', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: ex.id, review_status: 'approved' }) })
                       const data = await res.json()
@@ -2482,6 +2529,48 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               {resourceEditor.mode === 'view' && !resourceEditor.loading && <button className="btn btn-sm" onClick={() => setResourceEditor(current => current ? { ...current, mode: 'edit', error: '' } : current)}>Düzenlemeyi aç</button>}
               {resourceEditor.mode === 'edit' && <button className="btn btn-sm" onClick={() => void saveMebResource()} disabled={resourceEditor.loading || resourceEditor.saving || !resourceEditor.raw_text.trim()}>{resourceEditor.saving ? 'Kaydediliyor…' : 'Kaydet ve aramayı yenile'}</button>}
               <button className="btn btn-sm" onClick={() => setResourceEditor(null)} disabled={resourceEditor.saving}>Kapat</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {examEditor && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1950, padding: '1rem' }}>
+          <div className="card" style={{ maxWidth: '920px', width: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--primary)' }}>{examEditor.mode === 'edit' ? '✏️ Soru Kitapçığını Düzelt' : '📄 Soru Kitapçığını Görüntüle'}</div>
+                <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '4px' }}>Düzeltme, PDF’den çıkarılan metni ve arama parçalarını günceller; orijinal PDF korunur.</div>
+              </div>
+              <button className="btn btn-sm" onClick={() => setExamEditor(null)} disabled={examEditor.saving}>✕ Kapat</button>
+            </div>
+            {examEditor.file_url && <a href={examEditor.file_url} target="_blank" rel="noreferrer" style={{ fontSize: '12px', color: 'var(--accent)' }}>Orijinal PDF’yi yeni sekmede aç ↗</a>}
+            {examEditor.loading ? <div className="spinner" /> : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
+                  {([['title', 'Başlık'], ['grade', 'Sınıf'], ['subject', 'Ders'], ['topic', 'Ünite / Konu']] as const).map(([key, label]) => (
+                    <label key={key} style={{ fontSize: '11px', color: 'var(--text3)' }}>
+                      {label}
+                      <input value={examEditor[key]} disabled={examEditor.mode === 'view' || examEditor.saving}
+                        onChange={event => setExamEditor(current => current ? { ...current, [key]: event.target.value } : current)}
+                        style={{ display: 'block', width: '100%', marginTop: '4px', padding: '8px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', boxSizing: 'border-box' }} />
+                    </label>
+                  ))}
+                </div>
+                <label style={{ fontSize: '11px', color: 'var(--text3)' }}>
+                  PDF’den çıkarılan / düzenlenebilir metin
+                  <textarea value={examEditor.raw_text} disabled={examEditor.mode === 'view' || examEditor.saving}
+                    onChange={event => setExamEditor(current => current ? { ...current, raw_text: event.target.value } : current)}
+                    rows={16} spellCheck={false}
+                    style={{ display: 'block', width: '100%', marginTop: '4px', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'monospace', fontSize: '12px', lineHeight: 1.5 }} />
+                </label>
+                <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{examEditor.raw_text.length.toLocaleString('tr-TR')} karakter · Kaynak: {examEditor.source_type === 'teacher' ? 'Öğretmen imzalı' : 'Anonim'}</div>
+              </>
+            )}
+            {examEditor.error && <div style={{ color: 'var(--red)', fontSize: '12px' }}>{examEditor.error}</div>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              {examEditor.mode === 'view' && !examEditor.loading && <button className="btn btn-sm" onClick={() => setExamEditor(current => current ? { ...current, mode: 'edit', error: '' } : current)}>Düzeltmeyi aç</button>}
+              {examEditor.mode === 'edit' && <button className="btn btn-sm" onClick={() => void saveExamResource()} disabled={examEditor.loading || examEditor.saving || !examEditor.raw_text.trim()}>{examEditor.saving ? 'Kaydediliyor…' : 'Kaydet ve aramayı yenile'}</button>}
+              <button className="btn btn-sm" onClick={() => setExamEditor(null)} disabled={examEditor.saving}>Kapat</button>
             </div>
           </div>
         </div>

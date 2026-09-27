@@ -101,6 +101,22 @@ test('teacher booklets ground generation and approved exact questions re-enter t
   expect(bank).toContain('hasRealVisualAsset(clean)')
 })
 
+test('question booklet records can be viewed, edited and safely deleted by admins', () => {
+  const upload = readFileSync(join(process.cwd(), 'app/api/admin/exam-upload/route.ts'), 'utf8')
+  const admin = readFileSync(join(process.cwd(), 'app/admin/page.tsx'), 'utf8')
+  const migration = readFileSync(join(process.cwd(), 'supabase/migrations/20260927184506_update_exam_resource_document_v1.sql'), 'utf8')
+  expect(upload).toContain('export async function PUT')
+  expect(upload).toContain("adminDb.rpc('update_exam_resource_document_v1'")
+  expect(upload).toContain('const user = await getAdminUser()')
+  expect(admin).toContain('👁️ Görüntüle')
+  expect(admin).toContain('✏️ Düzelt')
+  expect(admin).toContain('🗑️ Sil')
+  expect(admin).toContain('orijinal PDF korunur')
+  expect(migration).toContain('security definer')
+  expect(migration).toContain('from public, anon, authenticated')
+  expect(migration).toContain('to service_role')
+})
+
 test('open-ended grading accepts age-appropriate concise student language', () => {
   const generate = readFileSync(join(process.cwd(), 'app/api/generate-open-ended/route.ts'), 'utf8')
   const grade = readFileSync(join(process.cwd(), 'app/api/grade-open-ended/route.ts'), 'utf8')
