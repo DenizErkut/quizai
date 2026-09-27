@@ -60,5 +60,7 @@ export async function POST(req: NextRequest) {
     result_metadata: { usedHint: body.usedHint === true, responseTimeMs: Number.isFinite(body.responseTimeMs) ? body.responseTimeMs : null },
   }).eq('id', body.checkId).eq('student_id', user.id).eq('status', 'served').select('id,status,transfer_result,completed_at').single()
   if (error || !completed) return NextResponse.json({ error: 'Transfer sonucu kaydedilemedi.' }, { status: 409 })
+  const { error: masteryError } = await db.rpc('apply_transfer_check_to_mastery_v1', { p_check_id: body.checkId })
+  if (masteryError) console.error('[transfer-check] mastery signal failed:', masteryError.message)
   return NextResponse.json({ check: completed })
 }
