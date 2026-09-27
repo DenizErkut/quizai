@@ -39,7 +39,7 @@ import { decideQuizProvider, getQuizProviderPolicy, QUIZ_PROVIDER_POLICY_VERSION
 import { attachQuestionRigorMetadata, summarizeQuestionSetRigor } from '@/lib/question-rigor'
 import { verifyVisualWithMistral } from '@/lib/mistral-quality'
 import { verifyVisualWithGemini } from '@/lib/gemini-visual-quality'
-import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, normalizeDifficultyLevel, requiredVisualCount, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
+import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
 import { isSameGradeSource } from '@/lib/meb-source-scope'
 
 const anthropic = new Anthropic()
@@ -1468,7 +1468,7 @@ export async function POST(req: NextRequest) {
       language,
       fileContent,
       includeVisuals = true,
-      questionType = 'multiple_choice',
+      questionType: rawQuestionType = 'mixed',
       dailyChallenge = false,
       continueSessionId, // adaptif akışta ikinci/sonraki parça — mevcut oturuma eklenir, yeni test sayılmaz
       excludeQuestionTexts, // aynı oturumda (henüz completed=false) az önce sorulmuş sorular — tekrar önleme
@@ -1483,6 +1483,7 @@ export async function POST(req: NextRequest) {
       // yol açıyordu (gerçek örnek: 10 sorudan 7'si "Past Simple Tense"le
       // hiç ilgisi olmayan Türkçe edebiyat/iletişim sorularıydı).
     } = body
+    const questionType = normalizeRequestedQuestionType(rawQuestionType)
 
     const MAX_QCOUNT: Record<string, number> = { free: 5, silver: 10, premium: 20, unlimited: 20 }
     const maxQ = MAX_QCOUNT[plan] ?? 0
@@ -1734,6 +1735,7 @@ export async function POST(req: NextRequest) {
         subject, topic, grade, language: effectiveLang,
         questionType, difficulty: resolvedDifficulty,
       }, safeQCount, recentQuestionTexts)
+      bankQuestions = filterQuestionsByRequestedType(bankQuestions, questionType)
 
       // Eski havuzda "onaylı" olmak, bilişsel derinliğin bugünkü eşiğini
       // karşıladığı anlamına gelmiyor. Temel/ezber düzeyindeki eski soruları
@@ -2169,6 +2171,7 @@ export async function POST(req: NextRequest) {
       ...normalizeInteractiveQuestionShape(q, effectiveLang),
       generationProvider: q.generationProvider || defaultGenerationProvider,
     }))
+    questions = filterQuestionsByRequestedType(questions, questionType)
 
     // Önce soru doğrulanır, sonra görsel doğrulanmış kesin soru metninden
     // üretilir. Eski paralel akışta doğrulayıcı soruların sırasını/metnini
@@ -2311,6 +2314,7 @@ export async function POST(req: NextRequest) {
             topupQuestions = (topupParsed?.questions || []).map((q: any) => ({ ...q, generationProvider: 'anthropic' }))
           }
           topupQuestions = topupQuestions.map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
+          topupQuestions = filterQuestionsByRequestedType(topupQuestions, questionType)
           topupQuestions = applyContentQualityFilters(topupQuestions, mebContext)
           // Yakın-tekrar kontrolü: hem önceki parçanın sorularına (excludeQuestionTexts)
           // hem de bu çağrıda ŞİMDİYE KADAR kabul edilmiş sorulara (questions) karşı.
@@ -2419,6 +2423,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'quality_policy_failed', reason: 'independent_verification', message: 'Testin tüm soruları bağımsız kalite kontrolünden geçemediği için oluşturulmadı.' }, { status: 503 })
     }
     questions = strictVerifyResult.questions.map((question: any) => normalizeInteractiveQuestionShape(question, effectiveLang))
+    questions = filterQuestionsByRequestedType(questions, questionType)
+    if (questions.length !== safeQCount) {
+      console.error(`[generate-quiz] question_type_mismatch expected=${questionType} accepted=${questions.length}/${safeQCount}`)
+      return NextResponse.json({ error: 'quality_policy_failed', reason: 'question_type_mismatch', message: 'Seçtiğin soru tipine uymayan sorular öğrenciye gösterilmeden elendi. Lütfen yeniden dene.' }, { status: 503 })
+    }
     if (!hasStrictQuestionReview(questions, objectiveCandidates)) {
       return NextResponse.json({ error: 'quality_policy_failed', reason: 'verification_evidence_missing', message: 'Soru kalite kontrol kanıtı eksik olduğu için test oluşturulmadı.' }, { status: 503 })
     }

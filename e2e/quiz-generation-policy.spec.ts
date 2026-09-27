@@ -3,14 +3,31 @@ import {
   buildAdaptiveDifficultyQuota,
   buildQuestionGenerationPlan,
   evaluateStrictQuestionReview,
+  filterQuestionsByRequestedType,
   formatDifficultyQuota,
   hasCanonicalObjectiveCoverage,
   hasDifficultyQuota,
   hasStrictQuestionReview,
   hasVisualQuota,
   requiredVisualCount,
+  normalizeRequestedQuestionType,
   visualAttemptCount,
 } from '../lib/quiz-generation-policy'
+
+test('defaults instant quiz requests to mixed and enforces an explicit format', () => {
+  expect(normalizeRequestedQuestionType(undefined)).toBe('mixed')
+  expect(normalizeRequestedQuestionType('unsupported')).toBe('mixed')
+  expect(normalizeRequestedQuestionType('ordering')).toBe('ordering')
+
+  const candidates = [
+    { type: 'multiple_choice', q: 'A' },
+    { type: 'ordering', q: 'B' },
+    { type: 'fill_blank', q: 'C' },
+    { type: 'mixed', q: 'invalid item type' },
+  ]
+  expect(filterQuestionsByRequestedType(candidates, 'ordering').map(question => question.q)).toEqual(['B'])
+  expect(filterQuestionsByRequestedType(candidates, 'mixed').map(question => question.q)).toEqual(['A', 'B', 'C'])
+})
 
 test('uses the 50/20/20/10 provider difficulty mix', () => {
   expect(buildQuestionGenerationPlan(10)).toEqual([

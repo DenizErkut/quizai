@@ -11,7 +11,7 @@ import { logAnthropicUsage } from '@/lib/ai-usage'
 import { decideQuestionQuality, evaluateQuestionStructure, providerQualitySignal } from '@/lib/ai-gateway'
 import { verifyQuestionWithMistral } from '@/lib/mistral-quality'
 import { requireAgentCapability, writeAgentDecisionAudit } from '@/lib/agent-security-policy'
-import { evaluateStrictQuestionReview } from '@/lib/quiz-generation-policy'
+import { evaluateStrictQuestionReview, filterQuestionsByRequestedType, normalizeRequestedQuestionType } from '@/lib/quiz-generation-policy'
 import { createClient } from '@supabase/supabase-js'
 
 const anthropic = new Anthropic()
@@ -190,7 +190,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { questions, topic, grade, language, questionType } = body
+    const { questions: rawQuestions, topic, grade, language } = body
+    const questionType = normalizeRequestedQuestionType(body.questionType)
+    const questions = Array.isArray(rawQuestions)
+      ? filterQuestionsByRequestedType(rawQuestions, questionType)
+      : []
     const reviewContext = {
       userId: user.id,
       sessionId: typeof body.sessionId === 'string' ? body.sessionId : undefined,

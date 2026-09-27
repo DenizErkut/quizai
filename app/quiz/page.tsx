@@ -217,7 +217,6 @@ function QuizPageContent() {
       setFavorites(favs)
       const lastSettings = JSON.parse(localStorage.getItem('pratium_last_settings') || '{}')
       if (lastSettings.difficulty) setDifficulty(lastSettings.difficulty)
-      if (lastSettings.questionType) setQuestionType(lastSettings.questionType)
       if (lastSettings.qCount) setQCount(lastSettings.qCount)
     } catch {}
   }, [])
@@ -258,7 +257,9 @@ function QuizPageContent() {
   const [qCount, setQCount] = useState(10)
   const [difficulty, setDifficulty] = useState('normal')
   const [includeVisuals, setIncludeVisuals] = useState(true)
-  const [questionType, setQuestionType] = useState<QuestionType>('multiple_choice')
+  // Her yeni anlık test Karma ile başlar. Kullanıcı bu ekranda başka bir tip
+  // seçerse seçim test boyunca korunur; eski tarayıcı ayarı varsayılanı ezmez.
+  const [questionType, setQuestionType] = useState<QuestionType>('mixed')
   const [assignmentId, setAssignmentId] = useState<string | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
 
@@ -317,7 +318,7 @@ function QuizPageContent() {
     if (adaptivePrefetchRef.current?.key === key) return
     const run = (async () => {
       const chunk1Answers = answersRef.current.slice(0, chunkBoundary)
-      const nextPolicy = nextQuestionPolicy(resolvedDifficulty, chunk1Answers, questions[current]?.type || questionType)
+      const nextPolicy = nextQuestionPolicy(resolvedDifficulty, chunk1Answers, questionType)
       const topic = customTopic.trim() || selectedTopic
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return { questions: [], nextPolicy }
@@ -325,7 +326,7 @@ function QuizPageContent() {
       const res = await fetch('/api/generate-quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ topic, questionCount: candidateCount, difficulty: nextPolicy.difficulty, language: currentLang, questionType: nextPolicy.questionType, adaptiveSupport: nextPolicy.supportLevel, includeVisuals, continueSessionId: sessionId, adaptiveCandidateBatch: true, subject: selectedSubject || undefined, excludeQuestionTexts: questions.map(q => q.q).filter(Boolean) }),
+        body: JSON.stringify({ topic, questionCount: candidateCount, difficulty: nextPolicy.difficulty, language: currentLang, questionType, adaptiveSupport: nextPolicy.supportLevel, includeVisuals, continueSessionId: sessionId, adaptiveCandidateBatch: true, subject: selectedSubject || undefined, excludeQuestionTexts: questions.map(q => q.q).filter(Boolean) }),
       })
       const data = await res.json().catch(() => ({}))
       return { questions: res.ok && Array.isArray(data.questions) ? data.questions : [], nextPolicy }
@@ -932,9 +933,11 @@ function QuizPageContent() {
       setFetchingNextChunk(true)
       try {
         const chunk1Answers = answersRef.current.slice(0, chunkBoundary)
-        const nextPolicy = nextQuestionPolicy(resolvedDifficulty, chunk1Answers, questions[current]?.type || questionType)
+        const nextPolicy = nextQuestionPolicy(resolvedDifficulty, chunk1Answers, questionType)
         const nextDiff = nextPolicy.difficulty
-        const nextQuestionType = nextPolicy.questionType
+        // Adaptif motor zorluk ve destek seviyesini değiştirebilir; öğrencinin
+        // açık soru tipi seçimini değiştiremez. Karma seçimi de Karma kalır.
+        const nextQuestionType = questionType
         const excludeTexts = questions.map(q => q.q).filter(Boolean)
         const topic = customTopic.trim() || selectedTopic
         // Tek adayın reddedilmesi artık bütün testi kesmez. Kalan soru

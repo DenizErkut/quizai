@@ -1,6 +1,37 @@
 export const REQUIRED_DIFFICULTIES = ['kolay', 'normal', 'zor', 'cok zor'] as const
 export type RequiredDifficulty = typeof REQUIRED_DIFFICULTIES[number]
 
+export const QUIZ_QUESTION_TYPES = [
+  'multiple_choice', 'fill_blank', 'matching', 'true_false', 'ordering',
+  'short_answer', 'multi_true_false', 'table_fill', 'mixed',
+] as const
+export type QuizQuestionType = typeof QUIZ_QUESTION_TYPES[number]
+
+export function normalizeRequestedQuestionType(value: unknown): QuizQuestionType {
+  return typeof value === 'string' && (QUIZ_QUESTION_TYPES as readonly string[]).includes(value)
+    ? value as QuizQuestionType
+    : 'mixed'
+}
+
+/**
+ * Karma dışındaki bir seçim, üreticinin etiketiyle değil öğrencinin açık
+ * tercihiyle belirlenir. Yanlış formatta dönen adaylar doğrulama/havuz/yedek
+ * akışlarına girmeden elenir. Karma ise gerçek soru tiplerinin tümünü kabul
+ * eder; `mixed` yalnız istek tipidir, tekil bir soru tipi değildir.
+ */
+export function questionMatchesRequestedType(question: Record<string, unknown>, requested: unknown): boolean {
+  const expected = normalizeRequestedQuestionType(requested)
+  const actual = typeof question.type === 'string' ? question.type : ''
+  if (expected === 'mixed') {
+    return actual !== 'mixed' && (QUIZ_QUESTION_TYPES as readonly string[]).includes(actual)
+  }
+  return actual === expected
+}
+
+export function filterQuestionsByRequestedType<T extends Record<string, unknown>>(questions: T[], requested: unknown): T[] {
+  return questions.filter(question => questionMatchesRequestedType(question, requested))
+}
+
 export interface DifficultyQuota {
   kolay: number
   normal: number
