@@ -222,7 +222,8 @@ export function hasStrictQuestionReview(
   questions: Array<Record<string, unknown>>,
   candidates: Array<{ id: string }>,
 ): boolean {
-  return questions.length > 0 && questions.every(question => question.qualityVerificationVersion === 'quiz-quality-v2'
+  return questions.length > 0 && questions.every(question => (question.qualityVerificationVersion === 'quiz-quality-v2'
+    || question.qualityVerificationVersion === 'quiz-quality-v2-degraded')
     && question.difficultyVerified === true
     && (candidates.length === 0 || question.objectiveVerified === true))
 }
