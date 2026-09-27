@@ -77,3 +77,8 @@ test('provider observability reports real usage cost and qualified quality sampl
   expect(route).toContain("select('is_admin')")
   expect(admin).toContain('<ProviderObservability />')
 })
+
+test('database plan constraint accepts every checkout profile plan', () => {
+  const migration = readFileSync(join(process.cwd(), 'supabase/migrations/20260927150931_allow_current_profile_plans.sql'), 'utf8')
+  for (const plan of ['free', 'silver', 'premium', 'unlimited']) expect(migration).toContain(`'${plan}'::text`)
+})
