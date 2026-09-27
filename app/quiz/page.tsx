@@ -976,7 +976,13 @@ function QuizPageContent() {
         // biter" diye pes ediliyordu. Artık aynı sessionId'ye (kota tekrar
         // SAYILMAZ) en fazla 2 ek istek daha atılıp hedefe (targetSecondChunk)
         // ulaşılmaya çalışılıyor.
-        if (secondChunk.length < targetSecondChunk && sessionId) {
+        // Üç aday üretmek bir tampon hedefidir; öğrencinin ilerlemesi için
+        // üçünün de gelmesi gerekmez. En az bir doğrulanmış yedek geldiyse
+        // onu hemen kullan. Aksi halde, yalnızca sıfır sonuçta top-up dene.
+        // Önceki davranışta 2/3 güvenli soru geldikten sonra üçüncü aday için
+        // yapılan ek istekler tekrar filtresine takılıp mevcut 2 soruyu da
+        // kullanıcıya göstermeden akışı kırıyordu.
+        if (secondChunk.length === 0 && sessionId) {
           let topupAttempts = 0
           while (secondChunk.length < targetSecondChunk && topupAttempts < 2) {
             topupAttempts++

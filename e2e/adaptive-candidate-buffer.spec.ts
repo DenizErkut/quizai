@@ -6,6 +6,7 @@ test('adaptive continuation requests a three-question validated reserve', () => 
   const page = readFileSync(join(process.cwd(), 'app/quiz/page.tsx'), 'utf8')
   expect(page).toContain('Math.min(3, Math.max(1, qCount - questions.length))')
   expect(page).toContain('adaptiveCandidateBatch: true')
+  expect(page).toContain('if (secondChunk.length === 0 && sessionId)')
   expect(page).not.toContain('Bağlantıyı kontrol edip testi yeniden başlatabilirsin.')
 })
 
