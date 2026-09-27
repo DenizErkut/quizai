@@ -31,6 +31,7 @@ import UnitEconomics from '@/components/admin/UnitEconomics'
 import QuestionBankEditor from '@/components/QuestionBankEditor'
 import DailyHabitMetrics from '@/components/admin/DailyHabitMetrics'
 import EducationAISafetyScorecard from '@/components/admin/EducationAISafetyScorecard'
+import ProviderObservability from '@/components/admin/ProviderObservability'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -734,6 +735,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         {tab === 'stats' && stats && (
           <div className="anim-up">
             <EducationAISafetyScorecard />
+            <ProviderObservability />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '1.5rem' }}>
               {[
                 { label: 'Toplam kullanıcı', value: stats.total_users, color: 'var(--accent)' },

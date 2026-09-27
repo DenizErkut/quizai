@@ -66,3 +66,14 @@ test('education AI safety scorecard uses live evidence and admin authorization',
   expect(route).toContain('privacy_access')
   expect(admin).toContain('<EducationAISafetyScorecard />')
 })
+
+test('provider observability reports real usage cost and qualified quality samples', () => {
+  const route = readFileSync(join(process.cwd(), 'app/api/admin/provider-observability/route.ts'), 'utf8')
+  const admin = readFileSync(join(process.cwd(), 'app/admin/page.tsx'), 'utf8')
+  expect(route).toContain("from('ai_usage_logs')")
+  expect(route).toContain('pricingCoverage')
+  expect(route).toContain('observedSuccessRate')
+  expect(route).toContain('qualitySample')
+  expect(route).toContain("select('is_admin')")
+  expect(admin).toContain('<ProviderObservability />')
+})
