@@ -30,6 +30,11 @@ export function questionBankKey(value: unknown): string {
     .trim()
 }
 
+export function questionBankTypeFilter(value: unknown): string | null {
+  const key = questionBankKey(value)
+  return key === 'mixed' || key === 'karisik' || key === 'karısık' || key === 'karışık' ? null : String(value || '')
+}
+
 export function questionFingerprint(question: Question): string {
   const text = [question.q, ...(Array.isArray(question.opts) ? question.opts : [])]
     .map(questionBankKey)
@@ -115,14 +120,33 @@ export function balanceAnswerPositions(questions: Question[]): Question[] {
     const target = targets.get(questionIndex)
     if (target === undefined) return { ...question }
 
+    const misconceptions = Array.isArray(question.distractorMisconceptions)
+      && question.distractorMisconceptions.length === question.opts.length
+      ? question.distractorMisconceptions
+      : null
     const correctOption = question.opts[question.ans]
-    const distractors = shuffled(question.opts.filter((_: unknown, index: number) => index !== question.ans))
+    const distractors = shuffled(question.opts
+      .map((option: unknown, index: number) => ({ option, misconception: misconceptions?.[index] ?? null, index }))
+      .filter((entry: { index: number }) => entry.index !== question.ans))
     const opts: unknown[] = []
+    const reorderedMisconceptions: unknown[] = []
     let distractorIndex = 0
     for (let optionIndex = 0; optionIndex < question.opts.length; optionIndex++) {
-      opts.push(optionIndex === target ? correctOption : distractors[distractorIndex++])
+      if (optionIndex === target) {
+        opts.push(correctOption)
+        reorderedMisconceptions.push(null)
+      } else {
+        const distractor = distractors[distractorIndex++]
+        opts.push(distractor.option)
+        reorderedMisconceptions.push(distractor.misconception)
+      }
     }
-    return normalizeAnswerReference({ ...question, opts, ans: target })
+    return normalizeAnswerReference({
+      ...question,
+      opts,
+      ans: target,
+      ...(misconceptions ? { distractorMisconceptions: reorderedMisconceptions } : {}),
+    })
   })
 }
 
@@ -172,13 +196,14 @@ export async function getQuestionBankSet(
       .eq('topic_key', questionBankKey(dimensions.topic))
       .eq('grade_key', questionBankKey(dimensions.grade))
       .eq('language_key', questionBankKey(dimensions.language))
-      .eq('question_type', dimensions.questionType)
       .eq('difficulty', dimensions.difficulty)
       .eq('review_status', 'approved').eq('report_count', 0)
       .order('use_count', { ascending: true })
       .order('last_used_at', { ascending: true, nullsFirst: true })
       .limit(Math.max(count * 5, 30))
     if (includeSubject) request = request.eq('subject_key', questionBankKey(dimensions.subject || 'genel'))
+    const typeFilter = questionBankTypeFilter(dimensions.questionType)
+    if (typeFilter) request = request.eq('question_type', typeFilter)
     return request
   }
   let { data, error } = await query(true)

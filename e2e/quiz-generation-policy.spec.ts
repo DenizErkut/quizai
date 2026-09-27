@@ -14,6 +14,7 @@ import {
   normalizeRequestedQuestionType,
   visualAttemptCount,
 } from '../lib/quiz-generation-policy'
+import { balanceAnswerPositions, questionBankTypeFilter } from '../lib/question-bank'
 
 test('defaults instant quiz requests to mixed and enforces an explicit format', () => {
   expect(normalizeRequestedQuestionType(undefined)).toBe('mixed')
@@ -87,6 +88,27 @@ test('requires thirty percent matched visuals with a seventy percent QA score', 
     { ...valid('Q6'), svg: 'not svg' }]
   expect(hasVisualQuota(questions, 3)).toBe(true)
   expect(hasVisualQuota(questions, 4)).toBe(false)
+})
+
+test('mixed quizzes can draw every real question type from the approved bank', () => {
+  expect(questionBankTypeFilter('mixed')).toBeNull()
+  expect(questionBankTypeFilter('karışık')).toBeNull()
+  expect(questionBankTypeFilter('multiple_choice')).toBe('multiple_choice')
+})
+
+test('answer balancing keeps misconception labels attached to their distractors', () => {
+  const original = {
+    q: 'Q', opts: ['correct', 'd1', 'd2', 'd3'], ans: 0,
+    distractorMisconceptions: [null, 'm1', 'm2', 'm3'],
+  }
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const balanced = balanceAnswerPositions([original])[0]
+    expect(balanced.distractorMisconceptions[balanced.ans]).toBeNull()
+    for (const [optionIndex, option] of balanced.opts.entries()) {
+      if (option === 'correct') continue
+      expect(balanced.distractorMisconceptions[optionIndex]).toBe(`m${option.slice(1)}`)
+    }
+  }
 })
 
 test('keeps the seventy-percent quality target usable for small batches', () => {
