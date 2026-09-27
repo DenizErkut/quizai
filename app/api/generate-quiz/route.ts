@@ -2442,9 +2442,32 @@ export async function POST(req: NextRequest) {
     // ve isteğin gerçek 120sn sınırını aşabilirdi. Artık kalan süre HER
     // zincire ortak bir üst sınır (maxMs) olarak da geçiliyor; hiçbir zincir
     // isteğin gerçekte sahip olduğundan fazla zaman harcayamaz.
+    // Adaptif parçalar için %30 kotayı parçanın kendi boyutuna uygulamak
+    // yanlıştı: tek kabul edilen yedek soruda ceil(1*0.30)=1 olup kota
+    // fiilen %100'e çıkıyordu. Mevcut oturumdaki görselleri de say ve yalnız
+    // birleşik testin %30 hedefinde eksik kalan kadar görsel iste.
+    let batchVisualMinimum = requiredVisualCount(safeQCount)
+    if (adaptiveCandidateBatch && continueSessionId) {
+      const { data: visualContextSession } = await supabase
+        .from('quiz_sessions')
+        .select('questions')
+        .eq('id', continueSessionId)
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (visualContextSession && Array.isArray(visualContextSession.questions)) {
+        const existingQuestions = visualContextSession.questions as Array<Record<string, unknown>>
+        const existingVisualCount = existingQuestions.filter(question => hasVisualQuota([question], 1)).length
+        const combinedMinimum = requiredVisualCount(existingQuestions.length + safeQCount)
+        batchVisualMinimum = Math.max(0, combinedMinimum - existingVisualCount)
+        console.log(`[generate-quiz] adaptive_visual_quota existing=${existingVisualCount}/${existingQuestions.length} batch_required=${batchVisualMinimum}/${safeQCount} combined_required=${combinedMinimum}`)
+      }
+    }
+
     const REQUEST_HARD_DEADLINE_MS = 112000 // 120sn'den DB yazımı/response için pay bırak
     const visualBudgetMs = REQUEST_HARD_DEADLINE_MS - (Date.now() - requestStartTime)
-    const visualIndexes = visualQuestionIndexes(questions, visualCategory, safeQCount)
+    const visualIndexes = batchVisualMinimum > 0
+      ? visualQuestionIndexes(questions, visualCategory, safeQCount)
+      : []
     const shouldGenerateVisuals = Boolean(visualCategory && visualIndexes.length > 0 && visualBudgetMs > 15000)
     if (visualCategory && visualIndexes.length > 0 && !shouldGenerateVisuals) {
       console.warn(`[generate-quiz] required visual quota skipped: insufficient time (${visualBudgetMs}ms)`)
@@ -2467,10 +2490,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (!hasVisualQuota(questions, requiredVisualCount(safeQCount))) {
+    if (!hasVisualQuota(questions, batchVisualMinimum)) {
       const actual = questions.filter(question => hasVisualQuota([question], 1)).length
-      console.error(`[generate-quiz] visual_quota_failed required=${requiredVisualCount(safeQCount)} actual=${actual} topic=${topic}`)
-      return NextResponse.json({ error: 'quality_policy_failed', reason: 'visual_quota', message: 'Soruların en az yarısı için birebir eşleşen ve bağımsız kontrolden geçmiş görsel üretilemediği için test oluşturulmadı.' }, { status: 503 })
+      console.error(`[generate-quiz] visual_quota_failed required=${batchVisualMinimum} actual=${actual} topic=${topic}`)
+      return NextResponse.json({ error: 'quality_policy_failed', reason: 'visual_quota', message: 'Test genelindeki %30 görsel hedefi için gereken birebir eşleşmiş ve bağımsız kontrolden geçmiş görseller tamamlanamadı.' }, { status: 503 })
     }
 
     // 26 Ağustos 2026 — kaynak metni öğrenciye de gönder (yukarıdaki nota bkz.).
