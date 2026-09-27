@@ -1699,7 +1699,6 @@ export async function POST(req: NextRequest) {
     const bookletContext = !fileContent
       ? await loadBookletContext(subject, grade, topic).catch(() => '')
       : ''
-    if (bookletContext) mebContext += bookletContext
     const isUniversityLevel = level === 'universite'
     const objectiveCandidates = await loadCanonicalObjectiveCandidates(supabase, {
       subject, grade, topic,
@@ -1876,8 +1875,9 @@ export async function POST(req: NextRequest) {
       + diagnosticStrategy.promptContext
       + (isUniversityLevel ? misconceptionMetadataInstruction(questionType) : '') // K12'de artık statik blokta
       + objectiveInstruction
+      + bookletContext
       + previousQuestionsNote
-    promptStr = fullPrompt + (adaptivePolicy?.promptContext || '') + diagnosticStrategy.promptContext + misconceptionMetadataInstruction(questionType) + objectiveInstruction + previousQuestionsNote // fallback için TAM metin saklanır
+    promptStr = fullPrompt + (adaptivePolicy?.promptContext || '') + diagnosticStrategy.promptContext + misconceptionMetadataInstruction(questionType) + objectiveInstruction + bookletContext + previousQuestionsNote // fallback için TAM metin saklanır
     countRef = aiQuestionCount
 
     // Hız optimizasyonu: az soru → Haiku (3x hızlı), çok soru → Sonnet

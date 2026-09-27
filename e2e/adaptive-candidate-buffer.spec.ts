@@ -89,6 +89,8 @@ test('teacher booklets ground generation and approved exact questions re-enter t
   const upload = readFileSync(join(process.cwd(), 'app/api/admin/exam-upload/route.ts'), 'utf8')
   const bank = readFileSync(join(process.cwd(), 'lib/question-bank.ts'), 'utf8')
   expect(route).toContain('ÖĞRETMEN İMZALI SORU KİTAPÇIĞI REFERANSI')
+  expect(route).toContain('+ bookletContext')
+  expect(route).not.toContain('if (bookletContext) mebContext += bookletContext')
   expect(route).toContain('const bankEligible = bankWriteEligible && !continueSessionId')
   expect(route).toContain('validatedQuestionsForBank = questions.slice()')
   expect(route.indexOf('validatedQuestionsForBank = questions.slice()')).toBeGreaterThan(route.indexOf('questions = balanceAnswerPositions(questions)'))
