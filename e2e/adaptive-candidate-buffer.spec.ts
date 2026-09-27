@@ -117,6 +117,24 @@ test('question booklet records can be viewed, edited and safely deleted by admin
   expect(migration).toContain('to service_role')
 })
 
+test('teacher publication evidence stays private and admin-managed', () => {
+  const evidenceRoute = readFileSync(join(process.cwd(), 'app/api/admin/exam-upload/evidence/route.ts'), 'utf8')
+  const uploadRoute = readFileSync(join(process.cwd(), 'app/api/admin/exam-upload/route.ts'), 'utf8')
+  const admin = readFileSync(join(process.cwd(), 'app/admin/page.tsx'), 'utf8')
+  const migration = readFileSync(join(process.cwd(), 'supabase/migrations/20260927185740_add_exam_publication_evidence.sql'), 'utf8')
+  expect(evidenceRoute).toContain("const BUCKET = 'publication-evidence'")
+  expect(evidenceRoute).toContain('const user = await getAdminUser()')
+  expect(evidenceRoute).toContain("resource.source_type !== 'teacher'")
+  expect(evidenceRoute).toContain('createSignedUrls(paths, 600)')
+  expect(uploadRoute).toContain("from('publication-evidence').createSignedUrls")
+  expect(uploadRoute).toContain("from('publication-evidence').remove")
+  expect(admin).toContain('Yayın izni görsel kanıtı')
+  expect(admin).toContain('Yayın izni kanıtları')
+  expect(migration).toContain("'publication-evidence'")
+  expect(migration).toContain('false,')
+  expect(migration).not.toContain('create policy')
+})
+
 test('open-ended grading accepts age-appropriate concise student language', () => {
   const generate = readFileSync(join(process.cwd(), 'app/api/generate-open-ended/route.ts'), 'utf8')
   const grade = readFileSync(join(process.cwd(), 'app/api/grade-open-ended/route.ts'), 'utf8')

@@ -98,12 +98,14 @@ export default function AdminPage() {
   const [examUploading, setExamUploading] = useState(false)
   const [examMsg, setExamMsg] = useState('')
   const [examFile, setExamFile] = useState<File | null>(null)
+  const [examEvidenceFiles, setExamEvidenceFiles] = useState<File[]>([])
   const [examForm, setExamForm] = useState({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '' })
   const [examList, setExamList] = useState<any[]>([])
   const [examListLoading, setExamListLoading] = useState(false)
   const [examEditor, setExamEditor] = useState<{
     id: string; title: string; grade: string; subject: string; topic: string
     source_type: string; file_url: string | null; raw_text: string
+    publication_evidence: { path: string; url: string }[]; evidenceUploading: boolean
     mode: 'view' | 'edit'; loading: boolean; saving: boolean; error: string
   } | null>(null)
 
@@ -212,7 +214,7 @@ export default function AdminPage() {
   }
 
   async function openExamResource(id: string, mode: 'view' | 'edit') {
-    setExamEditor({ id, title: '', grade: '', subject: '', topic: '', source_type: '', file_url: null, raw_text: '', mode, loading: true, saving: false, error: '' })
+    setExamEditor({ id, title: '', grade: '', subject: '', topic: '', source_type: '', file_url: null, raw_text: '', publication_evidence: [], evidenceUploading: false, mode, loading: true, saving: false, error: '' })
     try {
       const response = await fetch(`/api/admin/exam-upload?id=${encodeURIComponent(id)}`)
       const data = await response.json()
@@ -221,7 +223,7 @@ export default function AdminPage() {
       setExamEditor({
         id: exam.id, title: exam.title || '', grade: exam.grade || '', subject: exam.subject || '',
         topic: exam.topic || exam.subtopic || '', source_type: exam.source_type || '', file_url: exam.file_url || null,
-        raw_text: exam.raw_text || '', mode, loading: false, saving: false, error: '',
+        raw_text: exam.raw_text || '', publication_evidence: exam.publication_evidence || [], evidenceUploading: false, mode, loading: false, saving: false, error: '',
       })
     } catch (error) {
       setExamEditor(current => current ? { ...current, loading: false, error: error instanceof Error ? error.message : 'Kitapçık açılamadı.' } : current)
@@ -249,6 +251,17 @@ export default function AdminPage() {
     } catch (error) {
       setExamEditor(current => current ? { ...current, saving: false, error: error instanceof Error ? error.message : 'Kitapçık güncellenemedi.' } : current)
     }
+  }
+
+  async function uploadExamEvidence(resourceId: string, files: File[]) {
+    if (!files.length) return []
+    const form = new FormData()
+    form.append('resource_id', resourceId)
+    files.forEach(file => form.append('files', file))
+    const response = await fetch('/api/admin/exam-upload/evidence', { method: 'POST', body: form })
+    const data = await response.json()
+    if (!response.ok) throw new Error(data.error || 'Yayın izni kanıtı yüklenemedi.')
+    return data.evidence || []
   }
 
   async function extractMebObjectives(resourceId: string) {
@@ -1839,6 +1852,13 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               {examFile && <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '4px' }}>✓ {examFile.name} ({(examFile.size / 1024 / 1024).toFixed(1)} MB)</div>}
             </div>
 
+            {tab === 'question-books' && examForm.source_type === 'teacher' && <div style={{ marginBottom: '14px', padding: '12px', borderRadius: '10px', border: '1px solid rgba(22,163,74,0.25)', background: 'rgba(22,163,74,0.05)' }}>
+              <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>🛡️ Yayın izni görsel kanıtı (opsiyonel)</label>
+              <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>Öğretmenin soruları Pratium’da yayınlamanıza izin verdiği e-posta veya WhatsApp ekran görüntülerini ekleyin. Görseller özel depoda tutulur ve yalnızca yöneticiler görüntüleyebilir.</div>
+              <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e => setExamEvidenceFiles(Array.from(e.target.files || []))} />
+              {examEvidenceFiles.length > 0 && <div style={{ fontSize: '11px', color: '#15803d', marginTop: '5px' }}>✓ {examEvidenceFiles.length} kanıt görseli seçildi</div>}
+            </div>}
+
             {examMsg && (
               <div style={{ padding: '10px 14px', borderRadius: '10px', background: examMsg.startsWith('✅') ? 'rgba(22,163,74,0.08)' : examMsg.startsWith('❌') ? 'rgba(220,38,38,0.08)' : 'rgba(99,102,241,0.08)', border: `1px solid ${examMsg.startsWith('✅') ? '#16a34a' : examMsg.startsWith('❌') ? '#dc2626' : '#6366f1'}33`, fontSize: '13px', color: examMsg.startsWith('✅') ? '#15803d' : examMsg.startsWith('❌') ? '#dc2626' : '#6366f1', marginBottom: '12px' }}>
                 {examMsg}
@@ -1874,9 +1894,11 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     })
                     const data = await res.json()
                     if (res.ok) {
-                      setExamMsg(tab === 'question-books' && examForm.source_type === 'teacher' ? `✅ Yüklendi; ${data.promoted || 0} soru birebir anlık test havuzuna aktarıldı.` : `✅ Yüklendi! ${data.chunks} kaynak parçası işlendi.`)
+                      if (examEvidenceFiles.length && data.resource_id) await uploadExamEvidence(data.resource_id, examEvidenceFiles)
+                      setExamMsg(tab === 'question-books' && examForm.source_type === 'teacher' ? `✅ Yüklendi; ${data.promoted || 0} soru birebir anlık test havuzuna aktarıldı${examEvidenceFiles.length ? ` ve ${examEvidenceFiles.length} yayın izni kanıtı saklandı` : ''}.` : `✅ Yüklendi! ${data.chunks} kaynak parçası işlendi.`)
                       setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '' })
                       setExamFile(null)
+                      setExamEvidenceFiles([])
                     } else setExamMsg('❌ ' + (data.error || 'Sunucu hatasi'))
                   } else {
                     setExamMsg('Dosya isleniyor...')
@@ -1888,9 +1910,11 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     const res = await fetch('/api/admin/exam-upload', { method: 'POST', body: fd })
                     const data = await res.json()
                     if (res.ok) {
-                      setExamMsg(tab === 'question-books' && examForm.source_type === 'teacher' ? `✅ Yüklendi; ${data.promoted || 0} soru birebir anlık test havuzuna aktarıldı.` : `✅ Yüklendi! ${data.chunks} kaynak parçası işlendi.`)
+                      if (examEvidenceFiles.length && data.resource_id) await uploadExamEvidence(data.resource_id, examEvidenceFiles)
+                      setExamMsg(tab === 'question-books' && examForm.source_type === 'teacher' ? `✅ Yüklendi; ${data.promoted || 0} soru birebir anlık test havuzuna aktarıldı${examEvidenceFiles.length ? ` ve ${examEvidenceFiles.length} yayın izni kanıtı saklandı` : ''}.` : `✅ Yüklendi! ${data.chunks} kaynak parçası işlendi.`)
                       setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '' })
                       setExamFile(null)
+                      setExamEvidenceFiles([])
                     } else setExamMsg('❌ ' + (data.error || 'Sunucu hatasi'))
                   }
                 } catch (e: any) {
@@ -1927,7 +1951,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>🎯</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--primary)' }}>{ex.title}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Anlık test kaynağı · {ex.grade ? `${ex.grade}. sınıf · ` : ''}{ex.subject || 'Ders belirtilmedi'}{(ex.topic || ex.subtopic) ? ` · ${ex.topic || ex.subtopic}` : ''} · {ex.chunk_count || 0} parça</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Anlık test kaynağı · {ex.grade ? `${ex.grade}. sınıf · ` : ''}{ex.subject || 'Ders belirtilmedi'}{(ex.topic || ex.subtopic) ? ` · ${ex.topic || ex.subtopic}` : ''} · {ex.chunk_count || 0} parça{ex.publication_evidence_count ? ` · ${ex.publication_evidence_count} izin kanıtı` : ''}</div>
                     </div>
                     <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '99px', background: ex.source_type === 'teacher' ? 'rgba(22,163,74,0.1)' : 'rgba(99,102,241,0.1)', color: ex.source_type === 'teacher' ? '#15803d' : '#6366f1', fontWeight: 600 }}>{ex.source_type === 'teacher' ? 'Öğretmen' : 'Anonim'} · {ex.review_status === 'approved' ? 'Onaylı' : 'Bekliyor'}</span>
                     <button onClick={() => void openExamResource(ex.id, 'view')} className="btn btn-sm" style={{ flexShrink: 0 }}>👁️ Görüntüle</button>
@@ -2544,6 +2568,38 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               <button className="btn btn-sm" onClick={() => setExamEditor(null)} disabled={examEditor.saving}>✕ Kapat</button>
             </div>
             {examEditor.file_url && <a href={examEditor.file_url} target="_blank" rel="noreferrer" style={{ fontSize: '12px', color: 'var(--accent)' }}>Orijinal PDF’yi yeni sekmede aç ↗</a>}
+            {examEditor.source_type === 'teacher' && !examEditor.loading && <div style={{ padding: '10px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>🛡️ Yayın izni kanıtları ({examEditor.publication_evidence.length})</div>
+              {examEditor.publication_evidence.length === 0 ? <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Henüz görsel kanıt yüklenmemiş.</div> : (
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                  {examEditor.publication_evidence.map((evidence, index) => <div key={evidence.path} style={{ position: 'relative' }}>
+                    <a href={evidence.url} target="_blank" rel="noreferrer"><img src={evidence.url} alt={`Yayın izni kanıtı ${index + 1}`} style={{ width: 120, height: 90, objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border)' }} /></a>
+                    {examEditor.mode === 'edit' && <button type="button" title="Kanıtı sil" onClick={async () => {
+                      if (!confirm('Bu yayın izni kanıtı kalıcı olarak silinsin mi?')) return
+                      const response = await fetch('/api/admin/exam-upload/evidence', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resource_id: examEditor.id, path: evidence.path }) })
+                      const data = await response.json().catch(() => ({}))
+                      if (!response.ok) return setExamEditor(current => current ? { ...current, error: data.error || 'Kanıt silinemedi.' } : current)
+                      setExamEditor(current => current ? { ...current, publication_evidence: current.publication_evidence.filter(item => item.path !== evidence.path) } : current)
+                    }} style={{ position: 'absolute', top: 3, right: 3, border: 0, borderRadius: '99px', background: '#dc2626', color: '#fff', width: 24, height: 24, cursor: 'pointer' }}>×</button>}
+                  </div>)}
+                </div>
+              )}
+              {examEditor.mode === 'edit' && <label style={{ fontSize: '11px', color: 'var(--text3)' }}>
+                Yeni ekran görüntüsü ekle (JPG, PNG veya WEBP; en fazla 5 MB)
+                <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={examEditor.evidenceUploading} onChange={async event => {
+                  const files = Array.from(event.target.files || [])
+                  if (!files.length) return
+                  setExamEditor(current => current ? { ...current, evidenceUploading: true, error: '' } : current)
+                  try {
+                    const evidence = await uploadExamEvidence(examEditor.id, files)
+                    setExamEditor(current => current ? { ...current, publication_evidence: evidence, evidenceUploading: false } : current)
+                  } catch (error) {
+                    setExamEditor(current => current ? { ...current, evidenceUploading: false, error: error instanceof Error ? error.message : 'Kanıt yüklenemedi.' } : current)
+                  }
+                  event.target.value = ''
+                }} style={{ display: 'block', marginTop: '6px' }} />
+              </label>}
+            </div>}
             {examEditor.loading ? <div className="spinner" /> : (
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>

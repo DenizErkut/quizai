@@ -144,15 +144,20 @@ export async function GET(req: NextRequest) {
   if (id) {
     const { data, error } = await adminDb
       .from('exam_resources')
-      .select('id, title, exam_type, year, subject, answer_key, file_url, raw_text, purpose, source_type, reuse_policy, grade, topic, subtopic, review_status, created_at')
+      .select('id, title, exam_type, year, subject, answer_key, file_url, raw_text, purpose, source_type, reuse_policy, grade, topic, subtopic, review_status, publication_evidence_paths, created_at')
       .eq('id', id).single()
     if (error || !data) return NextResponse.json({ error: 'Bulunamadı' }, { status: 404 })
-    return NextResponse.json({ exam: { ...data, char_count: data.raw_text?.length || 0 } })
+    const evidencePaths = Array.isArray(data.publication_evidence_paths) ? data.publication_evidence_paths : []
+    const { data: signedEvidence } = evidencePaths.length
+      ? await adminDb.storage.from('publication-evidence').createSignedUrls(evidencePaths, 600)
+      : { data: [] }
+    const publication_evidence = (signedEvidence || []).map((item, index) => ({ path: evidencePaths[index], url: item.signedUrl }))
+    return NextResponse.json({ exam: { ...data, publication_evidence, char_count: data.raw_text?.length || 0 } })
   }
 
   let examQuery = adminDb
     .from('exam_resources')
-    .select('id, title, exam_type, year, subject, purpose, source_type, reuse_policy, grade, topic, subtopic, review_status, created_at, file_url')
+    .select('id, title, exam_type, year, subject, purpose, source_type, reuse_policy, grade, topic, subtopic, review_status, publication_evidence_paths, created_at, file_url')
     .order('exam_type', { ascending: true })
     .order('year', { ascending: false })
   if (purpose === 'instant_test' || purpose === 'exam') examQuery = examQuery.eq('purpose', purpose)
@@ -164,7 +169,7 @@ export async function GET(req: NextRequest) {
       .from('exam_chunks')
       .select('id', { count: 'exact', head: true })
       .eq('exam_resource_id', ex.id)
-    return { ...ex, chunk_count: count || 0 }
+    return { ...ex, publication_evidence_count: Array.isArray(ex.publication_evidence_paths) ? ex.publication_evidence_paths.length : 0, chunk_count: count || 0 }
   }))
 
   return NextResponse.json({ exams: withCounts })
@@ -377,11 +382,19 @@ export async function DELETE(req: NextRequest) {
     )
   }
 
+  const { data: resource } = await adminDb.from('exam_resources').select('publication_evidence_paths').eq('id', id).single()
+  const evidencePaths = Array.isArray(resource?.publication_evidence_paths) ? resource.publication_evidence_paths : []
+
   const { error: chunkErr } = await adminDb.from('exam_chunks').delete().eq('exam_resource_id', id)
   if (chunkErr) return NextResponse.json({ error: `Chunk silme hatası: ${chunkErr.message}` }, { status: 500 })
 
   const { error } = await adminDb.from('exam_resources').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (evidencePaths.length) {
+    const { error: storageError } = await adminDb.storage.from('publication-evidence').remove(evidencePaths)
+    if (storageError) console.error('[exam-upload] publication evidence cleanup failed', storageError)
+  }
 
   return NextResponse.json({ success: true })
 }
