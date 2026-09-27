@@ -54,9 +54,41 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ success: true, question: data })
 }
 
-export async function GET() {
+// 27 Eylul 2026 — Deniz'in bulgusu: bu uc nokta eskiden filtre parametrelerini
+// yok sayip her zaman en son guncellenen 200 satiri donduruyordu; sinif/ders/konu
+// acilir kutulari da SADECE o 200 satirdan turetiliyordu (bkz. QuestionBankEditor.tsx).
+// Toplu bir ekleme (ayni anda 200+ satir, hepsi taze updated_at ile) bu LIMIT 200'u
+// tamamen doldurup butun diger sinif/ders/konulari panelden GORUNMEZ hale getirdi —
+// veritabaninda hicbir kayip yoktu, sadece bu incelemenin varsayilan gorunumunde
+// gizlenmislerdi. Duzeltme: (1) acilir kutu secenekleri artik havuzun TAMAMINDAN
+// (facet sorgusu, review_status filtresiyle ama LIMIT olmadan) turetiliyor, (2)
+// sinif/ders/konu filtreleri artik sunucu tarafinda uygulaniyor, boylece "LIMIT 200"
+// sadece SECILEN filtreye uygulaniyor, tum havuza degil.
+export async function GET(req: NextRequest) {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
-  const { data, error } = await db.from('question_bank').select('id,question,subject_key,topic_key,grade_key,difficulty,review_status,awaiting_expert_review,ai_provider,ai_model,report_count,promoted_at,updated_at').in('review_status', ['candidate', 'approved']).order('updated_at', { ascending: false }).limit(200)
+  const { searchParams } = new URL(req.url)
+  const grade = searchParams.get('grade') || ''
+  const subject = searchParams.get('subject') || ''
+  const topic = searchParams.get('topic') || ''
+
+  const { data: facetRows, error: facetError } = await db.from('question_bank')
+    .select('grade_key,subject_key,topic_key')
+    .in('review_status', ['candidate', 'approved'])
+    .limit(50000)
+  if (facetError) return NextResponse.json({ error: facetError.message }, { status: 500 })
+  const facets = {
+    grades: [...new Set((facetRows || []).map((r) => r.grade_key).filter(Boolean))].sort(),
+    subjects: [...new Set((facetRows || []).map((r) => r.subject_key).filter(Boolean))].sort(),
+    topics: [...new Set((facetRows || []).map((r) => r.topic_key).filter(Boolean))].sort(),
+  }
+
+  let query = db.from('question_bank')
+    .select('id,question,subject_key,topic_key,grade_key,difficulty,review_status,awaiting_expert_review,ai_provider,ai_model,report_count,promoted_at,updated_at')
+    .in('review_status', ['candidate', 'approved'])
+  if (grade) query = query.eq('grade_key', grade)
+  if (subject) query = query.eq('subject_key', subject)
+  if (topic) query = query.eq('topic_key', topic)
+  const { data, error } = await query.order('updated_at', { ascending: false }).limit(200)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ questions: data || [] })
+  return NextResponse.json({ questions: data || [], facets })
 }
