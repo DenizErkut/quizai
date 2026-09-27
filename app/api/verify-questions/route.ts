@@ -6,7 +6,7 @@ export const maxDuration = 90
 export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
 import { verifyQuestionWithOpenAI } from '@/lib/openai'
-import { verifyQuestionWithGemini } from '@/lib/verify-gemini'
+import { verifyQuestionSetWithGemini, verifyQuestionWithGemini } from '@/lib/verify-gemini'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { decideQuestionQuality, evaluateQuestionStructure, providerQualitySignal } from '@/lib/ai-gateway'
 import { verifyQuestionWithMistral } from '@/lib/mistral-quality'
@@ -173,6 +173,11 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { questions, topic, grade, language, questionType } = body
+    const reviewContext = {
+      userId: user.id,
+      sessionId: typeof body.sessionId === 'string' ? body.sessionId : undefined,
+      requestId: typeof body.requestId === 'string' ? body.requestId : undefined,
+    }
     const strictQualityPolicy = body?.strictQualityPolicy === true
     const objectiveCandidates = Array.isArray(body?.objectiveCandidates)
       ? body.objectiveCandidates as ObjectiveCandidate[]
@@ -242,15 +247,20 @@ export async function POST(req: NextRequest) {
           // urettigini yine Claude'a kontrol ettirmiyor). Diger tipler icin
           // Claude ile devam ediyoruz.
           const verifyPrompt = buildVerifyPrompt(q, lang, selectedObjective)
+          const generatingProvider = q.generationProvider === 'mistral' ? 'mistral' : q.generationProvider === 'openai' ? 'openai' : 'anthropic'
 
           // Birincil (OpenAI/Claude) ve Gemini kontrollerini SIRALI degil
           // PARALEL calistir - sirali calistirmak toplam gecikmeyi ikiye
           // katliyordu ve generate-quiz'in 60sn'lik zaman asimina neden
           // oluyordu.
           const [primaryCheck, geminiCheck, mistralCheck] = await Promise.all([
-            isMathQuestion(q)
-              ? verifyQuestionWithOpenAI(verifyPrompt)
-              : (async () => {
+            strictQualityPolicy
+              ? generatingProvider === 'mistral'
+                ? verifyQuestionWithOpenAI(verifyPrompt, 'gpt-4.1-mini', { userId: user.id, quizSessionId: reviewContext.sessionId, requestId: reviewContext.requestId })
+                : verifyQuestionWithMistral(verifyPrompt, reviewContext)
+              : isMathQuestion(q)
+                ? verifyQuestionWithOpenAI(verifyPrompt)
+                : (async () => {
                   const res = await anthropic.messages.create({
                     model: 'claude-sonnet-4-5',
                     max_tokens: 150,
@@ -261,17 +271,19 @@ export async function POST(req: NextRequest) {
                   const match = text.match(/\{[\s\S]*\}/)
                   return match ? JSON.parse(match[0]) : { ok: true }
                 })(),
-            verifyQuestionWithGemini(verifyPrompt),
-            verifyQuestionWithMistral(verifyPrompt),
+            strictQualityPolicy ? Promise.resolve(null) : verifyQuestionWithGemini(verifyPrompt),
+            strictQualityPolicy || generatingProvider === 'mistral'
+              ? Promise.resolve(null)
+              : verifyQuestionWithMistral(verifyPrompt, reviewContext),
           ])
 
           if (strictQualityPolicy) {
             const strictReview = evaluateStrictQuestionReview({
               primary: primaryCheck,
-              secondary: [geminiCheck, mistralCheck],
+              secondary: [],
               objectiveRequired: objectiveCandidates.length > 0,
             })
-            if (!Boolean(q.difficulty) || !strictReview.passed) {
+            if (!Boolean(q.difficulty) || primaryCheck?.ok !== true || !strictReview.passed) {
               rejected.push(idx)
               rejectReasons.push(`Q${idx}: strict difficulty/outcome evidence missing or mismatched`)
               return
@@ -309,6 +321,27 @@ export async function POST(req: NextRequest) {
           }
         }
       }))
+    }
+
+    let geminiSetReview: { ok: boolean; reason?: string; issueIndexes?: number[] } | null = null
+    if (strictQualityPolicy && verified.length === questions.length) {
+      geminiSetReview = await verifyQuestionSetWithGemini({
+        questions: verified,
+        topic: String(topic || ''),
+        grade: String(grade || ''),
+        language: String(lang || ''),
+      })
+      if (geminiSetReview?.ok === false) {
+        rejectReasons.push(`Final Gemini set review rejected: ${geminiSetReview.reason || 'material issue detected'}`)
+        rejected.push(...(geminiSetReview.issueIndexes || []))
+        verified.splice(0, verified.length)
+      } else {
+        const reviewStatus = geminiSetReview?.ok === true ? 'passed' : 'unavailable'
+        if (reviewStatus === 'unavailable') {
+          console.warn('[verify-questions] Gemini whole-set review unavailable; per-question provider review remains enforced')
+        }
+        verified.splice(0, verified.length, ...verified.map(question => ({ ...question, geminiSetReviewStatus: reviewStatus })))
+      }
     }
 
     // Reddedilen sorular için yenilerini üret
@@ -369,6 +402,7 @@ Return ONLY valid JSON:
         replacements: replacements.length,
         final: final.length,
         rejectReasons,
+        ...(strictQualityPolicy ? { geminiSetReview } : {}),
       },
     })
   } catch (error: any) {

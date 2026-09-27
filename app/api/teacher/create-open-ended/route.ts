@@ -262,7 +262,7 @@ Bu içerik, belirtilen seviyedeki öğrencilere gösterilmeye uygun mu? Sadece �
 {"ok": true veya false, "reason": "Türkçe, kısa (1 cümle) gerekçe — uygun değilse neden, uygunsa boş bırakabilirsin"}`
 
     const verification = await verifyQuestionWithOpenAI(verifyPrompt)
-    if (verification.ok === false) {
+    if (verification?.ok === false) {
       return NextResponse.json({
         error: `İçerik MEB uygunluk kontrolünden geçemedi: ${verification.reason || 'Uygun bulunmadı.'} Lütfen senaryo/soruyu düzenleyip tekrar dene.`,
       }, { status: 422 })

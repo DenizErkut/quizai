@@ -110,15 +110,19 @@ export async function verifyMathWithOpenAI(question: string, answer: string, lan
 // 4. Genel soru doğrulama — bağımsız çapraz kontrol için (matematik odaklı,
 // Claude'un kendi ürettiğini yine Claude'a kontrol ettirmek yerine farklı
 // bir modelle gerçek bağımsız doğrulama sağlar)
-export async function verifyQuestionWithOpenAI(prompt: string): Promise<{ ok: boolean; reason?: string; fix?: string; difficultyMatches?: boolean; objectiveMatches?: boolean }> {
+export async function verifyQuestionWithOpenAI(
+  prompt: string,
+  model = 'gpt-4o',
+  context: { userId?: string; quizSessionId?: string; requestId?: string } = {},
+): Promise<{ ok: boolean; reason?: string; fix?: string; difficultyMatches?: boolean; objectiveMatches?: boolean } | null> {
   try {
     const result = await callOpenAI([
       { role: 'system', content: 'You are a strict educational content verifier. Respond only with valid JSON.' },
       { role: 'user', content: prompt },
-    ], { model: 'gpt-4o', max_tokens: 250, json: true, operation: 'verify-questions:gpt4o' })
+    ], { model, max_tokens: 250, json: true, timeoutMs: 15000, operation: `verify-questions:${model}`, ...context })
     return JSON.parse(result)
   } catch {
-    return { ok: true } // Doğrulama başarısız olursa soruyu reddetme, geç
+    return null // Provider outage is recorded as unavailable, never fabricated as approval.
   }
 }
 

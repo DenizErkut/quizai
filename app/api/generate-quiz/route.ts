@@ -39,7 +39,7 @@ import { decideQuizProvider, getQuizProviderPolicy, QUIZ_PROVIDER_POLICY_VERSION
 import { attachQuestionRigorMetadata, summarizeQuestionSetRigor } from '@/lib/question-rigor'
 import { verifyVisualWithMistral } from '@/lib/mistral-quality'
 import { verifyVisualWithGemini } from '@/lib/gemini-visual-quality'
-import { buildAdaptiveDifficultyQuota, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, normalizeDifficultyLevel, requiredVisualCount, visualAttemptCount } from '@/lib/quiz-generation-policy'
+import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, normalizeDifficultyLevel, requiredVisualCount, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
 import { isSameGradeSource } from '@/lib/meb-source-scope'
 
 const anthropic = new Anthropic()
@@ -332,8 +332,13 @@ function rigorInstruction(difficulty: string, count: number, topic: string): str
   const applicationCount = Math.max(1, Math.ceil(count * (hard ? 0.9 : easy ? 0.6 : 0.8)))
   const inferenceCount = Math.max(1, Math.ceil(count * (hard ? 0.7 : easy ? 0.3 : 0.5)))
   const directLimit = easy ? Math.max(1, Math.floor(count * 0.2)) : 0
-  const adaptiveQuota = buildAdaptiveDifficultyQuota(count, difficulty)
-  const mixRule = `Hedef zorluk dağılımı ${formatDifficultyQuota(adaptiveQuota)}. Bu dağılım adaptif başlangıç seviyesi (${difficulty}) için yaklaşık hedeftir; soru sayısına göre her seviyede 1-2 soru sapma kabul edilir. Kolay, normal ve zor düzeylerinin hepsi temsil edilmeli; etiketleri kota doldurmak için değil, sorunun gerçek bilişsel yüküne göre belirle.`
+  const generationPlan = buildQuestionGenerationPlan(count)
+  const roleQuota = {
+    kolay: generationPlan.find(batch => batch.difficulty === 'kolay')?.count || 0,
+    normal: generationPlan.find(batch => batch.difficulty === 'normal')?.count || 0,
+    zor: generationPlan.find(batch => batch.difficulty === 'zor')?.count || 0,
+  }
+  const mixRule = `Sabit üretim hedefi ${formatDifficultyQuota(roleQuota)}: GPT-4.1 mini kolay, Mistral normal, Claude Sonnet 4.5 zor soruları üretir. Bu oran soru sayısına göre en yakın tam sayıya yuvarlanır; etiketleri kota doldurmak için değil, sorunun gerçek bilişsel yüküne göre belirle. Öğrencinin adaptif profili (${difficulty}) soruların konu odağını, destek düzeyini ve alt/üst bilişsel karmaşıklığını etkiler; sağlayıcı-zorluk görev eşleşmesini değiştirme.`
   return `\n\nÖLÇME KALİTESİ VE ZORLUK KURALI (ZORUNLU): "${topic}" için ${count} soru üretirken sadece tanım ezberini veya tek adımlı işlemi ölçme. En az ${applicationCount} soru bilgiyi yeni bir bağlama/senaryoya uygulamayı, verilenleri ayıklamayı veya en az iki akıl yürütme adımını gerektirsin. En az ${inferenceCount} soru ilişki kurma, hata bulma, karşılaştırma, yanlış çözümü analiz etme ya da sonuç çıkarma ölçsün. ${mixRule} Doğrudan tanım/ezber veya tek işlemle çözülen soru sayısı en fazla ${directLimit} olabilir. Her soruya "difficulty" (kolay|normal|zor|cok zor), "cognitiveLevel" (uygulama|muhakeme) ve gerçek çözüm adımı sayısını gösteren "reasoningSteps" alanlarını ekle. Zorluk uzun ve karışık cümlelerden değil, kazanımın gerçekten kullanılmasından gelmeli. Her çoktan seçmeli soruda üç çeldirici öğrencinin yapabileceği farklı ve gerçek işlem, kavram veya yorum hatasına dayansın; komik, alakasız ya da ilk bakışta elenen seçenekler kullanma. Aynı hesap yöntemi, senaryo veya soru kalıbını tekrarlama. Sınıf seviyesinin dışına çıkma ve soruyu çözülemez hâle getirme. Açıklamada doğru sonuca giden mantığı en az iki açık adımla göster.`
 }
 
@@ -1103,6 +1108,112 @@ function normalizeInteractiveQuestionShape(q: any, language: string): any {
   return normalized
 }
 
+function extractProviderQuestions(raw: string): any[] {
+  const clean = raw.replace(/```json|```/gi, '').trim()
+  try {
+    const parsed = JSON.parse(clean)
+    return Array.isArray(parsed?.questions) ? parsed.questions : Array.isArray(parsed) ? parsed : []
+  } catch {
+    const start = clean.indexOf('"questions"')
+    const arrayStart = start >= 0 ? clean.indexOf('[', start) : -1
+    if (arrayStart < 0) return []
+    const found: any[] = []
+    let index = arrayStart + 1
+    while (index < clean.length) {
+      while (index < clean.length && /[\s,]/.test(clean[index])) index++
+      if (clean[index] !== '{') break
+      const objectStart = index
+      let depth = 0
+      let inString = false
+      let escaped = false
+      for (; index < clean.length; index++) {
+        const char = clean[index]
+        if (escaped) { escaped = false; continue }
+        if (char === '\\') { escaped = true; continue }
+        if (char === '"') { inString = !inString; continue }
+        if (inString) continue
+        if (char === '{') depth++
+        else if (char === '}' && --depth === 0) {
+          index++
+          try { found.push(JSON.parse(clean.slice(objectStart, index))) } catch { /* skip malformed item */ }
+          break
+        }
+      }
+      if (depth !== 0) break
+    }
+    return found
+  }
+}
+
+async function generateProviderQuestionBatch(args: {
+  batch: QuestionGenerationBatch
+  prompt: string
+  questionType: string
+  language: string
+  userId: string
+  sessionId?: string
+  requestId?: string
+  requestStartTime: number
+}): Promise<any[]> {
+  const { batch } = args
+  const difficultyLabel = batch.difficulty === 'zor' ? 'ZOR' : batch.difficulty === 'normal' ? 'NORMAL' : 'KOLAY'
+  const rolePrompt = `${args.prompt}\n\nBU SAĞLAYICIYA ÖZEL GÖREV: Yalnızca ${difficultyLabel} seviyesinde, tam ${batch.count} yeni soru üret. Bu grubun bütün sorularında difficulty alanı "${batch.difficulty}" olsun. Başka zorluk seviyesinden soru üretme. Bu talimat genel dağılım hedefinin bu grup için ayrıntılandırılmış hâlidir. JSON dışında açıklama yazma.`
+  const systemPrompt = 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca belirtilen sınıf ve kazanıma uygun, doğru ve yaşa uygun içerik üret.\n\n' + getStaticSystemBlock(args.questionType, args.language)
+  let raw = ''
+
+  if (batch.provider === 'openai') {
+    raw = await callOpenAI([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: rolePrompt },
+    ], {
+      model: 'gpt-4.1-mini',
+      max_tokens: Math.min(6000, Math.max(2000, batch.count * 650)),
+      json: true,
+      timeoutMs: 45000,
+      operation: 'generate-quiz:role-openai-easy',
+      userId: args.userId,
+      quizSessionId: args.sessionId,
+      requestId: args.requestId,
+    })
+  } else if (batch.provider === 'mistral') {
+    const adapter = new MistralAdapter()
+    if (!adapter.isConfigured()) throw new Error('Mistral is not configured for normal-difficulty generation')
+    const response = await adapter.execute({
+      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: rolePrompt }],
+      maxTokens: Math.min(6000, Math.max(2000, batch.count * 650)),
+      json: true,
+      timeoutMs: 45000,
+    }, {
+      task: 'quiz_generation',
+      userId: args.userId,
+      sessionId: args.sessionId,
+      requestId: args.requestId,
+      operationTag: 'generate-quiz:role-mistral-normal',
+      shadow: false,
+    })
+    raw = response.content
+  } else {
+    const timeoutMs = Math.max(20000, 100000 - (Date.now() - args.requestStartTime))
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5',
+      max_tokens: Math.min(6000, Math.max(2000, batch.count * 650)),
+      system: systemPrompt,
+      messages: [{ role: 'user', content: rolePrompt }],
+    }, { timeout: timeoutMs, maxRetries: 0 })
+    await logAnthropicUsage('generate-quiz:role-claude-hard', 'claude-sonnet-4-5', response, {
+      userId: args.userId,
+      quizSessionId: args.sessionId,
+      requestId: args.requestId,
+      meta: { count: batch.count, difficulty: batch.difficulty },
+    })
+    raw = response.content[0]?.type === 'text' ? response.content[0].text : ''
+  }
+
+  const providerQuestions = extractProviderQuestions(raw)
+  console.log(`[generate-quiz] role_batch provider=${batch.provider} difficulty=${batch.difficulty} requested=${batch.count} delivered=${providerQuestions.length}`)
+  return providerQuestions.slice(0, batch.count).map(question => ({ ...question, generationProvider: batch.provider }))
+}
+
 // 31 Ağustos 2026 — Deniz'in gerçek test karşılaştırmasıyla bulunan sorun:
 // önceki oturumda eklenen "önceki parçanın cümlelerini tekrar hedefleme"
 // talimatı (previousQuestionsNote'a eklenen KAYNAK METİN SÜREKLİLİĞİ notu)
@@ -1701,7 +1812,20 @@ export async function POST(req: NextRequest) {
       }
     }
     const aiQuestionCount = Math.max(0, safeQCount - bankQuestions.length)
-    let targetDifficultyQuota = buildAdaptiveDifficultyQuota(safeQCount, resolvedDifficulty)
+    // Standard K-12 tests use the requested per-question provider/difficulty
+    // roles. University requests and explicit admin provider probes retain
+    // their existing single-provider behavior.
+    const roleMixEnabled = !isUniversityLevel && forceProviderTest === null
+    const quotaForCount = (count: number) => {
+      if (!roleMixEnabled) return buildAdaptiveDifficultyQuota(count, resolvedDifficulty)
+      const plan = buildQuestionGenerationPlan(count)
+      return {
+        kolay: plan.find(batch => batch.difficulty === 'kolay')?.count || 0,
+        normal: plan.find(batch => batch.difficulty === 'normal')?.count || 0,
+        zor: plan.find(batch => batch.difficulty === 'zor')?.count || 0,
+      }
+    }
+    let targetDifficultyQuota = quotaForCount(safeQCount)
     // chartDataInstruction: yalnızca math_graph'ta ek talimat üretir (bkz.
     // fonksiyon tanımı) — burada erken hesaplamak için detectVisualCategory
     // tekrar çağrılıyor (saf/yan etkisiz fonksiyon, aşağıda zaten tekrar
@@ -1831,7 +1955,28 @@ export async function POST(req: NextRequest) {
     const genMaxTokens = Math.min(6000, Math.max(useHaiku ? 2500 : 3500, aiQuestionCount * 550))
 
     let text: string
-    if (useMistralLive) {
+    if (roleMixEnabled) {
+      const generationPlan = buildQuestionGenerationPlan(aiQuestionCount)
+      const generatedBatches = await Promise.all(generationPlan.map(batch => generateProviderQuestionBatch({
+        batch,
+        prompt,
+        questionType,
+        language: effectiveLang,
+        userId: user.id,
+        sessionId: usageSessionId,
+        requestId: usageRequestId,
+        requestStartTime,
+      }).catch(error => {
+        console.warn(`[generate-quiz] initial role generation failed provider=${batch.provider}:`, error instanceof Error ? error.message : 'unknown')
+        return []
+      })))
+      const generatedQuestions = generatedBatches.flat()
+      if (generatedQuestions.length === 0) throw new Error('All role-based question generation calls returned empty results')
+      genEngineUsed = 'mixed-openai65-mistral15-claude20'
+      experimentVariant = null
+      text = JSON.stringify({ questions: generatedQuestions })
+      console.log(`[generate-quiz] role_mix plan=${generationPlan.map(batch => `${batch.provider}:${batch.count}`).join(',')} delivered=${generatedQuestions.length}`)
+    } else if (useMistralLive) {
       const mistralAdapter = new MistralAdapter()
       const mistralResponse = await mistralAdapter.execute(
         {
@@ -1996,7 +2141,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    let questions = (parsed.questions || []).map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
+    const defaultGenerationProvider = genEngineUsed.startsWith('mistral') ? 'mistral' : genEngineUsed.startsWith('gpt') ? 'openai' : 'anthropic'
+    let questions = (parsed.questions || []).map((q: any) => ({
+      ...normalizeInteractiveQuestionShape(q, effectiveLang),
+      generationProvider: q.generationProvider || defaultGenerationProvider,
+    }))
 
     // Önce soru doğrulanır, sonra görsel doğrulanmış kesin soru metninden
     // üretilir. Eski paralel akışta doğrulayıcı soruların sırasını/metnini
@@ -2076,76 +2225,68 @@ export async function POST(req: NextRequest) {
         const missing = aiQuestionCount - questions.length
         const beforeRoundCount = questions.length
         try {
-          const currentDifficultyCounts = { kolay: 0, normal: 0, zor: 0 }
-          for (const question of questions) {
-            const level = normalizeDifficultyLevel(question.difficulty)
-            if (level) currentDifficultyCounts[level]++
-          }
-          const remainingDifficultyQuota = {
-            kolay: Math.max(0, targetDifficultyQuota.kolay - currentDifficultyCounts.kolay),
-            normal: Math.max(0, targetDifficultyQuota.normal - currentDifficultyCounts.normal),
-            zor: Math.max(0, targetDifficultyQuota.zor - currentDifficultyCounts.zor),
-          }
-          const topupPrompt = `${prompt}\n\nÖNEMLİ: Bu sefer TAM OLARAK ${missing} adet YENİ ve BİRBİRİNDEN FARKLI soru üret. Eksik zorluk kotası tam olarak ${formatDifficultyQuota(remainingDifficultyQuota)}. Daha önce üretilenlerle aynı/benzer soru üretme. Yanıtın SADECE geçerli, TAMAMLANMIŞ JSON olmalı.`
-          // 21 Eylül 2026 — ana çağrıdaki aynı zaman aşımı düzeltmesi: SDK'nın
-          // 10 dakikalık varsayılan zaman aşımı + otomatik tekrar denemeleri
-          // burada da fonksiyonu Vercel'in sessizce öldürmesine yol açabilir.
-          // Kalan TOPUP_TIME_BUDGET_MS'e göre bütçe-farkında bir timeout
-          // veriyoruz; aşılırsa bu turun kendi try/catch'i (üstte) yakalar,
-          // döngü bir sonraki turda zaten zaman kontrolüyle duruyor olurdu.
-          const topupCallTimeoutMs = Math.max(15000, TOPUP_TIME_BUDGET_MS - (Date.now() - requestStartTime))
-          const topupResponse = await anthropic.messages.create({
-            // Eksik soru tamamlama, sayıya SADIK KALMA konusunda Haiku'dan
-            // daha güvenilir olan Sonnet ile yapılır — burada hız değil
-            // doğru sayıya ulaşmak öncelikli.
-            model: 'claude-sonnet-4-5',
-            // A 10-question recovery previously hit a hard 4000-token cap.
-            // With the rubric, objective refs and explanations that cap often
-            // cut the JSON after 5–6 items, causing every recovery round to
-            // repeat and eventually return "Sorular tamamlanamadı". Give the
-            // recovery call enough room for the requested missing set; the
-            // outer time budget still bounds the request.
-            max_tokens: Math.min(8000, Math.max(3000, missing * 700)),
-            // 5 Eylül 2026 — P0 prompt caching: `prompt` değişkeni artık K12
-            // yolunda zaten SIKIŞTIRILMIŞ (statik kısımlar çıkarılmış) hâlde,
-            // bu yüzden topupPrompt de otomatik olarak küçük kalıyor. Aynı
-            // statik bloğu (ana çağrıyla BİREBİR AYNI metin — cache hit için
-            // şart) burada da system'e ekliyoruz. Gerçek veride topup en
-            // pahalı kalemdi (çağrı başına ~$0.038) çünkü tüm promptu tekrar
-            // gönderiyordu — artık hem daha küçük hem cache'den okunabilir.
-            system: isUniversityLevel
-              ? undefined
-              : [{ type: 'text' as const, text: getStaticSystemBlock(questionType, effectiveLang), cache_control: { type: 'ephemeral' as const } }],
-            messages: [{ role: 'user', content: topupPrompt }],
-          }, { timeout: topupCallTimeoutMs, maxRetries: 0 })
-          await logAnthropicUsage('generate-quiz:topup', 'claude-sonnet-4-5', topupResponse, {
-            userId: user.id,
-            quizSessionId: usageSessionId,
-            requestId: usageRequestId,
-            meta: { round: round + 1, missing },
-          })
-          const topupText = topupResponse.content[0].type === 'text' ? topupResponse.content[0].text : ''
-          const topupClean = topupText.replace(/```json|```/g, '').trim()
-          let topupParsed: any
-          try {
-            topupParsed = JSON.parse(topupClean)
-          } catch {
-            const m = topupClean.match(/\{[\s\S]*\}/)
-            if (m) {
-              try { topupParsed = JSON.parse(m[0]) } catch { topupParsed = null }
+          let topupQuestions: any[] = []
+          if (roleMixEnabled) {
+            const rolePlan = buildQuestionGenerationPlan(aiQuestionCount)
+            const providerCounts: Record<string, number> = { openai: 0, mistral: 0, anthropic: 0 }
+            for (const question of questions) {
+              const provider = question.generationProvider
+              if (typeof provider === 'string' && provider in providerCounts) providerCounts[provider]++
             }
-            // 4 Eylül 2026 — ana üretimdeki aynı sağlam kurtarma burada da: JSON
-            // token limiti yüzünden ortada kesilse bile TAMAMLANMIŞ soruları
-            // kurtarır (bkz. yukarıdaki extractQuestionObjects tanımı ve notu).
+            const deficits = rolePlan
+              .map(batch => ({ ...batch, count: Math.max(0, batch.count - providerCounts[batch.provider]) }))
+              .filter(batch => batch.count > 0)
+            const recoveredBatches = await Promise.all(deficits.map(batch => generateProviderQuestionBatch({
+              batch,
+              prompt,
+              questionType,
+              language: effectiveLang,
+              userId: user.id,
+              sessionId: usageSessionId,
+              requestId: usageRequestId,
+              requestStartTime,
+            }).catch(error => {
+              console.warn(`[generate-quiz] role topup failed provider=${batch.provider}:`, error instanceof Error ? error.message : 'unknown')
+              return []
+            })))
+            topupQuestions = recoveredBatches.flat()
+          } else {
+            const currentDifficultyCounts = { kolay: 0, normal: 0, zor: 0 }
+            for (const question of questions) {
+              const level = normalizeDifficultyLevel(question.difficulty)
+              if (level) currentDifficultyCounts[level]++
+            }
+            const remainingDifficultyQuota = {
+              kolay: Math.max(0, targetDifficultyQuota.kolay - currentDifficultyCounts.kolay),
+              normal: Math.max(0, targetDifficultyQuota.normal - currentDifficultyCounts.normal),
+              zor: Math.max(0, targetDifficultyQuota.zor - currentDifficultyCounts.zor),
+            }
+            const topupPrompt = `${prompt}\n\nÖNEMLİ: Bu sefer TAM OLARAK ${missing} adet YENİ ve BİRBİRİNDEN FARKLI soru üret. Eksik zorluk kotası tam olarak ${formatDifficultyQuota(remainingDifficultyQuota)}. Daha önce üretilenlerle aynı/benzer soru üretme. Yanıtın SADECE geçerli, TAMAMLANMIŞ JSON olmalı.`
+            const topupCallTimeoutMs = Math.max(15000, TOPUP_TIME_BUDGET_MS - (Date.now() - requestStartTime))
+            const topupResponse = await anthropic.messages.create({
+              model: 'claude-sonnet-4-5',
+              max_tokens: Math.min(8000, Math.max(3000, missing * 700)),
+              system: isUniversityLevel
+                ? undefined
+                : [{ type: 'text' as const, text: getStaticSystemBlock(questionType, effectiveLang), cache_control: { type: 'ephemeral' as const } }],
+              messages: [{ role: 'user', content: topupPrompt }],
+            }, { timeout: topupCallTimeoutMs, maxRetries: 0 })
+            await logAnthropicUsage('generate-quiz:topup', 'claude-sonnet-4-5', topupResponse, {
+              userId: user.id,
+              quizSessionId: usageSessionId,
+              requestId: usageRequestId,
+              meta: { round: round + 1, missing },
+            })
+            const topupText = topupResponse.content[0].type === 'text' ? topupResponse.content[0].text : ''
+            let topupParsed: any
+            try { topupParsed = JSON.parse(topupText.replace(/```json|```/g, '').trim()) } catch { topupParsed = null }
             if (!topupParsed?.questions?.length) {
-              const recovered = extractQuestionObjects(topupClean)
-              if (recovered.length > 0) {
-                topupParsed = { questions: recovered }
-                console.warn(`[generate-quiz] topup JSON recovered via balanced-brace parser, got ${recovered.length} questions`)
-              }
+              const recovered = extractQuestionObjects(topupText)
+              if (recovered.length) topupParsed = { questions: recovered }
             }
+            topupQuestions = (topupParsed?.questions || []).map((q: any) => ({ ...q, generationProvider: 'anthropic' }))
           }
-          let topupQuestions = (topupParsed?.questions || []).map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
+          topupQuestions = topupQuestions.map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
           topupQuestions = applyContentQualityFilters(topupQuestions, mebContext)
           // Yakın-tekrar kontrolü: hem önceki parçanın sorularına (excludeQuestionTexts)
           // hem de bu çağrıda ŞİMDİYE KADAR kabul edilmiş sorulara (questions) karşı.
@@ -2155,7 +2296,26 @@ export async function POST(req: NextRequest) {
             ...questions.map((q: any) => q.q).filter(Boolean),
           ]
           topupQuestions = filterOutNearDuplicates(topupQuestions, alreadyAsked)
-          questions = [...questions, ...topupQuestions].slice(0, aiQuestionCount)
+          if (roleMixEnabled) {
+            const rolePlan = buildQuestionGenerationPlan(aiQuestionCount)
+            const currentByProvider: Record<string, number> = { openai: 0, mistral: 0, anthropic: 0 }
+            for (const question of questions) {
+              const provider = question.generationProvider
+              if (typeof provider === 'string' && provider in currentByProvider) currentByProvider[provider]++
+            }
+            const remainingByProvider = { ...currentByProvider }
+            for (const question of topupQuestions) {
+              const provider = question.generationProvider
+              const target = rolePlan.find(batch => batch.provider === provider)?.count || 0
+              if (provider in remainingByProvider && remainingByProvider[provider] < target) {
+                questions.push(question)
+                remainingByProvider[provider]++
+              }
+            }
+            questions = questions.slice(0, aiQuestionCount)
+          } else {
+            questions = [...questions, ...topupQuestions].slice(0, aiQuestionCount)
+          }
           console.log(`[generate-quiz] eksik soru tamamlama (tur ${round + 1}/${maxTopupRounds}): ${missing} istendi, ${topupQuestions.length} eklendi (toplam ${questions.length})`)
         } catch (e) {
           console.warn(`[generate-quiz] eksik soru tamamlama (tur ${round + 1}) başarısız:`, e)
@@ -2185,7 +2345,7 @@ export async function POST(req: NextRequest) {
       // the entire test; one- or two-question remnants remain rejected.
       console.warn(`[generate-quiz] recovery produced ${questions.length}/${safeQCount}; accepting validated subset`)
       safeQCount = questions.length
-      targetDifficultyQuota = buildAdaptiveDifficultyQuota(safeQCount, resolvedDifficulty)
+      targetDifficultyQuota = quotaForCount(safeQCount)
     }
     if (questions.length !== safeQCount) {
       console.error(`[generate-quiz] incomplete_set requested=${safeQCount} delivered=${questions.length} topic=${topic}`)
@@ -2207,6 +2367,8 @@ export async function POST(req: NextRequest) {
         language: effectiveLang,
         questionType,
         strictQualityPolicy: true,
+        sessionId: usageSessionId,
+        requestId: usageRequestId,
         objectiveCandidates: objectiveCandidates.map(candidate => ({
           ref: candidate.ref,
           objectiveCode: candidate.objectiveCode,
@@ -2215,7 +2377,9 @@ export async function POST(req: NextRequest) {
           grade: candidate.grade,
         })),
       }),
-      signal: AbortSignal.timeout(50000),
+      // Role-based cross-checks run in two batches plus the final Gemini set
+      // review; give that complete chain enough headroom inside maxDuration.
+      signal: AbortSignal.timeout(70000),
     }).then(async response => response.ok ? response.json() : null).catch(() => null)
 
     if (!Array.isArray(strictVerifyResult?.questions) || strictVerifyResult.questions.length !== safeQCount) {

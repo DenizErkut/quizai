@@ -7,6 +7,43 @@ export interface DifficultyQuota {
   zor: number
 }
 
+export type QuestionGenerationProvider = 'openai' | 'mistral' | 'anthropic'
+export type QuestionGenerationDifficulty = 'kolay' | 'normal' | 'zor'
+export interface QuestionGenerationBatch {
+  provider: QuestionGenerationProvider
+  difficulty: QuestionGenerationDifficulty
+  count: number
+}
+
+/** Largest-remainder apportionment for the requested 65/15/20 role split. */
+export function buildQuestionGenerationPlan(count: number): QuestionGenerationBatch[] {
+  const size = Math.max(0, Math.trunc(count))
+  if (!size) return []
+  const roles: Array<{ provider: QuestionGenerationProvider; difficulty: QuestionGenerationDifficulty; weight: number }> = [
+    { provider: 'openai', difficulty: 'kolay', weight: 0.65 },
+    { provider: 'mistral', difficulty: 'normal', weight: 0.15 },
+    { provider: 'anthropic', difficulty: 'zor', weight: 0.20 },
+  ]
+  const raw = roles.map(role => role.weight * size)
+  const counts = raw.map(Math.floor)
+  let remaining = size - counts.reduce((sum, value) => sum + value, 0)
+  const order = raw.map((value, index) => ({ index, remainder: value - counts[index] }))
+    .sort((a, b) => b.remainder - a.remainder || a.index - b.index)
+  for (let index = 0; index < remaining; index++) counts[order[index].index]++
+
+  // For 3+ questions, ensure every assigned role appears at least once.
+  // Take from OpenAI's largest share; percentages are approximate for small sets.
+  if (size >= roles.length) {
+    for (let index = 1; index < roles.length; index++) {
+      if (counts[index] === 0) {
+        const donor = counts[0] > 1 ? 0 : counts.findIndex((value, candidate) => candidate !== index && value > 1)
+        if (donor >= 0) { counts[donor]--; counts[index]++ }
+      }
+    }
+  }
+  return roles.flatMap((role, index) => counts[index] > 0 ? [{ ...role, count: counts[index] }] : [])
+}
+
 export type StrictReviewSignal = {
   ok?: boolean
   difficultyMatches?: boolean
