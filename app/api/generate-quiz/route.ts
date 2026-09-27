@@ -38,6 +38,9 @@ import { balanceAnswerPositions, getQuestionBankSet, hasRealVisualAsset, promote
 import { decideQuizProvider, getQuizProviderPolicy, QUIZ_PROVIDER_POLICY_VERSION } from '@/lib/quiz-provider-policy'
 import { attachQuestionRigorMetadata, summarizeQuestionSetRigor } from '@/lib/question-rigor'
 import { verifyVisualWithMistral } from '@/lib/mistral-quality'
+import { verifyVisualWithGemini } from '@/lib/gemini-visual-quality'
+import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
+import { isSameGradeSource } from '@/lib/meb-source-scope'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -285,6 +288,10 @@ function detectVisualCategory(topic: string): string | null {
   for (const { category, keywords } of VISUAL_CATEGORY_KEYWORDS) {
     if (matchesAnyKeyword(t, keywords)) return category
   }
+  // Ordinary reading/history/language topics do not require a diagram. The
+  // previous fallback returned `general`, which activated the 50% visual
+  // quota for virtually every quiz and produced a false "visual quota"
+  // failure when no visual was pedagogically needed.
   return null
 }
 
@@ -309,6 +316,7 @@ function visualFormatGuidance(category: string | null): string {
     space: 'bir gök cismi/gezegen büyüklük veya konum karşılaştırması',
     ecosystem: 'bir besin zinciri/ağı diyagramı',
     timeline: 'yatay, olayları işaretlerle gösteren bir zaman çizelgesi',
+    general: 'soruda adı geçen nesneleri ve ilişkileri gösteren sade bir kavram/karşılaştırma şeması',
   }
   return category ? (guides[category] || guides.geometry) : 'somut bir şekil, harita veya ölçüm diyagramı'
 }
@@ -320,7 +328,8 @@ function visualPedagogyInstruction(topic: string, count: number): string {
     const maxTables = Math.max(1, Math.floor(minimum / 3))
     return `\n\nYENİ NESİL / BECERİ TEMELLİ SORU KURALI (ZORUNLU): Kullanıcı bunu açıkça istedi. Soruları kısa işlem, tanım veya ezber sorusu olarak kurma. En az ${minimum} soru; öğrencinin verilen bir grafik, tablo, şema, koordinat sistemi, ölçüm çizimi veya gerçek yaşam veri setini yorumlayıp en az iki akıl yürütme adımıyla sonuca ulaşmasını gerektirmelidir. Soruya yalnızca uzun bir hikâye eklemek yeni nesil sayılmaz. Her görseldeki nesneler, sayılar, birimler ve etiketler soru metnindeki senaryoyla BİREBİR aynı olmalıdır; meyve sorusuna hayvan, başka denklem veya genel konu görseli koyma. Görsel soruyu tekrar etmemeli, cevabı göstermemeli ve çözüm için anlamlı veri taşımalıdır. GÖRSEL FORMAT ÖNCELİĞİ: bu görsel soruların EN FAZLA ${maxTables} tanesi metne gömülü Markdown tablo olabilir; geri kalanı ${formatHint} gibi öğrencinin GERÇEKTEN GÖRDÜĞÜ somut bir sahne olmalı, sadece sayıların satır satır dizildiği bir veri tablosu değil. Aynı görsel fikri (ör. aynı "üç günlük satış" kurgusu) birden fazla soruda tekrar etme — her görsel soru farklı bir sahne/senaryo kullanmalı. Geçerli Markdown tablo kullanılıyorsa başlık, ayraç ve her veri satırı ayrı \\n satırında olmalı, hiçbir hücre boş bırakılmamalı (bilinmeyen değer için "?" yaz, hücreyi atlama). Bu koşulları karşılamayan soruyu çıktı listesine alma.`
   }
-  return `\n\nGÖRSEL SORU ÇEŞİTLİLİĞİ: Konu uygunsa soruların yaklaşık %30'unu grafik, tablo, şekil, koordinat sistemi, deney düzeneği, harita veya zaman çizelgesi üzerinden yorumlama gerektirecek biçimde kur. Gerekli bütün veri ve etiketler sorunun içinde bulunmalı; görünmeyen bir görsele "yukarıdaki" diye atıf yapma. GÖRSEL FORMAT ÖNCELİĞİ: bu görsel sorulardan en fazla 1 tanesi metne gömülü Markdown tablo olsun; diğerleri ${formatHint} gibi somut bir sahne olmalı. Metin içinde tablo gerekiyorsa her satırı \\n ile ayıran geçerli Markdown tablo biçimi kullan, tablo ayraçlarını ve satırları tek satırda birbirine yapıştırma, hiçbir hücreyi boş bırakma (bilinmeyen değer için "?" yaz).`
+  const minimum = requiredVisualCount(count)
+  return `\n\nZORUNLU GÖRSEL KOTASI: En az ${minimum}/${count} soruda öğrenci oluşturulan görseli gerçekten inceleyerek çözüm yapmalı. Görsel yalnızca süs olamaz; sorudaki varlıklar, sayılar, birimler, etiketler ve ilişkiler birebir aynı olmalı, cevabı açığa çıkarmamalı. Görsel soruya yeni çözüm verisi katmalı. En fazla ${Math.max(1, Math.floor(minimum / 3))} görsel soru Markdown tablosu olabilir; diğerleri ${formatHint} gibi gerçek bir SVG/çizim olmalıdır. Görsel kategorisindeki normal testlerde %30 kota yeterlidir; yeni nesil/beceri temelli testlerde %50 kota korunur.`
 }
 
 // 21 Eylül 2026 — Deniz'in isteğiyle: "grafik oluşturmada eksiğiz" sorununa
@@ -345,7 +354,7 @@ KRİTİK KURALLAR: (a) chartData içindeki TÜM sayı ve etiket, sorunun "q" met
 }
 
 function visualQuestionCandidate(question: any, category: string | null): boolean {
-  if (!question || question.type === 'true_false' || question.type === 'short_answer' || question.type === 'multi_true_false') return false
+  if (!question) return false
   const text = normalizeTR(String(question.q || ''))
   const explicitVisual = /sekil|grafik|tablo|diyagram|koordinat|venn|sema|harita|zaman cizelgesi|veri/.test(text)
   const shape = /kare|dikdortgen|ucgen|daire|cember|cokgen|prizma|kup|silindir|koni|kure|paralelkenar/.test(text)
@@ -360,12 +369,14 @@ function rigorInstruction(difficulty: string, count: number, topic: string): str
   const applicationCount = Math.max(1, Math.ceil(count * (hard ? 0.9 : easy ? 0.6 : 0.8)))
   const inferenceCount = Math.max(1, Math.ceil(count * (hard ? 0.7 : easy ? 0.3 : 0.5)))
   const directLimit = easy ? Math.max(1, Math.floor(count * 0.2)) : 0
-  const hardMixCount = hard ? Math.ceil(count * 0.7) : easy ? 0 : Math.ceil(count * 0.3)
-  const mixRule = hard
-    ? `Soruların en az ${hardMixCount} tanesi zor/çok zor düzeyde, kalanları normal düzeyde olsun; kolay soru üretme.`
-    : easy
-      ? 'Kolay düzey, ezber demek değildir: temel kazanımı yeni bir bağlamda uygulat; en az üç soru normal düzeye yaklaşsın.'
-      : `Soruların en az ${hardMixCount} tanesi zor düzeyde olsun; en fazla ${Math.max(1, Math.floor(count * 0.2))} kolay soru bulunabilir.`
+  const generationPlan = buildQuestionGenerationPlan(count)
+  const roleQuota = {
+    kolay: generationPlan.find(batch => batch.difficulty === 'kolay')?.count || 0,
+    normal: generationPlan.find(batch => batch.difficulty === 'normal')?.count || 0,
+    zor: generationPlan.find(batch => batch.difficulty === 'zor')?.count || 0,
+    'cok zor': generationPlan.find(batch => batch.difficulty === 'cok zor')?.count || 0,
+  }
+  const mixRule = `Sabit üretim hedefi ${formatDifficultyQuota(roleQuota)}: GPT-4.1 mini kolay, Mistral normal, Claude Sonnet 4.5 zor ve çok zor soruları üretir. Hedef dağılım %50 kolay, %20 normal, %20 zor, %10 çok zordur; küçük setlerde en yakın tam sayıya yuvarlanır. Etiketleri kota doldurmak için değil, sorunun gerçek bilişsel yüküne göre belirle. Öğrencinin adaptif profili (${difficulty}) soruların konu odağını, destek düzeyini ve alt/üst bilişsel karmaşıklığını etkiler; sağlayıcı-zorluk görev eşleşmesini değiştirme.`
   return `\n\nÖLÇME KALİTESİ VE ZORLUK KURALI (ZORUNLU): "${topic}" için ${count} soru üretirken sadece tanım ezberini veya tek adımlı işlemi ölçme. En az ${applicationCount} soru bilgiyi yeni bir bağlama/senaryoya uygulamayı, verilenleri ayıklamayı veya en az iki akıl yürütme adımını gerektirsin. En az ${inferenceCount} soru ilişki kurma, hata bulma, karşılaştırma, yanlış çözümü analiz etme ya da sonuç çıkarma ölçsün. ${mixRule} Doğrudan tanım/ezber veya tek işlemle çözülen soru sayısı en fazla ${directLimit} olabilir. Her soruya "difficulty" (kolay|normal|zor|cok zor), "cognitiveLevel" (uygulama|muhakeme) ve gerçek çözüm adımı sayısını gösteren "reasoningSteps" alanlarını ekle. Zorluk uzun ve karışık cümlelerden değil, kazanımın gerçekten kullanılmasından gelmeli. Her çoktan seçmeli soruda üç çeldirici öğrencinin yapabileceği farklı ve gerçek işlem, kavram veya yorum hatasına dayansın; komik, alakasız ya da ilk bakışta elenen seçenekler kullanma. Aynı hesap yöntemi, senaryo veya soru kalıbını tekrarlama. Sınıf seviyesinin dışına çıkma ve soruyu çözülemez hâle getirme. Açıklamada doğru sonuca giden mantığı en az iki açık adımla göster.`
 }
 
@@ -374,19 +385,9 @@ function canonicalQuestionDifficulty(value: unknown, fallback: string): string {
   return ['kolay', 'normal', 'zor', 'cok zor'].includes(normalized) ? normalized : fallback
 }
 
-function visualQuestionIndexes(questions: any[], category: string | null, requestedCount: number, forceVisuals: boolean): number[] {
+function visualQuestionIndexes(questions: any[], category: string | null, requestedCount: number): number[] {
   if (!category || requestedCount <= 0) return []
-  // 21 Eylül 2026 — kapsamı artırma: math_graph artık çoğunlukla deterministik
-  // chart-svg.ts ile (AI çağrısı YOK, maliyet/gecikme/kesilme riski yok)
-  // çiziliyor, bu yüzden eski AI-SVG kategorileri için konan temkinli min(3,...)
-  // sınırı math_graph'ta gereksiz — daha yüksek bir tavanla (6) kapsam artıyor.
-  // Diğer kategoriler (hâlâ her görsel için gerçek bir AI çağrısı gerektiriyor)
-  // eski, temkinli sınırda kalıyor.
-  const cap = category === 'math_graph' ? 6 : 3
-  const ratio = category === 'math_graph' ? 0.5 : 0.3
-  const target = forceVisuals
-    ? Math.max(1, Math.ceil(requestedCount * 0.5))
-    : Math.min(cap, Math.max(1, Math.ceil(requestedCount * ratio)))
+  const target = visualAttemptCount(requestedCount)
   const preferred = questions
     .map((question, index) => ({ question, index }))
     .filter(({ question }) => visualQuestionCandidate(question, category))
@@ -447,6 +448,7 @@ The student must figure out the answer from the question, NOT from your diagram.
     space: `Draw the relevant space object(s) with labels showing size relationships, orbital paths, or key features.`,
     ecosystem: `Draw a simple food chain or ecosystem diagram with arrows showing energy flow. Include 3-4 organisms with clear labels.`,
     timeline: `Draw a horizontal timeline with 4-6 key events marked. Use dots/markers and year labels below, event descriptions above.`,
+    general: `Draw a minimal concept, comparison, or process diagram using only entities and relationships stated in the exact question.`,
   }
 
   return `${base}\n\nDIAGRAM INSTRUCTIONS:\n${guides[category] || guides.geometry}\n\nMake it directly relevant to the specific question being asked. The student should understand the concept better by seeing this diagram.`
@@ -485,7 +487,7 @@ async function visualMatchesQuestion(questionText: string, svg: string, correctA
   try {
     // Genel konu benzerliği yeterli değildir: bağlam, soru ve SVG'nin
     // nesne/sayı/birim/etiket ilişkisi 100 üzerinden ayrı denetlenir.
-    const [raw, mistralReview] = await Promise.all([
+    const [raw, mistralReview, geminiReview] = await Promise.all([
       callOpenAI([
       { role: 'system', content: 'You are a strict K-12 visual-question QA gate. Return only valid JSON.' },
       { role: 'user', content: `Score the SVG against the exact question. Check scenario/context, every object, quantity, unit, label and relationship. Verify graph/axis values mathematically. A generic topic match is NOT enough. The SVG must not reveal the answer and must add useful information instead of merely repeating the question. Return exactly {"score":0-100,"contextMatch":boolean,"answerLeak":boolean,"useful":boolean,"reason":"short Turkish reason"}.\n\nQUESTION:\n${questionText}\n\nCORRECT ANSWER (must not be shown):\n${correctAnswer}\n\nSVG:\n${svg.slice(0, 9000)}` },
@@ -498,17 +500,28 @@ async function visualMatchesQuestion(questionText: string, svg: string, correctA
       json: true,
       }),
       verifyVisualWithMistral({ questionText, correctAnswer, svg }),
+      verifyVisualWithGemini({ questionText, correctAnswer, svg }),
     ])
     const result = JSON.parse(raw) as { score?: unknown; contextMatch?: unknown; answerLeak?: unknown; useful?: unknown; reason?: unknown }
     const score = Number(result.score)
     const reason = typeof result.reason === 'string' ? result.reason.slice(0, 240) : 'Görsel bağlamı doğrulanamadı.'
     const openAIPassed = Number.isFinite(score) && score >= 90 && result.contextMatch === true && result.answerLeak !== true && result.useful !== false
-    const passed = openAIPassed && (mistralReview?.passed ?? true)
-    const combinedScore = mistralReview ? Math.min(Number.isFinite(score) ? score : 0, mistralReview.score) : (Number.isFinite(score) ? score : 0)
-    const combinedReason = mistralReview
-      ? `OpenAI: ${reason} | Mistral: ${mistralReview.reason}`.slice(0, 480)
-      : reason
-    if (!passed) console.warn(`[visual-validation] rejected SVG openai=${score} mistral=${mistralReview?.score ?? 'unavailable'}: ${combinedReason}`)
+    // OpenAI is the mandatory enforcement boundary. Gemini and Mistral keep
+    // veto power when they return a decision, while a temporary timeout/quota
+    // issue in either auxiliary provider does not take the whole quiz offline.
+    const passed = openAIPassed && (geminiReview?.passed ?? true) && (mistralReview?.passed ?? true)
+    const reviews = [
+      `OpenAI: ${reason}`,
+      ...(mistralReview ? [`Mistral: ${mistralReview.reason}`] : []),
+      ...(geminiReview ? [`Gemini: ${geminiReview.reason}`] : []),
+    ]
+    const combinedScore = Math.min(
+      Number.isFinite(score) ? score : 0,
+      ...(mistralReview ? [mistralReview.score] : []),
+      ...(geminiReview ? [geminiReview.score] : []),
+    )
+    const combinedReason = reviews.join(' | ').slice(0, 480)
+    if (!passed) console.warn(`[visual-validation] rejected SVG openai=${score} mistral=${mistralReview?.score ?? 'unavailable'} gemini=${geminiReview?.score ?? 'unavailable'}: ${combinedReason}`)
     return { passed, score: combinedScore, reason: combinedReason }
   } catch (error) {
     console.error('[visual-validation] error:', error)
@@ -556,12 +569,7 @@ async function generateVisualForQuestion(
   grade: string
 ): Promise<{ svg: string; contextQuality: VisualContextQuality } | null> {
   try {
-    // Soru tipine göre SVG uygunluk kontrolü
-    // true_false ve short_answer sorularında SVG üretme
-    if (q.type === 'true_false' || q.type === 'short_answer' || q.type === 'multi_true_false') {
-      return null
-    }
-    // Doğru cevabı iki bağımsız görsel denetçiye veririz; ikisi de cevabın
+    // Doğru cevabı bağımsız görsel denetçilere veririz; hepsi cevabın
     // görselde açıkça görünmediğini kontrol eder.
     const correctAnswer = q.opts?.[q.ans] || q.blank || q.correctOrder || ''
     // 21 Eylül 2026 — DETERMİNİSTİK GRAFİK YOLU (bkz. lib/chart-svg.ts).
@@ -589,13 +597,6 @@ async function generateVisualForQuestion(
       return null
     }
     // Soru metni şekil/görsel gerektiriyor mu kontrol et
-    const qText = (q.q || '').toLowerCase()
-    const needsVisual = /şekil|grafik|tablo|diyagram|geometr|koordinat|venn|kesir|şema|harita|ok.*diyagram|ağaç/.test(qText)
-    const hasShape = /kare|dikdörtgen|üçgen|daire|çember|çokgen|prizma|küp|silindir|koni|küre|paralelkenar|eşkenar|ikizkenar/.test(qText)
-    // Sadece görsel gerektiren sorularda SVG üret
-    if (category !== 'math_graph' && !needsVisual && !hasShape) {
-      return null
-    }
     const prompt = buildSVGPrompt(category, topic, q.q, grade, String(correctAnswer))
     // Soruya özgü eğitim görsellerinin üretimi OpenAI'ye taşındı. SVG, grafik,
     // tablo ve denklem gibi ölçülebilir içeriklerde raster görsele göre sayısal
@@ -1094,27 +1095,35 @@ async function generateVisualWithRetry(q: any, category: string, topic: string, 
   })(), maxMs, null)
 }
 
-async function loadAnonymousBookletContext(subject: string, grade: string, topic: string): Promise<string> {
+async function loadBookletContext(subject: string, grade: string, topic: string): Promise<string> {
   const { data, error } = await supabase.from('exam_resources')
-    .select('raw_text,subject,grade,topic,subtopic')
+    .select('raw_text,subject,grade,topic,subtopic,source_type,review_status')
     .eq('purpose', 'instant_test')
-    .eq('source_type', 'anonymous')
     .neq('review_status', 'rejected')
     .limit(12)
   if (error || !data?.length) return ''
   const subjectKey = normalizeTR(subject)
-  const gradeKey = normalizeTR(grade)
   const topicKey = normalizeTR(topic)
   const matches = data.filter((row: any) => {
     const rowSubject = normalizeTR(String(row.subject || ''))
-    const rowGrade = normalizeTR(String(row.grade || ''))
+    const rowGrade = typeof row.grade === 'string' ? row.grade : ''
     const rowTopic = normalizeTR(String(row.topic || row.subtopic || ''))
-    return (!rowSubject || rowSubject.includes(subjectKey) || subjectKey.includes(rowSubject))
-      && (!rowGrade || gradeKey.includes(rowGrade) || rowGrade.includes(gradeKey))
-      && (!rowTopic || rowTopic.includes(topicKey) || topicKey.includes(rowTopic))
-  }).slice(0, 2)
+    return Boolean(rowSubject && rowTopic && rowGrade)
+      && isSameGradeSource(grade, rowGrade)
+      && (rowSubject.includes(subjectKey) || subjectKey.includes(rowSubject))
+      && (rowTopic.includes(topicKey) || topicKey.includes(rowTopic))
+  })
   if (!matches.length) return ''
-  return `\n\nANONİM SORU KİTAPÇIĞI REFERANSI — KOPYALAMA YASAK:\n${matches.map((row: any) => String(row.raw_text || '').slice(0, 2500)).join('\n---\n')}\nBu kaynak yalnızca ölçülen kavram, soru mantığı ve zorluk seviyesini anlamak içindir. Kaynaktaki soru cümlesini, sayıları, özel isimleri, seçenekleri veya kurguyu aynen kullanma. Öğrencinin karşısına tamamen yeni fakat aynı kazanımı ölçen benzer bir soru çıkar.`
+  const teacher = matches.filter((row: any) => row.source_type === 'teacher' && row.review_status === 'approved').slice(0, 2)
+  const anonymous = matches.filter((row: any) => row.source_type !== 'teacher').slice(0, 2)
+  const blocks: string[] = []
+  if (teacher.length) {
+    blocks.push(`ÖĞRETMEN İMZALI SORU KİTAPÇIĞI REFERANSI:\n${teacher.map((row: any) => String(row.raw_text || '').slice(0, 3500)).join('\n---\n')}\nYeni soru üretirken bu soruların ölçtüğü kazanımı, çözüm mantığını, bilişsel seviyeyi ve seçenek tasarımını MUTLAKA temel al. Yeni üretilen soru özgün olmalı; ancak konu ve ölçme yaklaşımı bu öğretmen sorularıyla açıkça aynı çizgide kalmalı. Öğretmen imzalı sorular ayrıca onaylı soru havuzundan öğrenciye birebir sunulabilir.`)
+  }
+  if (anonymous.length) {
+    blocks.push(`ANONİM SORU KİTAPÇIĞI REFERANSI — KOPYALAMA YASAK:\n${anonymous.map((row: any) => String(row.raw_text || '').slice(0, 2500)).join('\n---\n')}\nBu kaynak yalnızca ölçülen kavram, soru mantığı ve zorluk seviyesini anlamak içindir. Kaynaktaki soru cümlesini, sayıları, özel isimleri, seçenekleri veya kurguyu aynen kullanma. Öğrencinin karşısına tamamen yeni fakat aynı kazanımı ölçen benzer bir soru çıkar.`)
+  }
+  return blocks.length ? `\n\n${blocks.join('\n\n')}` : ''
 }
 
 // Model/provider çıktısı UI'ya ulaşmadan önce soru tiplerinin zorunlu alanlarını
@@ -1122,6 +1131,8 @@ async function loadAnonymousBookletContext(subject: string, grade: string, topic
 // özellikle true_false sorularında opts'un atlanması sonuç ekranını çökertebilir.
 function normalizeInteractiveQuestionShape(q: any, language: string): any {
   const normalized = { ...q }
+  const canonicalDifficulty = normalizeDifficultyLevel(normalized.difficulty)
+  if (canonicalDifficulty) normalized.difficulty = canonicalDifficulty
   if (normalized.type === 'true_false' && (!Array.isArray(normalized.opts) || normalized.opts.length < 2)) {
     const lang = String(language || '').toLocaleLowerCase('tr')
     normalized.opts = lang.includes('türk') ? ['Doğru', 'Yanlış'] : ['True', 'False']
@@ -1141,6 +1152,112 @@ function normalizeInteractiveQuestionShape(q: any, language: string): any {
   }
   if (!Array.isArray(normalized.opts)) normalized.opts = []
   return normalized
+}
+
+function extractProviderQuestions(raw: string): any[] {
+  const clean = raw.replace(/```json|```/gi, '').trim()
+  try {
+    const parsed = JSON.parse(clean)
+    return Array.isArray(parsed?.questions) ? parsed.questions : Array.isArray(parsed) ? parsed : []
+  } catch {
+    const start = clean.indexOf('"questions"')
+    const arrayStart = start >= 0 ? clean.indexOf('[', start) : -1
+    if (arrayStart < 0) return []
+    const found: any[] = []
+    let index = arrayStart + 1
+    while (index < clean.length) {
+      while (index < clean.length && /[\s,]/.test(clean[index])) index++
+      if (clean[index] !== '{') break
+      const objectStart = index
+      let depth = 0
+      let inString = false
+      let escaped = false
+      for (; index < clean.length; index++) {
+        const char = clean[index]
+        if (escaped) { escaped = false; continue }
+        if (char === '\\') { escaped = true; continue }
+        if (char === '"') { inString = !inString; continue }
+        if (inString) continue
+        if (char === '{') depth++
+        else if (char === '}' && --depth === 0) {
+          index++
+          try { found.push(JSON.parse(clean.slice(objectStart, index))) } catch { /* skip malformed item */ }
+          break
+        }
+      }
+      if (depth !== 0) break
+    }
+    return found
+  }
+}
+
+async function generateProviderQuestionBatch(args: {
+  batch: QuestionGenerationBatch
+  prompt: string
+  questionType: string
+  language: string
+  userId: string
+  sessionId?: string
+  requestId?: string
+  requestStartTime: number
+}): Promise<any[]> {
+  const { batch } = args
+  const difficultyLabel = batch.difficulty === 'cok zor' ? 'ÇOK ZOR' : batch.difficulty === 'zor' ? 'ZOR' : batch.difficulty === 'normal' ? 'NORMAL' : 'KOLAY'
+  const rolePrompt = `${args.prompt}\n\nBU SAĞLAYICIYA ÖZEL GÖREV: Yalnızca ${difficultyLabel} seviyesinde, tam ${batch.count} yeni soru üret. Bu grubun bütün sorularında difficulty alanı "${batch.difficulty}" olsun. Başka zorluk seviyesinden soru üretme. Bu talimat genel dağılım hedefinin bu grup için ayrıntılandırılmış hâlidir. JSON dışında açıklama yazma.`
+  const systemPrompt = 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca belirtilen sınıf ve kazanıma uygun, doğru ve yaşa uygun içerik üret.\n\n' + getStaticSystemBlock(args.questionType, args.language)
+  let raw = ''
+
+  if (batch.provider === 'openai') {
+    raw = await callOpenAI([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: rolePrompt },
+    ], {
+      model: 'gpt-4.1-mini',
+      max_tokens: Math.min(6000, Math.max(2000, batch.count * 650)),
+      json: true,
+      timeoutMs: 45000,
+      operation: 'generate-quiz:role-openai-easy',
+      userId: args.userId,
+      quizSessionId: args.sessionId,
+      requestId: args.requestId,
+    })
+  } else if (batch.provider === 'mistral') {
+    const adapter = new MistralAdapter()
+    if (!adapter.isConfigured()) throw new Error('Mistral is not configured for normal-difficulty generation')
+    const response = await adapter.execute({
+      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: rolePrompt }],
+      maxTokens: Math.min(6000, Math.max(2000, batch.count * 650)),
+      json: true,
+      timeoutMs: 45000,
+    }, {
+      task: 'quiz_generation',
+      userId: args.userId,
+      sessionId: args.sessionId,
+      requestId: args.requestId,
+      operationTag: 'generate-quiz:role-mistral-normal',
+      shadow: false,
+    })
+    raw = response.content
+  } else {
+    const timeoutMs = Math.max(20000, 100000 - (Date.now() - args.requestStartTime))
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5',
+      max_tokens: Math.min(6000, Math.max(2000, batch.count * 650)),
+      system: systemPrompt,
+      messages: [{ role: 'user', content: rolePrompt }],
+    }, { timeout: timeoutMs, maxRetries: 0 })
+    await logAnthropicUsage('generate-quiz:role-claude-hard', 'claude-sonnet-4-5', response, {
+      userId: args.userId,
+      quizSessionId: args.sessionId,
+      requestId: args.requestId,
+      meta: { count: batch.count, difficulty: batch.difficulty },
+    })
+    raw = response.content[0]?.type === 'text' ? response.content[0].text : ''
+  }
+
+  const providerQuestions = extractProviderQuestions(raw)
+  console.log(`[generate-quiz] role_batch provider=${batch.provider} difficulty=${batch.difficulty} requested=${batch.count} delivered=${providerQuestions.length}`)
+  return providerQuestions.slice(0, batch.count).map(question => ({ ...question, generationProvider: batch.provider }))
 }
 
 // 31 Ağustos 2026 — Deniz'in gerçek test karşılaştırmasıyla bulunan sorun:
@@ -1290,6 +1407,7 @@ export async function POST(req: NextRequest) {
   // erken durur — az sayıda soru eksik dönmek, hiç dönmemekten iyidir.
   const requestStartTime = Date.now()
   let promptStr = ''
+  const strictQualityPolicyActive = true
   let countRef = 5
   // 5 Eylül 2026 — GPT-4.1-mini pilotu: bu istekte ana üretim için hangi
   // motor kullanıldı (quiz_sessions.gen_engine'e yazılacak, kalite/maliyet
@@ -1326,6 +1444,12 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const isDailyChallengeRequest = body?.dailyChallenge === true
+    // Yalnız mevcut bir adaptif oturumun devamında geçerlidir. Bu kipte üç
+    // adaydan en az biri bütün kalite kapılarını geçerse doğrulanmış alt küme
+    // dönebilir; normal test oluşturma sözleşmesi hâlâ eksiksiz set ister.
+    const adaptiveCandidateBatch = body?.adaptiveCandidateBatch === true
+      && typeof body?.continueSessionId === 'string'
+      && body.continueSessionId.length > 0
     // 21 Eylül 2026 — Deniz'in isteğiyle: gerçek öğrenci trafiğine hiç
     // dokunmadan üç sağlayıcının (Mistral/GPT-4.1-mini/Claude) çıktısını
     // gözle kontrol edebilmesi için admin-only bir test anahtarı. SADECE
@@ -1381,7 +1505,7 @@ export async function POST(req: NextRequest) {
       language,
       fileContent,
       includeVisuals = true,
-      questionType = 'multiple_choice',
+      questionType: rawQuestionType = 'mixed',
       dailyChallenge = false,
       continueSessionId, // adaptif akışta ikinci/sonraki parça — mevcut oturuma eklenir, yeni test sayılmaz
       excludeQuestionTexts, // aynı oturumda (henüz completed=false) az önce sorulmuş sorular — tekrar önleme
@@ -1396,10 +1520,11 @@ export async function POST(req: NextRequest) {
       // yol açıyordu (gerçek örnek: 10 sorudan 7'si "Past Simple Tense"le
       // hiç ilgisi olmayan Türkçe edebiyat/iletişim sorularıydı).
     } = body
+    const questionType = normalizeRequestedQuestionType(rawQuestionType)
 
     const MAX_QCOUNT: Record<string, number> = { free: 5, silver: 10, premium: 20, unlimited: 20 }
     const maxQ = MAX_QCOUNT[plan] ?? 0
-    const safeQCount = isDailyChallengeRequest ? Math.min(questionCount, 10) : Math.min(questionCount, maxQ)
+    let safeQCount = isDailyChallengeRequest ? Math.min(questionCount, 10) : Math.min(questionCount, maxQ)
     usageRequestId = crypto.randomUUID()
     // Yeni oturumun kimliği üretimden önce bilinir; böylece AI maliyet kaydı
     // kullanıcı ve oturumla atomik olmayan bir sonradan eşleştirmeye ihtiyaç duymaz.
@@ -1576,7 +1701,7 @@ export async function POST(req: NextRequest) {
       try {
         const mebRes = await fetch(`${req.nextUrl.origin}/api/meb-search`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ topic, grade, subject, unit: topic, level, limit: 2 }),
           signal: AbortSignal.timeout(3000), // 3sn — daha agresif timeout
         })
@@ -1609,8 +1734,8 @@ export async function POST(req: NextRequest) {
       previousQuestionsNote += `\n\n⚠️ KAYNAK METİN SÜREKLİLİĞİ: Bu, aynı kaynak metne dayanan bir testin İKİNCİ (veya sonraki) parçası. Yukarıda listelenen önceki sorular, kaynak metnin BELİRLİ cümlelerini/olgularını zaten kullandı. Bu parçada o AYNI cümleleri/olguları FARKLI bir ifadeyle, farklı bir soru formatıyla, ya da "doğru mu yanlış mı" gibi tersinden bile olsa TEKRAR HEDEFLEME — bu, öğretmen tarafından "aynı bilgi 6-7 kez soruldu" diye eleştirilen bilinen bir hata deseni. Bunun yerine: (a) kaynak metnin önceki parçada HİÇ değinilmemiş başka bir cümlesini/paragrafını kullan, VEYA (b) konunun (topic) kendisi hakkında, kaynak metne dayanmayan, genel kavramsal bir soru sor (ör. temel itikat/tanım sorusu) — bu ikinci seçenek özellikle kaynak metin kısaysa ve tüm cümleleri önceki parçada tükenmişse tercih edilmeli.`
     }
 
-    const anonymousBookletContext = !fileContent
-      ? await loadAnonymousBookletContext(subject, grade, topic).catch(() => '')
+    const bookletContext = !fileContent
+      ? await loadBookletContext(subject, grade, topic).catch(() => '')
       : ''
     const isUniversityLevel = level === 'universite'
     const objectiveCandidates = await loadCanonicalObjectiveCandidates(supabase, {
@@ -1619,6 +1744,9 @@ export async function POST(req: NextRequest) {
       console.warn('[generate-quiz] canonical objective candidates unavailable:', error?.message || 'unknown')
       return []
     })
+    if (!isUniversityLevel && !fileContent && objectiveCandidates.length === 0) {
+      return NextResponse.json({ error: 'quality_policy_failed', reason: 'canonical_objectives_unavailable', message: 'Bu sınıf, ders ve konu için doğrulanmış aktif kazanım bulunamadığından test oluşturulamadı.' }, { status: 503 })
+    }
     const objectiveInstruction = learningObjectivePrompt(objectiveCandidates)
 
     // Question Bank v1: only a complete, server-approved set bypasses AI.
@@ -1630,13 +1758,21 @@ export async function POST(req: NextRequest) {
     // bankadan dönüyordu — üç sağlayıcı da aslında aynı bankadaki soruları
     // gösteriyordu. Zorlamalı testlerde bankayı tamamen devre dışı bırakıyoruz
     // ki gerçekten o sağlayıcının o anki çıktısı görülsün.
-    const bankEligible = !fileContent && !continueSessionId && !dailyChallenge && !isUniversityLevel && !forcedMistral && !forcedOpenAI && !forcedClaude
+    // Legacy question-bank rows lack per-item strict review evidence and often
+    // carry one requested difficulty for the whole set. Do not bypass the
+    // adaptive quota or visual/outcome gates with these rows.
+    const bankWriteEligible = !fileContent
+      && !isUniversityLevel
+      && !dailyChallenge
+      && forceProviderTest === null
+    const bankEligible = bankWriteEligible && !continueSessionId
     let bankQuestions: any[] = []
     if (bankEligible) {
       bankQuestions = await getQuestionBankSet(supabase, {
         subject, topic, grade, language: effectiveLang,
         questionType, difficulty: resolvedDifficulty,
       }, safeQCount, recentQuestionTexts)
+      bankQuestions = filterQuestionsByRequestedType(bankQuestions, questionType)
 
       // Eski havuzda "onaylı" olmak, bilişsel derinliğin bugünkü eşiğini
       // karşıladığı anlamına gelmiyor. Temel/ezber düzeyindeki eski soruları
@@ -1686,7 +1822,10 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      if (bankQuestions.length === safeQCount && usageSessionId) {
+      if (bankQuestions.length === safeQCount
+        && usageSessionId
+        && hasStrictQuestionReview(bankQuestions, objectiveCandidates)
+        && hasCanonicalObjectiveCoverage(bankQuestions, objectiveCandidates)) {
         const bankRigorSummary = summarizeQuestionSetRigor(bankQuestions, resolvedDifficulty)
         const mappedCount = bankQuestions.filter((question) => question?.objectiveMappingStatus === 'mapped').length
         const { data: bankSession, error: bankSessionError } = await supabase
@@ -1734,6 +1873,21 @@ export async function POST(req: NextRequest) {
       }
     }
     const aiQuestionCount = Math.max(0, safeQCount - bankQuestions.length)
+    // Standard K-12 tests use the requested per-question provider/difficulty
+    // roles. University requests and explicit admin provider probes retain
+    // their existing single-provider behavior.
+    const roleMixEnabled = !isUniversityLevel && forceProviderTest === null
+    const quotaForCount = (count: number) => {
+      if (!roleMixEnabled) return buildAdaptiveDifficultyQuota(count, resolvedDifficulty)
+      const plan = buildQuestionGenerationPlan(count)
+      return {
+        kolay: plan.find(batch => batch.difficulty === 'kolay')?.count || 0,
+        normal: plan.find(batch => batch.difficulty === 'normal')?.count || 0,
+        zor: plan.find(batch => batch.difficulty === 'zor')?.count || 0,
+        'cok zor': plan.find(batch => batch.difficulty === 'cok zor')?.count || 0,
+      }
+    }
+    let targetDifficultyQuota = quotaForCount(safeQCount)
     // chartDataInstruction: yalnızca math_graph'ta ek talimat üretir (bkz.
     // fonksiyon tanımı) — burada erken hesaplamak için detectVisualCategory
     // tekrar çağrılıyor (saf/yan etkisiz fonksiyon, aşağıda zaten tekrar
@@ -1760,9 +1914,9 @@ export async function POST(req: NextRequest) {
       + diagnosticStrategy.promptContext
       + (isUniversityLevel ? misconceptionMetadataInstruction(questionType) : '') // K12'de artık statik blokta
       + objectiveInstruction
-      + anonymousBookletContext
+      + bookletContext
       + previousQuestionsNote
-    promptStr = fullPrompt + (adaptivePolicy?.promptContext || '') + diagnosticStrategy.promptContext + misconceptionMetadataInstruction(questionType) + objectiveInstruction + anonymousBookletContext + previousQuestionsNote // fallback için TAM metin saklanır
+    promptStr = fullPrompt + (adaptivePolicy?.promptContext || '') + diagnosticStrategy.promptContext + misconceptionMetadataInstruction(questionType) + objectiveInstruction + bookletContext + previousQuestionsNote // fallback için TAM metin saklanır
     countRef = aiQuestionCount
 
     // Hız optimizasyonu: az soru → Haiku (3x hızlı), çok soru → Sonnet
@@ -1863,7 +2017,28 @@ export async function POST(req: NextRequest) {
     const genMaxTokens = Math.min(6000, Math.max(useHaiku ? 2500 : 3500, aiQuestionCount * 550))
 
     let text: string
-    if (useMistralLive) {
+    if (roleMixEnabled) {
+      const generationPlan = buildQuestionGenerationPlan(aiQuestionCount)
+      const generatedBatches = await Promise.all(generationPlan.map(batch => generateProviderQuestionBatch({
+        batch,
+        prompt,
+        questionType,
+        language: effectiveLang,
+        userId: user.id,
+        sessionId: usageSessionId,
+        requestId: usageRequestId,
+        requestStartTime,
+      }).catch(error => {
+        console.warn(`[generate-quiz] initial role generation failed provider=${batch.provider}:`, error instanceof Error ? error.message : 'unknown')
+        return []
+      })))
+      const generatedQuestions = generatedBatches.flat()
+      if (generatedQuestions.length === 0) throw new Error('All role-based question generation calls returned empty results')
+      genEngineUsed = 'mixed-openai65-mistral15-claude20'
+      experimentVariant = null
+      text = JSON.stringify({ questions: generatedQuestions })
+      console.log(`[generate-quiz] role_mix plan=${generationPlan.map(batch => `${batch.provider}:${batch.count}`).join(',')} delivered=${generatedQuestions.length}`)
+    } else if (useMistralLive) {
       const mistralAdapter = new MistralAdapter()
       const mistralResponse = await mistralAdapter.execute(
         {
@@ -2028,8 +2203,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    let questions = (parsed.questions || []).map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
-    let externalValidationPassed = false
+    const defaultGenerationProvider = genEngineUsed.startsWith('mistral') ? 'mistral' : genEngineUsed.startsWith('gpt') ? 'openai' : 'anthropic'
+    let questions = (parsed.questions || []).map((q: any) => ({
+      ...normalizeInteractiveQuestionShape(q, effectiveLang),
+      generationProvider: q.generationProvider || defaultGenerationProvider,
+    }))
+    questions = filterQuestionsByRequestedType(questions, questionType)
 
     // Önce soru doğrulanır, sonra görsel doğrulanmış kesin soru metninden
     // üretilir. Eski paralel akışta doğrulayıcı soruların sırasını/metnini
@@ -2037,19 +2216,8 @@ export async function POST(req: NextRequest) {
     const visualCategory = detectVisualCategory(topic)
     console.log(`[generate-quiz] topic="${topic}" visualCategory=${visualCategory} includeVisuals=${includeVisuals}`)
 
-    const verifyResult = questions.length > 0
-      ? await fetch(`${req.nextUrl.origin}/api/verify-questions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
-          body: JSON.stringify({ questions, topic, grade, language: effectiveLang, questionType }),
-          signal: AbortSignal.timeout(40000),
-        }).then(r => r.ok ? r.json() : null).catch(() => null)
-      : null
-
-    if (verifyResult?.questions?.length > 0) {
-      questions = verifyResult.questions.map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
-      externalValidationPassed = true
-    }
+    // Independent strict review runs once, after all top-up rounds, so every
+    // question that reaches storage has identical review coverage.
 
     // Kaynağın kendisi (yazar, ISBN, künye) hakkında soru üretilmesini
     // engellemek için prompt'a talimat eklendi (bkz. yukarı) — ama LLM'ler
@@ -2078,7 +2246,7 @@ export async function POST(req: NextRequest) {
     // Only this externally validated slice may enter the shared bank. Top-up
     // questions are generated later and are intentionally excluded until they
     // pass the same independent validation path in a future request.
-    const validatedQuestionsForBank = externalValidationPassed ? questions.slice() : []
+    let validatedQuestionsForBank: any[] = []
 
     // 14 Ağustos 2026'da öğretmen geri bildirimiyle bulunan ayrı bir hata:
     // istenen soru sayısı ile üretilen soru sayısı SIK SIK uyuşmuyordu
@@ -2120,60 +2288,70 @@ export async function POST(req: NextRequest) {
         const missing = aiQuestionCount - questions.length
         const beforeRoundCount = questions.length
         try {
-          const topupPrompt = `${prompt}\n\nÖNEMLİ: Bu sefer TAM OLARAK ${missing} adet YENİ ve BİRBİRİNDEN FARKLI soru üret (ne bir eksik ne bir fazla). Daha önce üretilenlerle aynı/benzer soru üretme. Yanıtın SADECE geçerli, TAMAMLANMIŞ (yarıda kesilmemiş) JSON olmalı.`
-          // 21 Eylül 2026 — ana çağrıdaki aynı zaman aşımı düzeltmesi: SDK'nın
-          // 10 dakikalık varsayılan zaman aşımı + otomatik tekrar denemeleri
-          // burada da fonksiyonu Vercel'in sessizce öldürmesine yol açabilir.
-          // Kalan TOPUP_TIME_BUDGET_MS'e göre bütçe-farkında bir timeout
-          // veriyoruz; aşılırsa bu turun kendi try/catch'i (üstte) yakalar,
-          // döngü bir sonraki turda zaten zaman kontrolüyle duruyor olurdu.
-          const topupCallTimeoutMs = Math.max(15000, TOPUP_TIME_BUDGET_MS - (Date.now() - requestStartTime))
-          const topupResponse = await anthropic.messages.create({
-            // Eksik soru tamamlama, sayıya SADIK KALMA konusunda Haiku'dan
-            // daha güvenilir olan Sonnet ile yapılır — burada hız değil
-            // doğru sayıya ulaşmak öncelikli.
-            model: 'claude-sonnet-4-5',
-            max_tokens: Math.min(4000, Math.max(2000, missing * 600)),
-            // 5 Eylül 2026 — P0 prompt caching: `prompt` değişkeni artık K12
-            // yolunda zaten SIKIŞTIRILMIŞ (statik kısımlar çıkarılmış) hâlde,
-            // bu yüzden topupPrompt de otomatik olarak küçük kalıyor. Aynı
-            // statik bloğu (ana çağrıyla BİREBİR AYNI metin — cache hit için
-            // şart) burada da system'e ekliyoruz. Gerçek veride topup en
-            // pahalı kalemdi (çağrı başına ~$0.038) çünkü tüm promptu tekrar
-            // gönderiyordu — artık hem daha küçük hem cache'den okunabilir.
-            system: isUniversityLevel
-              ? undefined
-              : [{ type: 'text' as const, text: getStaticSystemBlock(questionType, effectiveLang), cache_control: { type: 'ephemeral' as const } }],
-            messages: [{ role: 'user', content: topupPrompt }],
-          }, { timeout: topupCallTimeoutMs, maxRetries: 0 })
-          await logAnthropicUsage('generate-quiz:topup', 'claude-sonnet-4-5', topupResponse, {
-            userId: user.id,
-            quizSessionId: usageSessionId,
-            requestId: usageRequestId,
-            meta: { round: round + 1, missing },
-          })
-          const topupText = topupResponse.content[0].type === 'text' ? topupResponse.content[0].text : ''
-          const topupClean = topupText.replace(/```json|```/g, '').trim()
-          let topupParsed: any
-          try {
-            topupParsed = JSON.parse(topupClean)
-          } catch {
-            const m = topupClean.match(/\{[\s\S]*\}/)
-            if (m) {
-              try { topupParsed = JSON.parse(m[0]) } catch { topupParsed = null }
+          let topupQuestions: any[] = []
+          if (roleMixEnabled) {
+            const rolePlan = buildQuestionGenerationPlan(aiQuestionCount)
+            const providerCounts: Record<string, number> = { openai: 0, mistral: 0, anthropic: 0 }
+            for (const question of questions) {
+              const provider = question.generationProvider
+              if (typeof provider === 'string' && provider in providerCounts) providerCounts[provider]++
             }
-            // 4 Eylül 2026 — ana üretimdeki aynı sağlam kurtarma burada da: JSON
-            // token limiti yüzünden ortada kesilse bile TAMAMLANMIŞ soruları
-            // kurtarır (bkz. yukarıdaki extractQuestionObjects tanımı ve notu).
+            const deficits = rolePlan
+              .map(batch => ({ ...batch, count: Math.max(0, batch.count - providerCounts[batch.provider]) }))
+              .filter(batch => batch.count > 0)
+            const recoveredBatches = await Promise.all(deficits.map(batch => generateProviderQuestionBatch({
+              batch,
+              prompt,
+              questionType,
+              language: effectiveLang,
+              userId: user.id,
+              sessionId: usageSessionId,
+              requestId: usageRequestId,
+              requestStartTime,
+            }).catch(error => {
+              console.warn(`[generate-quiz] role topup failed provider=${batch.provider}:`, error instanceof Error ? error.message : 'unknown')
+              return []
+            })))
+            topupQuestions = recoveredBatches.flat()
+          } else {
+            const currentDifficultyCounts = { kolay: 0, normal: 0, zor: 0, 'cok zor': 0 }
+            for (const question of questions) {
+              const level = normalizeDifficultyLevel(question.difficulty)
+              if (level) currentDifficultyCounts[level]++
+            }
+            const remainingDifficultyQuota = {
+              kolay: Math.max(0, targetDifficultyQuota.kolay - currentDifficultyCounts.kolay),
+              normal: Math.max(0, targetDifficultyQuota.normal - currentDifficultyCounts.normal),
+              zor: Math.max(0, targetDifficultyQuota.zor - currentDifficultyCounts.zor),
+              'cok zor': Math.max(0, targetDifficultyQuota['cok zor'] - currentDifficultyCounts['cok zor']),
+            }
+            const topupPrompt = `${prompt}\n\nÖNEMLİ: Bu sefer TAM OLARAK ${missing} adet YENİ ve BİRBİRİNDEN FARKLI soru üret. Eksik zorluk kotası tam olarak ${formatDifficultyQuota(remainingDifficultyQuota)}. Daha önce üretilenlerle aynı/benzer soru üretme. Yanıtın SADECE geçerli, TAMAMLANMIŞ JSON olmalı.`
+            const topupCallTimeoutMs = Math.max(15000, TOPUP_TIME_BUDGET_MS - (Date.now() - requestStartTime))
+            const topupResponse = await anthropic.messages.create({
+              model: 'claude-sonnet-4-5',
+              max_tokens: Math.min(8000, Math.max(3000, missing * 700)),
+              system: isUniversityLevel
+                ? undefined
+                : [{ type: 'text' as const, text: getStaticSystemBlock(questionType, effectiveLang), cache_control: { type: 'ephemeral' as const } }],
+              messages: [{ role: 'user', content: topupPrompt }],
+            }, { timeout: topupCallTimeoutMs, maxRetries: 0 })
+            await logAnthropicUsage('generate-quiz:topup', 'claude-sonnet-4-5', topupResponse, {
+              userId: user.id,
+              quizSessionId: usageSessionId,
+              requestId: usageRequestId,
+              meta: { round: round + 1, missing },
+            })
+            const topupText = topupResponse.content[0].type === 'text' ? topupResponse.content[0].text : ''
+            let topupParsed: any
+            try { topupParsed = JSON.parse(topupText.replace(/```json|```/g, '').trim()) } catch { topupParsed = null }
             if (!topupParsed?.questions?.length) {
-              const recovered = extractQuestionObjects(topupClean)
-              if (recovered.length > 0) {
-                topupParsed = { questions: recovered }
-                console.warn(`[generate-quiz] topup JSON recovered via balanced-brace parser, got ${recovered.length} questions`)
-              }
+              const recovered = extractQuestionObjects(topupText)
+              if (recovered.length) topupParsed = { questions: recovered }
             }
+            topupQuestions = (topupParsed?.questions || []).map((q: any) => ({ ...q, generationProvider: 'anthropic' }))
           }
-          let topupQuestions = (topupParsed?.questions || []).map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
+          topupQuestions = topupQuestions.map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
+          topupQuestions = filterQuestionsByRequestedType(topupQuestions, questionType)
           topupQuestions = applyContentQualityFilters(topupQuestions, mebContext)
           // Yakın-tekrar kontrolü: hem önceki parçanın sorularına (excludeQuestionTexts)
           // hem de bu çağrıda ŞİMDİYE KADAR kabul edilmiş sorulara (questions) karşı.
@@ -2183,7 +2361,26 @@ export async function POST(req: NextRequest) {
             ...questions.map((q: any) => q.q).filter(Boolean),
           ]
           topupQuestions = filterOutNearDuplicates(topupQuestions, alreadyAsked)
-          questions = [...questions, ...topupQuestions].slice(0, aiQuestionCount)
+          if (roleMixEnabled) {
+            const rolePlan = buildQuestionGenerationPlan(aiQuestionCount)
+            const currentByProvider: Record<string, number> = { openai: 0, mistral: 0, anthropic: 0 }
+            for (const question of questions) {
+              const provider = question.generationProvider
+              if (typeof provider === 'string' && provider in currentByProvider) currentByProvider[provider]++
+            }
+            const remainingByProvider = { ...currentByProvider }
+            for (const question of topupQuestions) {
+              const provider = question.generationProvider
+              const target = rolePlan.find(batch => batch.provider === provider)?.count || 0
+              if (provider in remainingByProvider && remainingByProvider[provider] < target) {
+                questions.push(question)
+                remainingByProvider[provider]++
+              }
+            }
+            questions = questions.slice(0, aiQuestionCount)
+          } else {
+            questions = [...questions, ...topupQuestions].slice(0, aiQuestionCount)
+          }
           console.log(`[generate-quiz] eksik soru tamamlama (tur ${round + 1}/${maxTopupRounds}): ${missing} istendi, ${topupQuestions.length} eklendi (toplam ${questions.length})`)
         } catch (e) {
           console.warn(`[generate-quiz] eksik soru tamamlama (tur ${round + 1}) başarısız:`, e)
@@ -2207,6 +2404,16 @@ export async function POST(req: NextRequest) {
     // başlatmaya çalışıyordu. Bu kontrol kota/session değişikliklerinden
     // ÖNCE çalışır; öğrenciye yeniden deneme seçeneği verir ve bozuk oturum
     // bırakmaz.
+    if (questions.length !== safeQCount
+      && ((adaptiveCandidateBatch && questions.length > 0) || questions.length >= 3)) {
+      // Provider latency/format drift can leave a smaller but still useful
+      // candidate set after recovery. Normal testlerde bir-iki soruluk artık
+      // hâlâ reddedilir; adaptif devamda ise bunlar henüz öğrenciye açılmaz,
+      // aşağıdaki bağımsız doğrulamaya aday olarak ilerler.
+      console.warn(`[generate-quiz] recovery produced ${questions.length}/${safeQCount}; accepting validated subset`)
+      safeQCount = questions.length
+      targetDifficultyQuota = quotaForCount(safeQCount)
+    }
     if (questions.length !== safeQCount) {
       console.error(`[generate-quiz] incomplete_set requested=${safeQCount} delivered=${questions.length} topic=${topic}`)
       return NextResponse.json({
@@ -2217,7 +2424,68 @@ export async function POST(req: NextRequest) {
       }, { status: 503 })
     }
 
-    // Görsel üretimi TAM soru seti oluşmadan çalıştırılmaz. Önceki sıralamada
+    const strictVerifyResult = await fetch(`${req.nextUrl.origin}/api/verify-questions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        questions,
+        topic,
+        grade,
+        language: effectiveLang,
+        questionType,
+        strictQualityPolicy: true,
+        sessionId: usageSessionId,
+        requestId: usageRequestId,
+        objectiveCandidates: objectiveCandidates.map(candidate => ({
+          ref: candidate.ref,
+          objectiveCode: candidate.objectiveCode,
+          title: candidate.title,
+          subject: candidate.subject,
+          grade: candidate.grade,
+        })),
+      }),
+      // Role-based cross-checks run in two batches plus the final Gemini set
+      // review; give that complete chain enough headroom inside maxDuration.
+      signal: AbortSignal.timeout(70000),
+    }).then(async response => response.ok ? response.json() : null).catch(() => null)
+
+    const verifiedCandidateCount = Array.isArray(strictVerifyResult?.questions) ? strictVerifyResult.questions.length : 0
+    const minimumVerifiedCount = Math.max(1, Math.ceil(safeQCount * 0.70))
+    if (verifiedCandidateCount >= minimumVerifiedCount && verifiedCandidateCount < safeQCount) {
+      console.warn(`[generate-quiz] quality_threshold_subset accepted=${verifiedCandidateCount}/${safeQCount} minimum=${minimumVerifiedCount}`)
+      safeQCount = verifiedCandidateCount
+      targetDifficultyQuota = quotaForCount(safeQCount)
+    } else if (!Array.isArray(strictVerifyResult?.questions) || verifiedCandidateCount !== safeQCount) {
+      console.error(`[generate-quiz] strict_verification_failed verified=${strictVerifyResult?.questions?.length || 0}/${safeQCount}`)
+      return NextResponse.json({ error: 'quality_policy_failed', reason: 'independent_verification', message: 'Testin tüm soruları bağımsız kalite kontrolünden geçemediği için oluşturulmadı.' }, { status: 503 })
+    }
+    questions = strictVerifyResult.questions.map((question: any) => normalizeInteractiveQuestionShape(question, effectiveLang))
+    questions = filterQuestionsByRequestedType(questions, questionType)
+    if (questions.length !== safeQCount) {
+      console.error(`[generate-quiz] question_type_mismatch expected=${questionType} accepted=${questions.length}/${safeQCount}`)
+      return NextResponse.json({ error: 'quality_policy_failed', reason: 'question_type_mismatch', message: 'Seçtiğin soru tipine uymayan sorular öğrenciye gösterilmeden elendi. Lütfen yeniden dene.' }, { status: 503 })
+    }
+    if (!hasStrictQuestionReview(questions, objectiveCandidates)) {
+      return NextResponse.json({ error: 'quality_policy_failed', reason: 'verification_evidence_missing', message: 'Soru kalite kontrol kanıtı eksik olduğu için test oluşturulmadı.' }, { status: 503 })
+    }
+    if (!hasDifficultyQuota(questions, targetDifficultyQuota)) {
+      const actualDifficultyCounts = { kolay: 0, normal: 0, zor: 0, 'cok zor': 0, bilinmeyen: 0 }
+      for (const question of questions) {
+        const level = normalizeDifficultyLevel(question.difficulty)
+        if (level) actualDifficultyCounts[level]++
+        else actualDifficultyCounts.bilinmeyen++
+      }
+      console.error(`[generate-quiz] difficulty_quota_failed expected=${formatDifficultyQuota(targetDifficultyQuota)} actual=${JSON.stringify(actualDifficultyCounts)} tolerance=${Math.max(1, Math.ceil(questions.length * 0.3))}`)
+      return NextResponse.json({ error: 'quality_policy_failed', reason: 'difficulty_distribution', message: 'Kolay, normal ve zor soru dağılımı adaptif kota ile eşleşmediği için test oluşturulmadı.' }, { status: 503 })
+    }
+    const objectiveMapping = applyCanonicalObjectiveMappings(questions, objectiveCandidates)
+    questions = objectiveMapping.questions
+    if (!hasCanonicalObjectiveCoverage(questions, objectiveCandidates)) {
+      console.error(`[generate-quiz] objective_mapping_failed mapped=${objectiveMapping.mappedCount}/${questions.length} candidates=${objectiveCandidates.length}`)
+      return NextResponse.json({ error: 'quality_policy_failed', reason: 'objective_mapping', message: 'Soruların tümü aynı sınıf ve konuya ait doğrulanmış kazanımlarla eşleşmediği için test oluşturulmadı.' }, { status: 503 })
+    }
+    // Görsel üretimi kalite kontrollerinden geçmiş TAM soru seti üzerinde çalışır.
+    // Önceki sıralamada
     // doğrulama sonrası eksik kalan sorular tamamlanmadan 5+ SVG isteği
     // başlıyor, 120 saniyelik isteğin bütçesini tüketiyor ve öğrenciye
     // "Sorular tamamlanamadı" hatası dönüyordu. Görsel hiçbir zaman testin
@@ -2239,12 +2507,35 @@ export async function POST(req: NextRequest) {
     // ve isteğin gerçek 120sn sınırını aşabilirdi. Artık kalan süre HER
     // zincire ortak bir üst sınır (maxMs) olarak da geçiliyor; hiçbir zincir
     // isteğin gerçekte sahip olduğundan fazla zaman harcayamaz.
+    // Adaptif parçalar için %30 kotayı parçanın kendi boyutuna uygulamak
+    // yanlıştı: tek kabul edilen yedek soruda ceil(1*0.30)=1 olup kota
+    // fiilen %100'e çıkıyordu. Mevcut oturumdaki görselleri de say ve yalnız
+    // birleşik testin %30 hedefinde eksik kalan kadar görsel iste.
+    let batchVisualMinimum = requiredVisualCount(safeQCount)
+    if (adaptiveCandidateBatch && continueSessionId) {
+      const { data: visualContextSession } = await supabase
+        .from('quiz_sessions')
+        .select('questions')
+        .eq('id', continueSessionId)
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (visualContextSession && Array.isArray(visualContextSession.questions)) {
+        const existingQuestions = visualContextSession.questions as Array<Record<string, unknown>>
+        const existingVisualCount = existingQuestions.filter(question => hasVisualQuota([question], 1)).length
+        const combinedMinimum = requiredVisualCount(existingQuestions.length + safeQCount)
+        batchVisualMinimum = Math.max(0, combinedMinimum - existingVisualCount)
+        console.log(`[generate-quiz] adaptive_visual_quota existing=${existingVisualCount}/${existingQuestions.length} batch_required=${batchVisualMinimum}/${safeQCount} combined_required=${combinedMinimum}`)
+      }
+    }
+
     const REQUEST_HARD_DEADLINE_MS = 112000 // 120sn'den DB yazımı/response için pay bırak
     const visualBudgetMs = REQUEST_HARD_DEADLINE_MS - (Date.now() - requestStartTime)
-    const visualIndexes = visualQuestionIndexes(questions, visualCategory, safeQCount, isNewGenerationRequest(topic))
-    const shouldGenerateVisuals = includeVisuals && visualCategory && visualIndexes.length > 0 && visualBudgetMs > 15000
-    if (includeVisuals && visualCategory && visualIndexes.length > 0 && !shouldGenerateVisuals) {
-      console.warn(`[generate-quiz] zaman bütçesi görseller için yetersiz (${visualBudgetMs}ms kaldı), görseller atlanıyor`)
+    const visualIndexes = batchVisualMinimum > 0
+      ? visualQuestionIndexes(questions, visualCategory, safeQCount)
+      : []
+    const shouldGenerateVisuals = Boolean(visualCategory && visualIndexes.length > 0 && visualBudgetMs > 15000)
+    if (visualCategory && visualIndexes.length > 0 && !shouldGenerateVisuals) {
+      console.warn(`[generate-quiz] required visual quota skipped: insufficient time (${visualBudgetMs}ms)`)
     }
     const svgResults = shouldGenerateVisuals
       ? await Promise.all(visualIndexes.map(i =>
@@ -2262,6 +2553,12 @@ export async function POST(req: NextRequest) {
         }
         console.log(`[generate-quiz] visual generated for q[${i}] contextScore=${visual.contextQuality.score}`)
       }
+    }
+
+    if (!hasVisualQuota(questions, batchVisualMinimum)) {
+      const actual = questions.filter(question => hasVisualQuota([question], 1)).length
+      console.error(`[generate-quiz] visual_quota_failed required=${batchVisualMinimum} actual=${actual} topic=${topic}`)
+      return NextResponse.json({ error: 'quality_policy_failed', reason: 'visual_quota', message: 'Test genelindeki %30 görsel hedefi için gereken birebir eşleşmiş ve bağımsız kontrolden geçmiş görseller tamamlanamadı.' }, { status: 503 })
     }
 
     // 26 Ağustos 2026 — kaynak metni öğrenciye de gönder (yukarıdaki nota bkz.).
@@ -2322,9 +2619,10 @@ export async function POST(req: NextRequest) {
     const rigorSummary = summarizeQuestionSetRigor(questions, resolvedDifficulty)
     console.log(`[question-rigor] version=${rigorSummary.version} average=${rigorSummary.averageScore} minimum=${rigorSummary.minimumScore} application=${rigorSummary.applicationCount}/${rigorSummary.targetApplicationCount} reasoning=${rigorSummary.reasoningCount}/${rigorSummary.targetReasoningCount} direct=${rigorSummary.directRecallCount} visual=${rigorSummary.visualCount} target_met=${rigorSummary.meetsTarget}`)
     questions = balanceAnswerPositions(questions)
-    const objectiveMapping = applyCanonicalObjectiveMappings(questions, objectiveCandidates)
-    questions = objectiveMapping.questions
-
+    // Havuza doğrulama öncesi kopyayı değil, son görseli ve son metadata'sı
+    // eklenmiş öğrenciye sunulan nihai soruyu yaz. Böylece SVG/chartData soru
+    // ile aynı JSON kaydında kalır ve tekrar kullanımda kaybolmaz.
+    validatedQuestionsForBank = questions.slice()
     // continueSessionId: adaptif akışta ikinci/sonraki parça — aynı testin
     // devamı, YENİ bir test değil. Bu yüzden kota (monthly_test_count) TEKRAR
     // artırılmıyor ve DB'ye ayrı bir session satırı yazılmıyor; mevcut
@@ -2460,7 +2758,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    if (bankEligible && sessionId) {
+    if (bankWriteEligible && sessionId) {
       after(async () => {
         const promoted = await promoteQuestionsToBank(supabase, {
           subject, topic, grade, language: effectiveLang,
@@ -2487,6 +2785,15 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     console.error('Generate quiz error, trying OpenAI fallback:', error?.message)
+    // Once the strict production policy is active, never return an unscreened
+    // fallback set. A provider/verification outage must fail closed.
+    if (strictQualityPolicyActive) {
+      return NextResponse.json({
+        error: 'quality_policy_failed',
+        reason: 'generation_or_validation_unavailable',
+        message: 'Kalite ve kazanım kontrolleri tamamlanamadığı için test güvenli biçimde oluşturulamadı. Lütfen tekrar dene.',
+      }, { status: 503 })
+    }
     // GPT-4o yedek model
     try {
       if (!promptStr) throw new Error('No prompt')

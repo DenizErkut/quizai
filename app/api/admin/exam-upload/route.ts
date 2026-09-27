@@ -5,6 +5,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createHash } from 'node:crypto'
 import { callOpenAI } from '@/lib/openai'
+import { questionBankKey } from '@/lib/question-bank'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -185,7 +186,7 @@ async function promoteTeacherQuestions(row: { subject?: string | null; grade?: s
   const questions = extracted.filter((_: any, index: number) => approvedIndexes.has(index))
   const rows = questions.map((q: any) => ({
     fingerprint: createHash('sha256').update(`${q.q}|${q.opts.join('|')}`.toLocaleLowerCase('tr')).digest('hex'),
-    subject_key: String(row.subject || 'genel').toLocaleLowerCase('tr'), topic_key: String(q.topic || row.subtopic || 'genel').toLocaleLowerCase('tr'), grade_key: String(row.grade || '').toLocaleLowerCase('tr'), language_key: 'tr', question_type: 'multiple_choice', difficulty: ['easy','medium','hard'].includes(q.difficulty) ? q.difficulty : 'medium', question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, objective: q.topic || row.subtopic || '', sourcePolicy: 'teacher_exact' }, review_status: 'approved', quality_score: 1, source_engine: 'teacher_booklet_exact', report_count: 0
+    subject_key: questionBankKey(row.subject || 'genel'), topic_key: questionBankKey(q.topic || row.subtopic || 'genel'), grade_key: questionBankKey(row.grade || ''), language_key: 'tr', question_type: 'multiple_choice', difficulty: q.difficulty === 'easy' ? 'kolay' : q.difficulty === 'hard' ? 'zor' : 'normal', question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, objective: q.topic || row.subtopic || '', subject: row.subject || 'Genel', sourcePolicy: 'teacher_exact' }, review_status: 'approved', quality_score: 1, source_engine: 'teacher_booklet_exact', report_count: 0
   }))
   if (!rows.length) return 0
   const result = await adminDb.from('question_bank').upsert(rows, { onConflict: 'fingerprint', ignoreDuplicates: true })

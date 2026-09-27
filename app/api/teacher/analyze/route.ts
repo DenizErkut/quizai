@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server-create-client'
 import Anthropic from '@anthropic-ai/sdk'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { getIdentityBySupabaseId } from '@/lib/identity/client'
+import { requireAgentCapability, requireAssignedStudentScope, writeAgentDecisionAudit } from '@/lib/agent-security-policy'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,6 +14,8 @@ const supabaseAdmin = createClient(
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
 export async function POST(req: NextRequest) {
+  const agent = 'teacher-student-analysis-v1' as const
+  requireAgentCapability(agent, 'write_teacher_analysis')
   // Auth
   const authHeader = req.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) {
@@ -40,6 +43,38 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Eksik parametre.' }, { status: 400 })
   }
 
+  // Analiz önbelleğine veya öğrenci verilerine erişmeden önce ödevin
+  // öğretmenin sınıfında olduğunu ve öğrencinin sınıfa kayıtlı olduğunu doğrula.
+  const { data: assignmentAccess } = await supabaseAdmin
+    .from('assignments')
+    .select('id, classroom_id')
+    .eq('id', assignment_id)
+    .maybeSingle()
+  if (!assignmentAccess?.classroom_id) {
+    return NextResponse.json({ error: 'Ödev bulunamadı.' }, { status: 404 })
+  }
+
+  const { data: classroomAccess } = await supabaseAdmin
+    .from('classrooms')
+    .select('id,teacher_id')
+    .eq('id', assignmentAccess.classroom_id)
+    .eq('teacher_id', teacher.id)
+    .maybeSingle()
+  if (!classroomAccess) {
+    return NextResponse.json({ error: 'Bu ödeve erişim yetkiniz yok.' }, { status: 403 })
+  }
+
+  const { data: studentMembership } = await supabaseAdmin
+    .from('classroom_students')
+    .select('student_id')
+    .eq('classroom_id', assignmentAccess.classroom_id)
+    .eq('student_id', student_id)
+    .maybeSingle()
+  if (!studentMembership) {
+    return NextResponse.json({ error: 'Öğrenci bu sınıfta bulunmuyor.' }, { status: 403 })
+  }
+  requireAssignedStudentScope(agent, classroomAccess.teacher_id, teacher.id, studentMembership.student_id, student_id)
+
   // Önbellek: aynı analiz varsa getir
   const { data: cached } = await supabaseAdmin
     .from('teacher_student_analyses')
@@ -52,6 +87,7 @@ export async function POST(req: NextRequest) {
   // 1 saatten eskiyse yeniden üret
   const oneHourAgo = new Date(Date.now() - 3600 * 1000).toISOString()
   if (cached && cached.created_at > oneHourAgo) {
+    await writeAgentDecisionAudit(supabaseAdmin, { actor_id: user.id, agent_name: agent, policy_version: 'assigned-student-analysis-v1', input_summary: { event: 'cached_analysis_access' }, decision_summary: { cached: true, analysis_length: String(cached.analysis ?? '').length } })
     return NextResponse.json({ analysis: cached.analysis, cached: true })
   }
 
@@ -154,8 +190,10 @@ Lütfen şu formatta kısa ve öz bir analiz yaz (Türkçe):
 
   const analysis = response.content[0].type === 'text' ? response.content[0].text : ''
 
+  await writeAgentDecisionAudit(supabaseAdmin, { actor_id: user.id, agent_name: agent, policy_version: 'assigned-student-analysis-v1', input_summary: { event: 'analysis_generated', recent_session_count: recentSessions?.length ?? 0, wrong_answer_count: wrongAnswers.length }, decision_summary: { cached: false, analysis_length: analysis.length } })
+
   // Kaydet (upsert)
-  await supabaseAdmin
+  const { error: saveError } = await supabaseAdmin
     .from('teacher_student_analyses')
     .upsert({
       teacher_id: teacher.id,
@@ -164,6 +202,7 @@ Lütfen şu formatta kısa ve öz bir analiz yaz (Türkçe):
       analysis,
       created_at: new Date().toISOString(),
     }, { onConflict: 'teacher_id,student_id,assignment_id' })
+  if (saveError) return NextResponse.json({ error: 'Analiz kaydedilemedi.' }, { status: 500 })
 
   return NextResponse.json({ analysis, cached: false })
 }

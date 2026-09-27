@@ -21,7 +21,6 @@ export default function PricingPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [referralCount, setReferralCount] = useState(0)
   const [copied, setCopied] = useState(false)
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly')
 
   useEffect(() => {
     async function load() {
@@ -30,7 +29,7 @@ export default function PricingPage() {
       if (!user) return
       const [{ data: p }, { count }] = await Promise.all([
         supabase.from('profiles').select('plan, plan_expires_at, referral_code, monthly_test_count, daily_test_count, daily_test_date').eq('id', user.id).single(),
-        supabase.from('referrals').select('id', { count: 'exact', head: true }).eq('referrer_id', user.id),
+        supabase.from('referrals').select('id', { count: 'exact', head: true }).eq('referrer_id', user.id).not('qualified_at', 'is', null),
       ])
       setProfile(p)
       setReferralCount(count || 0)
@@ -55,8 +54,8 @@ export default function PricingPage() {
     {
       id: 'silver',
       label: 'Gümüş',
-      price: billingCycle === 'monthly' ? '₺299' : '₺2.490',
-      sub: billingCycle === 'monthly' ? 'aylık' : 'yıllık',
+      price: '₺2.490',
+      sub: 'yıllık',
       color: '#64748b',
       accent: false,
       features: [
@@ -69,13 +68,13 @@ export default function PricingPage() {
         'Davet ile Altın kazan',
       ],
       cta: 'Gümüş\'e geç →',
-      ctaHref: `/checkout?plan=silver_${billingCycle}`,
+      ctaHref: '/checkout?plan=silver_yearly',
     },
     {
       id: 'premium',
       label: 'Altın',
-      price: billingCycle === 'monthly' ? '₺499' : '₺4.490',
-      sub: billingCycle === 'monthly' ? 'aylık' : 'yıllık',
+      price: '₺4.490',
+      sub: 'yıllık',
       color: '#2563eb',
       accent: true,
       badge: 'En popüler',
@@ -91,13 +90,13 @@ export default function PricingPage() {
         'Öncelikli destek',
       ],
       cta: 'Altın\'a geç →',
-      ctaHref: `/checkout?plan=gold_${billingCycle}`,
+      ctaHref: '/checkout?plan=gold_yearly',
     },
     {
       id: 'unlimited',
       label: 'Platin',
-      price: billingCycle === 'monthly' ? '₺2.399' : '₺19.990',
-      sub: billingCycle === 'monthly' ? 'aylık' : 'yıllık',
+      price: '₺19.990',
+      sub: 'yıllık',
       color: '#0d9488',
       accent: false,
       features: [
@@ -112,7 +111,7 @@ export default function PricingPage() {
         'Öncelikli & telefon desteği',
       ],
       cta: 'Platin\'e geç →',
-      ctaHref: `/checkout?plan=platinum_${billingCycle}`,
+      ctaHref: '/checkout?plan=platinum_yearly',
     },
   ]
 
@@ -129,15 +128,6 @@ export default function PricingPage() {
           <p style={{ color: 'var(--text2)', fontSize: '16px' }}>
             İhtiyacına uygun planı seç, hemen başla.
           </p>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'center', margin: '-1rem 0 1.75rem' }}>
-          <div style={{ display: 'inline-flex', padding: 4, borderRadius: 999, border: '1px solid var(--border)', background: 'var(--bg2)' }}>
-            {(['monthly', 'yearly'] as const).map(cycle => <button key={cycle} onClick={() => setBillingCycle(cycle)}
-              style={{ border: 0, borderRadius: 999, padding: '8px 18px', cursor: 'pointer', fontWeight: 700, fontFamily: 'var(--font-sans)', background: billingCycle === cycle ? 'var(--primary)' : 'transparent', color: billingCycle === cycle ? '#fff' : 'var(--text2)' }}>
-              {cycle === 'monthly' ? 'Aylık' : 'Yıllık'}
-            </button>)}
-          </div>
         </div>
 
         {/* Plan cards */}
@@ -220,10 +210,10 @@ export default function PricingPage() {
               <div>
                 <h2 style={{ fontSize: '18px', fontWeight: 500, marginBottom: '4px' }}>🎁 Arkadaşlarını davet et</h2>
                 <p style={{ fontSize: '13px', color: 'var(--text2)' }}>
-                  Her 10 kişiyi davet ettiğinde <strong>1 yıl ücretsiz Altın</strong> kazanırsın.
+                  Her 10 ücretli davette, eşiği tamamlayan satın alma aylıksa <strong>1 ay</strong>, yıllıksa <strong>1 yıl ücretsiz Altın</strong> kazanırsın.
                 </p>
               </div>
-              <div className="badge badge-purple">{referralCount} / {nextMilestone} davet</div>
+              <div className="badge badge-purple">{referralCount} / {nextMilestone} ücretli üyelik</div>
             </div>
             <div className="progress-bar" style={{ marginBottom: '1rem' }}>
               <div className="progress-fill" style={{ width: `${progressPct}%` }} />
@@ -238,7 +228,7 @@ export default function PricingPage() {
             </div>
             {referralCount > 0 && (
               <p style={{ fontSize: '12px', color: 'var(--green)', marginTop: '8px' }}>
-                {referralCount} kişi davet ettin — {10 - (referralCount % 10)} kişi daha, 1 yıl Altın kazan!
+                {referralCount} davetin ücretli üyeliğe geçti — {10 - (referralCount % 10)} ücretli üyelik daha; ödül süresi satın alınan plana bağlı.
               </p>
             )}
           </div>
@@ -253,7 +243,7 @@ export default function PricingPage() {
             { q: 'Birden fazla sınıfa katılabilir miyim?', a: 'Evet! Matematik, Türkçe, Fen gibi farklı dersler için öğretmenlerinden farklı davet kodları alarak birden fazla sınıfa aynı anda üye olabilirsin.' },
             { q: 'Analiz için kaç test çözmem gerekiyor?', a: 'Analiz ve gelişim planı için en az 10 test çözmen gerekiyor. Daha fazla test çözdükçe analiz daha isabetli olur.' },
             { q: 'Platin\'deki koç görüşmesi nedir?', a: 'Yılda 12 kez birebir eğitim koçuyla online görüşme yapabilirsin. Çalışma planın, zayıf konuların ve hedefin üzerine kişisel rehberlik alırsın.' },
-            { q: 'Davet ile Altın nasıl çalışır?', a: 'Davet linkini paylaş, 10 kişi kayıt olursa 1 yıl ücretsiz Altın kazanırsın. Her 10 davette tekrar kazanırsın.' },
+            { q: 'Davet ile Altın nasıl çalışır?', a: 'Davet linkini paylaş. Her 10 ücretli davette, eşiği tamamlayan kişinin satın aldığı dönem kadar ücretsiz Altın kazanırsın: aylık üyelikte 1 ay, yıllık üyelikte 1 yıl. Ücretsiz kayıtlar ödül hesabına dahil edilmez.' },
           ].map((item, i) => (
             <div key={i} style={{ padding: '12px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
               <div style={{ fontWeight: 500, fontSize: '14px', marginBottom: '4px' }}>{item.q}</div>

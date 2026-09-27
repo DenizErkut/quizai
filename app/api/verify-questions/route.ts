@@ -6,12 +6,16 @@ export const maxDuration = 90
 export const runtime = 'nodejs'
 import Anthropic from '@anthropic-ai/sdk'
 import { verifyQuestionWithOpenAI } from '@/lib/openai'
-import { verifyQuestionWithGemini } from '@/lib/verify-gemini'
+import { verifyQuestionSetWithGemini, verifyQuestionWithGemini } from '@/lib/verify-gemini'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { decideQuestionQuality, evaluateQuestionStructure, providerQualitySignal } from '@/lib/ai-gateway'
 import { verifyQuestionWithMistral } from '@/lib/mistral-quality'
+import { requireAgentCapability, writeAgentDecisionAudit } from '@/lib/agent-security-policy'
+import { evaluateStrictQuestionReview, filterQuestionsByRequestedType, normalizeRequestedQuestionType } from '@/lib/quiz-generation-policy'
+import { createClient } from '@supabase/supabase-js'
 
 const anthropic = new Anthropic()
+const auditDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 // Matematik icerikli soru mu - varsa bagimsiz kontrol icin OpenAI'a yonlendirilir
 // (Claude'un kendi urettigini yine Claude'a kontrol ettirmek yerine)
@@ -21,7 +25,7 @@ function isMathQuestion(q: any): boolean {
 }
 
 // Soru tipine göre doğrulama prompt'u
-function buildVerifyPrompt(q: any, lang: string): string {
+function buildVerifyPromptBase(q: any, lang: string): string {
   const type = q.type || 'multiple_choice'
   const base = `You are a strict educational content verifier. Verify this question for correctness and language consistency.\n\nExpected question language: ${lang}\n\nLANGUAGE RULE (MANDATORY): The question stem and answer options must be written in the expected language. Foreign proper names, formulas and short quoted examples are allowed, but a question written mainly in another language MUST return ok:false with reason \"language_mismatch\". The explanation may be Turkish for foreign-language courses.\n\nSELF-CONTAINMENT RULE (MANDATORY): If the question says a word is underlined/highlighted/emphasized, that exact target must be visibly marked inside the question with [square brackets]. Otherwise return ok:false with reason \"missing_visible_emphasis\".\n\n`
 
@@ -77,6 +81,33 @@ Respond ONLY with JSON: {"ok": true} or {"ok": false, "reason": "correct order e
 
     default:
       return base + `Question: ${q.q}\nIs this question clear and answerable?\nRespond ONLY with JSON: {"ok": true} or {"ok": false, "reason": "..."}`
+  }
+}
+
+type ObjectiveCandidate = { ref: string; objectiveCode: string; title: string; subject?: string; grade?: string }
+
+function buildVerifyPrompt(q: any, lang: string, objective?: ObjectiveCandidate | null): string {
+  const difficulty = typeof q.difficulty === 'string' ? q.difficulty : ''
+  const criteria = `${difficulty ? `\n\nDIFFICULTY CLAIM: "${difficulty}". Easy = one basic concept/at most one operation; normal = two connected reasoning steps or concept application; hard = multi-step reasoning, transfer to a new situation, or combined concepts. Larger numbers or longer wording alone do not make an item hard. Set difficultyMatches=true only if the actual cognitive work matches the claim.` : ''}${objective ? `\n\nCANONICAL LEARNING OUTCOME: [${objective.objectiveCode}] ${objective.title} (${objective.grade || ''} ${objective.subject || ''}). Does this exact question directly assess that outcome, not merely share a broad topic? Set objectiveMatches=true only for direct alignment.` : ''}`
+  return buildVerifyPromptBase(q, lang) + criteria
+    + '\n\nReturn strict JSON with difficultyMatches (boolean); when an approved canonical learning outcome is supplied, also include objectiveMatches (boolean). Missing fields mean this item failed strict review.'
+}
+
+async function verifyQuestionWithClaude(verifyPrompt: string): Promise<{ ok: boolean; reason?: string; difficultyMatches?: boolean; objectiveMatches?: boolean } | null> {
+  try {
+    const res = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 180,
+      messages: [{ role: 'user', content: verifyPrompt }],
+    })
+    logAnthropicUsage('verify-questions:claude-fallback', 'claude-sonnet-4-5', res)
+    const text = res.content[0].type === 'text' ? res.content[0].text.trim() : ''
+    const match = text.match(/\{[\s\S]*\}/)
+    if (!match) return null
+    const parsed = JSON.parse(match[0])
+    return parsed && typeof parsed.ok === 'boolean' ? parsed : null
+  } catch {
+    return null
   }
 }
 
@@ -147,34 +178,55 @@ function checkBasamakQuestion(q: any): { ok: boolean; gercekCevap: string } | nu
 }
 
 export async function POST(req: NextRequest) {
-  // Internal secret (server-to-server) VEYA Bearer token kabul edilir
-  const internalSecret = req.headers.get('x-internal-secret')
-  const isInternal = internalSecret && internalSecret === (process.env.CRON_SECRET || 'internal')
-  if (!isInternal) {
-    const authHeader = req.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
-    const token = authHeader.slice(7)
-    const { createClient: cc } = require('@supabase/supabase-js')
-    const sbAuth = cc(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-    const { data: { user } } = await sbAuth.auth.getUser(token)
-    if (!user) return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 })
-  }
+  const agent = 'question-verifier-v1' as const
+  requireAgentCapability(agent, 'verify_content')
+  // Only a verified user token is accepted; do not use a service-role bypass here.
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  const token = authHeader.slice(7)
+  const sbAuth = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  const { data: { user } } = await sbAuth.auth.getUser(token)
+  if (!user) return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 })
 
   try {
-    const { questions, topic, grade, language, questionType } = await req.json()
+    const body = await req.json()
+    const { questions: rawQuestions, topic, grade, language } = body
+    const questionType = normalizeRequestedQuestionType(body.questionType)
+    const questions = Array.isArray(rawQuestions)
+      ? filterQuestionsByRequestedType(rawQuestions, questionType)
+      : []
+    const reviewContext = {
+      userId: user.id,
+      sessionId: typeof body.sessionId === 'string' ? body.sessionId : undefined,
+      requestId: typeof body.requestId === 'string' ? body.requestId : undefined,
+    }
+    const strictQualityPolicy = body?.strictQualityPolicy === true
+    const objectiveCandidates = Array.isArray(body?.objectiveCandidates)
+      ? body.objectiveCandidates as ObjectiveCandidate[]
+      : []
     if (!questions?.length) return NextResponse.json({ questions: [] })
 
     // Mixed tipte pahalı ikinci AI doğrulama yapılmaz; fakat tüm tipler merkezi
     // deterministik şema kontrolünden geçer.
-    if (questionType === 'mixed') {
+    if (questionType === 'mixed' && !strictQualityPolicy) {
       const accepted = questions.filter((question: any) => evaluateQuestionStructure(question).verdict === 'accept')
-      return NextResponse.json({ questions: accepted, stats: { policyVersion: 'quality-engine-v1', original: questions.length, verified: accepted.length, rejected: questions.length - accepted.length, replacements: 0, final: accepted.length } })
+      const stats = { policyVersion: 'quality-engine-v1', original: questions.length, verified: accepted.length, rejected: questions.length - accepted.length, replacements: 0, final: accepted.length }
+      await writeAgentDecisionAudit(auditDb, { actor_id: user.id, agent_name: agent, policy_version: 'question-verification-boundary-v1', input_summary: { question_count: questions.length, question_type: 'mixed' }, decision_summary: { verified: accepted.length, rejected: stats.rejected } })
+      return NextResponse.json({ questions: accepted, stats })
     }
 
     const lang = language || 'Türkçe'
     const verified: any[] = []
     const rejected: number[] = []
     const rejectReasons: string[] = []
+    const rejectionDetails: Array<{
+      questionIndex: number
+      objectiveCode: string | null
+      generationProvider: string
+      validator: string
+      controlType: string
+      reasonCode: string
+    }> = []
 
     // Her soruyu doğrula — paralel olarak (max 5 aynı anda)
     const BATCH = 5
@@ -188,6 +240,7 @@ export async function POST(req: NextRequest) {
         if (structuralDecision.verdict === 'reject') {
           rejected.push(idx)
           rejectReasons.push(`Q${idx}: ${structuralDecision.reasonCode}`)
+          rejectionDetails.push({ questionIndex: idx, objectiveCode: null, generationProvider: String(q.generationProvider || 'unknown'), validator: 'deterministic', controlType: 'structure', reasonCode: structuralDecision.reasonCode })
           return
         }
 
@@ -195,6 +248,7 @@ export async function POST(req: NextRequest) {
         if (!quickMathCheck(q)) {
           rejected.push(idx)
           rejectReasons.push(`Q${idx}: local math check failed`)
+          rejectionDetails.push({ questionIndex: idx, objectiveCode: null, generationProvider: String(q.generationProvider || 'unknown'), validator: 'deterministic', controlType: 'math', reasonCode: 'local_math_check_failed' })
           return
         }
 
@@ -203,14 +257,30 @@ export async function POST(req: NextRequest) {
         if (basamakResult && !basamakResult.ok) {
           rejected.push(idx)
           rejectReasons.push(`Q${idx}: basamak hesabı yanlış (doğrusu: ${basamakResult.gercekCevap})`)
+          rejectionDetails.push({ questionIndex: idx, objectiveCode: null, generationProvider: String(q.generationProvider || 'unknown'), validator: 'deterministic', controlType: 'place_value', reasonCode: 'place_value_mismatch' })
           return
         }
 
         // 2. AI doğrulama — sadece doğrulanabilir tipler
-        const needsAICheck = ['multiple_choice', 'fill_blank', 'true_false', 'matching', 'multi_true_false'].includes(q.type || 'multiple_choice')
+        // A single canonical objective is unambiguous. Models occasionally
+        // omit the ref even when the question was generated from the supplied
+        // objective list; seed that ref so the independent reviewer can still
+        // verify direct alignment. Multiple candidates remain fail-closed.
+        if (strictQualityPolicy && objectiveCandidates.length === 1
+          && (typeof q.learningObjectiveRef !== 'string' || !q.learningObjectiveRef.trim())) {
+          q.learningObjectiveRef = objectiveCandidates[0].ref
+        }
+        const selectedObjective = objectiveCandidates.find(candidate => candidate.ref === q.learningObjectiveRef) || null
+        if (strictQualityPolicy && objectiveCandidates.length > 0 && !selectedObjective) {
+          rejected.push(idx)
+          rejectReasons.push(`Q${idx}: canonical objective missing or invalid`)
+          rejectionDetails.push({ questionIndex: idx, objectiveCode: null, generationProvider: String(q.generationProvider || 'unknown'), validator: 'deterministic', controlType: 'objective', reasonCode: 'canonical_objective_missing' })
+          return
+        }
+        const needsAICheck = strictQualityPolicy || ['multiple_choice', 'fill_blank', 'true_false', 'matching', 'multi_true_false'].includes(q.type || 'multiple_choice')
 
         if (!needsAICheck) {
-          verified.push(q)
+          verified.push(strictQualityPolicy ? { ...q, qualityVerificationVersion: 'quiz-quality-v2', difficultyVerified: true, objectiveVerified: objectiveCandidates.length === 0 } : q)
           return
         }
 
@@ -218,16 +288,21 @@ export async function POST(req: NextRequest) {
           // Matematik sorularinda BAGIMSIZ kontrol icin OpenAI (Claude kendi
           // urettigini yine Claude'a kontrol ettirmiyor). Diger tipler icin
           // Claude ile devam ediyoruz.
-          const verifyPrompt = buildVerifyPrompt(q, lang)
+          const verifyPrompt = buildVerifyPrompt(q, lang, selectedObjective)
+          const generatingProvider = q.generationProvider === 'mistral' ? 'mistral' : q.generationProvider === 'openai' ? 'openai' : 'anthropic'
 
           // Birincil (OpenAI/Claude) ve Gemini kontrollerini SIRALI degil
           // PARALEL calistir - sirali calistirmak toplam gecikmeyi ikiye
           // katliyordu ve generate-quiz'in 60sn'lik zaman asimina neden
           // oluyordu.
           const [primaryCheck, geminiCheck, mistralCheck] = await Promise.all([
-            isMathQuestion(q)
-              ? verifyQuestionWithOpenAI(verifyPrompt)
-              : (async () => {
+            strictQualityPolicy
+              ? generatingProvider === 'mistral'
+                ? verifyQuestionWithOpenAI(verifyPrompt, 'gpt-4.1-mini', { userId: user.id, quizSessionId: reviewContext.sessionId, requestId: reviewContext.requestId })
+                : verifyQuestionWithMistral(verifyPrompt, reviewContext)
+              : isMathQuestion(q)
+                ? verifyQuestionWithOpenAI(verifyPrompt)
+                : (async () => {
                   const res = await anthropic.messages.create({
                     model: 'claude-sonnet-4-5',
                     max_tokens: 150,
@@ -238,9 +313,56 @@ export async function POST(req: NextRequest) {
                   const match = text.match(/\{[\s\S]*\}/)
                   return match ? JSON.parse(match[0]) : { ok: true }
                 })(),
-            verifyQuestionWithGemini(verifyPrompt),
-            verifyQuestionWithMistral(verifyPrompt),
+            strictQualityPolicy ? Promise.resolve(null) : verifyQuestionWithGemini(verifyPrompt),
+            strictQualityPolicy || generatingProvider === 'mistral'
+              ? Promise.resolve(null)
+              : verifyQuestionWithMistral(verifyPrompt, reviewContext),
           ])
+
+          if (strictQualityPolicy) {
+            // İlk bağımsız denetleyicinin tek başına reddi adaptif testi
+            // kesmesin. Aynı soru ikinci, farklı bir sağlayıcı tarafından
+            // yeniden incelenir; iki açık ret olursa fail-closed kalır.
+            let secondaryCheck = primaryCheck?.ok === false
+              ? await verifyQuestionWithGemini(verifyPrompt)
+              : null
+            // Gemini is an optional whole-set layer and can be unavailable or
+            // return malformed JSON. A primary rejection still deserves a
+            // real independent second opinion before the item is discarded.
+            if (primaryCheck?.ok === false && !secondaryCheck) {
+              secondaryCheck = generatingProvider === 'anthropic'
+                ? await verifyQuestionWithOpenAI(verifyPrompt, 'gpt-4.1-mini', reviewContext)
+                : await verifyQuestionWithClaude(verifyPrompt)
+            }
+            const strictReview = evaluateStrictQuestionReview({
+              primary: primaryCheck,
+              secondary: [secondaryCheck],
+              objectiveRequired: objectiveCandidates.length > 0,
+            })
+            if (!Boolean(q.difficulty) || !strictReview.passed) {
+              rejected.push(idx)
+              const reasonCode = primaryCheck?.ok === false
+                ? (secondaryCheck?.ok === false ? 'two_provider_rejection' : 'primary_rejection_not_overturned')
+                : 'strict_evidence_missing'
+              rejectReasons.push(`Q${idx}: ${reasonCode}`)
+              rejectionDetails.push({
+                questionIndex: idx,
+                objectiveCode: selectedObjective?.objectiveCode || null,
+                generationProvider: generatingProvider,
+                validator: generatingProvider === 'mistral' ? 'openai+gemini' : 'mistral+gemini',
+                controlType: 'independent_quality',
+                reasonCode,
+              })
+              return
+            }
+            verified.push({
+              ...q,
+              qualityVerificationVersion: 'quiz-quality-v2',
+              difficultyVerified: strictReview.difficultyVerified,
+              objectiveVerified: strictReview.objectiveVerified,
+            })
+            return
+          }
 
           const providerDecision = decideQuestionQuality([
             providerQualitySignal(isMathQuestion(q) ? 'openai-validator' : 'anthropic-validator', primaryCheck),
@@ -257,15 +379,45 @@ export async function POST(req: NextRequest) {
 
           verified.push(q)
         } catch {
-          // AI check failed → kabul et
-          verified.push(q)
+          if (strictQualityPolicy) {
+            rejected.push(idx)
+            rejectReasons.push(`Q${idx}: strict independent verification unavailable`)
+            rejectionDetails.push({ questionIndex: idx, objectiveCode: selectedObjective?.objectiveCode || null, generationProvider: String(q.generationProvider || 'unknown'), validator: 'independent_provider', controlType: 'availability', reasonCode: 'strict_verification_unavailable' })
+          } else {
+            // Legacy non-strict verification preserves historical behavior.
+            verified.push(q)
+          }
         }
       }))
     }
 
+    let geminiSetReview: { ok: boolean; reason?: string; issueIndexes?: number[] } | null = null
+    // Bazı adaylar elense bile kabul edilen alt küme Gemini'nin genel set
+    // kontrolünden geçmeden öğrenciye dönmez.
+    if (strictQualityPolicy && verified.length > 0) {
+      geminiSetReview = await verifyQuestionSetWithGemini({
+        questions: verified,
+        topic: String(topic || ''),
+        grade: String(grade || ''),
+        language: String(lang || ''),
+      })
+      if (geminiSetReview?.ok === false) {
+        rejectReasons.push(`Final Gemini set review rejected: ${geminiSetReview.reason || 'material issue detected'}`)
+        rejectionDetails.push({ questionIndex: -1, objectiveCode: null, generationProvider: 'mixed', validator: 'gemini', controlType: 'whole_set', reasonCode: 'gemini_set_rejection' })
+        rejected.push(...(geminiSetReview.issueIndexes || []))
+        verified.splice(0, verified.length)
+      } else {
+        const reviewStatus = geminiSetReview?.ok === true ? 'passed' : 'unavailable'
+        if (reviewStatus === 'unavailable') {
+          console.warn('[verify-questions] Gemini whole-set review unavailable; per-question provider review remains enforced')
+        }
+        verified.splice(0, verified.length, ...verified.map(question => ({ ...question, geminiSetReviewStatus: reviewStatus })))
+      }
+    }
+
     // Reddedilen sorular için yenilerini üret
     let replacements: any[] = []
-    if (rejected.length > 0) {
+    if (rejected.length > 0 && !strictQualityPolicy) {
       try {
         const replaceType = questionType || 'multiple_choice'
         const replacePrompt = `Generate ${rejected.length} verified ${replaceType} questions about "${topic}" for "${grade}" level in ${lang}.
@@ -309,22 +461,23 @@ Return ONLY valid JSON:
 
     const final = [...verified, ...replacements].slice(0, questions.length)
 
+    await writeAgentDecisionAudit(auditDb, { actor_id: user.id, agent_name: agent, policy_version: 'question-verification-boundary-v2', input_summary: { question_count: questions.length, question_type: questionType || 'multiple_choice' }, decision_summary: { verified: verified.length, rejected: rejected.length, replacements: replacements.length, final: final.length, rejection_details: rejectionDetails } })
+
     return NextResponse.json({
       questions: final,
       stats: {
-        policyVersion: 'quality-engine-v1',
+        policyVersion: strictQualityPolicy ? 'quiz-quality-v2' : 'quality-engine-v1',
         original: questions.length,
         verified: verified.length,
         rejected: rejected.length,
         replacements: replacements.length,
         final: final.length,
         rejectReasons,
+        ...(strictQualityPolicy ? { geminiSetReview } : {}),
       },
     })
   } catch (error: any) {
     console.error('[verify-questions] error:', error?.message)
-    // Hata durumunda orijinal soruları döndür
-    const { questions } = await req.json().catch(() => ({ questions: [] }))
-    return NextResponse.json({ questions: questions || [] })
+    return NextResponse.json({ error: 'Soru doğrulaması veya denetim kaydı tamamlanamadı.' }, { status: 503 })
   }
 }

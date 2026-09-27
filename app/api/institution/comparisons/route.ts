@@ -10,7 +10,7 @@ export async function GET(req:NextRequest){
   const token=req.headers.get('Authorization')?.replace(/^Bearer\s+/i,'');if(!token)return NextResponse.json({error:'Yetkisiz.'},{status:401})
   const {data:{user}}=await db.auth.getUser(token);if(!user)return NextResponse.json({error:'Oturum geçersiz.'},{status:401})
   const {data:membership}=await db.from('institution_users').select('institution_id').eq('user_id',user.id).eq('role','admin').maybeSingle();if(!membership)return NextResponse.json({error:'Yasak.'},{status:403})
-  const {data:institutionUsers,error:memberError}=await db.from('institution_users').select('user_id,role').eq('institution_id',membership.institution_id).in('role',['student','teacher']).limit(10000);if(memberError)return NextResponse.json({error:'Kurum üyeleri alınamadı.'},{status:500})
+  const {data:institutionUsers,error:memberError}=await db.from('institution_users').select('user_id,role').eq('institution_id',membership.institution_id).in('role',['student','teacher']).eq('is_active',true).limit(10000);if(memberError)return NextResponse.json({error:'Kurum üyeleri alınamadı.'},{status:500})
   const studentIds=(institutionUsers??[]).filter(row=>row.role==='student').map(row=>row.user_id);const teacherUsers=(institutionUsers??[]).filter(row=>row.role==='teacher').map(row=>row.user_id)
   if(!studentIds.length)return NextResponse.json({classes:[],teachers:[],periods:[],privacy_threshold:3})
   const since=new Date(Date.now()-60*86_400_000).toISOString()

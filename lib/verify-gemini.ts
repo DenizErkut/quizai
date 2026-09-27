@@ -19,8 +19,9 @@
 import { logGeminiUsage } from '@/lib/ai-usage'
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
+export type GeminiQuestionSetReview = { ok: boolean; reason?: string; issueIndexes?: number[] } | null
 
-export async function verifyQuestionWithGemini(prompt: string): Promise<{ ok: boolean; reason?: string } | null> {
+export async function verifyQuestionWithGemini(prompt: string): Promise<{ ok: boolean; reason?: string; difficultyMatches?: boolean; objectiveMatches?: boolean } | null> {
   if (!GEMINI_API_KEY) return null // Anahtar gerçekten yoksa — bu katman aktif değil
 
   try {
@@ -63,5 +64,58 @@ export async function verifyQuestionWithGemini(prompt: string): Promise<{ ok: bo
   } catch (e: any) {
     console.warn(`[verify-gemini] ağ/parse hatası, bu katman atlandı: ${e?.message || e}`)
     return null // Ağ/parse hatası — bu katmanı sessizce atla, üretimi bozma
+  }
+}
+
+/** Final, whole-test coherence and correctness pass after per-question checks. */
+export async function verifyQuestionSetWithGemini(args: {
+  questions: Array<Record<string, unknown>>
+  topic: string
+  grade: string
+  language: string
+}): Promise<GeminiQuestionSetReview> {
+  if (!GEMINI_API_KEY || args.questions.length === 0) return null
+  const questionText = args.questions.map((question, index) => {
+    const options = Array.isArray(question.opts) ? question.opts.map(String).join(' | ') : ''
+    const answer = typeof question.ans === 'number' && Array.isArray(question.opts)
+      ? String(question.opts[question.ans] ?? question.ans)
+      : String(question.ans ?? '')
+    return `Q${index + 1} [${String(question.difficulty || 'unknown')}]: ${String(question.q || '')}\nOptions: ${options}\nClaimed answer: ${answer}\nExplanation: ${String(question.exp || '').slice(0, 500)}\nOutcome: ${String(question.learningObjectiveTitle || question.learningObjectiveRef || '')}`
+  }).join('\n\n')
+  const prompt = `You are the final independent reviewer for a complete K-12 quiz. Review all questions together for factual/answer correctness, ambiguity, accidental duplicates, consistent grade level, and whether each item assesses the requested topic. Do not reject merely for stylistic preference. Flag only clear, material issues that would mislead a student.\nTopic: ${args.topic}\nGrade: ${args.grade}\nLanguage: ${args.language}\n\n${questionText.slice(0, 30000)}\n\nReturn ONLY JSON: {"ok":true,"reason":"brief summary","issueIndexes":[]} or {"ok":false,"reason":"brief material issue","issueIndexes":[1]}. Indexes are 1-based.`
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0, maxOutputTokens: 1200 },
+        }),
+        signal: AbortSignal.timeout(12000),
+      },
+    )
+    if (!response.ok) {
+      console.warn(`[verify-gemini] set review unavailable; status=${response.status}`)
+      return null
+    }
+    const data = await response.json()
+    logGeminiUsage('verify-questions:gemini-set', 'gemini-3.6-flash', data?.usageMetadata)
+    const text = String(data?.candidates?.[0]?.content?.parts?.[0]?.text || '').replace(/```json|```/gi, '').trim()
+    const match = text.match(/\{[\s\S]*\}/)
+    if (!match) return null
+    const parsed = JSON.parse(match[0])
+    if (typeof parsed?.ok !== 'boolean') return null
+    return {
+      ok: parsed.ok,
+      reason: typeof parsed.reason === 'string' ? parsed.reason.slice(0, 300) : undefined,
+      issueIndexes: Array.isArray(parsed.issueIndexes)
+        ? parsed.issueIndexes.filter((value: unknown) => Number.isInteger(value) && Number(value) > 0).slice(0, 20)
+        : [],
+    }
+  } catch (error) {
+    console.warn('[verify-gemini] set review failed:', error instanceof Error ? error.message : 'unknown')
+    return null
   }
 }

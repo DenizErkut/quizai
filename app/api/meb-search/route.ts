@@ -7,11 +7,16 @@ import {
   isKazanimListesi,
   findContentStart,
 } from '@/lib/content-filters'
+import { isSameGradeSource } from '@/lib/meb-source-scope'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+function normalizeTR(value: unknown): string {
+  return String(value || '').normalize('NFKC').toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ').trim()
+}
 
 async function embedQuery(text: string): Promise<number[] | null> {
   const apiKey = process.env.GEMINI_API_KEY
@@ -38,22 +43,14 @@ async function embedQuery(text: string): Promise<number[] | null> {
 // duyuyordu — önceden bu fonksiyonlar sadece bu dosyaya özeldi.
 
 export async function POST(req: NextRequest) {
-  // Ic route'lardan (orn. generate-quiz) x-internal-secret ile gelen
-  // sunucu-sunucu cagrilari icin bypass - diger ic route'larla (verify-
-  // questions, verify-math) ayni desen. Bu kontrol OLMADIGI icin generate-
-  // quiz'in bu route'a yaptigi TUM ic cagrilar 401 ile basarisiz oluyordu -
-  // MEB mufredat baglami hicbir zaman soru uretimine eklenemiyordu.
-  const internalSecret = req.headers.get('x-internal-secret')
-  const isInternal = internalSecret && internalSecret === (process.env.CRON_SECRET || 'internal')
-
-  if (!isInternal) {
-    const authHeader = req.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
-    const token = authHeader.slice(7)
-    const sbAuth = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
-    const { data: { user } } = await sbAuth.auth.getUser(token)
-    if (!user) return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 })
-  }
+  // Quiz generation forwards its verified user's JWT. The route has no
+  // service-role/internal-secret bypass because its queries use service role.
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  const token = authHeader.slice(7)
+  const sbAuth = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  const { data: { user } } = await sbAuth.auth.getUser(token)
+  if (!user) return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 })
 
   try {
     const { topic, grade, subject, unit, level, limit = 4 } = await req.json()
@@ -76,7 +73,9 @@ export async function POST(req: NextRequest) {
       if (chunks?.length) {
         // Semantic search bazen ön sayfa chunk'larını da (embedding'i
         // yanlışlıkla konuya yakın çıkabiliyor) döndürebiliyor — filtrele.
-        const cleanChunks = chunks.filter((c: any) => !isNonContent(c.content || ''))
+        const cleanChunks = chunks.filter((c: any) => isSameGradeSource(grade, c.grade)
+          && (!subject || !c.subject || normalizeTR(c.subject) === normalizeTR(subject))
+          && !isNonContent(c.content || ''))
         if (cleanChunks.length > 0) {
           context = cleanChunks.map((c: any, i: number) =>
             `[MEB Kaynak ${i + 1} - ${c.subject}/${c.unit}]\n${c.content}`
@@ -88,17 +87,25 @@ export async function POST(req: NextRequest) {
 
     // meb_resources.raw_text'ten direkt ara (chunk'sız — disk IO tasarrufu)
     if (!context) {
-      let q = adminDb
-        .from('meb_resources')
-        .select('title, subject, unit, grade, raw_text')
-        .limit(5) // birkaç fazla cek, asagida en zengin olanlari secelim
+      const selectFields = 'title, subject, unit, grade, raw_text, health_flag'
+      let exactQuery = adminDb.from('meb_resources').select(selectFields).limit(50)
+      if (subject) exactQuery = exactQuery.ilike('subject', `%${subject}%`)
+      if (unit) exactQuery = exactQuery.ilike('unit', `%${unit}%`)
+      const { data: exactResources } = await exactQuery
 
-      // Önce unit eşleştir
-      if (unit) q = q.ilike('unit', `%${unit}%`)
-      else if (subject) q = q.ilike('subject', `%${subject}%`)
-      else if (grade) q = q.eq('grade', grade)
-
-      const { data: allResources } = await q
+      // Kazanım kataloğu kanonik başlığı (örn. "Fizik Bilimi Ve Kariyer
+      // Keşfi") kullanırken kaynak belgesi "1. Ünite: ..." taşıyabilir.
+      // Tam ünite sorgusu sonuç üretmezse yalnız AYNI ders içindeki kaynakları
+      // genişlet; sınıf filtresi aşağıda fail-closed uygulanmaya devam eder.
+      let allResources = exactResources || []
+      if (allResources.length === 0 && subject) {
+        const { data: subjectResources } = await adminDb
+          .from('meb_resources')
+          .select(selectFields)
+          .ilike('subject', `%${subject}%`)
+          .limit(200)
+        allResources = subjectResources || []
+      }
 
       if (allResources?.length) {
         // Grade formatları veritabanında çok tutarsız ("Ortaokul 6. Sınıf",
@@ -108,19 +115,12 @@ export async function POST(req: NextRequest) {
         // düzeltiyor: `unit` parametresi verildiğinde grade HİÇ kontrol
         // edilmiyordu (yukarıdaki if/else if zinciri) — bu yüzden 6. sınıf
         // bir öğrenci, aynı isimli 5. sınıf ünitesinden içerik alabiliyordu.
-        const extractGradeNum = (g: string | null | undefined): number | null => {
-          const m = (g || '').match(/(\d+)\s*\.?\s*s[ıi]n[ıi]f/i)
-          return m ? parseInt(m[1], 10) : null
-        }
-        const requestedGradeNum = extractGradeNum(grade)
-        let gradeFiltered = allResources
-        if (requestedGradeNum !== null) {
-          const matching = allResources.filter((r: any) => extractGradeNum(r.grade) === requestedGradeNum)
-          // Eşleşen varsa SADECE onları kullan; hiç yoksa (ör. o sınıf seviyesi
-          // için hiç kaynak yüklenmemiş) tüm adaylara geri dön — hiç içerik
-          // dönmemesindense yanlış sınıftan da olsa içerik dönmesi tercih edilir.
-          if (matching.length > 0) gradeFiltered = matching
-        }
+        // Never widen to another grade. Missing/unknown request grades or no
+        // exact same-grade resource means this source path contributes nothing.
+        const gradeFiltered = grade
+          ? allResources.filter((r: any) => isSameGradeSource(grade, r.grade)
+            && (!subject || !r.subject || normalizeTR(r.subject) === normalizeTR(subject)))
+          : []
 
         // Bazı yüklenen kaynaklar sadece MÜFREDAT KAZANIM KODU LİSTESİ
         // (örn. "SB.6.4.1. ... a) ... b) ...") - bunlar ogretmene yonelik
@@ -131,13 +131,22 @@ export async function POST(req: NextRequest) {
         // olan kaynaklari, gercek anlatisal/orneklerle dolu icerik
         // varsa ELE. Yoksa (tek secenek buysa) yine kullan.
         // (isKazanimListesi artık lib/content-filters.ts'ten import ediliyor.)
-        const narrative = gradeFiltered.filter((r: any) => !isKazanimListesi(r.raw_text || ''))
-        const pool = narrative.length > 0 ? narrative : gradeFiltered
+        const healthy = gradeFiltered.filter((r: any) => !r.health_flag)
+        const healthyPool = healthy.length > 0 ? healthy : gradeFiltered
+        const narrative = healthyPool.filter((r: any) => !isKazanimListesi(r.raw_text || ''))
+        const pool = narrative.length > 0 ? narrative : healthyPool
 
         // En zengin (en uzun) icerigi one al - daha cok ornek/hikaye/haber
         // demek, sorulari cesitlendirmek icin daha fazla malzeme demek
+        const topicKey = normalizeTR(unit || topic)
         const resources = pool
-          .sort((a: any, b: any) => (b.raw_text?.length || 0) - (a.raw_text?.length || 0))
+          .sort((a: any, b: any) => {
+            const aHaystack = normalizeTR(`${a.unit || ''} ${a.raw_text || ''}`)
+            const bHaystack = normalizeTR(`${b.unit || ''} ${b.raw_text || ''}`)
+            const aRelevant = topicKey && aHaystack.includes(topicKey) ? 1 : 0
+            const bRelevant = topicKey && bHaystack.includes(topicKey) ? 1 : 0
+            return bRelevant - aRelevant || (b.raw_text?.length || 0) - (a.raw_text?.length || 0)
+          })
           .slice(0, 3)
 
         context = resources.map((r: any, i: number) => {
@@ -156,7 +165,7 @@ export async function POST(req: NextRequest) {
     if (subject || topic) {
       let examQ = adminDb
         .from('exam_chunks')
-        .select('content, subject, exam_type, year')
+        .select('content, subject, exam_type, year, grade')
         .limit(12) // Madde 4: filtreden sonra 3'e ineceği için fazladan çek
 
       if (subject) examQ = examQ.ilike('subject', `%${subject}%`)
@@ -180,6 +189,7 @@ export async function POST(req: NextRequest) {
         // desenli, daha hedefli) olduğu gibi kalıyor.
         const examChunks = examChunksRaw
           .filter((c: any) => {
+            if (!isSameGradeSource(grade, c.grade)) return false
             const content = c.content || ''
             return !isNonContent(content) && !isKazanimListesi(content)
           })

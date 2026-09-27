@@ -78,18 +78,29 @@ export async function POST(req: NextRequest) {
     const expiresAt = new Date()
     expiresAt.setMonth(expiresAt.getMonth() + meta.months)
 
-    await supabaseAdmin.from('profiles').update({
+    const { data: updatedProfile, error: profileUpdateError } = await supabaseAdmin.from('profiles').update({
       plan: meta.profilePlan,
       plan_expires_at: expiresAt.toISOString(),
       monthly_test_count: 0,
       daily_test_count: 0,
-    }).eq('id', sub.user_id)
+    }).eq('id', sub.user_id).select('id').maybeSingle()
+
+    if (profileUpdateError || !updatedProfile) {
+      console.error('[paytr callback] profil üyeliği güncellenemedi:', {
+        userId: sub.user_id,
+        plan: meta.profilePlan,
+        error: profileUpdateError?.message || 'Profil bulunamadı.',
+      })
+      // Üyelik profilde görünür hale gelmediyse ödemeyi başarılı sayma.
+      // PayTR yeniden bildirim gönderir; tekrar deneyerek tutarlı hale gelir.
+      return new NextResponse('profile update failed', { status: 500 })
+    }
 
     // Görünen isimler: silver=Gümüş, premium=Altın, unlimited=Platin
     // (bkz. app/api/iyzico/callback/route.ts'teki aynı yorum).
     const displayName = meta.tierName
     const emoji = meta.profilePlan === 'unlimited' ? '👑' : meta.profilePlan === 'silver' ? '🥈' : '⭐'
-    await supabaseAdmin.from('notifications').insert({
+    const { error: notificationError } = await supabaseAdmin.from('notifications').insert({
       user_id: sub.user_id,
       type: 'system',
       title: `${emoji} ${displayName} aktif!`,
@@ -97,12 +108,43 @@ export async function POST(req: NextRequest) {
       read: false,
       data: { href: '/pricing' },
     })
+    if (notificationError) {
+      // Bildirim hatası üyeliğin aktive edilmesini engellememeli.
+      console.error('[paytr callback] aktivasyon bildirimi oluşturulamadı:', notificationError.message)
+    }
 
-    await supabaseAdmin.from('subscriptions').update({
+    const { data: activatedSubscription, error: activationError } = await supabaseAdmin.from('subscriptions').update({
       status: 'active',
       current_period_start: new Date().toISOString(),
       current_period_end: expiresAt.toISOString(),
-    }).eq('id', sub.id)
+    }).eq('id', sub.id).eq('status', 'pending').select('id').maybeSingle()
+
+    if (activationError) {
+      console.error('[paytr callback] abonelik kaydı active yapılamadı:', {
+        subscriptionId: sub.id,
+        userId: sub.user_id,
+        plan: meta.profilePlan,
+        error: activationError.message,
+      })
+      return new NextResponse('subscription activation failed', { status: 500 })
+    }
+
+    if (!activatedSubscription) {
+      // Eşzamanlı tekrar bildiriminde diğer istek aboneliği aktive etmiş
+      // olabilir. Durumu okuyup yalnızca gerçekten active ise OK dön.
+      const { data: currentSubscription, error: statusError } = await supabaseAdmin
+        .from('subscriptions')
+        .select('status')
+        .eq('id', sub.id)
+        .maybeSingle()
+      if (statusError || currentSubscription?.status !== 'active') {
+        console.error('[paytr callback] abonelik active durumu doğrulanamadı:', {
+          subscriptionId: sub.id,
+          error: statusError?.message || 'Abonelik active değil.',
+        })
+        return new NextResponse('subscription activation unverified', { status: 500 })
+      }
+    }
 
     return new NextResponse('OK')
   } catch (e) {

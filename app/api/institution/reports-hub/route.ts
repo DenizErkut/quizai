@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
     case 'live-quiz': {
       // Kuruma bağlı öğretmenlerin sınıfları üzerinden
       const { data: instTeachers } = await supabaseAdmin
-        .from('institution_users').select('user_id').eq('institution_id', institutionId).eq('role', 'teacher')
+        .from('institution_users').select('user_id').eq('institution_id', institutionId).eq('role', 'teacher').eq('is_active', true)
       const teacherUserIds = (instTeachers ?? []).map((t: any) => t.user_id)
       let classroomIds: string[] = []
       if (teacherUserIds.length) {

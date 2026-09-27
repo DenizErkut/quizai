@@ -95,6 +95,7 @@ async function fetchQuizTopup(params: {
   missing: number
   existingTexts: string[]
   accessToken?: string
+  adaptiveCandidateBatch?: boolean
 }): Promise<any[]> {
   try {
     const res = await fetch('/api/generate-quiz', {
@@ -110,6 +111,7 @@ async function fetchQuizTopup(params: {
         subject: params.subject || undefined,
         unit: params.topic || undefined,
         continueSessionId: params.sessionId, // kota/yeni-session tekrarını önler
+        adaptiveCandidateBatch: params.adaptiveCandidateBatch === true,
         excludeQuestionTexts: params.existingTexts,
       }),
     })
@@ -187,45 +189,25 @@ function QuizPageContent() {
     if (profile) loadCurriculum()
   }, [profile?.grade])
 
-  // MEB kaynaklarini cek — sadece kullanicinin sinifina uygun olanlar
+  // Öğrenciye yalnız aktif, doğrulanmış ve yayımlanmış MEB kazanımlarının
+  // kanonik ünite başlıklarını göster. Belge başlığı tek başına öğrenciye
+  // açılma ölçütü değildir; aksi halde tema/ünite adı katalogla eşleşmeyip
+  // test üretiminde "kazanım bulunamadı" hatasına yol açabiliyordu.
   useEffect(() => {
     async function loadMebTopics() {
       try {
-        const res = await fetch('/api/admin/meb-upload?sort=asc')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.access_token || !profile?.grade) return
+        const params = new URLSearchParams({ grade: profile.grade })
+        const res = await fetch(`/api/curriculum-topics?${params}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
         if (!res.ok) return
         const data = await res.json()
-        const map: Record<string, string[]> = {}
-
-        const userGradeRaw = (profile?.grade || '').toLowerCase()
-        const userGradeNum = (userGradeRaw.match(/\d+/) || [])[0] || ''
-        const userLevel = userGradeRaw.includes('universite') ? 'universite'
-          : userGradeRaw.includes('lise') ? 'lise'
-          : userGradeRaw.includes('ortaokul') ? 'ortaokul'
-          : userGradeRaw.includes('ilkokul') ? 'ilkokul'
-          : 'ortaokul'
-
-        for (const r of (data.resources || [])) {
-          const resGradeRaw = (r.grade || '').toLowerCase()
-          const resGradeNum = (resGradeRaw.match(/\d+/) || [])[0] || ''
-          const resLevel = resGradeRaw.includes('universite') ? 'universite'
-            : resGradeRaw.includes('lise') ? 'lise'
-            : resGradeRaw.includes('ortaokul') ? 'ortaokul'
-            : resGradeRaw.includes('ilkokul') ? 'ilkokul'
-            : (r.level || '')
-
-          const levelMatch = resLevel === userLevel
-          const gradeMatch = !resGradeNum || !userGradeNum || resGradeNum === userGradeNum
-
-          if (levelMatch && gradeMatch) {
-            const key = r.subject || 'Diger'
-            if (!map[key]) map[key] = []
-            if (r.unit && !map[key].includes(r.unit)) map[key].push(r.unit)
-          }
-        }
-        setMebTopics(map)
+        setMebTopics(data.topicsBySubject || {})
       } catch {}
     }
-    loadMebTopics()
+    if (profile?.grade) loadMebTopics()
   }, [profile?.grade])
 
   // localStorage'dan favori ve son ayarları yükle
@@ -235,7 +217,6 @@ function QuizPageContent() {
       setFavorites(favs)
       const lastSettings = JSON.parse(localStorage.getItem('pratium_last_settings') || '{}')
       if (lastSettings.difficulty) setDifficulty(lastSettings.difficulty)
-      if (lastSettings.questionType) setQuestionType(lastSettings.questionType)
       if (lastSettings.qCount) setQCount(lastSettings.qCount)
     } catch {}
   }, [])
@@ -276,7 +257,9 @@ function QuizPageContent() {
   const [qCount, setQCount] = useState(10)
   const [difficulty, setDifficulty] = useState('normal')
   const [includeVisuals, setIncludeVisuals] = useState(true)
-  const [questionType, setQuestionType] = useState<QuestionType>('multiple_choice')
+  // Her yeni anlık test Karma ile başlar. Kullanıcı bu ekranda başka bir tip
+  // seçerse seçim test boyunca korunur; eski tarayıcı ayarı varsayılanı ezmez.
+  const [questionType, setQuestionType] = useState<QuestionType>('mixed')
   const [assignmentId, setAssignmentId] = useState<string | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
 
@@ -286,8 +269,9 @@ function QuizPageContent() {
   const [answers, setAnswers] = useState<{ userAns: number; correct: boolean; awardedScore?: number; timeMs?: number }[]>([])
   // ── Adaptif Test Motoru (Faz 2) ──
   // chunkBoundary: sıradaki adaptif karar sınırı (null = standart akış).
-  // Aktif kişiselleştirmede ilk iki tanılayıcı sorudan sonra her yeni soru,
-  // son cevaplara göre tek tek üretilir. resolvedDifficulty: sunucunun
+  // Aktif kişiselleştirmede ilk iki tanılayıcı sorudan sonra üç adaylık
+  // doğrulanmış bir mikro-yedek hazırlanır. İlk aday hemen gösterilir,
+  // kalanlar aynı adaptif kararın yedeği olarak kullanılır. resolvedDifficulty: sunucunun
   // (mastery skoruna göre) seçtiği o anki zorluk — bir sonraki parça için
   // referans noktası. showIntervention/interventionInfo: aynı soru tipinde
   // art arda 2 yanlış yapıldığında gösterilen öğretici ara ekran.
@@ -334,14 +318,15 @@ function QuizPageContent() {
     if (adaptivePrefetchRef.current?.key === key) return
     const run = (async () => {
       const chunk1Answers = answersRef.current.slice(0, chunkBoundary)
-      const nextPolicy = nextQuestionPolicy(resolvedDifficulty, chunk1Answers, questions[current]?.type || questionType)
+      const nextPolicy = nextQuestionPolicy(resolvedDifficulty, chunk1Answers, questionType)
       const topic = customTopic.trim() || selectedTopic
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return { questions: [], nextPolicy }
+      const candidateCount = Math.min(3, Math.max(1, qCount - questions.length))
       const res = await fetch('/api/generate-quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ topic, questionCount: 1, difficulty: nextPolicy.difficulty, language: currentLang, questionType: nextPolicy.questionType, adaptiveSupport: nextPolicy.supportLevel, includeVisuals, continueSessionId: sessionId, subject: selectedSubject || undefined, excludeQuestionTexts: questions.slice(0, chunkBoundary).map(q => q.q).filter(Boolean) }),
+        body: JSON.stringify({ topic, questionCount: candidateCount, difficulty: nextPolicy.difficulty, language: currentLang, questionType, adaptiveSupport: nextPolicy.supportLevel, includeVisuals, continueSessionId: sessionId, adaptiveCandidateBatch: true, subject: selectedSubject || undefined, excludeQuestionTexts: questions.map(q => q.q).filter(Boolean) }),
       })
       const data = await res.json().catch(() => ({}))
       return { questions: res.ok && Array.isArray(data.questions) ? data.questions : [], nextPolicy }
@@ -535,13 +520,30 @@ function QuizPageContent() {
   const hasFiles = uploadedFiles.length > 0
 
   // ── HATA MESAJLARI ──
-  function getErrorInfo(errorCode: string, status?: number): {code: string; title: string; desc: string; retry: boolean} {
+  function getErrorInfo(errorCode: string, status?: number, reason?: string, serverMessage?: string): {code: string; title: string; desc: string; retry: boolean} {
     if (status === 429 || errorCode === 'daily_limit_reached') return { code: 'daily_limit', title: "⏰ Günlük limit doldu", desc: "Bugünkü test hakkını kullandın. Yarın yenilenir ya da Altın'a geçerek sınırsız test çöz.", retry: false }
     if (errorCode === 'limit_reached') return { code: 'monthly_limit', title: "📚 Aylık limit doldu", desc: "Bu ay için test hakkın bitti. Sınırsız test için Altın'a geç.", retry: false }
     if (errorCode === 'out_of_curriculum') return { code: 'curriculum', title: "📖 Müfredat dışı konu", desc: "Bu konu MEB müfredatında yer almıyor. Başka bir konu dene ya da Altın ile tüm konulara eriş.", retry: false }
     if (errorCode === 'pdf_too_long') return { code: 'pdf', title: "📄 PDF çok uzun", desc: "PDF dosyan 100 sayfadan fazla. Daha kısa bir bölüm yükle ya da metni kopyalayıp yapıştır.", retry: false }
     if (errorCode === 'pdf_image_only') return { code: 'pdf', title: "🖼️ PDF okunemiyor", desc: "Bu PDF taranmış görsel içeriyor, metin çıkarılamıyor. Word veya metin dosyası yükle.", retry: false }
     if (errorCode === 'insufficient_questions') return { code: 'insufficient_questions', title: "🧩 Sorular tamamlanamadı", desc: "Kalite kontrolünden geçen soru sayısı yeterli değildi. Test kaydedilmedi; birkaç saniye sonra yeniden deneyebilirsin.", retry: true }
+    if (errorCode === 'quality_policy_failed') {
+      const titles: Record<string, string> = {
+        canonical_objectives_unavailable: '📚 Kazanım bulunamadı',
+        independent_verification: '🧪 Sorular doğrulanamadı',
+        verification_evidence_missing: '🧪 Kontrol kanıtı eksik',
+        difficulty_distribution: '📊 Zorluk dağılımı kurulamadı',
+        objective_mapping: '🎯 Kazanım eşleşmesi kurulamadı',
+        visual_quota: '🖼️ Görsel kotası tamamlanamadı',
+        generation_or_validation_unavailable: '⏱️ Kalite kontrolü tamamlanamadı',
+      }
+      return {
+        code: reason || 'quality_policy',
+        title: titles[reason || ''] || '🧪 Kalite kontrolü tamamlanamadı',
+        desc: serverMessage || 'Test kalite kurallarının tamamını karşılamadı ve kaydedilmedi. Lütfen yeniden dene.',
+        retry: true,
+      }
+    }
     if (status === 503 || status === 502 || status === 504) return { code: 'server', title: "🔧 Sunucu meşgul", desc: "Sunucularımız şu an yoğun. Birkaç saniye bekleyip tekrar dene.", retry: true }
     if (errorCode?.includes('invalid response')) return { code: 'ai_error', title: "🤖 AI yanıt hatası", desc: "Yapay zeka bu konu için geçerli soru üretemedi. Farklı bir konu veya daha kısa içerik dene.", retry: true }
     if (errorCode?.includes('timeout') || errorCode?.includes('abort')) return { code: 'timeout', title: "⏱️ Zaman aşımı", desc: "Sorular üretilirken zaman doldu. Daha az soru sayısı seç veya tekrar dene.", retry: true }
@@ -621,7 +623,7 @@ function QuizPageContent() {
           setTimeout(() => setScreen('topic'), 8000)
           return
         }
-        const errInfo = getErrorInfo(data.error || 'unknown', res.status)
+        const errInfo = getErrorInfo(data.error || 'unknown', res.status, data.reason, data.message)
         setQuizError(errInfo)
         setScreen('error')
         clearInterval(iv)
@@ -931,12 +933,17 @@ function QuizPageContent() {
       setFetchingNextChunk(true)
       try {
         const chunk1Answers = answersRef.current.slice(0, chunkBoundary)
-        const nextPolicy = nextQuestionPolicy(resolvedDifficulty, chunk1Answers, questions[current]?.type || questionType)
+        const nextPolicy = nextQuestionPolicy(resolvedDifficulty, chunk1Answers, questionType)
         const nextDiff = nextPolicy.difficulty
-        const nextQuestionType = nextPolicy.questionType
-        const excludeTexts = questions.slice(0, chunkBoundary).map(q => q.q).filter(Boolean)
+        // Adaptif motor zorluk ve destek seviyesini değiştirebilir; öğrencinin
+        // açık soru tipi seçimini değiştiremez. Karma seçimi de Karma kalır.
+        const nextQuestionType = questionType
+        const excludeTexts = questions.map(q => q.q).filter(Boolean)
         const topic = customTopic.trim() || selectedTopic
-        const targetSecondChunk = 1
+        // Tek adayın reddedilmesi artık bütün testi kesmez. Kalan soru
+        // sayısına göre en fazla üç doğrulanmış aday istenir; ilk soru hemen,
+        // diğerleri takip eden adımlarda yedek olarak tüketilir.
+        const targetSecondChunk = Math.min(3, Math.max(1, qCount - questions.length))
         const { data: { session } } = await supabase.auth.getSession()
         const prefetchKey = `${sessionId}:${chunkBoundary}:${answersRef.current.length}`
         const prefetched = adaptivePrefetchRef.current?.key === prefetchKey
@@ -954,6 +961,7 @@ function QuizPageContent() {
             adaptiveSupport: nextPolicy.supportLevel,
             includeVisuals,
             continueSessionId: sessionId,
+            adaptiveCandidateBatch: true,
             subject: selectedSubject || undefined,
             excludeQuestionTexts: excludeTexts,
           }),
@@ -971,7 +979,13 @@ function QuizPageContent() {
         // biter" diye pes ediliyordu. Artık aynı sessionId'ye (kota tekrar
         // SAYILMAZ) en fazla 2 ek istek daha atılıp hedefe (targetSecondChunk)
         // ulaşılmaya çalışılıyor.
-        if (secondChunk.length < targetSecondChunk && sessionId) {
+        // Üç aday üretmek bir tampon hedefidir; öğrencinin ilerlemesi için
+        // üçünün de gelmesi gerekmez. En az bir doğrulanmış yedek geldiyse
+        // onu hemen kullan. Aksi halde, yalnızca sıfır sonuçta top-up dene.
+        // Önceki davranışta 2/3 güvenli soru geldikten sonra üçüncü aday için
+        // yapılan ek istekler tekrar filtresine takılıp mevcut 2 soruyu da
+        // kullanıcıya göstermeden akışı kırıyordu.
+        if (secondChunk.length === 0 && sessionId) {
           let topupAttempts = 0
           while (secondChunk.length < targetSecondChunk && topupAttempts < 2) {
             topupAttempts++
@@ -982,6 +996,7 @@ function QuizPageContent() {
               sessionId, missing: targetSecondChunk - secondChunk.length,
               existingTexts: [...excludeTexts, ...secondChunk.map((q: any) => q.q).filter(Boolean)],
               accessToken: freshSession?.access_token,
+              adaptiveCandidateBatch: true,
             })
             if (extra.length === 0) break
             secondChunk = [...secondChunk, ...extra].slice(0, targetSecondChunk)
@@ -997,14 +1012,14 @@ function QuizPageContent() {
         } else {
           setChunkBoundary(null)
           setFetchingNextChunk(false)
-          setQuizError({ code: 'adaptive_next_failed', title: 'Sonraki soru hazırlanamadı', desc: 'Bağlantıyı kontrol edip testi yeniden başlatabilirsin.', retry: true })
+          setQuizError({ code: 'adaptive_next_failed', title: 'Yeni sorular kalite kontrolünden geçemedi', desc: 'Hazırlanan yedek adayların hiçbiri kalite kontrolünü geçemedi. Birkaç saniye sonra yeniden deneyebilirsin.', retry: true })
           setScreen('error')
           return
         }
       } catch {
         setFetchingNextChunk(false)
         setChunkBoundary(null)
-        setQuizError({ code: 'adaptive_next_failed', title: 'Sonraki soru hazırlanamadı', desc: 'Bağlantıyı kontrol edip testi yeniden başlatabilirsin.', retry: true })
+        setQuizError({ code: 'adaptive_next_failed', title: 'Yeni sorular kalite kontrolünden geçemedi', desc: 'Yedek soru hazırlanırken doğrulama tamamlanamadı. Birkaç saniye sonra yeniden deneyebilirsin.', retry: true })
         setScreen('error')
         return
       }
@@ -1382,7 +1397,7 @@ function QuizPageContent() {
         <main style={{ maxWidth: '520px', margin: '0 auto', padding: '2rem 1rem', textAlign: 'center' }}>
           <div style={{ padding: '48px 24px', borderRadius: '16px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
             <div style={{ fontSize: '32px', marginBottom: '12px' }}>⚡</div>
-            <div style={{ fontSize: '14px', color: 'var(--text2)' }}>Sıradaki sorular hazırlanıyor...</div>
+            <div style={{ fontSize: '14px', color: 'var(--text2)' }}>Yeni soru kalite kontrolünden geçiyor; yedek sorular hazırlanıyor...</div>
           </div>
         </main>
       )

@@ -58,10 +58,6 @@ export async function POST(req: NextRequest) {
     if (!sessionId || !studentAnswer?.trim()) {
       return NextResponse.json({ error: 'Cevap boş olamaz.' }, { status: 400 })
     }
-    if (studentAnswer.trim().length < 50) {
-      return NextResponse.json({ error: 'Cevap çok kısa — en az 50 karakter olmalı.' }, { status: 400 })
-    }
-
     // Rubrigi ve soruyu SUNUCUDAN oku - istemciden gelen rubrige guvenilmez
     // (aksi halde biri devtools'tan rubrigi degistirip tam puan alabilirdi)
     const { data: session, error: fetchErr } = await supabase
@@ -73,12 +69,30 @@ export async function POST(req: NextRequest) {
 
     if (fetchErr || !session) return NextResponse.json({ error: 'Soru bulunamadı.' }, { status: 404 })
 
+    // Ortaokul öğrencisinin tek ve doğru bir cümlesini sırf 50 karakteri
+    // geçmediği için reddetme. Alt sınır yalnızca boş/anlamsız gönderimleri
+    // ayırır; asıl yeterlilik aşağıdaki yaşa uygun rubrikle değerlendirilir.
+    const gradeKey = String(session.grade || '').toLocaleLowerCase('tr')
+    const minimumAnswerLength = gradeKey.includes('ilkokul') ? 8 : gradeKey.includes('lise') ? 20 : 12
+    if (studentAnswer.trim().length < minimumAnswerLength) {
+      return NextResponse.json({ error: `Cevabını biraz daha açık yazmalısın — en az ${minimumAnswerLength} karakter olmalı.` }, { status: 400 })
+    }
+
     const rubricText = (session.rubric as any[])
       .map((r, i) => `${i + 1}. ${r.criterion} (${r.maxPoints} puan): ${r.description}`)
       .join('\n')
 
     const prompt = `Sen MEB'in "Açık Uçlu Soruların Puanlanması Kursu" eğitiminden geçmiş, dereceli puanlama anahtarına (rubrik) göre değerlendirme yapan deneyimli bir öğretmensin.
 Puanlama ilkesi: puanlar görüş bildiren değil, DELİLLERLE DESTEKLENEN yanıtlara verilir. Kısmi puan vermekten çekinme - bir kriterin bir kısmı karşılanmışsa o kısmına denk gelen puanı ver.
+
+YAŞA UYGUN PUANLAMA KURALI — EN ÖNCELİKLİ KURAL:
+- Bu öğrenci ${session.grade || 'ortaokul'} seviyesindedir; cevabı bir uzman, akademisyen veya öğretmen metni gibi yazmasını bekleme.
+- Ortaokulda 1-3 kısa cümle, lisede 2-4 açık cümle; sorunun istediği doğru düşünceyi içeriyorsa tam puan alabilir.
+- Rubrikteki teknik sözcükleri birebir kullanma şartı arama. Aynı doğru kavramı gündelik, basit veya eş anlamlı sözcüklerle anlatan cevabı kabul et.
+- Cevap özlü diye puan kırma; yalnız soruda açıkça istenen bir unsur gerçekten yoksa puan kır.
+- Türkçe/yabancı dil dersi dışında yazım, noktalama, anlatım veya profesyonel üslup kusurlarını puanlama. Anlam doğruysa içeriğe puan ver.
+- Öğrenciden senaryoda veya soruda istenmeyen ek bilgi, uzun gerekçe, kaynak adı, bilimsel terminoloji ya da yetişkin düzeyi ayrıntı bekleme.
+- Doğru sonuca ulaşan fakat açıklaması sınırlı cevapta, doğru sonuç ve doğru düşünce için güçlü kısmi puan ver; küçük ifade kusuru sıfır puan nedeni değildir.
 
 SENARYO: ${session.scenario}
 SORU: ${session.question}

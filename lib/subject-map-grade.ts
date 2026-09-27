@@ -92,7 +92,10 @@ export const SUBJECT_MAP_BY_GRADE: Record<string, Record<string, string[]>> = {
     'İngilizce': ['Present tenses review', 'Reading strategies', 'Basic academic vocabulary'],
   },
   '10': {
-    'Matematik': ['Polinomlar', 'Rasyonel ifadeler', 'Fonksiyonlara giriş', 'Birinci dereceden fonksiyonlar', 'Trigonometriye giriş'],
+    // 2026 MEB kanonik konu adları. Legacy labels remain resolvable through
+    // reviewed aliases in learning_topic_aliases, so bookmarks/old links do
+    // not silently lose their objective mapping.
+    'Matematik': ['Geometrik Şekiller', 'İstatistiksel Araştırma Süreci', 'Sayılar', 'Nicelikler Ve Değişimler', 'Sayma, Algoritma Ve Bilişim', 'Analitik İnceleme', 'Veriden Olasılığa'],
     'Fizik': ['İtme ve momentum', 'Elektrostatik', 'Elektrik akımı', 'Manyetizma', 'Dalgalar'],
     'Kimya': ['Maddenin halleri', 'Gaz kanunları', 'Çözeltiler ve derişim', 'Asit ve bazlar'],
     'Biyoloji': ['Hücre bölünmeleri (mitoz-mayoz)', 'Kalıtımın temel ilkeleri', 'Bitki biyolojisi', 'Ekosistem ekolojisi'],

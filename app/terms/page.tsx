@@ -50,7 +50,7 @@ export default function TermsPage() {
           },
           {
             title: '5. Abonelik ve Ödeme',
-            content: 'Platform Gümüş, Altın ve Platin olmak üzere üç ücretli plan sunar. Gümüş planda aylık 30 test hakkı bulunmaktadır. Altın ve Platin planlar sınırsız test hakkı sunar. Tüm planlar aylık veya yıllık ücrete tabidir. Ödeme işlemleri güvenli ödeme altyapısı üzerinden gerçekleştirilir. Abonelik iptal edilmediği sürece otomatik olarak yenilenir. İptal işlemleri bir sonraki fatura döneminden önce yapılmalıdır. Tamamlanan ödemeler için iade yapılmamaktadır.',
+            content: 'Platform Gümüş, Altın ve Platin olmak üzere üç ücretli yıllık plan sunar. Gümüş planda aylık 30 test hakkı bulunmaktadır. Altın ve Platin planlar sınırsız test hakkı sunar. Üyelik ücretleri yıllık olarak tahsil edilir. Ödeme işlemleri güvenli ödeme altyapısı üzerinden gerçekleştirilir. Yenileme koşulları satın alma sırasında belirtilir. İptal ve iade işlemleri yürürlükteki mesafeli satış ve tüketici mevzuatına tabidir.',
           },
           {
             title: '6. Davet ve Referral Sistemi',

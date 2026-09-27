@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Tüm alanlar zorunlu' }, { status: 400 })
     }
 
-    let rawText = rawTextInput || ''
+    const rawText = rawTextInput || ''
     let fileUrl: string | null = null
     let fileBytesForExtract: Buffer | null = null
     let fileExt: string | undefined
@@ -212,9 +212,10 @@ export async function POST(req: NextRequest) {
       sourceType: file ? 'pdf' : 'text',
       title, grade, subject, unit, level,
     })
-  } catch (e: any) {
-    console.error('[meb-upload] error:', e.message)
-    return NextResponse.json({ error: e.message }, { status: 500 })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Beklenmeyen yükleme hatası'
+    console.error('[meb-upload] error:', message)
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -251,7 +252,7 @@ export async function GET(req: NextRequest) {
     if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     const { data, error } = await adminDb
       .from('meb_resources')
-      .select('id, title, grade, subject, unit, level, source_type, created_at, raw_text')
+      .select('id, title, grade, subject, unit, level, source_type, file_url, created_at, raw_text')
       .eq('id', id).single()
     if (error || !data) return NextResponse.json({ error: 'Bulunamadı' }, { status: 404 })
     return NextResponse.json({ resource: { ...data, char_count: data.raw_text?.length || 0 } })
@@ -290,6 +291,50 @@ export async function GET(req: NextRequest) {
   }))
 
   return NextResponse.json({ resources })
+}
+
+// Admin-only edit. The original uploaded file is preserved; the editable text
+// is the extracted/corrected transcript used by search and question context.
+export async function PUT(req: NextRequest) {
+  const user = await getAdminUser()
+  if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const body = await req.json().catch(() => null)
+  const resourceId = typeof body?.id === 'string' ? body.id : ''
+  const title = typeof body?.title === 'string' ? body.title.trim() : ''
+  const grade = typeof body?.grade === 'string' ? body.grade.trim() : ''
+  const subject = typeof body?.subject === 'string' ? body.subject.trim() : ''
+  const unit = typeof body?.unit === 'string' ? body.unit.trim() : ''
+  const level = typeof body?.level === 'string' ? body.level.trim() : ''
+  const rawText = typeof body?.raw_text === 'string' ? body.raw_text : ''
+
+  if (!resourceId || title.length < 2 || title.length > 300 || !grade || !subject || !unit || !level) {
+    return NextResponse.json({ error: 'Belge kimliği, başlık, seviye, sınıf, ders ve ünite zorunludur.' }, { status: 400 })
+  }
+  if (!rawText.trim() || rawText.length > 500_000) {
+    return NextResponse.json({ error: 'Belge metni boş olamaz ve 500.000 karakteri aşamaz.' }, { status: 400 })
+  }
+
+  const chunks = chunkText(rawText)
+  if (!chunks.length || chunks.length > 500) {
+    return NextResponse.json({ error: 'Belge metni aranabilir parçalara ayrılamadı.' }, { status: 400 })
+  }
+  const { data, error } = await adminDb.rpc('update_meb_resource_document_v1', {
+    p_resource_id: resourceId,
+    p_title: title,
+    p_grade: grade,
+    p_subject: subject,
+    p_unit: unit,
+    p_level: level,
+    p_raw_text: rawText,
+    p_chunks: chunks,
+  })
+  if (error) {
+    const status = /not found/i.test(error.message) ? 404 : 400
+    return NextResponse.json({ error: status === 404 ? 'Kaynak bulunamadı.' : error.message }, { status })
+  }
+
+  return NextResponse.json({ success: true, chunks: data, char_count: rawText.length })
 }
 
 // Kaynak sil

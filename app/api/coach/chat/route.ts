@@ -21,6 +21,7 @@ import { getIdentityBySupabaseId } from '@/lib/identity/client'
 import { buildCoachContext, CoachContext } from '@/lib/coach-context'
 import { generateCoachReply, generateCoachOpening, getCoachDailyMessageLimit } from '@/lib/coach-generation'
 import { isPaidCoachPlan, COACH_PLAN_REQUIRED_MESSAGE } from '@/lib/coach-access'
+import { requireAgentCapability, requireOwnStudentScope, writeAgentDecisionAudit } from '@/lib/agent-security-policy'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -77,10 +78,14 @@ async function loadCoachContext(supabase: any, userId: string): Promise<CoachCon
 }
 
 export async function GET(req: NextRequest) {
+  const agent = 'student-coach-v1' as const
+  requireAgentCapability(agent, 'persist_own_conversation')
+  requireAgentCapability(agent, 'return_user_facing_output')
   const supabase = authClient(req)
   if (!supabase) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  requireOwnStudentScope(agent, user.id, user.id)
 
   // Koç sadece ücretli üyelere açık — ücretsiz (free) planda hiç
   // konuşma oluşturulmuyor, hiç Claude çağrısı yapılmıyor.
@@ -109,6 +114,7 @@ export async function GET(req: NextRequest) {
     if (!messages || messages.length === 0) {
       const ctx = await loadCoachContext(supabaseAdmin, user.id)
       const opening = await generateCoachOpening(ctx, user.id, 'coach-chat-opening')
+      await writeAgentDecisionAudit(supabaseAdmin, { actor_id: user.id, agent_name: agent, policy_version: 'coach-boundary-v1', input_summary: { event: 'opening', context_topic_count: ctx.history.topics.length }, decision_summary: { response_length: opening.text.length, action_type: opening.action?.type ?? null } })
       const { data: inserted, error } = await supabaseAdmin
         .from('coach_messages')
         .insert({ conversation_id: conversationId, role: 'assistant', content: opening.text, action: opening.action })
@@ -127,10 +133,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const agent = 'student-coach-v1' as const
+  requireAgentCapability(agent, 'persist_own_conversation')
+  requireAgentCapability(agent, 'return_user_facing_output')
   const supabase = authClient(req)
   if (!supabase) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  requireOwnStudentScope(agent, user.id, user.id)
 
   const body = await req.json().catch(() => ({}))
   const userMessage = typeof body.message === 'string' ? body.message.trim() : ''
@@ -186,6 +196,8 @@ export async function POST(req: NextRequest) {
     const history = (historyDesc ?? []).slice().reverse()
 
     const reply = await generateCoachReply(ctx, history as { role: 'user' | 'assistant'; content: string }[], user.id, 'coach-chat')
+
+    await writeAgentDecisionAudit(supabaseAdmin, { actor_id: user.id, agent_name: agent, policy_version: 'coach-boundary-v1', input_summary: { event: 'reply', history_message_count: history.length, context_topic_count: ctx.history.topics.length }, decision_summary: { response_length: reply.text.length, action_type: reply.action?.type ?? null } })
 
     const { data: inserted, error: insertAssistantErr } = await supabaseAdmin
       .from('coach_messages')

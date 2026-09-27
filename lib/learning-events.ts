@@ -31,6 +31,18 @@ export async function recordQuizLearningEvents(
   }
 
   const row = Array.isArray(data) ? data[0] : data
+  // Transfer checks are delayed by event count and kept separate from
+  // ordinary mastery. A scheduling failure must never make quiz completion
+  // fail; the queue can be rebuilt idempotently later.
+  const { error: transferScheduleError } = await supabase.rpc('schedule_transfer_checks_v1', {
+    p_student_id: studentId,
+    p_session_id: sessionId,
+    p_min_delay: 10,
+    p_max_checks: 5,
+  })
+  if (transferScheduleError && transferScheduleError.code !== 'PGRST202') {
+    console.error('[transfer-check] scheduling failed:', transferScheduleError.message)
+  }
   const { data: objectiveMasteryData, error: objectiveMasteryError } = await supabase.rpc(
     'refresh_student_objective_mastery_v1',
     { p_student_id: studentId, p_session_id: sessionId }

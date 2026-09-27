@@ -1,0 +1,83 @@
+openapi: 3.1.0
+info:
+  title: Pratium Partner Integration API
+  version: 1.0.0
+  description: Initial read-only API. Only the institution and pseudonymous students endpoints are implemented in this release.
+servers:
+  - url: https://pratium.com/api/integrations/v1
+security:
+  - partnerKey: []
+paths:
+  /institution:
+    get:
+      summary: Read the institution bound to this integration key
+      description: Requires the institution:read scope.
+      security:
+        - partnerKey: []
+      responses:
+        '200':
+          description: Institution integration profile
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    type: object
+                    required: [institution_ref, name]
+                    properties:
+                      institution_ref: { type: string, description: Opaque institution reference }
+                      name: { type: string }
+                  request_id: { type: string, format: uuid }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /students:
+    get:
+      summary: Read the pseudonymous student roster
+      description: Requires the students:read:pseudonymous scope.
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Student records without direct identity fields
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required: [student_ref, grade, status, membership_since]
+                      properties:
+                        student_ref: { type: string, description: Stable only for this integration key }
+                        grade: { type: [string, 'null'] }
+                        status: { type: string, enum: [active] }
+                        membership_since: { type: [string, 'null'], format: date-time }
+                  next_cursor: { type: [string, 'null'] }
+                  request_id: { type: string, format: uuid }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          description: Invalid pagination cursor
+components:
+  securitySchemes:
+    partnerKey:
+      type: http
+      scheme: bearer
+      bearerFormat: PratiumIntegrationKey
+      description: Institution-specific key created from the Pratium institution integrations page.
+  responses:
+    Unauthorized:
+      description: Invalid, expired, or revoked integration key
+    Forbidden:
+      description: Missing scope or tenant authorization
+

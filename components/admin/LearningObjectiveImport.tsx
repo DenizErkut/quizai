@@ -59,7 +59,10 @@ const example = `[
 
 const mathematicsGrade5Source = 'MEB Türkiye Yüzyılı Maarif Modeli · Ortaokul Matematik Dersi Öğretim Programı (2024) · https://tymm.meb.gov.tr/ogretim-programlari/ortaokul-matematik-dersi/6'
 
-export default function LearningObjectiveImport() {
+export default function LearningObjectiveImport({
+  openBatchId,
+  onBatchOpened,
+}: { openBatchId?: string | null; onBatchOpened?: () => void }) {
   const [sourceType, setSourceType] = useState('meb')
   const [sourceReference, setSourceReference] = useState('')
   const [payload, setPayload] = useState(example)
@@ -105,10 +108,22 @@ export default function LearningObjectiveImport() {
       setEdits(Object.fromEntries((data.items || []).map((item: ImportItem) => [item.id, {
         title: item.title || '', topicNodeId: item.selected_topic_node_id || '', notes: item.review_notes || '',
       }])))
+      return true
     } catch (error) {
       setMessage(`❌ ${error instanceof Error ? error.message : 'Beklenmeyen hata'}`)
+      return false
     } finally { setBusy(false) }
   }
+
+  useEffect(() => {
+    if (!openBatchId) return
+    const timer = window.setTimeout(() => {
+      void loadBatch(openBatchId).then(loaded => {
+        if (loaded) setMessage('✅ Belge deposundan çıkarılan kazanım taslağı yüklendi. Satırları doğrulamadan yayımlamayın.')
+      }).finally(() => onBatchOpened?.())
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [openBatchId, onBatchOpened])
 
   async function reviewItem(item: ImportItem, action: 'approve' | 'reject' | 'reopen' | 'publish') {
     const edit = edits[item.id] || { title: item.title, topicNodeId: '', notes: '' }

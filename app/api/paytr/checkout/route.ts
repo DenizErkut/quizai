@@ -45,6 +45,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const planType = resolveBillingPlanKey(body.plan)
   if (!planType) return NextResponse.json({ error: 'Geçersiz plan.' }, { status: 400 })
+  if (!planType.endsWith('_yearly')) {
+    return NextResponse.json({ error: 'Satın alma işlemleri şu anda yalnızca yıllık planlar için açık.' }, { status: 400 })
+  }
   const plan = BILLING_PLANS[planType]
 
   const identity = await getIdentityBySupabaseId(user.id)
@@ -161,7 +164,7 @@ export async function POST(req: NextRequest) {
     // subscriptions satırını 'pending' olarak aç — bildirim (callback) bu
     // satırı merchant_oid'den bulup aktive edecek. seller/discount izi satın
     // alma anındaki anlık görüntü olarak saklanıyor (Iyzico route'uyla aynı gerekçe).
-    await supabaseAdmin.from('subscriptions').insert({
+    const { error: subscriptionInsertError } = await supabaseAdmin.from('subscriptions').insert({
       user_id: user.id,
       plan: planType,
       status: 'pending',
@@ -171,6 +174,15 @@ export async function POST(req: NextRequest) {
       discount_rate: discountRate,
       price_paid: finalPrice,
     })
+
+    if (subscriptionInsertError) {
+      console.error('[paytr checkout] pending subscription kaydı oluşturulamadı:', {
+        merchantOid,
+        userId: user.id,
+        error: subscriptionInsertError.message,
+      })
+      return NextResponse.json({ error: 'Ödeme hazırlığı tamamlanamadı. Lütfen tekrar deneyin.' }, { status: 500 })
+    }
 
     return NextResponse.json({ token: data.token, merchantOid })
   } catch (e) {

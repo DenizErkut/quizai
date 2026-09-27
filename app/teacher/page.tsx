@@ -8,6 +8,7 @@ import ContentIssueReporter from '@/components/ContentIssueReporter'
 import LearningInsights from '@/components/teacher/LearningInsights'
 import LearningRiskOverview from '@/components/LearningRiskOverview'
 import AgentApprovalQueue from '@/components/teacher/AgentApprovalQueue'
+import TeacherInstitutionMemberships from '@/components/teacher/TeacherInstitutionMemberships'
 
 export default function TeacherDashboard() {
   const [teacher, setTeacher] = useState<any>(null)
@@ -15,7 +16,7 @@ export default function TeacherDashboard() {
   const [assignments, setAssignments] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'students' | 'assign' | 'performance' | 'notify' | 'report'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'students' | 'assign' | 'performance' | 'notify' | 'report' | 'institutions'>('dashboard')
   const [selectedClass, setSelectedClass] = useState<string>('all')
   const [notifyClass, setNotifyClass] = useState<string>('')
   const [notifyMsg, setNotifyMsg] = useState('')
@@ -182,6 +183,7 @@ export default function TeacherDashboard() {
             { key: 'performance', label: '📈 Analiz' },
             { key: 'notify', label: '🔔 Bildirim' },
             { key: 'report', label: '🔧 Hata Bildir' },
+            { key: 'institutions', label: '🏢 Kurumlar' },
             { key: 'reports', label: '📋 RAPORLAR', href: '/teacher/reports' },
             { key: 'import', label: '📥 Not İçe Aktar', href: '/teacher/import-grades' },
             { key: 'live', label: '🎯 Canlı Test', href: '/teacher/live' },
@@ -211,6 +213,8 @@ export default function TeacherDashboard() {
       </nav>
 
       <div style={{ maxWidth: '960px', margin: '0 auto', padding: '1.5rem', paddingBottom: '5rem' }}>
+
+        {activeTab === 'institutions' && <TeacherInstitutionMemberships />}
 
         {/* DASHBOARD */}
         {activeTab === 'dashboard' && (

@@ -10,6 +10,8 @@ interface ReferralUser {
   name: string
   grade: string
   created_at: string
+  qualified_at: string | null
+  rewarded_months: number | null
 }
 
 interface Profile {
@@ -38,7 +40,7 @@ export default function ReferralPage() {
           .select('plan, plan_expires_at, referral_code, monthly_test_count')
           .eq('id', user.id).single(),
         supabase.from('referrals')
-          .select('referred_id, created_at, profiles!referrals_referred_id_fkey(grade)')
+          .select('referred_id, created_at, qualified_at, rewarded_months, profiles!referrals_referred_id_fkey(grade)')
           .eq('referrer_id', user.id)
           .order('created_at', { ascending: false }),
       ])
@@ -51,6 +53,8 @@ export default function ReferralPage() {
         name: refIdentities[r.referred_id]?.full_name || 'Kullanıcı',
         grade: r.profiles?.grade || '',
         created_at: r.created_at,
+        qualified_at: r.qualified_at,
+        rewarded_months: r.rewarded_months,
       })))
       setLoading(false)
     }
@@ -83,8 +87,9 @@ export default function ReferralPage() {
   )
 
   const totalReferrals = referrals.length
-  const currentProgress = totalReferrals % 10
-  const completedCycles = Math.floor(totalReferrals / 10)
+  const qualifiedReferrals = referrals.filter(referral => referral.qualified_at).length
+  const currentProgress = qualifiedReferrals % 10
+  const completedCycles = Math.floor(qualifiedReferrals / 10)
   const nextMilestone = (completedCycles + 1) * 10
   const progressPct = (currentProgress / 10) * 100
   const referralLink = `${typeof window !== 'undefined' ? window.location.origin : 'https://quizai-coral.vercel.app'}/register?ref=${profile?.referral_code}`
@@ -100,8 +105,8 @@ export default function ReferralPage() {
             Arkadaşlarını davet et
           </h1>
           <p style={{ color: 'var(--text2)', fontSize: '14px', lineHeight: 1.6 }}>
-            Her 10 kişiyi davet ettiğinde <strong>1 yıl ücretsiz Altın</strong> kazanırsın.
-            Altın üyeliğin birikiyor — ne kadar çok davet, o kadar çok Altın!
+            Her 10 ücretli davette, eşiği tamamlayan arkadaşının satın aldığı süre kadar Altın kazanırsın: aylık üyelikte 1 ay, yıllık üyelikte 1 yıl.
+            Ücretsiz kayıtlar ödül hesabına dahil edilmez.
           </p>
         </div>
 
@@ -115,7 +120,7 @@ export default function ReferralPage() {
                 <span style={{ fontSize: '18px', color: 'var(--text2)' }}>/10</span>
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '4px' }}>
-                {10 - currentProgress} kişi daha → 1 yıl Altın
+                {10 - currentProgress} ücretli üyelik daha → ödül
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -125,7 +130,7 @@ export default function ReferralPage() {
                 </div>
               )}
               <div style={{ fontSize: '13px', color: 'var(--text2)' }}>
-                Toplam {totalReferrals} davet
+                {qualifiedReferrals} ücretli üyelik tamamlandı · {totalReferrals - qualifiedReferrals} bekliyor
               </div>
               {profile?.plan === 'premium' && profile.plan_expires_at && (
                 <div style={{ fontSize: '11px', color: 'var(--green)', marginTop: '4px' }}>
@@ -141,8 +146,8 @@ export default function ReferralPage() {
               <div className="progress-fill" style={{ width: `${progressPct}%` }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '11px', color: 'var(--text3)' }}>
-              <span>{currentProgress} davet</span>
-              <span>{nextMilestone} davette 1 yıl premium</span>
+              <span>{currentProgress} ücretli üyelik</span>
+              <span>{nextMilestone} ücretli üyelikte ödül · süre satın alınan plana bağlı</span>
             </div>
           </div>
 
@@ -151,17 +156,17 @@ export default function ReferralPage() {
             {[10, 20, 30, 50].map(milestone => (
               <div key={milestone} style={{
                 flex: 1, padding: '8px', borderRadius: '8px', textAlign: 'center',
-                background: totalReferrals >= milestone ? 'var(--green-bg)' : 'var(--bg2)',
-                border: `1px solid ${totalReferrals >= milestone ? 'rgba(22,163,74,0.3)' : 'var(--border)'}`,
+                background: qualifiedReferrals >= milestone ? 'var(--green-bg)' : 'var(--bg2)',
+                border: `1px solid ${qualifiedReferrals >= milestone ? 'rgba(22,163,74,0.3)' : 'var(--border)'}`,
               }}>
                 <div style={{ fontSize: '14px', marginBottom: '2px' }}>
-                  {totalReferrals >= milestone ? '✅' : '🎯'}
+                  {qualifiedReferrals >= milestone ? '✅' : '🎯'}
                 </div>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: totalReferrals >= milestone ? 'var(--green)' : 'var(--text3)' }}>
-                  {milestone} davet
+                <div style={{ fontSize: '11px', fontWeight: 600, color: qualifiedReferrals >= milestone ? 'var(--green)' : 'var(--text3)' }}>
+                  {milestone} ücretli
                 </div>
                 <div style={{ fontSize: '10px', color: 'var(--text3)' }}>
-                  {milestone / 10} yıl
+                  ödül
                 </div>
               </div>
             ))}
@@ -207,8 +212,8 @@ export default function ReferralPage() {
           </div>
           {[
             { icon: '🔗', title: 'Linki paylaş', desc: 'Davet linkini kopyala, WhatsApp, Instagram veya doğrudan arkadaşına gönder.' },
-            { icon: '👤', title: 'Arkadaşın kayıt olsun', desc: 'Linkten giren her kullanıcı senin davetinden kayıt olmuş sayılır.' },
-            { icon: '🎁', title: 'Her 10 davette ödül', desc: '10 kişi kayıt olduğunda 1 yıl ücretsiz premium otomatik eklenir. 20 davette 2 yıl, 30 davette 3 yıl!' },
+            { icon: '👤', title: 'Arkadaşın kayıt olsun', desc: 'Linkinden kayıt olan kişi davet listene eklenir; kayıt olmak tek başına ödül kazandırmaz.' },
+            { icon: '🎁', title: 'Her 10 ücretli üyelikte ödül', desc: '10 ücretli davet tamamlandığında, eşiği tamamlayan son davetin satın aldığı dönem kadar ücretsiz Altın verilir: aylık planda 1 ay, yıllık planda 1 yıl. Ücretsiz kayıtlar sayılmaz.' },
           ].map((step, i) => (
             <div key={i} style={{ display: 'flex', gap: '12px', padding: '12px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
               <div style={{ fontSize: '24px', flexShrink: 0 }}>{step.icon}</div>
@@ -237,8 +242,13 @@ export default function ReferralPage() {
                     <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{r.grade}</div>
                   </div>
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text3)' }}>
-                  {new Date(r.created_at).toLocaleDateString('tr-TR')}
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '11px', color: r.qualified_at ? 'var(--green)' : 'var(--text3)' }}>
+                    {r.rewarded_months ? `${r.rewarded_months} ay Altın ödülü kazanıldı` : r.qualified_at ? 'Ücretli üyelik tamamlandı' : 'Ücretli üyelik bekleniyor'}
+                  </div>
+                  <div style={{ fontSize: '10px', color: 'var(--text3)' }}>
+                    {new Date(r.created_at).toLocaleDateString('tr-TR')}
+                  </div>
                 </div>
               </div>
             ))}

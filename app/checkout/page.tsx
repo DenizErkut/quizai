@@ -5,17 +5,14 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { BILLING_PLANS, resolveBillingPlanKey, type BillingPlanKey } from '@/lib/subscription-plans'
 
-const BASE_PRICES = Object.fromEntries(Object.entries(BILLING_PLANS).map(([key, value]) => [key, value.price])) as Record<BillingPlanKey, number>
+type AnnualBillingPlanKey = Extract<BillingPlanKey, `${string}_yearly`>
+const BASE_PRICES: Record<AnnualBillingPlanKey, number> = {
+  silver_yearly: BILLING_PLANS.silver_yearly.price,
+  gold_yearly: BILLING_PLANS.gold_yearly.price,
+  platinum_yearly: BILLING_PLANS.platinum_yearly.price,
+}
 
-const PLANS: Record<BillingPlanKey, PlanDisplay> = {
-  silver_monthly: {
-    name: 'Aylık Gümüş',
-    price: '299',
-    period: 'ay',
-    badge: '',
-    color: '#94a3b8',
-    features: ['Ayda 30 test', '10 soru/test', 'Sınav simülasyonu (demo)', 'Temel soru tipleri', '6 dil'],
-  },
+const PLANS: Record<AnnualBillingPlanKey, PlanDisplay> = {
   silver_yearly: {
     name: 'Yıllık Gümüş',
     price: '2.490',
@@ -24,14 +21,6 @@ const PLANS: Record<BillingPlanKey, PlanDisplay> = {
     color: '#94a3b8',
     features: ['Ayda 30 test', '10 soru/test', 'Sınav simülasyonu (demo)', 'Temel soru tipleri', '6 dil'],
   },
-  gold_monthly: {
-    name: 'Aylık Altın',
-    price: '499',
-    period: 'ay',
-    badge: '',
-    color: '#2563eb',
-    features: ['Sınırsız test', '20 soru/test', 'Tüm soru tipleri', 'Dosya/görsel yükleme', '6 dil', 'Öncelikli destek'],
-  },
   gold_yearly: {
     name: 'Yıllık Altın',
     price: '4.490',
@@ -39,14 +28,6 @@ const PLANS: Record<BillingPlanKey, PlanDisplay> = {
     badge: '🏆 En popüler',
     color: '#2563eb',
     features: ['Sınırsız test', '20 soru/test', 'Tüm soru tipleri', 'Dosya/görsel yükleme', '6 dil', 'Öncelikli destek'],
-  },
-  platinum_monthly: {
-    name: 'Aylık Platin',
-    price: '2.399',
-    period: 'ay',
-    badge: '👑 Tüm özellikler',
-    color: '#0d9488',
-    features: ['Sınırsız günlük test', '20 soru/test', 'Tüm soru tipleri', 'Gelişmiş analiz', 'Sınırsız sınıf', '12× birebir koç', 'Telefon desteği'],
   },
   platinum_yearly: {
     name: 'Yıllık Platin',
@@ -76,8 +57,8 @@ interface PlanDisplay {
 // Bir satıcı indirimi varsa, PLANS'ın fiyat alanlarını indirimli hale
 // getirir ve originalPrice ekler (checkout ekranındaki üstü çizili fiyat
 // gösterimi zaten bu alanı destekliyordu, sadece hiç doldurulmuyordu).
-function applyDiscount(discountRate: number): Record<keyof typeof PLANS, PlanDisplay> {
-  const out = JSON.parse(JSON.stringify(PLANS)) as Record<keyof typeof PLANS, PlanDisplay>
+function applyDiscount(discountRate: number): Record<AnnualBillingPlanKey, PlanDisplay> {
+  const out = JSON.parse(JSON.stringify(PLANS)) as Record<AnnualBillingPlanKey, PlanDisplay>
   if (discountRate <= 0) return out
   ;(Object.keys(BASE_PRICES) as Array<keyof typeof BASE_PRICES>).forEach(key => {
     const base = BASE_PRICES[key]
@@ -186,9 +167,12 @@ function PaytrProcessingScreen({ oid }: { oid: string }) {
 function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [selectedPlan, setSelectedPlan] = useState<BillingPlanKey>(() =>
-    resolveBillingPlanKey(searchParams.get('plan')) ?? 'gold_yearly'
-  )
+  const [selectedPlan, setSelectedPlan] = useState<AnnualBillingPlanKey>(() => {
+    const requested = resolveBillingPlanKey(searchParams.get('plan'))
+    return requested === 'silver_yearly' || requested === 'gold_yearly' || requested === 'platinum_yearly'
+      ? requested
+      : 'gold_yearly'
+  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [paytrToken, setPaytrToken] = useState('')
@@ -410,8 +394,8 @@ function CheckoutContent() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '1.5rem' }} className="anim-up-1">
-              {(Object.entries(displayPlans) as [string, PlanDisplay][]).map(([key, plan]) => (
-                <button key={key} onClick={() => setSelectedPlan(key as BillingPlanKey)}
+            {(Object.entries(displayPlans) as [AnnualBillingPlanKey, PlanDisplay][]).map(([key, plan]) => (
+                <button key={key} onClick={() => setSelectedPlan(key)}
                   style={{
                     padding: '1.25rem', borderRadius: '14px', textAlign: 'left',
                     border: `2px solid ${selectedPlan === key ? 'var(--accent)' : 'var(--border)'}`,

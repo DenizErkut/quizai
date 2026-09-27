@@ -57,6 +57,14 @@ function buildPrompt(level: string, grade: string, subject: string, topic: strin
 2) Bu senaryoya dayanan, öğrencinin ELEŞTİRİEL/ANALİTİK DÜŞÜNMESİNİ gerektiren, kendi cümleleriyle cevaplayacağı AÇIK UÇLU bir soru sorulur (şık YOKTUR, çoktan seçmeli DEĞİLDİR).
 3) Sorunun değerlendirilmesi için 3-4 kriterden oluşan DERECELİ PUANLAMA ANAHTARI (rubrik) hazırlanır, toplam 100 puan.
 
+YAŞA UYGUN CEVAP STANDARDI — ZORUNLU:
+- Beklenen cevap bir akademisyen/uzman cevabı değil, ${grade} öğrencisinin kendi kurabileceği doğal cümleler olmalıdır.
+- Ortaokul için 1-3 kısa ve açık cümle; lise için 2-4 açık cümle tam puan almaya yeterli olabilmelidir.
+- Rubrik teknik terimi birebir söylemeyi değil doğru düşünceyi/kavramı ölçsün; doğru fikir basit ve gündelik sözcüklerle anlatılmışsa tam puan verilebilsin.
+- Yazım, noktalama ve anlatım kusurları; ders Türkçe/yabancı dil değilse ve anlamı bozmuyorsa puan kaybettirmesin.
+- Üniversite düzeyi ayrıntı, profesyonel terminoloji veya soruda istenmeyen ek gerekçeler bekleme.
+- Her kriter tek ve gözlenebilir beklenti içersin; aynı bilgiyi iki kriterde tekrar puanlama.
+
 📐 MEB SORU DİLİ VE STİLİ (harici bir MEB uygunluk değerlendirmesiyle doğrulanmış kurallar):
 - Senaryo ASLA çıplak bir işlem talimatı olmasın (ör. "3/4 + 2/3 + 1/2 işlemini yapınız" YANLIŞ). Bunun yerine öğrenciyi günlük yaşam bağlamına yerleştir: alışveriş, yemek tarifi, boya/badana, bahçe, su tüketimi, yol/mesafe, zaman planlama gibi somut, tanıdık durumlar kullan.
 - Senaryoda "...nasıl [işlem yapacağını/çözeceğini] düşünüyor" gibi ifadelerle öğrenciyi bağlamsallaştır — doğrudan sonuca değil, DÜŞÜNME SÜRECİNE yönlendir.
@@ -80,17 +88,17 @@ SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir açıklama eklem
   "scenario": "Senaryo/durum metni (2-4 cümle, ${isForeignLanguageSubject(subject) ? subject : 'Türkçe'})",
   "question": "Senaryoya dayanan açık uçlu soru (${isForeignLanguageSubject(subject) ? subject : 'Türkçe'})",
   "rubric": [
-    { "criterion": "Kriter adı (kısa, Türkçe)", "maxPoints": 30, "description": "Bu kriterden tam puan almak için cevapta ne olmalı (1 cümle, Türkçe)" }
+    { "criterion": "Kriter adı (kısa, Türkçe)", "maxPoints": 30, "description": "${grade} öğrencisinin basit cümlelerle karşılayabileceği tek ve somut tam puan koşulu (1 cümle, Türkçe)" }
   ]
 }
 Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
 }
 
-async function searchMebContext(origin: string, subject: string, topic: string, grade: string, level: string): Promise<string> {
+async function searchMebContext(origin: string, subject: string, topic: string, grade: string, level: string, accessToken: string): Promise<string> {
   try {
     const mebRes = await fetch(`${origin}/api/meb-search`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET || 'internal' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({ topic, grade, subject, unit: topic, level, limit: 2 }),
       signal: AbortSignal.timeout(3000),
     })
@@ -102,10 +110,10 @@ async function searchMebContext(origin: string, subject: string, topic: string, 
   return ''
 }
 
-async function generateWithAI(subject: string, topic: string, grade: string, origin: string, userId: string) {
+async function generateWithAI(subject: string, topic: string, grade: string, origin: string, userId: string, accessToken: string) {
   const effectiveGrade = grade || 'ortaokul 6. sınıf'
   const level = getLevel(effectiveGrade)
-  const mebContext = await searchMebContext(origin, subject, topic, effectiveGrade, level)
+  const mebContext = await searchMebContext(origin, subject, topic, effectiveGrade, level, accessToken)
   const prompt = buildPrompt(level, effectiveGrade, subject, topic, mebContext)
 
   // 22 Eylül 2026 — Deniz'in fark ettiği gibi bu uç nokta hâlâ SADECE Claude
@@ -184,7 +192,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Ders ve konu zorunlu.' }, { status: 400 })
       }
       try {
-        const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin, user.id)
+        const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin, user.id, token)
         return NextResponse.json(result)
       } catch (e: any) {
         return NextResponse.json({ error: e?.message || 'Soru üretilemedi, tekrar dene.' }, { status: 500 })
@@ -214,7 +222,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Yapay zeka için ders ve konu zorunlu.' }, { status: 400 })
       }
       try {
-        const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin, user.id)
+        const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin, user.id, token)
         scenario = result.scenario; question = result.question; rubric = result.rubric
       } catch (e: any) {
         return NextResponse.json({ error: e?.message || 'Soru üretilemedi, tekrar dene.' }, { status: 500 })
@@ -252,7 +260,7 @@ export async function POST(req: NextRequest) {
     // kendi ürettiğini yine Claude'a kontrol ettirmek yerine) kontrol
     // edilir. Sadece onay alırsa kaydedilip öğrenciye gösterilir.
     const rubricSummary = rubric.map(r => `${r.criterion} (${r.maxPoints}p)`).join(', ')
-    const verifyPrompt = `Bir öğretmen, ${grade || 'belirtilmemiş'} seviyesindeki öğrencilerine "${subject || 'belirtilmemiş'}" dersinde şu açık uçlu soruyu ödev olarak atamak istiyor. Bu içeriği Türkiye MEB müfredatına uygunluk, yaş grubuna uygunluk, bilimsel/faktüel doğruluk ve genel eğitim içeriği güvenliği açısından değerlendir.
+    const verifyPrompt = `Bir öğretmen, ${grade || 'belirtilmemiş'} seviyesindeki öğrencilerine "${subject || 'belirtilmemiş'}" dersinde şu açık uçlu soruyu ödev olarak atamak istiyor. Bu içeriği Türkiye MEB müfredatına uygunluk, yaş grubuna uygunluk, bilimsel/faktüel doğruluk ve genel eğitim içeriği güvenliği açısından değerlendir. Rubriğin bir uzman/akademisyen cevabı istemediğini; öğrencinin basit, doğal ve yaşına uygun cümlelerle tam puana ulaşabilmesini de doğrula. Ortaokul için 1-3, lise için 2-4 açık cümle yeterli olabilmelidir.
 
 SENARYO: "${scenario}"
 SORU: "${question}"
@@ -262,7 +270,7 @@ Bu içerik, belirtilen seviyedeki öğrencilere gösterilmeye uygun mu? Sadece �
 {"ok": true veya false, "reason": "Türkçe, kısa (1 cümle) gerekçe — uygun değilse neden, uygunsa boş bırakabilirsin"}`
 
     const verification = await verifyQuestionWithOpenAI(verifyPrompt)
-    if (verification.ok === false) {
+    if (verification?.ok === false) {
       return NextResponse.json({
         error: `İçerik MEB uygunluk kontrolünden geçemedi: ${verification.reason || 'Uygun bulunmadı.'} Lütfen senaryo/soruyu düzenleyip tekrar dene.`,
       }, { status: 422 })

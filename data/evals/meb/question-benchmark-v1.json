@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "meb-question-eval-v1",
+  "policy": "Only teacher-approved cases count toward benchmark quality metrics. Candidate cases may run as safety regressions but never count as validated MEB coverage.",
+  "cases": [
+    {
+      "id": "projection-minimum-cubes-layout-missing-001",
+      "kind": "safety-regression",
+      "reviewStatus": "pending_teacher_review",
+      "sourceRef": "e2e/question-consistency.spec.ts :: yalnız görünüş kare sayılarıyla en az küp soran eksik tanımlı soruyu reddeder",
+      "curriculum": null,
+      "question": {
+        "type": "multiple_choice",
+        "q": "Bir yapının ön görünüşünde 6, üst görünüşünde 4 ve yan görünüşünde 5 kare vardır. Bu yapıyı oluşturmak için en az kaç küp gerekir?",
+        "opts": ["10", "15", "12", "20"],
+        "ans": 2,
+        "exp": "En büyük görünüş 6 kare olduğundan cevap 12 olur."
+      },
+      "expected": {
+        "consistencyVerdict": "reject",
+        "reasonCode": "PROJECTION_LAYOUT_MISSING"
+      }
+    }
+  ]
+}

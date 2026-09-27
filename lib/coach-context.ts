@@ -114,7 +114,7 @@ async function loadLiveQuizActivity(supabase: SupabaseClient, userId: string, si
   }))
 }
 
-// Sınav simülasyonu (LGS/TYT/AYT/YDT/KPSS tam deneme) — sadece tamamlanmış.
+// Tamamlanmış sınav simülasyonları (mevcut LGS/TYT/AYT/YDT ve geçmiş kayıtlar).
 async function loadExamActivity(supabase: SupabaseClient, userId: string, since: string): Promise<ActivityItem[]> {
   const { data } = await supabase
     .from('exam_sessions')
