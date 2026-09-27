@@ -9,7 +9,7 @@ create or replace function public.update_exam_resource_document_v1(
 )
 returns integer
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 declare
