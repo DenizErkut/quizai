@@ -95,6 +95,7 @@ async function fetchQuizTopup(params: {
   missing: number
   existingTexts: string[]
   accessToken?: string
+  adaptiveCandidateBatch?: boolean
 }): Promise<any[]> {
   try {
     const res = await fetch('/api/generate-quiz', {
@@ -110,6 +111,7 @@ async function fetchQuizTopup(params: {
         subject: params.subject || undefined,
         unit: params.topic || undefined,
         continueSessionId: params.sessionId, // kota/yeni-session tekrarını önler
+        adaptiveCandidateBatch: params.adaptiveCandidateBatch === true,
         excludeQuestionTexts: params.existingTexts,
       }),
     })
@@ -266,8 +268,9 @@ function QuizPageContent() {
   const [answers, setAnswers] = useState<{ userAns: number; correct: boolean; awardedScore?: number; timeMs?: number }[]>([])
   // ── Adaptif Test Motoru (Faz 2) ──
   // chunkBoundary: sıradaki adaptif karar sınırı (null = standart akış).
-  // Aktif kişiselleştirmede ilk iki tanılayıcı sorudan sonra her yeni soru,
-  // son cevaplara göre tek tek üretilir. resolvedDifficulty: sunucunun
+  // Aktif kişiselleştirmede ilk iki tanılayıcı sorudan sonra üç adaylık
+  // doğrulanmış bir mikro-yedek hazırlanır. İlk aday hemen gösterilir,
+  // kalanlar aynı adaptif kararın yedeği olarak kullanılır. resolvedDifficulty: sunucunun
   // (mastery skoruna göre) seçtiği o anki zorluk — bir sonraki parça için
   // referans noktası. showIntervention/interventionInfo: aynı soru tipinde
   // art arda 2 yanlış yapıldığında gösterilen öğretici ara ekran.
@@ -318,10 +321,11 @@ function QuizPageContent() {
       const topic = customTopic.trim() || selectedTopic
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return { questions: [], nextPolicy }
+      const candidateCount = Math.min(3, Math.max(1, qCount - questions.length))
       const res = await fetch('/api/generate-quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ topic, questionCount: 1, difficulty: nextPolicy.difficulty, language: currentLang, questionType: nextPolicy.questionType, adaptiveSupport: nextPolicy.supportLevel, includeVisuals, continueSessionId: sessionId, subject: selectedSubject || undefined, excludeQuestionTexts: questions.slice(0, chunkBoundary).map(q => q.q).filter(Boolean) }),
+        body: JSON.stringify({ topic, questionCount: candidateCount, difficulty: nextPolicy.difficulty, language: currentLang, questionType: nextPolicy.questionType, adaptiveSupport: nextPolicy.supportLevel, includeVisuals, continueSessionId: sessionId, adaptiveCandidateBatch: true, subject: selectedSubject || undefined, excludeQuestionTexts: questions.map(q => q.q).filter(Boolean) }),
       })
       const data = await res.json().catch(() => ({}))
       return { questions: res.ok && Array.isArray(data.questions) ? data.questions : [], nextPolicy }
@@ -931,9 +935,12 @@ function QuizPageContent() {
         const nextPolicy = nextQuestionPolicy(resolvedDifficulty, chunk1Answers, questions[current]?.type || questionType)
         const nextDiff = nextPolicy.difficulty
         const nextQuestionType = nextPolicy.questionType
-        const excludeTexts = questions.slice(0, chunkBoundary).map(q => q.q).filter(Boolean)
+        const excludeTexts = questions.map(q => q.q).filter(Boolean)
         const topic = customTopic.trim() || selectedTopic
-        const targetSecondChunk = 1
+        // Tek adayın reddedilmesi artık bütün testi kesmez. Kalan soru
+        // sayısına göre en fazla üç doğrulanmış aday istenir; ilk soru hemen,
+        // diğerleri takip eden adımlarda yedek olarak tüketilir.
+        const targetSecondChunk = Math.min(3, Math.max(1, qCount - questions.length))
         const { data: { session } } = await supabase.auth.getSession()
         const prefetchKey = `${sessionId}:${chunkBoundary}:${answersRef.current.length}`
         const prefetched = adaptivePrefetchRef.current?.key === prefetchKey
@@ -951,6 +958,7 @@ function QuizPageContent() {
             adaptiveSupport: nextPolicy.supportLevel,
             includeVisuals,
             continueSessionId: sessionId,
+            adaptiveCandidateBatch: true,
             subject: selectedSubject || undefined,
             excludeQuestionTexts: excludeTexts,
           }),
@@ -979,6 +987,7 @@ function QuizPageContent() {
               sessionId, missing: targetSecondChunk - secondChunk.length,
               existingTexts: [...excludeTexts, ...secondChunk.map((q: any) => q.q).filter(Boolean)],
               accessToken: freshSession?.access_token,
+              adaptiveCandidateBatch: true,
             })
             if (extra.length === 0) break
             secondChunk = [...secondChunk, ...extra].slice(0, targetSecondChunk)
@@ -994,14 +1003,14 @@ function QuizPageContent() {
         } else {
           setChunkBoundary(null)
           setFetchingNextChunk(false)
-          setQuizError({ code: 'adaptive_next_failed', title: 'Sonraki soru hazırlanamadı', desc: 'Bağlantıyı kontrol edip testi yeniden başlatabilirsin.', retry: true })
+          setQuizError({ code: 'adaptive_next_failed', title: 'Yeni sorular kalite kontrolünden geçemedi', desc: 'Hazırlanan yedek adayların hiçbiri kalite kontrolünü geçemedi. Birkaç saniye sonra yeniden deneyebilirsin.', retry: true })
           setScreen('error')
           return
         }
       } catch {
         setFetchingNextChunk(false)
         setChunkBoundary(null)
-        setQuizError({ code: 'adaptive_next_failed', title: 'Sonraki soru hazırlanamadı', desc: 'Bağlantıyı kontrol edip testi yeniden başlatabilirsin.', retry: true })
+        setQuizError({ code: 'adaptive_next_failed', title: 'Yeni sorular kalite kontrolünden geçemedi', desc: 'Yedek soru hazırlanırken doğrulama tamamlanamadı. Birkaç saniye sonra yeniden deneyebilirsin.', retry: true })
         setScreen('error')
         return
       }
@@ -1379,7 +1388,7 @@ function QuizPageContent() {
         <main style={{ maxWidth: '520px', margin: '0 auto', padding: '2rem 1rem', textAlign: 'center' }}>
           <div style={{ padding: '48px 24px', borderRadius: '16px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
             <div style={{ fontSize: '32px', marginBottom: '12px' }}>⚡</div>
-            <div style={{ fontSize: '14px', color: 'var(--text2)' }}>Sıradaki sorular hazırlanıyor...</div>
+            <div style={{ fontSize: '14px', color: 'var(--text2)' }}>Yeni soru kalite kontrolünden geçiyor; yedek sorular hazırlanıyor...</div>
           </div>
         </main>
       )

@@ -197,6 +197,14 @@ export async function POST(req: NextRequest) {
     const verified: any[] = []
     const rejected: number[] = []
     const rejectReasons: string[] = []
+    const rejectionDetails: Array<{
+      questionIndex: number
+      objectiveCode: string | null
+      generationProvider: string
+      validator: string
+      controlType: string
+      reasonCode: string
+    }> = []
 
     // Her soruyu doğrula — paralel olarak (max 5 aynı anda)
     const BATCH = 5
@@ -210,6 +218,7 @@ export async function POST(req: NextRequest) {
         if (structuralDecision.verdict === 'reject') {
           rejected.push(idx)
           rejectReasons.push(`Q${idx}: ${structuralDecision.reasonCode}`)
+          rejectionDetails.push({ questionIndex: idx, objectiveCode: null, generationProvider: String(q.generationProvider || 'unknown'), validator: 'deterministic', controlType: 'structure', reasonCode: structuralDecision.reasonCode })
           return
         }
 
@@ -217,6 +226,7 @@ export async function POST(req: NextRequest) {
         if (!quickMathCheck(q)) {
           rejected.push(idx)
           rejectReasons.push(`Q${idx}: local math check failed`)
+          rejectionDetails.push({ questionIndex: idx, objectiveCode: null, generationProvider: String(q.generationProvider || 'unknown'), validator: 'deterministic', controlType: 'math', reasonCode: 'local_math_check_failed' })
           return
         }
 
@@ -225,6 +235,7 @@ export async function POST(req: NextRequest) {
         if (basamakResult && !basamakResult.ok) {
           rejected.push(idx)
           rejectReasons.push(`Q${idx}: basamak hesabı yanlış (doğrusu: ${basamakResult.gercekCevap})`)
+          rejectionDetails.push({ questionIndex: idx, objectiveCode: null, generationProvider: String(q.generationProvider || 'unknown'), validator: 'deterministic', controlType: 'place_value', reasonCode: 'place_value_mismatch' })
           return
         }
 
@@ -233,6 +244,7 @@ export async function POST(req: NextRequest) {
         if (strictQualityPolicy && objectiveCandidates.length > 0 && !selectedObjective) {
           rejected.push(idx)
           rejectReasons.push(`Q${idx}: canonical objective missing or invalid`)
+          rejectionDetails.push({ questionIndex: idx, objectiveCode: null, generationProvider: String(q.generationProvider || 'unknown'), validator: 'deterministic', controlType: 'objective', reasonCode: 'canonical_objective_missing' })
           return
         }
         const needsAICheck = strictQualityPolicy || ['multiple_choice', 'fill_blank', 'true_false', 'matching', 'multi_true_false'].includes(q.type || 'multiple_choice')
@@ -278,14 +290,31 @@ export async function POST(req: NextRequest) {
           ])
 
           if (strictQualityPolicy) {
+            // İlk bağımsız denetleyicinin tek başına reddi adaptif testi
+            // kesmesin. Aynı soru ikinci, farklı bir sağlayıcı tarafından
+            // yeniden incelenir; iki açık ret olursa fail-closed kalır.
+            const secondaryCheck = primaryCheck?.ok === false
+              ? await verifyQuestionWithGemini(verifyPrompt)
+              : null
             const strictReview = evaluateStrictQuestionReview({
               primary: primaryCheck,
-              secondary: [],
+              secondary: [secondaryCheck],
               objectiveRequired: objectiveCandidates.length > 0,
             })
-            if (!Boolean(q.difficulty) || primaryCheck?.ok !== true || !strictReview.passed) {
+            if (!Boolean(q.difficulty) || !strictReview.passed) {
               rejected.push(idx)
-              rejectReasons.push(`Q${idx}: strict difficulty/outcome evidence missing or mismatched`)
+              const reasonCode = primaryCheck?.ok === false
+                ? (secondaryCheck?.ok === false ? 'two_provider_rejection' : 'primary_rejection_not_overturned')
+                : 'strict_evidence_missing'
+              rejectReasons.push(`Q${idx}: ${reasonCode}`)
+              rejectionDetails.push({
+                questionIndex: idx,
+                objectiveCode: selectedObjective?.objectiveCode || null,
+                generationProvider: generatingProvider,
+                validator: generatingProvider === 'mistral' ? 'openai+gemini' : 'mistral+gemini',
+                controlType: 'independent_quality',
+                reasonCode,
+              })
               return
             }
             verified.push({
@@ -315,6 +344,7 @@ export async function POST(req: NextRequest) {
           if (strictQualityPolicy) {
             rejected.push(idx)
             rejectReasons.push(`Q${idx}: strict independent verification unavailable`)
+            rejectionDetails.push({ questionIndex: idx, objectiveCode: selectedObjective?.objectiveCode || null, generationProvider: String(q.generationProvider || 'unknown'), validator: 'independent_provider', controlType: 'availability', reasonCode: 'strict_verification_unavailable' })
           } else {
             // Legacy non-strict verification preserves historical behavior.
             verified.push(q)
@@ -324,7 +354,9 @@ export async function POST(req: NextRequest) {
     }
 
     let geminiSetReview: { ok: boolean; reason?: string; issueIndexes?: number[] } | null = null
-    if (strictQualityPolicy && verified.length === questions.length) {
+    // Bazı adaylar elense bile kabul edilen alt küme Gemini'nin genel set
+    // kontrolünden geçmeden öğrenciye dönmez.
+    if (strictQualityPolicy && verified.length > 0) {
       geminiSetReview = await verifyQuestionSetWithGemini({
         questions: verified,
         topic: String(topic || ''),
@@ -333,6 +365,7 @@ export async function POST(req: NextRequest) {
       })
       if (geminiSetReview?.ok === false) {
         rejectReasons.push(`Final Gemini set review rejected: ${geminiSetReview.reason || 'material issue detected'}`)
+        rejectionDetails.push({ questionIndex: -1, objectiveCode: null, generationProvider: 'mixed', validator: 'gemini', controlType: 'whole_set', reasonCode: 'gemini_set_rejection' })
         rejected.push(...(geminiSetReview.issueIndexes || []))
         verified.splice(0, verified.length)
       } else {
@@ -390,7 +423,7 @@ Return ONLY valid JSON:
 
     const final = [...verified, ...replacements].slice(0, questions.length)
 
-    await writeAgentDecisionAudit(auditDb, { actor_id: user.id, agent_name: agent, policy_version: 'question-verification-boundary-v1', input_summary: { question_count: questions.length, question_type: questionType || 'multiple_choice' }, decision_summary: { verified: verified.length, rejected: rejected.length, replacements: replacements.length, final: final.length } })
+    await writeAgentDecisionAudit(auditDb, { actor_id: user.id, agent_name: agent, policy_version: 'question-verification-boundary-v2', input_summary: { question_count: questions.length, question_type: questionType || 'multiple_choice' }, decision_summary: { verified: verified.length, rejected: rejected.length, replacements: replacements.length, final: final.length, rejection_details: rejectionDetails } })
 
     return NextResponse.json({
       questions: final,

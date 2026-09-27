@@ -1,7 +1,12 @@
 import { Resvg } from '@resvg/resvg-js'
 import { MistralAdapter } from '@/lib/ai-gateway'
 
-export type MistralQuestionReview = { ok: boolean; reason?: string } | null
+export type MistralQuestionReview = {
+  ok: boolean
+  reason?: string
+  difficultyMatches?: boolean
+  objectiveMatches?: boolean
+} | null
 export type MistralVisualReview = {
   passed: boolean
   score: number
@@ -60,6 +65,8 @@ export async function verifyQuestionWithMistral(
     return {
       ok: parsed.ok,
       reason: typeof parsed.reason === 'string' ? parsed.reason.slice(0, 240) : undefined,
+      difficultyMatches: typeof parsed.difficultyMatches === 'boolean' ? parsed.difficultyMatches : undefined,
+      objectiveMatches: typeof parsed.objectiveMatches === 'boolean' ? parsed.objectiveMatches : undefined,
     }
   } catch (error) {
     console.warn('[mistral-quality] question validator unavailable:', error instanceof Error ? error.message : 'unknown')

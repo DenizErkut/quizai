@@ -1398,6 +1398,12 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const isDailyChallengeRequest = body?.dailyChallenge === true
+    // Yalnız mevcut bir adaptif oturumun devamında geçerlidir. Bu kipte üç
+    // adaydan en az biri bütün kalite kapılarını geçerse doğrulanmış alt küme
+    // dönebilir; normal test oluşturma sözleşmesi hâlâ eksiksiz set ister.
+    const adaptiveCandidateBatch = body?.adaptiveCandidateBatch === true
+      && typeof body?.continueSessionId === 'string'
+      && body.continueSessionId.length > 0
     // 21 Eylül 2026 — Deniz'in isteğiyle: gerçek öğrenci trafiğine hiç
     // dokunmadan üç sağlayıcının (Mistral/GPT-4.1-mini/Claude) çıktısını
     // gözle kontrol edebilmesi için admin-only bir test anahtarı. SADECE
@@ -2382,7 +2388,12 @@ export async function POST(req: NextRequest) {
       signal: AbortSignal.timeout(70000),
     }).then(async response => response.ok ? response.json() : null).catch(() => null)
 
-    if (!Array.isArray(strictVerifyResult?.questions) || strictVerifyResult.questions.length !== safeQCount) {
+    const verifiedCandidateCount = Array.isArray(strictVerifyResult?.questions) ? strictVerifyResult.questions.length : 0
+    if (adaptiveCandidateBatch && verifiedCandidateCount > 0 && verifiedCandidateCount < safeQCount) {
+      console.warn(`[generate-quiz] adaptive_candidate_subset accepted=${verifiedCandidateCount}/${safeQCount}`)
+      safeQCount = verifiedCandidateCount
+      targetDifficultyQuota = quotaForCount(safeQCount)
+    } else if (!Array.isArray(strictVerifyResult?.questions) || verifiedCandidateCount !== safeQCount) {
       console.error(`[generate-quiz] strict_verification_failed verified=${strictVerifyResult?.questions?.length || 0}/${safeQCount}`)
       return NextResponse.json({ error: 'quality_policy_failed', reason: 'independent_verification', message: 'Testin tüm soruları bağımsız kalite kontrolünden geçemediği için oluşturulmadı.' }, { status: 503 })
     }
