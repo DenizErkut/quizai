@@ -127,7 +127,7 @@ test('question booklet records can be viewed, edited and safely deleted by admin
   expect(admin).toContain('✏️ Düzelt')
   expect(admin).toContain('🗑️ Sil')
   expect(admin).toContain('orijinal PDF korunur')
-  expect(migration).toContain('security definer')
+  expect(migration).toContain('security invoker')
   expect(migration).toContain('from public, anon, authenticated')
   expect(migration).toContain('to service_role')
 })
