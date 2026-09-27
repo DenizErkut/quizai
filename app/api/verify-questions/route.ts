@@ -93,6 +93,24 @@ function buildVerifyPrompt(q: any, lang: string, objective?: ObjectiveCandidate 
     + '\n\nReturn strict JSON with difficultyMatches (boolean); when an approved canonical learning outcome is supplied, also include objectiveMatches (boolean). Missing fields mean this item failed strict review.'
 }
 
+async function verifyQuestionWithClaude(verifyPrompt: string): Promise<{ ok: boolean; reason?: string; difficultyMatches?: boolean; objectiveMatches?: boolean } | null> {
+  try {
+    const res = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 180,
+      messages: [{ role: 'user', content: verifyPrompt }],
+    })
+    logAnthropicUsage('verify-questions:claude-fallback', 'claude-sonnet-4-5', res)
+    const text = res.content[0].type === 'text' ? res.content[0].text.trim() : ''
+    const match = text.match(/\{[\s\S]*\}/)
+    if (!match) return null
+    const parsed = JSON.parse(match[0])
+    return parsed && typeof parsed.ok === 'boolean' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 // Matematik için yerel hızlı kontrol (API çağrısı yapmadan)
 function quickMathCheck(q: any): boolean {
   if (!q.q || !q.opts) return true
@@ -240,6 +258,14 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. AI doğrulama — sadece doğrulanabilir tipler
+        // A single canonical objective is unambiguous. Models occasionally
+        // omit the ref even when the question was generated from the supplied
+        // objective list; seed that ref so the independent reviewer can still
+        // verify direct alignment. Multiple candidates remain fail-closed.
+        if (strictQualityPolicy && objectiveCandidates.length === 1
+          && (typeof q.learningObjectiveRef !== 'string' || !q.learningObjectiveRef.trim())) {
+          q.learningObjectiveRef = objectiveCandidates[0].ref
+        }
         const selectedObjective = objectiveCandidates.find(candidate => candidate.ref === q.learningObjectiveRef) || null
         if (strictQualityPolicy && objectiveCandidates.length > 0 && !selectedObjective) {
           rejected.push(idx)
@@ -293,9 +319,17 @@ export async function POST(req: NextRequest) {
             // İlk bağımsız denetleyicinin tek başına reddi adaptif testi
             // kesmesin. Aynı soru ikinci, farklı bir sağlayıcı tarafından
             // yeniden incelenir; iki açık ret olursa fail-closed kalır.
-            const secondaryCheck = primaryCheck?.ok === false
+            let secondaryCheck = primaryCheck?.ok === false
               ? await verifyQuestionWithGemini(verifyPrompt)
               : null
+            // Gemini is an optional whole-set layer and can be unavailable or
+            // return malformed JSON. A primary rejection still deserves a
+            // real independent second opinion before the item is discarded.
+            if (primaryCheck?.ok === false && !secondaryCheck) {
+              secondaryCheck = generatingProvider === 'anthropic'
+                ? await verifyQuestionWithOpenAI(verifyPrompt, 'gpt-4.1-mini', reviewContext)
+                : await verifyQuestionWithClaude(verifyPrompt)
+            }
             const strictReview = evaluateStrictQuestionReview({
               primary: primaryCheck,
               secondary: [secondaryCheck],

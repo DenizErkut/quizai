@@ -24,6 +24,8 @@ test('a primary rejection receives an independent second opinion and is audited'
   const route = readFileSync(join(process.cwd(), 'app/api/verify-questions/route.ts'), 'utf8')
   expect(route).toContain('primaryCheck?.ok === false')
   expect(route).toContain('await verifyQuestionWithGemini(verifyPrompt)')
+  expect(route).toContain('verifyQuestionWithClaude(verifyPrompt)')
+  expect(route).toContain('objectiveCandidates.length === 1')
   expect(route).toContain('strictQualityPolicy && verified.length > 0')
   expect(route).toContain('two_provider_rejection')
   expect(route).toContain('rejection_details: rejectionDetails')
