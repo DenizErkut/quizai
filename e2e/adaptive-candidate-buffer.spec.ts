@@ -55,3 +55,14 @@ test('transfer report separates independent transfer from baseline performance',
   expect(route).toContain('impactDelta')
   expect(route).toContain('transferRate')
 })
+
+test('education AI safety scorecard uses live evidence and admin authorization', () => {
+  const route = readFileSync(join(process.cwd(), 'app/api/admin/ai-safety-scorecard/route.ts'), 'utf8')
+  const admin = readFileSync(join(process.cwd(), 'app/admin/page.tsx'), 'utf8')
+  expect(route).toContain("select('is_admin')")
+  expect(route).toContain("from('agent_decision_audit')")
+  expect(route).toContain("from('agent_action_approval_queue')")
+  expect(route).toContain("from('learning_transfer_checks')")
+  expect(route).toContain('privacy_access')
+  expect(admin).toContain('<EducationAISafetyScorecard />')
+})
