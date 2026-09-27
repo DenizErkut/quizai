@@ -2555,10 +2555,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (!hasVisualQuota(questions, batchVisualMinimum)) {
-      const actual = questions.filter(question => hasVisualQuota([question], 1)).length
-      console.error(`[generate-quiz] visual_quota_failed required=${batchVisualMinimum} actual=${actual} topic=${topic}`)
-      return NextResponse.json({ error: 'quality_policy_failed', reason: 'visual_quota', message: 'Test genelindeki %30 görsel hedefi için gereken birebir eşleşmiş ve bağımsız kontrolden geçmiş görseller tamamlanamadı.' }, { status: 503 })
+    // Görsel hedefi kalite için tercih edilen bir oran olarak kalır; görsel
+    // sağlayıcının geçici hatası veya zaman aşımı testin tamamını düşürmemeli.
+    // Başarılı görseller korunur, eksik kalanlar sonraki üretimlerde telafi
+    // edilebilir ve telemetriye gerçek oran yazılır.
+    const actualVisualCount = questions.filter(question => hasVisualQuota([question], 1)).length
+    if (actualVisualCount < batchVisualMinimum) {
+      console.warn(`[generate-quiz] visual_quota_advisory target=${batchVisualMinimum} actual=${actualVisualCount} topic=${topic}; continuing without hard failure`)
     }
 
     // 26 Ağustos 2026 — kaynak metni öğrenciye de gönder (yukarıdaki nota bkz.).
