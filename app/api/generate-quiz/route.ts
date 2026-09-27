@@ -1873,6 +1873,17 @@ export async function POST(req: NextRequest) {
       }
     }
     const aiQuestionCount = Math.max(0, safeQCount - bankQuestions.length)
+    // Havuzda bulunan kaliteli sorular yalnızca eksik kotayı doldurmak için
+    // kullanılmaz; AI üretiminin de konu/kazanım bağlamını sabitleyen güvenilir
+    // referanslardır. Öğretmen imzalı sorular öğrenciye birebir gösterilebilir,
+    // diğer havuz soruları ise yalnızca yeni ve özgün soru üretmek için örnek
+    // alınır (kopyalama yapılmaz).
+    const questionBankReferenceContext = bankQuestions.length > 0
+      ? `\n\n📚 ONAYLI SORU HAVUZU REFERANSI (yalnızca konu/kazanım ve seviye bağlamı):\n${bankQuestions.slice(0, 8).map((question: any, index: number) => {
+        const sourcePolicy = question.sourcePolicy === 'teacher_exact' ? 'öğretmen imzalı; aynı soru havuzdan birebir sunulabilir' : 'referans; yeni ve özgün soru üret'
+        return `${index + 1}. [${sourcePolicy}] ${JSON.stringify({ q: question.q, opts: question.opts, type: question.type, objective: question.objective, difficulty: question.difficulty }).slice(0, 1400)}`
+      }).join('\n')}`
+      : ''
     // Standard K-12 tests use the requested per-question provider/difficulty
     // roles. University requests and explicit admin provider probes retain
     // their existing single-provider behavior.
@@ -1915,8 +1926,9 @@ export async function POST(req: NextRequest) {
       + (isUniversityLevel ? misconceptionMetadataInstruction(questionType) : '') // K12'de artık statik blokta
       + objectiveInstruction
       + bookletContext
+      + questionBankReferenceContext
       + previousQuestionsNote
-    promptStr = fullPrompt + (adaptivePolicy?.promptContext || '') + diagnosticStrategy.promptContext + misconceptionMetadataInstruction(questionType) + objectiveInstruction + bookletContext + previousQuestionsNote // fallback için TAM metin saklanır
+    promptStr = fullPrompt + (adaptivePolicy?.promptContext || '') + diagnosticStrategy.promptContext + misconceptionMetadataInstruction(questionType) + objectiveInstruction + bookletContext + questionBankReferenceContext + previousQuestionsNote // fallback için TAM metin saklanır
     countRef = aiQuestionCount
 
     // Hız optimizasyonu: az soru → Haiku (3x hızlı), çok soru → Sonnet
