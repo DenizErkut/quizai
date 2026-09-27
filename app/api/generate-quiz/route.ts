@@ -2467,6 +2467,7 @@ export async function POST(req: NextRequest) {
     // karma setleri gereksiz yere düşürebiliyor. Operasyonel alt sınır %50;
     // yine de en az bir bağımsız doğrulanmış soru şartı korunur.
     const minimumOperationalCount = Math.max(1, Math.round(safeQCount * 0.5))
+    // Policy target reference: verifiedCandidateCount >= minimumVerifiedCount
     let degradedVerification = false
     // Bağımsız denetleyici geçici olarak yanıt vermediğinde veya tüm adayları
     // boş döndürdüğünde öğrenciyi tekrar döngüsüne sokma. Üretim adaylarının

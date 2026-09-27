@@ -213,9 +213,16 @@ export function hasCanonicalObjectiveCoverage(
   if (!candidates.length) return questions.every(question => question.objectiveMappingStatus !== 'mapped'
     && question.learningObjectiveId == null && question.learningObjectiveCode == null)
   const ids = new Set(candidates.map(candidate => candidate.id))
-  return questions.length > 0 && questions.every(question => question.objectiveMappingStatus === 'mapped'
-    && typeof question.learningObjectiveId === 'string' && ids.has(question.learningObjectiveId)
-    && typeof question.learningObjectiveCode === 'string')
+  return questions.length > 0 && questions.every(question => {
+    // Eski onaylı havuz kayıtlarında kazanım UUID'si bulunmayabilir. Bu
+    // kayıtlar zaten aynı sınıf/ders/konu ve onay filtresinden geçtiği için
+    // metadata eksikliği testi düşürmemeli; yeni AI soruları ise tam eşleşme
+    // şartını korur.
+    if (question.bankQuestionId && question.objectiveMappingStatus !== 'mapped') return true
+    return question.objectiveMappingStatus === 'mapped'
+      && typeof question.learningObjectiveId === 'string' && ids.has(question.learningObjectiveId)
+      && typeof question.learningObjectiveCode === 'string'
+  })
 }
 
 export function hasStrictQuestionReview(
