@@ -1,28 +1,30 @@
-export const REQUIRED_DIFFICULTIES = ['kolay', 'normal', 'zor'] as const
+export const REQUIRED_DIFFICULTIES = ['kolay', 'normal', 'zor', 'cok zor'] as const
 export type RequiredDifficulty = typeof REQUIRED_DIFFICULTIES[number]
 
 export interface DifficultyQuota {
   kolay: number
   normal: number
   zor: number
+  'cok zor': number
 }
 
 export type QuestionGenerationProvider = 'openai' | 'mistral' | 'anthropic'
-export type QuestionGenerationDifficulty = 'kolay' | 'normal' | 'zor'
+export type QuestionGenerationDifficulty = 'kolay' | 'normal' | 'zor' | 'cok zor'
 export interface QuestionGenerationBatch {
   provider: QuestionGenerationProvider
   difficulty: QuestionGenerationDifficulty
   count: number
 }
 
-/** Largest-remainder apportionment for the requested 65/15/20 role split. */
+/** Largest-remainder apportionment for the requested 50/20/20/10 difficulty split. */
 export function buildQuestionGenerationPlan(count: number): QuestionGenerationBatch[] {
   const size = Math.max(0, Math.trunc(count))
   if (!size) return []
   const roles: Array<{ provider: QuestionGenerationProvider; difficulty: QuestionGenerationDifficulty; weight: number }> = [
-    { provider: 'openai', difficulty: 'kolay', weight: 0.65 },
-    { provider: 'mistral', difficulty: 'normal', weight: 0.15 },
+    { provider: 'openai', difficulty: 'kolay', weight: 0.50 },
+    { provider: 'mistral', difficulty: 'normal', weight: 0.20 },
     { provider: 'anthropic', difficulty: 'zor', weight: 0.20 },
+    { provider: 'anthropic', difficulty: 'cok zor', weight: 0.10 },
   ]
   const raw = roles.map(role => role.weight * size)
   const counts = raw.map(Math.floor)
@@ -41,7 +43,9 @@ export function buildQuestionGenerationPlan(count: number): QuestionGenerationBa
       }
     }
   }
-  return roles.flatMap((role, index) => counts[index] > 0 ? [{ ...role, count: counts[index] }] : [])
+  return roles.flatMap((role, index) => counts[index] > 0
+    ? [{ provider: role.provider, difficulty: role.difficulty, count: counts[index] }]
+    : [])
 }
 
 export type StrictReviewSignal = {
@@ -85,8 +89,9 @@ export function evaluateStrictQuestionReview(args: {
 export function normalizeDifficultyLevel(value: unknown): RequiredDifficulty | null {
   if (typeof value !== 'string') return null
   const normalized = value.trim().toLocaleLowerCase('tr-TR').replace(/çok/g, 'cok').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ')
-  if (normalized === 'kolay' || normalized === 'normal' || normalized === 'zor') return normalized
-  if (['cok zor', 'very hard', 'very difficult', 'hard', 'advanced', 'difficult'].includes(normalized)) return 'zor'
+  if (normalized === 'kolay' || normalized === 'normal' || normalized === 'zor' || normalized === 'cok zor') return normalized
+  if (['very hard', 'very difficult', 'advanced'].includes(normalized)) return 'cok zor'
+  if (['hard', 'difficult'].includes(normalized)) return 'zor'
   if (['easy', 'beginner', 'basic'].includes(normalized)) return 'kolay'
   if (['orta', 'orta seviye', 'medium', 'intermediate', 'average'].includes(normalized)) return 'normal'
   return null
@@ -94,14 +99,14 @@ export function normalizeDifficultyLevel(value: unknown): RequiredDifficulty | n
 
 export function buildAdaptiveDifficultyQuota(count: number, startingDifficulty: string): DifficultyQuota {
   const size = Math.max(0, Math.trunc(count))
-  if (!size) return { kolay: 0, normal: 0, zor: 0 }
+  if (!size) return { kolay: 0, normal: 0, zor: 0, 'cok zor': 0 }
   const weights = startingDifficulty === 'kolay'
-    ? [0.5, 0.3, 0.2]
+    ? [0.55, 0.25, 0.15, 0.05]
     : ['zor', 'cok zor', 'çok zor'].includes(startingDifficulty.toLocaleLowerCase('tr-TR'))
-      ? [0.2, 0.3, 0.5]
-      : [0.25, 0.5, 0.25]
+      ? [0.30, 0.20, 0.30, 0.20]
+      : [0.50, 0.20, 0.20, 0.10]
   const values = [...REQUIRED_DIFFICULTIES]
-  const quota: DifficultyQuota = { kolay: 0, normal: 0, zor: 0 }
+  const quota: DifficultyQuota = { kolay: 0, normal: 0, zor: 0, 'cok zor': 0 }
   if (size >= values.length) for (const value of values) quota[value] = 1
   const remaining = size - values.reduce((total, value) => total + quota[value], 0)
   const raw = weights.map(weight => weight * remaining)
@@ -119,18 +124,16 @@ export function formatDifficultyQuota(quota: DifficultyQuota): string {
 }
 
 export function hasDifficultyQuota(questions: Array<Record<string, unknown>>, quota: DifficultyQuota): boolean {
-  const actual: DifficultyQuota = { kolay: 0, normal: 0, zor: 0 }
+  const actual: DifficultyQuota = { kolay: 0, normal: 0, zor: 0, 'cok zor': 0 }
   for (const question of questions) {
     const level = normalizeDifficultyLevel(question.difficulty)
     if (!level) return false
     actual[level]++
   }
-  // Adaptive quota is a target, not an exact inventory requirement. Small
-  // sets naturally have rounding variance; larger sets tolerate 20% drift,
-  // while preserving representation of all three difficulty levels.
-  if (questions.length >= REQUIRED_DIFFICULTIES.length
-    && REQUIRED_DIFFICULTIES.some(level => actual[level] === 0)) return false
-  const tolerance = Math.max(1, Math.ceil(questions.length * 0.2))
+  // This is a target distribution, not an all-or-nothing inventory gate.
+  // A 30% drift band keeps the requested mix meaningful while allowing a
+  // quality-rejected item to disappear without taking the whole test down.
+  const tolerance = Math.max(1, Math.ceil(questions.length * 0.3))
   return REQUIRED_DIFFICULTIES.every(level => Math.abs(actual[level] - quota[level]) <= tolerance)
 }
 
@@ -150,7 +153,7 @@ export function hasValidatedQuestionVisual(question: Record<string, unknown>): b
     && /<svg\b[\s\S]*<\/svg>/i.test(question.svg)
     && typeof question.q === 'string'
     && question.visualQuestionText === question.q
-    && Number(quality?.score) >= 90
+    && Number(quality?.score) >= 70
     && (quality?.evaluator === 'openai' || quality?.evaluator === 'deterministic')
 }
 

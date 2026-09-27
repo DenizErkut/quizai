@@ -337,8 +337,9 @@ function rigorInstruction(difficulty: string, count: number, topic: string): str
     kolay: generationPlan.find(batch => batch.difficulty === 'kolay')?.count || 0,
     normal: generationPlan.find(batch => batch.difficulty === 'normal')?.count || 0,
     zor: generationPlan.find(batch => batch.difficulty === 'zor')?.count || 0,
+    'cok zor': generationPlan.find(batch => batch.difficulty === 'cok zor')?.count || 0,
   }
-  const mixRule = `Sabit üretim hedefi ${formatDifficultyQuota(roleQuota)}: GPT-4.1 mini kolay, Mistral normal, Claude Sonnet 4.5 zor soruları üretir. Bu oran soru sayısına göre en yakın tam sayıya yuvarlanır; etiketleri kota doldurmak için değil, sorunun gerçek bilişsel yüküne göre belirle. Öğrencinin adaptif profili (${difficulty}) soruların konu odağını, destek düzeyini ve alt/üst bilişsel karmaşıklığını etkiler; sağlayıcı-zorluk görev eşleşmesini değiştirme.`
+  const mixRule = `Sabit üretim hedefi ${formatDifficultyQuota(roleQuota)}: GPT-4.1 mini kolay, Mistral normal, Claude Sonnet 4.5 zor ve çok zor soruları üretir. Hedef dağılım %50 kolay, %20 normal, %20 zor, %10 çok zordur; küçük setlerde en yakın tam sayıya yuvarlanır. Etiketleri kota doldurmak için değil, sorunun gerçek bilişsel yüküne göre belirle. Öğrencinin adaptif profili (${difficulty}) soruların konu odağını, destek düzeyini ve alt/üst bilişsel karmaşıklığını etkiler; sağlayıcı-zorluk görev eşleşmesini değiştirme.`
   return `\n\nÖLÇME KALİTESİ VE ZORLUK KURALI (ZORUNLU): "${topic}" için ${count} soru üretirken sadece tanım ezberini veya tek adımlı işlemi ölçme. En az ${applicationCount} soru bilgiyi yeni bir bağlama/senaryoya uygulamayı, verilenleri ayıklamayı veya en az iki akıl yürütme adımını gerektirsin. En az ${inferenceCount} soru ilişki kurma, hata bulma, karşılaştırma, yanlış çözümü analiz etme ya da sonuç çıkarma ölçsün. ${mixRule} Doğrudan tanım/ezber veya tek işlemle çözülen soru sayısı en fazla ${directLimit} olabilir. Her soruya "difficulty" (kolay|normal|zor|cok zor), "cognitiveLevel" (uygulama|muhakeme) ve gerçek çözüm adımı sayısını gösteren "reasoningSteps" alanlarını ekle. Zorluk uzun ve karışık cümlelerden değil, kazanımın gerçekten kullanılmasından gelmeli. Her çoktan seçmeli soruda üç çeldirici öğrencinin yapabileceği farklı ve gerçek işlem, kavram veya yorum hatasına dayansın; komik, alakasız ya da ilk bakışta elenen seçenekler kullanma. Aynı hesap yöntemi, senaryo veya soru kalıbını tekrarlama. Sınıf seviyesinin dışına çıkma ve soruyu çözülemez hâle getirme. Açıklamada doğru sonuca giden mantığı en az iki açık adımla göster.`
 }
 
@@ -1156,7 +1157,7 @@ async function generateProviderQuestionBatch(args: {
   requestStartTime: number
 }): Promise<any[]> {
   const { batch } = args
-  const difficultyLabel = batch.difficulty === 'zor' ? 'ZOR' : batch.difficulty === 'normal' ? 'NORMAL' : 'KOLAY'
+  const difficultyLabel = batch.difficulty === 'cok zor' ? 'ÇOK ZOR' : batch.difficulty === 'zor' ? 'ZOR' : batch.difficulty === 'normal' ? 'NORMAL' : 'KOLAY'
   const rolePrompt = `${args.prompt}\n\nBU SAĞLAYICIYA ÖZEL GÖREV: Yalnızca ${difficultyLabel} seviyesinde, tam ${batch.count} yeni soru üret. Bu grubun bütün sorularında difficulty alanı "${batch.difficulty}" olsun. Başka zorluk seviyesinden soru üretme. Bu talimat genel dağılım hedefinin bu grup için ayrıntılandırılmış hâlidir. JSON dışında açıklama yazma.`
   const systemPrompt = 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca belirtilen sınıf ve kazanıma uygun, doğru ve yaşa uygun içerik üret.\n\n' + getStaticSystemBlock(args.questionType, args.language)
   let raw = ''
@@ -1829,6 +1830,7 @@ export async function POST(req: NextRequest) {
         kolay: plan.find(batch => batch.difficulty === 'kolay')?.count || 0,
         normal: plan.find(batch => batch.difficulty === 'normal')?.count || 0,
         zor: plan.find(batch => batch.difficulty === 'zor')?.count || 0,
+        'cok zor': plan.find(batch => batch.difficulty === 'cok zor')?.count || 0,
       }
     }
     let targetDifficultyQuota = quotaForCount(safeQCount)
@@ -2257,7 +2259,7 @@ export async function POST(req: NextRequest) {
             })))
             topupQuestions = recoveredBatches.flat()
           } else {
-            const currentDifficultyCounts = { kolay: 0, normal: 0, zor: 0 }
+            const currentDifficultyCounts = { kolay: 0, normal: 0, zor: 0, 'cok zor': 0 }
             for (const question of questions) {
               const level = normalizeDifficultyLevel(question.difficulty)
               if (level) currentDifficultyCounts[level]++
@@ -2266,6 +2268,7 @@ export async function POST(req: NextRequest) {
               kolay: Math.max(0, targetDifficultyQuota.kolay - currentDifficultyCounts.kolay),
               normal: Math.max(0, targetDifficultyQuota.normal - currentDifficultyCounts.normal),
               zor: Math.max(0, targetDifficultyQuota.zor - currentDifficultyCounts.zor),
+              'cok zor': Math.max(0, targetDifficultyQuota['cok zor'] - currentDifficultyCounts['cok zor']),
             }
             const topupPrompt = `${prompt}\n\nÖNEMLİ: Bu sefer TAM OLARAK ${missing} adet YENİ ve BİRBİRİNDEN FARKLI soru üret. Eksik zorluk kotası tam olarak ${formatDifficultyQuota(remainingDifficultyQuota)}. Daha önce üretilenlerle aynı/benzer soru üretme. Yanıtın SADECE geçerli, TAMAMLANMIŞ JSON olmalı.`
             const topupCallTimeoutMs = Math.max(15000, TOPUP_TIME_BUDGET_MS - (Date.now() - requestStartTime))
@@ -2391,8 +2394,9 @@ export async function POST(req: NextRequest) {
     }).then(async response => response.ok ? response.json() : null).catch(() => null)
 
     const verifiedCandidateCount = Array.isArray(strictVerifyResult?.questions) ? strictVerifyResult.questions.length : 0
-    if (adaptiveCandidateBatch && verifiedCandidateCount > 0 && verifiedCandidateCount < safeQCount) {
-      console.warn(`[generate-quiz] adaptive_candidate_subset accepted=${verifiedCandidateCount}/${safeQCount}`)
+    const minimumVerifiedCount = Math.max(1, Math.ceil(safeQCount * 0.70))
+    if (verifiedCandidateCount >= minimumVerifiedCount && verifiedCandidateCount < safeQCount) {
+      console.warn(`[generate-quiz] quality_threshold_subset accepted=${verifiedCandidateCount}/${safeQCount} minimum=${minimumVerifiedCount}`)
       safeQCount = verifiedCandidateCount
       targetDifficultyQuota = quotaForCount(safeQCount)
     } else if (!Array.isArray(strictVerifyResult?.questions) || verifiedCandidateCount !== safeQCount) {
@@ -2404,13 +2408,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'quality_policy_failed', reason: 'verification_evidence_missing', message: 'Soru kalite kontrol kanıtı eksik olduğu için test oluşturulmadı.' }, { status: 503 })
     }
     if (!hasDifficultyQuota(questions, targetDifficultyQuota)) {
-      const actualDifficultyCounts = { kolay: 0, normal: 0, zor: 0, bilinmeyen: 0 }
+      const actualDifficultyCounts = { kolay: 0, normal: 0, zor: 0, 'cok zor': 0, bilinmeyen: 0 }
       for (const question of questions) {
         const level = normalizeDifficultyLevel(question.difficulty)
         if (level) actualDifficultyCounts[level]++
         else actualDifficultyCounts.bilinmeyen++
       }
-      console.error(`[generate-quiz] difficulty_quota_failed expected=${formatDifficultyQuota(targetDifficultyQuota)} actual=${JSON.stringify(actualDifficultyCounts)} tolerance=${Math.max(1, Math.ceil(questions.length * 0.2))}`)
+      console.error(`[generate-quiz] difficulty_quota_failed expected=${formatDifficultyQuota(targetDifficultyQuota)} actual=${JSON.stringify(actualDifficultyCounts)} tolerance=${Math.max(1, Math.ceil(questions.length * 0.3))}`)
       return NextResponse.json({ error: 'quality_policy_failed', reason: 'difficulty_distribution', message: 'Kolay, normal ve zor soru dağılımı adaptif kota ile eşleşmediği için test oluşturulmadı.' }, { status: 503 })
     }
     const objectiveMapping = applyCanonicalObjectiveMappings(questions, objectiveCandidates)

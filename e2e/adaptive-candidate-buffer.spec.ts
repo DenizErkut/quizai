@@ -10,11 +10,12 @@ test('adaptive continuation requests a three-question validated reserve', () => 
   expect(page).not.toContain('Bağlantıyı kontrol edip testi yeniden başlatabilirsin.')
 })
 
-test('only adaptive continuation may accept a non-empty verified subset', () => {
+test('quality gate accepts a verified seventy-percent subset without relaxing objectives', () => {
   const route = readFileSync(join(process.cwd(), 'app/api/generate-quiz/route.ts'), 'utf8')
   expect(route).toContain("body?.adaptiveCandidateBatch === true")
   expect(route).toContain("typeof body?.continueSessionId === 'string'")
-  expect(route).toContain('adaptiveCandidateBatch && verifiedCandidateCount > 0')
+  expect(route).toContain('Math.ceil(safeQCount * 0.70)')
+  expect(route).toContain('verifiedCandidateCount >= minimumVerifiedCount')
   expect(route).toContain('adaptiveCandidateBatch && questions.length > 0')
   expect(route).toContain('combinedMinimum = requiredVisualCount(existingQuestions.length + safeQCount)')
   expect(route).toContain('batchVisualMinimum = Math.max(0, combinedMinimum - existingVisualCount)')
