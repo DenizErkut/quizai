@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { questionBankKey } from '@/lib/question-bank'
+import { educationEvalGradeKey } from '@/lib/education-eval-grade'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
@@ -17,10 +18,6 @@ async function getAdminUser() {
   if (!user) return null
   const { data: profile } = await db.from('profiles').select('is_admin').eq('id', user.id).maybeSingle()
   return profile?.is_admin ? user : null
-}
-
-function scopeKey(value: unknown) {
-  return questionBankKey(value).replace(/\b(ortaokul|ilkokul|lise|sinif|sinifi)\b/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 function gradeAliases(value: unknown) {
@@ -80,7 +77,7 @@ export async function GET() {
       .order('created_at', { ascending: true }).limit(200)
     for (const row of questions || []) {
       if (!validQuestion(row.question) || usedBankQuestionIds.has(row.id)) continue
-      if (scopeKey(row.grade_key) !== scopeKey(resource.grade) || questionBankKey(row.subject_key) !== questionBankKey(resource.subject)) continue
+      if (educationEvalGradeKey(row.grade_key) !== educationEvalGradeKey(resource.grade) || questionBankKey(row.subject_key) !== questionBankKey(resource.subject)) continue
       candidates.push({ id: row.id, question: row.question, grade: resource.grade, subject: resource.subject,
         topic: resource.subtopic || resource.topic || row.topic_key, difficulty: row.difficulty,
         resourceId: resource.id, resourceTitle: resource.title })
@@ -94,7 +91,7 @@ export async function GET() {
       return data?.signedUrl || null
     }))
     const objectiveScope = (scopedObjectives.find(result => result.resourceId === resource.id)?.data || []).filter((objective: any) => objective.curriculum_version_id === benchmark?.curriculum_version_id
-      && scopeKey(objective.grade) === scopeKey(resource.grade)
+      && educationEvalGradeKey(objective.grade) === educationEvalGradeKey(resource.grade)
       && questionBankKey(objective.subject) === questionBankKey(resource.subject))
     return { id: resource.id, title: resource.title, grade: resource.grade, subject: resource.subject,
       topic: resource.subtopic || resource.topic || '',
@@ -145,13 +142,13 @@ export async function POST(req: NextRequest) {
   const question = bankQuestion?.question
   if (!bankQuestion || bankQuestion.review_status !== 'approved' || bankQuestion.source_engine !== 'teacher_booklet_exact'
     || question?.bookletResourceId !== resource.id || question?.sourcePolicy !== 'teacher_exact'
-    || !validQuestion(question) || scopeKey(bankQuestion.grade_key) !== scopeKey(resource.grade)
+    || !validQuestion(question) || educationEvalGradeKey(bankQuestion.grade_key) !== educationEvalGradeKey(resource.grade)
     || questionBankKey(bankQuestion.subject_key) !== questionBankKey(resource.subject)) {
     return NextResponse.json({ error: 'Soru bu öğretmen onaylı kitapçıkla birebir eşleşmiyor veya doğrulanmış değil.' }, { status: 400 })
   }
   if (!objective || objective.verification_status !== 'verified' || objective.lifecycle_status !== 'active' || !objective.is_active
     || objective.curriculum_version_id !== set.curriculum_version_id
-    || scopeKey(objective.grade) !== scopeKey(resource.grade) || questionBankKey(objective.subject) !== questionBankKey(resource.subject)) {
+    || educationEvalGradeKey(objective.grade) !== educationEvalGradeKey(resource.grade) || questionBankKey(objective.subject) !== questionBankKey(resource.subject)) {
     return NextResponse.json({ error: 'Kazanım doğrulanmış ve kaynakla aynı sınıf/ders kapsamında olmalı.' }, { status: 400 })
   }
   const currentSourceVersion = createHash('sha256').update(JSON.stringify({ id: resource.id, title: resource.title, raw_text: resource.raw_text || '', updated_at: resource.created_at })).digest('hex')

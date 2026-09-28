@@ -1,8 +1,15 @@
 import { expect, test } from '@playwright/test'
 import manifest from '../data/evals/meb/question-benchmark-v1.json'
 import { runMebEvalCase, summarizeMebEvalResults, validateMebEvalCase, type MebEvalCase } from '../lib/meb-eval-suite'
+import { educationEvalGradeKey } from '../lib/education-eval-grade'
 
 const cases = manifest.cases as MebEvalCase[]
+
+test('benchmark grade scope matches numeric and Turkish class labels', () => {
+  expect(educationEvalGradeKey('5')).toBe(educationEvalGradeKey('5. sınıf'))
+  expect(educationEvalGradeKey('ortaokul 5. sınıf')).toBe(educationEvalGradeKey('5'))
+  expect(educationEvalGradeKey('7. sınıf')).not.toBe(educationEvalGradeKey('5'))
+})
 
 test('MEB eval manifest is source-traceable and does not invent teacher approval', () => {
   expect(manifest.schemaVersion).toBe('meb-question-eval-v1')
