@@ -1788,7 +1788,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               {tab === 'exam-books' ? '🎯 Yeni Sınav Kitapçığı Yükle' : '📚 Yeni Soru Kitapçığı Yükle'}
             </div>
             <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '12px', padding: '12px 14px', marginBottom: '1.25rem', fontSize: '12px', color: '#6366f1' }}>
-              📌 {tab === 'exam-books' ? 'LGS, TYT, AYT ve YDT simülasyonlarında kullanılacak sınav kitapçıklarını yönetin.' : 'Bu alan yalnızca anlık test havuzunu besler. Öğretmen imzalı sorular aynı metin ve seçeneklerle havuza alınır. Anonim sorular öğrenciye aynen gösterilmez; AI yalnızca bunları referans alarak yeni ve benzer sorular üretir.'}
+              📌 {tab === 'exam-books' ? 'LGS, TYT, AYT ve YDT simülasyonlarında kullanılacak sınav kitapçıklarını yönetin.' : 'Bu alan yalnızca anlık test havuzunu besler. Öğretmen imzalı ve AI kitapçığı soruları aynı metin ve seçeneklerle havuza alınır; ayrıca yeni soru üretiminde referans olabilir. Anonim sorular öğrenciye aynen gösterilmez; yalnızca benzer/özgün üretimde referans alınır.'}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
@@ -1804,6 +1804,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px' }}>
                   <option value="anonymous">Anonim — benzer/özgün üretim</option>
                   <option value="teacher">Öğretmen imzalı — birebir anlık test havuzu</option>
+                  <option value="ai">AI — birebir + yeni soru referansı</option>
                 </select>
               </div>
               {tab === 'question-books' && <div>
@@ -1895,7 +1896,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     const data = await res.json()
                     if (res.ok) {
                       if (examEvidenceFiles.length && data.resource_id) await uploadExamEvidence(data.resource_id, examEvidenceFiles)
-                      setExamMsg(tab === 'question-books' && examForm.source_type === 'teacher' ? `✅ Yüklendi; ${data.promoted || 0} soru birebir anlık test havuzuna aktarıldı${examEvidenceFiles.length ? ` ve ${examEvidenceFiles.length} yayın izni kanıtı saklandı` : ''}.` : `✅ Yüklendi! ${data.chunks} kaynak parçası işlendi.`)
+                      setExamMsg(tab === 'question-books' && examForm.source_type !== 'anonymous' ? `✅ Yüklendi; ${data.promoted || 0} soru birebir anlık test havuzuna aktarıldı${examEvidenceFiles.length ? ` ve ${examEvidenceFiles.length} yayın izni kanıtı saklandı` : ''}.` : `✅ Yüklendi! ${data.chunks} kaynak parçası işlendi.`)
                       setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '' })
                       setExamFile(null)
                       setExamEvidenceFiles([])
@@ -1911,7 +1912,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     const data = await res.json()
                     if (res.ok) {
                       if (examEvidenceFiles.length && data.resource_id) await uploadExamEvidence(data.resource_id, examEvidenceFiles)
-                      setExamMsg(tab === 'question-books' && examForm.source_type === 'teacher' ? `✅ Yüklendi; ${data.promoted || 0} soru birebir anlık test havuzuna aktarıldı${examEvidenceFiles.length ? ` ve ${examEvidenceFiles.length} yayın izni kanıtı saklandı` : ''}.` : `✅ Yüklendi! ${data.chunks} kaynak parçası işlendi.`)
+                      setExamMsg(tab === 'question-books' && examForm.source_type !== 'anonymous' ? `✅ Yüklendi; ${data.promoted || 0} soru birebir anlık test havuzuna aktarıldı${examEvidenceFiles.length ? ` ve ${examEvidenceFiles.length} yayın izni kanıtı saklandı` : ''}.` : `✅ Yüklendi! ${data.chunks} kaynak parçası işlendi.`)
                       setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '' })
                       setExamFile(null)
                       setExamEvidenceFiles([])
@@ -1953,7 +1954,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                       <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--primary)' }}>{ex.title}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Anlık test kaynağı · {ex.grade ? `${ex.grade}. sınıf · ` : ''}{ex.subject || 'Ders belirtilmedi'}{(ex.topic || ex.subtopic) ? ` · ${ex.topic || ex.subtopic}` : ''} · {ex.chunk_count || 0} parça{ex.publication_evidence_count ? ` · ${ex.publication_evidence_count} izin kanıtı` : ''}</div>
                     </div>
-                    <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '99px', background: ex.source_type === 'teacher' ? 'rgba(22,163,74,0.1)' : 'rgba(99,102,241,0.1)', color: ex.source_type === 'teacher' ? '#15803d' : '#6366f1', fontWeight: 600 }}>{ex.source_type === 'teacher' ? 'Öğretmen' : 'Anonim'} · {ex.review_status === 'approved' ? 'Onaylı' : 'Bekliyor'}</span>
+                    <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '99px', background: ex.source_type === 'teacher' ? 'rgba(22,163,74,0.1)' : ex.source_type === 'ai' ? 'rgba(14,165,233,0.1)' : 'rgba(99,102,241,0.1)', color: ex.source_type === 'teacher' ? '#15803d' : ex.source_type === 'ai' ? '#0369a1' : '#6366f1', fontWeight: 600 }}>{ex.source_type === 'teacher' ? 'Öğretmen' : ex.source_type === 'ai' ? 'AI' : 'Anonim'} · {ex.review_status === 'approved' ? 'Onaylı' : 'Bekliyor'}</span>
                     <button onClick={() => void openExamResource(ex.id, 'view')} className="btn btn-sm" style={{ flexShrink: 0 }}>👁️ Görüntüle</button>
                     <button onClick={() => void openExamResource(ex.id, 'edit')} className="btn btn-sm" style={{ flexShrink: 0 }}>✏️ Düzelt</button>
                     {ex.review_status !== 'approved' && <button onClick={async () => {
@@ -1961,11 +1962,11 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                       const data = await res.json()
                       if (res.ok) {
                         setExamList(current => current.map(item => item.id === ex.id ? { ...item, review_status: 'approved' } : item))
-                        setExamMsg(ex.source_type === 'teacher'
+                        setExamMsg(ex.source_type === 'teacher' || ex.source_type === 'ai'
                           ? `✅ Onaylandı; ${data.promoted || 0} soru anlık test havuzuna aktarıldı.`
                           : '✅ Anonim kitapçık onaylandı; yalnızca benzer/özgün soru üretiminde referans olarak kullanılacak.')
                       } else setExamMsg(`❌ ${data.error || 'Onay başarısız'}`)
-                    }} style={{ padding: '5px 9px', borderRadius: '7px', border: '1px solid rgba(22,163,74,0.3)', background: 'rgba(22,163,74,0.08)', color: '#15803d', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>{ex.source_type === 'teacher' ? '✓ Onayla ve havuza aktar' : '✓ Onayla — referans kullan'}</button>}
+                    }} style={{ padding: '5px 9px', borderRadius: '7px', border: '1px solid rgba(22,163,74,0.3)', background: 'rgba(22,163,74,0.08)', color: '#15803d', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>{ex.source_type === 'teacher' || ex.source_type === 'ai' ? '✓ Onayla ve havuza aktar' : '✓ Onayla — referans kullan'}</button>}
                     <button onClick={async () => {
                       // "Önce gör, sonra sil" — exam_chunks için ilk defa buradan
                       // silinebiliyor (önceden repo dışı, elle SQL ile yapılıyordu).
@@ -2624,7 +2625,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     rows={16} spellCheck={false}
                     style={{ display: 'block', width: '100%', marginTop: '4px', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'monospace', fontSize: '12px', lineHeight: 1.5 }} />
                 </label>
-                <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{examEditor.raw_text.length.toLocaleString('tr-TR')} karakter · Kaynak: {examEditor.source_type === 'teacher' ? 'Öğretmen imzalı' : 'Anonim'}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{examEditor.raw_text.length.toLocaleString('tr-TR')} karakter · Kaynak: {examEditor.source_type === 'teacher' ? 'Öğretmen imzalı' : examEditor.source_type === 'ai' ? 'AI kitapçığı' : 'Anonim'}</div>
               </>
             )}
             {examEditor.error && <div style={{ color: 'var(--red)', fontSize: '12px' }}>{examEditor.error}</div>}

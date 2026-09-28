@@ -1115,10 +1115,14 @@ async function loadBookletContext(subject: string, grade: string, topic: string)
   })
   if (!matches.length) return ''
   const teacher = matches.filter((row: any) => row.source_type === 'teacher' && row.review_status === 'approved').slice(0, 2)
-  const anonymous = matches.filter((row: any) => row.source_type !== 'teacher').slice(0, 2)
+  const ai = matches.filter((row: any) => row.source_type === 'ai' && row.review_status === 'approved').slice(0, 2)
+  const anonymous = matches.filter((row: any) => row.source_type === 'anonymous').slice(0, 2)
   const blocks: string[] = []
   if (teacher.length) {
     blocks.push(`ÖĞRETMEN İMZALI SORU KİTAPÇIĞI REFERANSI:\n${teacher.map((row: any) => String(row.raw_text || '').slice(0, 3500)).join('\n---\n')}\nYeni soru üretirken bu soruların ölçtüğü kazanımı, çözüm mantığını, bilişsel seviyeyi ve seçenek tasarımını MUTLAKA temel al. Yeni üretilen soru özgün olmalı; ancak konu ve ölçme yaklaşımı bu öğretmen sorularıyla açıkça aynı çizgide kalmalı. Öğretmen imzalı sorular ayrıca onaylı soru havuzundan öğrenciye birebir sunulabilir.`)
+  }
+  if (ai.length) {
+    blocks.push(`AI SORU KİTAPÇIĞI REFERANSI — BİREBİR + YENİ ÜRETİM:\n${ai.map((row: any) => String(row.raw_text || '').slice(0, 3500)).join('\n---\n')}\nBu onaylı AI kitapçığındaki sorular soru havuzundan öğrenciye birebir sunulabilir. Yeni soru üretirken de ölçülen kazanımı, çözüm mantığını, bilişsel seviyeyi ve seçenek tasarımını referans al; eksik kalan kontenjan için aynı kazanımı ölçen yeni ve özgün sorular üret.`)
   }
   if (anonymous.length) {
     blocks.push(`ANONİM SORU KİTAPÇIĞI REFERANSI — KOPYALAMA YASAK:\n${anonymous.map((row: any) => String(row.raw_text || '').slice(0, 2500)).join('\n---\n')}\nBu kaynak yalnızca ölçülen kavram, soru mantığı ve zorluk seviyesini anlamak içindir. Kaynaktaki soru cümlesini, sayıları, özel isimleri, seçenekleri veya kurguyu aynen kullanma. Öğrencinin karşısına tamamen yeni fakat aynı kazanımı ölçen benzer bir soru çıkar.`)
@@ -1880,7 +1884,11 @@ export async function POST(req: NextRequest) {
     // alınır (kopyalama yapılmaz).
     const questionBankReferenceContext = bankQuestions.length > 0
       ? `\n\n📚 ONAYLI SORU HAVUZU REFERANSI (yalnızca konu/kazanım ve seviye bağlamı):\n${bankQuestions.slice(0, 8).map((question: any, index: number) => {
-        const sourcePolicy = question.sourcePolicy === 'teacher_exact' ? 'öğretmen imzalı; aynı soru havuzdan birebir sunulabilir' : 'referans; yeni ve özgün soru üret'
+        const sourcePolicy = question.sourcePolicy === 'teacher_exact'
+          ? 'öğretmen imzalı; aynı soru havuzdan birebir sunulabilir'
+          : question.sourcePolicy === 'ai_exact'
+            ? 'onaylı AI kitapçığı; aynı soru havuzdan birebir sunulabilir ve yeni soru üretiminde referans alınabilir'
+            : 'referans; yeni ve özgün soru üret'
         return `${index + 1}. [${sourcePolicy}] ${JSON.stringify({ q: question.q, opts: question.opts, type: question.type, objective: question.objective, difficulty: question.difficulty }).slice(0, 1400)}`
       }).join('\n')}`
       : ''

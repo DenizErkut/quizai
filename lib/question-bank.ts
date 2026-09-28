@@ -88,14 +88,14 @@ function isNewGenerationTopic(topic: string): boolean {
 function selectWithVisualQuota(rows: any[], count: number, topic: string): any[] {
   const ratio = isNewGenerationTopic(topic) ? 0.5 : 0.3
   const target = Math.min(count, Math.max(1, Math.ceil(count * ratio)))
-  const teacherRows = shuffled(rows.filter(row => row.question?.sourcePolicy === 'teacher_exact')).slice(0, count)
-  const chosen = new Set(teacherRows.map(row => row.id))
-  const teacherVisualCount = teacherRows.filter(row => hasRealVisualAsset(row.question)).length
+  const exactRows = shuffled(rows.filter(row => ['teacher_exact', 'ai_exact'].includes(row.question?.sourcePolicy))).slice(0, count)
+  const chosen = new Set(exactRows.map(row => row.id))
+  const exactVisualCount = exactRows.filter(row => hasRealVisualAsset(row.question)).length
   const visualRows = shuffled(rows.filter(row => !chosen.has(row.id) && hasRealVisualAsset(row.question)))
-    .slice(0, Math.max(0, target - teacherVisualCount))
+    .slice(0, Math.max(0, target - exactVisualCount))
   visualRows.forEach(row => chosen.add(row.id))
-  const remaining = shuffled(rows.filter(row => !chosen.has(row.id))).slice(0, count - teacherRows.length - visualRows.length)
-  return shuffled([...teacherRows, ...visualRows, ...remaining])
+  const remaining = shuffled(rows.filter(row => !chosen.has(row.id))).slice(0, count - exactRows.length - visualRows.length)
+  return shuffled([...exactRows, ...visualRows, ...remaining])
 }
 
 export function balanceAnswerPositions(questions: Question[]): Question[] {
@@ -218,23 +218,23 @@ export async function getQuestionBankSet(
     }
   }
 
-  // Öğretmen imzalı kitapçık soruları insan onaylıdır ve öğrenciye birebir
-  // gösterilmesi istenir. Eski kayıtların difficulty/topic anahtarları bugünkü
+  // Öğretmen imzalı ve ayrıca hazırlanmış AI kitapçığı soruları onaylandıktan
+  // sonra öğrenciye birebir gösterilebilir. Eski kayıtların anahtarları bugünkü
   // normalizasyondan önce yazılmış olabileceği için yalnızca tam difficulty
-  // filtresine bağlı kalma; aynı sınıf/dil/tip içindeki öğretmen sorularını
+  // filtresine bağlı kalma; aynı sınıf/dil/tip içindeki exact soruları
   // getirip konu ve ders eşleşmesini uygulama tarafında yeniden doğrula.
-  const teacherRows = await db.from('question_bank')
+  const exactRows = await db.from('question_bank')
     .select('id, question, fingerprint, use_count, subject_key, topic_key')
     .eq('grade_key', questionBankKey(dimensions.grade))
     .eq('review_status', 'approved')
     .eq('report_count', 0)
-    .contains('question', { sourcePolicy: 'teacher_exact' })
     .order('use_count', { ascending: true })
-    .limit(100)
-  if (!teacherRows.error && Array.isArray(teacherRows.data)) {
+    .limit(250)
+  if (!exactRows.error && Array.isArray(exactRows.data)) {
     const requestedSubject = questionBankKey(dimensions.subject || 'genel')
     const requestedTopic = questionBankKey(dimensions.topic)
-    const matchingTeacherRows = teacherRows.data.filter((row: any) => {
+    const matchingExactRows = exactRows.data.filter((row: any) => {
+      if (!['teacher_exact', 'ai_exact'].includes(row.question?.sourcePolicy)) return false
       const rowSubject = questionBankKey(row.subject_key || row.question?.subject || 'genel')
       const rowTopic = questionBankKey(row.question?.objective || row.topic_key)
       const subjectMatches = rowSubject === requestedSubject
@@ -250,7 +250,7 @@ export async function getQuestionBankSet(
         || requestedType === 'multiple choice'
       return subjectMatches && topicMatches && typeMatches
     })
-    const unique = new Map([...(matchingTeacherRows || []), ...(data || [])].map((row: any) => [row.id, row]))
+    const unique = new Map([...(matchingExactRows || []), ...(data || [])].map((row: any) => [row.id, row]))
     data = [...unique.values()]
   }
 

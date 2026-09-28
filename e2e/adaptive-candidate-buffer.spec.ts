@@ -99,7 +99,7 @@ test('database plan constraint accepts every checkout profile plan', () => {
   for (const plan of ['free', 'silver', 'premium', 'unlimited']) expect(migration).toContain(`'${plan}'::text`)
 })
 
-test('teacher booklets ground generation and approved exact questions re-enter the live bank', () => {
+test('teacher and AI booklets ground generation and approved exact questions re-enter the live bank', () => {
   const route = readFileSync(join(process.cwd(), 'app/api/generate-quiz/route.ts'), 'utf8')
   const upload = readFileSync(join(process.cwd(), 'app/api/admin/exam-upload/route.ts'), 'utf8')
   const bank = readFileSync(join(process.cwd(), 'lib/question-bank.ts'), 'utf8')
@@ -109,11 +109,22 @@ test('teacher booklets ground generation and approved exact questions re-enter t
   expect(route).toContain('const bankEligible = bankWriteEligible && !continueSessionId')
   expect(route).toContain('validatedQuestionsForBank = questions.slice()')
   expect(route.indexOf('validatedQuestionsForBank = questions.slice()')).toBeGreaterThan(route.indexOf('questions = balanceAnswerPositions(questions)'))
-  expect(upload).toContain("sourcePolicy: 'teacher_exact'")
+  expect(upload).toContain("sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact'")
   expect(upload).toContain("difficulty: q.difficulty === 'easy' ? 'kolay'")
-  expect(bank).toContain("row.question?.sourcePolicy === 'teacher_exact'")
-  expect(bank).toContain("contains('question', { sourcePolicy: 'teacher_exact' })")
+  expect(bank).toContain("['teacher_exact', 'ai_exact'].includes")
   expect(bank).toContain('hasRealVisualAsset(clean)')
+  expect(route).toContain('AI SORU KİTAPÇIĞI REFERANSI')
+  expect(route).toContain("row.source_type === 'anonymous'")
+})
+
+test('admin accepts AI question booklets for exact reuse and reference generation', () => {
+  const upload = readFileSync(join(process.cwd(), 'app/api/admin/exam-upload/route.ts'), 'utf8')
+  const admin = readFileSync(join(process.cwd(), 'app/admin/page.tsx'), 'utf8')
+  const migration = readFileSync(join(process.cwd(), 'supabase/migrations/20260928072735_add_ai_question_booklet_source.sql'), 'utf8')
+  expect(admin).toContain('<option value="ai">AI — birebir + yeni soru referansı</option>')
+  expect(upload).toContain("source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact'")
+  expect(upload).toContain("source_type !== 'anonymous'")
+  expect(migration).toContain("('anonymous', 'teacher', 'ai')")
 })
 
 test('question booklet records can be viewed, edited and safely deleted by admins', () => {

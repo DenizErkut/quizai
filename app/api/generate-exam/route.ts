@@ -87,7 +87,7 @@ async function getBookletReference(format: ExamFormat, section: ExamSection): Pr
     const subjectOk = !r.subject || !section.subject || String(r.subject).toLocaleLowerCase('tr').includes(String(section.subject).toLocaleLowerCase('tr'))
     return gradeOk && subjectOk
   }).slice(0, 3)
-  return rows.map((r: any) => `[${r.source_type === 'teacher' ? 'öğretmen imzalı' : 'anonim'} referans] ${(r.raw_text || '').slice(0, 1400)}`).filter((s: string) => s.length > 40).join('\n---\n')
+  return rows.map((r: any) => `[${r.source_type === 'teacher' ? 'öğretmen imzalı' : r.source_type === 'ai' ? 'AI kitapçığı' : 'anonim'} referans] ${(r.raw_text || '').slice(0, 1400)}`).filter((s: string) => s.length > 40).join('\n---\n')
 }
 
 function structurallyValid(question: ExamQuestion, optionCount: number): boolean {

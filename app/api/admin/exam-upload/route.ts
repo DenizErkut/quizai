@@ -83,7 +83,7 @@ async function embedText(text: string): Promise<number[] | null> {
 
 async function processExam(params: {
   title: string; exam_type: string; year: string; subject: string; answer_key: string
-  rawText: string; fileUrl?: string; fileName?: string; source_type: 'anonymous' | 'teacher'; grade: string; subtopic: string; topic?: string; purpose: 'exam' | 'instant_test'; uploaded_by?: string
+  rawText: string; fileUrl?: string; fileName?: string; source_type: 'anonymous' | 'teacher' | 'ai'; grade: string; subtopic: string; topic?: string; purpose: 'exam' | 'instant_test'; uploaded_by?: string
 }) {
   const { title, exam_type, year, subject, answer_key, rawText, fileUrl, fileName, source_type, grade, subtopic, topic, purpose, uploaded_by } = params
 
@@ -95,7 +95,7 @@ async function processExam(params: {
     raw_text: rawText,
     purpose,
     source_type,
-    reuse_policy: source_type === 'teacher' ? 'exact_reuse' : 'reference_only',
+    reuse_policy: source_type === 'anonymous' ? 'reference_only' : 'exact_reuse',
     grade: grade || '',
     subtopic: subtopic || '', topic: topic || subtopic || '',
     review_status: 'pending',
@@ -120,7 +120,7 @@ async function processExam(params: {
       content: chunks[i],
       embedding: embedding ? JSON.stringify(embedding) : null,
       exam_type, year: parseInt(year), subject: subject || null,
-      source_type, reuse_policy: source_type === 'teacher' ? 'exact_reuse' : 'reference_only',
+      source_type, reuse_policy: source_type === 'anonymous' ? 'reference_only' : 'exact_reuse',
       grade: grade || '', subtopic: subtopic || '',
     })
     if (embedding) embeddedCount++
@@ -175,23 +175,35 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ exams: withCounts })
 }
 
-async function promoteTeacherQuestions(row: { subject?: string | null; grade?: string | null; subtopic?: string | null; raw_text?: string | null }) {
-  const prompt = `Aşağıdaki öğretmen imzalı kitapçıktaki çoktan seçmeli soruları AYNI soru metni, AYNI seçenekler ve AYNI doğru cevapla ayıkla. Yeniden yazma, sadeleştirme veya benzer soru üretme. Açıklama kitapçıkta yoksa yalnızca doğru cevabı kısaca açıkla. Eksik ya da cevabı belirlenemeyen soruyu atla. En fazla 40 soru döndür. {"questions":[{"q":"...","opts":["..."],"ans":0,"exp":"...","topic":"...","difficulty":"easy|medium|hard"}]}\n\n${String(row.raw_text || '').slice(0, 50000)}`
-  const response = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 12000, messages: [{ role: 'user', content: prompt }] })
-  const text = response.content[0].type === 'text' ? response.content[0].text : ''
-  const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
-  const extracted = (parsed.questions || []).filter((q: any) => q?.q && Array.isArray(q.opts) && q.opts.length >= 4 && q.opts.length <= 5 && Number.isInteger(q.ans) && q.ans >= 0 && q.ans < q.opts.length && q.exp)
+async function promoteExactQuestions(row: { subject?: string | null; grade?: string | null; subtopic?: string | null; raw_text?: string | null }, sourceType: 'teacher' | 'ai') {
+  const sourceLabel = sourceType === 'teacher' ? 'öğretmen imzalı' : 'yapay zekâ ile ayrıca hazırlanmış'
+  const rawText = String(row.raw_text || '').slice(0, 300000)
+  const answerStart = rawText.search(/\n\s*(?:CEVAP(?:LAR| ANAHTARI)?|YANIT(?:LAR| ANAHTARI)?)\b/iu)
+  const questionSection = answerStart > 0 ? rawText.slice(0, answerStart) : rawText
+  const answerSection = answerStart > 0 ? rawText.slice(answerStart) : ''
+  const numberedBlocks = questionSection.split(/(?=\n\s*\d{1,3}[\.)]\s+)/).filter(part => /^\s*\d{1,3}[\.)]\s+/u.test(part))
+  const batches = numberedBlocks.length > 55
+    ? Array.from({ length: Math.ceil(numberedBlocks.length / 50) }, (_, index) => `${numberedBlocks.slice(index * 50, index * 50 + 50).join('')}\n\n${answerSection}`)
+    : [rawText]
+  const extractedGroups = await Promise.all(batches.map(async batch => {
+    const prompt = `Aşağıdaki ${sourceLabel} kitapçık bölümündeki çoktan seçmeli soruları AYNI soru metni, AYNI seçenekler ve AYNI doğru cevapla ayıkla. Yeniden yazma, sadeleştirme veya benzer soru üretme. Bölümün sonundaki cevap anahtarından yalnız bu bölümdeki soruların cevaplarını kullan. Açıklama kitapçıkta yoksa doğru cevabı kısaca açıkla. Eksik ya da cevabı belirlenemeyen soruyu atla. En fazla 55 soru döndür. {"questions":[{"q":"...","opts":["..."],"ans":0,"exp":"...","topic":"...","difficulty":"easy|medium|hard"}]}\n\n${batch}`
+    const response = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 12000, messages: [{ role: 'user', content: prompt }] })
+    const text = response.content[0].type === 'text' ? response.content[0].text : ''
+    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
+    return Array.isArray(parsed.questions) ? parsed.questions : []
+  }))
+  const extracted = extractedGroups.flat().filter((q: any) => q?.q && Array.isArray(q.opts) && q.opts.length >= 4 && q.opts.length <= 5 && Number.isInteger(q.ans) && q.ans >= 0 && q.ans < q.opts.length && q.exp)
   if (!extracted.length) return 0
   const validationText = await callOpenAI([
     { role: 'system', content: 'Sen bağımsız soru kalite denetçisisin. Soruları değiştirme. Yalnızca doğru cevabı kesin, seçenekleri benzersiz ve soru eksiksiz olan kayıtları onayla. JSON döndür.' },
     { role: 'user', content: `${JSON.stringify({ questions: extracted.map((q: any, index: number) => ({ index, q: q.q, opts: q.opts, ans: q.ans, exp: q.exp })) })}\nYanıt şeması: {"results":[{"index":0,"approved":true,"reason":"..."}]}` },
-  ], { model: process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini', max_tokens: 3000, json: true, operation: 'teacher-booklet-validator' })
+  ], { model: process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini', max_tokens: 12000, json: true, operation: `${sourceType}-booklet-validator` })
   const validation = JSON.parse(validationText)
   const approvedIndexes = new Set<number>((validation.results || []).filter((item: any) => item.approved === true).map((item: any) => Number(item.index)))
   const questions = extracted.filter((_: any, index: number) => approvedIndexes.has(index))
   const rows = questions.map((q: any) => ({
     fingerprint: createHash('sha256').update(`${q.q}|${q.opts.join('|')}`.toLocaleLowerCase('tr')).digest('hex'),
-    subject_key: questionBankKey(row.subject || 'genel'), topic_key: questionBankKey(q.topic || row.subtopic || 'genel'), grade_key: questionBankKey(row.grade || ''), language_key: 'tr', question_type: 'multiple_choice', difficulty: q.difficulty === 'easy' ? 'kolay' : q.difficulty === 'hard' ? 'zor' : 'normal', question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, objective: q.topic || row.subtopic || '', subject: row.subject || 'Genel', sourcePolicy: 'teacher_exact' }, review_status: 'approved', quality_score: 1, source_engine: 'teacher_booklet_exact', report_count: 0
+    subject_key: questionBankKey(row.subject || 'genel'), topic_key: questionBankKey(q.topic || row.subtopic || 'genel'), grade_key: questionBankKey(row.grade || ''), language_key: 'tr', question_type: 'multiple_choice', difficulty: q.difficulty === 'easy' ? 'kolay' : q.difficulty === 'hard' ? 'zor' : 'normal', question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, objective: q.topic || row.subtopic || '', subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' }, review_status: 'approved', quality_score: 1, source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact', report_count: 0
   }))
   if (!rows.length) return 0
   const result = await adminDb.from('question_bank').upsert(rows, { onConflict: 'fingerprint', ignoreDuplicates: true })
@@ -207,7 +219,7 @@ export async function POST(req: NextRequest) {
   try {
     const contentType = req.headers.get('content-type') || ''
 
-    let title = '', exam_type = 'LGS', year = '', subject = '', answer_key = '', source_type: 'anonymous' | 'teacher' = 'anonymous', grade = '', subtopic = '', topic = '', fileName = '', purpose: 'exam' | 'instant_test' = 'exam'
+    let title = '', exam_type = 'LGS', year = '', subject = '', answer_key = '', source_type: 'anonymous' | 'teacher' | 'ai' = 'anonymous', grade = '', subtopic = '', topic = '', fileName = '', purpose: 'exam' | 'instant_test' = 'exam'
     let rawText = '', fileUrl = ''
 
     // JSON mod: storage_path ile (büyük dosya)
@@ -215,7 +227,7 @@ export async function POST(req: NextRequest) {
       const body = await req.json()
       title = body.title; exam_type = body.exam_type; year = body.year
       subject = body.subject || ''; answer_key = body.answer_key || ''
-      source_type = body.source_type === 'teacher' ? 'teacher' : 'anonymous'; grade = body.grade || ''; subtopic = body.subtopic || ''; topic = body.topic || subtopic; fileName = body.file_name || ''
+      source_type = body.source_type === 'teacher' || body.source_type === 'ai' ? body.source_type : 'anonymous'; grade = body.grade || ''; subtopic = body.subtopic || ''; topic = body.topic || subtopic; fileName = body.file_name || ''
       purpose = body.purpose === 'instant_test' ? 'instant_test' : 'exam'
 
       const { data: fileData, error: dlErr } = await adminDb.storage
@@ -243,7 +255,8 @@ export async function POST(req: NextRequest) {
       year = form.get('year') as string
       subject = form.get('subject') as string || ''
       answer_key = form.get('answer_key') as string || ''
-      source_type = form.get('source_type') === 'teacher' ? 'teacher' : 'anonymous'
+      const submittedSourceType = form.get('source_type')
+      source_type = submittedSourceType === 'teacher' || submittedSourceType === 'ai' ? submittedSourceType : 'anonymous'
       grade = form.get('grade') as string || ''
       subtopic = form.get('subtopic') as string || ''
       topic = form.get('topic') as string || subtopic
@@ -286,8 +299,8 @@ export async function POST(req: NextRequest) {
     if ('error' in result) return NextResponse.json({ error: result.error }, { status: 500 })
 
     let promoted = 0
-    if (purpose === 'instant_test' && source_type === 'teacher') {
-      promoted = await promoteTeacherQuestions({ subject, grade, subtopic, raw_text: rawText })
+    if (purpose === 'instant_test' && source_type !== 'anonymous') {
+      promoted = await promoteExactQuestions({ subject, grade, subtopic, raw_text: rawText }, source_type)
       await adminDb.from('exam_resources').update({ review_status: 'approved', reuse_policy: 'exact_reuse' }).eq('id', result.resource_id)
     }
 
@@ -349,13 +362,13 @@ export async function PATCH(req: NextRequest) {
   if (!id || !['pending', 'approved', 'rejected'].includes(review_status)) return NextResponse.json({ error: 'Geçersiz durum' }, { status: 400 })
     const { data: row } = await adminDb.from('exam_resources').select('source_type,purpose,title,subject,grade,topic,subtopic,raw_text').eq('id', id).single()
   if (!row) return NextResponse.json({ error: 'Bulunamadı' }, { status: 404 })
-  const { error } = await adminDb.from('exam_resources').update({ review_status, reuse_policy: row.source_type === 'teacher' ? 'exact_reuse' : 'reference_only' }).eq('id', id)
+  const { error } = await adminDb.from('exam_resources').update({ review_status, reuse_policy: row.source_type === 'anonymous' ? 'reference_only' : 'exact_reuse' }).eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   let promoted = 0
-  if (review_status === 'approved' && row.source_type === 'teacher' && row.purpose === 'instant_test') {
+  if (review_status === 'approved' && (row.source_type === 'teacher' || row.source_type === 'ai') && row.purpose === 'instant_test') {
     try {
-      promoted = await promoteTeacherQuestions(row)
-    } catch (e) { console.error('[exam-upload] teacher promotion failed', e) }
+      promoted = await promoteExactQuestions(row, row.source_type)
+    } catch (e) { console.error(`[exam-upload] ${row.source_type} promotion failed`, e) }
   }
   return NextResponse.json({ success: true, promoted })
 }
