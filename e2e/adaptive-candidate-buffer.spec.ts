@@ -122,6 +122,7 @@ test('admin accepts AI question booklets for exact reuse and reference generatio
   const admin = readFileSync(join(process.cwd(), 'app/admin/page.tsx'), 'utf8')
   const migration = readFileSync(join(process.cwd(), 'supabase/migrations/20260928072735_add_ai_question_booklet_source.sql'), 'utf8')
   expect(admin).toContain('<option value="ai">AI — birebir + yeni soru referansı</option>')
+  expect(admin).toContain('<option value="teacher">Öğretmen imzalı — birebir + yeni soru referansı</option>')
   expect(upload).toContain("source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact'")
   expect(upload).toContain("source_type !== 'anonymous'")
   expect(upload).toContain('canonicalBookletGrade')

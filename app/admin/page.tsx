@@ -1803,7 +1803,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                 <select value={examForm.source_type} onChange={e => setExamForm(p => ({ ...p, source_type: e.target.value }))}
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px' }}>
                   <option value="anonymous">Anonim — benzer/özgün üretim</option>
-                  <option value="teacher">Öğretmen imzalı — birebir anlık test havuzu</option>
+                  <option value="teacher">Öğretmen imzalı — birebir + yeni soru referansı</option>
                   <option value="ai">AI — birebir + yeni soru referansı</option>
                 </select>
               </div>
