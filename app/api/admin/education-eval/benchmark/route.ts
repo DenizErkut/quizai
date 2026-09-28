@@ -23,6 +23,20 @@ function scopeKey(value: unknown) {
   return questionBankKey(value).replace(/\b(ortaokul|ilkokul|lise|sinif|sinifi)\b/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
+function gradeAliases(value: unknown) {
+  const grade = String(value || '').trim()
+  const number = grade.match(/\b(\d{1,2})\b/)?.[1]
+  if (!number) return [grade]
+  return [...new Set([
+    grade,
+    number,
+    `${number}. sınıf`,
+    `ilkokul ${number}. sınıf`,
+    `ortaokul ${number}. sınıf`,
+    `lise ${number}. sınıf`,
+  ])]
+}
+
 function validQuestion(question: any) {
   return question && typeof question.q === 'string' && question.q.trim().length >= 8
     && Array.isArray(question.opts) && question.opts.length >= 2
@@ -33,15 +47,29 @@ export async function GET() {
   const user = await getAdminUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
 
-  const [{ data: benchmark }, { data: items, error: itemError }, { data: resources, error: resourceError }, { data: objectives }] = await Promise.all([
+  const [{ data: benchmark }, { data: items, error: itemError }, { data: resources, error: resourceError }] = await Promise.all([
     db.from('education_eval_benchmark_sets').select('*').eq('code', 'meb-k12-controlled').eq('version', 1).maybeSingle(),
     db.from('education_eval_benchmark_items').select('*').order('ordinal'),
     db.from('exam_resources').select('id,title,grade,subject,topic,subtopic,raw_text,source_type,purpose,reuse_policy,review_status,publication_evidence_paths,created_at').eq('source_type', 'teacher').eq('purpose', 'instant_test').eq('review_status', 'approved').order('created_at', { ascending: false }).limit(100),
-    db.from('learning_objective_catalog').select('id,objective_code,title,grade,subject,verification_status,lifecycle_status,is_active,curriculum_version_id').eq('verification_status', 'verified').eq('lifecycle_status', 'active').eq('is_active', true).limit(2500),
   ])
   if (itemError || resourceError) return NextResponse.json({ error: itemError?.message || resourceError?.message }, { status: 500 })
 
   const eligibleResources = (resources || []).filter(resource => Array.isArray(resource.publication_evidence_paths) && resource.publication_evidence_paths.length > 0)
+  // Do not fetch an arbitrary first page of the global catalog and filter it in
+  // memory: the catalog is larger than PostgREST's page cap, which silently
+  // omitted valid grade/subject objectives from later pages.
+  const scopedObjectives = await Promise.all(eligibleResources.map(async resource => {
+    const { data, error } = await db.from('learning_objective_catalog')
+      .select('id,objective_code,title,grade,subject,verification_status,lifecycle_status,is_active,curriculum_version_id')
+      .eq('curriculum_version_id', benchmark?.curriculum_version_id || '')
+      .eq('verification_status', 'verified').eq('lifecycle_status', 'active').eq('is_active', true)
+      .eq('subject', resource.subject).in('grade', gradeAliases(resource.grade))
+      .order('objective_code').limit(500)
+    return { resourceId: resource.id, data: data || [], error }
+  }))
+  const objectiveError = scopedObjectives.find(result => result.error)?.error
+  if (objectiveError) return NextResponse.json({ error: objectiveError.message }, { status: 500 })
+
   const candidates: any[] = []
   const usedBankQuestionIds = new Set((items || []).map((item: any) => item.question_bank_id))
   for (const resource of eligibleResources) {
@@ -65,7 +93,7 @@ export async function GET() {
       const { data } = await db.storage.from('publication-evidence').createSignedUrl(path, 60 * 30)
       return data?.signedUrl || null
     }))
-    const objectiveScope = (objectives || []).filter(objective => objective.curriculum_version_id === benchmark?.curriculum_version_id
+    const objectiveScope = (scopedObjectives.find(result => result.resourceId === resource.id)?.data || []).filter((objective: any) => objective.curriculum_version_id === benchmark?.curriculum_version_id
       && scopeKey(objective.grade) === scopeKey(resource.grade)
       && questionBankKey(objective.subject) === questionBankKey(resource.subject))
     return { id: resource.id, title: resource.title, grade: resource.grade, subject: resource.subject,
