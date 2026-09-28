@@ -40,6 +40,14 @@ export function parseBlindEvalAnswer(text: string, options: readonly string[]): 
     }
   }
 
+  const explicitLetterIndex = cleaned.match(/(?:answerIndex|answer_index|cevapIndeksi)\s*[:=]\s*["']?([A-F])\b/i)
+  if (explicitLetterIndex) {
+    const answerIndex = explicitLetterIndex[1].toUpperCase().charCodeAt(0) - 65
+    if (answerIndex >= 0 && answerIndex < optionCount) {
+      return { answerIndex, explanation: cleaned.slice((explicitLetterIndex.index || 0) + explicitLetterIndex[0].length).trim().slice(0, 2000) }
+    }
+  }
+
   const labelledOption = cleaned.match(/^\s*(?:(?:doğru\s+)?(?:cevap|yanıt|answer|option|seçenek|şık)\s*[:\-]?\s*)?([A-F])(?:[).:\s\-]|$)/i)
   if (labelledOption) {
     const answerIndex = labelledOption[1].toUpperCase().charCodeAt(0) - 65
@@ -52,6 +60,17 @@ export function parseBlindEvalAnswer(text: string, options: readonly string[]): 
   if (explicitAnswer) {
     const answerIndex = options.findIndex(option => option.trim() === explicitAnswer[1].trim())
     if (answerIndex >= 0) return { answerIndex, explanation: cleaned.slice(explicitAnswer[0].length).trim().slice(0, 2000) }
+  }
+
+  // Some providers prepend a short note before giving the actual labelled
+  // answer. Accept only an explicit answer/choice label anywhere in the text;
+  // do not infer a choice from arbitrary prose or from an explanation.
+  const labelledAnswer = cleaned.match(/(?:(?:the\s+)?(?:correct\s+)?answer|doğru\s+(?:cevap|yanıt|seçenek)|cevap|yanıt|choice|seçenek|şık)\s*(?:(?:is)\s+|[:=\-]\s*)["'*(]*([A-F])\b/i)
+  if (labelledAnswer) {
+    const answerIndex = labelledAnswer[1].toUpperCase().charCodeAt(0) - 65
+    if (answerIndex >= 0 && answerIndex < optionCount) {
+      return { answerIndex, explanation: cleaned.slice((labelledAnswer.index || 0) + labelledAnswer[0].length).trim().replace(/^[*_`]+|[*_`]+$/g, '').trim().slice(0, 2000) }
+    }
   }
 
   return null
