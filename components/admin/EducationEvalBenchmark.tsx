@@ -7,12 +7,18 @@ import { matchVerifiedObjectiveCode } from '@/lib/learning-objective-codes'
 type Objective = { id: string; objective_code: string; title: string }
 type Resource = { id: string; title: string; grade: string; subject: string; sourceVersion: string; evidenceUrls: string[]; evidenceCount: number; questionCount: number; objectives: Objective[] }
 type Candidate = { id: string; question: any; grade: string; subject: string; topic: string; resourceId: string; resourceTitle: string }
+type AiResource = { id: string; title: string; grade: string; subject: string; topic: string; questionCount: number; objectives: Objective[] }
 
 export default function EducationEvalBenchmark() {
   const [data, setData] = useState<any>(null)
   const [resourceId, setResourceId] = useState('')
   const [questionId, setQuestionId] = useState('')
   const [objectiveId, setObjectiveId] = useState('')
+  const [aiResourceId, setAiResourceId] = useState('')
+  const [aiQuestionId, setAiQuestionId] = useState('')
+  const [aiObjectiveId, setAiObjectiveId] = useState('')
+  const [mappingObjectiveByItem, setMappingObjectiveByItem] = useState<Record<string, string>>({})
+  const [showAllAiItems, setShowAllAiItems] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -35,9 +41,15 @@ export default function EducationEvalBenchmark() {
 
   const resources: Resource[] = data?.resources || []
   const candidates: Candidate[] = useMemo(() => data?.candidates || [], [data])
+  const aiResources: AiResource[] = data?.aiResources || []
+  const aiCandidates: Candidate[] = useMemo(() => data?.aiCandidates || [], [data])
+  const aiItems: any[] = data?.aiItems || []
   const selectedResource = resources.find(resource => resource.id === resourceId)
   const questions = useMemo(() => candidates.filter(question => question.resourceId === resourceId), [candidates, resourceId])
   const selectedQuestion = questions.find(question => question.id === questionId)
+  const selectedAiResource = aiResources.find(resource => resource.id === aiResourceId)
+  const aiQuestions = useMemo(() => aiCandidates.filter(question => question.resourceId === aiResourceId), [aiCandidates, aiResourceId])
+  const selectedAiQuestion = aiQuestions.find(question => question.id === aiQuestionId)
 
   function selectResource(id: string) {
     setResourceId(id); setQuestionId(''); setObjectiveId(''); setConfirmed(false); setMessage('')
@@ -52,18 +64,45 @@ export default function EducationEvalBenchmark() {
     setConfirmed(false)
   }
 
+  function selectAiResource(id: string) {
+    setAiResourceId(id); setAiQuestionId(''); setAiObjectiveId(''); setMessage('')
+  }
+
+  function selectAiQuestion(id: string) {
+    const question = aiQuestions.find(candidate => candidate.id === id)
+    const code = matchVerifiedObjectiveCode(question?.question?.learningObjectiveCode, selectedAiResource?.objectives.map(objective => objective.objective_code) || [])
+    const objective = code ? selectedAiResource?.objectives.find(candidate => candidate.objective_code.toLocaleUpperCase('tr-TR') === code) : null
+    setAiQuestionId(id); setAiObjectiveId(objective?.id || '')
+  }
+
   async function mutate(method: 'POST' | 'DELETE', body?: any, itemId?: string) {
     setBusy(true); setMessage('')
     try {
-      const response = await fetch(`/api/admin/education-eval/benchmark${itemId ? `?itemId=${encodeURIComponent(itemId)}` : ''}`, {
-        method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined,
+      const aiItemId = body?.action === 'delete-ai' ? body.itemId : undefined
+      const query = aiItemId ? `?aiItemId=${encodeURIComponent(aiItemId)}` : itemId ? `?itemId=${encodeURIComponent(itemId)}` : ''
+      const requestBody = body?.action === 'delete-ai' ? undefined : body
+      const response = await fetch(`/api/admin/education-eval/benchmark${query}`, {
+        method, headers: { 'Content-Type': 'application/json' }, body: requestBody ? JSON.stringify(requestBody) : undefined,
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'İşlem tamamlanamadı.')
-      setMessage(method === 'DELETE' ? 'Soru taslak setten çıkarıldı.' : body?.action === 'activate' ? 'Benchmark etkinleştirildi.' : 'Soru doğrulanmış başlangıç setine eklendi.')
-      setConfirmed(false); setQuestionId(''); setObjectiveId('')
+      setMessage(method === 'DELETE' ? 'Soru değerlendirme havuzundan çıkarıldı.' : body?.action === 'activate' ? 'Benchmark etkinleştirildi.' : body?.action === 'add-ai' ? 'AI sorusu ayrı değerlendirme havuzuna eklendi.' : body?.action === 'map-ai' ? 'Doğrulanmış kazanım AI sorusuna bağlandı.' : 'Soru doğrulanmış başlangıç setine eklendi.')
+      setConfirmed(false); setQuestionId(''); setObjectiveId(''); setAiQuestionId(''); setAiObjectiveId('')
       await load()
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Beklenmeyen hata.') }
+    finally { setBusy(false) }
+  }
+
+  async function reprocessAiBooklet(resource: AiResource) {
+    setBusy(true); setMessage('')
+    try {
+      const response = await fetch('/api/admin/exam-upload', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reprocess-ai-booklet', id: resource.id }) })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Kitapçık yeniden işlenemedi.')
+      setMessage(`${resource.title}: ${result.promoted} soru havuza aktarıldı; AI değerlendirme havuzu güncellendi.`)
+      await load()
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Yeniden işleme başarısız oldu.') }
     finally { setBusy(false) }
   }
 
@@ -88,6 +127,72 @@ export default function EducationEvalBenchmark() {
     <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 14, color: 'var(--text2)', lineHeight: 1.55 }}>
       Yalnızca öğretmen onaylı, yayın izni kanıtı ekli, kaynak kitapçıkla birebir eşleşen ve doğrulanmış aktif kazanıma bağlanan sorular 50 soruluk başarı metriğine dahil edilir. Set etkinleşince soru ve cevap anlık görüntüleri sürüm kilidiyle korunur.
       {data.readiness.missingEvidenceBooklets > 0 && <div style={{ marginTop: 8, color: 'var(--red, #b54735)' }}>{data.readiness.missingEvidenceBooklets} onaylı kitapçıkta kanıt görseli bulunmadığından bu kitapçıklar henüz aday olamaz.</div>}
+    </div>
+
+    <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 14, display: 'grid', gap: 10 }}>
+      <div><strong>🤖 AI kitapçığı değerlendirme havuzu</strong><div style={{ color: 'var(--text2)', fontSize: 13, marginTop: 4 }}>
+        AI ile üretilip yüklenen, soruları bağımsız kalite kontrolünden geçmiş kitapçık soruları burada tutulur. Bu sorular model karşılaştırmaları için adaydır; öğretmen onaylı 50 soruluk MEB başarı metriğine ve kanıt şartına dahil edilmez.
+      </div></div>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 13 }}>
+        <span><strong>{aiItems.length}</strong> soru havuzda</span>
+        <span><strong>{aiItems.filter((item: any) => item.status === 'ready').length}</strong> kazanımı eşleşmiş</span>
+        <span><strong>{aiItems.filter((item: any) => item.status !== 'ready').length}</strong> kazanım bekliyor</span>
+      </div>
+      {aiResources.length === 0 && <small style={{ color: 'var(--text2)' }}>Onaylı AI kaynaklı anlık test kitapçığı bulunmuyor.</small>}
+      {aiResources.length > 0 && <>
+        <label>AI kitapçığı
+          <select className="input" style={{ marginTop: 5 }} value={aiResourceId} onChange={event => selectAiResource(event.target.value)}>
+            <option value="">Kitapçık seç</option>
+            {aiResources.map(resource => <option key={resource.id} value={resource.id}>{resource.title} · {resource.grade}. sınıf · {resource.subject} · {resource.questionCount} soru</option>)}
+          </select>
+        </label>
+        {selectedAiResource && selectedAiResource.questionCount === 0 && <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <small style={{ color: 'var(--text2)' }}>Bu kitapçıkta henüz havuza bağlanmış soru yok. Metni yeniden tarayıp uygun soruları çıkarabilirsin.</small>
+          <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => void reprocessAiBooklet(selectedAiResource)}>Kitapçığı yeniden tara</button>
+        </div>}
+        {aiQuestions.length > 0 && <>
+          <select className="input" value={aiQuestionId} onChange={event => selectAiQuestion(event.target.value)}>
+            <option value="">Havuza yeni eklenecek AI sorusunu seç</option>
+            {aiQuestions.map(question => <option key={question.id} value={question.id}>{question.topic} · {question.question.q.slice(0, 110)}</option>)}
+          </select>
+          {selectedAiQuestion && <div style={{ padding: 12, borderRadius: 8, background: 'var(--bg2, #f7f1e9)' }}>
+            <div><strong>{selectedAiQuestion.question.q}</strong></div>
+            <ol type="A">{selectedAiQuestion.question.opts.map((option: string, index: number) => <li key={index}>{option}{index === selectedAiQuestion.question.ans ? ' ✓' : ''}</li>)}</ol>
+            <label>Doğrulanmış MEB kazanımı
+              <select className="input" style={{ marginTop: 5 }} value={aiObjectiveId} onChange={event => setAiObjectiveId(event.target.value)}>
+                <option value="">Kazanım seç</option>
+                {selectedAiResource?.objectives.map(objective => <option key={objective.id} value={objective.id}>{objective.objective_code} · {objective.title}</option>)}
+              </select>
+            </label>
+            <button className="btn btn-primary btn-sm" style={{ marginTop: 10 }} disabled={busy || !aiObjectiveId}
+              onClick={() => void mutate('POST', { action: 'add-ai', sourceResourceId: aiResourceId, questionBankId: aiQuestionId, objectiveId: aiObjectiveId })}>AI değerlendirme havuzuna ekle</button>
+          </div>}
+        </>}
+      </>}
+      {aiItems.length > 0 && <div style={{ display: 'grid', gap: 8, marginTop: 4 }}>
+        <strong>AI değerlendirme havuzu içeriği ({aiItems.length})</strong>
+        {(showAllAiItems ? aiItems : aiItems.slice(0, 20)).map((item: any) => {
+          const resource = aiResources.find(candidate => candidate.id === item.source_resource_id)
+          const objectives = resource?.objectives || []
+          return <div key={item.id} style={{ borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: 13 }}>
+            <b>{item.objective_code || 'Kazanım eşlemesi bekliyor'}</b> · {item.grade}. sınıf · {item.subject} · AI kaynaklı
+            <div>{item.question_snapshot?.q}</div>
+            <small style={{ color: 'var(--text2)' }}>{resource?.title || 'AI kitapçığı'} · öğretmen benchmark metriği dışı</small>
+            {item.status !== 'ready' && objectives.length > 0 && <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+              <select className="input" style={{ maxWidth: 600 }} value={mappingObjectiveByItem[item.id] || ''}
+                onChange={event => setMappingObjectiveByItem(previous => ({ ...previous, [item.id]: event.target.value }))}>
+                <option value="">Doğrulanmış kazanım seç</option>
+                {objectives.map(objective => <option key={objective.id} value={objective.id}>{objective.objective_code} · {objective.title}</option>)}
+              </select>
+              <button className="btn btn-sm" disabled={busy || !mappingObjectiveByItem[item.id]}
+                onClick={() => void mutate('POST', { action: 'map-ai', aiItemId: item.id, objectiveId: mappingObjectiveByItem[item.id] })}>Kazanımı bağla</button>
+            </div>}
+          </div>
+        })}
+        {aiItems.length > 20 && <button className="btn btn-sm" style={{ justifySelf: 'start' }} onClick={() => setShowAllAiItems(value => !value)}>
+          {showAllAiItems ? 'Daha az göster' : `Tüm ${aiItems.length} soruyu göster`}
+        </button>}
+      </div>}
     </div>
 
     {benchmark?.status === 'draft' && <div style={{ display: 'grid', gap: 10 }}>

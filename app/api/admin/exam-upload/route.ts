@@ -261,6 +261,58 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
   if (!rows.length) return 0
   const result = await adminDb.from('question_bank').upsert(rows, { onConflict: 'fingerprint', ignoreDuplicates: true }).select('id')
   if (result.error) throw result.error
+  if (sourceType === 'ai' && row.id) {
+    try {
+      const { data: promotedRows, error: promotedError } = await adminDb.from('question_bank')
+        .select('id,question,grade_key,subject_key,review_status,source_engine')
+        .eq('review_status', 'approved').eq('source_engine', 'ai_booklet_exact')
+        .contains('question', { bookletResourceId: row.id, sourcePolicy: 'ai_exact' }).limit(500)
+      if (promotedError) throw promotedError
+      const references = await loadVerifiedBookletObjectives(row)
+      const referenceCodes = references.map(objective => objective.code)
+      const { data: benchmarkSet } = await adminDb.from('education_eval_benchmark_sets')
+        .select('curriculum_version_id').eq('code', 'meb-k12-controlled').order('version', { ascending: false }).limit(1).maybeSingle()
+      const { data: catalogRows } = referenceCodes.length && benchmarkSet?.curriculum_version_id
+        ? await adminDb.from('learning_objective_catalog')
+          .select('id,objective_code,title,grade,subject,verification_status,lifecycle_status,is_active,curriculum_version_id')
+          .eq('curriculum_version_id', benchmarkSet.curriculum_version_id)
+          .eq('verification_status', 'verified').eq('lifecycle_status', 'active').eq('is_active', true)
+          .in('objective_code', referenceCodes)
+        : { data: [] }
+      const objectiveByCode = new Map((catalogRows || []).filter(objective =>
+        educationEvalGradeKey(objective.grade) === educationEvalGradeKey(row.grade)
+        && questionBankKey(objective.subject) === questionBankKey(row.subject || '')
+      ).map(objective => [objective.objective_code.toLocaleUpperCase('tr-TR'), objective]))
+      const evalRows = (promotedRows || []).filter(bankRow => {
+        const question = bankRow.question as { q?: unknown; opts?: unknown; ans?: unknown }
+        return typeof question?.q === 'string' && Array.isArray(question.opts) && Number.isInteger(question.ans)
+          && Number(question.ans) >= 0 && Number(question.ans) < question.opts.length
+      }).map(bankRow => {
+        const question = bankRow.question as { q: string; opts: string[]; ans: number; learningObjectiveCode?: unknown }
+        const verifiedCode = matchVerifiedObjectiveCode(question.learningObjectiveCode, referenceCodes)
+        const objective = verifiedCode ? objectiveByCode.get(verifiedCode) : null
+        return {
+          source_resource_id: row.id,
+          question_bank_id: bankRow.id,
+          grade: row.grade || bankRow.grade_key,
+          subject: row.subject || bankRow.subject_key,
+          objective_id: objective?.id || null,
+          objective_code: objective?.objective_code || null,
+          objective_title: objective?.title || null,
+          question_snapshot: question,
+          answer_key: { answerIndex: question.ans, answerText: question.opts[question.ans] },
+          status: objective ? 'ready' : 'needs_objective',
+        }
+      })
+      if (evalRows.length) {
+        const { error: evalError } = await adminDb.from('education_eval_ai_question_items')
+          .upsert(evalRows, { onConflict: 'question_bank_id', ignoreDuplicates: true })
+        if (evalError) throw evalError
+      }
+    } catch (error) {
+      console.error('[exam-upload] AI Education Eval pool sync failed', error)
+    }
+  }
   return result.data?.length || 0
 }
 
@@ -416,7 +468,25 @@ export async function PUT(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const user = await getAdminUser()
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  const { id, review_status } = await req.json()
+  const body = await req.json()
+  if (body?.action === 'reprocess-ai-booklet') {
+    const id = typeof body.id === 'string' ? body.id : ''
+    if (!id) return NextResponse.json({ error: 'Kitapçık kimliği gerekli.' }, { status: 400 })
+    const { data: row } = await adminDb.from('exam_resources')
+      .select('id,title,source_type,purpose,review_status,subject,grade,topic,subtopic,raw_text,learning_objective_codes')
+      .eq('id', id).maybeSingle()
+    if (!row || row.source_type !== 'ai' || row.purpose !== 'instant_test' || row.review_status !== 'approved') {
+      return NextResponse.json({ error: 'Onaylı bir AI anlık test kitapçığı gerekli.' }, { status: 400 })
+    }
+    try {
+      const promoted = await promoteExactQuestions(row, 'ai')
+      return NextResponse.json({ success: true, promoted })
+    } catch (error) {
+      console.error('[exam-upload] AI booklet reprocessing failed', error)
+      return NextResponse.json({ error: 'Kitapçık yeniden işlenemedi; sunucu kayıtlarını kontrol edin.' }, { status: 500 })
+    }
+  }
+  const { id, review_status } = body
   if (!id || !['pending', 'approved', 'rejected'].includes(review_status)) return NextResponse.json({ error: 'Geçersiz durum' }, { status: 400 })
   const { data: row } = await adminDb.from('exam_resources').select('id,source_type,purpose,title,subject,grade,topic,subtopic,raw_text,learning_objective_codes').eq('id', id).single()
   if (!row) return NextResponse.json({ error: 'Bulunamadı' }, { status: 404 })
