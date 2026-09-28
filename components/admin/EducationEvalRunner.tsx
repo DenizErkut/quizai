@@ -14,7 +14,7 @@ type EvalOutput = {
 
 type ScoreKey = 'curriculum_alignment_score' | 'pedagogy_score' | 'age_appropriateness_score' | 'safety_score'
 type EvalRun = { id: string; benchmark_version: number; status: 'running' | 'completed' | 'failed'; total_items: number; completed_items: number; created_at: string; completed_at?: string | null }
-type EvalSummary = { provider: string; model: string; n: number; accuracy: number; meanLatencyMs: number; totalCostUsd: number; curriculumAlignment: number; pedagogy: number; ageAppropriateness: number; safety: number }
+type EvalSummary = { provider: string; model: string; n: number; unscoredOutputs: number; accuracy: number; meanLatencyMs: number; totalCostUsd: number; curriculumAlignment: number; pedagogy: number; ageAppropriateness: number; safety: number }
 type RunnerData = { run: EvalRun | null; results: EvalOutput[]; summary: EvalSummary[] | null; progress?: { completedOutputs: number; ratedOutputs: number; totalOutputs: number; completedItems: number; failedOutputs: number; blinded: boolean }; readiness?: { benchmarkStatus: string; eligibleQuestions: number; target: number; providersConfigured: boolean } }
 type Rating = Record<ScoreKey, number> & { reviewerNotes: string }
 
@@ -133,7 +133,9 @@ export default function EducationEvalRunner() {
         const setRating = (key: keyof Rating, value: number | string) => setRatings(current => ({ ...current, [output.id]: { ...rating, [key]: value } as Rating }))
         return <article key={output.id} className="card" style={{ display: 'grid', gap: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}><b>Soru {output.item?.ordinal || '?'} · Model {output.blind_label}</b>
-            <small>{output.status === 'completed' ? `${output.duration_ms} ms · ${output.input_tokens + output.output_tokens} token` : `Hata: ${output.error_code || 'çağrı başarısız'}`}</small></div>
+            <small>{output.status === 'error' ? `Hata: ${output.error_code || 'çağrı başarısız'}` : output.error_code === 'INVALID_MODEL_OUTPUT'
+              ? `Otomatik puanlanamadı · ${output.duration_ms} ms · ${output.input_tokens + output.output_tokens} token`
+              : `${output.duration_ms} ms · ${output.input_tokens + output.output_tokens} token`}</small></div>
           <div><b>{output.item?.objective_code}</b> · {output.item?.objective_title}<div style={{ marginTop: 5 }}>{output.item?.question_snapshot.q}</div>
             <ol type="A" style={{ margin: '6px 0 0 20px' }}>{output.item?.question_snapshot.opts.map((option, index) => <li key={index}>{option}{output.answer_index === index ? ' ← Model yanıtı' : ''}</li>)}</ol></div>
           <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{output.explanation}</div>
@@ -158,8 +160,8 @@ export default function EducationEvalRunner() {
     </div>}
 
     {data.summary && <div style={{ overflowX: 'auto' }}><strong>Sağlayıcı özeti · körlük kaldırıldı</strong><table style={{ width: '100%', marginTop: 8, borderCollapse: 'collapse', fontSize: 13 }}>
-      <thead><tr>{['Sağlayıcı / model', 'Doğruluk', 'Süre ort.', 'Maliyet', 'Kazanım', 'Pedagoji', 'Yaş', 'Güvenlik'].map(label => <th key={label} style={{ textAlign: 'left', padding: 7, borderBottom: '1px solid var(--border)' }}>{label}</th>)}</tr></thead>
-        <tbody>{data.summary.map(row => <tr key={row.provider}>{[`${row.provider} · ${row.model}`, `${(row.accuracy * 100).toFixed(1)}%`, `${row.meanLatencyMs} ms`, `$${row.totalCostUsd}`, row.curriculumAlignment, row.pedagogy, row.ageAppropriateness, row.safety].map((value, index) => <td key={index} style={{ padding: 7, borderBottom: '1px solid var(--border)' }}>{value}</td>)}</tr>)}</tbody>
+      <thead><tr>{['Sağlayıcı / model', 'Doğruluk (N)', 'Puanlanamayan', 'Süre ort.', 'Maliyet', 'Kazanım', 'Pedagoji', 'Yaş', 'Güvenlik'].map(label => <th key={label} style={{ textAlign: 'left', padding: 7, borderBottom: '1px solid var(--border)' }}>{label}</th>)}</tr></thead>
+        <tbody>{data.summary.map(row => <tr key={row.provider}>{[`${row.provider} · ${row.model}`, `${(row.accuracy * 100).toFixed(1)}% (${row.n})`, row.unscoredOutputs, `${row.meanLatencyMs} ms`, `$${row.totalCostUsd}`, row.curriculumAlignment, row.pedagogy, row.ageAppropriateness, row.safety].map((value, index) => <td key={index} style={{ padding: 7, borderBottom: '1px solid var(--border)' }}>{value}</td>)}</tr>)}</tbody>
     </table></div>}
     {message && <div role="status" style={{ color: 'var(--text2)' }}>{message}</div>}
   </section>

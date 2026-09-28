@@ -54,8 +54,10 @@ async function loadRun(runId?: string) {
     visibleResults = resultRows.map(row => ({ ...row }))
     providerSummary = PROVIDERS.map(provider => {
       const rows = completed.filter(row => row.blind_label === (run.blind_mapping as Record<string, string>)[provider.key])
-      const mean = (field: string) => rows.length ? Number((rows.reduce((sum, row) => sum + Number(row[field] || 0), 0) / rows.length).toFixed(3)) : 0
-      return { provider: provider.key, model: rows[0]?.model || '', n: rows.length, accuracy: mean('is_correct'),
+      const scorableRows = rows.filter(row => row.error_code !== 'INVALID_MODEL_OUTPUT')
+      const mean = (field: string, source = rows) => source.length ? Number((source.reduce((sum, row) => sum + Number(row[field] || 0), 0) / source.length).toFixed(3)) : 0
+      return { provider: provider.key, model: rows[0]?.model || '', n: scorableRows.length,
+        unscoredOutputs: rows.length - scorableRows.length, accuracy: mean('is_correct', scorableRows),
         meanLatencyMs: mean('duration_ms'), totalCostUsd: Number(rows.reduce((sum, row) => sum + Number(row.cost_usd || 0), 0).toFixed(6)),
         curriculumAlignment: mean('curriculum_alignment_score'), pedagogy: mean('pedagogy_score'),
         ageAppropriateness: mean('age_appropriateness_score'), safety: mean('safety_score') }
@@ -170,13 +172,14 @@ export async function POST(req: NextRequest) {
           providerCallTimeoutMs: 90000, claudeCallDeadlineMs: 90000,
           routingMeta: { educationEvalRunId: run.id, benchmarkItemId: next.id, blindLabel } })
         const answer = parseBlindEvalAnswer(response.text, question.opts)
-        if (!answer) throw new Error('INVALID_MODEL_OUTPUT')
         const { data: usage } = await db.from('ai_usage_logs').select('input_tokens,output_tokens,cost_usd')
           .eq('request_id', requestId).order('created_at', { ascending: false }).limit(1).maybeSingle()
         const row = { run_id: run.id, benchmark_item_id: next.id, provider_key: provider.key, blind_label: blindLabel,
           model: decision.engine === 'gpt-4.1-mini' ? 'gpt-4.1-mini' : decision.engine === 'mistral' ? (process.env.MISTRAL_PRIMARY_MODEL || 'mistral-large-latest') : decision.engine === 'claude-haiku' ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5',
-          status: 'completed', answer_index: answer.answerIndex, is_correct: answer.answerIndex === Number(next.answer_key.answerIndex),
-          explanation: answer.explanation, error_code: null, duration_ms: response.durationMs, input_tokens: usage?.input_tokens || 0,
+          status: 'completed', answer_index: answer?.answerIndex ?? null,
+          is_correct: answer ? answer.answerIndex === Number(next.answer_key.answerIndex) : false,
+          explanation: answer?.explanation || (response.text || '').slice(0, 2000),
+          error_code: answer ? null : 'INVALID_MODEL_OUTPUT', duration_ms: response.durationMs, input_tokens: usage?.input_tokens || 0,
           output_tokens: usage?.output_tokens || 0, cost_usd: usage?.cost_usd || 0 }
         const { error } = await db.from('education_eval_run_results').upsert(row, { onConflict: 'run_id,benchmark_item_id,provider_key' })
         if (error) throw error
