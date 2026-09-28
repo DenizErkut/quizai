@@ -27,11 +27,13 @@ async function loadMetrics(): Promise<Metric[]> {
   const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
   const since = new Date(Date.now() - 30 * 86_400_000).toISOString()
   const { data, error } = await db.from('ai_usage_logs')
-    .select('provider,cost_usd,duration_ms,meta').gte('created_at', since).limit(30000)
+    .select('provider,operation,cost_usd,duration_ms,meta').gte('created_at', since).limit(30000)
   if (error) throw error
 
   const groups = new Map<ProviderKey, { calls: number; costs: number; priced: number; durations: number[]; success: number; failed: number }>()
   for (const row of data || []) {
+    const operation = String(row.operation || '')
+    if (!/^(generate-|live-quiz|teacher:create-open-ended)/.test(operation)) continue
     if (!['openai', 'mistral', 'anthropic'].includes(String(row.provider))) continue
     const provider = row.provider as ProviderKey
     const group = groups.get(provider) || { calls: 0, costs: 0, priced: 0, durations: [], success: 0, failed: 0 }

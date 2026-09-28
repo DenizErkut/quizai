@@ -28,7 +28,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { callOpenAI } from '@/lib/openai'
 import { MistralAdapter, isProviderConfigured } from '@/lib/ai-gateway'
-import { logAnthropicUsage } from '@/lib/ai-usage'
+import { logAIUsage, logAnthropicUsage } from '@/lib/ai-usage'
 
 const anthropic = new Anthropic()
 
@@ -159,11 +159,23 @@ export async function generateWithRoutedProvider(
     routingReason: decision.routingReason || 'UNSPECIFIED',
     routerServedEngine: decision.engine,
     routerRecommendedEngine: decision.recommendedEngine || decision.engine,
+    outcome: 'success',
   } : params.routingMeta
+
+  async function logRoutingFailure(provider: 'openai' | 'mistral' | 'anthropic', model: string, error: unknown) {
+    if (!decision.policyVersion) return
+    await logAIUsage({
+      operation: params.operationTag, provider, model, inputTokens: 0, outputTokens: 0,
+      userId: params.userId, quizSessionId: params.quizSessionId, requestId: params.requestId,
+      durationMs: Date.now() - startedAt,
+      meta: { ...(routingMeta || {}), outcome: 'error', errorType: error instanceof Error ? error.name : 'UnknownError' },
+    })
+  }
 
   if (decision.engine === 'mistral') {
     const mistralAdapter = new MistralAdapter()
-    const response = await mistralAdapter.execute(
+    let response
+    try { response = await mistralAdapter.execute(
       {
         messages: [
           { role: 'system', content: flatSystem },
@@ -181,12 +193,16 @@ export async function generateWithRoutedProvider(
         shadow: false,
         meta: routingMeta,
       }
-    )
+    ) } catch (error) {
+      void logRoutingFailure('mistral', process.env.MISTRAL_PRIMARY_MODEL || 'mistral-large-latest', error)
+      throw error
+    }
     return { text: response.content, durationMs: Date.now() - startedAt }
   }
 
   if (decision.engine === 'gpt-4.1-mini') {
-    const text = await callOpenAI(
+    let text: string
+    try { text = await callOpenAI(
       [
         { role: 'system', content: flatSystem },
         { role: 'user', content: params.userPrompt },
@@ -201,7 +217,10 @@ export async function generateWithRoutedProvider(
         requestId: params.requestId,
         meta: routingMeta,
       }
-    )
+    ) } catch (error) {
+      void logRoutingFailure('openai', 'gpt-4.1-mini', error)
+      throw error
+    }
     return { text, durationMs: Date.now() - startedAt }
   }
 
@@ -213,12 +232,16 @@ export async function generateWithRoutedProvider(
   const deadline = params.claudeCallDeadlineMs ?? 100000
   const timeoutMs = Math.max(20000, deadline - (Date.now() - requestStartTime))
   const model = decision.engine === 'claude-haiku' ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5'
-  const response = await anthropic.messages.create({
+  let response
+  try { response = await anthropic.messages.create({
     model,
     max_tokens: params.maxTokens,
     system: params.systemPrompt,
     messages: [{ role: 'user', content: params.userPrompt }],
-  }, { timeout: timeoutMs, maxRetries: 0 })
+  }, { timeout: timeoutMs, maxRetries: 0 }) } catch (error) {
+    void logRoutingFailure('anthropic', model, error)
+    throw error
+  }
   const durationMs = Date.now() - startedAt
   await logAnthropicUsage(params.operationTag, model, response, {
     userId: params.userId,
