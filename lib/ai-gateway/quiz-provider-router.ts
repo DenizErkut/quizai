@@ -132,6 +132,7 @@ export interface RoutedGenerationParams {
   // Claude budget-aware timeout için: bu deadline'a (fonksiyon başlangıcından
   // itibaren ms) göre timeout hesaplanır. Vermezsen tam bütçe (100sn) varsayılır.
   claudeCallDeadlineMs?: number
+  providerCallTimeoutMs?: number
   requestStartTime?: number
   routingMeta?: Record<string, unknown>
 }
@@ -182,6 +183,7 @@ export async function generateWithRoutedProvider(
           { role: 'user', content: params.userPrompt },
         ],
         maxTokens: params.maxTokens,
+        timeoutMs: params.providerCallTimeoutMs,
         json: true,
       },
       {
@@ -215,6 +217,7 @@ export async function generateWithRoutedProvider(
         userId: params.userId,
         quizSessionId: params.quizSessionId,
         requestId: params.requestId,
+        timeoutMs: params.providerCallTimeoutMs,
         meta: routingMeta,
       }
     ) } catch (error) {

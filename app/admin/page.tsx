@@ -33,6 +33,7 @@ import DailyHabitMetrics from '@/components/admin/DailyHabitMetrics'
 import EducationAISafetyScorecard from '@/components/admin/EducationAISafetyScorecard'
 import ProviderObservability from '@/components/admin/ProviderObservability'
 import EducationEvalBenchmark from '@/components/admin/EducationEvalBenchmark'
+import EducationEvalRunner from '@/components/admin/EducationEvalRunner'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -2570,6 +2571,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         <div className="anim-up">
           <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)', marginBottom: '1rem' }}>🧭 Education Eval</h2>
           <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1rem' }}>Önce MEB benchmark’ını kaynak, onay kanıtı, kazanım ve cevap anahtarıyla doğrulanabilir biçimde kurun.</p>
+          <EducationEvalRunner />
           <EducationEvalBenchmark />
         </div>
       )}

@@ -227,6 +227,7 @@ export default function TeacherDashboard() {
                 Hoş geldin, {teacher?.name?.split(' ')[0]} 👋
               </h1>
               <p style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '4px' }}>{teacher?.school}</p>
+              <Link href="/teacher/ai-training" className="btn btn-sm" style={{ marginTop: '10px' }}>🎓 Öğretmen AI eğitim pilotu</Link>
             </div>
 
             {/* Özet kartlar */}
