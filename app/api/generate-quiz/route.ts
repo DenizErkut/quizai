@@ -2720,7 +2720,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!sessionId) {
-      const { data: sessionRow } = await supabase
+      const { data: sessionRow, error: sessionInsertError } = await supabase
         .from('quiz_sessions')
         .insert({
           id: usageSessionId,
@@ -2747,6 +2747,17 @@ export async function POST(req: NextRequest) {
         })
         .select('id')
         .maybeSingle()
+      if (sessionInsertError || !sessionRow?.id) {
+        console.error('[generate-quiz] session_persist_failed', {
+          requestId: usageRequestId,
+          code: sessionInsertError?.code || 'missing_session_id',
+          message: sessionInsertError?.message || 'Session insert returned no id',
+        })
+        return NextResponse.json({
+          error: 'quiz_session_persist_failed',
+          message: 'Sorular hazırlandı ancak test kaydı oluşturulamadı. Lütfen tekrar dene.',
+        }, { status: 503 })
+      }
       sessionId = sessionRow?.id
     }
 

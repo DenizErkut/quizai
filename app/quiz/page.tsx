@@ -527,6 +527,7 @@ function QuizPageContent() {
     if (errorCode === 'pdf_too_long') return { code: 'pdf', title: "📄 PDF çok uzun", desc: "PDF dosyan 100 sayfadan fazla. Daha kısa bir bölüm yükle ya da metni kopyalayıp yapıştır.", retry: false }
     if (errorCode === 'pdf_image_only') return { code: 'pdf', title: "🖼️ PDF okunemiyor", desc: "Bu PDF taranmış görsel içeriyor, metin çıkarılamıyor. Word veya metin dosyası yükle.", retry: false }
     if (errorCode === 'insufficient_questions') return { code: 'insufficient_questions', title: "🧩 Sorular tamamlanamadı", desc: "Kalite kontrolünden geçen soru sayısı yeterli değildi. Test kaydedilmedi; birkaç saniye sonra yeniden deneyebilirsin.", retry: true }
+    if (errorCode === 'quiz_session_persist_failed') return { code: errorCode, title: "💾 Test kaydedilemedi", desc: serverMessage || "Test kaydı oluşturulamadı. Sorularını kaybetmemek için lütfen yeniden dene.", retry: true }
     if (errorCode === 'quality_policy_failed') {
       const titles: Record<string, string> = {
         canonical_objectives_unavailable: '📚 Kazanım bulunamadı',
@@ -665,7 +666,11 @@ function QuizPageContent() {
           collected = [...collected, ...extra].slice(0, firstChunkSize)
         }
       }
-      if (collected.length !== firstChunkSize) {
+      // The API can return a smaller set after independent review. Keep trying
+      // to fill it, but do not discard a useful test when at least the agreed
+      // 70% quality threshold is already available.
+      const minimumDeliverableCount = Math.max(1, Math.ceil(firstChunkSize * 0.7))
+      if (collected.length < minimumDeliverableCount) {
         setQuizError(getErrorInfo('insufficient_questions', 503))
         setScreen('error')
         return
