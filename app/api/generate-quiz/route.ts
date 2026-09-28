@@ -39,7 +39,7 @@ import { decideQuizProvider, getQuizProviderPolicy, QUIZ_PROVIDER_POLICY_VERSION
 import { attachQuestionRigorMetadata, summarizeQuestionSetRigor } from '@/lib/question-rigor'
 import { verifyVisualWithMistral } from '@/lib/mistral-quality'
 import { verifyVisualWithGemini } from '@/lib/gemini-visual-quality'
-import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, minimumVerifiedQuestionCount, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
+import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
 import { isSameGradeSource } from '@/lib/meb-source-scope'
 
 const anthropic = new Anthropic()
@@ -1528,7 +1528,7 @@ export async function POST(req: NextRequest) {
 
     const MAX_QCOUNT: Record<string, number> = { free: 5, silver: 10, premium: 20, unlimited: 20 }
     const maxQ = MAX_QCOUNT[plan] ?? 0
-    let safeQCount = isDailyChallengeRequest ? Math.min(questionCount, 10) : Math.min(questionCount, maxQ)
+    const safeQCount = isDailyChallengeRequest ? Math.min(questionCount, 10) : Math.min(questionCount, maxQ)
     usageRequestId = crypto.randomUUID()
     // Yeni oturumun kimliği üretimden önce bilinir; böylece AI maliyet kaydı
     // kullanıcı ve oturumla atomik olmayan bir sonradan eşleştirmeye ihtiyaç duymaz.
@@ -1906,7 +1906,7 @@ export async function POST(req: NextRequest) {
         'cok zor': plan.find(batch => batch.difficulty === 'cok zor')?.count || 0,
       }
     }
-    let targetDifficultyQuota = quotaForCount(safeQCount)
+    const targetDifficultyQuota = quotaForCount(safeQCount)
     // chartDataInstruction: yalnızca math_graph'ta ek talimat üretir (bkz.
     // fonksiyon tanımı) — burada erken hesaplamak için detectVisualCategory
     // tekrar çağrılıyor (saf/yan etkisiz fonksiyon, aşağıda zaten tekrar
@@ -2414,6 +2414,33 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // AI generation/filtering can still leave a raw-count gap. Make one final
+    // approved-bank pass before declaring the set incomplete, excluding every
+    // already selected or recently used question and preserving the same
+    // independent review below.
+    if (questions.length < aiQuestionCount && bankWriteEligible && !fileContent) {
+      const missingFromAi = aiQuestionCount - questions.length
+      const recoveryDifficulties = roleMixEnabled ? ['kolay', 'normal', 'zor', 'cok zor'] : [resolvedDifficulty]
+      const bankFallback: any[] = []
+      for (const recoveryDifficulty of recoveryDifficulties) {
+        if (bankFallback.length >= missingFromAi) break
+        const fallbackQuestions = await getQuestionBankSet(supabase, {
+          subject, topic, grade, language: effectiveLang, questionType,
+          difficulty: recoveryDifficulty,
+        }, missingFromAi - bankFallback.length, [
+          ...recentQuestionTexts,
+          ...bankQuestions.map((question: any) => question?.q).filter(Boolean),
+          ...questions.map((question: any) => question?.q).filter(Boolean),
+          ...bankFallback.map((question: any) => question?.q).filter(Boolean),
+        ])
+        bankFallback.push(...filterQuestionsByRequestedType(fallbackQuestions, questionType))
+      }
+      if (bankFallback.length) {
+        questions = [...questions, ...bankFallback].slice(0, aiQuestionCount)
+        console.log(`[question-bank] raw_shortage_recovery added=${bankFallback.length}/${missingFromAi} topic=${topic}`)
+      }
+    }
+
     // Hibrit sonuç: onaylı havuz sorularını önce kullan, yalnızca eksik kısmı
     // AI ile üret. Böylece kısmi bir havuz eşleşmesi de maliyeti ve beklemeyi
     // azaltır; eskisi gibi 9/10 eşleşmede dokuz soruyu çöpe atmayız.
@@ -2424,16 +2451,6 @@ export async function POST(req: NextRequest) {
     // başlatmaya çalışıyordu. Bu kontrol kota/session değişikliklerinden
     // ÖNCE çalışır; öğrenciye yeniden deneme seçeneği verir ve bozuk oturum
     // bırakmaz.
-    if (questions.length !== safeQCount
-      && ((adaptiveCandidateBatch && questions.length > 0) || questions.length >= 3)) {
-      // Provider latency/format drift can leave a smaller but still useful
-      // candidate set after recovery. Normal testlerde bir-iki soruluk artık
-      // hâlâ reddedilir; adaptif devamda ise bunlar henüz öğrenciye açılmaz,
-      // aşağıdaki bağımsız doğrulamaya aday olarak ilerler.
-      console.warn(`[generate-quiz] recovery produced ${questions.length}/${safeQCount}; accepting validated subset`)
-      safeQCount = questions.length
-      targetDifficultyQuota = quotaForCount(safeQCount)
-    }
     if (questions.length !== safeQCount) {
       console.error(`[generate-quiz] incomplete_set requested=${safeQCount} delivered=${questions.length} topic=${topic}`)
       return NextResponse.json({
@@ -2444,11 +2461,11 @@ export async function POST(req: NextRequest) {
       }, { status: 503 })
     }
 
-    const strictVerifyResult = await fetch(`${req.nextUrl.origin}/api/verify-questions`, {
+    const verifyQuestionCandidates = async (candidateQuestions: any[]) => fetch(`${req.nextUrl.origin}/api/verify-questions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
-        questions,
+        questions: candidateQuestions,
         topic,
         grade,
         language: effectiveLang,
@@ -2464,48 +2481,83 @@ export async function POST(req: NextRequest) {
           grade: candidate.grade,
         })),
       }),
-      // Role-based cross-checks run in two batches plus the final Gemini set
-      // review; give that complete chain enough headroom inside maxDuration.
       signal: AbortSignal.timeout(70000),
     }).then(async response => response.ok ? response.json() : null).catch(() => null)
 
-    const verifiedCandidateCount = Array.isArray(strictVerifyResult?.questions) ? strictVerifyResult.questions.length : 0
-    const minimumVerifiedCount = minimumVerifiedQuestionCount(safeQCount)
-    // Geçici sağlayıcı/denetleyici dalgalanmalarında %70 eşiği küçük ve
-    // karma setleri gereksiz yere düşürebiliyor. Operasyonel alt sınır %50;
-    // yine de en az bir bağımsız doğrulanmış soru şartı korunur.
-    const minimumOperationalCount = Math.max(1, Math.round(safeQCount * 0.5))
-    // Policy target reference: verifiedCandidateCount >= minimumVerifiedCount
-    let degradedVerification = false
-    // Bağımsız denetleyici geçici olarak yanıt vermediğinde veya tüm adayları
-    // boş döndürdüğünde öğrenciyi tekrar döngüsüne sokma. Üretim adaylarının
-    // en az %70'lik kullanılabilir alt kümesini kontrollü "degraded" etiketiyle
-    // ilerlet; bu durum telemetride görünür kalır ve sonraki testte yeniden
-    // tam doğrulama denenir.
-    if (verifiedCandidateCount === 0 && questions.length >= minimumVerifiedCount) {
-      degradedVerification = true
-      questions = questions.slice(0, minimumVerifiedCount).map((question: any) => ({
-        ...question,
-        qualityVerificationVersion: 'quiz-quality-v2-degraded',
-        difficultyVerified: Boolean(question.difficulty),
-        objectiveVerified: objectiveCandidates.length === 0 || Boolean(question.learningObjectiveRef),
-        verificationDegraded: true,
-      }))
-      safeQCount = questions.length
-      targetDifficultyQuota = quotaForCount(safeQCount)
-      console.warn(`[generate-quiz] strict_verification_degraded accepted=${questions.length}/${safeQCount} original=${verifiedCandidateCount}; retry will be attempted on next request`)
+    const initialVerification = await verifyQuestionCandidates(questions)
+    let verifiedQuestions: any[] = Array.isArray(initialVerification?.questions) ? initialVerification.questions : []
+
+    // Quality review can reject otherwise complete candidate batches. Replace
+    // those slots from approved bank rows first, then generate fresh AI
+    // candidates using the established provider/difficulty roles, and run the
+    // same independent review again. Never shrink the requested session size.
+    const replenishDeadline = Math.min(requestStartTime + 108000, Date.now() + 36000)
+    for (let recoveryRound = 0; verifiedQuestions.length < safeQCount && recoveryRound < 3; recoveryRound++) {
+      if (Date.now() >= replenishDeadline) break
+      const missing = safeQCount - verifiedQuestions.length
+      const existingTexts = [...questions, ...verifiedQuestions].map((question: any) => question?.q).filter(Boolean)
+      let replacements: any[] = []
+
+      if (bankWriteEligible && !fileContent) {
+        const recoveryDifficulties = roleMixEnabled
+          ? ['kolay', 'normal', 'zor', 'cok zor']
+          : [resolvedDifficulty]
+        for (const recoveryDifficulty of recoveryDifficulties) {
+          if (replacements.length >= missing) break
+          const bankRows = await getQuestionBankSet(supabase, {
+            subject, topic, grade, language: effectiveLang, questionType,
+            difficulty: recoveryDifficulty,
+          }, missing - replacements.length, [...recentQuestionTexts, ...existingTexts, ...replacements.map((question: any) => question.q).filter(Boolean)])
+          replacements.push(...filterQuestionsByRequestedType(bankRows, questionType))
+        }
+      }
+
+      if (replacements.length < missing && roleMixEnabled && Date.now() < replenishDeadline) {
+        const aiMissing = missing - replacements.length
+        const recoveryPlan = buildQuestionGenerationPlan(aiMissing)
+        const recoveryPrompt = `${prompt}\n\nRECOVERY: Produce exactly ${aiMissing} fresh replacement questions for the same grade, subject, topic and objectives. Do not repeat any of these already prepared questions: ${existingTexts.slice(-12).join(' | ').slice(0, 3500)}.`
+        const recoveryBatches = await Promise.all(recoveryPlan.map(batch => generateProviderQuestionBatch({
+          batch,
+          prompt: recoveryPrompt,
+          questionType,
+          language: effectiveLang,
+          userId: user.id,
+          sessionId: usageSessionId,
+          requestId: usageRequestId,
+          requestStartTime,
+        }).catch(error => {
+          console.warn(`[generate-quiz] verification replacement failed provider=${batch.provider}:`, error instanceof Error ? error.message : 'unknown')
+          return []
+        })))
+        let generated = recoveryBatches.flat()
+        generated = generated.map((question: any) => normalizeInteractiveQuestionShape(question, effectiveLang))
+        generated = filterQuestionsByRequestedType(generated, questionType)
+        generated = applyContentQualityFilters(generated, mebContext)
+        generated = filterOutNearDuplicates(generated, [...existingTexts, ...replacements.map((question: any) => question.q).filter(Boolean)])
+        replacements.push(...generated)
+      }
+
+      replacements = replacements.slice(0, missing)
+      if (!replacements.length) break
+      const replacementReview = await verifyQuestionCandidates(replacements)
+      const acceptedReplacements = Array.isArray(replacementReview?.questions) ? replacementReview.questions : []
+      const existingKeys = new Set(verifiedQuestions.map((question: any) => String(question?.q || '').trim().toLocaleLowerCase('tr-TR')))
+      const uniqueAccepted = acceptedReplacements.filter((question: any) => {
+        const key = String(question?.q || '').trim().toLocaleLowerCase('tr-TR')
+        if (!key || existingKeys.has(key)) return false
+        existingKeys.add(key)
+        return true
+      })
+      verifiedQuestions = [...verifiedQuestions, ...uniqueAccepted].slice(0, safeQCount)
+      console.log(`[generate-quiz] verification_recovery round=${recoveryRound + 1} bank_or_ai=${replacements.length} accepted=${uniqueAccepted.length} total=${verifiedQuestions.length}/${safeQCount}`)
     }
-    if (!degradedVerification && verifiedCandidateCount >= minimumOperationalCount && verifiedCandidateCount < safeQCount) {
-      console.warn(`[generate-quiz] quality_threshold_subset accepted=${verifiedCandidateCount}/${safeQCount} operational_minimum=${minimumOperationalCount} policy_target=${minimumVerifiedCount}`)
-      safeQCount = verifiedCandidateCount
-      targetDifficultyQuota = quotaForCount(safeQCount)
-    } else if (!degradedVerification && (!Array.isArray(strictVerifyResult?.questions) || verifiedCandidateCount !== safeQCount)) {
-      console.error(`[generate-quiz] strict_verification_failed verified=${strictVerifyResult?.questions?.length || 0}/${safeQCount}`)
-      return NextResponse.json({ error: 'quality_policy_failed', reason: 'independent_verification', message: 'Testin tüm soruları bağımsız kalite kontrolünden geçemediği için oluşturulmadı.' }, { status: 503 })
+
+    const verifiedCandidateCount = verifiedQuestions.length
+    if (verifiedCandidateCount !== safeQCount) {
+      console.error(`[generate-quiz] strict_verification_failed verified=${verifiedCandidateCount}/${safeQCount}`)
+      return NextResponse.json({ error: 'insufficient_questions', reason: 'independent_verification', message: `İstenen ${safeQCount} sorunun tamamı için havuz ve AI yedekleri denendi; ${verifiedCandidateCount} soru kontrolden geçti. Tam sayı sağlanamadığı için kısmi test başlatılmadı. Birkaç saniye sonra yeniden deneyebilirsin.`, requestedCount: safeQCount, deliveredCount: verifiedCandidateCount }, { status: 503 })
     }
-    questions = degradedVerification
-      ? questions.map((question: any) => normalizeInteractiveQuestionShape(question, effectiveLang))
-      : strictVerifyResult.questions.map((question: any) => normalizeInteractiveQuestionShape(question, effectiveLang))
+    questions = verifiedQuestions.map((question: any) => normalizeInteractiveQuestionShape(question, effectiveLang))
     questions = filterQuestionsByRequestedType(questions, questionType)
     if (questions.length !== safeQCount) {
       console.error(`[generate-quiz] question_type_mismatch expected=${questionType} accepted=${questions.length}/${safeQCount}`)
@@ -2531,7 +2583,7 @@ export async function POST(req: NextRequest) {
     }
     const objectiveMapping = applyCanonicalObjectiveMappings(questions, objectiveCandidates)
     questions = objectiveMapping.questions
-    if (!hasCanonicalObjectiveCoverage(questions, objectiveCandidates) && !degradedVerification) {
+    if (!hasCanonicalObjectiveCoverage(questions, objectiveCandidates)) {
       console.error(`[generate-quiz] objective_mapping_failed mapped=${objectiveMapping.mappedCount}/${questions.length} candidates=${objectiveCandidates.length}`)
       return NextResponse.json({ error: 'quality_policy_failed', reason: 'objective_mapping', message: 'Soruların tümü aynı sınıf ve konuya ait doğrulanmış kazanımlarla eşleşmediği için test oluşturulmadı.' }, { status: 503 })
     }

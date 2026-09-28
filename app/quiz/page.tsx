@@ -666,11 +666,9 @@ function QuizPageContent() {
           collected = [...collected, ...extra].slice(0, firstChunkSize)
         }
       }
-      // The API can return a smaller set after independent review. Keep trying
-      // to fill it, but do not discard a useful test when at least the agreed
-      // 70% quality threshold is already available.
-      const minimumDeliverableCount = Math.max(1, Math.ceil(firstChunkSize * 0.7))
-      if (collected.length < minimumDeliverableCount) {
+      // The requested count is a hard contract. Never start or finish a quiz
+      // with a partial chunk; the server should replenish from bank/AI first.
+      if (collected.length !== firstChunkSize) {
         setQuizError(getErrorInfo('insufficient_questions', 503))
         setScreen('error')
         return
@@ -945,9 +943,8 @@ function QuizPageContent() {
         const nextQuestionType = questionType
         const excludeTexts = questions.map(q => q.q).filter(Boolean)
         const topic = customTopic.trim() || selectedTopic
-        // Tek adayın reddedilmesi artık bütün testi kesmez. Kalan soru
-        // sayısına göre en fazla üç doğrulanmış aday istenir; ilk soru hemen,
-        // diğerleri takip eden adımlarda yedek olarak tüketilir.
+        // Request exactly the remaining count. The server may prepare internal
+        // reserves, but the student-facing session must reach the chosen total.
         const targetSecondChunk = Math.min(3, Math.max(1, qCount - questions.length))
         const { data: { session } } = await supabase.auth.getSession()
         const prefetchKey = `${sessionId}:${chunkBoundary}:${answersRef.current.length}`
@@ -984,13 +981,7 @@ function QuizPageContent() {
         // biter" diye pes ediliyordu. Artık aynı sessionId'ye (kota tekrar
         // SAYILMAZ) en fazla 2 ek istek daha atılıp hedefe (targetSecondChunk)
         // ulaşılmaya çalışılıyor.
-        // Üç aday üretmek bir tampon hedefidir; öğrencinin ilerlemesi için
-        // üçünün de gelmesi gerekmez. En az bir doğrulanmış yedek geldiyse
-        // onu hemen kullan. Aksi halde, yalnızca sıfır sonuçta top-up dene.
-        // Önceki davranışta 2/3 güvenli soru geldikten sonra üçüncü aday için
-        // yapılan ek istekler tekrar filtresine takılıp mevcut 2 soruyu da
-        // kullanıcıya göstermeden akışı kırıyordu.
-        if (secondChunk.length === 0 && sessionId) {
+        if (secondChunk.length < targetSecondChunk && sessionId) {
           let topupAttempts = 0
           while (secondChunk.length < targetSecondChunk && topupAttempts < 2) {
             topupAttempts++
@@ -1008,7 +999,7 @@ function QuizPageContent() {
           }
         }
         adaptivePrefetchRef.current = null
-        if (secondChunk.length > 0) {
+        if (secondChunk.length === targetSecondChunk) {
           const nextBoundary = questions.length + secondChunk.length
           setQuestions(prev => [...prev, ...secondChunk])
           setResolvedDifficulty(nextDiff)
@@ -1017,7 +1008,7 @@ function QuizPageContent() {
         } else {
           setChunkBoundary(null)
           setFetchingNextChunk(false)
-          setQuizError({ code: 'adaptive_next_failed', title: 'Yeni sorular kalite kontrolünden geçemedi', desc: 'Hazırlanan yedek adayların hiçbiri kalite kontrolünü geçemedi. Birkaç saniye sonra yeniden deneyebilirsin.', retry: true })
+          setQuizError({ code: 'adaptive_next_failed', title: 'İstenen soru sayısı tamamlanamadı', desc: `Şu ana kadar ${questions.length + secondChunk.length}/${qCount} soru hazırlanabildi. Eksik sorular tamamlanmadan test bitirilmedi; birkaç saniye sonra yeniden deneyebilirsin.`, retry: true })
           setScreen('error')
           return
         }
