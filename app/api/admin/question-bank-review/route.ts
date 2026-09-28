@@ -70,39 +70,26 @@ export async function GET(req: NextRequest) {
   const grade = searchParams.get('grade') || ''
   const subject = searchParams.get('subject') || ''
   const topic = searchParams.get('topic') || ''
+  const page = Math.max(1, Number.parseInt(searchParams.get('page') || '1', 10) || 1)
+  const pageSize = Math.min(100, Math.max(20, Number.parseInt(searchParams.get('page_size') || '50', 10) || 50))
 
-  // PostgREST proje ayarındaki varsayılan satır sınırı `.limit(50000)` verilse
-  // bile yanıtı 1000 satırda kesebilir. Facet'leri deterministik sayfalarla
-  // toplamazsak son toplu kitapçık yüklemesi Matematik gibi diğer dersleri
-  // açılır listeden gizler.
-  const facetRows: Array<{ grade_key: string; subject_key: string; topic_key: string }> = []
-  const pageSize = 1000
-  for (let page = 0; page < 50; page++) {
-    const from = page * pageSize
-    const { data: pageRows, error: facetError } = await db.from('question_bank')
-      .select('grade_key,subject_key,topic_key')
-      .in('review_status', ['candidate', 'approved'])
-      .order('id', { ascending: true })
-      .range(from, from + pageSize - 1)
-    if (facetError) return NextResponse.json({ error: facetError.message }, { status: 500 })
-    facetRows.push(...(pageRows || []))
-    if ((pageRows || []).length < pageSize) break
-  }
-  const subjectFacetRows = grade ? facetRows.filter(row => row.grade_key === grade) : facetRows
-  const topicFacetRows = subjectFacetRows.filter(row => !subject || row.subject_key === subject)
-  const facets = {
-    grades: [...new Set(facetRows.map((r) => r.grade_key).filter(Boolean))].sort(),
-    subjects: [...new Set(subjectFacetRows.map((r) => r.subject_key).filter(Boolean))].sort(),
-    topics: [...new Set(topicFacetRows.map((r) => r.topic_key).filter(Boolean))].sort(),
-  }
+  // Facet'ler SQL tarafında DISTINCT ile üretilir. Böylece 100.000 soruluk
+  // havuzda tüm satırları API belleğine taşımayız ve PostgREST satır sınırına
+  // takılmayız.
+  const { data: facets, error: facetError } = await db.rpc('question_bank_admin_facets_v1', {
+    p_grade: grade || null,
+    p_subject: subject || null,
+  })
+  if (facetError) return NextResponse.json({ error: facetError.message }, { status: 500 })
 
   let query = db.from('question_bank')
-    .select('id,question,subject_key,topic_key,grade_key,difficulty,review_status,awaiting_expert_review,ai_provider,ai_model,report_count,promoted_at,updated_at')
+    .select('id,question,subject_key,topic_key,grade_key,difficulty,review_status,awaiting_expert_review,ai_provider,ai_model,report_count,promoted_at,updated_at', { count: 'exact' })
     .in('review_status', ['candidate', 'approved'])
   if (grade) query = query.eq('grade_key', grade)
   if (subject) query = query.eq('subject_key', subject)
   if (topic) query = query.eq('topic_key', topic)
-  const { data, error } = await query.order('updated_at', { ascending: false }).limit(200)
+  const from = (page - 1) * pageSize
+  const { data, error, count } = await query.order('updated_at', { ascending: false }).range(from, from + pageSize - 1)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ questions: data || [], facets })
+  return NextResponse.json({ questions: data || [], facets, pagination: { page, page_size: pageSize, total: count || 0, total_pages: Math.max(1, Math.ceil((count || 0) / pageSize)) } })
 }
