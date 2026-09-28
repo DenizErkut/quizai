@@ -185,7 +185,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ exams: withCounts })
 }
 
-async function promoteExactQuestions(row: { subject?: string | null; grade?: string | null; subtopic?: string | null; raw_text?: string | null }, sourceType: 'teacher' | 'ai') {
+async function promoteExactQuestions(row: { id?: string; subject?: string | null; grade?: string | null; topic?: string | null; subtopic?: string | null; raw_text?: string | null }, sourceType: 'teacher' | 'ai') {
   const sourceLabel = sourceType === 'teacher' ? 'öğretmen imzalı' : 'yapay zekâ ile ayrıca hazırlanmış'
   const rawText = String(row.raw_text || '').slice(0, 300000)
   const answerStart = rawText.search(/\n\s*(?:CEVAP(?:LAR| ANAHTARI)?|YANIT(?:LAR| ANAHTARI)?)\b/iu)
@@ -213,12 +213,19 @@ async function promoteExactQuestions(row: { subject?: string | null; grade?: str
   const questions = extracted.filter((_: any, index: number) => approvedIndexes.has(index))
   const rows = questions.map((q: any) => ({
     fingerprint: createHash('sha256').update(`${q.q}|${q.opts.join('|')}`.toLocaleLowerCase('tr')).digest('hex'),
-    subject_key: questionBankKey(row.subject || 'genel'), topic_key: questionBankKey(q.topic || row.subtopic || 'genel'), grade_key: canonicalBookletGrade(row.grade || ''), language_key: 'tr', question_type: 'multiple_choice', difficulty: q.difficulty === 'easy' ? 'kolay' : q.difficulty === 'hard' ? 'zor' : 'normal', question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, objective: q.topic || row.subtopic || '', subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' }, review_status: 'approved', quality_score: 1, source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact', report_count: 0
+    subject_key: questionBankKey(row.subject || 'genel'),
+    // `topic_key` is the booklet's selected parent unit so all extracted
+    // questions stay together in admin filters and parent-topic bank lookup.
+    // Preserve the classifier's finer subtopic separately in the question.
+    topic_key: questionBankKey(row.subtopic || row.topic || q.topic || 'genel'),
+    grade_key: canonicalBookletGrade(row.grade || ''), language_key: 'tr', question_type: 'multiple_choice', difficulty: q.difficulty === 'easy' ? 'kolay' : q.difficulty === 'hard' ? 'zor' : 'normal',
+    question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, objective: q.topic || row.subtopic || '', bookletTopic: row.subtopic || row.topic || '', bookletResourceId: row.id || null, subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' },
+    review_status: 'approved', quality_score: 1, source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact', report_count: 0
   }))
   if (!rows.length) return 0
-  const result = await adminDb.from('question_bank').upsert(rows, { onConflict: 'fingerprint', ignoreDuplicates: true })
+  const result = await adminDb.from('question_bank').upsert(rows, { onConflict: 'fingerprint', ignoreDuplicates: true }).select('id')
   if (result.error) throw result.error
-  return rows.length
+  return result.data?.length || 0
 }
 
 // POST: yeni kitapçık yükle
@@ -310,7 +317,7 @@ export async function POST(req: NextRequest) {
 
     let promoted = 0
     if (purpose === 'instant_test' && source_type !== 'anonymous') {
-      promoted = await promoteExactQuestions({ subject, grade, subtopic, raw_text: rawText }, source_type)
+      promoted = await promoteExactQuestions({ id: result.resource_id, subject, grade, topic, subtopic, raw_text: rawText }, source_type)
       await adminDb.from('exam_resources').update({ review_status: 'approved', reuse_policy: 'exact_reuse' }).eq('id', result.resource_id)
     }
 
@@ -370,7 +377,7 @@ export async function PATCH(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const { id, review_status } = await req.json()
   if (!id || !['pending', 'approved', 'rejected'].includes(review_status)) return NextResponse.json({ error: 'Geçersiz durum' }, { status: 400 })
-    const { data: row } = await adminDb.from('exam_resources').select('source_type,purpose,title,subject,grade,topic,subtopic,raw_text').eq('id', id).single()
+  const { data: row } = await adminDb.from('exam_resources').select('id,source_type,purpose,title,subject,grade,topic,subtopic,raw_text').eq('id', id).single()
   if (!row) return NextResponse.json({ error: 'Bulunamadı' }, { status: 404 })
   const { error } = await adminDb.from('exam_resources').update({ review_status, reuse_policy: row.source_type === 'anonymous' ? 'reference_only' : 'exact_reuse' }).eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

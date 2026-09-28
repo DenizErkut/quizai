@@ -126,6 +126,8 @@ test('admin accepts AI question booklets for exact reuse and reference generatio
   expect(upload).toContain("source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact'")
   expect(upload).toContain("source_type !== 'anonymous'")
   expect(upload).toContain('canonicalBookletGrade')
+  expect(upload).toContain(".upsert(rows, { onConflict: 'fingerprint', ignoreDuplicates: true }).select('id')")
+  expect(upload).toContain('return result.data?.length || 0')
   expect(migration).toContain("('anonymous', 'teacher', 'ai')")
 })
 
@@ -145,6 +147,14 @@ test('question bank facets page through the whole pool and cascade by grade and 
   expect(facetsMigration).toContain('security invoker')
   expect(facetsMigration).toContain('from public, anon, authenticated')
   expect(facetsMigration).toContain('to service_role')
+})
+
+test('exact booklet questions use the selected parent topic while preserving subtopics for retrieval', () => {
+  const upload = readFileSync(join(process.cwd(), 'app/api/admin/exam-upload/route.ts'), 'utf8')
+  const bank = readFileSync(join(process.cwd(), 'lib/question-bank.ts'), 'utf8')
+  expect(upload).toContain('topic_key: questionBankKey(row.subtopic || row.topic || q.topic || \'genel\')')
+  expect(upload).toContain('bookletTopic: row.subtopic || row.topic || \'\'')
+  expect(bank).toContain('row.question?.bookletTopic, row.question?.objective, row.topic_key')
 })
 
 test('question booklet records can be viewed, edited and safely deleted by admins', () => {

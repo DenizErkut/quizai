@@ -236,14 +236,16 @@ export async function getQuestionBankSet(
     const matchingExactRows = exactRows.data.filter((row: any) => {
       if (!['teacher_exact', 'ai_exact'].includes(row.question?.sourcePolicy)) return false
       const rowSubject = questionBankKey(row.subject_key || row.question?.subject || 'genel')
-      const rowTopic = questionBankKey(row.question?.objective || row.topic_key)
+      const rowTopics = [row.question?.bookletTopic, row.question?.objective, row.topic_key]
+        .map(questionBankKey)
+        .filter(Boolean)
       const subjectMatches = rowSubject === requestedSubject
         || rowSubject === 'genel'
         || requestedSubject.includes(rowSubject)
         || rowSubject.includes(requestedSubject)
-      const topicMatches = rowTopic === requestedTopic
+      const topicMatches = rowTopics.some((rowTopic: string) => rowTopic === requestedTopic
         || rowTopic.includes(requestedTopic)
-        || requestedTopic.includes(rowTopic)
+        || requestedTopic.includes(rowTopic))
       const requestedType = questionBankKey(dimensions.questionType)
       const typeMatches = requestedType === 'mixed'
         || requestedType === 'karisik'
