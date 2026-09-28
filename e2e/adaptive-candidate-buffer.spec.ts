@@ -124,7 +124,20 @@ test('admin accepts AI question booklets for exact reuse and reference generatio
   expect(admin).toContain('<option value="ai">AI — birebir + yeni soru referansı</option>')
   expect(upload).toContain("source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact'")
   expect(upload).toContain("source_type !== 'anonymous'")
+  expect(upload).toContain('canonicalBookletGrade')
   expect(migration).toContain("('anonymous', 'teacher', 'ai')")
+})
+
+test('question bank facets page through the whole pool and cascade by grade and subject', () => {
+  const route = readFileSync(join(process.cwd(), 'app/api/admin/question-bank-review/route.ts'), 'utf8')
+  const editor = readFileSync(join(process.cwd(), 'components/QuestionBankEditor.tsx'), 'utf8')
+  const migration = readFileSync(join(process.cwd(), 'supabase/migrations/20260928073554_normalize_exact_question_bank_grades.sql'), 'utf8')
+  expect(route).toContain('.range(from, from + pageSize - 1)')
+  expect(route).toContain('subjectFacetRows')
+  expect(route).toContain('topicFacetRows')
+  expect(editor).toContain("{ grade: e.target.value, subject: '', topic: '' }")
+  expect(migration).toContain("when '7' then 'ortaokul 7 sinif'")
+  expect(migration).toContain("'ai_booklet_exact'")
 })
 
 test('question booklet records can be viewed, edited and safely deleted by admins', () => {

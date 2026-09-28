@@ -14,6 +14,16 @@ const adminDb = createClient(
 
 const anthropic = new Anthropic()
 
+function canonicalBookletGrade(value: unknown): string {
+  const key = questionBankKey(value)
+  if (!/^\d{1,2}$/.test(key)) return key
+  const grade = Number(key)
+  if (grade >= 1 && grade <= 4) return `ilkokul ${grade} sinif`
+  if (grade >= 5 && grade <= 8) return `ortaokul ${grade} sinif`
+  if (grade >= 9 && grade <= 12) return `lise ${grade} sinif`
+  return key
+}
+
 async function getAdminUser() {
   const cookieStore = await cookies()
   const sb = createServerClient(
@@ -203,7 +213,7 @@ async function promoteExactQuestions(row: { subject?: string | null; grade?: str
   const questions = extracted.filter((_: any, index: number) => approvedIndexes.has(index))
   const rows = questions.map((q: any) => ({
     fingerprint: createHash('sha256').update(`${q.q}|${q.opts.join('|')}`.toLocaleLowerCase('tr')).digest('hex'),
-    subject_key: questionBankKey(row.subject || 'genel'), topic_key: questionBankKey(q.topic || row.subtopic || 'genel'), grade_key: questionBankKey(row.grade || ''), language_key: 'tr', question_type: 'multiple_choice', difficulty: q.difficulty === 'easy' ? 'kolay' : q.difficulty === 'hard' ? 'zor' : 'normal', question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, objective: q.topic || row.subtopic || '', subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' }, review_status: 'approved', quality_score: 1, source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact', report_count: 0
+    subject_key: questionBankKey(row.subject || 'genel'), topic_key: questionBankKey(q.topic || row.subtopic || 'genel'), grade_key: canonicalBookletGrade(row.grade || ''), language_key: 'tr', question_type: 'multiple_choice', difficulty: q.difficulty === 'easy' ? 'kolay' : q.difficulty === 'hard' ? 'zor' : 'normal', question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, objective: q.topic || row.subtopic || '', subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' }, review_status: 'approved', quality_score: 1, source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact', report_count: 0
   }))
   if (!rows.length) return 0
   const result = await adminDb.from('question_bank').upsert(rows, { onConflict: 'fingerprint', ignoreDuplicates: true })

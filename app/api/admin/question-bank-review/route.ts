@@ -71,15 +71,29 @@ export async function GET(req: NextRequest) {
   const subject = searchParams.get('subject') || ''
   const topic = searchParams.get('topic') || ''
 
-  const { data: facetRows, error: facetError } = await db.from('question_bank')
-    .select('grade_key,subject_key,topic_key')
-    .in('review_status', ['candidate', 'approved'])
-    .limit(50000)
-  if (facetError) return NextResponse.json({ error: facetError.message }, { status: 500 })
+  // PostgREST proje ayarındaki varsayılan satır sınırı `.limit(50000)` verilse
+  // bile yanıtı 1000 satırda kesebilir. Facet'leri deterministik sayfalarla
+  // toplamazsak son toplu kitapçık yüklemesi Matematik gibi diğer dersleri
+  // açılır listeden gizler.
+  const facetRows: Array<{ grade_key: string; subject_key: string; topic_key: string }> = []
+  const pageSize = 1000
+  for (let page = 0; page < 50; page++) {
+    const from = page * pageSize
+    const { data: pageRows, error: facetError } = await db.from('question_bank')
+      .select('grade_key,subject_key,topic_key')
+      .in('review_status', ['candidate', 'approved'])
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1)
+    if (facetError) return NextResponse.json({ error: facetError.message }, { status: 500 })
+    facetRows.push(...(pageRows || []))
+    if ((pageRows || []).length < pageSize) break
+  }
+  const subjectFacetRows = grade ? facetRows.filter(row => row.grade_key === grade) : facetRows
+  const topicFacetRows = subjectFacetRows.filter(row => !subject || row.subject_key === subject)
   const facets = {
-    grades: [...new Set((facetRows || []).map((r) => r.grade_key).filter(Boolean))].sort(),
-    subjects: [...new Set((facetRows || []).map((r) => r.subject_key).filter(Boolean))].sort(),
-    topics: [...new Set((facetRows || []).map((r) => r.topic_key).filter(Boolean))].sort(),
+    grades: [...new Set(facetRows.map((r) => r.grade_key).filter(Boolean))].sort(),
+    subjects: [...new Set(subjectFacetRows.map((r) => r.subject_key).filter(Boolean))].sort(),
+    topics: [...new Set(topicFacetRows.map((r) => r.topic_key).filter(Boolean))].sort(),
   }
 
   let query = db.from('question_bank')
