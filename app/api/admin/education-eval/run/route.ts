@@ -6,7 +6,7 @@ import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { isProviderConfigured } from '@/lib/ai-gateway'
 import { generateWithRoutedProvider, pickQuizEngine, type ForceProvider } from '@/lib/ai-gateway/quiz-provider-router'
-import { createBlindEvalPrompt, isCompleteBenchmark, shouldUnblindResults, toBlindQuestion } from '@/lib/education-eval-runner'
+import { createBlindEvalPrompt, isCompleteBenchmark, parseBlindEvalAnswer, shouldUnblindResults, toBlindQuestion } from '@/lib/education-eval-runner'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
@@ -27,16 +27,6 @@ async function getAdminUser() {
   if (!user) return null
   const { data: profile } = await db.from('profiles').select('is_admin').eq('id', user.id).maybeSingle()
   return profile?.is_admin ? user : null
-}
-
-function parseAnswer(text: string, optionCount: number): { answerIndex: number; explanation: string } | null {
-  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
-  try {
-    const value = JSON.parse(cleaned)
-    const answerIndex = Number(value?.answerIndex)
-    if (!Number.isInteger(answerIndex) || answerIndex < 0 || answerIndex >= optionCount) return null
-    return { answerIndex, explanation: typeof value.explanation === 'string' ? value.explanation.slice(0, 2000) : '' }
-  } catch { return null }
 }
 
 async function loadRun(runId?: string) {
@@ -179,7 +169,7 @@ export async function POST(req: NextRequest) {
           operationTag: 'education-eval-blind', userId: user.id, requestId,
           providerCallTimeoutMs: 90000, claudeCallDeadlineMs: 90000,
           routingMeta: { educationEvalRunId: run.id, benchmarkItemId: next.id, blindLabel } })
-        const answer = parseAnswer(response.text, question.opts.length)
+        const answer = parseBlindEvalAnswer(response.text, question.opts)
         if (!answer) throw new Error('INVALID_MODEL_OUTPUT')
         const { data: usage } = await db.from('ai_usage_logs').select('input_tokens,output_tokens,cost_usd')
           .eq('request_id', requestId).order('created_at', { ascending: false }).limit(1).maybeSingle()

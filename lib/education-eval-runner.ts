@@ -1,5 +1,62 @@
 export type BlindQuestion = { q: string; opts: string[] }
 
+export type BlindEvalAnswer = { answerIndex: number; explanation: string }
+
+/**
+ * Providers sometimes wrap the requested JSON in prose/markdown, or return a
+ * plainly labelled option. Accept only explicit, unambiguous answer markers so
+ * formatting variance does not stall an otherwise valid benchmark run.
+ */
+export function parseBlindEvalAnswer(text: string, options: readonly string[]): BlindEvalAnswer | null {
+  const optionCount = options.length
+  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+  const candidates = [cleaned]
+  const jsonObject = cleaned.match(/\{[\s\S]*\}/)
+  if (jsonObject?.[0] && jsonObject[0] !== cleaned) candidates.push(jsonObject[0])
+
+  for (const candidate of candidates) {
+    try {
+      const value = JSON.parse(candidate)
+      const rawAnswer = value?.answerIndex ?? value?.answer_index ?? value?.answer ?? value?.choice
+      const answerIndex = typeof rawAnswer === 'number' && Number.isInteger(rawAnswer)
+        ? rawAnswer
+        : typeof rawAnswer === 'string' && /^\d+$/.test(rawAnswer.trim())
+          ? Number(rawAnswer.trim())
+          : typeof rawAnswer === 'string' && /^[A-F]$/i.test(rawAnswer.trim())
+            ? rawAnswer.trim().toUpperCase().charCodeAt(0) - 65
+            : typeof rawAnswer === 'string'
+              ? options.findIndex(option => option.trim() === rawAnswer.trim())
+              : -1
+      if (!Number.isInteger(answerIndex) || answerIndex < 0 || answerIndex >= optionCount) continue
+      return { answerIndex, explanation: typeof value.explanation === 'string' ? value.explanation.slice(0, 2000) : '' }
+    } catch { /* Try the next well-bounded representation. */ }
+  }
+
+  const explicitIndex = cleaned.match(/(?:answerIndex|answer_index|cevapIndeksi)\s*[:=]\s*["']?(\d+)/i)
+  if (explicitIndex) {
+    const answerIndex = Number(explicitIndex[1])
+    if (Number.isInteger(answerIndex) && answerIndex >= 0 && answerIndex < optionCount) {
+      return { answerIndex, explanation: cleaned.slice(0, 2000) }
+    }
+  }
+
+  const labelledOption = cleaned.match(/^\s*(?:(?:doğru\s+)?(?:cevap|yanıt|answer|option|seçenek|şık)\s*[:\-]?\s*)?([A-F])(?:[).:\s\-]|$)/i)
+  if (labelledOption) {
+    const answerIndex = labelledOption[1].toUpperCase().charCodeAt(0) - 65
+    if (answerIndex >= 0 && answerIndex < optionCount) {
+      return { answerIndex, explanation: cleaned.slice(labelledOption[0].length).trim().slice(0, 2000) }
+    }
+  }
+
+  const explicitAnswer = cleaned.match(/^\s*(?:doğru\s+)?(?:cevap|yanıt|answer|choice|seçenek|şık)\s*[:=\-]\s*["']?([^\n"']+)/i)
+  if (explicitAnswer) {
+    const answerIndex = options.findIndex(option => option.trim() === explicitAnswer[1].trim())
+    if (answerIndex >= 0) return { answerIndex, explanation: cleaned.slice(explicitAnswer[0].length).trim().slice(0, 2000) }
+  }
+
+  return null
+}
+
 export function toBlindQuestion(snapshot: unknown): BlindQuestion | null {
   if (!snapshot || typeof snapshot !== 'object') return null
   const value = snapshot as Record<string, unknown>

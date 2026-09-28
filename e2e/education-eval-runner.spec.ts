@@ -1,5 +1,17 @@
 import { expect, test } from '@playwright/test'
-import { createBlindEvalPrompt, isCompleteBenchmark, shouldUnblindResults, toBlindQuestion } from '../lib/education-eval-runner'
+import { createBlindEvalPrompt, isCompleteBenchmark, parseBlindEvalAnswer, shouldUnblindResults, toBlindQuestion } from '../lib/education-eval-runner'
+
+test('parses strict JSON plus common provider formatting wrappers without guessing', () => {
+  const options = ['Birinci', 'İkinci', 'Üçüncü', 'Dördüncü']
+  expect(parseBlindEvalAnswer('{"answerIndex":2,"explanation":"Açıklama"}', options)).toEqual({ answerIndex: 2, explanation: 'Açıklama' })
+  expect(parseBlindEvalAnswer('Yanıtım: {"answerIndex":1,"explanation":"Gerekçe"}', options)).toEqual({ answerIndex: 1, explanation: 'Gerekçe' })
+  expect(parseBlindEvalAnswer('{"answer":"C","explanation":"Gerekçe"}', options)).toEqual({ answerIndex: 2, explanation: 'Gerekçe' })
+  expect(parseBlindEvalAnswer('Cevap: C — Çünkü işlem sonucu budur.', options)).toEqual({ answerIndex: 2, explanation: '— Çünkü işlem sonucu budur.' })
+  expect(parseBlindEvalAnswer('Cevap: Dördüncü', options)).toEqual({ answerIndex: 3, explanation: '' })
+  expect(parseBlindEvalAnswer('Cevap: E', options)).toBeNull()
+  expect(parseBlindEvalAnswer('{"answerIndex":null}', options)).toBeNull()
+  expect(parseBlindEvalAnswer('Bu soruyu yanıtlayamıyorum.', options)).toBeNull()
+})
 
 test('only a complete fifty-question set with valid answer indices can start evaluation', () => {
   const items = Array.from({ length: 50 }, () => ({
