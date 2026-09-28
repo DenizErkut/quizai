@@ -633,6 +633,7 @@ export type Database = {
           file_url: string | null
           raw_text: string | null
           created_at: string
+          learning_objective_codes: string[]
         }
         Insert: {
           id?: string
@@ -643,10 +644,12 @@ export type Database = {
           answer_key?: string | null
           file_url?: string | null
           raw_text?: string | null
+          learning_objective_codes?: string[]
         }
         Update: {
           title?: string
           answer_key?: string | null
+          learning_objective_codes?: string[]
         }
       }
       partner_integrations: {

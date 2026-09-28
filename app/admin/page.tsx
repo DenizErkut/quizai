@@ -101,11 +101,11 @@ export default function AdminPage() {
   const [examMsg, setExamMsg] = useState('')
   const [examFile, setExamFile] = useState<File | null>(null)
   const [examEvidenceFiles, setExamEvidenceFiles] = useState<File[]>([])
-  const [examForm, setExamForm] = useState({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '' })
+  const [examForm, setExamForm] = useState({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '', learningObjectiveCodes: '' })
   const [examList, setExamList] = useState<any[]>([])
   const [examListLoading, setExamListLoading] = useState(false)
   const [examEditor, setExamEditor] = useState<{
-    id: string; title: string; grade: string; subject: string; topic: string
+    id: string; title: string; grade: string; subject: string; topic: string; purpose: string; learning_objective_codes: string
     source_type: string; file_url: string | null; raw_text: string
     publication_evidence: { path: string; url: string }[]; evidenceUploading: boolean
     mode: 'view' | 'edit'; loading: boolean; saving: boolean; error: string
@@ -216,7 +216,7 @@ export default function AdminPage() {
   }
 
   async function openExamResource(id: string, mode: 'view' | 'edit') {
-    setExamEditor({ id, title: '', grade: '', subject: '', topic: '', source_type: '', file_url: null, raw_text: '', publication_evidence: [], evidenceUploading: false, mode, loading: true, saving: false, error: '' })
+    setExamEditor({ id, title: '', grade: '', subject: '', topic: '', purpose: '', learning_objective_codes: '', source_type: '', file_url: null, raw_text: '', publication_evidence: [], evidenceUploading: false, mode, loading: true, saving: false, error: '' })
     try {
       const response = await fetch(`/api/admin/exam-upload?id=${encodeURIComponent(id)}`)
       const data = await response.json()
@@ -224,7 +224,7 @@ export default function AdminPage() {
       const exam = data.exam || {}
       setExamEditor({
         id: exam.id, title: exam.title || '', grade: exam.grade || '', subject: exam.subject || '',
-        topic: exam.topic || exam.subtopic || '', source_type: exam.source_type || '', file_url: exam.file_url || null,
+        topic: exam.topic || exam.subtopic || '', purpose: exam.purpose || '', learning_objective_codes: Array.isArray(exam.learning_objective_codes) ? exam.learning_objective_codes.join(', ') : '', source_type: exam.source_type || '', file_url: exam.file_url || null,
         raw_text: exam.raw_text || '', publication_evidence: exam.publication_evidence || [], evidenceUploading: false, mode, loading: false, saving: false, error: '',
       })
     } catch (error) {
@@ -241,12 +241,13 @@ export default function AdminPage() {
         body: JSON.stringify({
           id: examEditor.id, title: examEditor.title, grade: examEditor.grade,
           subject: examEditor.subject, topic: examEditor.topic, raw_text: examEditor.raw_text,
+          learning_objective_codes: examEditor.learning_objective_codes,
         }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Kitapçık güncellenemedi.')
       setExamList(current => current.map(item => item.id === examEditor.id
-        ? { ...item, title: examEditor.title, grade: examEditor.grade, subject: examEditor.subject, topic: examEditor.topic, subtopic: examEditor.topic, chunk_count: data.chunks }
+        ? { ...item, title: examEditor.title, grade: examEditor.grade, subject: examEditor.subject, topic: examEditor.topic, subtopic: examEditor.topic, learning_objective_codes: data.learning_objective_codes || [], chunk_count: data.chunks }
         : item))
       setExamEditor(current => current ? { ...current, mode: 'view', saving: false, error: '' } : current)
       setExamMsg(`✅ Kitapçık güncellendi; ${data.chunks} arama parçası yenilendi. Orijinal PDF korundu.`)
@@ -1818,6 +1819,13 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                 <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>ÜNİTE/KONU</label>
                 <input value={examForm.subtopic} onChange={e => setExamForm(p => ({ ...p, subtopic: e.target.value }))} placeholder="Hücre bölünmeleri" aria-label="ÜNİTE/KONU" style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', boxSizing: 'border-box' as const }} />
               </div>}
+              {tab === 'question-books' && <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block' }}>
+                Kazanım kodu
+                <textarea value={examForm.learningObjectiveCodes} onChange={e => setExamForm(p => ({ ...p, learningObjectiveCodes: e.target.value }))}
+                  placeholder={'Örn. MAT.7.1.1, MAT.7.1.2\nBirden fazla kodu virgül, noktalı virgül veya yeni satırla ayırın.'} rows={2}
+                  style={{ display: 'block', width: '100%', marginTop: '6px', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', boxSizing: 'border-box' as const, resize: 'vertical' }} />
+                <span style={{ display: 'block', marginTop: '5px', fontSize: '11px', color: 'var(--text3)' }}>Soru kitapçığıyla ilgili MEB kodlarını ekleyin. Sistem doğrulanmış kodları sorularla eşleştirmeye çalışır; emin olmadığı eşleşmeyi boş bırakır.</span>
+              </label>}
               {tab === 'exam-books' && <div>
                 <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Sınav Türü *</label>
                 <select value={examForm.exam_type} onChange={e => setExamForm(p => ({ ...p, exam_type: e.target.value }))}
@@ -1900,7 +1908,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     if (res.ok) {
                       if (examEvidenceFiles.length && data.resource_id) await uploadExamEvidence(data.resource_id, examEvidenceFiles)
                       setExamMsg(tab === 'question-books' && examForm.source_type !== 'anonymous' ? `✅ Yüklendi; ${data.promoted || 0} soru birebir anlık test havuzuna aktarıldı${examEvidenceFiles.length ? ` ve ${examEvidenceFiles.length} yayın izni kanıtı saklandı` : ''}.` : `✅ Yüklendi! ${data.chunks} kaynak parçası işlendi.`)
-                      setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '' })
+                      setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '', learningObjectiveCodes: '' })
                       setExamFile(null)
                       setExamEvidenceFiles([])
                     } else setExamMsg('❌ ' + (data.error || 'Sunucu hatasi'))
@@ -1916,7 +1924,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     if (res.ok) {
                       if (examEvidenceFiles.length && data.resource_id) await uploadExamEvidence(data.resource_id, examEvidenceFiles)
                       setExamMsg(tab === 'question-books' && examForm.source_type !== 'anonymous' ? `✅ Yüklendi; ${data.promoted || 0} soru birebir anlık test havuzuna aktarıldı${examEvidenceFiles.length ? ` ve ${examEvidenceFiles.length} yayın izni kanıtı saklandı` : ''}.` : `✅ Yüklendi! ${data.chunks} kaynak parçası işlendi.`)
-                      setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '' })
+                      setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '', learningObjectiveCodes: '' })
                       setExamFile(null)
                       setExamEvidenceFiles([])
                     } else setExamMsg('❌ ' + (data.error || 'Sunucu hatasi'))
@@ -1955,7 +1963,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>🎯</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--primary)' }}>{ex.title}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Anlık test kaynağı · {ex.grade ? `${ex.grade}. sınıf · ` : ''}{ex.subject || 'Ders belirtilmedi'}{(ex.topic || ex.subtopic) ? ` · ${ex.topic || ex.subtopic}` : ''} · {ex.chunk_count || 0} parça{ex.publication_evidence_count ? ` · ${ex.publication_evidence_count} izin kanıtı` : ''}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Anlık test kaynağı · {ex.grade ? `${ex.grade}. sınıf · ` : ''}{ex.subject || 'Ders belirtilmedi'}{(ex.topic || ex.subtopic) ? ` · ${ex.topic || ex.subtopic}` : ''} · {ex.chunk_count || 0} parça{Array.isArray(ex.learning_objective_codes) && ex.learning_objective_codes.length ? ` · kazanım: ${ex.learning_objective_codes.join(', ')}` : ''}{ex.publication_evidence_count ? ` · ${ex.publication_evidence_count} izin kanıtı` : ''}</div>
                     </div>
                     <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '99px', background: ex.source_type === 'teacher' ? 'rgba(22,163,74,0.1)' : ex.source_type === 'ai' ? 'rgba(14,165,233,0.1)' : 'rgba(99,102,241,0.1)', color: ex.source_type === 'teacher' ? '#15803d' : ex.source_type === 'ai' ? '#0369a1' : '#6366f1', fontWeight: 600 }}>{ex.source_type === 'teacher' ? 'Öğretmen' : ex.source_type === 'ai' ? 'AI' : 'Anonim'} · {ex.review_status === 'approved' ? 'Onaylı' : 'Bekliyor'}</span>
                     <button onClick={() => void openExamResource(ex.id, 'view')} className="btn btn-sm" style={{ flexShrink: 0 }}>👁️ Görüntüle</button>
@@ -2547,6 +2555,13 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     </label>
                   ))}
                 </div>
+                {examEditor.purpose === 'instant_test' && <label style={{ fontSize: '11px', color: 'var(--text3)' }}>
+                  Kazanım kodu
+                  <textarea value={examEditor.learning_objective_codes} disabled={examEditor.mode === 'view' || examEditor.saving}
+                    onChange={event => setExamEditor(current => current ? { ...current, learning_objective_codes: event.target.value } : current)}
+                    placeholder="MAT.7.1.1, MAT.7.1.2" rows={2}
+                    style={{ display: 'block', width: '100%', marginTop: '4px', padding: '8px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', resize: 'vertical', boxSizing: 'border-box' }} />
+                </label>}
                 <label style={{ fontSize: '11px', color: 'var(--text3)' }}>
                   Kaynaktan çıkarılan / düzenlenebilir metin
                   <textarea value={resourceEditor.raw_text} disabled={resourceEditor.mode === 'view' || resourceEditor.saving}

@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { matchVerifiedObjectiveCode } from '@/lib/learning-objective-codes'
 
 type Objective = { id: string; objective_code: string; title: string }
 type Resource = { id: string; title: string; grade: string; subject: string; sourceVersion: string; evidenceUrls: string[]; evidenceCount: number; questionCount: number; objectives: Objective[] }
@@ -40,6 +41,15 @@ export default function EducationEvalBenchmark() {
 
   function selectResource(id: string) {
     setResourceId(id); setQuestionId(''); setObjectiveId(''); setConfirmed(false); setMessage('')
+  }
+
+  function selectQuestion(id: string) {
+    const question = questions.find(candidate => candidate.id === id)
+    const code = matchVerifiedObjectiveCode(question?.question?.learningObjectiveCode, selectedResource?.objectives.map(objective => objective.objective_code) || [])
+    const objective = code ? selectedResource?.objectives.find(candidate => candidate.objective_code.toLocaleUpperCase('tr-TR') === code) : null
+    setQuestionId(id)
+    setObjectiveId(objective?.id || '')
+    setConfirmed(false)
   }
 
   async function mutate(method: 'POST' | 'DELETE', body?: any, itemId?: string) {
@@ -88,13 +98,14 @@ export default function EducationEvalBenchmark() {
       </select>
       {selectedResource && <>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{selectedResource.evidenceUrls.map((url, index) => <a key={url} href={url} target="_blank" rel="noreferrer"><img src={url} alt={`Yayın izni kanıtı ${index + 1}`} style={{ width: 130, height: 90, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }} /></a>)}</div>
-        <select className="input" value={questionId} onChange={event => { setQuestionId(event.target.value); setConfirmed(false) }}>
+        <select className="input" value={questionId} onChange={event => selectQuestion(event.target.value)}>
           <option value="">Kitapçıktan birebir çıkarılmış soru seç</option>
-          {questions.map(question => <option key={question.id} value={question.id}>{question.topic} · {question.question.q.slice(0, 110)}</option>)}
+          {questions.map(question => <option key={question.id} value={question.id}>{question.question.learningObjectiveCode ? `${question.question.learningObjectiveCode} · ` : ''}{question.topic} · {question.question.q.slice(0, 110)}</option>)}
         </select>
         {selectedQuestion && <div style={{ padding: 12, borderRadius: 8, background: 'var(--bg2, #f7f1e9)' }}>
           <div><strong>{selectedQuestion.question.q}</strong></div>
           <ol type="A">{selectedQuestion.question.opts.map((option: string, index: number) => <li key={index}>{option}{index === selectedQuestion.question.ans ? ' ✓' : ''}</li>)}</ol>
+          {selectedQuestion.question.learningObjectiveCode && objectiveId && <small style={{ color: 'var(--green, #15803d)' }}>Kazanım kodu otomatik eşleştirildi: {selectedQuestion.question.learningObjectiveCode}</small>}
           <label style={{ display: 'block', marginTop: 10 }}>Kazanım
             <select className="input" style={{ marginTop: 6 }} value={objectiveId} onChange={event => setObjectiveId(event.target.value)}>
               <option value="">Doğrulanmış kazanım seç</option>
