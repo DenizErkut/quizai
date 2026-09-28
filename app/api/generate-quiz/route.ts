@@ -2499,8 +2499,11 @@ export async function POST(req: NextRequest) {
     // those slots from approved bank rows first, then generate fresh AI
     // candidates using the established provider/difficulty roles, and run the
     // same independent review again. Never shrink the requested session size.
-    const replenishDeadline = Math.min(requestStartTime + 108000, Date.now() + 36000)
-    for (let recoveryRound = 0; verifiedQuestions.length < minimumVerifiedCount && recoveryRound < 3; recoveryRound++) {
+    // Use the remaining request budget for verified replacements instead of
+    // giving recovery an arbitrary 36-second ceiling. This is shared by every
+    // grade/subject path, including university and forced single-provider runs.
+    const replenishDeadline = Math.min(requestStartTime + 113000, Date.now() + 55000)
+    for (let recoveryRound = 0; verifiedQuestions.length < minimumVerifiedCount && recoveryRound < 4; recoveryRound++) {
       if (Date.now() >= replenishDeadline) break
       const missing = safeQCount - verifiedQuestions.length
       const existingTexts = [...questions, ...verifiedQuestions].map((question: any) => question?.q).filter(Boolean)
@@ -2520,29 +2523,68 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      if (replacements.length < missing && roleMixEnabled && Date.now() < replenishDeadline) {
+      if (replacements.length < missing && Date.now() < replenishDeadline) {
         const aiMissing = missing - replacements.length
-        const recoveryPlan = buildQuestionGenerationPlan(aiMissing)
         const recoveryPrompt = `${prompt}\n\nRECOVERY: Produce exactly ${aiMissing} fresh replacement questions for the same grade, subject, topic and objectives. Do not repeat any of these already prepared questions: ${existingTexts.slice(-12).join(' | ').slice(0, 3500)}.`
-        const recoveryBatches = await Promise.all(recoveryPlan.map(batch => generateProviderQuestionBatch({
-          batch,
-          prompt: recoveryPrompt,
-          questionType,
-          language: effectiveLang,
-          userId: user.id,
-          sessionId: usageSessionId,
-          requestId: usageRequestId,
-          requestStartTime,
-        }).catch(error => {
-          console.warn(`[generate-quiz] verification replacement failed provider=${batch.provider}:`, error instanceof Error ? error.message : 'unknown')
-          return []
-        })))
-        let generated = recoveryBatches.flat()
-        generated = generated.map((question: any) => normalizeInteractiveQuestionShape(question, effectiveLang))
+
+        if (roleMixEnabled) {
+          const recoveryPlan = buildQuestionGenerationPlan(aiMissing)
+          const recoveryBatches = await Promise.all(recoveryPlan.map(batch => generateProviderQuestionBatch({
+            batch,
+            prompt: recoveryPrompt,
+            questionType,
+            language: effectiveLang,
+            userId: user.id,
+            sessionId: usageSessionId,
+            requestId: usageRequestId,
+            requestStartTime,
+          }).catch(error => {
+            console.warn(`[generate-quiz] verification replacement failed provider=${batch.provider}:`, error instanceof Error ? error.message : 'unknown')
+            return []
+          })))
+          replacements.push(...recoveryBatches.flat())
+        }
+
+        // Role-mix providers may fail or return fewer candidates than asked.
+        // A single, reliable Sonnet completion is the universal final source
+        // for every remaining slot (including non-K12/single-provider flows).
+        if (replacements.length < missing && Date.now() < replenishDeadline) {
+          const finalMissing = missing - replacements.length
+          const remainingMs = replenishDeadline - Date.now()
+          try {
+            const recoveryResponse = await anthropic.messages.create({
+              model: 'claude-sonnet-4-5',
+              max_tokens: Math.min(6000, Math.max(2000, finalMissing * 650)),
+              system: isUniversityLevel
+                ? undefined
+                : [
+                    { type: 'text' as const, text: 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca belirtilen sınıf ve kazanıma uygun, doğru ve yaşa uygun içerik üret.' },
+                    { type: 'text' as const, text: getStaticSystemBlock(questionType, effectiveLang), cache_control: { type: 'ephemeral' as const } },
+                  ],
+              messages: [{ role: 'user', content: `${prompt}\n\nRECOVERY: Produce exactly ${finalMissing} fresh replacement questions. Preserve the requested class, course, topic, learning outcomes and question type. Avoid every prepared question listed here: ${[...existingTexts, ...replacements.map((question: any) => question?.q).filter(Boolean)].slice(-12).join(' | ').slice(0, 3500)}.` }],
+            }, { timeout: Math.max(1000, Math.min(45000, remainingMs)), maxRetries: 0 })
+            await logAnthropicUsage('generate-quiz:verification-recovery', 'claude-sonnet-4-5', recoveryResponse, {
+              userId: user.id,
+              quizSessionId: usageSessionId,
+              requestId: usageRequestId,
+              meta: { requested: finalMissing, recoveryRound: recoveryRound + 1, subject, grade, topic },
+            })
+            const recoveryText = recoveryResponse.content[0]?.type === 'text' ? recoveryResponse.content[0].text : ''
+            replacements.push(...extractProviderQuestions(recoveryText).map((question: any) => ({
+              ...question,
+              generationProvider: question.generationProvider || 'anthropic',
+            })))
+          } catch (error) {
+            console.warn('[generate-quiz] universal verification replacement failed:', error instanceof Error ? error.message : 'unknown')
+          }
+        }
+
+        let generated = replacements
+          .map((question: any) => normalizeInteractiveQuestionShape(question, effectiveLang))
         generated = filterQuestionsByRequestedType(generated, questionType)
         generated = applyContentQualityFilters(generated, mebContext)
-        generated = filterOutNearDuplicates(generated, [...existingTexts, ...replacements.map((question: any) => question.q).filter(Boolean)])
-        replacements.push(...generated)
+        generated = filterOutNearDuplicates(generated, [...existingTexts, ...bankQuestions.map((question: any) => question.q).filter(Boolean), ...verifiedQuestions.map((question: any) => question.q).filter(Boolean)])
+        replacements = generated
       }
 
       replacements = replacements.slice(0, missing)
