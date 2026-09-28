@@ -33,6 +33,8 @@ test('model prompt only receives the question and options, never answer-key meta
   expect(prompt.userPrompt).not.toContain('secret')
   expect(prompt.userPrompt).not.toContain('distractorMisconceptions')
   expect(prompt.userPrompt).not.toContain('answerIndex')
+  expect(prompt.systemPrompt).toContain('Uzun düşünce zincirini veya analizini yazma')
+  expect(prompt.systemPrompt).toContain('en fazla 2 kısa cümle ve 45 kelime')
 })
 
 test('provider identities are unblinded only after every one of the 150 outputs is rated', () => {

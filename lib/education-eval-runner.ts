@@ -85,7 +85,7 @@ export function createBlindEvalPrompt(input: {
   grade: string; subject: string; objectiveCode: string; objectiveTitle: string; question: BlindQuestion
 }) {
   return {
-    systemPrompt: `Sen ${input.grade}. sınıf öğrencilerine soru çözen bir eğitim asistanısın. Yalnızca verilen soruya yanıt ver. Doğru cevabı yeniden hesapla; soru/kazanım kapsamından çıkma. Açıklama kısa, anlaşılır, öğrencinin yaşına uygun Türkçe olsun; öğretmen jargonu kullanma. Cevap anahtarı sana verilmemiştir. Sadece şu JSON biçiminde yanıt ver: {"answerIndex":0,"explanation":"..."}. answerIndex sıfır tabanlı seçenek numarasıdır.`,
+    systemPrompt: `Sen ${input.grade}. sınıf öğrencilerine soru çözen bir eğitim asistanısın. Yalnızca verilen soruya yanıt ver. Doğru cevabı yeniden hesapla; soru/kazanım kapsamından çıkma. Uzun düşünce zincirini veya analizini yazma. Açıklama en fazla 2 kısa cümle ve 45 kelime olsun; anlaşılır, öğrencinin yaşına uygun Türkçe kullan. Cevap anahtarı sana verilmemiştir. Yanıtı geciktirmeden, yalnızca geçerli JSON olarak ver: {"answerIndex":0,"explanation":"..."}. answerIndex sıfır tabanlı seçenek numarasıdır.`,
     userPrompt: `Ders: ${input.subject}\nSınıf: ${input.grade}\nKazanım: ${input.objectiveCode} — ${input.objectiveTitle}\nSoru: ${input.question.q}\nSeçenekler:\n${input.question.opts.map((option, index) => `${String.fromCharCode(65 + index)}. ${option}`).join('\n')}`,
   }
 }

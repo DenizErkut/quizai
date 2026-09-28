@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
       try {
         if (!isProviderConfigured(provider.key === 'anthropic' ? 'anthropic' : provider.key)) throw new Error('PROVIDER_NOT_CONFIGURED')
         const decision = pickQuizEngine({ bucketKey: `education-eval:${run.id}:${next.id}:${provider.key}`, forceProvider: provider.force })
-        const response = await generateWithRoutedProvider(decision, { systemPrompt, userPrompt, maxTokens: 600,
+        const response = await generateWithRoutedProvider(decision, { systemPrompt, userPrompt, maxTokens: 1200,
           operationTag: 'education-eval-blind', userId: user.id, requestId,
           providerCallTimeoutMs: 90000, claudeCallDeadlineMs: 90000,
           routingMeta: { educationEvalRunId: run.id, benchmarkItemId: next.id, blindLabel } })
