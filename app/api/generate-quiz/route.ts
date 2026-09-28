@@ -39,7 +39,7 @@ import { decideQuizProvider, getQuizProviderPolicy, QUIZ_PROVIDER_POLICY_VERSION
 import { attachQuestionRigorMetadata, summarizeQuestionSetRigor } from '@/lib/question-rigor'
 import { verifyVisualWithMistral } from '@/lib/mistral-quality'
 import { verifyVisualWithGemini } from '@/lib/gemini-visual-quality'
-import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
+import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, minimumVerifiedQuestionCount, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
 import { isSameGradeSource } from '@/lib/meb-source-scope'
 
 const anthropic = new Anthropic()
@@ -505,7 +505,9 @@ async function visualMatchesQuestion(questionText: string, svg: string, correctA
     const result = JSON.parse(raw) as { score?: unknown; contextMatch?: unknown; answerLeak?: unknown; useful?: unknown; reason?: unknown }
     const score = Number(result.score)
     const reason = typeof result.reason === 'string' ? result.reason.slice(0, 240) : 'Görsel bağlamı doğrulanamadı.'
-    const openAIPassed = Number.isFinite(score) && score >= 90 && result.contextMatch === true && result.answerLeak !== true && result.useful !== false
+    // Keep semantic safety checks hard, but use the agreed 70% quality floor
+    // instead of the previous 90% score gate that rejected usable visuals.
+    const openAIPassed = Number.isFinite(score) && score >= 70 && result.contextMatch === true && result.answerLeak !== true && result.useful !== false
     // OpenAI is the mandatory enforcement boundary. Gemini and Mistral keep
     // veto power when they return a decision, while a temporary timeout/quota
     // issue in either auxiliary provider does not take the whole quiz offline.
@@ -1529,6 +1531,12 @@ export async function POST(req: NextRequest) {
     const MAX_QCOUNT: Record<string, number> = { free: 5, silver: 10, premium: 20, unlimited: 20 }
     const maxQ = MAX_QCOUNT[plan] ?? 0
     const safeQCount = isDailyChallengeRequest ? Math.min(questionCount, 10) : Math.min(questionCount, maxQ)
+    // Normal test creation must still deliver the exact requested count.
+    // An adaptive continuation is a reserve batch, however: allow a 70%
+    // verified subset so one over-strict rejection cannot stall the live test.
+    const minimumVerifiedCount = adaptiveCandidateBatch
+      ? minimumVerifiedQuestionCount(safeQCount)
+      : safeQCount
     usageRequestId = crypto.randomUUID()
     // Yeni oturumun kimliği üretimden önce bilinir; böylece AI maliyet kaydı
     // kullanıcı ve oturumla atomik olmayan bir sonradan eşleştirmeye ihtiyaç duymaz.
@@ -2451,8 +2459,8 @@ export async function POST(req: NextRequest) {
     // başlatmaya çalışıyordu. Bu kontrol kota/session değişikliklerinden
     // ÖNCE çalışır; öğrenciye yeniden deneme seçeneği verir ve bozuk oturum
     // bırakmaz.
-    if (questions.length !== safeQCount) {
-      console.error(`[generate-quiz] incomplete_set requested=${safeQCount} delivered=${questions.length} topic=${topic}`)
+    if (questions.length < minimumVerifiedCount) {
+      console.error(`[generate-quiz] incomplete_set requested=${safeQCount} minimum=${minimumVerifiedCount} delivered=${questions.length} topic=${topic}`)
       return NextResponse.json({
         error: 'insufficient_questions',
         message: 'Soruların tamamı kalite kontrolünden geçemedi. Lütfen birkaç saniye sonra yeniden dene.',
@@ -2492,7 +2500,7 @@ export async function POST(req: NextRequest) {
     // candidates using the established provider/difficulty roles, and run the
     // same independent review again. Never shrink the requested session size.
     const replenishDeadline = Math.min(requestStartTime + 108000, Date.now() + 36000)
-    for (let recoveryRound = 0; verifiedQuestions.length < safeQCount && recoveryRound < 3; recoveryRound++) {
+    for (let recoveryRound = 0; verifiedQuestions.length < minimumVerifiedCount && recoveryRound < 3; recoveryRound++) {
       if (Date.now() >= replenishDeadline) break
       const missing = safeQCount - verifiedQuestions.length
       const existingTexts = [...questions, ...verifiedQuestions].map((question: any) => question?.q).filter(Boolean)
@@ -2553,13 +2561,14 @@ export async function POST(req: NextRequest) {
     }
 
     const verifiedCandidateCount = verifiedQuestions.length
-    if (verifiedCandidateCount !== safeQCount) {
-      console.error(`[generate-quiz] strict_verification_failed verified=${verifiedCandidateCount}/${safeQCount}`)
-      return NextResponse.json({ error: 'insufficient_questions', reason: 'independent_verification', message: `İstenen ${safeQCount} sorunun tamamı için havuz ve AI yedekleri denendi; ${verifiedCandidateCount} soru kontrolden geçti. Tam sayı sağlanamadığı için kısmi test başlatılmadı. Birkaç saniye sonra yeniden deneyebilirsin.`, requestedCount: safeQCount, deliveredCount: verifiedCandidateCount }, { status: 503 })
+    if (verifiedCandidateCount < minimumVerifiedCount) {
+      console.error(`[generate-quiz] strict_verification_failed verified=${verifiedCandidateCount}/${safeQCount} minimum=${minimumVerifiedCount}`)
+      return NextResponse.json({ error: 'insufficient_questions', reason: 'independent_verification', message: `İstenen ${safeQCount} sorudan en az ${minimumVerifiedCount} tanesi kalite kontrolünü geçmeliydi; ${verifiedCandidateCount} soru geçti.`, requestedCount: safeQCount, deliveredCount: verifiedCandidateCount, minimumVerifiedCount }, { status: 503 })
     }
     questions = verifiedQuestions.map((question: any) => normalizeInteractiveQuestionShape(question, effectiveLang))
     questions = filterQuestionsByRequestedType(questions, questionType)
-    if (questions.length !== safeQCount) {
+    const adaptiveBatchHasMinimum = adaptiveCandidateBatch && questions.length > 0 && questions.length >= minimumVerifiedCount
+    if (!adaptiveBatchHasMinimum && (questions.length < minimumVerifiedCount || questions.length !== safeQCount)) {
       console.error(`[generate-quiz] question_type_mismatch expected=${questionType} accepted=${questions.length}/${safeQCount}`)
       return NextResponse.json({ error: 'quality_policy_failed', reason: 'question_type_mismatch', message: 'Seçtiğin soru tipine uymayan sorular öğrenciye gösterilmeden elendi. Lütfen yeniden dene.' }, { status: 503 })
     }

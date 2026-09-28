@@ -946,6 +946,7 @@ function QuizPageContent() {
         // Request exactly the remaining count. The server may prepare internal
         // reserves, but the student-facing session must reach the chosen total.
         const targetSecondChunk = Math.min(3, Math.max(1, qCount - questions.length))
+        const minimumSecondChunk = Math.max(1, Math.round(targetSecondChunk * 0.7))
         const { data: { session } } = await supabase.auth.getSession()
         const prefetchKey = `${sessionId}:${chunkBoundary}:${answersRef.current.length}`
         const prefetched = adaptivePrefetchRef.current?.key === prefetchKey
@@ -999,7 +1000,11 @@ function QuizPageContent() {
           }
         }
         adaptivePrefetchRef.current = null
-        if (secondChunk.length === targetSecondChunk) {
+        // Prefer completing this chunk exactly, but if retries still leave a
+        // verified 70% subset, keep the adaptive session moving. The next
+        // boundary is recalculated from the actual count, so the overall quiz
+        // continues requesting questions until qCount is reached.
+        if (secondChunk.length >= minimumSecondChunk) {
           const nextBoundary = questions.length + secondChunk.length
           setQuestions(prev => [...prev, ...secondChunk])
           setResolvedDifficulty(nextDiff)
@@ -1008,7 +1013,7 @@ function QuizPageContent() {
         } else {
           setChunkBoundary(null)
           setFetchingNextChunk(false)
-          setQuizError({ code: 'adaptive_next_failed', title: 'İstenen soru sayısı tamamlanamadı', desc: `Şu ana kadar ${questions.length + secondChunk.length}/${qCount} soru hazırlanabildi. Eksik sorular tamamlanmadan test bitirilmedi; birkaç saniye sonra yeniden deneyebilirsin.`, retry: true })
+          setQuizError({ code: 'adaptive_next_failed', title: 'Yedek sorular kalite kontrolünden geçemedi', desc: `Bu adım için gereken ${minimumSecondChunk} doğrulanmış soru hazırlanamadı. Birkaç saniye sonra yeniden deneyebilirsin.`, retry: true })
           setScreen('error')
           return
         }

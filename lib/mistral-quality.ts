@@ -123,7 +123,7 @@ Yalnızca JSON döndür: {"score":0-100,"contextMatch":true,"answerLeak":false,"
     const useful = parsed.useful === true
     const renderingIssue = parsed.renderingIssue === true
     const reason = typeof parsed.reason === 'string' ? parsed.reason.slice(0, 240) : 'Mistral görsel denetimi gerekçe döndürmedi.'
-    const passed = Number.isFinite(score) && score >= 88 && contextMatch && !answerLeak && useful && !renderingIssue
+    const passed = Number.isFinite(score) && score >= 70 && contextMatch && !answerLeak && useful && !renderingIssue
     return { passed, score: Number.isFinite(score) ? score : 0, reason, contextMatch, answerLeak, useful }
   } catch (error) {
     console.warn('[mistral-quality] visual validator unavailable:', error instanceof Error ? error.message : 'unknown')

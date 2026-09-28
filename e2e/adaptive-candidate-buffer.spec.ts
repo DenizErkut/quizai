@@ -6,7 +6,8 @@ test('adaptive continuation requests a three-question validated reserve', () => 
   const page = readFileSync(join(process.cwd(), 'app/quiz/page.tsx'), 'utf8')
   expect(page).toContain('Math.min(3, Math.max(1, qCount - questions.length))')
   expect(page).toContain('adaptiveCandidateBatch: true')
-  expect(page).toContain('if (secondChunk.length === 0 && sessionId)')
+  expect(page).toContain('const minimumSecondChunk = Math.max(1, Math.round(targetSecondChunk * 0.7))')
+  expect(page).toContain('secondChunk.length >= minimumSecondChunk')
   expect(page).not.toContain('Bağlantıyı kontrol edip testi yeniden başlatabilirsin.')
 })
 
@@ -15,7 +16,7 @@ test('quality gate accepts a verified seventy-percent subset without relaxing ob
   expect(route).toContain("body?.adaptiveCandidateBatch === true")
   expect(route).toContain("typeof body?.continueSessionId === 'string'")
   expect(route).toContain('minimumVerifiedQuestionCount(safeQCount)')
-  expect(route).toContain('verifiedCandidateCount >= minimumVerifiedCount')
+  expect(route).toContain('verifiedCandidateCount < minimumVerifiedCount')
   expect(route).toContain('adaptiveCandidateBatch && questions.length > 0')
   expect(route).toContain('combinedMinimum = requiredVisualCount(existingQuestions.length + safeQCount)')
   expect(route).toContain('batchVisualMinimum = Math.max(0, combinedMinimum - existingVisualCount)')
@@ -30,6 +31,23 @@ test('a primary rejection receives an independent second opinion and is audited'
   expect(route).toContain('strictQualityPolicy && verified.length > 0')
   expect(route).toContain('two_provider_rejection')
   expect(route).toContain('rejection_details: rejectionDetails')
+})
+
+test('unlocalized whole-set review feedback no longer erases individually verified questions', () => {
+  const route = readFileSync(join(process.cwd(), 'app/api/verify-questions/route.ts'), 'utf8')
+  expect(route).toContain('Gemini indexes are 1-based within this verified subset')
+  expect(route).toContain('const retained = verified.filter((_, index) => !issueSet.has(index))')
+  expect(route).toContain("qualityVerificationVersion: 'quiz-quality-v2-degraded'")
+  expect(route).not.toContain('verified.splice(0, verified.length)')
+})
+
+test('visual checks use the agreed seventy-percent score floor and retain safety vetoes', () => {
+  const generate = readFileSync(join(process.cwd(), 'app/api/generate-quiz/route.ts'), 'utf8')
+  const mistral = readFileSync(join(process.cwd(), 'lib/mistral-quality.ts'), 'utf8')
+  const gemini = readFileSync(join(process.cwd(), 'lib/gemini-visual-quality.ts'), 'utf8')
+  expect(generate).toContain('score >= 70 && result.contextMatch === true && result.answerLeak !== true && result.useful !== false')
+  expect(mistral).toContain('score >= 70 && contextMatch && !answerLeak && useful && !renderingIssue')
+  expect(gemini).toContain('score >= 70 && contextMatch && !answerLeak && useful && !renderingIssue')
 })
 
 test('completed learning events schedule delayed transfer checks', () => {

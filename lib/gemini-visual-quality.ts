@@ -44,7 +44,7 @@ export function parseGeminiVisualReview(raw: string): GeminiVisualReview {
     : 'Gemini görsel denetimi gerekçe döndürmedi.'
 
   return {
-    passed: score >= 90 && contextMatch && !answerLeak && useful && !renderingIssue,
+    passed: score >= 70 && contextMatch && !answerLeak && useful && !renderingIssue,
     score,
     reason,
     contextMatch,

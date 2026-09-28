@@ -419,8 +419,28 @@ export async function POST(req: NextRequest) {
       if (geminiSetReview?.ok === false) {
         rejectReasons.push(`Final Gemini set review rejected: ${geminiSetReview.reason || 'material issue detected'}`)
         rejectionDetails.push({ questionIndex: -1, objectiveCode: null, generationProvider: 'mixed', validator: 'gemini', controlType: 'whole_set', reasonCode: 'gemini_set_rejection' })
-        rejected.push(...(geminiSetReview.issueIndexes || []))
-        verified.splice(0, verified.length)
+        // Whole-set feedback is often broad and may identify only one or two
+        // items. Do not let that erase every independently verified question.
+        // Gemini indexes are 1-based within this verified subset.
+        const issueIndexes = [...new Set((geminiSetReview.issueIndexes || [])
+          .filter(index => Number.isInteger(index) && index > 0 && index <= verified.length)
+          .map(index => index - 1))]
+        if (issueIndexes.length > 0) {
+          const issueSet = new Set(issueIndexes)
+          issueIndexes.forEach(index => rejected.push(index))
+          const retained = verified.filter((_, index) => !issueSet.has(index))
+          verified.splice(0, verified.length, ...retained)
+        } else {
+          // If the set reviewer cannot localize its concern, keep the
+          // question-level approved items and mark the set-level check as
+          // advisory/degraded. Per-question structure, math, objective, and
+          // independent-provider checks remain mandatory.
+          verified.splice(0, verified.length, ...verified.map(question => ({
+            ...question,
+            qualityVerificationVersion: 'quiz-quality-v2-degraded',
+            geminiSetReviewStatus: 'rejected_unlocalized',
+          })))
+        }
       } else {
         const reviewStatus = geminiSetReview?.ok === true ? 'passed' : 'unavailable'
         if (reviewStatus === 'unavailable') {
