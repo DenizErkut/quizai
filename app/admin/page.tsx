@@ -32,6 +32,7 @@ import QuestionBankEditor from '@/components/QuestionBankEditor'
 import DailyHabitMetrics from '@/components/admin/DailyHabitMetrics'
 import EducationAISafetyScorecard from '@/components/admin/EducationAISafetyScorecard'
 import ProviderObservability from '@/components/admin/ProviderObservability'
+import EducationEvalBenchmark from '@/components/admin/EducationEvalBenchmark'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -71,7 +72,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'question-books' | 'exam-books' | 'question-bank' | 'curriculum' | 'kvkk' | 'adaptive' | 'risk' | 'coaching' | 'coach-usage' | 'unit-economics'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'question-books' | 'exam-books' | 'question-bank' | 'education-eval' | 'curriculum' | 'kvkk' | 'adaptive' | 'risk' | 'coaching' | 'coach-usage' | 'unit-economics'>('users')
   const [identityMissing, setIdentityMissing] = useState<number | null>(null)
   const [identityScanning, setIdentityScanning] = useState(false)
   const [identityFixing, setIdentityFixing] = useState(false)
@@ -769,6 +770,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             { key: 'question-books', label: '📚 Soru Kitapçıkları' },
             { key: 'exam-books', label: '🎯 Sınav Kitapçıkları' },
             { key: 'question-bank', label: '📝 Soru Havuzu' },
+            { key: 'education-eval', label: '🧭 Education Eval' },
             { key: 'curriculum', label: '📋 Müfredat Yönetimi' },
             { key: 'kvkk', label: '🔐 KVKK Talepleri' },
             { key: 'adaptive', label: '🧪 Adaptive Pilot' },
@@ -2561,6 +2563,14 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               <button className="btn btn-sm" onClick={() => setResourceEditor(null)} disabled={resourceEditor.saving}>Kapat</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {tab === 'education-eval' && (
+        <div className="anim-up">
+          <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)', marginBottom: '1rem' }}>🧭 Education Eval</h2>
+          <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1rem' }}>Önce MEB benchmark’ını kaynak, onay kanıtı, kazanım ve cevap anahtarıyla doğrulanabilir biçimde kurun.</p>
+          <EducationEvalBenchmark />
         </div>
       )}
       {examEditor && (
