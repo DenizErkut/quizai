@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: 'Sağlayıcı ölçümleri alınamadı.' }, { status: 500 })
   type Bucket = { provider:string; calls:number; inputTokens:number; outputTokens:number; costUsd:number; durations:number[]; priced:number; successEvidence:number; failureEvidence:number; models:Set<string>; operations:Map<string,number> }
   const map = new Map<string, Bucket>()
+  const routerShadow = new Map<string, { servedEngine: string; recommendedEngine: string; reason: string; calls: number }>()
   for (const row of data ?? []) {
     const provider = row.provider || 'unknown'
     const b = map.get(provider) ?? { provider, calls:0, inputTokens:0, outputTokens:0, costUsd:0, durations:[], priced:0, successEvidence:0, failureEvidence:0, models:new Set(), operations:new Map() }
@@ -23,9 +24,19 @@ export async function GET(req: NextRequest) {
     if (row.pricing_version && row.pricing_version !== 'unknown') b.priced++
     if (row.model) b.models.add(row.model)
     b.operations.set(row.operation, (b.operations.get(row.operation) ?? 0) + 1)
-    const meta = (row.meta ?? {}) as Record<string, unknown>; const outcome = String(meta.outcome ?? '').toLowerCase(); const status = Number(meta.status)
+    const meta = (row.meta ?? {}) as Record<string, unknown>
+    if (meta.routingPolicyVersion === 'measured-router-v1' && meta.routingMode === 'shadow') {
+      const servedEngine = String(meta.routerServedEngine || 'unknown')
+      const recommendedEngine = String(meta.routerRecommendedEngine || servedEngine)
+      const reason = String(meta.routingReason || 'unknown')
+      const key = `${servedEngine}|${recommendedEngine}|${reason}`
+      const entry = routerShadow.get(key) ?? { servedEngine, recommendedEngine, reason, calls: 0 }
+      entry.calls++
+      routerShadow.set(key, entry)
+    }
+    const outcome = String(meta.outcome ?? '').toLowerCase(); const hasStatus = meta.status !== undefined && meta.status !== null; const status = hasStatus ? Number(meta.status) : Number.NaN
     const failed = outcome.includes('error') || outcome.includes('fail') || (Number.isFinite(status) && status >= 400)
-    const evidenced = Boolean(outcome) || Number.isFinite(status)
+    const evidenced = Boolean(outcome) || (hasStatus && Number.isFinite(status))
     if (failed) b.failureEvidence++; else if (evidenced) b.successEvidence++
     map.set(provider, b)
   }
@@ -34,5 +45,5 @@ export async function GET(req: NextRequest) {
     return { provider:b.provider, calls:b.calls, models:[...b.models], inputTokens:b.inputTokens, outputTokens:b.outputTokens, costUsd:Number(b.costUsd.toFixed(6)), costPerCallUsd:b.calls?Number((b.costUsd/b.calls).toFixed(6)):null, p95DurationMs:b.durations.length?b.durations[Math.min(b.durations.length-1,Math.floor(b.durations.length*.95))]:null, pricingCoverage:b.calls?b.priced/b.calls:null, observedSuccessRate:qualitySample?b.successEvidence/qualitySample:null, qualitySample, topOperations:[...b.operations.entries()].sort((a,c)=>c[1]-a[1]).slice(0,5).map(([operation,calls])=>({operation,calls})) }
   }).sort((a,b)=>b.costUsd-a.costUsd)
   const totalCost = providers.reduce((n,p)=>n+p.costUsd,0)
-  return NextResponse.json({ periodDays:30, generatedAt:new Date().toISOString(), totals:{calls:providers.reduce((n,p)=>n+p.calls,0),costUsd:Number(totalCost.toFixed(6)),inputTokens:providers.reduce((n,p)=>n+p.inputTokens,0),outputTokens:providers.reduce((n,p)=>n+p.outputTokens,0)}, providers, note:'Maliyet ai_usage_logs içindeki gerçekleşen token kayıtlarından hesaplanır. Kalite oranı yalnız sonucu meta veride bulunan çağrıları kapsar; örneklem ayrıca gösterilir.' })
+  return NextResponse.json({ periodDays:30, generatedAt:new Date().toISOString(), totals:{calls:providers.reduce((n,p)=>n+p.calls,0),costUsd:Number(totalCost.toFixed(6)),inputTokens:providers.reduce((n,p)=>n+p.inputTokens,0),outputTokens:providers.reduce((n,p)=>n+p.outputTokens,0)}, providers, routerShadow: [...routerShadow.values()], note:'Maliyet ai_usage_logs içindeki gerçekleşen token kayıtlarından hesaplanır. Gözlenen başarı oranı yalnız sonuç meta verisi bulunan çağrıları kapsar ve teknik çağrı başarısını gösterir; içerik doğruluğu/pedagojik kalite metriği değildir. Router gölge önerileri canlı sağlayıcı seçimini değiştirmez.' })
 }

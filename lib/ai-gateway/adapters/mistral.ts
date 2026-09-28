@@ -61,7 +61,7 @@ export class MistralAdapter implements AIProviderAdapter<MistralChatRequest, Mis
       userId: context.userId,
       quizSessionId: context.sessionId,
       requestId: context.requestId,
-      meta: { policyVersion: 'multi-ai-gateway-v3-p0', shadow: context.shadow !== false },
+      meta: { policyVersion: 'multi-ai-gateway-v3-p0', shadow: context.shadow !== false, ...(context.meta || {}) },
     })
     return { content: data?.choices?.[0]?.message?.content || '', model, inputTokens, outputTokens, durationMs }
   }

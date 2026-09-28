@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { questionBankKey } from '@/lib/question-bank'
-import { educationEvalGradeKey } from '@/lib/education-eval-grade'
+import { educationEvalGradeKey, isEducationEvalObjectiveInScope } from '@/lib/education-eval-grade'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
@@ -18,20 +18,6 @@ async function getAdminUser() {
   if (!user) return null
   const { data: profile } = await db.from('profiles').select('is_admin').eq('id', user.id).maybeSingle()
   return profile?.is_admin ? user : null
-}
-
-function gradeAliases(value: unknown) {
-  const grade = String(value || '').trim()
-  const number = grade.match(/\b(\d{1,2})\b/)?.[1]
-  if (!number) return [grade]
-  return [...new Set([
-    grade,
-    number,
-    `${number}. sınıf`,
-    `ilkokul ${number}. sınıf`,
-    `ortaokul ${number}. sınıf`,
-    `lise ${number}. sınıf`,
-  ])]
 }
 
 function validQuestion(question: any) {
@@ -52,19 +38,26 @@ export async function GET() {
   if (itemError || resourceError) return NextResponse.json({ error: itemError?.message || resourceError?.message }, { status: 500 })
 
   const eligibleResources = (resources || []).filter(resource => Array.isArray(resource.publication_evidence_paths) && resource.publication_evidence_paths.length > 0)
-  // Do not fetch an arbitrary first page of the global catalog and filter it in
-  // memory: the catalog is larger than PostgREST's page cap, which silently
-  // omitted valid grade/subject objectives from later pages.
-  const scopedObjectives = await Promise.all(eligibleResources.map(async resource => {
-    const { data, error } = await db.from('learning_objective_catalog')
-      .select('id,objective_code,title,grade,subject,verification_status,lifecycle_status,is_active,curriculum_version_id')
-      .eq('curriculum_version_id', benchmark?.curriculum_version_id || '')
-      .eq('verification_status', 'verified').eq('lifecycle_status', 'active').eq('is_active', true)
-      .eq('subject', resource.subject).in('grade', gradeAliases(resource.grade))
-      .order('objective_code').limit(500)
-    return { resourceId: resource.id, data: data || [], error }
-  }))
-  const objectiveError = scopedObjectives.find(result => result.error)?.error
+  // Fetch the complete active catalog for this curriculum in explicit pages,
+  // then scope locally with the same canonical grade/subject rules as the
+  // benchmark insert. SQL equality here is intentionally avoided: catalog
+  // values can be "5", "5. Sınıf", "Ortaokul 5. sınıf" etc., and Postgres
+  // equality is case-sensitive even though these are the same grade to us.
+  const catalogRows: any[] = []
+  let objectiveError: any = null
+  if (benchmark?.curriculum_version_id) {
+    const pageSize = 500
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await db.from('learning_objective_catalog')
+        .select('id,objective_code,title,grade,subject,verification_status,lifecycle_status,is_active,curriculum_version_id')
+        .eq('curriculum_version_id', benchmark.curriculum_version_id)
+        .eq('verification_status', 'verified').eq('lifecycle_status', 'active').eq('is_active', true)
+        .order('objective_code').range(offset, offset + pageSize - 1)
+      if (error) { objectiveError = error; break }
+      catalogRows.push(...(data || []))
+      if (!data || data.length < pageSize) break
+    }
+  }
   if (objectiveError) return NextResponse.json({ error: objectiveError.message }, { status: 500 })
 
   const candidates: any[] = []
@@ -90,9 +83,9 @@ export async function GET() {
       const { data } = await db.storage.from('publication-evidence').createSignedUrl(path, 60 * 30)
       return data?.signedUrl || null
     }))
-    const objectiveScope = (scopedObjectives.find(result => result.resourceId === resource.id)?.data || []).filter((objective: any) => objective.curriculum_version_id === benchmark?.curriculum_version_id
-      && educationEvalGradeKey(objective.grade) === educationEvalGradeKey(resource.grade)
-      && questionBankKey(objective.subject) === questionBankKey(resource.subject))
+    const objectiveScope = catalogRows.filter((objective: any) => isEducationEvalObjectiveInScope(objective, {
+      grade: resource.grade, subject: resource.subject, curriculumVersionId: benchmark?.curriculum_version_id,
+    }))
     return { id: resource.id, title: resource.title, grade: resource.grade, subject: resource.subject,
       topic: resource.subtopic || resource.topic || '',
       sourceVersion: createHash('sha256').update(JSON.stringify({ id: resource.id, title: resource.title, raw_text: resource.raw_text || '', updated_at: resource.created_at })).digest('hex'),

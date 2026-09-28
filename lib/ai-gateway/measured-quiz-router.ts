@@ -3,12 +3,14 @@ import { isProviderConfigured } from './model-registry'
 import { pickQuizEngine, type ForceProvider, type QuizRoutingDecision } from './quiz-provider-router'
 
 type ProviderKey = 'openai' | 'mistral' | 'anthropic'
-type Metric = { provider: ProviderKey; calls: number; qualitySample: number; successRate: number | null; costPerCall: number | null; p95Ms: number | null }
+type Metric = { provider: ProviderKey; calls: number; outcomeSample: number; operationalSuccessRate: number | null; costPerCall: number | null; p95Ms: number | null }
 
 export type MeasuredQuizDecision = QuizRoutingDecision & {
   policyVersion: 'measured-router-v1'
+  routingMode: 'shadow' | 'active'
   routingReason: string
   measuredProvider?: ProviderKey
+  recommendedEngine: QuizRoutingDecision['engine']
 }
 
 const CACHE_MS = 5 * 60_000
@@ -40,21 +42,25 @@ async function loadMetrics(): Promise<Metric[]> {
     if (Number.isFinite(duration) && duration >= 0) group.durations.push(duration)
     const meta = (row.meta || {}) as Record<string, unknown>
     const outcome = String(meta.outcome || '').toLowerCase()
-    const status = Number(meta.status)
-    const evidenced = Boolean(outcome) || Number.isFinite(status)
+    const hasStatus = meta.status !== undefined && meta.status !== null
+    const status = hasStatus ? Number(meta.status) : Number.NaN
+    const evidenced = Boolean(outcome) || (hasStatus && Number.isFinite(status))
     const failed = outcome.includes('error') || outcome.includes('fail') || (Number.isFinite(status) && status >= 400)
-    if (evidenced) failed ? group.failed++ : group.success++
+    if (evidenced) {
+      if (failed) group.failed++
+      else group.success++
+    }
     groups.set(provider, group)
   }
 
   const metrics = [...groups.entries()].map(([provider, group]) => {
     group.durations.sort((a, b) => a - b)
-    const qualitySample = group.success + group.failed
+    const outcomeSample = group.success + group.failed
     return {
       provider,
       calls: group.calls,
-      qualitySample,
-      successRate: qualitySample ? group.success / qualitySample : null,
+      outcomeSample,
+      operationalSuccessRate: outcomeSample ? group.success / outcomeSample : null,
       costPerCall: group.priced ? group.costs / group.priced : null,
       p95Ms: group.durations.length ? group.durations[Math.min(group.durations.length - 1, Math.floor(group.durations.length * 0.95))] : null,
     }
@@ -77,34 +83,44 @@ export async function pickMeasuredQuizEngine(opts: {
   useHaiku?: boolean
 }): Promise<MeasuredQuizDecision> {
   const base = pickQuizEngine(opts)
+  const mode = process.env.MEASURED_ROUTER_MODE === 'active' ? 'active' : 'shadow'
   const protectedDecision = Boolean(opts.forceProvider) || opts.hardDifficulty === true || opts.pilotEligible === false
-  if (protectedDecision) return { ...base, policyVersion: 'measured-router-v1', routingReason: 'ROLE_OR_MANUAL_POLICY_PROTECTED' }
+  if (protectedDecision) return { ...base, policyVersion: 'measured-router-v1', routingMode: 'shadow', routingReason: 'ROLE_OR_MANUAL_POLICY_PROTECTED', recommendedEngine: base.engine }
+
+  function decision(recommendedEngine: QuizRoutingDecision['engine'], routingReason: string, measuredProvider?: ProviderKey): MeasuredQuizDecision {
+    // Measurements are collected without changing the live provider by default.
+    // Active mode must be explicitly enabled after evaluation and sufficient samples.
+    const engine = mode === 'active' ? recommendedEngine : base.engine
+    const genEngineTag = engine === recommendedEngine ? base.genEngineTag : `${base.genEngineTag}-measured-shadow`
+    return { ...base, engine, genEngineTag, policyVersion: 'measured-router-v1', routingMode: mode,
+      routingReason, measuredProvider, recommendedEngine }
+  }
 
   try {
     const metrics = await loadMetrics()
     const provider = providerForEngine(base.engine)
     const current = metrics.find(metric => metric.provider === provider)
-    if (!current || current.calls < 20 || current.qualitySample < 10) {
-      return { ...base, policyVersion: 'measured-router-v1', routingReason: 'INSUFFICIENT_MEASURED_SAMPLE', measuredProvider: provider }
+    if (!current || current.calls < 20 || current.outcomeSample < 10) {
+      return decision(base.engine, 'INSUFFICIENT_MEASURED_SAMPLE', provider)
     }
 
-    const comparable = metrics.filter(metric => metric.provider !== provider && metric.calls >= 20 && metric.qualitySample >= 10 && metric.successRate !== null && metric.successRate >= 0.7)
+    const comparable = metrics.filter(metric => metric.provider !== provider && metric.calls >= 20 && metric.outcomeSample >= 10 && metric.operationalSuccessRate !== null && metric.operationalSuccessRate >= 0.7)
     const cheapestComparable = comparable.filter(metric => metric.costPerCall !== null).sort((a, b) => (a.costPerCall || 0) - (b.costPerCall || 0))[0]
-    const qualityBlocked = current.successRate !== null && current.successRate < 0.7
+    const callSuccessBlocked = current.operationalSuccessRate !== null && current.operationalSuccessRate < 0.7
     const latencyBlocked = current.p95Ms !== null && current.p95Ms > 90_000
     const costBlocked = Boolean(current.costPerCall !== null && cheapestComparable?.costPerCall !== null
       && current.costPerCall > cheapestComparable.costPerCall * 2.5
-      && (current.successRate || 0) <= (cheapestComparable.successRate || 0) + 0.02)
-    if (!qualityBlocked && !latencyBlocked && !costBlocked) {
-      return { ...base, policyVersion: 'measured-router-v1', routingReason: 'MEASURED_PROVIDER_HEALTHY', measuredProvider: provider }
+      && (current.operationalSuccessRate || 0) <= (cheapestComparable.operationalSuccessRate || 0) + 0.02)
+    if (!callSuccessBlocked && !latencyBlocked && !costBlocked) {
+      return decision(base.engine, 'MEASURED_PROVIDER_HEALTHY', provider)
     }
 
     const forcedFallback = fallbackProvider(provider)
-    if (!forcedFallback) return { ...base, policyVersion: 'measured-router-v1', routingReason: 'NO_CONFIGURED_SAFE_FALLBACK', measuredProvider: provider }
+    if (!forcedFallback) return decision(base.engine, 'NO_CONFIGURED_SAFE_FALLBACK', provider)
     const fallback = pickQuizEngine({ ...opts, forceProvider: forcedFallback })
-    const reasons = [qualityBlocked && 'QUALITY_BELOW_70', latencyBlocked && 'P95_ABOVE_90S', costBlocked && 'COST_OUTLIER'].filter(Boolean).join('+')
-    return { ...fallback, genEngineTag: `${fallback.genEngineTag}-measured-fallback`, policyVersion: 'measured-router-v1', routingReason: reasons, measuredProvider: provider }
+    const reasons = [callSuccessBlocked && 'CALL_SUCCESS_BELOW_70', latencyBlocked && 'P95_ABOVE_90S', costBlocked && 'COST_OUTLIER'].filter(Boolean).join('+')
+    return decision(fallback.engine, reasons, provider)
   } catch {
-    return { ...base, policyVersion: 'measured-router-v1', routingReason: 'METRICS_UNAVAILABLE_FAIL_SAFE' }
+    return decision(base.engine, 'METRICS_UNAVAILABLE_FAIL_SAFE')
   }
 }

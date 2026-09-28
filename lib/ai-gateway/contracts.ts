@@ -25,6 +25,7 @@ export interface IntelligenceRequestContext {
   // varsayılanını korur — mevcut shadow-comparison çağrısı ETKİLENMEZ.
   operationTag?: string
   shadow?: boolean
+  meta?: Record<string, unknown>
 }
 
 export interface ModelTarget {

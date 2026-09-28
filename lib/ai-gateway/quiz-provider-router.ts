@@ -40,6 +40,11 @@ export interface QuizRoutingDecision {
   engine: QuizEngine
   experimentVariant: ExperimentVariant
   genEngineTag: string
+  policyVersion?: 'measured-router-v1'
+  routingMode?: 'shadow' | 'active'
+  routingReason?: string
+  measuredProvider?: 'openai' | 'mistral' | 'anthropic'
+  recommendedEngine?: QuizEngine
 }
 
 function hashBucket(key: string): number {
@@ -128,6 +133,7 @@ export interface RoutedGenerationParams {
   // itibaren ms) göre timeout hesaplanır. Vermezsen tam bütçe (100sn) varsayılır.
   claudeCallDeadlineMs?: number
   requestStartTime?: number
+  routingMeta?: Record<string, unknown>
 }
 
 function flattenSystemPrompt(systemPrompt: RoutedGenerationParams['systemPrompt']): string {
@@ -146,6 +152,14 @@ export async function generateWithRoutedProvider(
 ): Promise<{ text: string; durationMs: number }> {
   const startedAt = Date.now()
   const flatSystem = flattenSystemPrompt(params.systemPrompt)
+  const routingMeta = decision.policyVersion ? {
+    ...(params.routingMeta || {}),
+    routingPolicyVersion: decision.policyVersion,
+    routingMode: decision.routingMode || 'shadow',
+    routingReason: decision.routingReason || 'UNSPECIFIED',
+    routerServedEngine: decision.engine,
+    routerRecommendedEngine: decision.recommendedEngine || decision.engine,
+  } : params.routingMeta
 
   if (decision.engine === 'mistral') {
     const mistralAdapter = new MistralAdapter()
@@ -165,6 +179,7 @@ export async function generateWithRoutedProvider(
         requestId: params.requestId,
         operationTag: params.operationTag,
         shadow: false,
+        meta: routingMeta,
       }
     )
     return { text: response.content, durationMs: Date.now() - startedAt }
@@ -184,6 +199,7 @@ export async function generateWithRoutedProvider(
         userId: params.userId,
         quizSessionId: params.quizSessionId,
         requestId: params.requestId,
+        meta: routingMeta,
       }
     )
     return { text, durationMs: Date.now() - startedAt }
@@ -200,7 +216,7 @@ export async function generateWithRoutedProvider(
   const response = await anthropic.messages.create({
     model,
     max_tokens: params.maxTokens,
-    system: params.systemPrompt as any,
+    system: params.systemPrompt,
     messages: [{ role: 'user', content: params.userPrompt }],
   }, { timeout: timeoutMs, maxRetries: 0 })
   const durationMs = Date.now() - startedAt
@@ -209,6 +225,7 @@ export async function generateWithRoutedProvider(
     quizSessionId: params.quizSessionId,
     requestId: params.requestId,
     durationMs,
+    meta: routingMeta,
   })
   const text = response.content[0].type === 'text' ? response.content[0].text : ''
   return { text, durationMs }

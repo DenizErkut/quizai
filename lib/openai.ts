@@ -19,7 +19,7 @@ export class OpenAITruncatedError extends Error {
   }
 }
 
-async function callOpenAI(messages: {role: string, content: any}[], options: {
+async function callOpenAI(messages: {role: string, content: unknown}[], options: {
   model?: string
   max_tokens?: number
   temperature?: number
@@ -30,6 +30,7 @@ async function callOpenAI(messages: {role: string, content: any}[], options: {
   requestId?: string
   requireComplete?: boolean // finish_reason='length' olursa OpenAITruncatedError fırlat
   timeoutMs?: number        // 16 Eylül 2026 — sınırsız bekleyen fetch, zaman bütçesini sessizce yiyordu
+  meta?: Record<string, unknown>
 } = {}) {
   const model = options.model || 'gpt-4o-mini'
   const controller = new AbortController()
@@ -72,6 +73,7 @@ async function callOpenAI(messages: {role: string, content: any}[], options: {
     quizSessionId: options.quizSessionId,
     requestId: options.requestId,
     durationMs,
+    meta: options.meta,
   })
   const choice = data.choices[0]
   if (options.requireComplete && choice.finish_reason === 'length') {
