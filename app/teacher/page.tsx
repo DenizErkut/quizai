@@ -9,6 +9,7 @@ import LearningInsights from '@/components/teacher/LearningInsights'
 import LearningRiskOverview from '@/components/LearningRiskOverview'
 import AgentApprovalQueue from '@/components/teacher/AgentApprovalQueue'
 import TeacherInstitutionMemberships from '@/components/teacher/TeacherInstitutionMemberships'
+import LearningGainPilot from '@/components/teacher/LearningGainPilot'
 
 export default function TeacherDashboard() {
   const [teacher, setTeacher] = useState<any>(null)
@@ -220,6 +221,7 @@ export default function TeacherDashboard() {
         {activeTab === 'dashboard' && (
           <div>
             <LearningInsights />
+            <LearningGainPilot classrooms={classrooms} />
             <LearningRiskOverview endpoint="/api/teacher/learning-risk" title="Sınıf erken uyarıları" />
             <AgentApprovalQueue />
             <div style={{ marginBottom: '1.5rem' }}>

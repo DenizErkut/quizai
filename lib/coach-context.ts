@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { computeAutonomousGoals, type AutonomousGoal } from './study-plan-generator'
 import { checkDisengagement, type DisengagementSignal } from './disengagement-risk'
+import { loadCoachGain, type CoachGainSummary } from './coach-learning-gain'
 
 export interface CoachSession { topic: string; pct: number; score: number; questionCount: number; createdAt: string }
 export interface PeriodSummary { sessions: number; questions: number; averagePct: number | null }
@@ -34,6 +35,7 @@ export interface CoachContext {
   disengagement: DisengagementSignal; goals: AutonomousGoal[]
   recentSessions: CoachSession[]; history: CoachHistorySummary
   otherActivity: ActivityItem[]
+  learningGain: CoachGainSummary
 }
 
 const DAY_MS = 86_400_000
@@ -167,7 +169,7 @@ async function loadReadingActivity(supabase: SupabaseClient, userId: string, sin
 
 export async function buildCoachContext(supabase: SupabaseClient, userId: string, opts: { displayName: string; grade?: string | null; language?: string | null }): Promise<CoachContext> {
   const since = new Date(Date.now() - 365 * DAY_MS).toISOString()
-  const [streakRes, disengagement, goals, sessionsRes, openEnded, liveQuiz, exam, reading] = await Promise.all([
+  const [streakRes, disengagement, goals, sessionsRes, openEnded, liveQuiz, exam, reading, learningGain] = await Promise.all([
     supabase.from('streaks').select('current_streak, longest_streak, last_activity_date').eq('user_id', userId).maybeSingle(),
     checkDisengagement(supabase, userId), computeAutonomousGoals(supabase, userId, 4),
     supabase.from('quiz_sessions').select('topic, pct, score, question_count, created_at').eq('user_id', userId).eq('completed', true).gte('created_at', since).order('created_at', { ascending: false }).limit(500),
@@ -175,13 +177,14 @@ export async function buildCoachContext(supabase: SupabaseClient, userId: string
     loadLiveQuizActivity(supabase, userId, since).catch(() => []),
     loadExamActivity(supabase, userId, since).catch(() => []),
     loadReadingActivity(supabase, userId, since).catch(() => []),
+    loadCoachGain(supabase, userId).catch(() => ({ available: false, recordedPairs: 0, currentPairs: 0, transferPairs: 0, averageGainPp: null, objectives: [] })),
   ])
   const streakRow = (streakRes as any)?.data
   const sessions: CoachSession[] = ((sessionsRes as any)?.data ?? []).map((s: any) => ({ topic: s.topic, pct: Number(s.pct ?? 0), score: Number(s.score ?? 0), questionCount: Number(s.question_count ?? 0), createdAt: s.created_at }))
   const otherActivity = [...openEnded, ...liveQuiz, ...exam, ...reading]
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
     .slice(0, 15)
-  return { displayName: opts.displayName, grade: opts.grade ?? null, language: opts.language ?? null, streak: { current: streakRow?.current_streak ?? 0, longest: streakRow?.longest_streak ?? 0, lastActivityDate: streakRow?.last_activity_date ?? null }, disengagement, goals, recentSessions: sessions.slice(0, 10), history: summarizeCoachHistory(sessions), otherActivity }
+  return { displayName: opts.displayName, grade: opts.grade ?? null, language: opts.language ?? null, streak: { current: streakRow?.current_streak ?? 0, longest: streakRow?.longest_streak ?? 0, lastActivityDate: streakRow?.last_activity_date ?? null }, disengagement, goals, recentSessions: sessions.slice(0, 10), history: summarizeCoachHistory(sessions), otherActivity, learningGain }
 }
 
 const pct = (v: number | null) => v === null ? 'veri yok' : `%${Math.round(v)}`
@@ -210,6 +213,14 @@ export function formatCoachContextForPrompt(ctx: CoachContext): string {
     lines.push('Diğer aktiviteler (test dışı — AUS, canlı quiz, sınav simülasyonu, sesli kitap):')
     for (const a of ctx.otherActivity) lines.push(`- [${a.detail}] ${a.label}${a.pct !== null ? ` — ${pct(a.pct)}` : ''} (${new Date(a.createdAt).toLocaleDateString('tr-TR')})`)
   }
+  if (!ctx.learningGain.available) lines.push('Ön/son öğrenme kazanımı ölçüm kaynağı şu anda kullanılamıyor; ölçülmüş kazanım iddia etme.')
+  else if (!ctx.learningGain.currentPairs) lines.push('Doğrulanmış ön/son öğrenme kazanımı çifti henüz yok; test geçmişini kazanım artışı diye sunma.')
+  else {
+    const gain = ctx.learningGain
+    lines.push(`Öğretmen incelemeli ön/son kazanım ölçümü: ${gain.recordedPairs} kayıt, ${gain.currentPairs} güncel kazanım, ${gain.transferPairs} aktarım testi. ${gain.averageGainPp === null ? 'Beşten az güncel çift olduğu için genel ortalama yok.' : `Güncel ortalama fark ${gain.averageGainPp} yüzde puan.`}`)
+    for (const item of gain.objectives) lines.push(`- ${item.code}: ${item.pairs} ölçüm, son ön/son farkı ${item.latestGainPp} yüzde puan, ${item.transferPairs} aktarım testi${item.averageGainPp === null ? '; ortalama için yetersiz örneklem' : `; ortalama ${item.averageGainPp} yüzde puan`}`)
+  }
+  lines.push('Kazanım eşleştirmeleri ayrıca insan kontrolündedir. Ön/son farkı müdahalenin nedensel etkisi değildir.')
   lines.push('Tahminleri kesin sonuç gibi sunma. Tahmin güveni düşük/yetersiz ise bunu açıkça belirt.')
   return lines.join('\n')
 }
