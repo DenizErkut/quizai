@@ -100,10 +100,36 @@ export default function ObjectiveMappingReview() {
     </div>
     {message && <p role="status" style={{ color: message.startsWith('Kaydedildi') ? 'var(--green)' : 'var(--red)', marginBottom: 12 }}>{message}</p>}
     {loading ? <p>Yükleniyor…</p> : <div style={{ display: 'grid', gap: 8 }}>
-      {items.map(item => <button key={item.key} type="button" onClick={() => select(item)} className="card-sm" style={{ textAlign: 'left', cursor: 'pointer', borderColor: selected?.key === item.key ? 'var(--accent)' : undefined }}>
-        <div style={{ fontWeight: 600 }}>{item.question.q || 'Soru metni yok'}</div>
-        <small>{item.grade} · {item.subject} · {item.topic} · {item.question.learningObjectiveCode || 'Eşleşmemiş'}{item.question.objectiveMappingStatus === 'human_approved' ? ' · İnsan onaylı' : ''}</small>
-      </button>)}
+      {items.map(item => <div key={item.key}>
+        <button type="button" onClick={() => selected?.key === item.key ? setSelected(null) : select(item)} aria-expanded={selected?.key === item.key} className="card-sm" style={{ width: '100%', textAlign: 'left', cursor: 'pointer', borderColor: selected?.key === item.key ? 'var(--accent)' : undefined }}>
+          <div style={{ fontWeight: 600 }}>{item.question.q || 'Soru metni yok'}</div>
+          <small>{item.grade} · {item.subject} · {item.topic} · {item.question.learningObjectiveCode || 'Eşleşmemiş'}{item.question.objectiveMappingStatus === 'human_approved' ? ' · İnsan onaylı' : ''}</small>
+        </button>
+        {selected?.key === item.key && <div style={{ border: '1px solid var(--border)', borderTop: 0, borderRadius: '0 0 16px 16px', padding: 18 }}>
+          <h3 style={{ marginBottom: 8 }}>Soru incelemesi</h3>
+          <p>{selected.question.q}</p>
+          {Array.isArray(selected.question.opts) && <ol>{selected.question.opts.map((option, index) => <li key={index}>{option}</li>)}</ol>}
+          {selected.question.exp && <p style={{ color: 'var(--text2)' }}>Açıklama: {selected.question.exp}</p>}
+          <p style={{ marginTop: 10 }}>Mevcut bağ: {selected.question.learningObjectiveCode || 'Yok'}</p>
+          <label style={{ display: 'block', marginTop: 12 }}>Kazanım kodu veya açıklamasında ara</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input className="input" value={search} onChange={event => setSearch(event.target.value)} placeholder="Örn. MAT.5 veya veri" />
+            <button className="btn btn-sm" onClick={() => void loadCandidates(selected, search)}>Ara</button>
+          </div>
+          <label style={{ display: 'block', marginTop: 12 }}>Onaylanacak kazanım</label>
+          <select className="input" value={objectiveId} onChange={event => setObjectiveId(event.target.value)}>
+            <option value="">— Kazanım seç —</option>
+            {candidates.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.objective_code} · {candidate.title}</option>)}
+            {objectiveId && !candidates.some(candidate => candidate.id === objectiveId) && <option value={objectiveId}>Mevcut kazanım ({selected.question.learningObjectiveCode || objectiveId})</option>}
+          </select>
+          <label style={{ display: 'block', marginTop: 12 }}>İnceleme notu (zorunlu)</label>
+          <textarea className="input" value={reason} onChange={event => setReason(event.target.value)} placeholder="Soru bu kazanımı nasıl ölçüyor veya neden reddediliyor?" style={{ width: '100%', minHeight: 72 }} />
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button className="btn btn-primary" disabled={saving} onClick={() => void save(false)}>Kazanımı onayla ve bağla</button>
+            <button className="btn" disabled={saving} onClick={() => void save(true)}>Eşleştirmeyi reddet / kaldır</button>
+          </div>
+        </div>}
+      </div>)}
       {!items.length && <p>Bu sayfada soru bulunamadı.</p>}
     </div>}
     <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
@@ -111,29 +137,5 @@ export default function ObjectiveMappingReview() {
       <span style={{ alignSelf: 'center' }}>Sayfa {page}</span>
       <button className="btn btn-sm" disabled={page * 20 >= total} onClick={() => setPage(value => value + 1)}>Sonraki →</button>
     </div>
-    {selected && <div style={{ borderTop: '1px solid var(--border)', marginTop: 20, paddingTop: 18 }}>
-      <h3 style={{ marginBottom: 8 }}>Soru incelemesi</h3>
-      <p>{selected.question.q}</p>
-      {Array.isArray(selected.question.opts) && <ol>{selected.question.opts.map((option, index) => <li key={index}>{option}</li>)}</ol>}
-      {selected.question.exp && <p style={{ color: 'var(--text2)' }}>Açıklama: {selected.question.exp}</p>}
-      <p style={{ marginTop: 10 }}>Mevcut bağ: {selected.question.learningObjectiveCode || 'Yok'}</p>
-      <label style={{ display: 'block', marginTop: 12 }}>Kazanım kodu veya açıklamasında ara</label>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input className="input" value={search} onChange={event => setSearch(event.target.value)} placeholder="Örn. MAT.5 veya veri" />
-        <button className="btn btn-sm" onClick={() => void loadCandidates(selected, search)}>Ara</button>
-      </div>
-      <label style={{ display: 'block', marginTop: 12 }}>Onaylanacak kazanım</label>
-      <select className="input" value={objectiveId} onChange={event => setObjectiveId(event.target.value)}>
-        <option value="">— Kazanım seç —</option>
-        {candidates.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.objective_code} · {candidate.title}</option>)}
-        {objectiveId && !candidates.some(candidate => candidate.id === objectiveId) && <option value={objectiveId}>Mevcut kazanım ({selected.question.learningObjectiveCode || objectiveId})</option>}
-      </select>
-      <label style={{ display: 'block', marginTop: 12 }}>İnceleme notu (zorunlu)</label>
-      <textarea className="input" value={reason} onChange={event => setReason(event.target.value)} placeholder="Soru bu kazanımı nasıl ölçüyor veya neden reddediliyor?" style={{ width: '100%', minHeight: 72 }} />
-      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-        <button className="btn btn-primary" disabled={saving} onClick={() => void save(false)}>Kazanımı onayla ve bağla</button>
-        <button className="btn" disabled={saving} onClick={() => void save(true)}>Eşleştirmeyi reddet / kaldır</button>
-      </div>
-    </div>}
   </div>
 }
