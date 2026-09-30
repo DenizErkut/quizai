@@ -35,6 +35,7 @@ import EducationAISafetyScorecard from '@/components/admin/EducationAISafetyScor
 import ProviderObservability from '@/components/admin/ProviderObservability'
 import EducationEvalBenchmark from '@/components/admin/EducationEvalBenchmark'
 import EducationEvalRunner from '@/components/admin/EducationEvalRunner'
+import ObjectiveMappingReview from '@/components/admin/ObjectiveMappingReview'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -74,7 +75,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'question-books' | 'exam-books' | 'question-bank' | 'education-eval' | 'curriculum' | 'kvkk' | 'adaptive' | 'risk' | 'coaching' | 'coach-usage' | 'unit-economics'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'question-books' | 'exam-books' | 'question-bank' | 'objective-mapping' | 'education-eval' | 'curriculum' | 'kvkk' | 'adaptive' | 'risk' | 'coaching' | 'coach-usage' | 'unit-economics'>('users')
   const [identityMissing, setIdentityMissing] = useState<number | null>(null)
   const [identityScanning, setIdentityScanning] = useState(false)
   const [identityFixing, setIdentityFixing] = useState(false)
@@ -773,6 +774,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             { key: 'question-books', label: '📚 Soru Kitapçıkları' },
             { key: 'exam-books', label: '🎯 Sınav Kitapçıkları' },
             { key: 'question-bank', label: '📝 Soru Havuzu' },
+            { key: 'objective-mapping', label: '🎯 Kazanım Eşleştirme' },
             { key: 'education-eval', label: '🧭 Education Eval' },
             { key: 'curriculum', label: '📋 Müfredat Yönetimi' },
             { key: 'kvkk', label: '🔐 KVKK Talepleri' },
@@ -793,6 +795,8 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             </button>
           ))}
         </div>
+
+        {tab === 'objective-mapping' && <ObjectiveMappingReview />}
 
         {/* Stats tab */}
         {tab === 'stats' && stats && (
