@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { BILLING_PLANS, resolveBillingPlanKey, type BillingPlanKey } from '@/lib/subscription-plans'
+import { discountedPrice } from '@/lib/automatic-discount'
 
 type AnnualBillingPlanKey = Extract<BillingPlanKey, `${string}_yearly`>
 const BASE_PRICES: Record<AnnualBillingPlanKey, number> = {
@@ -54,7 +55,7 @@ interface PlanDisplay {
   originalPrice?: string
 }
 
-// Bir satıcı indirimi varsa, PLANS'ın fiyat alanlarını indirimli hale
+// Bir indirim varsa, PLANS'ın fiyat alanlarını indirimli hale
 // getirir ve originalPrice ekler (checkout ekranındaki üstü çizili fiyat
 // gösterimi zaten bu alanı destekliyordu, sadece hiç doldurulmuyordu).
 function applyDiscount(discountRate: number): Record<AnnualBillingPlanKey, PlanDisplay> {
@@ -62,7 +63,7 @@ function applyDiscount(discountRate: number): Record<AnnualBillingPlanKey, PlanD
   if (discountRate <= 0) return out
   ;(Object.keys(BASE_PRICES) as Array<keyof typeof BASE_PRICES>).forEach(key => {
     const base = BASE_PRICES[key]
-    const discounted = Math.max(0, base * (1 - discountRate / 100))
+    const discounted = discountedPrice(base, discountRate)
     out[key].price = formatTRY(discounted)
     out[key].originalPrice = formatTRY(base)
     out[key].badge = out[key].badge ? `${out[key].badge} · %${discountRate} indirimli` : `%${discountRate} indirimli 🎉`
@@ -177,6 +178,9 @@ function CheckoutContent() {
   const [error, setError] = useState('')
   const [paytrToken, setPaytrToken] = useState('')
   const [discountRate, setDiscountRate] = useState(0)
+  const [discountSource, setDiscountSource] = useState<'institution' | 'seller' | 'none'>('none')
+  const [discountLabel, setDiscountLabel] = useState('')
+  const [discountLoading, setDiscountLoading] = useState(true)
   const [codeInput, setCodeInput] = useState('')
   const [appliedCode, setAppliedCode] = useState<{ code: string; discountRate: number; label: string } | null>(null)
   const [codeError, setCodeError] = useState('')
@@ -198,12 +202,10 @@ function CheckoutContent() {
   const processingOid = searchParams.get('oid')
 
   useEffect(() => {
-    // Satıcı üzerinden gelinmişse (kayıtta ?satici=KOD ile bağlanmış olabilir)
-    // o satıcının o anki indirim oranını çek — girişli değilse veya
-    // bağlı bir satıcı yoksa sessizce 0 döner, hata göstermez.
+    // Üyeliğe bağlı kurum indirimi (veya satıcı indirimi) sunucudan alınır.
     async function loadDiscount() {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
+      if (!session) { setDiscountLoading(false); return }
       try {
         const res = await fetch('/api/my-discount', {
           headers: { Authorization: `Bearer ${session.access_token}` },
@@ -211,8 +213,14 @@ function CheckoutContent() {
         if (res.ok) {
           const d = await res.json()
           setDiscountRate(d.discount_rate || 0)
+          setDiscountSource(d.source || 'none')
+          setDiscountLabel(d.label || '')
+        } else {
+          setError('İndirim bilgisi doğrulanamadı. Ödemeye geçmeden önce sayfayı yenileyin.')
         }
-      } catch { /* indirim opsiyonel, sessiz geç */ }
+      } catch {
+        setError('İndirim bilgisi doğrulanamadı. Ödemeye geçmeden önce sayfayı yenileyin.')
+      } finally { setDiscountLoading(false) }
     }
     loadDiscount()
   }, [])
@@ -363,6 +371,11 @@ function CheckoutContent() {
             </div>
 
             {/* İndirim kodu / Satıcı kodu / Kurum kodu — planların hemen üstünde, fark edilir yerde */}
+            {!appliedCode && discountRate > 0 && (
+              <div role="status" style={{ marginBottom: '1rem', padding: '12px 16px', background: 'var(--green-bg)', color: 'var(--green)', borderRadius: '10px', fontSize: '14px', fontWeight: 700 }}>
+                ✓ {discountLabel || 'İndirim'} otomatik uygulandı · %{discountRate}
+              </div>
+            )}
             <div className="card-sm anim-up-1" style={{ marginBottom: '1.25rem', border: '1.5px dashed var(--accent)' }}>
               {appliedCode ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
@@ -412,14 +425,15 @@ function CheckoutContent() {
                   )}
                   <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '6px' }}>{plan.name}</div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '4px' }}>
-                    <span className="serif" style={{ fontSize: '32px', color: 'var(--text)' }}>₺{plan.price}</span>
+                    <span className="serif" style={{ fontSize: '32px', color: 'var(--text)' }}>{discountLoading ? 'Fiyat hesaplanıyor…' : `₺${plan.price}`}</span>
                     <span style={{ fontSize: '13px', color: 'var(--text3)' }}>/{plan.period}</span>
                   </div>
-                  {'originalPrice' in plan && (
-                    <div style={{ fontSize: '12px', color: 'var(--text3)', textDecoration: 'line-through' }}>
-                      ₺{(plan as any).originalPrice}/{plan.period}
+                  {plan.originalPrice && !discountLoading && (
+                    <div style={{ fontSize: '13px', color: 'var(--text3)' }}>
+                      Normal fiyat: <s>₺{plan.originalPrice}/{plan.period}</s>
                     </div>
                   )}
+                  {plan.originalPrice && !discountLoading && <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--green)' }}>{appliedCode ? 'Kodlu' : discountSource === 'institution' ? 'Kuruma özel' : 'İndirimli'} fiyat · %{effectiveDiscountRate}</div>}
                   <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
                     {plan.features.slice(0, 4).map(f => (
                       <div key={f} style={{ fontSize: '12px', color: selectedPlan === key ? 'var(--accent)' : 'var(--text2)', display: 'flex', gap: '6px' }}>
@@ -445,11 +459,11 @@ function CheckoutContent() {
               </div>
             )}
 
-            <button className="btn btn-primary btn-lg" onClick={startPayment} disabled={loading}
+            <button className="btn btn-primary btn-lg" onClick={startPayment} disabled={loading || discountLoading || Boolean(error && error.includes('İndirim bilgisi doğrulanamadı'))}
               style={{ width: "100%", justifyContent: "center" }}>
               {loading
                 ? <><span className="spinner" style={{ width: 18, height: 18 }} /> Yükleniyor...</>
-                : `₺${displayPlans[selectedPlan].price} — Ödemeye geç →`}
+                : discountLoading ? 'Fiyat hesaplanıyor…' : `₺${displayPlans[selectedPlan].price} — Ödemeye geç →`}
             </button>
 
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', fontSize: '12px', color: 'var(--text3)' }}>

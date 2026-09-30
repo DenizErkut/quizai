@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentityBySupabaseId } from '@/lib/identity/client'
 import { BILLING_PLANS, resolveBillingPlanKey } from '@/lib/subscription-plans'
 import { resolveDiscountCode } from '@/lib/referral-code'
+import { discountedPrice, resolveAutomaticDiscount, safeDiscountRate } from '@/lib/automatic-discount'
 import {
   PAYTR_MERCHANT_ID,
   PAYTR_GET_TOKEN_URL,
@@ -69,28 +70,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Satıcı/kurum kodu artık geçerli değil. Lütfen kodu kaldırıp tekrar deneyin.' }, { status: 400 })
     }
     sellerId = resolved.sellerId
-    discountRate = resolved.discountRate
+    discountRate = safeDiscountRate(resolved.discountRate)
   } else {
-    // Kod girilmediyse, kayıt olurken bağlanmış olan otomatik satıcı
-    // indirimine düş — Iyzico route'uyla birebir aynı mantık (bkz.
-    // app/api/iyzico/checkout/route.ts).
-    const { data: buyerProfile } = await supabaseAdmin
-      .from('profiles').select('seller_id').eq('id', user.id).maybeSingle()
-    if (buyerProfile?.seller_id) {
-      const { data: seller } = await supabaseAdmin
-        .from('sellers').select('id, discount_rate, active').eq('id', buyerProfile.seller_id).maybeSingle()
-      if (seller?.active) {
-        sellerId = seller.id
-        discountRate = Number(seller.discount_rate) || 0
-      }
+    // Aktif kurum öğrenciliği önceliklidir; yoksa kayıtlı satıcı indirimi.
+    try {
+      const automatic = await resolveAutomaticDiscount(supabaseAdmin, user.id)
+      sellerId = automatic.sellerId
+      discountRate = automatic.discountRate
+    } catch (error) {
+      console.error('[paytr checkout] Otomatik indirim alınamadı:', error)
+      return NextResponse.json({ error: 'Kurum indirimi doğrulanamadı. Lütfen tekrar deneyin.' }, { status: 500 })
     }
   }
 
   const basePrice = plan.price
-  const finalPrice = discountRate > 0
-    ? Math.max(0, basePrice * (1 - discountRate / 100))
-    : basePrice
-  const finalPriceStr = finalPrice.toFixed(2)
+  const finalPrice = discountedPrice(basePrice, discountRate)
 
   const merchantOid = generateMerchantOid()
   // x-forwarded-for birden fazla IP içerebilir ("client, proxy1, proxy2") — ilkini al.

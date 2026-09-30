@@ -11,6 +11,7 @@ import { generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-route
 import { pickMeasuredQuizEngine } from '@/lib/ai-gateway/measured-quiz-router'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { checkMinorConsentBlock } from '@/lib/identity/client'
+import { gradeKeyFromProfile, isSelectableOpenEndedTopic, loadOpenEndedCatalog } from '@/lib/open-ended-practice-catalog'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -105,13 +106,18 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { subject, topic } = body as { subject: string; topic: string }
-    if (!subject?.trim() || !topic?.trim()) {
+    const subject = typeof body?.subject === 'string' ? body.subject.trim() : ''
+    const topic = typeof body?.topic === 'string' ? body.topic.trim() : ''
+    if (!subject || !topic) {
       return NextResponse.json({ error: 'Ders ve konu zorunlu.' }, { status: 400 })
     }
 
     const grade = profile.grade || 'ortaokul 6. sınıf'
     const level = getLevel(grade)
+    const available = await loadOpenEndedCatalog(supabase, gradeKeyFromProfile(grade))
+    if (!isSelectableOpenEndedTopic(available, subject, topic)) {
+      return NextResponse.json({ error: 'Seçilen ders/konu bu sınıfın açık uçlu pratik kataloğunda aktif değil.' }, { status: 400 })
+    }
 
     const prompt = `Sen MEB Ölçme, Değerlendirme ve Sınav Hizmetleri Genel Müdürlüğü tarzında soru hazırlayan bir uzmansın.
 2023-2024 eğitim öğretim yılından itibaren ülke geneli ortak sınavlarda kullanılan format şu şekildedir:

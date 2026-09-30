@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import SiteFooter from '@/components/SiteFooter'
+import { BILLING_PLANS } from '@/lib/subscription-plans'
+import { discountedPrice } from '@/lib/automatic-discount'
 
 interface Profile {
   plan: string
@@ -21,18 +23,31 @@ export default function PricingPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [referralCount, setReferralCount] = useState(0)
   const [copied, setCopied] = useState(false)
+  const [discountRate, setDiscountRate] = useState(0)
+  const [discountSource, setDiscountSource] = useState<'institution' | 'seller' | 'none'>('none')
+  const [discountLabel, setDiscountLabel] = useState('')
 
   useEffect(() => {
     async function load() {
       const supabase = createClient() as any
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+      const { data: { session } } = await supabase.auth.getSession()
       const [{ data: p }, { count }] = await Promise.all([
         supabase.from('profiles').select('plan, plan_expires_at, referral_code, monthly_test_count, daily_test_count, daily_test_date').eq('id', user.id).single(),
         supabase.from('referrals').select('id', { count: 'exact', head: true }).eq('referrer_id', user.id).not('qualified_at', 'is', null),
       ])
       setProfile(p)
       setReferralCount(count || 0)
+      if (session) {
+        const response = await fetch('/api/my-discount', { headers: { Authorization: `Bearer ${session.access_token}` } })
+        if (response.ok) {
+          const discount = await response.json()
+          setDiscountRate(discount.discount_rate || 0)
+          setDiscountSource(discount.source || 'none')
+          setDiscountLabel(discount.label || '')
+        }
+      }
     }
     load()
   }, [])
@@ -54,7 +69,7 @@ export default function PricingPage() {
     {
       id: 'silver',
       label: 'Gümüş',
-      price: '₺2.490',
+      price: BILLING_PLANS.silver_yearly.price,
       sub: 'yıllık',
       color: '#64748b',
       accent: false,
@@ -73,7 +88,7 @@ export default function PricingPage() {
     {
       id: 'premium',
       label: 'Altın',
-      price: '₺4.490',
+      price: BILLING_PLANS.gold_yearly.price,
       sub: 'yıllık',
       color: '#2563eb',
       accent: true,
@@ -95,7 +110,7 @@ export default function PricingPage() {
     {
       id: 'unlimited',
       label: 'Platin',
-      price: '₺19.990',
+      price: BILLING_PLANS.platinum_yearly.price,
       sub: 'yıllık',
       color: '#0d9488',
       accent: false,
@@ -130,6 +145,8 @@ export default function PricingPage() {
           </p>
         </div>
 
+        {discountRate > 0 && <div role="status" style={{ marginBottom: '1.5rem', padding: '12px 16px', borderRadius: '10px', background: 'var(--green-bg)', color: 'var(--green)', textAlign: 'center', fontWeight: 700, fontSize: '14px' }}>✓ {discountLabel || 'İndirim'} otomatik uygulanacak · %{discountRate}</div>}
+
         {/* Plan cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px,100%), 1fr))', gap: '14px', marginBottom: '2.5rem' }} className="anim-up-1">
           {PLANS.map(p => {
@@ -145,7 +162,9 @@ export default function PricingPage() {
                   <div className="badge badge-green" style={{ marginBottom: '0.75rem', display: 'inline-flex', alignSelf: 'flex-start' }}>Mevcut planın ✓</div>
                 )}
                 <div style={{ fontSize: '12px', fontWeight: 700, color: p.color, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>{p.label}</div>
-                <div style={{ fontSize: '28px', fontWeight: 700, marginBottom: '2px' }}>{p.price}</div>
+                {discountRate > 0 && <div style={{ fontSize: '14px', color: 'var(--text3)' }}>Normal fiyat: <s>₺{p.price.toLocaleString('tr-TR')}</s></div>}
+                <div style={{ fontSize: '28px', fontWeight: 700, marginBottom: '2px' }}>₺{discountedPrice(p.price, discountRate).toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</div>
+                {discountRate > 0 && <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--green)' }}>{discountSource === 'institution' ? 'Kuruma özel' : 'İndirimli'} fiyat · %{discountRate}</div>}
                 <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '1.25rem' }}>{p.sub}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '1.5rem', flex: 1 }}>
                   {p.features.map(f => (

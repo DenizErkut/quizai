@@ -6,6 +6,7 @@
 // sızdırma riski yoktur; yalnızca tek bir sayı döner.
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { resolveAutomaticDiscount } from '@/lib/automatic-discount'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,13 +29,11 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ discount_rate: 0 })
 
-  const { data: profile } = await supabaseAdmin
-    .from('profiles').select('seller_id').eq('id', user.id).maybeSingle()
-  if (!profile?.seller_id) return NextResponse.json({ discount_rate: 0 })
-
-  const { data: seller } = await supabaseAdmin
-    .from('sellers').select('discount_rate, active').eq('id', profile.seller_id).maybeSingle()
-  if (!seller?.active) return NextResponse.json({ discount_rate: 0 })
-
-  return NextResponse.json({ discount_rate: Number(seller.discount_rate) || 0 })
+  try {
+    const discount = await resolveAutomaticDiscount(supabaseAdmin, user.id)
+    return NextResponse.json({ discount_rate: discount.discountRate, source: discount.source, label: discount.label, institution_name: discount.institutionName })
+  } catch (error) {
+    console.error('[my-discount] İndirim alınamadı:', error)
+    return NextResponse.json({ error: 'İndirim bilgisi alınamadı.' }, { status: 500 })
+  }
 }

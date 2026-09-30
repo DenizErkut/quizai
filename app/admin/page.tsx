@@ -27,6 +27,7 @@ import PredictiveRiskCalibration from '@/components/admin/PredictiveRiskCalibrat
 import PipelineHealth from '@/components/admin/PipelineHealth'
 import CoachAnalytics from '@/components/admin/CoachAnalytics'
 import CoachUsage from '@/components/admin/CoachUsage'
+import OpenEndedCatalogManager from '@/components/admin/OpenEndedCatalogManager'
 import UnitEconomics from '@/components/admin/UnitEconomics'
 import QuestionBankEditor from '@/components/QuestionBankEditor'
 import DailyHabitMetrics from '@/components/admin/DailyHabitMetrics'
@@ -1493,6 +1494,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
       {/* MEB KAYNAKLARI */}
       {tab === 'curriculum' && (
         <div>
+          <OpenEndedCatalogManager />
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '1rem' }}>
               📋 Müfredat Yönetimi — Sınıf Bazlı Ders Ekleme/Çıkarma

@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { getSubjectsForGrade } from '@/lib/subject-map-grade'
 import { useVoiceTutor } from '@/lib/use-voice-tutor'
 
 interface RubricItem { criterion: string; maxPoints: number; description: string }
@@ -14,7 +13,7 @@ export default function AcikUcluPage() {
   const supabase = createClient() as any
 
   const [loading, setLoading] = useState(true)
-  const [grade, setGrade] = useState('')
+  const [subjectCatalog, setSubjectCatalog] = useState<Record<string, string[]>>({})
   const [subject, setSubject] = useState('')
   const [topic, setTopic] = useState('')
 
@@ -46,8 +45,17 @@ export default function AcikUcluPage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
-      const { data: p } = await supabase.from('profiles').select('grade').eq('id', user.id).single()
-      setGrade(p?.grade || 'ortaokul 6. sınıf')
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const response = await fetch('/api/open-ended/catalog', {
+          headers: { Authorization: `Bearer ${session?.access_token}` }, cache: 'no-store',
+        })
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error || 'Ders ve konular alınamadı.')
+        setSubjectCatalog(Object.fromEntries(data.subjects.map((item: { subject: string; topics: string[] }) => [item.subject, item.topics])))
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'Ders ve konular alınamadı.')
+      }
       setLoading(false)
     }
     load()
@@ -95,9 +103,8 @@ export default function AcikUcluPage() {
     }
   }
 
-  const gradeSubjectMap = getSubjectsForGrade(grade)
-  const subjects = Object.keys(gradeSubjectMap)
-  const topics = subject ? (gradeSubjectMap[subject] || []) : []
+  const subjects = Object.keys(subjectCatalog)
+  const topics = subject ? (subjectCatalog[subject] || []) : []
 
   async function generate() {
     if (!subject || !topic.trim()) { setError('Ders ve konu seçmelisin.'); return }
