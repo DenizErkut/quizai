@@ -65,27 +65,42 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ candidates: data || [] })
   }
   const source = req.nextUrl.searchParams.get('source') === 'sessions' ? 'sessions' : 'bank'
+  const reviewState = req.nextUrl.searchParams.get('reviewState')
+  const status = reviewState === 'approved' || reviewState === 'rejected' ? reviewState : 'pending'
+  const mappingStatus = status === 'approved' ? 'human_approved' : status === 'rejected' ? 'human_rejected' : null
   const page = Math.max(1, Number(req.nextUrl.searchParams.get('page') || 1))
   const subject = text(req.nextUrl.searchParams.get('subject'))
   const grade = text(req.nextUrl.searchParams.get('grade'))
   const start = (page - 1) * 20
   if (source === 'bank') {
     let query = db.from('question_bank').select('id,question,subject_key,topic_key,grade_key,updated_at', { count: 'exact' })
+    if (mappingStatus) query = query.eq('question->>objectiveMappingStatus', mappingStatus)
+    else query = query.or('question->>objectiveMappingStatus.is.null,question->>objectiveMappingStatus.not.in.(human_approved,human_rejected)')
     if (subject) query = query.eq('subject_key', subject)
     if (grade) query = query.eq('grade_key', grade)
     const { data, error, count } = await query.order('updated_at', { ascending: false }).range(start, start + 19)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ items: (data || []).map(row => ({ key: row.id, source: 'bank', recordId: row.id, index: null, question: row.question, subject: row.subject_key, grade: row.grade_key, topic: row.topic_key })), total: count || 0 })
   }
-  let query = db.from('quiz_sessions').select('id,questions,topic,grade,created_at', { count: 'exact' }).eq('completed', true)
-  if (grade) query = query.ilike('grade', `%${gradeNumber(grade)}%`)
-  const { data, error, count } = await query.order('created_at', { ascending: false }).range(start, start + 19)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  const items = (data || []).flatMap(row => (Array.isArray(row.questions) ? row.questions : []).map((question: Question, index: number) => ({
+  // The review state belongs to each question, not its parent session. Scan the
+  // completed sessions before paginating so a mixed-status session is handled correctly.
+  const sessions: Array<{ id: string; questions: Question[]; topic: string; grade: string }> = []
+  for (let offset = 0; ; offset += 200) {
+    let query = db.from('quiz_sessions').select('id,questions,topic,grade,created_at').eq('completed', true)
+    if (grade) query = query.ilike('grade', `%${gradeNumber(grade)}%`)
+    const { data, error } = await query.order('created_at', { ascending: false }).range(offset, offset + 199)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    sessions.push(...(data || []))
+    if (!data || data.length < 200) break
+  }
+  const matchingItems = sessions.flatMap(row => (Array.isArray(row.questions) ? row.questions : []).map((question: Question, index: number) => ({
     key: `${row.id}:${index}`, source: 'sessions', recordId: row.id, index, question,
     subject: text(question.subject), grade: row.grade, topic: row.topic,
-  }))).filter(item => !subject || item.subject === subject)
-  return NextResponse.json({ items, total: count || 0, pageUnit: 'test oturumu' })
+  }))).filter(item => {
+    const currentStatus = text(item.question.objectiveMappingStatus)
+    return (!subject || item.subject === subject) && (mappingStatus ? currentStatus === mappingStatus : currentStatus !== 'human_approved' && currentStatus !== 'human_rejected')
+  })
+  return NextResponse.json({ items: matchingItems.slice(start, start + 20), total: matchingItems.length, pageUnit: 'soru' })
 }
 
 export async function POST(req: NextRequest) {

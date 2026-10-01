@@ -11,6 +11,7 @@ type Candidate = { id: string; objective_code: string; title: string; topic: str
 
 export default function ObjectiveMappingReview() {
   const [source, setSource] = useState<'bank' | 'sessions'>('bank')
+  const [reviewState, setReviewState] = useState<'pending' | 'approved' | 'rejected'>('pending')
   const [page, setPage] = useState(1)
   const [items, setItems] = useState<Item[]>([])
   const [total, setTotal] = useState(0)
@@ -26,18 +27,18 @@ export default function ObjectiveMappingReview() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/admin/objective-mapping-review?source=${source}&page=${page}`)
+      const response = await fetch(`/api/admin/objective-mapping-review?source=${source}&page=${page}&reviewState=${reviewState}`)
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Sorular yüklenemedi.')
       setItems(data.items || [])
       setTotal(data.total || 0)
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Sorular yüklenemedi.') }
     finally { setLoading(false) }
-  }, [source, page])
+  }, [source, page, reviewState])
 
   useEffect(() => {
     const controller = new AbortController()
-    fetch(`/api/admin/objective-mapping-review?source=${source}&page=${page}`, { signal: controller.signal })
+    fetch(`/api/admin/objective-mapping-review?source=${source}&page=${page}&reviewState=${reviewState}`, { signal: controller.signal })
       .then(async response => {
         const data = await response.json()
         if (!response.ok) throw new Error(data.error || 'Sorular yüklenemedi.')
@@ -46,7 +47,7 @@ export default function ObjectiveMappingReview() {
       })
       .catch(error => { if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : 'Sorular yüklenemedi.') })
     return () => controller.abort()
-  }, [source, page])
+  }, [source, page, reviewState])
 
   const loadCandidates = useCallback(async (item: Item, term = '') => {
     const params = new URLSearchParams({ mode: 'candidates', subject: item.subject, grade: item.grade, topic: item.topic })
@@ -96,14 +97,19 @@ export default function ObjectiveMappingReview() {
       <button className={`btn btn-sm ${source === 'bank' ? 'btn-primary' : ''}`} onClick={() => { setSource('bank'); setPage(1); setSelected(null) }}>Soru havuzu</button>
       <button className={`btn btn-sm ${source === 'sessions' ? 'btn-primary' : ''}`} onClick={() => { setSource('sessions'); setPage(1); setSelected(null) }}>Geçmiş testler</button>
       <button className="btn btn-sm" onClick={() => void load()}>↻ Yenile</button>
-      <span style={{ alignSelf: 'center', color: 'var(--text2)' }}>{total} {source === 'bank' ? 'soru' : 'test oturumu'}</span>
+    </div>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
+      {([['pending', 'Bekleyenler'], ['approved', 'Onaylananlar'], ['rejected', 'Reddedilenler']] as const).map(([key, label]) =>
+        <button key={key} className={`btn btn-sm ${reviewState === key ? 'btn-primary' : ''}`} onClick={() => { setReviewState(key); setPage(1); setSelected(null); setMessage('') }}>{label}</button>
+      )}
+      <span style={{ alignSelf: 'center', color: 'var(--text2)' }}>{total} soru</span>
     </div>
     {message && <p role="status" style={{ color: message.startsWith('Kaydedildi') ? 'var(--green)' : 'var(--red)', marginBottom: 12 }}>{message}</p>}
     {loading ? <p>Yükleniyor…</p> : <div style={{ display: 'grid', gap: 8 }}>
       {items.map(item => <div key={item.key}>
         <button type="button" onClick={() => selected?.key === item.key ? setSelected(null) : select(item)} aria-expanded={selected?.key === item.key} className="card-sm" style={{ width: '100%', textAlign: 'left', cursor: 'pointer', borderColor: selected?.key === item.key ? 'var(--accent)' : undefined }}>
           <div style={{ fontWeight: 600 }}>{item.question.q || 'Soru metni yok'}</div>
-          <small>{item.grade} · {item.subject} · {item.topic} · {item.question.learningObjectiveCode || 'Eşleşmemiş'}{item.question.objectiveMappingStatus === 'human_approved' ? ' · İnsan onaylı' : ''}</small>
+          <small>{item.grade} · {item.subject} · {item.topic} · {item.question.learningObjectiveCode || 'Eşleşmemiş'}{item.question.objectiveMappingStatus === 'human_approved' ? ' · İnsan onaylı' : item.question.objectiveMappingStatus === 'human_rejected' ? ' · Reddedildi' : ''}</small>
         </button>
         {selected?.key === item.key && <div style={{ border: '1px solid var(--border)', borderTop: 0, borderRadius: '0 0 16px 16px', padding: 18 }}>
           <h3 style={{ marginBottom: 8 }}>Soru incelemesi</h3>
