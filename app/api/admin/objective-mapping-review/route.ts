@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
       const { data, error } = await db.from('learning_objective_catalog')
         .select('id,objective_code,title,topic,grade,subject')
         .eq('is_active', true).eq('verification_status', 'verified')
-        .eq('subject', subject).eq('grade', `${grade}. sınıf`)
+        .ilike('subject', subject).eq('grade', `${grade}. sınıf`)
         .or(`objective_code.ilike.%${escaped}%,title.ilike.%${escaped}%`).limit(50)
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       return NextResponse.json({ candidates: data || [] })

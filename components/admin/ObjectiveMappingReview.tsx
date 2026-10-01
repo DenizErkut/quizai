@@ -17,6 +17,8 @@ export default function ObjectiveMappingReview() {
   const [total, setTotal] = useState(0)
   const [selected, setSelected] = useState<Item | null>(null)
   const [candidates, setCandidates] = useState<Candidate[]>([])
+  const [candidateLoading, setCandidateLoading] = useState(false)
+  const [candidateMessage, setCandidateMessage] = useState('')
   const [objectiveId, setObjectiveId] = useState('')
   const [search, setSearch] = useState('')
   const [reason, setReason] = useState('')
@@ -52,12 +54,16 @@ export default function ObjectiveMappingReview() {
   const loadCandidates = useCallback(async (item: Item, term = '') => {
     const params = new URLSearchParams({ mode: 'candidates', subject: item.subject, grade: item.grade, topic: item.topic })
     if (term) params.set('search', term)
+    setCandidateLoading(true)
+    setCandidateMessage('')
     try {
       const response = await fetch(`/api/admin/objective-mapping-review?${params}`)
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Kazanımlar yüklenemedi.')
       setCandidates(data.candidates || [])
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Kazanımlar yüklenemedi.') }
+      setCandidateMessage(data.candidates?.length ? `${data.candidates.length} kazanım bulundu.` : 'Bu sınıf ve ders için eşleşen kazanım bulunamadı.')
+    } catch (error) { setCandidateMessage(error instanceof Error ? error.message : 'Kazanımlar yüklenemedi.') }
+    finally { setCandidateLoading(false) }
   }, [])
 
   function select(item: Item) {
@@ -66,6 +72,8 @@ export default function ObjectiveMappingReview() {
     setSearch('')
     setReason('')
     setMessage('')
+    setCandidates([])
+    setCandidateMessage('')
     void loadCandidates(item)
   }
 
@@ -120,8 +128,9 @@ export default function ObjectiveMappingReview() {
           <label style={{ display: 'block', marginTop: 12 }}>Kazanım kodu veya açıklamasında ara</label>
           <div style={{ display: 'flex', gap: 8 }}>
             <input className="input" value={search} onChange={event => setSearch(event.target.value)} placeholder="Örn. MAT.5 veya veri" />
-            <button className="btn btn-sm" onClick={() => void loadCandidates(selected, search)}>Ara</button>
+            <button className="btn btn-sm" disabled={candidateLoading} onClick={() => void loadCandidates(selected, search)}>Ara</button>
           </div>
+          <small role="status" style={{ display: 'block', marginTop: 6, color: 'var(--text2)' }}>{candidateLoading ? 'Kazanımlar aranıyor…' : candidateMessage}</small>
           <label style={{ display: 'block', marginTop: 12 }}>Onaylanacak kazanım</label>
           <select className="input" value={objectiveId} onChange={event => setObjectiveId(event.target.value)}>
             <option value="">— Kazanım seç —</option>
