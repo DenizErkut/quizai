@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { noteMatchesObjectiveReview } from '@/lib/objective-review-note'
 
 type Item = {
   key: string; source: 'bank' | 'sessions'; recordId: string; index: number | null
@@ -27,6 +28,10 @@ export default function ObjectiveMappingReview() {
   const [qualityRunning, setQualityRunning] = useState(false)
   const [qualityProgress, setQualityProgress] = useState('')
   const [message, setMessage] = useState('')
+  const candidateRequest = useRef(0)
+  const selectedObjective = candidates.find(candidate => candidate.id === objectiveId)
+  const noteMismatch = Boolean(selected && objectiveId && reason.trim().length >= 3 && !noteMatchesObjectiveReview(reason, selected.question.q || '', selected.question.exp || '', selectedObjective?.title || ''))
+  const searchMismatch = Boolean(selected && ((/^F(?:B)?\./i.test(search.trim()) && /matematik/i.test(selected.subject)) || (/^MAT\./i.test(search.trim()) && /fen bilimleri/i.test(selected.subject))))
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -54,6 +59,7 @@ export default function ObjectiveMappingReview() {
   }, [source, page, reviewState])
 
   const loadCandidates = useCallback(async (item: Item, term = '') => {
+    const request = ++candidateRequest.current
     const params = new URLSearchParams({ mode: 'candidates', subject: item.subject, grade: item.grade, topic: item.topic })
     if (term) params.set('search', term)
     setCandidateLoading(true)
@@ -62,13 +68,15 @@ export default function ObjectiveMappingReview() {
       const response = await fetch(`/api/admin/objective-mapping-review?${params}`)
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Kazanımlar yüklenemedi.')
+      if (request !== candidateRequest.current) return
       setCandidates(data.candidates || [])
       setCandidateMessage(data.candidates?.length ? `${data.candidates.length} kazanım bulundu.` : 'Bu sınıf ve ders için eşleşen kazanım bulunamadı.')
-    } catch (error) { setCandidateMessage(error instanceof Error ? error.message : 'Kazanımlar yüklenemedi.') }
-    finally { setCandidateLoading(false) }
+    } catch (error) { if (request === candidateRequest.current) setCandidateMessage(error instanceof Error ? error.message : 'Kazanımlar yüklenemedi.') }
+    finally { if (request === candidateRequest.current) setCandidateLoading(false) }
   }, [])
 
   function select(item: Item) {
+    candidateRequest.current++
     setSelected(item)
     setObjectiveId(item.question.learningObjectiveId || '')
     setSearch('')
@@ -83,12 +91,13 @@ export default function ObjectiveMappingReview() {
     if (!selected) return
     if (!reject && !objectiveId) { setMessage('Önce bir kazanım seçin.'); return }
     if (reason.trim().length < 3) { setMessage('En az 3 karakterlik bir inceleme notu yazın.'); return }
+    if (!reject && noteMismatch) { setMessage('İnceleme notu seçili soru veya kazanımla ilişkili görünmüyor. Lütfen bu soruya özel bir gerekçe yazın.'); return }
     setSaving(true)
     setMessage('')
     try {
       const response = await fetch('/api/admin/objective-mapping-review', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: selected.source, recordId: selected.recordId, index: selected.index, objectiveId: reject ? null : objectiveId, reason }),
+        body: JSON.stringify({ source: selected.source, recordId: selected.recordId, index: selected.index, objectiveId: reject ? null : objectiveId, reason, expectedQuestionText: selected.question.q || '', expectedOptions: selected.question.opts || [] }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Eşleştirme kaydedilemedi.')
@@ -132,13 +141,13 @@ export default function ObjectiveMappingReview() {
     <p style={{ color: 'var(--text2)', marginBottom: 16 }}>Adaylar yalnızca öneridir. Seçilen kazanım insan onayıyla kaydedilir; ders ve sınıf uyumu ayrıca denetlenir.</p>
     <p style={{ color: 'var(--text2)', marginBottom: 16 }}>Soru havuzundaki onay gelecekteki kullanım için kaydedilir. Geçmiş öğrenci sonuçlarını güncellemek için aynı sorunun “Geçmiş testler” kaydı ayrıca incelenmelidir.</p>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
-      <button className={`btn btn-sm ${source === 'bank' ? 'btn-primary' : ''}`} onClick={() => { setSource('bank'); setPage(1); setSelected(null) }}>Soru havuzu</button>
-      <button className={`btn btn-sm ${source === 'sessions' ? 'btn-primary' : ''}`} onClick={() => { setSource('sessions'); setPage(1); setSelected(null) }}>Geçmiş testler</button>
+      <button className={`btn btn-sm ${source === 'bank' ? 'btn-primary' : ''}`} onClick={() => { candidateRequest.current++; setSource('bank'); setPage(1); setSelected(null) }}>Soru havuzu</button>
+      <button className={`btn btn-sm ${source === 'sessions' ? 'btn-primary' : ''}`} onClick={() => { candidateRequest.current++; setSource('sessions'); setPage(1); setSelected(null) }}>Geçmiş testler</button>
       <button className="btn btn-sm" onClick={() => void load()}>↻ Yenile</button>
     </div>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
       {([['pending', 'Bekleyenler'], ['approved', 'Onaylananlar'], ['rejected', 'Reddedilenler']] as const).map(([key, label]) =>
-        <button key={key} className={`btn btn-sm ${reviewState === key ? 'btn-primary' : ''}`} onClick={() => { setReviewState(key); setPage(1); setSelected(null); setMessage('') }}>{label}</button>
+        <button key={key} className={`btn btn-sm ${reviewState === key ? 'btn-primary' : ''}`} onClick={() => { candidateRequest.current++; setReviewState(key); setPage(1); setSelected(null); setMessage('') }}>{label}</button>
       )}
       <span style={{ alignSelf: 'center', color: 'var(--text2)' }}>{total} soru</span>
     </div>
@@ -165,9 +174,10 @@ export default function ObjectiveMappingReview() {
           <p style={{ marginTop: 10 }}>Mevcut bağ: {selected.question.learningObjectiveCode || 'Yok'}</p>
           <label style={{ display: 'block', marginTop: 12 }}>Kazanım kodu veya açıklamasında ara</label>
           <div style={{ display: 'flex', gap: 8 }}>
-            <input className="input" value={search} onChange={event => setSearch(event.target.value)} placeholder="Örn. MAT.5 veya veri" />
-            <button className="btn btn-sm" disabled={candidateLoading} onClick={() => void loadCandidates(selected, search)}>Ara</button>
+            <input className="input" value={search} onChange={event => { candidateRequest.current++; setSearch(event.target.value); setObjectiveId(''); setCandidates([]); setCandidateMessage('') }} placeholder="Örn. MAT.6 veya ortak bölen" />
+            <button className="btn btn-sm" disabled={candidateLoading || searchMismatch} onClick={() => void loadCandidates(selected, search)}>Ara</button>
           </div>
+          {searchMismatch && <small role="alert" style={{ display: 'block', marginTop: 6, color: 'var(--red)' }}>Aranan kod seçili sorunun dersine ait değil. {selected.subject} kazanımı arayın.</small>}
           <small role="status" style={{ display: 'block', marginTop: 6, color: 'var(--text2)' }}>{candidateLoading ? 'Kazanımlar aranıyor…' : candidateMessage}</small>
           <label style={{ display: 'block', marginTop: 12 }}>Onaylanacak kazanım</label>
           <select className="input" value={objectiveId} onChange={event => setObjectiveId(event.target.value)}>
@@ -177,8 +187,9 @@ export default function ObjectiveMappingReview() {
           </select>
           <label style={{ display: 'block', marginTop: 12 }}>İnceleme notu (zorunlu)</label>
           <textarea className="input" value={reason} onChange={event => setReason(event.target.value)} placeholder="Soru bu kazanımı nasıl ölçüyor veya neden reddediliyor?" style={{ width: '100%', minHeight: 72 }} />
+          {noteMismatch && <small role="alert" style={{ display: 'block', color: 'var(--red)', marginTop: 6 }}>Not bu soruya veya seçilen kazanıma özgü görünmüyor. Önceki soruya ait metni kullanmayın.</small>}
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <button className="btn btn-primary" disabled={saving} onClick={() => void save(false)}>Kazanımı onayla ve bağla</button>
+            <button className="btn btn-primary" disabled={saving || candidateLoading || noteMismatch} onClick={() => void save(false)}>Kazanımı onayla ve bağla</button>
             <button className="btn" disabled={saving} onClick={() => void save(true)}>Eşleştirmeyi reddet / kaldır</button>
           </div>
         </div>}

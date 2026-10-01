@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { noteMatchesObjectiveReview } from '@/lib/objective-review-note'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -22,8 +23,11 @@ function gradeNumber(value: string) { return value.match(/\d+/)?.[0] || '' }
 function text(value: unknown) { return typeof value === 'string' ? value.trim() : '' }
 function reviewHistory(q: Question) { return Array.isArray(q.objectiveMappingReviews) ? q.objectiveMappingReviews : [] }
 function updateQuestion(q: Question, objective: { id: string; objective_code: string; curriculum_version_id: string | null; current_revision_id: string | null } | null, reviewer: string, reason: string) {
+  const base = { ...q }
+  // A previous bank quality verdict cannot certify a newly changed mapping.
+  delete base.historicalBankQuality
   return {
-    ...q,
+    ...base,
     learningObjectiveId: objective?.id || null,
     learningObjectiveCode: objective?.objective_code || null,
     curriculumVersionId: objective?.curriculum_version_id || null,
@@ -106,22 +110,26 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const reviewer = await adminId()
   if (!reviewer) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
-  const body = await req.json().catch(() => ({})) as { source?: string; recordId?: string; index?: number; objectiveId?: string | null; reason?: string }
+  const body = await req.json().catch(() => ({})) as { source?: string; recordId?: string; index?: number; objectiveId?: string | null; reason?: string; expectedQuestionText?: string; expectedOptions?: string[] }
   if (!uuid.test(body.recordId || '') || !['bank', 'sessions'].includes(body.source || '') || typeof body.reason !== 'string' || body.reason.trim().length < 3) {
     return NextResponse.json({ error: 'Kaynak, kayıt ve en az 3 karakterlik inceleme notu gerekli.' }, { status: 400 })
   }
-  let objective: { id: string; objective_code: string; curriculum_version_id: string | null; current_revision_id: string | null; grade: string; subject: string } | null = null
+  if (typeof body.expectedQuestionText !== 'string' || !Array.isArray(body.expectedOptions) || !body.expectedOptions.every(option => typeof option === 'string')) return NextResponse.json({ error: 'İncelenen soru bilgisi eksik. Sayfayı yenileyin.' }, { status: 400 })
+  let objective: { id: string; objective_code: string; title: string; curriculum_version_id: string | null; current_revision_id: string | null; grade: string; subject: string } | null = null
   if (body.objectiveId) {
     if (!uuid.test(body.objectiveId)) return NextResponse.json({ error: 'Kazanım kimliği geçersiz.' }, { status: 400 })
-    const result = await db.from('learning_objective_catalog').select('id,objective_code,curriculum_version_id,current_revision_id,grade,subject').eq('id', body.objectiveId).eq('is_active', true).eq('verification_status', 'verified').maybeSingle()
+    const result = await db.from('learning_objective_catalog').select('id,objective_code,title,curriculum_version_id,current_revision_id,grade,subject').eq('id', body.objectiveId).eq('is_active', true).eq('verification_status', 'verified').maybeSingle()
     if (result.error || !result.data) return NextResponse.json({ error: 'Aktif ve doğrulanmış kazanım bulunamadı.' }, { status: 400 })
     objective = result.data
   }
   if (body.source === 'bank') {
     const { data: row, error } = await db.from('question_bank').select('id,question,grade_key,subject_key').eq('id', body.recordId).maybeSingle()
     if (error || !row) return NextResponse.json({ error: 'Soru bulunamadı.' }, { status: 404 })
+    const current = row.question as Question
+    if (text(current.q) !== text(body.expectedQuestionText) || JSON.stringify(current.opts || []) !== JSON.stringify(body.expectedOptions)) return NextResponse.json({ error: 'Soru inceleme sırasında değişti. Sayfayı yenileyin.' }, { status: 409 })
     if (objective && (gradeNumber(row.grade_key) !== gradeNumber(objective.grade) || row.subject_key.toLocaleLowerCase('tr-TR') !== objective.subject.toLocaleLowerCase('tr-TR'))) return NextResponse.json({ error: 'Sınıf veya ders kazanımla uyuşmuyor.' }, { status: 400 })
-    const question = updateQuestion(row.question as Question, objective, reviewer, body.reason.trim())
+    if (objective && !noteMatchesObjectiveReview(body.reason, text(current.q), text(current.exp || current.explanation), objective.title)) return NextResponse.json({ error: 'İnceleme notu bu soru veya kazanımla ilişkili görünmüyor. Soruya özel bir gerekçe yazın.' }, { status: 400 })
+    const question = updateQuestion(current, objective, reviewer, body.reason.trim())
     const saved = await db.from('question_bank').update({ question, updated_at: new Date().toISOString() }).eq('id', row.id).select('id').maybeSingle()
     if (saved.error || !saved.data) return NextResponse.json({ error: saved.error?.message || 'Kayıt güncellenemedi.' }, { status: 500 })
     return NextResponse.json({ success: true, updatedEvents: 0 })
@@ -130,7 +138,9 @@ export async function POST(req: NextRequest) {
   const { data: row, error } = await db.from('quiz_sessions').select('id,questions,grade,topic,objective_mapped_count').eq('id', body.recordId).maybeSingle()
   if (error || !row || !Array.isArray(row.questions) || !row.questions[body.index!]) return NextResponse.json({ error: 'Test sorusu bulunamadı.' }, { status: 404 })
   const current = row.questions[body.index!] as Question
+  if (text(current.q) !== text(body.expectedQuestionText) || JSON.stringify(current.opts || []) !== JSON.stringify(body.expectedOptions)) return NextResponse.json({ error: 'Soru inceleme sırasında değişti. Sayfayı yenileyin.' }, { status: 409 })
   if (objective && (gradeNumber(row.grade) !== gradeNumber(objective.grade) || text(current.subject).toLocaleLowerCase('tr-TR') !== objective.subject.toLocaleLowerCase('tr-TR'))) return NextResponse.json({ error: 'Sınıf veya ders kazanımla uyuşmuyor.' }, { status: 400 })
+  if (objective && !noteMatchesObjectiveReview(body.reason, text(current.q), text(current.exp || current.explanation), objective.title)) return NextResponse.json({ error: 'İnceleme notu bu soru veya kazanımla ilişkili görünmüyor. Soruya özel bir gerekçe yazın.' }, { status: 400 })
   const questions = [...row.questions]
   questions[body.index!] = updateQuestion(current, objective, reviewer, body.reason.trim())
   const mappedCount = questions.filter((q: Question) => text(q.learningObjectiveId)).length
