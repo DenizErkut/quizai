@@ -115,6 +115,7 @@ export default function ObjectiveMappingReview() {
     setSelected(null)
     setMessage('')
     let added = 0, existing = 0, excluded = 0, failed = 0
+    const errors: string[] = []
     for (const [index, item] of targets.entries()) {
       setQualityProgress(`${index + 1}/${targets.length} soru inceleniyor…`)
       try {
@@ -123,16 +124,23 @@ export default function ObjectiveMappingReview() {
           body: JSON.stringify({ recordId: item.recordId, index: item.index }),
         })
         const result = await response.json()
-        if (!response.ok) { failed++; continue }
+        if (!response.ok) {
+          failed++
+          if (errors.length < 3) errors.push(`${index + 1}. soru: ${result.error || `HTTP ${response.status}`}`)
+          continue
+        }
         if (result.status === 'added') added++
         else if (result.status === 'already_in_bank') existing++
         else excluded++
         setItems(current => current.map(entry => entry.key === item.key ? { ...entry, question: { ...entry.question, historicalBankQuality: result } } : entry))
-      } catch { failed++ }
+      } catch {
+        failed++
+        if (errors.length < 3) errors.push(`${index + 1}. soru: Bağlantı hatası.`)
+      }
     }
     setQualityRunning(false)
     setQualityProgress('')
-    setMessage(`Tarama tamamlandı: ${added} havuza alındı, ${existing} zaten havuzdaydı, ${excluded} kalite kontrolünden geçmedi${failed ? `, ${failed} incelenemedi` : ''}.`)
+    setMessage(`Tarama tamamlandı: ${added} havuza alındı, ${existing} zaten havuzdaydı, ${excluded} kalite kontrolünden geçmedi${failed ? `, ${failed} incelenemedi. Hatalar: ${errors.join(' | ')}` : '.'}`)
     await load()
   }
 

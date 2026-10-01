@@ -13,7 +13,7 @@ export const runtime = 'nodejs'
 export const maxDuration = 90
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const policyVersion = 'historical-bank-quality-v1'
 const minimumScore = 80
 const reusableFields = new Set(['q', 'opts', 'ans', 'exp', 'explanation', 'type', 'blank', 'referenceAnswer', 'pairs', 'items', 'correctOrder', 'statements', 'tableData', 'tableAnswers', 'distractorMisconceptions', 'difficulty', 'subject', 'qtype', 'svg', 'visualQuestionText', 'visualContextQuality', 'chartData', 'hasVisual', 'visualKind', 'learningObjectiveId', 'learningObjectiveCode', 'curriculumVersionId', 'learningObjectiveRevisionId', 'objectiveVerified', 'objectiveMappingStatus', 'objectiveMappingVersion'])
