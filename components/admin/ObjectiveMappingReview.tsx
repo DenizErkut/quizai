@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 type Item = {
   key: string; source: 'bank' | 'sessions'; recordId: string; index: number | null
-  question: { q?: string; opts?: string[]; exp?: string; learningObjectiveId?: string | null; learningObjectiveCode?: string | null; objectiveMappingStatus?: string }
+  question: { q?: string; opts?: string[]; exp?: string; learningObjectiveId?: string | null; learningObjectiveCode?: string | null; objectiveMappingStatus?: string; historicalBankQuality?: { status: 'added' | 'already_in_bank' | 'excluded'; score: number; reason: string; reviewedAt: string } }
   subject: string; grade: string; topic: string
 }
 type Candidate = { id: string; objective_code: string; title: string; topic: string | null }
@@ -24,6 +24,8 @@ export default function ObjectiveMappingReview() {
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [qualityRunning, setQualityRunning] = useState(false)
+  const [qualityProgress, setQualityProgress] = useState('')
   const [message, setMessage] = useState('')
 
   const load = useCallback(async () => {
@@ -97,6 +99,34 @@ export default function ObjectiveMappingReview() {
     finally { setSaving(false) }
   }
 
+  async function scanApprovedPage() {
+    const targets = items.filter(item => item.source === 'sessions' && item.question.objectiveMappingStatus === 'human_approved')
+    if (!targets.length) { setMessage('Bu sayfada taranacak onaylı geçmiş soru yok.'); return }
+    setQualityRunning(true)
+    setSelected(null)
+    setMessage('')
+    let added = 0, existing = 0, excluded = 0, failed = 0
+    for (const [index, item] of targets.entries()) {
+      setQualityProgress(`${index + 1}/${targets.length} soru inceleniyor…`)
+      try {
+        const response = await fetch('/api/admin/objective-mapping-review/quality', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recordId: item.recordId, index: item.index }),
+        })
+        const result = await response.json()
+        if (!response.ok) { failed++; continue }
+        if (result.status === 'added') added++
+        else if (result.status === 'already_in_bank') existing++
+        else excluded++
+        setItems(current => current.map(entry => entry.key === item.key ? { ...entry, question: { ...entry.question, historicalBankQuality: result } } : entry))
+      } catch { failed++ }
+    }
+    setQualityRunning(false)
+    setQualityProgress('')
+    setMessage(`Tarama tamamlandı: ${added} havuza alındı, ${existing} zaten havuzdaydı, ${excluded} kalite kontrolünden geçmedi${failed ? `, ${failed} incelenemedi` : ''}.`)
+    await load()
+  }
+
   return <div className="card anim-up" style={{ padding: 24 }}>
     <h2 style={{ fontSize: 20, marginBottom: 6 }}>🎯 Geçmiş Soruların Kazanım Eşleştirmesi</h2>
     <p style={{ color: 'var(--text2)', marginBottom: 16 }}>Adaylar yalnızca öneridir. Seçilen kazanım insan onayıyla kaydedilir; ders ve sınıf uyumu ayrıca denetlenir.</p>
@@ -112,18 +142,26 @@ export default function ObjectiveMappingReview() {
       )}
       <span style={{ alignSelf: 'center', color: 'var(--text2)' }}>{total} soru</span>
     </div>
-    {message && <p role="status" style={{ color: message.startsWith('Kaydedildi') ? 'var(--green)' : 'var(--red)', marginBottom: 12 }}>{message}</p>}
+    {source === 'sessions' && reviewState === 'approved' && <div style={{ marginBottom: 18 }}>
+      <button className="btn btn-primary" disabled={qualityRunning || loading || !items.length} onClick={() => void scanApprovedPage()}>
+        {qualityRunning ? qualityProgress : 'Bu sayfadaki onaylananları yeniden tara ve kalite kontrolü yap'}
+      </button>
+      <small style={{ display: 'block', marginTop: 6, color: 'var(--text2)' }}>Bu sayfadaki en fazla 20 soru incelenir. En az 80/100 kalite puanı ve iki bağımsız denetçi onayı alanlar havuza alınır; geçemeyenler geçmiş testlerde kalır.</small>
+    </div>}
+    {message && <p role="status" style={{ color: message.startsWith('Kaydedildi') || message.startsWith('Tarama tamamlandı') ? 'var(--green)' : 'var(--red)', marginBottom: 12 }}>{message}</p>}
     {loading ? <p>Yükleniyor…</p> : <div style={{ display: 'grid', gap: 8 }}>
       {items.map(item => <div key={item.key}>
         <button type="button" onClick={() => selected?.key === item.key ? setSelected(null) : select(item)} aria-expanded={selected?.key === item.key} className="card-sm" style={{ width: '100%', textAlign: 'left', cursor: 'pointer', borderColor: selected?.key === item.key ? 'var(--accent)' : undefined }}>
           <div style={{ fontWeight: 600 }}>{item.question.q || 'Soru metni yok'}</div>
           <small>{item.grade} · {item.subject} · {item.topic} · {item.question.learningObjectiveCode || 'Eşleşmemiş'}{item.question.objectiveMappingStatus === 'human_approved' ? ' · İnsan onaylı' : item.question.objectiveMappingStatus === 'human_rejected' ? ' · Reddedildi' : ''}</small>
+          {item.question.historicalBankQuality && <small style={{ display: 'block', marginTop: 4 }}>Kalite: {item.question.historicalBankQuality.score}/100 · {item.question.historicalBankQuality.status === 'added' ? 'Havuza alındı' : item.question.historicalBankQuality.status === 'already_in_bank' ? 'Zaten havuzda' : 'Havuz dışında'}</small>}
         </button>
         {selected?.key === item.key && <div style={{ border: '1px solid var(--border)', borderTop: 0, borderRadius: '0 0 16px 16px', padding: 18 }}>
           <h3 style={{ marginBottom: 8 }}>Soru incelemesi</h3>
           <p>{selected.question.q}</p>
           {Array.isArray(selected.question.opts) && <ol>{selected.question.opts.map((option, index) => <li key={index}>{option}</li>)}</ol>}
           {selected.question.exp && <p style={{ color: 'var(--text2)' }}>Açıklama: {selected.question.exp}</p>}
+          {selected.question.historicalBankQuality && <p style={{ color: 'var(--text2)' }}>Kalite incelemesi: {selected.question.historicalBankQuality.score}/100 — {selected.question.historicalBankQuality.reason}</p>}
           <p style={{ marginTop: 10 }}>Mevcut bağ: {selected.question.learningObjectiveCode || 'Yok'}</p>
           <label style={{ display: 'block', marginTop: 12 }}>Kazanım kodu veya açıklamasında ara</label>
           <div style={{ display: 'flex', gap: 8 }}>
