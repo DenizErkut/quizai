@@ -39,6 +39,18 @@ test('doğrulanmamış kazanım eşleşmesi ölçüme alınmaz', () => {
   assert.match(inspectMeasurementSession(candidate).reason || '', /kanıtı eksik/)
 })
 
+test('insan onaylı ve bağımsız kalite denetiminden geçmiş tarihsel soru ölçüme alınır', () => {
+  const reviewed = session('pre', 'insan', 3)
+  for (const question of reviewed.questions as Array<Record<string, unknown>>) {
+    question.objectiveMappingStatus = 'human_approved'
+    question.qualityVerificationVersion = 'historical-bank-quality-v1'
+    question.historicalBankQuality = { status: 'added', score: 85, policyVersion: 'historical-bank-quality-v1' }
+  }
+  assert.ok(inspectMeasurementSession(reviewed).evidence)
+  ;(reviewed.questions as Array<Record<string, unknown>>)[0].historicalBankQuality = { status: 'excluded', score: 85, policyVersion: 'historical-bank-quality-v1' }
+  assert.match(inspectMeasurementSession(reviewed).reason || '', /kanıtı eksik/)
+})
+
 test('farklı kazanım veya zorluk dağılımı eşleştirilemez', () => {
   const pre = inspectMeasurementSession(session('pre', 'ilk', 2))
   const otherObjective = inspectMeasurementSession(session('post', 'son', 4, 'objective-2'))

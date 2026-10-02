@@ -21,6 +21,8 @@ function pctBg(p: number) { return p >= 80 ? 'rgba(22,163,74,0.12)' : p >= 50 ? 
 // Okulyo stilinde menü ikonları
 const menuItems = [
   { href: '/quiz',      icon: '⚡', label: 'Test Çöz',      color: '#6366f1', bg: 'rgba(99,102,241,0.12)' },
+  { href: '/transfer-checks', icon: '🧭', label: 'Tekrar Kontrolü', color: '#0d9488', bg: 'rgba(13,148,136,0.12)' },
+  { href: '/verified-learning', icon: '📈', label: 'Öğrenme Pilotu', color: '#3f8b70', bg: 'rgba(63,139,112,0.12)' },
   { href: '/koc',       icon: '✦', label: 'Pratium Koç',   color: '#a855f7', bg: 'rgba(168,85,247,0.12)' },
   { href: '/ai-literacy', icon: '🔍', label: 'AI Okuryazarlığı', color: '#0891b2', bg: 'rgba(8,145,178,0.12)' },
   { href: '/live',      icon: '🎯', label: 'Canlı Test',    color: '#10b981', bg: 'rgba(16,185,129,0.12)' },

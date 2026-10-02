@@ -214,12 +214,9 @@ export function hasCanonicalObjectiveCoverage(
     && question.learningObjectiveId == null && question.learningObjectiveCode == null)
   const ids = new Set(candidates.map(candidate => candidate.id))
   return questions.length > 0 && questions.every(question => {
-    // Eski onaylı havuz kayıtlarında kazanım UUID'si bulunmayabilir. Bu
-    // kayıtlar zaten aynı sınıf/ders/konu ve onay filtresinden geçtiği için
-    // metadata eksikliği testi düşürmemeli; yeni AI soruları ise tam eşleşme
-    // şartını korur.
-    if (question.bankQuestionId && question.objectiveMappingStatus !== 'mapped') return true
-    return question.objectiveMappingStatus === 'mapped'
+    // Havuz onayı kazanım onayı değildir. Eski havuz kayıtları da kanonik
+    // kimlik ve doğrulanmış eşleşme taşımadıkça bu yolu kullanamaz.
+    return (question.objectiveMappingStatus === 'mapped' || question.objectiveMappingStatus === 'human_approved')
       && typeof question.learningObjectiveId === 'string' && ids.has(question.learningObjectiveId)
       && typeof question.learningObjectiveCode === 'string'
   })

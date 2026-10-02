@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { data: measurements, error: measurementError } = await db.from('learning_gain_measurements')
-    .select('id,student_id,learning_objective_id,pre_score_pct,post_score_pct,gain_pp,item_count,pre_completed_at,post_completed_at,transfer_session_id,transfer_score_pct,transfer_gain_pp,transfer_completed_at,created_at')
+    .select('id,student_id,learning_objective_id,pre_score_pct,post_score_pct,gain_pp,item_count,pre_completed_at,post_completed_at,transfer_session_id,transfer_score_pct,transfer_gain_pp,transfer_completed_at,measurement_version,created_at')
     .eq('teacher_id', context!.teacherId).eq('classroom_id', classroomId)
     .order('created_at', { ascending: false }).limit(100)
   if (measurementError) return NextResponse.json({ error: 'Ölçüm kayıtları alınamadı; veritabanı güncellemesini kontrol edin.' }, { status: 500 })
@@ -146,6 +146,12 @@ export async function POST(req: NextRequest) {
   if (pairIssue) return NextResponse.json({ error: pairIssue }, { status: 422 })
 
   const gainPp = Math.round((postCheck.evidence.scorePct - preCheck.evidence.scorePct) * 100) / 100
+  const { data: verifiedAttempts } = await db.from('verified_learning_attempts')
+    .select('cycle_id,stage,quiz_session_id').eq('student_id', body.studentId!)
+    .in('quiz_session_id', [pre.id, post.id]).eq('status', 'completed')
+  const preAttempt = verifiedAttempts?.find(item => item.quiz_session_id === pre.id && item.stage === 'baseline')
+  const postAttempt = verifiedAttempts?.find(item => item.quiz_session_id === post.id && item.stage === 'post')
+  const serverScoredPair = Boolean(preAttempt && postAttempt && preAttempt.cycle_id === postAttempt.cycle_id)
   const { data, error } = await db.from('learning_gain_measurements').insert({
     teacher_id: scope.context!.teacherId,
     classroom_id: body.classroomId,
@@ -160,6 +166,7 @@ export async function POST(req: NextRequest) {
     pre_completed_at: preAt,
     post_completed_at: postAt,
     reviewed_by: scope.user!.id,
+    measurement_version: serverScoredPair ? 'learning-gain-v2-server-scored-prepost' : 'learning-gain-v1',
   }).select('id,pre_score_pct,post_score_pct,gain_pp').single()
   if (error) return NextResponse.json({ error: error.code === '23505' ? 'Bu test çifti daha önce kaydedildi.' : 'Ölçüm kaydedilemedi.' }, { status: error.code === '23505' ? 409 : 500 })
   return NextResponse.json({ measurement: data }, { status: 201 })
@@ -175,7 +182,7 @@ export async function PATCH(req: NextRequest) {
   const scope = await teacherScope(req, body.classroomId!)
   if (scope.error) return scope.error
   const { data: measurement, error: measurementError } = await db.from('learning_gain_measurements')
-    .select('id,student_id,learning_objective_id,pre_session_id,post_session_id,pre_score_pct,post_score_pct,pre_completed_at,post_completed_at,transfer_session_id')
+    .select('id,student_id,learning_objective_id,pre_session_id,post_session_id,pre_score_pct,post_score_pct,pre_completed_at,post_completed_at,transfer_session_id,measurement_version')
     .eq('id', body.measurementId!).eq('teacher_id', scope.context!.teacherId).eq('classroom_id', body.classroomId!).maybeSingle()
   if (measurementError) return NextResponse.json({ error: 'Ölçüm alınamadı.' }, { status: 500 })
   if (!measurement || !scope.context!.roster.some(item => item.id === measurement.student_id)) {
@@ -220,6 +227,16 @@ export async function PATCH(req: NextRequest) {
     inspectMeasurementPair(preCheck.evidence, transferCheck.evidence, measurement.pre_completed_at, transferAt)
   if (issue) return NextResponse.json({ error: issue }, { status: 422 })
   const transferGainPp = Math.round((transferCheck.evidence.scorePct - preCheck.evidence.scorePct) * 100) / 100
+  const { data: verifiedAttempts } = await db.from('verified_learning_attempts')
+    .select('cycle_id,stage,quiz_session_id').eq('student_id', measurement.student_id)
+    .in('quiz_session_id', [pre.id, post.id, transfer.id]).eq('status', 'completed')
+  const stages = new Map((verifiedAttempts || []).map(item => [item.stage, item]))
+  const serverScoredTransfer = measurement.measurement_version === 'learning-gain-v2-server-scored-prepost'
+    && stages.get('baseline')?.quiz_session_id === pre.id
+    && stages.get('post')?.quiz_session_id === post.id
+    && stages.get('transfer')?.quiz_session_id === transfer.id
+    && stages.get('baseline')?.cycle_id === stages.get('post')?.cycle_id
+    && stages.get('post')?.cycle_id === stages.get('transfer')?.cycle_id
   const { data, error } = await db.from('learning_gain_measurements').update({
     transfer_session_id: transfer.id,
     transfer_score_pct: transferCheck.evidence.scorePct,
@@ -227,6 +244,7 @@ export async function PATCH(req: NextRequest) {
     transfer_completed_at: transferAt,
     transfer_reviewed_by: scope.user!.id,
     transfer_reviewed_at: new Date().toISOString(),
+    measurement_version: serverScoredTransfer ? 'learning-gain-v2-server-scored-transfer' : 'learning-gain-v1',
   }).eq('id', measurement.id).is('transfer_session_id', null)
     .select('id,transfer_score_pct,transfer_gain_pp').maybeSingle()
   if (error || !data) return NextResponse.json({ error: 'Aktarım kaydedilemedi veya başka oturumda zaten kaydedildi.' }, { status: 409 })

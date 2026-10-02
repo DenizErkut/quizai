@@ -177,7 +177,7 @@ export async function buildCoachContext(supabase: SupabaseClient, userId: string
     loadLiveQuizActivity(supabase, userId, since).catch(() => []),
     loadExamActivity(supabase, userId, since).catch(() => []),
     loadReadingActivity(supabase, userId, since).catch(() => []),
-    loadCoachGain(supabase, userId).catch(() => ({ available: false, recordedPairs: 0, currentPairs: 0, transferPairs: 0, averageGainPp: null, objectives: [] })),
+    loadCoachGain(supabase, userId).catch(() => ({ available: false, recordedPairs: 0, currentPairs: 0, transferPairs: 0, verifiedTransferPairs: 0, averageGainPp: null, objectives: [] })),
   ])
   const streakRow = (streakRes as any)?.data
   const sessions: CoachSession[] = ((sessionsRes as any)?.data ?? []).map((s: any) => ({ topic: s.topic, pct: Number(s.pct ?? 0), score: Number(s.score ?? 0), questionCount: Number(s.question_count ?? 0), createdAt: s.created_at }))
@@ -214,10 +214,11 @@ export function formatCoachContextForPrompt(ctx: CoachContext): string {
     for (const a of ctx.otherActivity) lines.push(`- [${a.detail}] ${a.label}${a.pct !== null ? ` — ${pct(a.pct)}` : ''} (${new Date(a.createdAt).toLocaleDateString('tr-TR')})`)
   }
   if (!ctx.learningGain.available) lines.push('Ön/son öğrenme kazanımı ölçüm kaynağı şu anda kullanılamıyor; ölçülmüş kazanım iddia etme.')
-  else if (!ctx.learningGain.currentPairs) lines.push('Doğrulanmış ön/son öğrenme kazanımı çifti henüz yok; test geçmişini kazanım artışı diye sunma.')
+  else if (!ctx.learningGain.currentPairs) lines.push('Ön/son öğrenme kazanımı ölçüm çifti henüz yok; test geçmişini kazanım artışı diye sunma.')
   else {
     const gain = ctx.learningGain
     lines.push(`Öğretmen incelemeli ön/son kazanım ölçümü: ${gain.recordedPairs} kayıt, ${gain.currentPairs} güncel kazanım, ${gain.transferPairs} aktarım testi. ${gain.averageGainPp === null ? 'Beşten az güncel çift olduğu için genel ortalama yok.' : `Güncel ortalama fark ${gain.averageGainPp} yüzde puan.`}`)
+    lines.push(`Sunucu puanlamalı, gecikmeli aktarımı da tamamlanmış doğrulanmış ölçüm: ${gain.verifiedTransferPairs}. Diğer ölçümler betimseldir; bunları doğrulanmış öğrenme kazanımı diye adlandırma.`)
     for (const item of gain.objectives) lines.push(`- ${item.code}: ${item.pairs} ölçüm, son ön/son farkı ${item.latestGainPp} yüzde puan, ${item.transferPairs} aktarım testi${item.averageGainPp === null ? '; ortalama için yetersiz örneklem' : `; ortalama ${item.averageGainPp} yüzde puan`}`)
   }
   lines.push('Kazanım eşleştirmeleri ayrıca insan kontrolündedir. Ön/son farkı müdahalenin nedensel etkisi değildir.')

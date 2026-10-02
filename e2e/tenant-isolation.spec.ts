@@ -13,6 +13,10 @@ test.describe('tenant isolation security contract', () => {
     ['/api/institution/comparisons', 'get'],
     ['/api/admin/pipeline-health', 'get'],
     ['/api/teacher/agent-approvals', 'get'],
+    ['/api/admin/learning-evidence-readiness', 'get'],
+    ['/api/student/verified-learning', 'get'],
+    ['/api/coach/guided-practice', 'get'],
+    ['/api/transfer-check', 'get'],
   ] as const
 
   for (const [route, method] of protectedRoutes) {

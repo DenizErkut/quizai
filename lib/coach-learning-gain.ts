@@ -8,6 +8,7 @@ export interface CoachGainRow {
   pre_score_pct: number | string
   post_score_pct: number | string
   post_completed_at: string
+  measurement_version?: string | null
 }
 
 export interface CoachGainSummary {
@@ -15,6 +16,7 @@ export interface CoachGainSummary {
   recordedPairs: number
   currentPairs: number
   transferPairs: number
+  verifiedTransferPairs: number
   averageGainPp: number | null
   objectives: Array<{ code: string; pairs: number; averageGainPp: number | null; latestGainPp: number; transferPairs: number }>
 }
@@ -34,6 +36,7 @@ export function summarizeCoachGain(rows: CoachGainRow[], codes: Record<string, s
   return {
     available: true, recordedPairs: rows.length, currentPairs: current.length,
     transferPairs: current.filter(row => row.transfer_gain_pp !== null).length,
+    verifiedTransferPairs: current.filter(row => row.measurement_version === 'learning-gain-v2-server-scored-transfer' && row.transfer_gain_pp !== null).length,
     averageGainPp: mean(current.map(row => Number(row.gain_pp))),
     objectives: [...groups.entries()].map(([id, group]) => ({
       code: codes[id] ?? 'Kazanım kodu bulunamadı', pairs: group.length,
@@ -48,10 +51,10 @@ export async function loadCoachGain(supabase: SupabaseClient, userId: string): P
   const rows: CoachGainRow[] = []
   for (let offset = 0; ; offset += 500) {
     const { data, error } = await supabase.from('learning_gain_measurements')
-      .select('student_id,learning_objective_id,gain_pp,transfer_gain_pp,pre_score_pct,post_score_pct,post_completed_at')
+      .select('student_id,learning_objective_id,gain_pp,transfer_gain_pp,pre_score_pct,post_score_pct,post_completed_at,measurement_version')
       .eq('student_id', userId).order('post_completed_at', { ascending: false }).range(offset, offset + 499)
     if (error) {
-      if (error.code === '42P01' || error.code === 'PGRST205') return { available: false, recordedPairs: 0, currentPairs: 0, transferPairs: 0, averageGainPp: null, objectives: [] }
+      if (error.code === '42P01' || error.code === 'PGRST205') return { available: false, recordedPairs: 0, currentPairs: 0, transferPairs: 0, verifiedTransferPairs: 0, averageGainPp: null, objectives: [] }
       throw error
     }
     rows.push(...((data ?? []) as CoachGainRow[]))

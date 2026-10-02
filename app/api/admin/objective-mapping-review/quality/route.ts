@@ -134,7 +134,11 @@ export async function POST(req: NextRequest) {
 
   const result = { status: outcome, score, reason: reason || 'Kalite ve kazanım kontrollerini geçti.', bankQuestionId: outcome === 'excluded' ? null : bankId, policyVersion, reviewedAt: new Date().toISOString(), reviewer }
   const updated = [...freshQuestions!]
-  updated[body.index!] = { ...freshQuestion, historicalBankQuality: result }
+  updated[body.index!] = {
+    ...freshQuestion,
+    historicalBankQuality: result,
+    ...(outcome !== 'excluded' ? { qualityVerificationVersion: policyVersion } : {}),
+  }
   const { error: saveError } = await db.from('quiz_sessions').update({ questions: updated }).eq('id', session.id)
   if (saveError) return NextResponse.json({ error: `Kalite sonucu test kaydına yazılamadı: ${saveError.message}`, ...result }, { status: 500 })
   return NextResponse.json(result)

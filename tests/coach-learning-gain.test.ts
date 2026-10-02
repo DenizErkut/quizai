@@ -19,6 +19,14 @@ test('aktarımı yalnız mevcut kanıt varsa sayar', () => {
   const summary = summarizeCoachGain([row('a', 10, '2026-02-01', 5), row('b', 0, '2026-02-02')], {})
   assert.equal(summary.transferPairs, 1)
   assert.equal(summary.currentPairs, 2)
+  assert.equal(summary.verifiedTransferPairs, 0)
+})
+
+test('yalnız sunucuda puanlanan aktarım doğrulanmış olarak sayılır', () => {
+  const verified = { ...row('a', 10, '2026-02-01', 5), measurement_version: 'learning-gain-v2-server-scored-transfer' }
+  const summary = summarizeCoachGain([verified, row('b', 10, '2026-02-01', 5)], {})
+  assert.equal(summary.transferPairs, 2)
+  assert.equal(summary.verifiedTransferPairs, 1)
 })
 
 test('ortalama en az beş çiftte görünür', () => {

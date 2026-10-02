@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { noteMatchesObjectiveReview } from '@/lib/objective-review-note'
+import LearningEvidenceReadiness from './LearningEvidenceReadiness'
 
 type Item = {
   key: string; source: 'bank' | 'sessions'; recordId: string; index: number | null
@@ -146,6 +147,7 @@ export default function ObjectiveMappingReview() {
 
   return <div className="card anim-up" style={{ padding: 24 }}>
     <h2 style={{ fontSize: 20, marginBottom: 6 }}>🎯 Geçmiş Soruların Kazanım Eşleştirmesi</h2>
+    <LearningEvidenceReadiness />
     <p style={{ color: 'var(--text2)', marginBottom: 16 }}>Adaylar yalnızca öneridir. Seçilen kazanım insan onayıyla kaydedilir; ders ve sınıf uyumu ayrıca denetlenir.</p>
     <p style={{ color: 'var(--text2)', marginBottom: 16 }}>Soru havuzundaki onay gelecekteki kullanım için kaydedilir. Geçmiş öğrenci sonuçlarını güncellemek için aynı sorunun “Geçmiş testler” kaydı ayrıca incelenmelidir.</p>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>

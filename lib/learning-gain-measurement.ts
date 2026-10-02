@@ -13,9 +13,10 @@ type Question = {
   objectiveMappingStatus?: unknown
   objectiveVerified?: unknown
   qualityVerificationVersion?: unknown
+  historicalBankQuality?: unknown
 }
 
-type Answer = { correct?: boolean; awardedScore?: unknown }
+type Answer = { correct?: boolean; awardedScore?: unknown; hintUsed?: unknown }
 
 export type MeasurementSession = {
   id: string
@@ -42,13 +43,19 @@ export function inspectMeasurementSession(session: MeasurementSession):
   if (questions.length < MIN_MEASUREMENT_ITEMS || answers.length !== questions.length || session.question_count !== questions.length) {
     return { evidence: null, reason: `Ölçüm için en az ${MIN_MEASUREMENT_ITEMS} yanıtlanmış soru gerekli.` }
   }
+  if (answers.some(answer => answer.hintUsed === true)) return { evidence: null, reason: 'Ölçüm testinde ipucu kullanılmış.' }
   const ids = new Set<string>()
   const signatures: string[] = []
   const difficultyProfile: string[] = []
   for (const question of questions) {
     const objectiveId = typeof question.learningObjectiveId === 'string' ? question.learningObjectiveId : ''
-    if (question.objectiveMappingStatus !== 'mapped' || question.objectiveVerified !== true ||
-      question.qualityVerificationVersion !== 'quiz-quality-v2' || !objectiveId) {
+    const mappingVerified = question.objectiveMappingStatus === 'mapped' || question.objectiveMappingStatus === 'human_approved'
+    const historicalReview = question.historicalBankQuality as { status?: unknown; score?: unknown; policyVersion?: unknown } | undefined
+    const qualityVerified = question.qualityVerificationVersion === 'quiz-quality-v2' ||
+      (question.objectiveMappingStatus === 'human_approved' &&
+        ['added', 'already_in_bank'].includes(String(historicalReview?.status)) &&
+        historicalReview?.policyVersion === 'historical-bank-quality-v1' && Number(historicalReview.score) >= 80)
+    if (!mappingVerified || question.objectiveVerified !== true || !qualityVerified || !objectiveId) {
       return { evidence: null, reason: 'Soruların kazanım veya kalite doğrulama kanıtı eksik.' }
     }
     ids.add(objectiveId)

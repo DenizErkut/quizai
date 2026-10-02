@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import LearningEvidenceChain from './LearningEvidenceChain'
+import VerifiedLearningPlans from './VerifiedLearningPlans'
 
 type Classroom = { id: string; name: string }
 type Session = {
@@ -13,6 +15,7 @@ type Measurement = {
   id: string; student_id: string; learning_objective_id: string; studentName: string; objectiveCode: string; objectiveTitle: string;
   pre_score_pct: number; post_score_pct: number; gain_pp: number; item_count: number;
   post_completed_at: string; transfer_session_id: string | null; transfer_score_pct: number | null; transfer_gain_pp: number | null
+  measurement_version: string
 }
 type Data = {
   students: { id: string; name: string }[]; sessions: Session[]; measurements: Measurement[];
@@ -168,6 +171,7 @@ export default function LearningGainPilot({ classrooms }: { classrooms: Classroo
     {!!data?.measurements.length && <details style={{ fontSize: 12 }}><summary style={{ cursor: 'pointer', fontWeight: 700 }}>Kaydedilmiş ölçümler ({data.measurements.length})</summary>
       <div style={{ maxHeight: 260, overflowY: 'auto', marginTop: 8 }}>{data.measurements.map(item => <div key={item.id} style={{ padding: '7px 0', borderTop: '1px solid var(--border)' }}>
         {item.studentName} · {item.objectiveCode} · %{item.pre_score_pct} → %{item.post_score_pct} · <strong>{Number(item.gain_pp) >= 0 ? '+' : ''}{item.gain_pp} puan</strong>
+        {item.measurement_version === 'learning-gain-v2-server-scored-transfer' ? ' · sunucuda puanlanmış, öğretmen incelemeli' : ' · betimleyici pilot'}
         {item.transfer_session_id ? ` · aktarım %${item.transfer_score_pct} (başlangıca göre ${Number(item.transfer_gain_pp) >= 0 ? '+' : ''}${item.transfer_gain_pp} puan)` : ' · aktarım bekleniyor'}
         {!item.transfer_session_id && studentId === item.student_id && <button className="btn" style={{ marginLeft: 8 }} onClick={() => { setTransferForId(item.id); setTransferId(''); setTransferReviewed(false) }}>Aktarım testi ekle</button>}
       </div>)}</div>
@@ -187,5 +191,7 @@ export default function LearningGainPilot({ classrooms }: { classrooms: Classroo
       {transfer && <label style={{ display: 'flex', gap: 7, alignItems: 'flex-start' }}><input type="checkbox" checked={transferReviewed} onChange={event => setTransferReviewed(event.target.checked)} />Soruların aynı kazanımı yeni bir durumda ölçtüğünü ve cevap anahtarını inceledim.</label>}
       <div style={{ display: 'flex', gap: 8 }}><button className="btn btn-primary" disabled={!transfer || !transferReviewed || saving} onClick={() => void saveTransfer()}>Aktarımı kaydet</button><button className="btn" onClick={() => setTransferForId('')}>Vazgeç</button></div>
     </div>}
+    <LearningEvidenceChain classroomId={effectiveClassroomId} studentId={studentId} />
+    <VerifiedLearningPlans classroomId={effectiveClassroomId} studentId={studentId} />
   </section>
 }

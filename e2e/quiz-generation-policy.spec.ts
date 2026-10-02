@@ -126,6 +126,8 @@ test('requires each item to map to an approved canonical outcome and have strict
     qualityVerificationVersion: 'quiz-quality-v2', difficultyVerified: true, objectiveVerified: true,
   }
   expect(hasCanonicalObjectiveCoverage([approvedQuestion], candidates)).toBe(true)
+  expect(hasCanonicalObjectiveCoverage([{ ...approvedQuestion, objectiveMappingStatus: 'human_approved', bankQuestionId: 'bank-1' }], candidates)).toBe(true)
+  expect(hasCanonicalObjectiveCoverage([{ ...approvedQuestion, objectiveMappingStatus: 'unmapped', bankQuestionId: 'bank-1', learningObjectiveId: null }], candidates)).toBe(false)
   expect(hasStrictQuestionReview([approvedQuestion], candidates)).toBe(true)
   expect(hasCanonicalObjectiveCoverage([{ ...approvedQuestion, learningObjectiveId: 'invented' }], candidates)).toBe(false)
   expect(hasStrictQuestionReview([{ ...approvedQuestion, objectiveVerified: false }], candidates)).toBe(false)
