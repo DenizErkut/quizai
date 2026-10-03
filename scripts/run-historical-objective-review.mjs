@@ -95,7 +95,7 @@ async function worker() {
       let result,lastError
       for(let attempt=0;attempt<8;attempt++) {
         try { result=await request({ entries }); break }
-        catch(error) { lastError=error; console.warn(`Batch ${index+1}, attempt ${attempt+1}: ${error.message.slice(0,1000)}`); if(attempt<7) await new Promise(resolve=>setTimeout(resolve,Math.min(60000,10000*2**attempt))) }
+        catch(error) { lastError=error; console.warn(`Batch ${index+1}, attempt ${attempt+1}: ${error.message.slice(0,1000)}`); if(attempt>=1 && /malformed audit|incomplete audit|truncated|JSON/.test(error.message)) break; if(attempt<7) await new Promise(resolve=>setTimeout(resolve,Math.min(60000,10000*2**attempt))) }
       }
       if(!result) throw lastError
       for(const entry of result.results) {
@@ -108,6 +108,12 @@ async function worker() {
       }
       stats.conflicts+=result.skipped.length
     } catch(error) {
+      if(entries.length>1 && /malformed audit|incomplete audit|truncated|JSON/.test(error.message)) {
+        const middle=Math.ceil(entries.length/2)
+        batches.push(entries.slice(0,middle),entries.slice(middle))
+        console.warn(`Batch ${index+1} split for complete independent reports`)
+        continue
+      }
       stats.failed+=entries.reduce((sum,entry)=>sum+entry.items.length,0)
       await appendFile(resolve(directory,'remote-errors.jsonl'),JSON.stringify({ index,error:error.message,signatures:entries.map(entry=>entry.signature) })+'\n')
       console.warn(`Batch ${index+1}: ${error.message}`)

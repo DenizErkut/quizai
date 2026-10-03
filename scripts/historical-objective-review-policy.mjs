@@ -12,7 +12,7 @@ export function parseAudits(raw, size, provider, model) {
       || typeof result.reason !== 'string' || result.reason.trim().length < 8
       || !(result.objectiveCode === null || typeof result.objectiveCode === 'string')
       || REQUIRED.some(key => typeof result[key] !== 'boolean') || typeof result.difficultyMatches !== 'boolean' || typeof result.standalone !== 'boolean') {
-      throw new Error(`${provider}: malformed audit`)
+      throw new Error(`${provider}: malformed audit (${JSON.stringify({ index: result.index, types: Object.fromEntries(['score','reason','objectiveCode',...REQUIRED,'difficultyMatches','standalone'].map(key=>[key,typeof result[key]])) })})`)
     }
     if (norm(result.reason).includes('dogrudan olmasa')) result.directObjectiveMatch = false
     byIndex.set(result.index, { ...result, provider, model, score: Math.round(result.score), reason: result.reason.slice(0, 1200),
