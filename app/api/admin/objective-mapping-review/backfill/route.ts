@@ -6,6 +6,9 @@ import { callOpenAI } from '@/lib/openai'
 import { MistralAdapter } from '@/lib/ai-gateway'
 import { questionBankKey, questionFingerprint } from '@/lib/question-bank'
 import { objectiveReviewContent } from '@/lib/objective-mapping-verification'
+import { evaluateQuestionStructure } from '@/lib/ai-gateway/quality-engine'
+import { evaluateQuestionConsistency } from '@/lib/question-consistency'
+import type { Question } from '@/lib/quiz-constants'
 import { POLICY, parseAudits, decideAudits, deterministicBlock, norm } from '@/scripts/historical-objective-review-policy.mjs'
 
 export const runtime = 'nodejs'
@@ -16,6 +19,13 @@ const fields = ['q','opts','ans','exp','explanation','type','blank','referenceAn
 const reusable = new Set(['q','opts','ans','exp','explanation','type','blank','referenceAnswer','pairs','items','correctOrder','statements','tableData','tableAnswers','distractorMisconceptions','difficulty','subject','qtype'])
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
 const grade = (value: unknown) => String(value || '').match(/\d+/)?.[0] || ''
+function blockQuestion(question: Record<string,unknown>) {
+  const structure=evaluateQuestionStructure(question as unknown as Question)
+  const consistency=evaluateQuestionConsistency(question as unknown as Question)
+  return deterministicBlock(question)
+    || (structure.verdict==='reject'?`Soru veya cevap yapısı geçersiz: ${structure.reasonCode}.`:null)
+    || (consistency.verdict==='reject'?consistency.detail || 'Soru verisi cevabı belirlemek için yeterli değil.':null)
+}
 type Target = { source: string; recordId: string; index: number; question: Record<string, unknown>; subject: string; grade: string; topic: string; difficulty?: string }
 
 async function runFor(req: NextRequest) {
@@ -118,10 +128,10 @@ export async function POST(req: NextRequest) {
       && (unknownSubject || norm(objective.subject)===norm(items[0].subject))) })
   }
   if(!entries.length) return NextResponse.json({ results:[],skipped })
-  const eligible=entries.filter(entry=>!deterministicBlock(entry.question)&&entry.candidates.length)
+  const eligible=entries.filter(entry=>!blockQuestion(entry.question)&&entry.candidates.length)
   const decisions=new Map<string,any>()
   for(const entry of entries) {
-    const block=deterministicBlock(entry.question)||(!entry.candidates.length?'Bu sınıf ve ders için aktif doğrulanmış kazanım bulunamadı.':null)
+    const block=blockQuestion(entry.question)||(!entry.candidates.length?'Bu sınıf ve ders için aktif doğrulanmış kazanım bulunamadı.':null)
     if(block) decisions.set(entry.signature,{ decision:'rejected',objective:null,score:0,reason:block,audits:[] })
   }
   // A group shares one catalog; never truncate eligible objectives to keyword matches.
