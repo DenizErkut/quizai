@@ -93,9 +93,9 @@ async function worker() {
     const index=cursor++,entries=batches[index]
     try {
       let result,lastError
-      for(let attempt=0;attempt<3;attempt++) {
+      for(let attempt=0;attempt<8;attempt++) {
         try { result=await request({ entries }); break }
-        catch(error) { lastError=error; if(attempt<2) await new Promise(resolve=>setTimeout(resolve,3000*2**attempt)) }
+        catch(error) { lastError=error; console.warn(`Batch ${index+1}, attempt ${attempt+1}: ${error.message.slice(0,1000)}`); if(attempt<7) await new Promise(resolve=>setTimeout(resolve,Math.min(60000,10000*2**attempt))) }
       }
       if(!result) throw lastError
       for(const entry of result.results) {
