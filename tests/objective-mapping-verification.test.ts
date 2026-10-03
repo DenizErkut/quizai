@@ -13,6 +13,16 @@ test('otomatik onay ancak iki bağımsız denetim ve aynı içerikle geçerlidir
   assert.equal(hasAutomatedObjectiveApproval({ ...question(),ans:2 }),false)
   assert.equal(hasAutomatedObjectiveApproval({ ...question(),learningObjectiveCode:'FB.6.1.1' }),false)
 })
+test('yapılandırılmış alternatif denetçi bağımsızlığı korur; tek sağlayıcı yeterli değildir',()=> {
+  const q=question()
+  const review=q.objectiveBackfillReview as { audits: Array<{ provider:string }> }
+  review.audits[0].provider='anthropic'
+  assert.equal(hasAutomatedObjectiveApproval(q),true)
+  review.audits[1].provider='anthropic'
+  assert.equal(hasAutomatedObjectiveApproval(q),false)
+  review.audits[1].provider='unknown'
+  assert.equal(hasAutomatedObjectiveApproval(q),false)
+})
 test('haritalama onayı zorluk doğrulaması eksikse pilot stokunu artırmaz',()=> {
   assert.equal(hasVerifiedBankQuality(question()),true)
   assert.equal(hasVerifiedBankQuality({ ...question(),difficulty:'zor' }),false)

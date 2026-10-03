@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import Anthropic from '@anthropic-ai/sdk'
+import { logAnthropicUsage } from '@/lib/ai-usage'
 import { isDeepStrictEqual } from 'node:util'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
@@ -61,7 +63,7 @@ export async function GET(req: NextRequest) {
   const run=await runFor(req)
   if (!run) return NextResponse.json({ error:'Yetkisiz veya süresi dolmuş toplu inceleme.' },{ status:403 })
   const source=req.nextUrl.searchParams.get('source')
-  if(source!=='bank'&&source!=='sessions') return NextResponse.json({ runId:run.id,policy:POLICY,createdAt:run.cutoff,paginated:true })
+  if(source!=='bank'&&source!=='sessions') return NextResponse.json({ runId:run.id,policy:POLICY,createdAt:run.cutoff,paginated:true,reviewers:{ openai:Boolean(process.env.OPENAI_API_KEY),anthropic:Boolean(process.env.ANTHROPIC_API_KEY),mistral:new MistralAdapter().isConfigured() } })
   const offset=Math.max(0,Number(req.nextUrl.searchParams.get('offset')) || 0)
   const size=source==='bank'?100:50
   const query=source==='bank'
@@ -87,6 +89,7 @@ export async function POST(req: NextRequest) {
   const run=await runFor(req)
   if(!run) return NextResponse.json({ error:'Yetkisiz veya süresi dolmuş toplu inceleme.' },{ status:403 })
   const body=await req.json().catch(()=>null)
+  if(body?.reviewer && !['openai','anthropic'].includes(body.reviewer)) return NextResponse.json({ error:'Geçersiz bağımsız denetçi.' },{ status:400 })
   if(body?.action==='finish') {
     const { error }=await db.from('historical_objective_backfill_runs').update({ status:'complete' }).eq('id',run.id)
     return NextResponse.json(error?{ error:error.message }:{ success:true },{ status:error?500:200 })
@@ -141,13 +144,25 @@ export async function POST(req: NextRequest) {
     const payload=JSON.stringify({ ...auditCatalogPayload(eligible[0].candidates),
       questions:eligible.map((entry,index)=>({ index,grade:entry.items[0].grade,subject:entry.items[0].subject,question:entry.question })) })
     try {
-      const adapter=new MistralAdapter()
-      if(!adapter.isConfigured()) throw new Error('İkinci bağımsız denetçi yapılandırılmamış.')
-      const [first,second]=await Promise.all([
-        callOpenAI([{ role:'system',content:system },{ role:'user',content:payload }],{ model:process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini',temperature:0,max_tokens:Math.max(2000,eligible.length*900),json:true,requireComplete:true,timeoutMs:75000,operation:POLICY,requestId:run.id }),
+        const adapter=new MistralAdapter()
+        if(!adapter.isConfigured()) throw new Error('İkinci bağımsız denetçi yapılandırılmamış.')
+        const firstProvider=body.reviewer==='anthropic'?'anthropic':'openai'
+        if(firstProvider==='anthropic'&&!process.env.ANTHROPIC_API_KEY) throw new Error('Alternatif bağımsız denetçi yapılandırılmamış.')
+        const firstModel=firstProvider==='anthropic'?(process.env.ANTHROPIC_REVIEW_MODEL || 'claude-haiku-4-5-20251001'):(process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini')
+        const primary=async () => {
+          if(firstProvider==='openai') return callOpenAI([{ role:'system',content:system },{ role:'user',content:payload }],{ model:firstModel,temperature:0,max_tokens:Math.max(2000,eligible.length*900),json:true,requireComplete:true,timeoutMs:75000,operation:POLICY,requestId:run.id })
+          if(!process.env.ANTHROPIC_API_KEY) throw new Error('Alternatif bağımsız denetçi yapılandırılmamış.')
+          const client=new Anthropic({ apiKey:process.env.ANTHROPIC_API_KEY,maxRetries:0,timeout:75000 })
+          const message=await client.messages.create({ model:firstModel,system,temperature:0,max_tokens:Math.max(2000,eligible.length*900),messages:[{ role:'user',content:payload }] })
+          await logAnthropicUsage(POLICY,firstModel,message,{ requestId:run.id })
+          if(message.stop_reason==='max_tokens') throw new Error('Anthropic audit truncated')
+          return message.content.filter(part=>part.type==='text').map(part=>part.text).join('\n').trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'')
+        }
+        const [first,second]=await Promise.all([
+        primary(),
         adapter.execute({ model:process.env.MISTRAL_QUALITY_MODEL || 'mistral-small-latest',messages:[{ role:'system',content:system },{ role:'user',content:payload }],temperature:0,maxTokens:Math.max(2000,eligible.length*900),json:true,timeoutMs:75000 },{ task:'content_validation',operationTag:POLICY,requestId:run.id,shadow:false }),
       ])
-      const openai=parseAudits(first,eligible.length,'openai',process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini')
+        const openai=parseAudits(first,eligible.length,firstProvider,firstModel)
       const mistral=parseAudits(second.content,eligible.length,'mistral',second.model)
       eligible.forEach((entry,index)=>decisions.set(entry.signature,decideAudits([openai[index],mistral[index]],entry.candidates)))
     } catch(error) { return NextResponse.json({ error:error instanceof Error?error.message:'Denetçiler kullanılamadı; karar kaydedilmedi.' },{ status:503 }) }

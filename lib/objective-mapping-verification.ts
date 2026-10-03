@@ -21,7 +21,7 @@ export function hasAutomatedObjectiveApproval(question: Record<string, unknown>)
     && new Set(audits.map(audit => audit.provider)).size === 2
     && (audits.every(audit => audit.standalone === true) || review.sourceContext === undefined
       || JSON.stringify(review.sourceContext) === JSON.stringify(question.passage))
-    && audits.every(audit => ['openai', 'mistral'].includes(String(audit.provider)) && audit.approved === true
+    && audits.every(audit => ['openai', 'mistral', 'anthropic'].includes(String(audit.provider)) && audit.approved === true
       && audit.objectiveCode === question.learningObjectiveCode && typeof audit.score === 'number' && audit.score >= 80
       && audit.answerCorrect === true && audit.explanationConsistent === true && audit.ageAppropriate === true
       && audit.unambiguous === true && audit.directObjectiveMatch === true)
