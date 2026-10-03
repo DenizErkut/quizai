@@ -27,6 +27,9 @@ function updateQuestion(q: Question, objective: { id: string; objective_code: st
   // A previous bank quality verdict cannot certify a newly changed mapping.
   delete base.historicalBankQuality
   delete base.objectiveBackfillReview
+  delete base.objectiveProductionReview
+  delete base.objectiveReuseEvidence
+  delete base.objectiveReviewException
   return {
     ...base,
     learningObjectiveId: objective?.id || null,

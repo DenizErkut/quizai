@@ -6,6 +6,7 @@ import { generateQuizFallback, callOpenAI, OpenAITruncatedError } from '@/lib/op
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { hasVerifiedObjectiveMapping } from '@/lib/objective-mapping-verification'
+import { finalizeContinuousReview } from '@/lib/continuous-question-review'
 
 function contextualAdaptiveHint(question: unknown, topic: string, fallback: string | null) {
   if (!fallback) return null
@@ -2475,6 +2476,7 @@ export async function POST(req: NextRequest) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         questions: candidateQuestions,
+        subject,
         topic,
         grade,
         language: effectiveLang,
@@ -2491,7 +2493,15 @@ export async function POST(req: NextRequest) {
         })),
       }),
       signal: AbortSignal.timeout(70000),
-    }).then(async response => response.ok ? response.json() : null).catch(() => null)
+    }).then(async response => {
+      if (!response.ok) return null
+      const reviewed = await response.json()
+      if (bankWriteEligible && !fileContent && Array.isArray(reviewed.reviewExceptions) && reviewed.reviewExceptions.length) {
+        await promoteQuestionsToBank(supabase, { subject,topic,grade,language:effectiveLang,questionType,difficulty:resolvedDifficulty },
+          reviewed.reviewExceptions,{ engine:genEngineUsed,teacherExceptions:true })
+      }
+      return reviewed
+    }).catch(() => null)
 
     const initialVerification = await verifyQuestionCandidates(questions)
     let verifiedQuestions: any[] = Array.isArray(initialVerification?.questions) ? initialVerification.questions : []
@@ -2777,6 +2787,9 @@ export async function POST(req: NextRequest) {
     const rigorSummary = summarizeQuestionSetRigor(questions, resolvedDifficulty)
     console.log(`[question-rigor] version=${rigorSummary.version} average=${rigorSummary.averageScore} minimum=${rigorSummary.minimumScore} application=${rigorSummary.applicationCount}/${rigorSummary.targetApplicationCount} reasoning=${rigorSummary.reasoningCount}/${rigorSummary.targetReasoningCount} direct=${rigorSummary.directRecallCount} visual=${rigorSummary.visualCount} target_met=${rigorSummary.meetsTarget}`)
     questions = balanceAnswerPositions(questions)
+    // Bind the decision to the final, actually delivered content. New visuals
+    // or passages invalidate the text-only verdict and enter teacher review.
+    questions = questions.map((question: any) => finalizeContinuousReview(question))
     // Havuza doğrulama öncesi kopyayı değil, son görseli ve son metadata'sı
     // eklenmiş öğrenciye sunulan nihai soruyu yaz. Böylece SVG/chartData soru
     // ile aynı JSON kaydında kalır ve tekrar kullanımda kaybolmaz.

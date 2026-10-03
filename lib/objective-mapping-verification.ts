@@ -1,3 +1,4 @@
+import { hasContinuousApproval, CONTINUOUS_REVIEW_POLICY } from './continuous-question-review'
 export const HISTORICAL_OBJECTIVE_REVIEW_POLICY = 'historical-objective-backfill-v1'
 
 type Audit = { provider?: unknown; approved?: unknown; objectiveCode?: unknown; score?: unknown; difficultyMatches?: unknown; answerCorrect?: unknown; explanationConsistent?: unknown; ageAppropriate?: unknown; unambiguous?: unknown; directObjectiveMatch?: unknown; standalone?: unknown }
@@ -10,6 +11,7 @@ export function objectiveReviewContent(question: Record<string, unknown>): strin
 
 /** Automated decisions carry their own provenance and require two agreeing auditors. */
 export function hasAutomatedObjectiveApproval(question: Record<string, unknown>): boolean {
+  if (question.objectiveMappingStatus === 'ai_approved' && hasContinuousApproval(question)) return true
   const review = question.objectiveBackfillReview as { policyVersion?: unknown; decision?: unknown; audits?: Audit[]; content?: unknown; sourceContext?: unknown } | undefined
   const audits = review?.audits
   return question.objectiveMappingStatus === 'ai_approved'
@@ -34,6 +36,7 @@ export function hasVerifiedObjectiveMapping(question: Record<string, unknown>): 
 
 /** Reusable stock may use audited backfill questions; this does not certify past learning gain. */
 export function hasVerifiedBankQuality(question: Record<string, unknown>): boolean {
+  if (question.qualityVerificationVersion === CONTINUOUS_REVIEW_POLICY) return hasContinuousApproval(question)
   if (question.qualityVerificationVersion === 'quiz-quality-v2') return true
   const review = question.objectiveBackfillReview as { audits?: Audit[]; reviewedDifficulty?: unknown } | undefined
   return question.qualityVerificationVersion === HISTORICAL_OBJECTIVE_REVIEW_POLICY

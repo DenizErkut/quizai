@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createHash, randomInt } from 'node:crypto'
+import { hasAutomatedObjectiveApproval } from './objective-mapping-verification'
+import { hasContinuousApproval, CONTINUOUS_REVIEW_POLICY } from './continuous-question-review'
 
 type AnyDb = any
 type Question = Record<string, any>
@@ -117,6 +119,7 @@ export function balanceAnswerPositions(questions: Question[]): Question[] {
   }
 
   return questions.map((question, questionIndex) => {
+    if (hasAutomatedObjectiveApproval(question) || question.objectiveMappingStatus === 'human_approved') return { ...question }
     const target = targets.get(questionIndex)
     if (target === undefined) return { ...question }
 
@@ -302,12 +305,14 @@ export async function promoteQuestionsToBank(
   db: AnyDb,
   dimensions: QuestionBankDimensions,
   questions: Question[],
-  source: { sessionId?: string; engine?: string },
+  source: { sessionId?: string; engine?: string; teacherExceptions?: boolean },
 ): Promise<number> {
   const rows = questions
-    .filter(validQuestion)
+    .filter(question => source.teacherExceptions ? typeof question.q === 'string' && Boolean(question.q.trim()) : validQuestion(question))
     .map(question => {
       const clean = reusableQuestion(question)
+      const automaticApproval = !source.teacherExceptions && hasContinuousApproval(clean)
+      const requiresTeacher = source.teacherExceptions === true || question.objectiveMappingStatus === 'review_required'
       const visual = hasRealVisualAsset(clean)
       // Görsel soru ile ilişkili SVG aynı question JSON'unda tutulur. Ayrı
       // bir dosya/URL'ye bağımlı olmadığı için havuzdan tekrar sunulduğunda
@@ -323,15 +328,15 @@ export async function promoteQuestionsToBank(
         topic_key: questionBankKey(dimensions.topic),
         grade_key: questionBankKey(dimensions.grade),
         language_key: questionBankKey(dimensions.language),
-        question_type: dimensions.questionType,
-        difficulty: dimensions.difficulty,
+        question_type: typeof question.type === 'string' ? question.type : dimensions.questionType,
+        difficulty: typeof question.difficulty === 'string' ? question.difficulty : dimensions.difficulty,
         question: bankQuestion,
-        review_status: 'candidate',
-        awaiting_expert_review: false,
+        review_status: automaticApproval ? 'approved' : 'candidate',
+        awaiting_expert_review: requiresTeacher,
         ai_provider: providerFromEngine(source.engine),
         ai_model: source.engine || null,
-        ai_policy_version: 'question-bank-shadow-review-v1',
-        quality_score: 1,
+        ai_policy_version: automaticApproval ? CONTINUOUS_REVIEW_POLICY : 'question-bank-shadow-review-v1',
+        quality_score: automaticApproval ? Number(question.objectiveProductionReview.score) / 100 : requiresTeacher ? 0 : 1,
         source_session_id: source.sessionId || null,
         source_engine: source.engine || null,
         updated_at: new Date().toISOString(),

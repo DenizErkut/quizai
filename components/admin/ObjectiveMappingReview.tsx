@@ -6,10 +6,18 @@ import LearningEvidenceReadiness from './LearningEvidenceReadiness'
 
 type Item = {
   key: string; source: 'bank' | 'sessions'; recordId: string; index: number | null
-  question: { q?: string; opts?: string[]; exp?: string; learningObjectiveId?: string | null; learningObjectiveCode?: string | null; objectiveMappingStatus?: string; objectiveBackfillReview?: { reason: string; score: number; reviewedAt: string; decision: string; poolStatus?: string }; historicalBankQuality?: { status: 'added' | 'already_in_bank' | 'excluded'; score: number; reason: string; reviewedAt: string } }
+  question: { q?: string; opts?: string[]; exp?: string; learningObjectiveId?: string | null; learningObjectiveCode?: string | null; objectiveMappingStatus?: string; objectiveReviewException?: string; objectiveProductionReview?: { reason: string; score: number; reviewedAt: string; decision: string; audits?: Array<{ provider: string; reason?: string; score?: number }> }; objectiveBackfillReview?: { reason: string; score: number; reviewedAt: string; decision: string; poolStatus?: string }; historicalBankQuality?: { status: 'added' | 'already_in_bank' | 'excluded'; score: number; reason: string; reviewedAt: string } }
   subject: string; grade: string; topic: string
 }
 type Candidate = { id: string; objective_code: string; title: string; topic: string | null }
+const reviewReason = (reason?: string) => ({
+  missing_objective:'Doğrulanmış kazanım eksik', canonical_objective_missing:'Kazanım seçimi eksik veya geçersiz',
+  visual_review_required:'Görsel öğretmen kontrolü gerekiyor', review_unavailable:'Bağımsız denetçi yanıtı alınamadı',
+  auditor_disagreement_or_incomplete_evidence:'Denetçiler uzlaşmadı veya kontrol kanıtı eksik',
+  content_changed_after_review:'Soru incelemeden sonra değişti', two_independent_auditors_agreed:'İki bağımsız denetçi uzlaştı',
+  objective_changed_after_review:'Kazanım veya müfredat sürümü incelemeden sonra değişti',
+  set_review_disagreement:'Test bütünlüğü denetimi şüphe bildirdi', gemini_set_rejection:'Test bütünlüğü denetimi soruyu işaretledi',
+} as Record<string,string>)[reason || ''] || 'Öğretmen kalite kontrolü gerekiyor'
 
 export default function ObjectiveMappingReview() {
   const [source, setSource] = useState<'bank' | 'sessions'>('bank')
@@ -148,7 +156,7 @@ export default function ObjectiveMappingReview() {
   return <div className="card anim-up" style={{ padding: 24 }}>
     <h2 style={{ fontSize: 20, marginBottom: 6 }}>🎯 Geçmiş Soruların Kazanım Eşleştirmesi</h2>
     <LearningEvidenceReadiness />
-    <p style={{ color: 'var(--text2)', marginBottom: 16 }}>Yeni soruları öğretmenler inceler. Geçmiş birikim için yapılan toplu incelemenin kararları, gerekçeleri ve kalite puanları “Otomatik inceleme” etiketiyle gösterilir.</p>
+    <p style={{ color: 'var(--text2)', marginBottom: 16 }}>Yeni sorular üretim sırasında iki bağımsız denetçiden geçer. Uygun ve uzlaşılan sorular AI onaylı kaydedilir. Bekleyenlerde yalnız anlaşmazlıklar, görseller, eksik kazanımlar veya kontrol gerektiren sorular bulunur. Değişmeyen onaylı sorular mevcut onayını korur.</p>
     <p style={{ color: 'var(--text2)', marginBottom: 16 }}>Soru havuzundaki onay gelecekteki kullanım için kaydedilir. Geçmiş öğrenci sonuçlarını güncellemek için aynı sorunun “Geçmiş testler” kaydı ayrıca incelenmelidir.</p>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
       <button className={`btn btn-sm ${source === 'bank' ? 'btn-primary' : ''}`} onClick={() => { candidateRequest.current++; setSource('bank'); setPage(1); setSelected(null) }}>Soru havuzu</button>
@@ -172,8 +180,10 @@ export default function ObjectiveMappingReview() {
       {items.map(item => <div key={item.key}>
         <button type="button" onClick={() => selected?.key === item.key ? setSelected(null) : select(item)} aria-expanded={selected?.key === item.key} className="card-sm" style={{ width: '100%', textAlign: 'left', cursor: 'pointer', borderColor: selected?.key === item.key ? 'var(--accent)' : undefined }}>
           <div style={{ fontWeight: 600 }}>{item.question.q || 'Soru metni yok'}</div>
-          <small>{item.grade} · {item.subject} · {item.topic} · {item.question.learningObjectiveCode || 'Eşleşmemiş'}{item.question.objectiveMappingStatus === 'human_approved' ? ' · İnsan onaylı' : item.question.objectiveMappingStatus === 'human_rejected' ? ' · Reddedildi' : item.question.objectiveMappingStatus === 'ai_approved' ? ' · Otomatik inceleme: Onaylandı' : item.question.objectiveMappingStatus === 'ai_rejected' ? ' · Otomatik inceleme: Reddedildi' : ''}</small>
+          <small>{item.grade} · {item.subject} · {item.topic} · {item.question.learningObjectiveCode || 'Eşleşmemiş'}{item.question.objectiveMappingStatus === 'human_approved' ? ' · İnsan onaylı' : item.question.objectiveMappingStatus === 'human_rejected' ? ' · Reddedildi' : item.question.objectiveMappingStatus === 'ai_approved' ? ' · AI onaylı' : item.question.objectiveMappingStatus === 'ai_rejected' ? ' · Otomatik inceleme: Reddedildi' : ''}</small>
           {item.question.objectiveBackfillReview && <small style={{ display: 'block', marginTop: 4 }}>Kalite: {item.question.objectiveBackfillReview.score}/100 · {item.question.objectiveBackfillReview.reason}</small>}
+          {item.question.objectiveProductionReview && <small style={{ display:'block',marginTop:4 }}>Üretim denetimi: {item.question.objectiveProductionReview.score}/100 · {reviewReason(item.question.objectiveReviewException || item.question.objectiveProductionReview.reason)}</small>}
+          {!item.question.objectiveProductionReview && item.question.objectiveReviewException && <small style={{ display:'block',marginTop:4 }}>{reviewReason(item.question.objectiveReviewException)}</small>}
           {item.question.historicalBankQuality && <small style={{ display: 'block', marginTop: 4 }}>Kalite: {item.question.historicalBankQuality.score}/100 · {item.question.historicalBankQuality.status === 'added' ? 'Havuza alındı' : item.question.historicalBankQuality.status === 'already_in_bank' ? 'Zaten havuzda' : 'Havuz dışında'}</small>}
         </button>
         {selected?.key === item.key && <div style={{ border: '1px solid var(--border)', borderTop: 0, borderRadius: '0 0 16px 16px', padding: 18 }}>
@@ -182,6 +192,10 @@ export default function ObjectiveMappingReview() {
           {Array.isArray(selected.question.opts) && <ol>{selected.question.opts.map((option, index) => <li key={index}>{option}</li>)}</ol>}
           {selected.question.exp && <p style={{ color: 'var(--text2)' }}>Açıklama: {selected.question.exp}</p>}
           {selected.question.objectiveBackfillReview && <p style={{ marginTop: 10, color: 'var(--text2)' }}>Toplu inceleme: {selected.question.objectiveBackfillReview.score}/100 — {selected.question.objectiveBackfillReview.reason}</p>}
+          {selected.question.objectiveProductionReview && <div style={{ marginTop:10,color:'var(--text2)' }}>
+            <p>Üretim denetimi: {reviewReason(selected.question.objectiveReviewException || selected.question.objectiveProductionReview.reason)}</p>
+            {selected.question.objectiveProductionReview.audits?.map((audit,index) => <p key={index}>{audit.provider}: {audit.score ?? '—'}/100 — {audit.reason || 'Tam denetim yanıtı alınamadı.'}</p>)}
+          </div>}
           {selected.question.historicalBankQuality && <p style={{ color: 'var(--text2)' }}>Kalite incelemesi: {selected.question.historicalBankQuality.score}/100 — {selected.question.historicalBankQuality.reason}</p>}
           <p style={{ marginTop: 10 }}>Mevcut bağ: {selected.question.learningObjectiveCode || 'Yok'}</p>
           <label style={{ display: 'block', marginTop: 12 }}>Kazanım kodu veya açıklamasında ara</label>

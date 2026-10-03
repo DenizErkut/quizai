@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { hasAutomatedObjectiveApproval } from './objective-mapping-verification'
 
 export interface CanonicalObjectiveCandidate {
   ref: string
@@ -92,6 +93,12 @@ export function applyCanonicalObjectiveMappings(
   const byRef = new Map(candidates.map(candidate => [candidate.ref, candidate]))
   let mappedCount = 0
   const mappedQuestions = questions.map(question => {
+    const unchanged = candidates.find(candidate => candidate.id === question.learningObjectiveId
+      && candidate.objectiveCode === question.learningObjectiveCode && candidate.revisionId === question.learningObjectiveRevisionId)
+    if (unchanged && (question.objectiveMappingStatus === 'human_approved' || hasAutomatedObjectiveApproval(question))) {
+      mappedCount++
+      return { ...question, learningObjectiveRef: unchanged.ref }
+    }
     // Modelden gelebilecek doğrudan kimlikleri hiçbir zaman güvenilir kabul etme.
     const { learningObjectiveId: _id, learning_objective_id: _snakeId,
       learningObjectiveCode: _code, curriculumVersionId: _versionId,

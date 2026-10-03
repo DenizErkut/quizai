@@ -116,12 +116,12 @@ export async function verifyQuestionWithOpenAI(
   prompt: string,
   model = 'gpt-4o',
   context: { userId?: string; quizSessionId?: string; requestId?: string } = {},
-): Promise<{ ok: boolean; reason?: string; fix?: string; difficultyMatches?: boolean; objectiveMatches?: boolean } | null> {
+): Promise<{ ok: boolean; reason?: string; fix?: string; difficultyMatches?: boolean; objectiveMatches?: boolean; score?: number; answerCorrect?: boolean; explanationConsistent?: boolean; ageAppropriate?: boolean; unambiguous?: boolean } | null> {
   try {
     const result = await callOpenAI([
       { role: 'system', content: 'You are a strict educational content verifier. Respond only with valid JSON.' },
       { role: 'user', content: prompt },
-    ], { model, max_tokens: 250, json: true, timeoutMs: 15000, operation: `verify-questions:${model}`, ...context })
+    ], { model, max_tokens: 500, json: true, timeoutMs: 15000, operation: `verify-questions:${model}`, ...context })
     return JSON.parse(result)
   } catch {
     return null // Provider outage is recorded as unavailable, never fabricated as approval.

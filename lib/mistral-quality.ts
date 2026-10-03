@@ -6,6 +6,11 @@ export type MistralQuestionReview = {
   reason?: string
   difficultyMatches?: boolean
   objectiveMatches?: boolean
+  score?: number
+  answerCorrect?: boolean
+  explanationConsistent?: boolean
+  ageAppropriate?: boolean
+  unambiguous?: boolean
 } | null
 export type MistralVisualReview = {
   passed: boolean
@@ -50,7 +55,7 @@ export async function verifyQuestionWithMistral(
         { role: 'system', content: 'You are an independent K-12 question quality auditor. Be strict. Return only valid JSON.' },
         { role: 'user', content: verifyPrompt },
       ],
-      maxTokens: 220,
+      maxTokens: 500,
       temperature: 0,
       json: true,
       timeoutMs: 20000,
@@ -67,6 +72,11 @@ export async function verifyQuestionWithMistral(
       reason: typeof parsed.reason === 'string' ? parsed.reason.slice(0, 240) : undefined,
       difficultyMatches: typeof parsed.difficultyMatches === 'boolean' ? parsed.difficultyMatches : undefined,
       objectiveMatches: typeof parsed.objectiveMatches === 'boolean' ? parsed.objectiveMatches : undefined,
+      score: typeof parsed.score === 'number' ? parsed.score : undefined,
+      answerCorrect: typeof parsed.answerCorrect === 'boolean' ? parsed.answerCorrect : undefined,
+      explanationConsistent: typeof parsed.explanationConsistent === 'boolean' ? parsed.explanationConsistent : undefined,
+      ageAppropriate: typeof parsed.ageAppropriate === 'boolean' ? parsed.ageAppropriate : undefined,
+      unambiguous: typeof parsed.unambiguous === 'boolean' ? parsed.unambiguous : undefined,
     }
   } catch (error) {
     console.warn('[mistral-quality] question validator unavailable:', error instanceof Error ? error.message : 'unknown')
