@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
         const primary=async () => {
           if(firstProvider==='openai') return callOpenAI([{ role:'system',content:system },{ role:'user',content:payload }],{ model:firstModel,temperature:0,max_tokens:Math.max(2000,eligible.length*900),json:true,requireComplete:true,timeoutMs:75000,operation:POLICY,requestId:run.id })
           if(firstProvider==='google') {
-            const response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(firstModel)}:generateContent`,{ method:'POST',headers:{ 'Content-Type':'application/json','x-goog-api-key':process.env.GEMINI_API_KEY! },body:JSON.stringify({ systemInstruction:{ parts:[{ text:system }] },contents:[{ role:'user',parts:[{ text:payload }] }],generationConfig:{ temperature:0,maxOutputTokens:Math.max(2000,eligible.length*900),responseMimeType:'application/json' } }),signal:AbortSignal.timeout(75000) })
+            const response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(firstModel)}:generateContent`,{ method:'POST',headers:{ 'Content-Type':'application/json','x-goog-api-key':process.env.GEMINI_API_KEY! },body:JSON.stringify({ systemInstruction:{ parts:[{ text:system }] },contents:[{ role:'user',parts:[{ text:payload }] }],generationConfig:{ temperature:0,maxOutputTokens:Math.max(6000,eligible.length*1000),responseMimeType:'application/json' } }),signal:AbortSignal.timeout(75000) })
             if(!response.ok) throw new Error(`GEMINI_HTTP_${response.status}`)
             const data=await response.json()
             await logGeminiUsage(POLICY,firstModel,data.usageMetadata,{ requestId:run.id })
