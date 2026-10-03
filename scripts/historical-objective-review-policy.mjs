@@ -1,7 +1,7 @@
 export const POLICY = 'historical-objective-backfill-v1'
 export const MIN_SCORE = 80
 export function reviewQuestionShape(question) {
-  if (question.type === 'true_false' && (question.opts == null || (Array.isArray(question.opts) && question.opts.length === 0))) return { ...question,opts:['Doğru','Yanlış'] }
+  if (question.type === 'true_false' && (question.opts == null || (Array.isArray(question.opts) && question.opts.length === 0))) return { ...question,opts:['Doğru','Yanlış'],ans:typeof question.ans==='boolean'?(question.ans?0:1):question.ans }
   return question
 }
 export function auditCatalogPayload(candidates) {

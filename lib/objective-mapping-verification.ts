@@ -3,7 +3,7 @@ export const HISTORICAL_OBJECTIVE_REVIEW_POLICY = 'historical-objective-backfill
 type Audit = { provider?: unknown; approved?: unknown; objectiveCode?: unknown; score?: unknown; difficultyMatches?: unknown; answerCorrect?: unknown; explanationConsistent?: unknown; ageAppropriate?: unknown; unambiguous?: unknown; directObjectiveMatch?: unknown; standalone?: unknown }
 
 export function objectiveReviewContent(question: Record<string, unknown>): string {
-  if (question.type === 'true_false' && (question.opts == null || (Array.isArray(question.opts) && question.opts.length === 0))) question = { ...question,opts:['Doğru','Yanlış'] }
+  if (question.type === 'true_false' && (question.opts == null || (Array.isArray(question.opts) && question.opts.length === 0))) question = { ...question,opts:['Doğru','Yanlış'],ans:typeof question.ans==='boolean'?(question.ans?0:1):question.ans }
   const keys = ['q', 'opts', 'ans', 'exp', 'explanation', 'type', 'blank', 'referenceAnswer', 'pairs', 'items', 'correctOrder', 'statements', 'tableData', 'tableAnswers']
   return JSON.stringify(Object.fromEntries(keys.filter(key => question[key] !== undefined).map(key => [key, question[key]])))
 }
@@ -22,7 +22,7 @@ export function hasAutomatedObjectiveApproval(question: Record<string, unknown>)
     && new Set(audits.map(audit => audit.provider)).size === 2
     && (audits.every(audit => audit.standalone === true) || review.sourceContext === undefined
       || JSON.stringify(review.sourceContext) === JSON.stringify(question.passage))
-    && audits.every(audit => ['openai', 'mistral', 'anthropic'].includes(String(audit.provider)) && audit.approved === true
+    && audits.every(audit => ['openai', 'mistral', 'anthropic', 'google'].includes(String(audit.provider)) && audit.approved === true
       && audit.objectiveCode === question.learningObjectiveCode && typeof audit.score === 'number' && audit.score >= 80
       && audit.answerCorrect === true && audit.explanationConsistent === true && audit.ageAppropriate === true
       && audit.unambiguous === true && audit.directObjectiveMatch === true)

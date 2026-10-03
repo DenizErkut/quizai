@@ -30,6 +30,8 @@ test('eski doğru/yanlış biçimi uygulamanın standart seçenekleriyle aynı k
   review.content=objectiveReviewContent(q)
   assert.equal(hasAutomatedObjectiveApproval(q),true)
   assert.equal(hasAutomatedObjectiveApproval({ ...q,opts:['Doğru','Yanlış'] }),true)
+  assert.equal(hasAutomatedObjectiveApproval({ ...q,opts:[],ans:true }),true)
+  assert.equal(hasAutomatedObjectiveApproval({ ...q,opts:[],ans:false }),false)
   assert.equal(hasAutomatedObjectiveApproval({ ...q,opts:['Yanlış','Doğru'] }),false)
 })
 test('haritalama onayı zorluk doğrulaması eksikse pilot stokunu artırmaz',()=> {

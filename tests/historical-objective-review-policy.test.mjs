@@ -47,5 +47,6 @@ test('eksik cevap ve yinelenen seçenekler deterministik olarak yakalanır',()=>
   assert.equal(deterministicBlock({ ...question,sourceBased:true }),null)
   assert.equal(deterministicBlock({ ...question,passage:'Kaynakta örnek işlemler yer alıyordu.' }),null)
   assert.equal(deterministicBlock({ ...question,type:'true_false',opts:[],ans:0 }),null)
+  assert.equal(deterministicBlock({ ...question,type:'true_false',opts:[],ans:true }),null)
   assert.ok(deterministicBlock({ ...question,type:'true_false',opts:[],ans:2 }))
 })

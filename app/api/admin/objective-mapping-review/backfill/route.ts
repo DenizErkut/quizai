@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import Anthropic from '@anthropic-ai/sdk'
-import { logAnthropicUsage } from '@/lib/ai-usage'
+import { logAnthropicUsage, logGeminiUsage } from '@/lib/ai-usage'
 import { isDeepStrictEqual } from 'node:util'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
     const { data,error }=await db.from('historical_objective_backfill_reviews').select('source,record_id,question_index').eq('run_id',run.id).eq('review->>superseded','true').limit(500)
     return NextResponse.json(error?{ error:error.message }:{ keys:(data || []).map(row=>`${row.source}:${row.record_id}:${row.question_index}`) },{ status:error?500:200 })
   }
-  if(source!=='bank'&&source!=='sessions') return NextResponse.json({ runId:run.id,policy:POLICY,createdAt:run.cutoff,paginated:true,reviewers:{ openai:Boolean(process.env.OPENAI_API_KEY),anthropic:Boolean(process.env.ANTHROPIC_API_KEY),mistral:new MistralAdapter().isConfigured() } })
+  if(source!=='bank'&&source!=='sessions') return NextResponse.json({ runId:run.id,policy:POLICY,createdAt:run.cutoff,paginated:true,reviewers:{ openai:Boolean(process.env.OPENAI_API_KEY),anthropic:Boolean(process.env.ANTHROPIC_API_KEY),google:Boolean(process.env.GEMINI_API_KEY),mistral:new MistralAdapter().isConfigured() } })
   const offset=Math.max(0,Number(req.nextUrl.searchParams.get('offset')) || 0)
   const size=source==='bank'?100:50
   const query=source==='bank'
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
   const run=await runFor(req)
   if(!run) return NextResponse.json({ error:'Yetkisiz veya süresi dolmuş toplu inceleme.' },{ status:403 })
   const body=await req.json().catch(()=>null)
-  if(body?.reviewer && !['openai','anthropic'].includes(body.reviewer)) return NextResponse.json({ error:'Geçersiz bağımsız denetçi.' },{ status:400 })
+  if(body?.reviewer && !['openai','anthropic','google'].includes(body.reviewer)) return NextResponse.json({ error:'Geçersiz bağımsız denetçi.' },{ status:400 })
   if(body?.action==='finish') {
     const { error }=await db.from('historical_objective_backfill_runs').update({ status:'complete' }).eq('id',run.id)
     return NextResponse.json(error?{ error:error.message }:{ success:true },{ status:error?500:200 })
@@ -150,11 +150,20 @@ export async function POST(req: NextRequest) {
     try {
         const adapter=new MistralAdapter()
         if(!adapter.isConfigured()) throw new Error('İkinci bağımsız denetçi yapılandırılmamış.')
-        const firstProvider=body.reviewer==='anthropic'?'anthropic':'openai'
+        const firstProvider=body.reviewer==='google'?'google':body.reviewer==='anthropic'?'anthropic':'openai'
         if(firstProvider==='anthropic'&&!process.env.ANTHROPIC_API_KEY) throw new Error('Alternatif bağımsız denetçi yapılandırılmamış.')
-        const firstModel=firstProvider==='anthropic'?(process.env.ANTHROPIC_REVIEW_MODEL || 'claude-haiku-4-5-20251001'):(process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini')
+        if(firstProvider==='google'&&!process.env.GEMINI_API_KEY) throw new Error('Alternatif bağımsız denetçi yapılandırılmamış.')
+        const firstModel=firstProvider==='google'?(process.env.GEMINI_OBJECTIVE_REVIEW_MODEL || process.env.GEMINI_MULTIMODAL_MODEL || 'gemini-3.6-flash'):firstProvider==='anthropic'?(process.env.ANTHROPIC_REVIEW_MODEL || 'claude-haiku-4-5-20251001'):(process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini')
         const primary=async () => {
           if(firstProvider==='openai') return callOpenAI([{ role:'system',content:system },{ role:'user',content:payload }],{ model:firstModel,temperature:0,max_tokens:Math.max(2000,eligible.length*900),json:true,requireComplete:true,timeoutMs:75000,operation:POLICY,requestId:run.id })
+          if(firstProvider==='google') {
+            const response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(firstModel)}:generateContent`,{ method:'POST',headers:{ 'Content-Type':'application/json','x-goog-api-key':process.env.GEMINI_API_KEY! },body:JSON.stringify({ systemInstruction:{ parts:[{ text:system }] },contents:[{ role:'user',parts:[{ text:payload }] }],generationConfig:{ temperature:0,maxOutputTokens:Math.max(2000,eligible.length*900),responseMimeType:'application/json' } }),signal:AbortSignal.timeout(75000) })
+            if(!response.ok) throw new Error(`GEMINI_HTTP_${response.status}`)
+            const data=await response.json()
+            await logGeminiUsage(POLICY,firstModel,data.usageMetadata,{ requestId:run.id })
+            if(data.candidates?.[0]?.finishReason==='MAX_TOKENS') throw new Error('Gemini audit truncated')
+            return (data.candidates?.[0]?.content?.parts || []).filter((part:any)=>typeof part.text==='string'&&!part.thought).map((part:any)=>part.text).join('\n').trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'')
+          }
           if(!process.env.ANTHROPIC_API_KEY) throw new Error('Alternatif bağımsız denetçi yapılandırılmamış.')
           const client=new Anthropic({ apiKey:process.env.ANTHROPIC_API_KEY,maxRetries:0,timeout:75000 })
           const message=await client.messages.create({ model:firstModel,system,temperature:0,max_tokens:Math.max(2000,eligible.length*900),messages:[{ role:'user',content:payload }] })

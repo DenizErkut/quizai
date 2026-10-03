@@ -16,7 +16,7 @@ const credential=JSON.parse(await readFile(credentialPath,'utf8'))
 const endpoint='https://pratium.com/api/admin/objective-mapping-review/backfill'
 const headers={ Authorization:`Bearer ${credential.token}`,'Content-Type':'application/json' }
 const reviewer=process.argv.find(arg=>arg.startsWith('--reviewer='))?.split('=')[1] || 'openai'
-if(!['openai','anthropic'].includes(reviewer)) throw new Error('Unsupported independent reviewer')
+if(!['openai','anthropic','google'].includes(reviewer)) throw new Error('Unsupported independent reviewer')
 const request=async (body, query='') => {
   const response=await fetch(endpoint+query,{ headers,...(body?{ method:'POST',body:JSON.stringify(body) }:{}),signal:AbortSignal.timeout(130000) })
   const data=await response.json().catch(()=>({ error:`HTTP ${response.status}` }))
@@ -93,14 +93,15 @@ if(Number.isFinite(maximumBatches)) batches.splice(maximumBatches)
 console.log(JSON.stringify({ runId:credential.runId,batches:batches.length,...stats }))
 let cursor=0, stoppedReason=null
 const concurrency=Math.max(1,Math.min(6,Number(process.argv.find(arg=>arg.startsWith('--workers='))?.split('=')[1] || 4)))
+const attempts=Math.max(1,Math.min(8,Number(process.argv.find(arg=>arg.startsWith('--attempts='))?.split('=')[1] || 8)))
 async function worker() {
   while(cursor<batches.length&&!stoppedReason) {
     const index=cursor++,entries=batches[index]
     try {
       let result,lastError
-      for(let attempt=0;attempt<8;attempt++) {
+      for(let attempt=0;attempt<attempts;attempt++) {
         try { result=await request({ entries,reviewer }); break }
-        catch(error) { lastError=error; console.warn(`Batch ${index+1}, attempt ${attempt+1}: ${error.message.slice(0,1000)}`); if(/no credits|credit balance|insufficient_quota|billing|yapılandırılmamış/i.test(error.message)) { stoppedReason=error.message.slice(0,1000); break }; if(attempt>=1 && /malformed audit|incomplete audit|truncated|JSON/.test(error.message)) break; if(attempt<7) await new Promise(resolve=>setTimeout(resolve,Math.min(60000,10000*2**attempt))) }
+        catch(error) { lastError=error; console.warn(`Batch ${index+1}, attempt ${attempt+1}: ${error.message.slice(0,1000)}`); if(/no credits|credit balance|insufficient_quota|billing|yapılandırılmamış/i.test(error.message)) { stoppedReason=error.message.slice(0,1000); break }; if(attempt>=1 && /malformed audit|incomplete audit|truncated|JSON/.test(error.message)) break; if(attempt<attempts-1) await new Promise(resolve=>setTimeout(resolve,Math.min(60000,10000*2**attempt))) }
       }
       if(!result) throw lastError
       for(const entry of result.results) {
