@@ -1,4 +1,5 @@
 import { answerScore } from './partial-scoring'
+import { hasVerifiedObjectiveMapping, hasVerifiedBankQuality } from './objective-mapping-verification'
 
 export const MIN_MEASUREMENT_ITEMS = 5
 export const MIN_MEASUREMENT_GAP_MS = 24 * 60 * 60 * 1000
@@ -49,9 +50,9 @@ export function inspectMeasurementSession(session: MeasurementSession):
   const difficultyProfile: string[] = []
   for (const question of questions) {
     const objectiveId = typeof question.learningObjectiveId === 'string' ? question.learningObjectiveId : ''
-    const mappingVerified = question.objectiveMappingStatus === 'mapped' || question.objectiveMappingStatus === 'human_approved'
+    const mappingVerified = hasVerifiedObjectiveMapping(question as Record<string, unknown>)
     const historicalReview = question.historicalBankQuality as { status?: unknown; score?: unknown; policyVersion?: unknown } | undefined
-    const qualityVerified = question.qualityVerificationVersion === 'quiz-quality-v2' ||
+    const qualityVerified = hasVerifiedBankQuality(question as Record<string, unknown>) ||
       (question.objectiveMappingStatus === 'human_approved' &&
         ['added', 'already_in_bank'].includes(String(historicalReview?.status)) &&
         historicalReview?.policyVersion === 'historical-bank-quality-v1' && Number(historicalReview.score) >= 80)

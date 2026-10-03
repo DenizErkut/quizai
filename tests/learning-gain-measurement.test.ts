@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { inspectMeasurementPair, inspectMeasurementSession, type MeasurementSession } from '../lib/learning-gain-measurement'
+import { objectiveReviewContent } from '../lib/objective-mapping-verification'
 
 function session(id: string, prefix: string, score: number, objectiveId = 'objective-1'): MeasurementSession {
   return {
@@ -68,4 +69,27 @@ test('erken son test ilerleme ölçümü olarak kaydedilemez', () => {
   const post = inspectMeasurementSession(session('post', 'son', 4))
   assert.ok(pre.evidence && post.evidence)
   assert.match(inspectMeasurementPair(pre.evidence, post.evidence, '2026-09-01T10:00:00Z', '2026-09-01T12:00:00Z') || '', /1–90 gün/)
+})
+
+test('two audited AI approvals are eligible, but changed content or missing difficulty proof is not', () => {
+  const reviewed = session('pre', 'AI', 3)
+  for (const question of reviewed.questions as Array<Record<string, unknown>>) {
+    question.objectiveMappingStatus = 'ai_approved'
+    question.learningObjectiveCode = 'MAT.7.1.1'
+    question.qualityVerificationVersion = 'historical-objective-backfill-v1'
+    question.objectiveBackfillReview = {
+      policyVersion: 'historical-objective-backfill-v1', decision: 'approved',
+      content: objectiveReviewContent(question), reviewedDifficulty: question.difficulty,
+      audits: ['openai', 'mistral'].map(provider => ({ provider, approved: true,
+        objectiveCode: 'MAT.7.1.1', score: 90, difficultyMatches: true, answerCorrect: true,
+        explanationConsistent: true, ageAppropriate: true, unambiguous: true, directObjectiveMatch: true })),
+    }
+  }
+  assert.ok(inspectMeasurementSession(reviewed).evidence)
+  const question = (reviewed.questions as Array<Record<string, unknown>>)[0]
+  question.difficulty = 'zor'
+  assert.equal(inspectMeasurementSession(reviewed).evidence, null)
+  question.difficulty = 'kolay'
+  question.q = 'Changed after approval'
+  assert.equal(inspectMeasurementSession(reviewed).evidence, null)
 })

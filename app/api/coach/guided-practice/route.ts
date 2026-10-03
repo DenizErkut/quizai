@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { randomInt } from 'node:crypto'
-import { questionBankKey } from '@/lib/question-bank'
+import { sameLearningScope } from '@/lib/learning-evidence-scope'
 import { recordQuizLearningEvents } from '@/lib/learning-events'
 import { eligibleVerifiedItem, type VerifiedBankRow, type VerifiedItemSets } from '@/lib/verified-learning-cycle'
 
@@ -79,8 +79,7 @@ export async function POST(req: NextRequest) {
       .map(row => String(row.question.q).normalize('NFKC').toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ').trim()))
     const candidates = ((bank || []) as VerifiedBankRow[]).filter(row => !reserved.has(row.id)
       && !reservedTexts.has(String(row.question.q).normalize('NFKC').toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ').trim())
-      && questionBankKey(row.grade_key) === questionBankKey(detail.objective!.grade)
-      && questionBankKey(row.subject_key) === questionBankKey(detail.objective!.subject)
+      && sameLearningScope({ grade:row.grade_key,subject:row.subject_key },detail.objective!)
       && eligibleVerifiedItem(row, detail.objective!.id))
     if (!candidates.length) return NextResponse.json({ error: 'Ölçüm sorularından ayrı kalite onaylı çalışma sorusu kalmadı.' }, { status: 409 })
     const selected = candidates[randomInt(candidates.length)]

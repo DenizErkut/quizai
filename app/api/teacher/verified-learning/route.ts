@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { buildTeacherContext, getAuthedUser } from '@/lib/report-context'
 import { questionBankKey } from '@/lib/question-bank'
+import { sameLearningScope } from '@/lib/learning-evidence-scope'
 import { allocateVerifiedItemSets, eligibleVerifiedItem, hasSeparatePracticeItem, type VerifiedBankRow } from '@/lib/verified-learning-cycle'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
@@ -49,8 +50,7 @@ export async function GET(req: NextRequest) {
     && gradeNumber(objective.grade) === gradeNumber(classroom.grade)
     && (!classroom.subject || questionBankKey(classroom.subject) === 'tum dersler' || questionBankKey(classroom.subject) === questionBankKey(objective.subject)))
     .map(objective => {
-      const relevant = rows.filter(row => questionBankKey(row.grade_key) === questionBankKey(objective.grade)
-        && questionBankKey(row.subject_key) === questionBankKey(objective.subject)
+      const relevant = rows.filter(row => sameLearningScope({ grade:row.grade_key,subject:row.subject_key },objective)
         && eligibleVerifiedItem(row, objective.id))
       const sets = allocateVerifiedItemSets(relevant, objective.id)
       return { ...objective, availableItems: relevant.length, ready: Boolean(sets && hasSeparatePracticeItem(relevant, objective.id, sets)) }
@@ -84,8 +84,7 @@ export async function POST(req: NextRequest) {
     (classroom.subject && questionBankKey(classroom.subject) !== 'tum dersler' && questionBankKey(classroom.subject) !== questionBankKey(objective.subject))) {
     return NextResponse.json({ error: 'Öğrenci, sınıf, ders veya doğrulanmış kazanım uyumsuz.' }, { status: 422 })
   }
-  const matching = ((bank || []) as VerifiedBankRow[]).filter(row => questionBankKey(row.grade_key) === questionBankKey(objective.grade)
-    && questionBankKey(row.subject_key) === questionBankKey(objective.subject))
+  const matching = ((bank || []) as VerifiedBankRow[]).filter(row => sameLearningScope({ grade:row.grade_key,subject:row.subject_key },objective))
   const sets = allocateVerifiedItemSets(matching, objective.id)
   const eligibleCount = matching.filter(row => eligibleVerifiedItem(row, objective.id)).length
   if (!sets || !hasSeparatePracticeItem(matching, objective.id, sets)) return NextResponse.json({ error: 'Üç ölçüm seti ve ayrı rehberli çalışma için en az 16 farklı, kalite doğrulanmış soru gerekiyor.', availableItems: eligibleCount, requiredItems: 16 }, { status: 422 })

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
-import { questionBankKey } from '@/lib/question-bank'
+import { sameLearningScope } from '@/lib/learning-evidence-scope'
 import { recordQuizLearningEvents } from '@/lib/learning-events'
 import { eligibleVerifiedItem, publicVerifiedQuestions, scoreVerifiedAnswers, type VerifiedBankRow, type VerifiedStage, type VerifiedItemSets } from '@/lib/verified-learning-cycle'
 
@@ -106,8 +106,7 @@ export async function POST(req: NextRequest) {
     if (bankError || bank?.length !== 5) return NextResponse.json({ error: 'Bir soru kalite onayını kaybetmiş; öğretmenin seti yenilemesi gerekiyor.' }, { status: 409 })
     const ordered = ids.map(id => (bank as VerifiedBankRow[]).find(row => row.id === id)!)
     if (ordered.some(row => !eligibleVerifiedItem(row, detail.objective!.id)
-      || questionBankKey(row.grade_key) !== questionBankKey(detail.objective!.grade)
-      || questionBankKey(row.subject_key) !== questionBankKey(detail.objective!.subject))) {
+      || !sameLearningScope({ grade:row.grade_key,subject:row.subject_key },detail.objective!))) {
       return NextResponse.json({ error: 'Soru veya kazanım kanıtı artık geçerli değil.' }, { status: 409 })
     }
     const questions = ordered.map(row => ({ ...row.question, bankQuestionId: row.id, subject: detail.objective!.subject, verifiedLearningStage: stage }))
