@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
     const question=reviewQuestionShape(Object.fromEntries(fields.filter(key=>items[0].question[key]!==undefined).map(key=>[key,items[0].question[key]])))
     if(!question.difficulty&&items[0].difficulty) question.difficulty=items[0].difficulty
     for(const item of items) {
-      const content=Object.fromEntries(fields.filter(key=>item.question[key]!==undefined).map(key=>[key,item.question[key]]))
+      const content=reviewQuestionShape(Object.fromEntries(fields.filter(key=>item.question[key]!==undefined).map(key=>[key,item.question[key]])))
       if(!content.difficulty&&item.difficulty) content.difficulty=item.difficulty
       if(`${grade(item.grade)}|${norm(item.subject)}`!==dimension||!isDeepStrictEqual(content,question)) return NextResponse.json({ error:'İnceleme grubundaki sorular eşdeğer değil.' },{ status:400 })
     }
