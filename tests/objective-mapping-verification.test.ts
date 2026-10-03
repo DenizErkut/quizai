@@ -23,6 +23,15 @@ test('yapılandırılmış alternatif denetçi bağımsızlığı korur; tek sa�
   review.audits[1].provider='unknown'
   assert.equal(hasAutomatedObjectiveApproval(q),false)
 })
+test('eski doğru/yanlış biçimi uygulamanın standart seçenekleriyle aynı kanıttır',()=> {
+  const q=question()
+  Object.assign(q,{ type:'true_false',q:'40 ve 56 sayılarının en büyük ortak böleni 8’dir.',opts:[],ans:0 })
+  const review=q.objectiveBackfillReview as { content:string }
+  review.content=objectiveReviewContent(q)
+  assert.equal(hasAutomatedObjectiveApproval(q),true)
+  assert.equal(hasAutomatedObjectiveApproval({ ...q,opts:['Doğru','Yanlış'] }),true)
+  assert.equal(hasAutomatedObjectiveApproval({ ...q,opts:['Yanlış','Doğru'] }),false)
+})
 test('haritalama onayı zorluk doğrulaması eksikse pilot stokunu artırmaz',()=> {
   assert.equal(hasVerifiedBankQuality(question()),true)
   assert.equal(hasVerifiedBankQuality({ ...question(),difficulty:'zor' }),false)

@@ -60,6 +60,7 @@ try { for(const line of (await readFile(resolve(directory,'remote-results.jsonl'
 try { for(const key of JSON.parse(await readFile(resolve(directory,'superseded.json'),'utf8'))) done.delete(key) }
 catch(error) { if(error.code!=='ENOENT') throw error }
 const limit=Number(process.argv.find(arg=>arg.startsWith('--limit='))?.split('=')[1] || Infinity)
+for(const key of (await request(null,'?source=corrections')).keys || []) done.delete(key)
 const groups=new Map()
 let targets=[...unique.values()].slice(0,limit)
 if(process.argv.includes('--sample')) {
@@ -110,6 +111,7 @@ async function worker() {
           else if(applied.status==='conflict') stats.conflicts++
         }
       }
+      if(result.skipped.length) await appendFile(resolve(directory,'remote-results.jsonl'),JSON.stringify({ decision:'unchanged',applied:result.skipped.map(key=>({ key,status:'already_reviewed' })) })+'\n')
       stats.conflicts+=result.skipped.length
     } catch(error) {
       if(entries.length>1 && /malformed audit|incomplete audit|truncated|JSON/.test(error.message)) {
@@ -127,5 +129,5 @@ async function worker() {
 }
 await Promise.all(Array.from({ length:concurrency },worker))
 await writeFile(resolve(directory,'remote-summary.json'),JSON.stringify({ runId:credential.runId,finishedAt:new Date().toISOString(),...stats },null,2))
-console.log(JSON.stringify({ complete:!stoppedReason,stoppedReason,...stats }))
+console.log(JSON.stringify({ complete:!stoppedReason&&stats.failed===0,stoppedReason,...stats }))
 if(stats.failed) process.exitCode=1

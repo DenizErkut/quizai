@@ -3,6 +3,7 @@ export const HISTORICAL_OBJECTIVE_REVIEW_POLICY = 'historical-objective-backfill
 type Audit = { provider?: unknown; approved?: unknown; objectiveCode?: unknown; score?: unknown; difficultyMatches?: unknown; answerCorrect?: unknown; explanationConsistent?: unknown; ageAppropriate?: unknown; unambiguous?: unknown; directObjectiveMatch?: unknown; standalone?: unknown }
 
 export function objectiveReviewContent(question: Record<string, unknown>): string {
+  if (question.type === 'true_false' && (question.opts == null || (Array.isArray(question.opts) && question.opts.length === 0))) question = { ...question,opts:['Doğru','Yanlış'] }
   const keys = ['q', 'opts', 'ans', 'exp', 'explanation', 'type', 'blank', 'referenceAnswer', 'pairs', 'items', 'correctOrder', 'statements', 'tableData', 'tableAnswers']
   return JSON.stringify(Object.fromEntries(keys.filter(key => question[key] !== undefined).map(key => [key, question[key]])))
 }

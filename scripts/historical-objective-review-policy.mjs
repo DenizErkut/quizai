@@ -1,5 +1,9 @@
 export const POLICY = 'historical-objective-backfill-v1'
 export const MIN_SCORE = 80
+export function reviewQuestionShape(question) {
+  if (question.type === 'true_false' && (question.opts == null || (Array.isArray(question.opts) && question.opts.length === 0))) return { ...question,opts:['Doğru','Yanlış'] }
+  return question
+}
 export function auditCatalogPayload(candidates) {
   const contexts = [], indexes = new Map()
   const catalog = candidates.map(candidate => {
@@ -53,6 +57,7 @@ export function norm(value) {
 }
 
 export function deterministicBlock(question) {
+  question = reviewQuestionShape(question)
   if (typeof question.q !== 'string' || question.q.trim().length < 5) return 'Soru metni eksik.'
   const type = question.type || 'multiple_choice'
   if (['multiple_choice', 'true_false'].includes(type)) {

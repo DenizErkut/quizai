@@ -11,7 +11,7 @@ import { objectiveReviewContent } from '@/lib/objective-mapping-verification'
 import { evaluateQuestionStructure } from '@/lib/ai-gateway/quality-engine'
 import { evaluateQuestionConsistency } from '@/lib/question-consistency'
 import type { Question } from '@/lib/quiz-constants'
-import { POLICY, parseAudits, decideAudits, deterministicBlock, norm, auditCatalogPayload } from '@/scripts/historical-objective-review-policy.mjs'
+import { POLICY, parseAudits, decideAudits, deterministicBlock, norm, auditCatalogPayload, reviewQuestionShape } from '@/scripts/historical-objective-review-policy.mjs'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
@@ -63,6 +63,10 @@ export async function GET(req: NextRequest) {
   const run=await runFor(req)
   if (!run) return NextResponse.json({ error:'Yetkisiz veya süresi dolmuş toplu inceleme.' },{ status:403 })
   const source=req.nextUrl.searchParams.get('source')
+  if(source==='corrections') {
+    const { data,error }=await db.from('historical_objective_backfill_reviews').select('source,record_id,question_index').eq('run_id',run.id).eq('review->>superseded','true').limit(500)
+    return NextResponse.json(error?{ error:error.message }:{ keys:(data || []).map(row=>`${row.source}:${row.record_id}:${row.question_index}`) },{ status:error?500:200 })
+  }
   if(source!=='bank'&&source!=='sessions') return NextResponse.json({ runId:run.id,policy:POLICY,createdAt:run.cutoff,paginated:true,reviewers:{ openai:Boolean(process.env.OPENAI_API_KEY),anthropic:Boolean(process.env.ANTHROPIC_API_KEY),mistral:new MistralAdapter().isConfigured() } })
   const offset=Math.max(0,Number(req.nextUrl.searchParams.get('offset')) || 0)
   const size=source==='bank'?100:50
@@ -119,7 +123,7 @@ export async function POST(req: NextRequest) {
     }
     if(!items.length) continue
     const dimension=`${grade(items[0].grade)}|${norm(items[0].subject)}`
-    const question=Object.fromEntries(fields.filter(key=>items[0].question[key]!==undefined).map(key=>[key,items[0].question[key]]))
+    const question=reviewQuestionShape(Object.fromEntries(fields.filter(key=>items[0].question[key]!==undefined).map(key=>[key,items[0].question[key]])))
     if(!question.difficulty&&items[0].difficulty) question.difficulty=items[0].difficulty
     for(const item of items) {
       const content=Object.fromEntries(fields.filter(key=>item.question[key]!==undefined).map(key=>[key,item.question[key]]))
@@ -178,9 +182,9 @@ export async function POST(req: NextRequest) {
     for(const item of entry.items) {
       const { data,error }=await db.rpc('apply_historical_objective_backfill_review',{
         p_run_id:run.id,p_source:item.source,p_record_id:item.recordId,p_question_index:item.index,p_expected_question:item.question,
-        p_objective_id:decision.objective?.id || null,p_review:review,p_bank_fingerprint:questionFingerprint(item.question),
+        p_objective_id:decision.objective?.id || null,p_review:review,p_bank_fingerprint:questionFingerprint(reviewQuestionShape(item.question)),
         p_bank_grade:questionBankKey(item.grade),p_bank_subject:questionBankKey(decision.objective?.subject || item.subject),p_bank_topic:questionBankKey(item.topic),
-        p_reusable_question:Object.fromEntries(Object.entries({ ...item.question,...(item.difficulty?{ difficulty:item.difficulty }:{}) }).filter(([key])=>reusable.has(key))),
+        p_reusable_question:Object.fromEntries(Object.entries({ ...reviewQuestionShape(item.question),...(item.difficulty?{ difficulty:item.difficulty }:{}) }).filter(([key])=>reusable.has(key))),
       })
       applied.push({ key:`${item.source}:${item.recordId}:${item.index}`,...(error?{ status:'error',error:error.message }:data) })
     }
