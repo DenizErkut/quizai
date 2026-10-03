@@ -144,8 +144,8 @@ export async function POST(req: NextRequest) {
       const adapter=new MistralAdapter()
       if(!adapter.isConfigured()) throw new Error('İkinci bağımsız denetçi yapılandırılmamış.')
       const [first,second]=await Promise.all([
-        callOpenAI([{ role:'system',content:system },{ role:'user',content:payload }],{ model:process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini',temperature:0,max_tokens:Math.max(1600,eligible.length*480),json:true,requireComplete:true,timeoutMs:75000,operation:POLICY,requestId:run.id }),
-        adapter.execute({ model:process.env.MISTRAL_QUALITY_MODEL || 'mistral-small-latest',messages:[{ role:'system',content:system },{ role:'user',content:payload }],temperature:0,maxTokens:Math.max(1600,eligible.length*480),json:true,timeoutMs:75000 },{ task:'content_validation',operationTag:POLICY,requestId:run.id,shadow:false }),
+        callOpenAI([{ role:'system',content:system },{ role:'user',content:payload }],{ model:process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini',temperature:0,max_tokens:Math.max(2000,eligible.length*900),json:true,requireComplete:true,timeoutMs:75000,operation:POLICY,requestId:run.id }),
+        adapter.execute({ model:process.env.MISTRAL_QUALITY_MODEL || 'mistral-small-latest',messages:[{ role:'system',content:system },{ role:'user',content:payload }],temperature:0,maxTokens:Math.max(2000,eligible.length*900),json:true,timeoutMs:75000 },{ task:'content_validation',operationTag:POLICY,requestId:run.id,shadow:false }),
       ])
       const openai=parseAudits(first,eligible.length,'openai',process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini')
       const mistral=parseAudits(second.content,eligible.length,'mistral',second.model)
