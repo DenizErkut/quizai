@@ -15,15 +15,30 @@ if(process.argv.includes('--init')) {
 const credential=JSON.parse(await readFile(credentialPath,'utf8'))
 const endpoint='https://pratium.com/api/admin/objective-mapping-review/backfill'
 const headers={ Authorization:`Bearer ${credential.token}`,'Content-Type':'application/json' }
-const request=async (body) => {
-  const response=await fetch(endpoint,{ headers,...(body?{ method:'POST',body:JSON.stringify(body) }:{}),signal:AbortSignal.timeout(130000) })
+const request=async (body, query='') => {
+  const response=await fetch(endpoint+query,{ headers,...(body?{ method:'POST',body:JSON.stringify(body) }:{}),signal:AbortSignal.timeout(130000) })
   const data=await response.json().catch(()=>({ error:`HTTP ${response.status}` }))
   if(!response.ok) throw new Error(data.error || `HTTP ${response.status}`)
   return data
 }
 let manifest
 try { manifest=JSON.parse(await readFile(resolve(directory,'manifest.json'),'utf8')) }
-catch(error) { if(error.code!=='ENOENT') throw error; manifest=await request(); await writeFile(resolve(directory,'manifest.json'),JSON.stringify(manifest),{ mode:0o600 }) }
+catch(error) {
+  if(error.code!=='ENOENT') throw error
+  manifest=await request()
+  if(!manifest.paginated) throw new Error('Waiting for paginated production deployment')
+  manifest.items=[]
+  for(const source of ['bank','sessions']) {
+    let offset=0
+    for(;;) {
+      const page=await request(null,`?source=${source}&offset=${offset}`)
+      manifest.items.push(...page.items)
+      if(!page.hasMore) break
+      offset=page.nextOffset
+    }
+  }
+  await writeFile(resolve(directory,'manifest.json'),JSON.stringify(manifest),{ mode:0o600 })
+}
 if(manifest.runId!==credential.runId||manifest.policy!==POLICY) throw new Error('Snapshot run mismatch')
 const fields=['q','opts','ans','exp','explanation','type','blank','referenceAnswer','pairs','items','correctOrder','statements','tableData','tableAnswers','difficulty','svg','chartData','hasVisual','sourceBased','passage']
 const unique=new Map()
@@ -42,7 +57,18 @@ try { for(const line of (await readFile(resolve(directory,'remote-results.jsonl'
 } } catch(error) { if(error.code!=='ENOENT') throw error }
 const limit=Number(process.argv.find(arg=>arg.startsWith('--limit='))?.split('=')[1] || Infinity)
 const groups=new Map()
-for(const entry of [...unique.values()].slice(0,limit)) {
+let targets=[...unique.values()].slice(0,limit)
+if(process.argv.includes('--sample')) {
+  const chosen=new Map()
+  for(const predicate of [
+    entry=>entry.items[0].source==='bank'&&/matematik/i.test(entry.items[0].subject),
+    entry=>entry.items[0].source==='bank'&&!/matematik/i.test(entry.items[0].subject),
+    entry=>entry.items[0].source==='sessions'&&Boolean(entry.items[0].subject),
+    entry=>entry.items[0].source==='sessions'&&!entry.items[0].subject,
+  ]) for(const entry of [...unique.values()].filter(predicate).slice(0,4)) chosen.set(entry.signature,entry)
+  targets=[...chosen.values()]
+}
+for(const entry of targets) {
   entry.items=entry.items.filter(item=>!done.has(`${item.source}:${item.recordId}:${item.index}`))
   if(!entry.items.length) continue
   for(let offset=0;offset<entry.items.length;offset+=100) groups.set(entry.dimension,[...(groups.get(entry.dimension)||[]),{ ...entry,items:entry.items.slice(offset,offset+100) }])
