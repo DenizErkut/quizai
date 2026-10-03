@@ -1,5 +1,15 @@
 export const POLICY = 'historical-objective-backfill-v1'
 export const MIN_SCORE = 80
+export function auditCatalogPayload(candidates) {
+  const contexts = [], indexes = new Map()
+  const catalog = candidates.map(candidate => {
+    const context = { subject:candidate.subject || '', topic:candidate.topic || '', unit:candidate.unit || '' }
+    const key = JSON.stringify(context)
+    if (!indexes.has(key)) { indexes.set(key,contexts.length); contexts.push(context) }
+    return [candidate.objective_code,candidate.title,indexes.get(key)]
+  })
+  return { catalogFields:['code','title','contextIndex'],contexts,catalog }
+}
 const REQUIRED = ['answerCorrect', 'explanationConsistent', 'ageAppropriate', 'unambiguous', 'directObjectiveMatch']
 
 export function parseAudits(raw, size, provider, model) {

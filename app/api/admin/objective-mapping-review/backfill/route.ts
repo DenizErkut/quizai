@@ -9,7 +9,7 @@ import { objectiveReviewContent } from '@/lib/objective-mapping-verification'
 import { evaluateQuestionStructure } from '@/lib/ai-gateway/quality-engine'
 import { evaluateQuestionConsistency } from '@/lib/question-consistency'
 import type { Question } from '@/lib/quiz-constants'
-import { POLICY, parseAudits, decideAudits, deterministicBlock, norm } from '@/scripts/historical-objective-review-policy.mjs'
+import { POLICY, parseAudits, decideAudits, deterministicBlock, norm, auditCatalogPayload } from '@/scripts/historical-objective-review-policy.mjs'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
   if(eligible.length) {
     const dimensions=new Set(eligible.map(entry=>`${grade(entry.items[0].grade)}|${norm(entry.items[0].subject)}`))
     if(dimensions.size!==1) return NextResponse.json({ error:'Aynı grupta yalnız bir sınıf ve ders incelenebilir.' },{ status:400 })
-    const payload=JSON.stringify({ catalog:eligible[0].candidates.map(({ objective_code,title,topic,unit })=>({ code:objective_code,title,topic,unit })),
+    const payload=JSON.stringify({ ...auditCatalogPayload(eligible[0].candidates),
       questions:eligible.map((entry,index)=>({ index,grade:entry.items[0].grade,subject:entry.items[0].subject,question:entry.question })) })
     try {
       const adapter=new MistralAdapter()

@@ -1,10 +1,21 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { parseAudits, decideAudits, deterministicBlock } from '../scripts/historical-objective-review-policy.mjs'
+import { parseAudits, decideAudits, deterministicBlock, auditCatalogPayload } from '../scripts/historical-objective-review-policy.mjs'
 
 const result = { index:0,objectiveCode:'MAT.6.1.4',score:90,reason:'40 ve 56 için ortak bölen 8 bulunur; ortak böleni yorumlama ölçülür.',answerCorrect:true,explanationConsistent:true,ageAppropriate:true,unambiguous:true,directObjectiveMatch:true,difficultyMatches:true,standalone:true }
 const parse = (provider, extra = {}) => parseAudits(JSON.stringify({ results:[{ ...result,...extra }] }),1,provider,'test')[0]
 const candidates = [{ id:'objective-id',objective_code:'MAT.6.1.4' }]
+test('katalog bağlamları tekilleştirilir; hiçbir kazanım veya kapsam metni kaybolmaz',()=> {
+  const original = [1,2,3].map(index=>({ objective_code:`MAT.6.1.${index}`,title:`Beceri ${index}`,subject:'Matematik',topic:'Sayılar',unit:'Ünite 1' }))
+  const encoded = auditCatalogPayload(original)
+  assert.equal(encoded.catalog.length,original.length)
+  assert.equal(encoded.contexts.length,1)
+  encoded.catalog.forEach(([code,title,contextIndex],index)=> {
+    assert.equal(code,original[index].objective_code)
+    assert.equal(title,original[index].title)
+    assert.equal(encoded.contexts[contextIndex].topic,original[index].topic)
+  })
+})
 
 test('iki bağımsız denetçi aynı gerçek kazanımı onaylamalı',()=> {
   assert.equal(decideAudits([parse('openai'),parse('mistral')],candidates).decision,'approved')
