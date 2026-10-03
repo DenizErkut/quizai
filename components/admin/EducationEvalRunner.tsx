@@ -14,7 +14,7 @@ type EvalOutput = {
 
 type ScoreKey = 'curriculum_alignment_score' | 'pedagogy_score' | 'age_appropriateness_score' | 'safety_score'
 type EvalRun = { id: string; benchmark_version: number; status: 'running' | 'completed' | 'failed'; total_items: number; completed_items: number; created_at: string; completed_at?: string | null }
-type EvalSummary = { provider: string; model: string; n: number; unscoredOutputs: number; accuracy: number; meanLatencyMs: number; totalCostUsd: number; curriculumAlignment: number; pedagogy: number; ageAppropriateness: number; safety: number }
+type EvalSummary = { provider: string; model: string; n: number; unscoredOutputs: number; accuracy: number; effectiveAccuracy: number; meanLatencyMs: number; totalCostUsd: number; curriculumAlignment: number; pedagogy: number; ageAppropriateness: number; safety: number }
 type RunnerData = { run: EvalRun | null; results: EvalOutput[]; summary: EvalSummary[] | null; progress?: { completedOutputs: number; ratedOutputs: number; totalOutputs: number; completedItems: number; failedOutputs: number; blinded: boolean }; readiness?: { benchmarkStatus: string; eligibleQuestions: number; target: number; providersConfigured: boolean } }
 type Rating = Record<ScoreKey, number> & { reviewerNotes: string }
 
@@ -160,8 +160,8 @@ export default function EducationEvalRunner() {
     </div>}
 
     {data.summary && <div style={{ overflowX: 'auto' }}><strong>Sağlayıcı özeti · körlük kaldırıldı</strong><table style={{ width: '100%', marginTop: 8, borderCollapse: 'collapse', fontSize: 13 }}>
-      <thead><tr>{['Sağlayıcı / model', 'Doğruluk (N)', 'Puanlanamayan', 'Süre ort.', 'Maliyet', 'Kazanım', 'Pedagoji', 'Yaş', 'Güvenlik'].map(label => <th key={label} style={{ textAlign: 'left', padding: 7, borderBottom: '1px solid var(--border)' }}>{label}</th>)}</tr></thead>
-        <tbody>{data.summary.map(row => <tr key={row.provider}>{[`${row.provider} · ${row.model}`, `${(row.accuracy * 100).toFixed(1)}% (${row.n})`, row.unscoredOutputs, `${row.meanLatencyMs} ms`, `$${row.totalCostUsd}`, row.curriculumAlignment, row.pedagogy, row.ageAppropriateness, row.safety].map((value, index) => <td key={index} style={{ padding: 7, borderBottom: '1px solid var(--border)' }}>{value}</td>)}</tr>)}</tbody>
+      <thead><tr>{['Sağlayıcı / model', 'Geçerli yanıt doğruluğu (N)', '50 soru üzerinden başarı', 'Puanlanamayan', 'Süre ort.', 'Maliyet', 'Kazanım', 'Pedagoji', 'Yaş', 'Güvenlik'].map(label => <th key={label} style={{ textAlign: 'left', padding: 7, borderBottom: '1px solid var(--border)' }}>{label}</th>)}</tr></thead>
+        <tbody>{data.summary.map(row => <tr key={row.provider}>{[`${row.provider} · ${row.model}`, `${(row.accuracy * 100).toFixed(1)}% (${row.n})`, `${(row.effectiveAccuracy * 100).toFixed(1)}%`, row.unscoredOutputs, `${row.meanLatencyMs} ms`, `$${row.totalCostUsd}`, row.curriculumAlignment, row.pedagogy, row.ageAppropriateness, row.safety].map((value, index) => <td key={index} style={{ padding: 7, borderBottom: '1px solid var(--border)' }}>{value}</td>)}</tr>)}</tbody>
     </table></div>}
     {message && <div role="status" style={{ color: 'var(--text2)' }}>{message}</div>}
   </section>

@@ -36,6 +36,7 @@ import ProviderObservability from '@/components/admin/ProviderObservability'
 import EducationEvalBenchmark from '@/components/admin/EducationEvalBenchmark'
 import EducationEvalRunner from '@/components/admin/EducationEvalRunner'
 import ObjectiveMappingReview from '@/components/admin/ObjectiveMappingReview'
+import PilotAccountSetup from '@/components/admin/PilotAccountSetup'
 
 interface User {
   id: string; name: string; grade: string; plan: string
@@ -852,6 +853,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         {/* Users tab */}
         {tab === 'users' && (
           <div className="anim-up">
+            <PilotAccountSetup users={users} />
             {/* Kimlik uzlaştırma banner'ı — Supabase profiles ↔ TR-PG identities
                 arasında eksik kayıt varsa (örn. "İsimsiz" kullanıcı) burada
                 görünür ve tek tıkla düzeltilebilir. Her gün 06:00'da (cron)

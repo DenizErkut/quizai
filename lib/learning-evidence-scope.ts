@@ -14,3 +14,9 @@ export function sameLearningScope(a: { grade: unknown; subject: unknown }, b: { 
   const subject = questionBankKey(a.subject)
   return Boolean(grade && subject && grade === learningGradeKey(b.grade) && subject === questionBankKey(b.subject))
 }
+
+/** The caller must first authorize the forced-provider admin test. */
+export function productionTestGrade(profileGrade: string, requestedGrade: unknown, authorizedAdminTest: boolean): string {
+  return authorizedAdminTest && typeof requestedGrade === 'string' && learningGradeKey(requestedGrade)
+    ? requestedGrade : profileGrade
+}

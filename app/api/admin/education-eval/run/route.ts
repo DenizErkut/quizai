@@ -58,6 +58,7 @@ async function loadRun(runId?: string) {
       const mean = (field: string, source = rows) => source.length ? Number((source.reduce((sum, row) => sum + Number(row[field] || 0), 0) / source.length).toFixed(3)) : 0
       return { provider: provider.key, model: rows[0]?.model || '', n: scorableRows.length,
         unscoredOutputs: rows.length - scorableRows.length, accuracy: mean('is_correct', scorableRows),
+        effectiveAccuracy: rows.length ? scorableRows.filter(row => row.is_correct === true).length / 50 : 0,
         meanLatencyMs: mean('duration_ms'), totalCostUsd: Number(rows.reduce((sum, row) => sum + Number(row.cost_usd || 0), 0).toFixed(6)),
         curriculumAlignment: mean('curriculum_alignment_score'), pedagogy: mean('pedagogy_score'),
         ageAppropriateness: mean('age_appropriateness_score'), safety: mean('safety_score') }

@@ -29,7 +29,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { SUBJECT_MAP } from '@/lib/subject-map'
 
 const GRADE_OPTIONS = [
   'ortaokul 6. sinif', 'ortaokul 7. sinif', 'ortaokul 8. sinif',
@@ -43,9 +42,6 @@ const GRADE_OPTIONS = [
 // serbest metindi, konu listesi de hep aynı (elle girilen "Mutlak değer")
 // kaldığı için sonuç hep "Matematik" hissi veriyordu. Artık ders VE konu,
 // gerçek platform kataloğundan (aynı ortaokul/lise ayrımıyla) seçiliyor.
-function getLevel(grade: string): 'ilkokul' | 'ortaokul' | 'lise' | 'universite' {
-  return grade.startsWith('ilk') ? 'ilkokul' : grade.startsWith('orta') ? 'ortaokul' : grade.startsWith('lise') ? 'lise' : 'universite'
-}
 
 const PROVIDERS = [
   { id: 'mistral', label: 'Mistral Large', color: '#f97316' },
@@ -67,10 +63,11 @@ export default function AIQualityTestPage() {
   const router = useRouter()
   const supabase = createClient() as any
   const [grade, setGrade] = useState('lise 9. sinif')
-  const level = getLevel(grade)
-  const subjectOptions = Object.keys(SUBJECT_MAP[level] || {})
+  const [topicsBySubject, setTopicsBySubject] = useState<Record<string, string[]>>({})
+  const [catalogMessage, setCatalogMessage] = useState('')
+  const subjectOptions = Object.keys(topicsBySubject)
   const [subject, setSubject] = useState('Matematik')
-  const topicOptions = SUBJECT_MAP[level]?.[subject] || []
+  const topicOptions = topicsBySubject[subject] || []
   const [topic, setTopic] = useState('Mutlak değer')
   const [questionCount, setQuestionCount] = useState(5)
   const [runs, setRuns] = useState<Record<ProviderId, RunResult>>({
@@ -78,6 +75,25 @@ export default function AIQualityTestPage() {
     openai: { provider: 'openai', loading: false, error: null, data: null, clientMs: null },
     claude: { provider: 'claude', loading: false, error: null, data: null, clientMs: null },
   })
+
+  useEffect(() => {
+    let active = true
+    setTopicsBySubject({}); setCatalogMessage('Aktif kazanım konuları yükleniyor…')
+    async function loadTopics() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.access_token) throw new Error('Oturum gerekli.')
+        const response = await fetch(`/api/curriculum-topics?${new URLSearchParams({ grade })}`, { headers: { Authorization: `Bearer ${session.access_token}` } })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error || 'Kazanım konuları yüklenemedi.')
+        if (active) { setTopicsBySubject(result.topicsBySubject || {}); setCatalogMessage('Yalnız aktif ve doğrulanmış kazanım konuları listelenir.') }
+      } catch (error) { if (active) setCatalogMessage(error instanceof Error ? error.message : 'Katalog alınamadı.') }
+    }
+    void loadTopics()
+    return () => { active = false }
+    // The client is stateless here; grade is the catalog scope.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grade])
 
   // Sınıf değişince o seviyede olmayan bir ders seçili kalmasın (ör.
   // ortaokul'dan lise'ye geçince "T.C. İnkılap Tarihi..." lise'de yok).
@@ -110,6 +126,7 @@ export default function AIQualityTestPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({
+          grade,
           topic,
           subject,
           questionCount,
@@ -135,7 +152,7 @@ export default function AIQualityTestPage() {
     await Promise.all(PROVIDERS.map(p => runOne(p.id)))
   }
 
-  const anyLoading = Object.values(runs).some(r => r.loading)
+  const anyLoading = Object.values(runs).some(r => r.loading) || !topicOptions.includes(topic)
 
   return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: '80px' }}>
@@ -147,6 +164,7 @@ export default function AIQualityTestPage() {
         <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', marginTop: 4 }}>
           Gerçek öğrenci trafiğini etkilemeden, Mistral / GPT-4.1-mini / Claude Sonnet'i aynı konuyla zorlayıp yan yana karşılaştır (yalnızca admin hesaplar).
         </p>
+        <p style={{ color: '#fff', fontSize: 13 }} role="status">{catalogMessage}</p>
       </div>
 
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem 1rem' }}>
@@ -178,7 +196,7 @@ export default function AIQualityTestPage() {
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button onClick={runAll} disabled={anyLoading}
               style={{ padding: '10px 20px', borderRadius: '10px', border: 'none', background: '#082465', color: '#fff', fontWeight: 700, fontSize: '13px', cursor: 'pointer', opacity: anyLoading ? 0.5 : 1 }}>
-              {anyLoading ? 'Üretiliyor...' : '🔀 Üçünü birden üret'}
+          {Object.values(runs).some(r => r.loading) ? 'Üretiliyor...' : '🔀 Üçünü birden üret'}
             </button>
             {PROVIDERS.map(p => (
               <button key={p.id} onClick={() => runOne(p.id)} disabled={anyLoading}

@@ -11,6 +11,7 @@ type AiResource = { id: string; title: string; grade: string; subject: string; t
 
 export default function EducationEvalBenchmark() {
   const [data, setData] = useState<any>(null)
+  const [version, setVersion] = useState(1)
   const [resourceId, setResourceId] = useState('')
   const [questionId, setQuestionId] = useState('')
   const [objectiveId, setObjectiveId] = useState('')
@@ -26,13 +27,13 @@ export default function EducationEvalBenchmark() {
   const load = useCallback(async () => {
     setBusy(true)
     try {
-      const response = await fetch('/api/admin/education-eval/benchmark', { cache: 'no-store' })
+      const response = await fetch(`/api/admin/education-eval/benchmark?version=${version}`, { cache: 'no-store' })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Benchmark verileri alınamadı.')
       setData(result)
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Beklenmeyen hata.') }
     finally { setBusy(false) }
-  }, [])
+  }, [version])
 
   // Loading here synchronizes the admin panel with server state; the setter is
   // only reached after the network request resolves.
@@ -80,7 +81,7 @@ export default function EducationEvalBenchmark() {
     try {
       const aiItemId = body?.action === 'delete-ai' ? body.itemId : undefined
       const query = aiItemId ? `?aiItemId=${encodeURIComponent(aiItemId)}` : itemId ? `?itemId=${encodeURIComponent(itemId)}` : ''
-      const requestBody = body?.action === 'delete-ai' ? undefined : body
+      const requestBody = body?.action === 'delete-ai' ? undefined : body ? { ...body, version } : undefined
       const response = await fetch(`/api/admin/education-eval/benchmark${query}`, {
         method, headers: { 'Content-Type': 'application/json' }, body: requestBody ? JSON.stringify(requestBody) : undefined,
       })
@@ -116,6 +117,10 @@ export default function EducationEvalBenchmark() {
       <div><strong>🎯 MEB kontrollü başlangıç seti</strong><div style={{ color: 'var(--text2)', fontSize: 13, marginTop: 4 }}>{benchmark?.title || '50 soruluk benchmark'}</div></div>
       <button className="btn btn-sm" onClick={() => void load()} disabled={busy}>Yenile</button>
     </div>
+    <label>Benchmark sürümü <select value={version} disabled={busy} onChange={event => { setVersion(Number(event.target.value)); setResourceId(''); setQuestionId(''); setObjectiveId(''); setConfirmed(false) }}>
+      {(data.versions || [{ version: 1, status: benchmark.status }]).map((item: any) => <option key={item.version} value={item.version}>v{item.version} · {item.status === 'draft' ? 'Taslak — yeni sonuç üretilmedi' : 'Kilitli geçmiş sürüm'}</option>)}
+    </select></label>
+    <small>Bu seçim eski değerlendirme sonuçlarını değiştirmez. Yeni sürüm, kazanım ve insan incelemesi tamamlanmadan etkinleştirilmez.</small>
 
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 }}>
       <div className="card"><strong>{eligible} / {benchmark?.target_size || 50}</strong><div>ölçüme uygun soru</div></div>
@@ -234,8 +239,10 @@ export default function EducationEvalBenchmark() {
 
     <div><strong>Set içeriği ({data.items.length})</strong>
       <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>{data.items.map((item: any) => <div key={item.id} style={{ borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: 13 }}>
-        <b>{item.ordinal}. {item.objective_code}</b> · {item.grade} · {item.subject} · {item.case_type === 'regression' ? 'regresyon (metrik dışı)' : 'öğretmen onaylı'}
+        <b>{item.ordinal}. {item.objective_code}</b> · {item.grade} · {item.subject} · {item.case_type === 'regression' ? 'regresyon (metrik dışı)' : item.teacher_approved ? 'öğretmen onaylı' : 'yeniden insan incelemesi gerekli'}
         <div>{item.question_snapshot?.q}</div>
+        {item.review_notes && <div style={{ color: 'var(--text2)' }}>{item.review_notes}</div>}
+        {benchmark.status === 'draft' && !item.teacher_approved && <button className="btn btn-sm" disabled={busy} onClick={() => void mutate('POST', { action: 'review-draft', itemId: item.id, confirmed: true })}>Soru ve düzeltilmiş kazanımı inceledim — insan onayı ver</button>}
         <small style={{ color: 'var(--text2)' }}>{item.source_reference} · sürüm {item.source_version?.slice(0, 12)}… · {item.metric_eligible ? 'ölçüme dahil' : 'ölçüm dışı'}</small>
         {benchmark.status === 'draft' && <button className="btn btn-sm" style={{ marginLeft: 8 }} onClick={() => void mutate('DELETE', undefined, item.id)}>Çıkar</button>}
       </div>)}</div>

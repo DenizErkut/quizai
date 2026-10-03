@@ -7,6 +7,7 @@ import { logAnthropicUsage } from '@/lib/ai-usage'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { hasVerifiedObjectiveMapping } from '@/lib/objective-mapping-verification'
 import { finalizeContinuousReview } from '@/lib/continuous-question-review'
+import { productionTestGrade } from '@/lib/learning-evidence-scope'
 
 function contextualAdaptiveHint(question: unknown, topic: string, fallback: string | null) {
   if (!fallback) return null
@@ -1544,7 +1545,7 @@ export async function POST(req: NextRequest) {
     // kullanıcı ve oturumla atomik olmayan bir sonradan eşleştirmeye ihtiyaç duymaz.
     usageSessionId = continueSessionId ? undefined : crypto.randomUUID()
 
-    const grade = profile.grade || 'ortaokul 6. sinif'
+    const grade = productionTestGrade(profile.grade || 'ortaokul 6. sinif', body.grade, forceProviderTest !== null)
 
     if (!fileContent && !isInCurriculum(topic, plan, grade)) {
       return NextResponse.json({ error: 'out_of_curriculum' }, { status: 403 })
@@ -2843,7 +2844,7 @@ export async function POST(req: NextRequest) {
           id: usageSessionId,
           user_id: user.id,
           topic,
-          grade: profile.grade,
+          grade,
           language: effectiveLang,
           question_count: questions.length,
           questions,

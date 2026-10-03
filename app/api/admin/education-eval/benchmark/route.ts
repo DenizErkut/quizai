@@ -26,14 +26,18 @@ function validQuestion(question: any) {
     && Number.isInteger(question.ans) && question.ans >= 0 && question.ans < question.opts.length
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const user = await getAdminUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
 
-  const [{ data: benchmark }, { data: items, error: itemError }, { data: resources, error: resourceError },
+  const version = Number(req.nextUrl.searchParams.get('version') || 1)
+  if (!Number.isInteger(version) || version < 1) return NextResponse.json({ error: 'Geçerli sürüm gerekli.' }, { status: 400 })
+  const { data: benchmark, error: benchmarkError } = await db.from('education_eval_benchmark_sets').select('*').eq('code', 'meb-k12-controlled').eq('version', version).maybeSingle()
+  if (benchmarkError || !benchmark) return NextResponse.json({ error: 'Benchmark sürümü bulunamadı.' }, { status: 404 })
+  const { data: versions } = await db.from('education_eval_benchmark_sets').select('version,status,title').eq('code', 'meb-k12-controlled').order('version')
+  const [{ data: items, error: itemError }, { data: resources, error: resourceError },
     { data: aiResources, error: aiResourceError }, { data: aiItems, error: aiItemsError }] = await Promise.all([
-    db.from('education_eval_benchmark_sets').select('*').eq('code', 'meb-k12-controlled').eq('version', 1).maybeSingle(),
-    db.from('education_eval_benchmark_items').select('*').order('ordinal'),
+    db.from('education_eval_benchmark_items').select('*').eq('benchmark_set_id', benchmark.id).order('ordinal'),
     db.from('exam_resources').select('id,title,grade,subject,topic,subtopic,raw_text,source_type,purpose,reuse_policy,review_status,publication_evidence_paths,created_at').eq('source_type', 'teacher').eq('purpose', 'instant_test').eq('review_status', 'approved').order('created_at', { ascending: false }).limit(100),
     db.from('exam_resources').select('id,title,grade,subject,topic,subtopic,raw_text,source_type,purpose,review_status,created_at').eq('source_type', 'ai').eq('purpose', 'instant_test').eq('review_status', 'approved').order('created_at', { ascending: false }).limit(100),
     db.from('education_eval_ai_question_items').select('*').order('created_at', { ascending: false }).limit(1000),
@@ -126,7 +130,7 @@ export async function GET() {
 
   const metricCount = (items || []).filter((item: any) => item.metric_eligible).length
   const regressionCount = (items || []).filter((item: any) => item.case_type === 'regression').length
-  return NextResponse.json({ benchmark, items: items || [], metricCount, regressionCount, candidates, resources: evidence,
+  return NextResponse.json({ benchmark, versions: versions || [], items: items || [], metricCount, regressionCount, candidates, resources: evidence,
     aiResources: aiResourceDetails, aiCandidates: aiQuestionCandidates, aiItems: aiItems || [],
     readiness: { target: benchmark?.target_size ?? 50, eligibleQuestions: candidates.length,
       eligibleBooklets: eligibleResources.length, teacherApprovedBooklets: resources?.length || 0,
@@ -139,10 +143,30 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
   const body = await req.json().catch(() => null)
   if (!body || typeof body.action !== 'string') return NextResponse.json({ error: 'İşlem bilgisi gerekli.' }, { status: 400 })
+  const version = Number(body.version || 1)
+  if (!Number.isInteger(version) || version < 1) return NextResponse.json({ error: 'Geçerli sürüm gerekli.' }, { status: 400 })
+
+  if (body.action === 'review-draft') {
+    if (body.confirmed !== true || typeof body.itemId !== 'string') return NextResponse.json({ error: 'Soruyu ve düzeltilmiş kazanımı inceleyin.' }, { status: 400 })
+    const { data: item } = await db.from('education_eval_benchmark_items').select('*').eq('id', body.itemId).maybeSingle()
+    const { data: set } = await db.from('education_eval_benchmark_sets').select('*').eq('code', 'meb-k12-controlled').eq('version', version).maybeSingle()
+    if (!item || !set || item.benchmark_set_id !== set.id || set.status !== 'draft') return NextResponse.json({ error: 'Yalnızca seçili taslak sürüm incelenebilir.' }, { status: 409 })
+    const { data: objective } = await db.from('learning_objective_catalog').select('*').eq('id', item.objective_id).maybeSingle()
+    if (!objective || !objective.is_active || objective.lifecycle_status !== 'active' || objective.verification_status !== 'verified'
+      || !isEducationEvalObjectiveInScope(objective, { grade: item.grade, subject: item.subject, curriculumVersionId: set.curriculum_version_id })
+      || objective.objective_code !== item.objective_code || objective.title !== item.objective_title) return NextResponse.json({ error: 'Kazanım etkin ve doğrulanmış değil; önce katalog incelemesini tamamlayın.' }, { status: 422 })
+    if (/veri dışı nedensellik/.test(item.review_notes || '')) return NextResponse.json({ error: 'İçerik sorunu giderilmemiş. Bu taslak maddesini düzeltilmiş kaynak sorusuyla değiştirin.' }, { status: 422 })
+    if (!item.teacher_approved && (!item.source_resource_id || !item.evidence_verified_by || !item.approval_evidence_paths?.length)) return NextResponse.json({ error: 'Kaynak ve yayın izni kanıtı eksik.' }, { status: 422 })
+    const { error } = await db.from('education_eval_benchmark_items').update({ teacher_approved: true, metric_eligible: true,
+      reviewed_by: user.id, reviewed_at: new Date().toISOString(), review_notes: `${item.review_notes || ''}\nYeni sürümün soru ve kazanım eşleşmesi insan tarafından incelendi.` }).eq('id', item.id).eq('benchmark_set_id', set.id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ success: true })
+  }
 
   if (body.action === 'activate') {
-    const { data: set } = await db.from('education_eval_benchmark_sets').select('id').eq('code', 'meb-k12-controlled').eq('version', 1).maybeSingle()
+    const { data: set } = await db.from('education_eval_benchmark_sets').select('id,status').eq('code', 'meb-k12-controlled').eq('version', version).maybeSingle()
     if (!set) return NextResponse.json({ error: 'Benchmark seti bulunamadı.' }, { status: 404 })
+    if (set.status !== 'draft') return NextResponse.json({ error: 'Etkin veya geçmiş sürüm değiştirilemez.' }, { status: 409 })
     const { error } = await db.from('education_eval_benchmark_sets').update({ status: 'active', activated_by: user.id }).eq('id', set.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ success: true })
@@ -154,7 +178,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'AI kitapçığı, soru ve doğrulanmış kazanım seçin.' }, { status: 400 })
     }
     const [{ data: set }, { data: resource }, { data: bankQuestion }, { data: objective }] = await Promise.all([
-      db.from('education_eval_benchmark_sets').select('curriculum_version_id').eq('code', 'meb-k12-controlled').eq('version', 1).maybeSingle(),
+      db.from('education_eval_benchmark_sets').select('curriculum_version_id').eq('code', 'meb-k12-controlled').eq('version', version).maybeSingle(),
       db.from('exam_resources').select('id,title,grade,subject,source_type,purpose,review_status').eq('id', sourceResourceId).maybeSingle(),
       db.from('question_bank').select('id,question,grade_key,subject_key,topic_key,source_engine,review_status').eq('id', questionBankId).maybeSingle(),
       db.from('learning_objective_catalog').select('id,objective_code,title,grade,subject,verification_status,lifecycle_status,is_active,curriculum_version_id').eq('id', objectiveId).maybeSingle(),
@@ -194,7 +218,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'AI soru kaydı ve kazanım seçin.' }, { status: 400 })
     }
     const [{ data: set }, { data: item }, { data: objective }] = await Promise.all([
-      db.from('education_eval_benchmark_sets').select('curriculum_version_id').eq('code', 'meb-k12-controlled').eq('version', 1).maybeSingle(),
+      db.from('education_eval_benchmark_sets').select('curriculum_version_id').eq('code', 'meb-k12-controlled').eq('version', version).maybeSingle(),
       db.from('education_eval_ai_question_items').select('id,grade,subject').eq('id', aiItemId).maybeSingle(),
       db.from('learning_objective_catalog').select('id,objective_code,title,grade,subject,verification_status,lifecycle_status,is_active,curriculum_version_id').eq('id', objectiveId).maybeSingle(),
     ])
@@ -219,7 +243,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Kaynak, soru, kazanım ve kanıtı kontrol ettiğinizi onaylamanız gerekli.' }, { status: 400 })
   }
   const [{ data: set }, { data: resource }, { data: bankQuestion }, { data: objective }] = await Promise.all([
-    db.from('education_eval_benchmark_sets').select('id,status,target_size,curriculum_version_id').eq('code', 'meb-k12-controlled').eq('version', 1).maybeSingle(),
+    db.from('education_eval_benchmark_sets').select('id,status,target_size,curriculum_version_id').eq('code', 'meb-k12-controlled').eq('version', version).maybeSingle(),
     db.from('exam_resources').select('id,title,grade,subject,topic,subtopic,raw_text,source_type,purpose,reuse_policy,review_status,publication_evidence_paths,created_at').eq('id', sourceResourceId).maybeSingle(),
     db.from('question_bank').select('id,question,grade_key,subject_key,topic_key,difficulty,question_type,source_engine,review_status').eq('id', questionBankId).maybeSingle(),
     db.from('learning_objective_catalog').select('id,objective_code,title,grade,subject,verification_status,lifecycle_status,is_active,curriculum_version_id').eq('id', objectiveId).maybeSingle(),
@@ -277,6 +301,13 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true })
   }
   if (!itemId) return NextResponse.json({ error: 'Madde kimliği gerekli.' }, { status: 400 })
+  const { data: item, error: itemError } = await db.from('education_eval_benchmark_items').select('benchmark_set_id').eq('id', itemId).maybeSingle()
+  if (itemError || !item) return NextResponse.json({ error: 'Madde bulunamadı.' }, { status: 404 })
+  const [{ data: set }, { count: runCount, error: runError }] = await Promise.all([
+    db.from('education_eval_benchmark_sets').select('status').eq('id', item.benchmark_set_id).maybeSingle(),
+    db.from('education_eval_runs').select('id', { count: 'exact', head: true }).eq('benchmark_set_id', item.benchmark_set_id),
+  ])
+  if (runError || !set || set.status !== 'draft' || runCount !== 0) return NextResponse.json({ error: 'Etkin veya kullanılmış benchmark değiştirilemez. Yeni sürüm hazırlayın.' }, { status: 409 })
   const { error } = await db.from('education_eval_benchmark_items').delete().eq('id', itemId)
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   return NextResponse.json({ success: true })
