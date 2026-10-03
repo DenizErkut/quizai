@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { parseAudits, decideAudits, deterministicBlock } from '../scripts/historical-objective-review-policy.mjs'
 
-const result = { index:0,objectiveCode:'MAT.6.1.4',score:90,reason:'40 ve 56 için ortak bölen 8 bulunur; ortak böleni yorumlama ölçülür.',answerCorrect:true,explanationConsistent:true,ageAppropriate:true,unambiguous:true,directObjectiveMatch:true,difficultyMatches:true }
+const result = { index:0,objectiveCode:'MAT.6.1.4',score:90,reason:'40 ve 56 için ortak bölen 8 bulunur; ortak böleni yorumlama ölçülür.',answerCorrect:true,explanationConsistent:true,ageAppropriate:true,unambiguous:true,directObjectiveMatch:true,difficultyMatches:true,standalone:true }
 const parse = (provider, extra = {}) => parseAudits(JSON.stringify({ results:[{ ...result,...extra }] }),1,provider,'test')[0]
 const candidates = [{ id:'objective-id',objective_code:'MAT.6.1.4' }]
 
@@ -16,6 +16,7 @@ test('yanlış cevap veya kapsam dışı soru yüksek puanla bile onaylanmaz',()
     assert.equal(decideAudits([parse('openai'),parse('mistral',{ [field]:false })],candidates).decision,'rejected')
   }
   assert.equal(decideAudits([parse('openai'),parse('mistral',{ score:79 })],candidates).decision,'rejected')
+  assert.equal(decideAudits([parse('openai'),parse('mistral',{ reason:'Bu kazanımı doğrudan olmasa da dolaylı ölçer.' })],candidates).decision,'rejected')
 })
 test('eksik/tekrarlı veya türü bozuk model yanıtı karar sayılmaz',()=> {
   assert.throws(()=>parseAudits('{"results":[]}',1,'openai','test'))
@@ -30,4 +31,6 @@ test('eksik cevap ve yinelenen seçenekler deterministik olarak yakalanır',()=>
   assert.equal(deterministicBlock({ ...question,opts:['-8','8'] }),null)
   assert.equal(deterministicBlock({ ...question,opts:['1,2','12'] }),null)
   assert.ok(deterministicBlock({ ...question,hasVisual:true }))
+  assert.equal(deterministicBlock({ ...question,sourceBased:true }),null)
+  assert.equal(deterministicBlock({ ...question,passage:'Kaynakta örnek işlemler yer alıyordu.' }),null)
 })

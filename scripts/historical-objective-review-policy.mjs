@@ -11,9 +11,10 @@ export function parseAudits(raw, size, provider, model) {
       || typeof result.score !== 'number' || result.score < 0 || result.score > 100
       || typeof result.reason !== 'string' || result.reason.trim().length < 8
       || !(result.objectiveCode === null || typeof result.objectiveCode === 'string')
-      || REQUIRED.some(key => typeof result[key] !== 'boolean') || typeof result.difficultyMatches !== 'boolean') {
+      || REQUIRED.some(key => typeof result[key] !== 'boolean') || typeof result.difficultyMatches !== 'boolean' || typeof result.standalone !== 'boolean') {
       throw new Error(`${provider}: malformed audit`)
     }
+    if (norm(result.reason).includes('dogrudan olmasa')) result.directObjectiveMatch = false
     byIndex.set(result.index, { ...result, provider, model, score: Math.round(result.score), reason: result.reason.slice(0, 1200),
       approved: REQUIRED.every(key => result[key] === true) && result.score >= MIN_SCORE && Boolean(result.objectiveCode) })
   }
@@ -46,7 +47,6 @@ export function deterministicBlock(question) {
     if (new Set(question.opts.map(value => value.normalize('NFKC').toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ').trim())).size !== question.opts.length) return 'Seçenekler yineleniyor.'
   } else if (!['fill_blank', 'short_answer', 'matching', 'multi_true_false', 'ordering', 'table_fill'].includes(type)) return 'Soru tipi tanınmıyor.'
   if (question.svg || question.chartData || question.hasVisual) return 'Görsel soru ayrıca görsel öğretmen kontrolü gerektiriyor; toplu metin denetimiyle onaylanmadı.'
-  if (question.sourceBased || question.passage) return 'Kaynak metne bağlı soru ayrı inceleme gerektiriyor; toplu bağımsız soru denetimiyle onaylanmadı.'
   if (!String(question.exp || question.explanation || '').trim()) return 'Doğru cevabı doğrulayan açıklama eksik.'
   return null
 }

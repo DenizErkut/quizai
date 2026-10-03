@@ -55,6 +55,8 @@ try { for(const line of (await readFile(resolve(directory,'remote-results.jsonl'
   const result=JSON.parse(line)
   for(const applied of result.applied || []) if(['applied','already_applied','already_reviewed'].includes(applied.status)) done.add(applied.key)
 } } catch(error) { if(error.code!=='ENOENT') throw error }
+try { for(const key of JSON.parse(await readFile(resolve(directory,'superseded.json'),'utf8'))) done.delete(key) }
+catch(error) { if(error.code!=='ENOENT') throw error }
 const limit=Number(process.argv.find(arg=>arg.startsWith('--limit='))?.split('=')[1] || Infinity)
 const groups=new Map()
 let targets=[...unique.values()].slice(0,limit)

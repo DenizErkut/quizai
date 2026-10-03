@@ -1,6 +1,6 @@
 export const HISTORICAL_OBJECTIVE_REVIEW_POLICY = 'historical-objective-backfill-v1'
 
-type Audit = { provider?: unknown; approved?: unknown; objectiveCode?: unknown; score?: unknown; difficultyMatches?: unknown; answerCorrect?: unknown; explanationConsistent?: unknown; ageAppropriate?: unknown; unambiguous?: unknown; directObjectiveMatch?: unknown }
+type Audit = { provider?: unknown; approved?: unknown; objectiveCode?: unknown; score?: unknown; difficultyMatches?: unknown; answerCorrect?: unknown; explanationConsistent?: unknown; ageAppropriate?: unknown; unambiguous?: unknown; directObjectiveMatch?: unknown; standalone?: unknown }
 
 export function objectiveReviewContent(question: Record<string, unknown>): string {
   const keys = ['q', 'opts', 'ans', 'exp', 'explanation', 'type', 'blank', 'referenceAnswer', 'pairs', 'items', 'correctOrder', 'statements', 'tableData', 'tableAnswers']
@@ -9,7 +9,7 @@ export function objectiveReviewContent(question: Record<string, unknown>): strin
 
 /** Automated decisions carry their own provenance and require two agreeing auditors. */
 export function hasAutomatedObjectiveApproval(question: Record<string, unknown>): boolean {
-  const review = question.objectiveBackfillReview as { policyVersion?: unknown; decision?: unknown; audits?: Audit[]; content?: unknown } | undefined
+  const review = question.objectiveBackfillReview as { policyVersion?: unknown; decision?: unknown; audits?: Audit[]; content?: unknown; sourceContext?: unknown } | undefined
   const audits = review?.audits
   return question.objectiveMappingStatus === 'ai_approved'
     && question.objectiveVerified === true
@@ -19,6 +19,8 @@ export function hasAutomatedObjectiveApproval(question: Record<string, unknown>)
     && review.content === objectiveReviewContent(question)
     && Array.isArray(audits) && audits.length === 2
     && new Set(audits.map(audit => audit.provider)).size === 2
+    && (audits.every(audit => audit.standalone === true) || review.sourceContext === undefined
+      || JSON.stringify(review.sourceContext) === JSON.stringify(question.passage))
     && audits.every(audit => ['openai', 'mistral'].includes(String(audit.provider)) && audit.approved === true
       && audit.objectiveCode === question.learningObjectiveCode && typeof audit.score === 'number' && audit.score >= 80
       && audit.answerCorrect === true && audit.explanationConsistent === true && audit.ageAppropriate === true
