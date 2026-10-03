@@ -1,3 +1,5 @@
+import { hasVerifiedObjectiveMapping, hasVerifiedBankQuality } from './objective-mapping-verification'
+
 type BankItem = { id: string; question: Record<string, unknown> }
 
 export function verifiedQuestionInventory(rows: BankItem[]) {
@@ -5,8 +7,8 @@ export function verifiedQuestionInventory(rows: BankItem[]) {
   for (const row of rows) {
     const question = row.question
     const id = typeof question.learningObjectiveId === 'string' ? question.learningObjectiveId : ''
-    if (!id || !['mapped', 'human_approved'].includes(String(question.objectiveMappingStatus)) ||
-      question.objectiveVerified !== true || question.qualityVerificationVersion !== 'quiz-quality-v2') continue
+    if (!id || !hasVerifiedObjectiveMapping(question) ||
+      question.objectiveVerified !== true || !hasVerifiedBankQuality(question)) continue
     const difficulty = typeof question.difficulty === 'string' ? question.difficulty.trim().toLocaleLowerCase('tr-TR') : ''
     if (!difficulty) continue
     const current = byObjective.get(id) || { objectiveId: id, code: String(question.learningObjectiveCode || ''), count: 0, difficulty: {} }

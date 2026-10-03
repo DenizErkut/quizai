@@ -26,6 +26,7 @@ function updateQuestion(q: Question, objective: { id: string; objective_code: st
   const base = { ...q }
   // A previous bank quality verdict cannot certify a newly changed mapping.
   delete base.historicalBankQuality
+  delete base.objectiveBackfillReview
   return {
     ...base,
     learningObjectiveId: objective?.id || null,
@@ -71,15 +72,15 @@ export async function GET(req: NextRequest) {
   const source = req.nextUrl.searchParams.get('source') === 'sessions' ? 'sessions' : 'bank'
   const reviewState = req.nextUrl.searchParams.get('reviewState')
   const status = reviewState === 'approved' || reviewState === 'rejected' ? reviewState : 'pending'
-  const mappingStatus = status === 'approved' ? 'human_approved' : status === 'rejected' ? 'human_rejected' : null
+  const mappingStatuses = status === 'approved' ? ['human_approved', 'ai_approved'] : status === 'rejected' ? ['human_rejected', 'ai_rejected'] : null
   const page = Math.max(1, Number(req.nextUrl.searchParams.get('page') || 1))
   const subject = text(req.nextUrl.searchParams.get('subject'))
   const grade = text(req.nextUrl.searchParams.get('grade'))
   const start = (page - 1) * 20
   if (source === 'bank') {
     let query = db.from('question_bank').select('id,question,subject_key,topic_key,grade_key,updated_at', { count: 'exact' })
-    if (mappingStatus) query = query.eq('question->>objectiveMappingStatus', mappingStatus)
-    else query = query.or('question->>objectiveMappingStatus.is.null,question->>objectiveMappingStatus.not.in.(human_approved,human_rejected)')
+    if (mappingStatuses) query = query.in('question->>objectiveMappingStatus', mappingStatuses)
+    else query = query.or('question->>objectiveMappingStatus.is.null,question->>objectiveMappingStatus.not.in.(human_approved,human_rejected,ai_approved,ai_rejected)')
     if (subject) query = query.eq('subject_key', subject)
     if (grade) query = query.eq('grade_key', grade)
     const { data, error, count } = await query.order('updated_at', { ascending: false }).range(start, start + 19)
@@ -102,7 +103,7 @@ export async function GET(req: NextRequest) {
     subject: text(question.subject), grade: row.grade, topic: row.topic,
   }))).filter(item => {
     const currentStatus = text(item.question.objectiveMappingStatus)
-    return (!subject || item.subject === subject) && (mappingStatus ? currentStatus === mappingStatus : currentStatus !== 'human_approved' && currentStatus !== 'human_rejected')
+    return (!subject || item.subject === subject) && (mappingStatuses ? mappingStatuses.includes(currentStatus) : !['human_approved', 'human_rejected', 'ai_approved', 'ai_rejected'].includes(currentStatus))
   })
   return NextResponse.json({ items: matchingItems.slice(start, start + 20), total: matchingItems.length, pageUnit: 'soru' })
 }

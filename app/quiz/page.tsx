@@ -46,7 +46,7 @@ interface Question {
   learningObjectiveRef?: string | null
   learningObjectiveId?: string | null
   learningObjectiveCode?: string | null
-  objectiveMappingStatus?: 'mapped' | 'unmapped' | 'no_candidates'
+  objectiveMappingStatus?: 'mapped' | 'unmapped' | 'no_candidates' | 'human_approved' | 'human_rejected' | 'ai_approved' | 'ai_rejected'
   objectiveMappingVersion?: 'v1'
 }
 interface Profile { name: string; grade: string; language: string; plan: string; monthly_test_count: number; daily_test_count?: number; daily_test_date?: string; onboarding_completed?: boolean; priority_subjects?: unknown; priority_setup_completed?: boolean }

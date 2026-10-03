@@ -6,7 +6,7 @@ import LearningEvidenceReadiness from './LearningEvidenceReadiness'
 
 type Item = {
   key: string; source: 'bank' | 'sessions'; recordId: string; index: number | null
-  question: { q?: string; opts?: string[]; exp?: string; learningObjectiveId?: string | null; learningObjectiveCode?: string | null; objectiveMappingStatus?: string; historicalBankQuality?: { status: 'added' | 'already_in_bank' | 'excluded'; score: number; reason: string; reviewedAt: string } }
+  question: { q?: string; opts?: string[]; exp?: string; learningObjectiveId?: string | null; learningObjectiveCode?: string | null; objectiveMappingStatus?: string; objectiveBackfillReview?: { reason: string; score: number; reviewedAt: string; decision: string; poolStatus?: string }; historicalBankQuality?: { status: 'added' | 'already_in_bank' | 'excluded'; score: number; reason: string; reviewedAt: string } }
   subject: string; grade: string; topic: string
 }
 type Candidate = { id: string; objective_code: string; title: string; topic: string | null }
@@ -110,7 +110,7 @@ export default function ObjectiveMappingReview() {
   }
 
   async function scanApprovedPage() {
-    const targets = items.filter(item => item.source === 'sessions' && item.question.objectiveMappingStatus === 'human_approved')
+    const targets = items.filter(item => item.source === 'sessions' && ['human_approved', 'ai_approved'].includes(item.question.objectiveMappingStatus || ''))
     if (!targets.length) { setMessage('Bu sayfada taranacak onaylı geçmiş soru yok.'); return }
     setQualityRunning(true)
     setSelected(null)
@@ -148,7 +148,7 @@ export default function ObjectiveMappingReview() {
   return <div className="card anim-up" style={{ padding: 24 }}>
     <h2 style={{ fontSize: 20, marginBottom: 6 }}>🎯 Geçmiş Soruların Kazanım Eşleştirmesi</h2>
     <LearningEvidenceReadiness />
-    <p style={{ color: 'var(--text2)', marginBottom: 16 }}>Adaylar yalnızca öneridir. Seçilen kazanım insan onayıyla kaydedilir; ders ve sınıf uyumu ayrıca denetlenir.</p>
+    <p style={{ color: 'var(--text2)', marginBottom: 16 }}>Yeni soruları öğretmenler inceler. Geçmiş birikim için yapılan toplu incelemenin kararları, gerekçeleri ve kalite puanları “Otomatik inceleme” etiketiyle gösterilir.</p>
     <p style={{ color: 'var(--text2)', marginBottom: 16 }}>Soru havuzundaki onay gelecekteki kullanım için kaydedilir. Geçmiş öğrenci sonuçlarını güncellemek için aynı sorunun “Geçmiş testler” kaydı ayrıca incelenmelidir.</p>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
       <button className={`btn btn-sm ${source === 'bank' ? 'btn-primary' : ''}`} onClick={() => { candidateRequest.current++; setSource('bank'); setPage(1); setSelected(null) }}>Soru havuzu</button>
@@ -172,7 +172,8 @@ export default function ObjectiveMappingReview() {
       {items.map(item => <div key={item.key}>
         <button type="button" onClick={() => selected?.key === item.key ? setSelected(null) : select(item)} aria-expanded={selected?.key === item.key} className="card-sm" style={{ width: '100%', textAlign: 'left', cursor: 'pointer', borderColor: selected?.key === item.key ? 'var(--accent)' : undefined }}>
           <div style={{ fontWeight: 600 }}>{item.question.q || 'Soru metni yok'}</div>
-          <small>{item.grade} · {item.subject} · {item.topic} · {item.question.learningObjectiveCode || 'Eşleşmemiş'}{item.question.objectiveMappingStatus === 'human_approved' ? ' · İnsan onaylı' : item.question.objectiveMappingStatus === 'human_rejected' ? ' · Reddedildi' : ''}</small>
+          <small>{item.grade} · {item.subject} · {item.topic} · {item.question.learningObjectiveCode || 'Eşleşmemiş'}{item.question.objectiveMappingStatus === 'human_approved' ? ' · İnsan onaylı' : item.question.objectiveMappingStatus === 'human_rejected' ? ' · Reddedildi' : item.question.objectiveMappingStatus === 'ai_approved' ? ' · Otomatik inceleme: Onaylandı' : item.question.objectiveMappingStatus === 'ai_rejected' ? ' · Otomatik inceleme: Reddedildi' : ''}</small>
+          {item.question.objectiveBackfillReview && <small style={{ display: 'block', marginTop: 4 }}>Kalite: {item.question.objectiveBackfillReview.score}/100 · {item.question.objectiveBackfillReview.reason}</small>}
           {item.question.historicalBankQuality && <small style={{ display: 'block', marginTop: 4 }}>Kalite: {item.question.historicalBankQuality.score}/100 · {item.question.historicalBankQuality.status === 'added' ? 'Havuza alındı' : item.question.historicalBankQuality.status === 'already_in_bank' ? 'Zaten havuzda' : 'Havuz dışında'}</small>}
         </button>
         {selected?.key === item.key && <div style={{ border: '1px solid var(--border)', borderTop: 0, borderRadius: '0 0 16px 16px', padding: 18 }}>
@@ -180,6 +181,7 @@ export default function ObjectiveMappingReview() {
           <p>{selected.question.q}</p>
           {Array.isArray(selected.question.opts) && <ol>{selected.question.opts.map((option, index) => <li key={index}>{option}</li>)}</ol>}
           {selected.question.exp && <p style={{ color: 'var(--text2)' }}>Açıklama: {selected.question.exp}</p>}
+          {selected.question.objectiveBackfillReview && <p style={{ marginTop: 10, color: 'var(--text2)' }}>Toplu inceleme: {selected.question.objectiveBackfillReview.score}/100 — {selected.question.objectiveBackfillReview.reason}</p>}
           {selected.question.historicalBankQuality && <p style={{ color: 'var(--text2)' }}>Kalite incelemesi: {selected.question.historicalBankQuality.score}/100 — {selected.question.historicalBankQuality.reason}</p>}
           <p style={{ marginTop: 10 }}>Mevcut bağ: {selected.question.learningObjectiveCode || 'Yok'}</p>
           <label style={{ display: 'block', marginTop: 12 }}>Kazanım kodu veya açıklamasında ara</label>

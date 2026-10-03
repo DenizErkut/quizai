@@ -39,7 +39,7 @@ export interface Question {
   curriculumVersionId?: string | null
   learningObjectiveRevisionId?: string | null
   objectiveCandidateBasis?: 'topic_exact' | 'title_keyword' | 'unit_exact' | 'reviewed_alias' | null
-  objectiveMappingStatus?: 'mapped' | 'unmapped' | 'no_candidates'
+  objectiveMappingStatus?: 'mapped' | 'unmapped' | 'no_candidates' | 'human_approved' | 'human_rejected' | 'ai_approved' | 'ai_rejected'
   objectiveMappingVersion?: 'v1'
 }
 

@@ -8,6 +8,7 @@ import { evaluateQuestionStructure } from '@/lib/ai-gateway/quality-engine'
 import { evaluateQuestionConsistency } from '@/lib/question-consistency'
 import { hasRealVisualAsset, questionBankKey, questionFingerprint } from '@/lib/question-bank'
 import type { Question } from '@/lib/quiz-constants'
+import { hasAutomatedObjectiveApproval } from '@/lib/objective-mapping-verification'
 
 export const runtime = 'nodejs'
 export const maxDuration = 90
@@ -40,7 +41,7 @@ function blockedReason(question: StoredQuestion): string | null {
     const options = question.opts.map(value => questionBankKey(value))
     if (options.some(value => !value) || new Set(options).size !== options.length) return 'Boş veya yinelenen seçenek var.'
   }
-  if (!question.learningObjectiveId || String(question.objectiveMappingStatus) !== 'human_approved') return 'Kazanım insan tarafından onaylanmamış.'
+  if (!question.learningObjectiveId || (String(question.objectiveMappingStatus) !== 'human_approved' && !hasAutomatedObjectiveApproval(question))) return 'Kazanım eşleştirmesi onaylanmamış.'
   return null
 }
 
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
   const { data: session, error: sessionError } = await db.from('quiz_sessions').select('id,questions,grade,topic,completed').eq('id', body.recordId).maybeSingle()
   if (sessionError || !session || !session.completed || !Array.isArray(session.questions) || !session.questions[body.index!]) return NextResponse.json({ error: 'Tamamlanmış test sorusu bulunamadı.' }, { status: 404 })
   const question = session.questions[body.index!] as StoredQuestion
-  if (String(question.objectiveMappingStatus) !== 'human_approved' || !uuid.test(String(question.learningObjectiveId || ''))) return NextResponse.json({ error: 'Önce kazanım eşleştirmesi onaylanmalı.' }, { status: 400 })
+  if ((String(question.objectiveMappingStatus) !== 'human_approved' && !hasAutomatedObjectiveApproval(question)) || !uuid.test(String(question.learningObjectiveId || ''))) return NextResponse.json({ error: 'Önce kazanım eşleştirmesi onaylanmalı.' }, { status: 400 })
 
   const { data: objective, error: objectiveError } = await db.from('learning_objective_catalog')
     .select('id,objective_code,title,grade,subject').eq('id', question.learningObjectiveId).eq('is_active', true).eq('verification_status', 'verified').maybeSingle()
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest) {
   const { data: freshSession, error: freshError } = await db.from('quiz_sessions').select('questions').eq('id', session.id).maybeSingle()
   const freshQuestions = freshSession?.questions as StoredQuestion[] | undefined
   const freshQuestion = freshQuestions?.[body.index!]
-  if (freshError || !freshQuestion || questionFingerprint(freshQuestion) !== fingerprint || String(freshQuestion.learningObjectiveId) !== String(question.learningObjectiveId) || String(freshQuestion.objectiveMappingStatus) !== 'human_approved') {
+  if (freshError || !freshQuestion || questionFingerprint(freshQuestion) !== fingerprint || String(freshQuestion.learningObjectiveId) !== String(question.learningObjectiveId) || String(freshQuestion.objectiveMappingStatus) !== String(question.objectiveMappingStatus)) {
     return NextResponse.json({ error: 'Soru inceleme sırasında değişti. Listeyi yenileyip yeniden deneyin.' }, { status: 409 })
   }
   let bankId: string | null = null

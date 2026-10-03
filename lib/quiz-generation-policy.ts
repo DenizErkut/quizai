@@ -1,3 +1,5 @@
+import { hasVerifiedObjectiveMapping, hasVerifiedBankQuality } from './objective-mapping-verification'
+
 export const REQUIRED_DIFFICULTIES = ['kolay', 'normal', 'zor', 'cok zor'] as const
 export type RequiredDifficulty = typeof REQUIRED_DIFFICULTIES[number]
 
@@ -216,7 +218,7 @@ export function hasCanonicalObjectiveCoverage(
   return questions.length > 0 && questions.every(question => {
     // Havuz onayı kazanım onayı değildir. Eski havuz kayıtları da kanonik
     // kimlik ve doğrulanmış eşleşme taşımadıkça bu yolu kullanamaz.
-    return (question.objectiveMappingStatus === 'mapped' || question.objectiveMappingStatus === 'human_approved')
+    return hasVerifiedObjectiveMapping(question)
       && typeof question.learningObjectiveId === 'string' && ids.has(question.learningObjectiveId)
       && typeof question.learningObjectiveCode === 'string'
   })
@@ -226,7 +228,7 @@ export function hasStrictQuestionReview(
   questions: Array<Record<string, unknown>>,
   candidates: Array<{ id: string }>,
 ): boolean {
-  return questions.length > 0 && questions.every(question => (question.qualityVerificationVersion === 'quiz-quality-v2'
+  return questions.length > 0 && questions.every(question => (hasVerifiedBankQuality(question)
     || question.qualityVerificationVersion === 'quiz-quality-v2-degraded')
     && question.difficultyVerified === true
     && (candidates.length === 0 || question.objectiveVerified === true))

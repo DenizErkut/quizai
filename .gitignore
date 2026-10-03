@@ -43,4 +43,6 @@ next-env.d.ts
 
 *.zip
 *.bundle
+/.backfill/
+/supabase/.temp/
 

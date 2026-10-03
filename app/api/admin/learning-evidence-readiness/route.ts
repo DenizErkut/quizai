@@ -6,6 +6,17 @@ import { verifiedQuestionInventory } from '@/lib/evidence-readiness'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
+async function verifiedBankRows() {
+  const rows: Array<{ id: string; question: Record<string, unknown> }> = []
+  for (let offset = 0; ; offset += 500) {
+    const result = await db.from('question_bank').select('id,question').eq('review_status', 'approved').eq('report_count', 0)
+      .not('question->>learningObjectiveId', 'is', null).order('id').range(offset, offset + 499)
+    if (result.error) return { data: null, error: result.error }
+    rows.push(...result.data)
+    if (result.data.length < 500) return { data: rows, error: null }
+  }
+}
+
 export async function GET() {
   const jar = await cookies()
   const auth = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
@@ -23,7 +34,7 @@ export async function GET() {
     db.from('question_bank').select('id', { count: 'exact', head: true }).eq('review_status', 'approved').not('question->>learningObjectiveId', 'is', null),
     db.from('learning_gain_measurements').select('id', { count: 'exact', head: true }),
     db.from('learning_transfer_checks').select('id', { count: 'exact', head: true }).eq('status', 'completed'),
-    db.from('question_bank').select('id,question').eq('review_status', 'approved').eq('report_count', 0).not('question->>learningObjectiveId', 'is', null).limit(1000),
+    verifiedBankRows(),
   ])
   if ([events, mappedEvents, approved, mappedBank, gain, transfers, bankRows].some(result => result.error)) {
     return NextResponse.json({ error: 'Kanıt hazırlık durumu alınamadı.' }, { status: 500 })

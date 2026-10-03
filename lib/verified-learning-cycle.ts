@@ -1,3 +1,5 @@
+import { hasVerifiedObjectiveMapping, hasVerifiedBankQuality } from './objective-mapping-verification'
+
 export type VerifiedBankRow = { id: string; question: Record<string, unknown>; grade_key: string; subject_key: string }
 export type VerifiedStage = 'baseline' | 'post' | 'transfer'
 export type VerifiedItemSets = Record<VerifiedStage, string[]>
@@ -6,9 +8,9 @@ export function eligibleVerifiedItem(row: VerifiedBankRow, objectiveId: string):
   const question = row.question
   const options = question.opts
   return question.learningObjectiveId === objectiveId
-    && ['mapped', 'human_approved'].includes(String(question.objectiveMappingStatus))
+    && hasVerifiedObjectiveMapping(question)
     && question.objectiveVerified === true
-    && question.qualityVerificationVersion === 'quiz-quality-v2'
+    && hasVerifiedBankQuality(question)
     && typeof question.q === 'string' && question.q.trim().length > 0
     && typeof question.difficulty === 'string' && question.difficulty.trim().length > 0
     && Array.isArray(options) && options.length >= 3

@@ -5,6 +5,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { generateQuizFallback, callOpenAI, OpenAITruncatedError } from '@/lib/openai'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { hasVerifiedObjectiveMapping } from '@/lib/objective-mapping-verification'
 
 function contextualAdaptiveHint(question: unknown, topic: string, fallback: string | null) {
   if (!fallback) return null
@@ -1839,7 +1840,7 @@ export async function POST(req: NextRequest) {
         && hasStrictQuestionReview(bankQuestions, objectiveCandidates)
         && hasCanonicalObjectiveCoverage(bankQuestions, objectiveCandidates)) {
         const bankRigorSummary = summarizeQuestionSetRigor(bankQuestions, resolvedDifficulty)
-        const mappedCount = bankQuestions.filter((question) => question?.objectiveMappingStatus === 'mapped').length
+        const mappedCount = bankQuestions.filter((question) => question && hasVerifiedObjectiveMapping(question)).length
         const { data: bankSession, error: bankSessionError } = await supabase
           .from('quiz_sessions')
           .insert({
@@ -2805,7 +2806,7 @@ export async function POST(req: NextRequest) {
 
       if (existing) {
         const mergedQuestions = [...(existing.questions || []), ...questions]
-        const mergedObjectiveMappedCount = mergedQuestions.filter((question: any) => question?.objectiveMappingStatus === 'mapped').length
+        const mergedObjectiveMappedCount = mergedQuestions.filter((question: any) => question && hasVerifiedObjectiveMapping(question)).length
         await supabase
           .from('quiz_sessions')
           .update({

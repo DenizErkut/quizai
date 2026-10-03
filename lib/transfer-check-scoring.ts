@@ -1,3 +1,5 @@
+import { hasVerifiedObjectiveMapping, hasVerifiedBankQuality } from './objective-mapping-verification'
+
 type TransferQuestion = Record<string, unknown>
 
 export function usableTransferQuestion(question: TransferQuestion, objectiveId: string, sourceText: string, sourceDifficulty?: string): boolean {
@@ -9,9 +11,9 @@ export function usableTransferQuestion(question: TransferQuestion, objectiveId: 
     && Array.isArray(options) && options.length >= 3 && options.every(option => typeof option === 'string' && option.trim())
     && Number.isInteger(answer) && Number(answer) >= 0 && Number(answer) < options.length
     && question.learningObjectiveId === objectiveId
-    && ['mapped', 'human_approved'].includes(String(question.objectiveMappingStatus))
+    && hasVerifiedObjectiveMapping(question)
     && question.objectiveVerified === true
-    && question.qualityVerificationVersion === 'quiz-quality-v2'
+    && hasVerifiedBankQuality(question)
     && (!sourceDifficulty || String(question.difficulty || '').trim().toLocaleLowerCase('tr-TR') === sourceDifficulty.trim().toLocaleLowerCase('tr-TR'))
 }
 
