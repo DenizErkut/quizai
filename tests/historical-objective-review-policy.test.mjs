@@ -21,6 +21,8 @@ test('yanlış cevap veya kapsam dışı soru yüksek puanla bile onaylanmaz',()
 test('eksik/tekrarlı veya türü bozuk model yanıtı karar sayılmaz',()=> {
   assert.throws(()=>parseAudits('{"results":[]}',1,'openai','test'))
   assert.throws(()=>parse('openai',{ answerCorrect:'true' }))
+  assert.throws(()=>parse('openai',{ difficultyMatches:undefined }))
+  assert.equal(parse('mistral',{ objectiveCode:null,directObjectiveMatch:false,difficultyMatches:undefined,standalone:undefined }).approved,false)
   assert.throws(()=>decideAudits([parse('openai'),parse('openai')],candidates))
 })
 test('eksik cevap ve yinelenen seçenekler deterministik olarak yakalanır',()=> {

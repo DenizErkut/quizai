@@ -7,6 +7,10 @@ export function parseAudits(raw, size, provider, model) {
   if (!Array.isArray(parsed.results) || parsed.results.length !== size) throw new Error(`${provider}: incomplete audit`)
   const byIndex = new Map()
   for (const result of parsed.results) {
+    // Missing reuse-only flags cannot turn an explicit negative audit into approval.
+    if (result.objectiveCode === null || REQUIRED.some(key => result[key] === false) || (typeof result.score === 'number' && result.score < MIN_SCORE)) {
+      for (const key of ['difficultyMatches','standalone']) if (result[key] === undefined) result[key] = false
+    }
     if (!Number.isInteger(result.index) || result.index < 0 || result.index >= size || byIndex.has(result.index)
       || typeof result.score !== 'number' || result.score < 0 || result.score > 100
       || typeof result.reason !== 'string' || result.reason.trim().length < 8
