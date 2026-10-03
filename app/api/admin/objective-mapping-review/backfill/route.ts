@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
   const size=source==='bank'?100:50
   const query=source==='bank'
     ? db.from('question_bank').select('id,question,subject_key,topic_key,grade_key,difficulty').lte('created_at',run.cutoff).order('id').range(offset,offset+size-1)
-    : db.from('quiz_sessions').select('id,questions,grade,topic,difficulty').eq('completed',true).lte('created_at',run.cutoff).order('id').range(offset,offset+size-1)
+    : db.from('quiz_sessions').select('id,questions,grade,topic').eq('completed',true).lte('created_at',run.cutoff).order('id').range(offset,offset+size-1)
   const { data,error }=await query
   if(error) return NextResponse.json({ error:error.message },{ status:500 })
   const items: Target[]=[]
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
       if(!terminal.has(row.question?.objectiveMappingStatus)) items.push({ source,recordId:row.id,index:-1,question:row.question,
         subject:row.subject_key,grade:row.grade_key,topic:row.topic_key,difficulty:row.question?.difficulty || row.difficulty })
     } else for(const [index,question] of (Array.isArray(row.questions)?row.questions:[]).entries()) {
-      if(!terminal.has(question?.objectiveMappingStatus)) items.push({ source,recordId:row.id,index,question,subject:question.subject || '',grade:row.grade,topic:row.topic,difficulty:question.difficulty || row.difficulty })
+      if(!terminal.has(question?.objectiveMappingStatus)) items.push({ source,recordId:row.id,index,question,subject:question.subject || '',grade:row.grade,topic:row.topic,difficulty:question.difficulty })
     }
   }
   return NextResponse.json({ items,nextOffset:offset+size,hasMore:data.length===size })
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
       if(!uuid.test(target.recordId)||!['bank','sessions'].includes(target.source)||!Number.isInteger(target.index)) return NextResponse.json({ error:'Geçersiz soru kimliği.' },{ status:400 })
       const query=target.source==='bank'
         ? db.from('question_bank').select('question,subject_key,grade_key,topic_key,difficulty').eq('id',target.recordId).lte('created_at',run.cutoff)
-        : db.from('quiz_sessions').select('questions,grade,topic,difficulty').eq('id',target.recordId).eq('completed',true).lte('created_at',run.cutoff)
+        : db.from('quiz_sessions').select('questions,grade,topic').eq('id',target.recordId).eq('completed',true).lte('created_at',run.cutoff)
       const { data,error }=await query.maybeSingle()
       if(error) return NextResponse.json({ error:error.message },{ status:500 })
       const row=data as Record<string,any> | null
