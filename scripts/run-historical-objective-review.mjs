@@ -101,7 +101,7 @@ async function worker() {
       let result,lastError
       for(let attempt=0;attempt<attempts;attempt++) {
         try { result=await request({ entries,reviewer }); break }
-        catch(error) { lastError=error; console.warn(`Batch ${index+1}, attempt ${attempt+1}: ${error.message.slice(0,1000)}`); if(/no credits|credit balance|insufficient_quota|billing|yapılandırılmamış/i.test(error.message)) { stoppedReason=error.message.slice(0,1000); break }; if(attempt>=1 && /malformed audit|incomplete audit|truncated|JSON/.test(error.message)) break; if(attempt<attempts-1) await new Promise(resolve=>setTimeout(resolve,Math.min(60000,10000*2**attempt))) }
+        catch(error) { lastError=error; console.warn(`Batch ${index+1}, attempt ${attempt+1}: ${error.message.slice(0,1000)}`); if(/no credits|credit balance|insufficient_quota|billing|yapılandırılmamış|süresi dolmuş|yetkisiz/i.test(error.message)) { stoppedReason=error.message.slice(0,1000); break }; if(attempt>=1 && /malformed audit|incomplete audit|truncated|JSON/.test(error.message)) break; if(attempt<attempts-1) await new Promise(resolve=>setTimeout(resolve,Math.min(60000,10000*2**attempt))) }
       }
       if(!result) throw lastError
       for(const entry of result.results) {
