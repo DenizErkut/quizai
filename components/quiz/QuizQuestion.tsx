@@ -1,5 +1,6 @@
 'use client'
 import { Fragment, useState } from 'react'
+import MathText from '@/components/MathText'
 import { DIFFICULTIES, type Question } from '@/lib/quiz-constants'
 
 type ParsedInlineTable = {
@@ -67,11 +68,7 @@ function parseInlineMarkdownTable(text: string): ParsedInlineTable | null {
 }
 
 function HighlightedText({ text }: { text: string }) {
-  return <>{text.split(/(\[[^\]]+\])/).map((part, idx) =>
-    part.startsWith('[') && part.endsWith(']')
-      ? <span key={idx} style={{ textDecoration: 'underline', textDecorationStyle: 'double', textDecorationColor: '#6366f1', fontWeight: 700 }}>{part.slice(1, -1)}</span>
-      : <span key={idx}>{part}</span>
-  )}</>
+  return <MathText text={text} highlight />
 }
 
 interface QuizQuestionProps {
@@ -222,7 +219,7 @@ export default function QuizQuestion({
               <button type="button" onClick={() => setHintState({ questionIndex: current, open: !hintOpen })} style={{ border: '1px solid var(--border)', borderRadius: 9, padding: '7px 10px', background: 'var(--bg2)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                 {hintOpen ? 'İpucunu kapat' : '💡 İpucu göster'}
               </button>
-              {hintOpen && <div style={{ marginTop: 7, padding: '9px 11px', borderRadius: 9, background: '#fff9e9', color: '#725a52', fontSize: 12 }}>{q.adaptiveHint}</div>}
+              {hintOpen && <div style={{ marginTop: 7, padding: '9px 11px', borderRadius: 9, background: '#fff9e9', color: '#725a52', fontSize: 12 }}><MathText text={q.adaptiveHint} /></div>}
             </div>
           )}
 
@@ -238,7 +235,7 @@ export default function QuizQuestion({
                 return (
                   <button key={i} onClick={() => onSelectAnswer(i)} disabled={chosen !== null}
                     style={{ textAlign: 'left', padding: '12px 15px', borderRadius: '10px', border, background: bg, color, fontSize: '14px', cursor: chosen !== null ? 'default' : 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s', width: '100%' }}>
-                    <span style={{ fontWeight: 700, marginRight: '8px', opacity: 0.5 }}>{String.fromCharCode(65 + i)}.</span>{opt}
+                    <span style={{ fontWeight: 700, marginRight: '8px', opacity: 0.5 }}>{String.fromCharCode(65 + i)}.</span><MathText text={opt} />
                   </button>
                 )
               })}
@@ -490,7 +487,7 @@ export default function QuizQuestion({
                 <strong style={{ color: chosen === q.ans ? '#16a34a' : '#dc2626', display: 'block', marginBottom: '4px' }}>
                   {chosen === q.ans ? '✓ Doğru!' : '✗ Yanlış'}
                 </strong>
-                {q.exp}
+                <MathText text={q.exp} />
               </div>
               <button className="btn btn-primary" onClick={onNext} disabled={checkingAnswer} style={{ width: '100%', justifyContent: 'center' }}>
                 {current + 1 < questions.length ? 'Sonraki Soru →' : 'Sonuçları Gör 🎯'}

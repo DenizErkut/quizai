@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import 'katex/dist/katex.min.css'
 import Navbar from '@/components/Navbar'
 import ThemeToggleFloating from '@/components/ThemeToggleFloating'
 import { UserProvider } from '@/lib/user-context'

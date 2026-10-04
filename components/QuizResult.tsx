@@ -1,4 +1,5 @@
 'use client'
+import MathText from '@/components/MathText'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -472,13 +473,13 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
             const yt = ytLink ? (typeof ytLink === 'string' ? { url: ytLink, title: topic, channel: '', thumbnail: '' } : ytLink) : null
             return (
               <div key={i} style={{ padding: '12px 14px', borderRadius: '10px', background: 'var(--red-bg)', border: '1px solid rgba(220,38,38,0.15)', marginBottom: '10px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>Soru {i + 1}: {q.q}</div>
+                <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>Soru {i + 1}: <MathText text={q.q} /></div>
                 <div style={{ fontSize: '12px', marginBottom: '4px' }}>
-                  <span style={{ color: 'var(--red)' }}>✗ Cevabın: {userAnswerText(q, answers[i]?.userAns)}</span>
+                  <span style={{ color: 'var(--red)' }}>✗ Cevabın: <MathText text={userAnswerText(q, answers[i]?.userAns)} /></span>
                   {'  ·  '}
-                  <span style={{ color: 'var(--green)' }}>✓ Doğru: {correctAnswerText(q)}</span>
+                  <span style={{ color: 'var(--green)' }}>✓ Doğru: <MathText text={correctAnswerText(q)} /></span>
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--text2)', lineHeight: 1.6, marginBottom: '8px' }}>💡 {q.exp}</div>
+                <div style={{ fontSize: '12px', color: 'var(--text2)', lineHeight: 1.6, marginBottom: '8px' }}>💡 <MathText text={q.exp} /></div>
                 {yt && (
                   <a href={yt.url} target="_blank" rel="noopener noreferrer"
                     style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '8px', background: '#ff0000', textDecoration: 'none', color: '#fff', marginBottom: '8px' }}>
@@ -510,7 +511,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
                 {answers[i]?.correct ? '✓' : isPartial ? '◐' : '✗'}
               </span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '3px' }}>{q.q}</div>
+                <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '3px' }}><MathText text={q.q} /></div>
                 {isPartial && <div style={{ fontSize: '12px', color: '#d97706', fontWeight: 700, marginBottom: '3px' }}>
                   Kısmi puan: %{Math.round(earned * 100)}
                 </div>}
