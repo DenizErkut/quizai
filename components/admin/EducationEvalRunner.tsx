@@ -16,7 +16,7 @@ type EvalOutput = {
 type ScoreKey = 'curriculum_alignment_score' | 'pedagogy_score' | 'age_appropriateness_score' | 'safety_score'
 type EvalRun = { id: string; benchmark_version: number; status: 'running' | 'completed' | 'failed'; total_items: number; completed_items: number; created_at: string; completed_at?: string | null }
 type EvalSummary = { provider: string; model: string; n: number; unscoredOutputs: number; accuracy: number; effectiveAccuracy: number; meanLatencyMs: number; totalCostUsd: number; curriculumAlignment: number; pedagogy: number; ageAppropriateness: number; safety: number }
-type RunnerData = { run: EvalRun | null; results: EvalOutput[]; summary: EvalSummary[] | null; progress?: { completedOutputs: number; ratedOutputs: number; totalOutputs: number; completedItems: number; failedOutputs: number; blinded: boolean }; readiness?: { benchmarkStatus: string; eligibleQuestions: number; target: number; providersConfigured: boolean } }
+type RunnerData = { selectedVersion?: number; versions?: Array<{ version: number; status: string; title: string }>; run: EvalRun | null; results: EvalOutput[]; summary: EvalSummary[] | null; progress?: { completedOutputs: number; ratedOutputs: number; totalOutputs: number; completedItems: number; failedOutputs: number; blinded: boolean }; readiness?: { benchmarkStatus: string; eligibleQuestions: number; target: number; providersConfigured: boolean } }
 type Rating = Record<ScoreKey, number> & { reviewerNotes: string }
 
 const RATING_FIELDS: Array<{ key: ScoreKey; label: string }> = [
@@ -28,6 +28,7 @@ const RATING_FIELDS: Array<{ key: ScoreKey; label: string }> = [
 
 export default function EducationEvalRunner() {
   const [data, setData] = useState<RunnerData | null>(null)
+  const [version, setVersion] = useState(0)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [page, setPage] = useState(0)
@@ -36,12 +37,12 @@ export default function EducationEvalRunner() {
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch('/api/admin/education-eval/run', { cache: 'no-store' })
+      const response = await fetch(`/api/admin/education-eval/run${version ? `?version=${version}` : ''}`, { cache: 'no-store' })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Education Eval durumu alınamadı.')
       setData(result)
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Beklenmeyen hata.') }
-  }, [])
+  }, [version])
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load() }, [load])
 
@@ -56,11 +57,12 @@ export default function EducationEvalRunner() {
     try {
       let run = data?.run
       if (!run || run.status !== 'running') {
-        const response = await fetch('/api/admin/education-eval/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'start' }) })
+        const response = await fetch('/api/admin/education-eval/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'start', version: data?.selectedVersion }) })
         const result = await response.json()
         if (!response.ok) throw new Error(result.error || 'Ölçüm başlatılamadı.')
         run = result.run
-        setData(current => ({ ...(current || { run: null, results: [], summary: null }), run, readiness: current?.readiness }))
+        setPage(0); setRatings({})
+        setData(current => ({ ...(current || {}), run, results: [], summary: null, progress: undefined, readiness: current?.readiness }))
       }
       setMessage('Modeller aynı 50 soruda çalışıyor. İstersen işlemi durdurup daha sonra sürdürebilirsin.')
       while (!stopRequested.current) {
@@ -103,8 +105,16 @@ export default function EducationEvalRunner() {
   return <section className="card" style={{ display: 'grid', gap: 14, marginBottom: 16 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
       <div><strong>🧪 Kör Education Eval çalıştırıcısı</strong><div style={{ color: 'var(--text2)', fontSize: 13, marginTop: 4 }}>Aynı onaylı MEB sorularında üç model; otomatik ölçümler ve ayrı insan puanlaması.</div></div>
-      <button className="btn btn-sm" onClick={() => void load()}>Durumu yenile</button>
+      <button className="btn btn-sm" disabled={busy} onClick={() => void load()}>Durumu yenile</button>
     </div>
+    <label>Çalıştırılacak benchmark sürümü
+      <select className="input" value={data.selectedVersion} disabled={busy} onChange={event => {
+        setVersion(Number(event.target.value)); setData(null); setPage(0); setRatings({}); setMessage('')
+      }}>
+        {data.versions?.map(item => <option key={item.version} value={item.version}>v{item.version} · {item.status === 'active' ? 'Etkin / kilitli' : item.status === 'draft' ? 'Taslak' : 'Geçmiş'}</option>)}
+      </select>
+    </label>
+    <small>Seçili benchmark: v{data.selectedVersion}. {data.run ? `Gösterilen çalışma: v${data.run.benchmark_version} · ${data.run.id}` : 'Bu sürüm için henüz çalışma yok.'} Önceki sürümlerin çıktıları ve insan puanları yeni çalışmaya taşınmaz.</small>
     <div style={{ padding: 12, borderRadius: 10, background: 'var(--bg2, #f7f1e9)', color: 'var(--text2)', lineHeight: 1.55 }}>
       Model çağrıları yalnızca yönetici “Başlat” dediğinde yapılır. Başlatmak için kilitli 50/50 benchmark ve üç sağlayıcının yapılandırılmış olması gerekir. 50 sorunun her birinde cevap doğruluğu, süre, gerçek token/maliyet kaydı ölçülür; model kimliği, 150 çıktı da insan tarafından puanlanana dek saklanır.
     </div>
@@ -113,13 +123,13 @@ export default function EducationEvalRunner() {
       <span>Sağlayıcılar: <b>{data.readiness?.providersConfigured ? 'hazır' : 'eksik yapılandırma var'}</b></span>
       {data.run && <span>Çalışma: <b>{progress.completedItems}/50 soru</b>, {progress.completedOutputs}/150 model çıktısı · {progress.ratedOutputs}/150 insan puanı</span>}
     </div>
-    {data.run?.status !== 'completed' && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
       <button className="btn btn-primary" disabled={busy || (!waitingRun && !ready)} onClick={() => void startOrContinue()}>
-        {busy ? 'Çalışıyor…' : waitingRun ? 'Sürdür / hataları yinele' : '50 soruluk karşılaştırmayı başlat'}
+        {busy ? 'Çalışıyor…' : waitingRun ? 'Sürdür / hataları yinele' : `v${data.selectedVersion} için ${data.run ? 'yeni ' : ''}50 soruluk değerlendirmeyi başlat`}
       </button>
       {busy && <button className="btn btn-sm" onClick={() => { stopRequested.current = true }}>Duraklat</button>}
       {!waitingRun && !ready && <small style={{ alignSelf: 'center', color: 'var(--text2)' }}>Önce Education Eval bölümündeki 50/50 soruluk seti tamamlayıp etkinleştirin; henüz model çağrısı yapılmıyor.</small>}
-    </div>}
+    </div>
 
     {data.run && data.run.status !== 'running' && <div style={{ display: 'grid', gap: 10 }}>
       <strong>Kör çıktı puanlaması · sayfa {page + 1}/{pages}</strong>

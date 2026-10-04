@@ -29,8 +29,9 @@ async function getAdminUser() {
   return profile?.is_admin ? user : null
 }
 
-async function loadRun(runId?: string) {
+async function loadRun(runId?: string, version?: number) {
   let query = db.from('education_eval_runs').select('*').order('created_at', { ascending: false }).limit(1)
+  if (version) query = query.eq('benchmark_version', version)
   if (runId) query = db.from('education_eval_runs').select('*').eq('id', runId).limit(1)
   const { data: runs, error } = await query
   if (error) throw error
@@ -84,14 +85,19 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
   try {
     const runId = req.nextUrl.searchParams.get('runId') || undefined
+    const { data: versions, error: versionsError } = await db.from('education_eval_benchmark_sets').select('version,status,title').eq('code', 'meb-k12-controlled').order('version', { ascending: false })
+    if (versionsError) throw versionsError
+    const version = Number(req.nextUrl.searchParams.get('version') || versions?.find(item => item.status === 'active')?.version || 1)
+    if (!Number.isInteger(version) || version < 1) return NextResponse.json({ error: 'Geçerli benchmark sürümü gerekli.' }, { status: 400 })
     const [state, { data: set }] = await Promise.all([
-      loadRun(runId),
-      db.from('education_eval_benchmark_sets').select('id,status,target_size').eq('code', 'meb-k12-controlled').eq('version', 1).maybeSingle(),
+      loadRun(runId, version),
+      db.from('education_eval_benchmark_sets').select('id,status,target_size').eq('code', 'meb-k12-controlled').eq('version', version).maybeSingle(),
     ])
+    if (state.run && state.run.benchmark_version !== version) return NextResponse.json({ error: 'Çalışma seçili benchmark sürümüne ait değil.' }, { status: 409 })
     const { count: eligibleCount } = set ? await db.from('education_eval_benchmark_items').select('id', { count: 'exact', head: true })
       .eq('benchmark_set_id', set.id).eq('metric_eligible', true) : { count: 0 }
     const configured = PROVIDERS.every(provider => isProviderConfigured(provider.key === 'anthropic' ? 'anthropic' : provider.key))
-    return NextResponse.json({ ...state, readiness: { benchmarkStatus: set?.status || 'missing', eligibleQuestions: eligibleCount || 0,
+    return NextResponse.json({ ...state, selectedVersion: version, versions: versions || [], readiness: { benchmarkStatus: set?.status || 'missing', eligibleQuestions: eligibleCount || 0,
       target: set?.target_size || 50, providersConfigured: configured } })
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Education Eval verisi alınamadı.' }, { status: 500 })
@@ -105,9 +111,11 @@ export async function POST(req: NextRequest) {
   if (!body || typeof body.action !== 'string') return NextResponse.json({ error: 'İşlem bilgisi gerekli.' }, { status: 400 })
 
   if (body.action === 'start') {
+    const version = Number(body.version)
+    if (!Number.isInteger(version) || version < 1) return NextResponse.json({ error: 'Başlatılacak benchmark sürümünü seçin.' }, { status: 400 })
     const missing = PROVIDERS.filter(provider => !isProviderConfigured(provider.key === 'anthropic' ? 'anthropic' : provider.key))
     if (missing.length) return NextResponse.json({ error: `Ölçüm başlatılmadı; yapılandırılmamış sağlayıcılar var: ${missing.map(item => item.key).join(', ')}.` }, { status: 409 })
-    const { data: set, error: setError } = await db.from('education_eval_benchmark_sets').select('id,version,status,target_size').eq('code', 'meb-k12-controlled').eq('version', 1).maybeSingle()
+    const { data: set, error: setError } = await db.from('education_eval_benchmark_sets').select('id,version,status,target_size').eq('code', 'meb-k12-controlled').eq('version', version).maybeSingle()
     if (setError) return NextResponse.json({ error: setError.message }, { status: 500 })
     if (!set || set.status !== 'active' || set.target_size !== 50) return NextResponse.json({ error: 'Önce 50 soruluk MEB benchmark setini kilitleyip etkinleştirin.' }, { status: 409 })
     const { data: items, error: itemsError } = await db.from('education_eval_benchmark_items').select('id,question_snapshot,answer_key,metric_eligible').eq('benchmark_set_id', set.id).eq('metric_eligible', true).order('ordinal')
