@@ -1,4 +1,5 @@
 import { questionBankKey } from '@/lib/question-bank'
+import { educationEvalSubjectKey } from './education-eval-subject'
 
 export function educationEvalGradeKey(value: unknown) {
   const grade = String(value || '').trim()
@@ -13,6 +14,6 @@ export function isEducationEvalObjectiveInScope(
   scope: { grade: unknown; subject: unknown; curriculumVersionId: unknown },
 ) {
   return educationEvalGradeKey(objective.grade) === educationEvalGradeKey(scope.grade)
-    && questionBankKey(objective.subject) === questionBankKey(scope.subject)
+    && educationEvalSubjectKey(objective.subject) === educationEvalSubjectKey(scope.subject)
     && String(objective.curriculum_version_id || '') === String(scope.curriculumVersionId || '')
 }

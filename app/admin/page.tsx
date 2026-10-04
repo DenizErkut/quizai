@@ -1831,7 +1831,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                 </select>
               </div>
               {tab === 'question-books' && <div>
-                <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Sınıf</label>
+                <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Sınıf *</label>
                 <input value={examForm.grade} onChange={e => setExamForm(p => ({ ...p, grade: e.target.value }))} placeholder="6" style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', boxSizing: 'border-box' as const }} />
               </div>}
               {tab === 'question-books' && <div>
@@ -1897,7 +1897,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             )}
 
             <button
-              disabled={examUploading || !examFile || !examForm.title}
+              disabled={examUploading || !examFile || !examForm.title || (tab === 'question-books' && (!examForm.grade.trim() || !examForm.subject.trim()))}
               onClick={async () => {
                 if (!examFile || !examForm.title) return
                 setExamUploading(true); setExamMsg('')

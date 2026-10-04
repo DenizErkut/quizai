@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto'
 import { callOpenAI } from '@/lib/openai'
 import { questionBankKey } from '@/lib/question-bank'
 import { educationEvalGradeKey } from '@/lib/education-eval-grade'
+import { educationEvalSubjectKey } from '@/lib/education-eval-subject'
 import { matchVerifiedObjectiveCode, parseLearningObjectiveCodes } from '@/lib/learning-objective-codes'
 
 const adminDb = createClient(
@@ -209,7 +210,7 @@ async function loadVerifiedBookletObjectives(row: { subject?: string | null; gra
   return (data || []).filter(objective => {
     const code = matchVerifiedObjectiveCode(objective.objective_code, codes)
     const inScope = educationEvalGradeKey(objective.grade) === educationEvalGradeKey(row.grade)
-      && questionBankKey(objective.subject) === questionBankKey(row.subject)
+      && educationEvalSubjectKey(objective.subject) === educationEvalSubjectKey(row.subject)
     if (!code || !inScope || seen.has(code)) return false
     seen.add(code)
     return true
@@ -394,6 +395,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (purpose === 'instant_test') {
+      if (!grade.trim() || !subject.trim()) {
+        return NextResponse.json({ error: 'Anlık test kitapçığı için sınıf ve ders zorunludur.' }, { status: 400 })
+      }
       exam_type = 'ANLIK_TEST'
       year = new Date().getFullYear().toString()
       answer_key = ''

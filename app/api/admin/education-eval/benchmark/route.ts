@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { questionBankKey } from '@/lib/question-bank'
+import { educationEvalSubjectKey as questionBankKey } from '@/lib/education-eval-subject'
 import { educationEvalGradeKey, isEducationEvalObjectiveInScope } from '@/lib/education-eval-grade'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
