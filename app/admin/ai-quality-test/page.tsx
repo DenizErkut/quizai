@@ -26,6 +26,7 @@
 // debugGenEngine/debugBankFallback alanlarını dönüyor; bu sayfa bunları
 // açıkça gösteriyor.
 'use client'
+import MathText from '@/components/MathText'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -247,17 +248,17 @@ export default function AIQualityTestPage() {
                     <div style={{ maxHeight: '480px', overflowY: 'auto' }}>
                       {(run.data.questions || []).map((q: any, i: number) => (
                         <div key={i} style={{ padding: '10px', borderRadius: '8px', background: 'var(--bg2)', marginBottom: '8px' }}>
-                          <div style={{ fontWeight: 700, fontSize: '12px', marginBottom: 5, whiteSpace: 'pre-wrap' }}>{i + 1}. {q.q}</div>
+                          <div style={{ fontWeight: 700, fontSize: '12px', marginBottom: 5, whiteSpace: 'pre-wrap' }}>{i + 1}. <MathText text={q.q} /></div>
                           {Array.isArray(q.opts) && (
                             <div style={{ fontSize: '11px', color: 'var(--text2)' }}>
                               {q.opts.map((opt: string, oi: number) => (
                                 <div key={oi} style={{ color: oi === q.ans ? '#16a34a' : 'var(--text2)', fontWeight: oi === q.ans ? 700 : 400 }}>
-                                  {String.fromCharCode(65 + oi)}) {opt} {oi === q.ans ? '✓' : ''}
+                                  {String.fromCharCode(65 + oi)}) <MathText text={opt} /> {oi === q.ans ? '✓' : ''}
                                 </div>
                               ))}
                             </div>
                           )}
-                          {q.explanation && <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: 5, fontStyle: 'italic' }}>{q.explanation}</div>}
+                          {q.explanation && <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: 5, fontStyle: 'italic' }}><MathText text={q.explanation} /></div>}
                         </div>
                       ))}
                     </div>

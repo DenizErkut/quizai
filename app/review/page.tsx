@@ -1,4 +1,5 @@
 'use client'
+import MathText from "@/components/MathText"
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
@@ -115,7 +116,7 @@ export default function ReviewPage() {
             🧠 {card.topic}
           </div>
           <div style={{ fontSize: '16px', fontWeight: 500, color: 'var(--primary)', lineHeight: 1.65, marginBottom: '1.25rem' }}>
-            {card.question}
+            <MathText text={card.question} />
           </div>
 
           {/* Şıklar */}
@@ -128,7 +129,7 @@ export default function ReviewPage() {
                 return (
                   <div key={i} style={{ padding: '10px 14px', borderRadius: '10px', border: `1.5px solid ${border}`, background: bg, color, fontSize: '14px', display: 'flex', gap: '8px' }}>
                     <span style={{ fontWeight: 700, color: showAnswer && isCorrect ? '#16a34a' : '#8b5cf6' }}>{['A','B','C','D'][i]}</span>
-                    {opt}
+                    <MathText text={opt} />
                     {showAnswer && isCorrect && <span style={{ marginLeft: 'auto' }}>✓</span>}
                   </div>
                 )
@@ -138,7 +139,7 @@ export default function ReviewPage() {
 
           {showAnswer && card.explanation && (
             <div style={{ padding: '10px 12px', borderRadius: '10px', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', fontSize: '13px', color: 'var(--text)', lineHeight: 1.6 }}>
-              💡 {card.explanation}
+              💡 <MathText text={card.explanation} />
             </div>
           )}
         </div>

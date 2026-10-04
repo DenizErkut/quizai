@@ -1,4 +1,5 @@
 'use client'
+import MathText from "@/components/MathText"
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
@@ -682,7 +683,7 @@ export default function ExamPage() {
             <div className="card" style={{ marginBottom: '1rem' }}>
               {q.passage && (
                 <div style={{ padding: '14px', borderRadius: 12, background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: 13, lineHeight: 1.7, marginBottom: 16, whiteSpace: 'pre-wrap' }}>
-                  {q.passage}
+                  <MathText text={q.passage} />
                 </div>
               )}
               {q.visual && (
@@ -690,18 +691,14 @@ export default function ExamPage() {
                   {q.visual.title && <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 8 }}>{q.visual.title}</div>}
                   {q.visual.kind === 'table' && q.visual.rows?.length ? (
                     <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                      {q.visual.headers?.length ? <thead><tr>{q.visual.headers.map((header, index) => <th key={index} style={{ border: '1px solid #cbd5e1', padding: 7 }}>{header}</th>)}</tr></thead> : null}
-                      <tbody>{q.visual.rows.map((row, ri) => <tr key={ri}>{row.map((cell, ci) => <td key={ci} style={{ border: '1px solid #cbd5e1', padding: 7 }}>{cell}</td>)}</tr>)}</tbody>
+                      {q.visual.headers?.length ? <thead><tr>{q.visual.headers.map((header, index) => <th key={index} style={{ border: '1px solid #cbd5e1', padding: 7 }}><MathText text={header} /></th>)}</tr></thead> : null}
+                      <tbody>{q.visual.rows.map((row, ri) => <tr key={ri}>{row.map((cell, ci) => <td key={ci} style={{ border: '1px solid #cbd5e1', padding: 7 }}><MathText text={cell} /></td>)}</tr>)}</tbody>
                     </table></div>
                   ) : <div style={{ fontSize: 12, lineHeight: 1.6 }}>{q.visual.description}</div>}
                 </div>
               )}
               <div style={{ fontSize: '15px', fontWeight: 500, color: 'var(--primary)', lineHeight: 1.65, marginBottom: '1.25rem' }}>
-                {q.q.split(/(\[[^\]]+\])/).map((part: string, idx: number) =>
-                  part.startsWith('[') && part.endsWith(']')
-                    ? <span key={idx} style={{ textDecoration: 'underline', textDecorationStyle: 'double', textDecorationColor: '#6366f1', fontWeight: 700 }}>{part.slice(1, -1)}</span>
-                    : <span key={idx}>{part}</span>
-                )}
+                <MathText text={q.q} highlight />
               </div>
 
               {/* Şıklar */}
@@ -729,7 +726,7 @@ export default function ExamPage() {
                       <span style={{ fontWeight: 700, flexShrink: 0, width: '18px' }}>
                         {['A', 'B', 'C', 'D', 'E'][i]}
                       </span>
-                      {opt}
+                      <MathText text={opt} />
                       {chosen !== null && isCorrect && <span style={{ marginLeft: 'auto' }}>✓</span>}
                       {chosen !== null && isChosen && !isCorrect && <span style={{ marginLeft: 'auto' }}>✗</span>}
                     </button>
@@ -740,7 +737,7 @@ export default function ExamPage() {
               {/* Açıklama */}
               {showExp && q.exp && (
                 <div style={{ marginTop: '12px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(30,207,184,0.08)', border: '1px solid rgba(30,207,184,0.2)', fontSize: '13px', color: 'var(--text)', lineHeight: 1.6 }}>
-                  💡 {q.exp}
+                  💡 <MathText text={q.exp} />
                 </div>
               )}
             </div>

@@ -1,6 +1,7 @@
 'use client'
 import { Fragment, useState } from 'react'
 import MathText from '@/components/MathText'
+import { plainMathText } from '@/lib/math-text'
 import { DIFFICULTIES, type Question } from '@/lib/quiz-constants'
 
 type ParsedInlineTable = {
@@ -190,7 +191,7 @@ export default function QuizQuestion({
                 📖 Kaynak Metin{!isFirstPassageOccurrence && passageOrigin !== undefined && ` (Soru ${passageOrigin + 1}'de gösterildi — tekrar okumak için aç)`}
               </summary>
               <div style={{ marginTop: '10px', maxHeight: '240px', overflowY: 'auto', fontSize: '13px', lineHeight: 1.6, color: 'var(--text2)', whiteSpace: 'pre-wrap' }}>
-                {q.passage}
+                <MathText text={q.passage} />
               </div>
             </details>
           )}
@@ -201,10 +202,10 @@ export default function QuizQuestion({
               <div style={{ overflowX: 'auto', marginBottom: '12px', border: '1px solid var(--border)', borderRadius: '10px' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '420px', fontSize: '14px' }}>
                   <thead>
-                    <tr>{inlineTable.headers.map((header, index) => <th key={index} style={{ padding: '10px 12px', background: 'rgba(8,36,101,0.08)', color: 'var(--primary)', textAlign: 'left', borderBottom: '1px solid var(--border)', fontWeight: 700 }}>{header}</th>)}</tr>
+                    <tr>{inlineTable.headers.map((header, index) => <th key={index} style={{ padding: '10px 12px', background: 'rgba(8,36,101,0.08)', color: 'var(--primary)', textAlign: 'left', borderBottom: '1px solid var(--border)', fontWeight: 700 }}><MathText text={header} /></th>)}</tr>
                   </thead>
                   <tbody>
-                    {inlineTable.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex} style={{ padding: '10px 12px', borderBottom: rowIndex === inlineTable.rows.length - 1 ? 'none' : '1px solid var(--border)', background: rowIndex % 2 ? 'var(--bg2)' : 'var(--bg)' }}>{cell}</td>)}</tr>)}
+                    {inlineTable.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex} style={{ padding: '10px 12px', borderBottom: rowIndex === inlineTable.rows.length - 1 ? 'none' : '1px solid var(--border)', background: rowIndex % 2 ? 'var(--bg2)' : 'var(--bg)' }}><MathText text={cell} /></td>)}</tr>)}
                   </tbody>
                 </table>
               </div>
@@ -277,7 +278,7 @@ export default function QuizQuestion({
               )}
               {chosen !== null && (
                 <div style={{ marginTop: '10px', fontSize: '13px', fontWeight: 600, color: answers[answers.length-1]?.correct ? '#15803d' : '#dc2626' }}>
-                  {answers[answers.length-1]?.correct ? '✓ Doğru!' : `Doğru cevap: "${q.blank || q.opts?.[q.ans]}"`}
+                  {answers[answers.length-1]?.correct ? '✓ Doğru!' : <>Doğru cevap: <MathText text={q.blank || q.opts?.[q.ans] || ''} /></>}
                 </div>
               )}
             </div>
@@ -296,7 +297,7 @@ export default function QuizQuestion({
               )}
               {chosen !== null && (
                 <div style={{ marginTop: '12px', padding: '12px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '13px' }}>
-                  <strong style={{ color: 'var(--primary)' }}>Örnek cevap:</strong> {q.opts?.[q.ans] || q.blank}
+                  <strong style={{ color: 'var(--primary)' }}>Örnek cevap:</strong> <MathText text={q.opts?.[q.ans] || q.blank} />
                 </div>
               )}
             </div>
@@ -315,7 +316,7 @@ export default function QuizQuestion({
                   return (
                     <Fragment key={i}>
                       <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'rgba(8,36,101,0.06)', border: '1px solid var(--border)', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center' }}>
-                        {pair.left}
+                        <MathText text={pair.left} />
                       </div>
                       <select value={userShuffledIdx ?? ''}
                         onChange={e => setMatchAnswer(prev => ({ ...prev, [i]: Number(e.target.value) }))}
@@ -323,7 +324,7 @@ export default function QuizQuestion({
                         style={{ padding: '10px 12px', borderRadius: '8px', border: `1.5px solid ${isAnswered ? (isCorrect ? 'rgba(22,163,74,0.5)' : 'rgba(220,38,38,0.4)') : 'var(--border)'}`, background: isAnswered ? (isCorrect ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.06)') : 'var(--bg2)', fontSize: '13px', fontFamily: 'var(--font-sans)', color: 'var(--text)' }}>
                         <option value="">Seç...</option>
                         {shuffledPairs.map((right: string, j: number) => (
-                          <option key={j} value={j}>{right}</option>
+                          <option key={j} value={j}>{plainMathText(right)}</option>
                         ))}
                       </select>
                     </Fragment>
@@ -342,7 +343,7 @@ export default function QuizQuestion({
                 <div style={{ marginTop: '10px', padding: '12px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '13px' }}>
                   <strong style={{ color: 'var(--primary)', display: 'block', marginBottom: '6px' }}>Doğru eşleşmeler:</strong>
                   {(q.pairs || []).map((p: any, i: number) => (
-                    <div key={i} style={{ marginTop: '3px', color: 'var(--text2)' }}>• {p.left} → {p.right}</div>
+                    <div key={i} style={{ marginTop: '3px', color: 'var(--text2)' }}>• <MathText text={p.left} /> → <MathText text={p.right} /></div>
                   ))}
                 </div>
               )}
@@ -359,7 +360,7 @@ export default function QuizQuestion({
                   return (
                     <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 14px', borderRadius: '10px', border: `1.5px solid ${chosen !== null ? (isCorrect ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.3)') : 'var(--border)'}`, background: chosen !== null ? (isCorrect ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.06)') : 'var(--bg2)', fontSize: '13px' }}>
                       <span style={{ fontWeight: 700, color: 'var(--text4)', fontSize: '12px', width: '20px' }}>{i + 1}.</span>
-                      <span style={{ flex: 1 }}>{item}</span>
+                      <span style={{ flex: 1 }}><MathText text={item} /></span>
                       {chosen === null && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                           <button onClick={() => { if (i === 0) return; const a = [...orderAnswer]; [a[i-1], a[i]] = [a[i], a[i-1]]; setOrderAnswer(a) }} disabled={i === 0} style={{ background: 'rgba(8,36,101,0.08)', border: '1px solid rgba(8,36,101,0.15)', borderRadius: '6px', cursor: 'pointer', color: '#082465', fontSize: '20px', padding: '4px 10px', opacity: i === 0 ? 0.3 : 1, lineHeight: 1 }}>▲</button>
@@ -389,7 +390,7 @@ export default function QuizQuestion({
                   const isCorrect = multiTFAnswer[i] === s.correct
                   return (
                     <div key={i} style={{ padding: '12px 14px', borderRadius: '10px', border: `1.5px solid ${isAnswered ? (isCorrect ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.3)') : 'var(--border)'}`, background: isAnswered ? (isCorrect ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.06)') : 'var(--bg2)' }}>
-                      <div style={{ fontSize: '13px', marginBottom: '8px' }}>{i + 1}. {s.text}</div>
+                      <div style={{ fontSize: '13px', marginBottom: '8px' }}>{i + 1}. <MathText text={s.text} /></div>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         {[true, false].map(val => (
                           <button key={String(val)} onClick={() => { if (chosen !== null) return; setMultiTFAnswer(prev => ({ ...prev, [i]: val })) }}
@@ -437,7 +438,7 @@ export default function QuizQuestion({
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                     <thead>
                       <tr>{td?.headers?.map((h: string, i: number) => (
-                        <th key={i} style={{ padding: '10px 12px', background: 'rgba(8,36,101,0.06)', border: '1px solid var(--border)', fontWeight: 700, color: 'var(--primary)', textAlign: 'left' }}>{h}</th>
+                        <th key={i} style={{ padding: '10px 12px', background: 'rgba(8,36,101,0.06)', border: '1px solid var(--border)', fontWeight: 700, color: 'var(--primary)', textAlign: 'left' }}><MathText text={h} /></th>
                       ))}</tr>
                     </thead>
                     <tbody>
@@ -452,7 +453,7 @@ export default function QuizQuestion({
                                 <td key={ci} style={{ padding: '8px', border: '1px solid var(--border)', background: chosen !== null ? (isCorrectAns ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.06)') : 'var(--bg3)' }}>
                                   {chosen !== null ? (
                                     <span style={{ fontWeight: 600, color: isCorrectAns ? '#15803d' : '#dc2626' }}>
-                                      {tableFillAnswer[idx] || '—'} {!isCorrectAns && <span style={{ fontSize: '11px' }}>→ {tableAnswers[idx]}</span>}
+                                      <MathText text={tableFillAnswer[idx] || '—'} /> {!isCorrectAns && <span style={{ fontSize: '11px' }}>→ <MathText text={tableAnswers[idx]} /></span>}
                                     </span>
                                   ) : (
                                     <input value={tableFillAnswer[idx] || ''} onChange={e => { const n = [...tableFillAnswer]; n[idx] = e.target.value; setTableFillAnswer(() => n) }}
@@ -461,7 +462,7 @@ export default function QuizQuestion({
                                 </td>
                               )
                             }
-                            return <td key={ci} style={{ padding: '10px 12px', border: '1px solid var(--border)', color: 'var(--text2)' }}>{cell}</td>
+                            return <td key={ci} style={{ padding: '10px 12px', border: '1px solid var(--border)', color: 'var(--text2)' }}><MathText text={cell} /></td>
                           })}
                         </tr>
                       ))}

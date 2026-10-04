@@ -1,4 +1,5 @@
 'use client'
+import MathText from "@/components/MathText"
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -128,7 +129,7 @@ export default function ChallengePage() {
 
       <div style={{ maxWidth: '560px', margin: '0 auto', padding: '1.25rem 1rem' }}>
         <div className="card">
-          <div style={{ fontSize: '15px', fontWeight: 500, color: 'var(--primary)', lineHeight: 1.65, marginBottom: '1.25rem' }}>{q.q}</div>
+          <div style={{ fontSize: '15px', fontWeight: 500, color: 'var(--primary)', lineHeight: 1.65, marginBottom: '1.25rem' }}><MathText text={q.q} /></div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {q.opts.map((opt: string, i: number) => {
               const isChosen = chosen === i
@@ -142,7 +143,7 @@ export default function ChallengePage() {
                 <button key={i} onClick={() => selectAnswer(i)} disabled={chosen !== null}
                   style={{ textAlign: 'left', padding: '12px 14px', borderRadius: '10px', border: `1.5px solid ${border}`, background: bg, color, cursor: chosen !== null ? 'default' : 'pointer', fontFamily: 'var(--font-sans)', fontSize: '14px', display: 'flex', gap: '10px', transition: 'all 0.15s' }}>
                   <span style={{ fontWeight: 700 }}>{['A','B','C','D'][i]}</span>
-                  {opt}
+                  <MathText text={opt} />
                   {chosen !== null && isCorrect && <span style={{ marginLeft: 'auto' }}>✓</span>}
                   {chosen !== null && isChosen && !isCorrect && <span style={{ marginLeft: 'auto' }}>✗</span>}
                 </button>

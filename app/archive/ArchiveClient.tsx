@@ -61,116 +61,10 @@ function dateGroup(iso: string): string {
   return new Date(iso).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
 }
 
-// ✅ PDF Export fonksiyonu — jsPDF client-side
+// Shared Unicode and mathematical print/PDF layout.
 async function exportQuizPDF(session: Session) {
-  const { jsPDF } = await import('jspdf')
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-
-  const pageW = 210
-  const margin = 18
-  const contentW = pageW - margin * 2
-  let y = 20
-
-  // Başlık
-  doc.setFillColor(8, 36, 101) // navy
-  doc.rect(0, 0, pageW, 28, 'F')
-  doc.setTextColor(253, 211, 29) // yellow
-  doc.setFontSize(16)
-  doc.setFont('helvetica', 'bold')
-  doc.text('pratium.com', margin, 12)
-  doc.setTextColor(255, 255, 255)
-  doc.setFontSize(10)
-  doc.setFont('helvetica', 'normal')
-  doc.text('AI Destekli Soru Platformu', margin, 20)
-  y = 40
-
-  // Test bilgisi
-  doc.setTextColor(8, 36, 101)
-  doc.setFontSize(16)
-  doc.setFont('helvetica', 'bold')
-  const titleLines = doc.splitTextToSize(session.topic, contentW)
-  doc.text(titleLines, margin, y)
-  y += titleLines.length * 7 + 4
-
-  doc.setFontSize(9)
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(100, 116, 139)
-  const meta = [
-    session.grade && `Sınıf: ${session.grade}`,
-    `${session.question_count} Soru`,
-    session.question_type && (QUESTION_TYPE_LABELS[session.question_type] || session.question_type),
-    new Date(session.created_at).toLocaleDateString('tr-TR'),
-  ].filter(Boolean).join('  ·  ')
-  doc.text(meta, margin, y)
-  y += 6
-
-  // Ad-soyad alanı
-  doc.setDrawColor(226, 232, 240)
-  doc.line(margin, y, pageW - margin, y)
-  y += 8
-  doc.setFontSize(9)
-  doc.setTextColor(100, 116, 139)
-  doc.text('Ad Soyad: ________________________________________    Tarih: ___________', margin, y)
-  y += 10
-
-  // Sorular
-  const questions: any[] = session.questions || []
-
-  questions.forEach((q: any, idx: number) => {
-    // Sayfa taşıyorsa yeni sayfa
-    if (y > 265) {
-      doc.addPage()
-      y = 20
-    }
-
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(15, 23, 42)
-    const qText = `${idx + 1}. ${q.q || q.question || ''}`
-    const qLines = doc.splitTextToSize(qText, contentW)
-    doc.text(qLines, margin, y)
-    y += qLines.length * 5.5 + 2
-
-    // Seçenekler
-    if (q.opts && Array.isArray(q.opts)) {
-      const letters = ['A', 'B', 'C', 'D', 'E']
-      q.opts.forEach((opt: string, oi: number) => {
-        if (y > 270) { doc.addPage(); y = 20 }
-        doc.setFont('helvetica', 'normal')
-        doc.setFontSize(9)
-        doc.setTextColor(51, 65, 85)
-        const optText = `${letters[oi]}) ${opt}`
-        const optLines = doc.splitTextToSize(optText, contentW - 6)
-        doc.text(optLines, margin + 5, y)
-        y += optLines.length * 5 + 1
-      })
-      y += 2
-    } else if (q.type === 'true_false') {
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(9)
-      doc.setTextColor(51, 65, 85)
-      doc.text('A) Doğru    B) Yanlış', margin + 5, y)
-      y += 7
-    } else if (q.type === 'fill_blank' || q.type === 'short_answer') {
-      doc.setDrawColor(200, 210, 220)
-      doc.line(margin + 5, y + 4, margin + contentW - 5, y + 4)
-      y += 10
-    }
-
-    y += 3
-  })
-
-  // Footer
-  const pageCount = doc.getNumberOfPages()
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i)
-    doc.setFontSize(8)
-    doc.setTextColor(148, 163, 184)
-    doc.text(`pratium.com  ·  ${i} / ${pageCount}`, pageW / 2, 293, { align: 'center' })
-  }
-
-  const fileName = `${session.topic.slice(0, 40).replace(/[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ\s]/g, '')}_quiz.pdf`
-  doc.save(fileName)
+  const { printLearningDocument, questionPrintHtml } = await import("@/lib/learning-print");
+  await printLearningDocument("Pratium - " + session.topic, [session.grade, new Date(session.created_at).toLocaleDateString("tr-TR"), session.question_count + " soru"].filter(Boolean).join(" · "), questionPrintHtml(session.questions || []));
 }
 
 export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
@@ -449,7 +343,7 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
                       <button
                         onClick={(e) => handleExport(e, s)}
                         disabled={exportingId === s.id}
-                        title="PDF olarak indir"
+                        title="Yazdır / PDF olarak kaydet"
                         style={{
                           position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
                           width: 32, height: 32, borderRadius: '8px',

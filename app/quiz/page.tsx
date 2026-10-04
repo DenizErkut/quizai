@@ -1,4 +1,5 @@
 'use client'
+import MathText from "@/components/MathText"
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import OnboardingModal from '@/components/OnboardingModal'
 import PrioritySetupModal from '@/components/PrioritySetupModal'
@@ -1421,7 +1422,7 @@ function QuizPageContent() {
             </p>
             {interventionInfo.exp && (
               <div style={{ padding: '14px 16px', borderRadius: '10px', background: 'var(--bg)', border: '1px solid var(--border)', fontSize: '13.5px', color: 'var(--text)', lineHeight: 1.6, marginBottom: '18px' }}>
-                {interventionInfo.exp}
+                <MathText text={interventionInfo.exp} />
               </div>
             )}
             <button className="btn btn-primary" onClick={next} style={{ width: '100%', justifyContent: 'center' }}>

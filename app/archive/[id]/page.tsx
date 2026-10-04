@@ -1,4 +1,5 @@
 'use client'
+import MathText from "@/components/MathText"
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -139,7 +140,7 @@ export default function SessionDetailPage() {
                       {correct ? '✓' : '✗'}
                     </span>
                     <p style={{ fontSize: '14px', fontWeight: 600, lineHeight: 1.55, color: 'var(--primary)', margin: 0 }}>
-                      {i + 1}. {q.q}
+                      {i + 1}. <MathText text={q.q} />
                     </p>
                   </div>
                   {q.passage && (
@@ -148,7 +149,7 @@ export default function SessionDetailPage() {
                         📖 Kaynak Metin
                       </summary>
                       <div style={{ marginTop: '8px', maxHeight: '200px', overflowY: 'auto', fontSize: '12px', lineHeight: 1.6, color: 'var(--text3)', whiteSpace: 'pre-wrap' }}>
-                        {q.passage}
+                        <MathText text={q.passage} />
                       </div>
                     </details>
                   )}
@@ -168,14 +169,14 @@ export default function SessionDetailPage() {
                           <span style={{ opacity: 0.45, marginRight: '8px', fontSize: '11px', fontWeight: 700 }}>
                             {String.fromCharCode(65 + j)})
                           </span>
-                          {opt}
+                          <MathText text={opt} />
                         </div>
                       )
                     })}
                   </div>
                   {q.exp && !correct && (
                     <div style={{ marginTop: '10px', paddingLeft: '26px', fontSize: '12px', color: 'var(--text3)', lineHeight: 1.6, borderTop: '1px solid rgba(220,38,38,0.12)', paddingTop: '10px' }}>
-                      💡 {q.exp}
+                      💡 <MathText text={q.exp} />
                     </div>
                   )}
                 </div>

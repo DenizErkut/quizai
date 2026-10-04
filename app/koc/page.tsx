@@ -1,4 +1,5 @@
 'use client'
+import LearningMessage from '@/components/LearningMessage'
 // app/koc/page.tsx — Pratium Koç, Faz E/C: dedike bir sohbet sayfası +
 // eyleme geçirilebilir mesajlar. /api/coach/chat'e bağlanır — konuşma
 // geçmişi kalıcı, açılış mesajı gerçek öğrenci verisine (streak/mastery/
@@ -226,7 +227,7 @@ export default function PratiumKocPage() {
                   background: m.role === 'user' ? 'var(--accent)' : 'var(--bg2)',
                   color: m.role === 'user' ? '#fff' : 'var(--text)',
                 }}>
-                  {m.content}
+                  {m.role === 'assistant' ? <LearningMessage text={m.content} /> : m.content}
                   {m.role === 'assistant' && m.id && (
                     <button onClick={() => speak(m.id)} className="btn btn-ghost" style={{ marginTop: '8px', padding: '5px 9px', fontSize: '12px' }}>
                       {speakingId === m.id ? '⏸ Sesi durdur' : '🔊 Koçu dinle'}

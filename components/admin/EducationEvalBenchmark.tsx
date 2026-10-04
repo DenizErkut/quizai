@@ -1,4 +1,5 @@
 'use client'
+import MathText from "@/components/MathText"
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -161,8 +162,8 @@ export default function EducationEvalBenchmark() {
             {aiQuestions.map(question => <option key={question.id} value={question.id}>{question.topic} · {question.question.q.slice(0, 110)}</option>)}
           </select>
           {selectedAiQuestion && <div style={{ padding: 12, borderRadius: 8, background: 'var(--bg2, #f7f1e9)' }}>
-            <div><strong>{selectedAiQuestion.question.q}</strong></div>
-            <ol type="A">{selectedAiQuestion.question.opts.map((option: string, index: number) => <li key={index}>{option}{index === selectedAiQuestion.question.ans ? ' ✓' : ''}</li>)}</ol>
+            <div><strong><MathText text={selectedAiQuestion.question.q} /></strong></div>
+            <ol type="A">{selectedAiQuestion.question.opts.map((option: string, index: number) => <li key={index}><MathText text={option} />{index === selectedAiQuestion.question.ans ? ' ✓' : ''}</li>)}</ol>
             <label>Doğrulanmış MEB kazanımı
               <select className="input" style={{ marginTop: 5 }} value={aiObjectiveId} onChange={event => setAiObjectiveId(event.target.value)}>
                 <option value="">Kazanım seç</option>
@@ -181,7 +182,7 @@ export default function EducationEvalBenchmark() {
           const objectives = resource?.objectives || []
           return <div key={item.id} style={{ borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: 13 }}>
             <b>{item.objective_code || 'Kazanım eşlemesi bekliyor'}</b> · {item.grade}. sınıf · {item.subject} · AI kaynaklı
-            <div>{item.question_snapshot?.q}</div>
+            <div><MathText text={item.question_snapshot?.q} /></div>
             <small style={{ color: 'var(--text2)' }}>{resource?.title || 'AI kitapçığı'} · öğretmen benchmark metriği dışı</small>
             {item.status !== 'ready' && objectives.length > 0 && <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
               <select className="input" style={{ maxWidth: 600 }} value={mappingObjectiveByItem[item.id] || ''}
@@ -213,8 +214,8 @@ export default function EducationEvalBenchmark() {
           {questions.map(question => <option key={question.id} value={question.id}>{question.question.learningObjectiveCode ? `${question.question.learningObjectiveCode} · ` : ''}{question.topic} · {question.question.q.slice(0, 110)}</option>)}
         </select>
         {selectedQuestion && <div style={{ padding: 12, borderRadius: 8, background: 'var(--bg2, #f7f1e9)' }}>
-          <div><strong>{selectedQuestion.question.q}</strong></div>
-          <ol type="A">{selectedQuestion.question.opts.map((option: string, index: number) => <li key={index}>{option}{index === selectedQuestion.question.ans ? ' ✓' : ''}</li>)}</ol>
+          <div><strong><MathText text={selectedQuestion.question.q} /></strong></div>
+          <ol type="A">{selectedQuestion.question.opts.map((option: string, index: number) => <li key={index}><MathText text={option} />{index === selectedQuestion.question.ans ? ' ✓' : ''}</li>)}</ol>
           {selectedQuestion.question.learningObjectiveCode && objectiveId && <small style={{ color: 'var(--green, #15803d)' }}>Kazanım kodu otomatik eşleştirildi: {selectedQuestion.question.learningObjectiveCode}</small>}
           <label style={{ display: 'block', marginTop: 10 }}>Kazanım
             <select className="input" style={{ marginTop: 6 }} value={objectiveId} onChange={event => setObjectiveId(event.target.value)}>
@@ -240,7 +241,7 @@ export default function EducationEvalBenchmark() {
     <div><strong>Set içeriği ({data.items.length})</strong>
       <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>{data.items.map((item: any) => <div key={item.id} style={{ borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: 13 }}>
         <b>{item.ordinal}. {item.objective_code}</b> · {item.grade} · {item.subject} · {item.case_type === 'regression' ? 'regresyon (metrik dışı)' : item.teacher_approved ? 'öğretmen onaylı' : 'yeniden insan incelemesi gerekli'}
-        <div>{item.question_snapshot?.q}</div>
+        <div><MathText text={item.question_snapshot?.q} /></div>
         {item.review_notes && <div style={{ color: 'var(--text2)' }}>{item.review_notes}</div>}
         {benchmark.status === 'draft' && !item.teacher_approved && <button className="btn btn-sm" disabled={busy} onClick={() => void mutate('POST', { action: 'review-draft', itemId: item.id, confirmed: true })}>Soru ve düzeltilmiş kazanımı inceledim — insan onayı ver</button>}
         <small style={{ color: 'var(--text2)' }}>{item.source_reference} · sürüm {item.source_version?.slice(0, 12)}… · {item.metric_eligible ? 'ölçüme dahil' : 'ölçüm dışı'}</small>

@@ -1,4 +1,5 @@
 'use client'
+import MathText from "@/components/MathText"
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -84,7 +85,7 @@ export default function QuestionBankEditor() {
           <button className="btn btn-sm" onClick={()=>setEditing(null)}>Vazgeç</button>
         </div>
       </div> : <>
-        <div style={{margin:'5px 0'}}>{r.question?.q}</div>
+        <div style={{margin:'5px 0'}}><MathText text={r.question?.q} /></div>
         <div style={{display:'flex',gap:6}}>
           <button className="btn btn-sm" onClick={()=>setEditing({...r,question:{...r.question}})}>Düzenle</button>
           {r.review_status === 'candidate' && <>

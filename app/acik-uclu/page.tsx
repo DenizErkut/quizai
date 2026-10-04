@@ -1,4 +1,5 @@
 'use client'
+import MathText from "@/components/MathText"
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -289,11 +290,11 @@ export default function AcikUcluPage() {
           <div>
             <div className="card" style={{ padding: '1.25rem', marginBottom: '1rem', borderLeft: '3px solid #3E8E3E' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, color: '#3E8E3E', marginBottom: '6px', textTransform: 'uppercase' }}>Senaryo</div>
-              <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7 }}>{scenario}</p>
+              <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7 }}><MathText text={scenario} /></p>
             </div>
             <div className="card" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', marginBottom: '6px', textTransform: 'uppercase' }}>Soru</div>
-              <p style={{ fontSize: '15px', fontWeight: 600, lineHeight: 1.6 }}>{question}</p>
+              <p style={{ fontSize: '15px', fontWeight: 600, lineHeight: 1.6 }}><MathText text={question} /></p>
             </div>
 
             <div className="card" style={{ padding: '1.25rem' }}>
@@ -351,7 +352,7 @@ export default function AcikUcluPage() {
               <div style={{ fontSize: '36px', fontWeight: 800, color: totalEarned / totalPossible >= 0.7 ? 'var(--green)' : totalEarned / totalPossible >= 0.4 ? '#d97706' : 'var(--red)' }}>
                 {totalEarned} / {totalPossible}
               </div>
-              {overallFeedback && <p style={{ fontSize: '13px', color: 'var(--text2)', marginTop: '10px', lineHeight: 1.6 }}>{overallFeedback}</p>}
+              {overallFeedback && <p style={{ fontSize: '13px', color: 'var(--text2)', marginTop: '10px', lineHeight: 1.6 }}><MathText text={overallFeedback} /></p>}
             </div>
 
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>
@@ -360,7 +361,7 @@ export default function AcikUcluPage() {
             {criteriaResults.map((c, i) => (
               <div key={i} className="card-sm" style={{ padding: '14px 16px', marginBottom: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 600 }}>{c.criterion}</span>
+                  <span style={{ fontSize: '13px', fontWeight: 600 }}><MathText text={c.criterion} /></span>
                   <span style={{ fontSize: '13px', fontWeight: 700, color: c.earnedPoints >= c.maxPoints * 0.7 ? 'var(--green)' : c.earnedPoints > 0 ? '#d97706' : 'var(--red)' }}>
                     {c.earnedPoints} / {c.maxPoints}
                   </span>
@@ -368,7 +369,7 @@ export default function AcikUcluPage() {
                 <div style={{ background: 'var(--border)', borderRadius: '4px', height: '6px', marginBottom: '8px' }}>
                   <div style={{ background: 'var(--accent)', height: '6px', borderRadius: '4px', width: `${Math.min(100, (c.earnedPoints / c.maxPoints) * 100)}%` }} />
                 </div>
-                <p style={{ fontSize: '12.5px', color: 'var(--text2)', lineHeight: 1.5 }}>{c.feedback}</p>
+                <p style={{ fontSize: '12.5px', color: 'var(--text2)', lineHeight: 1.5 }}><MathText text={c.feedback} /></p>
               </div>
             ))}
 

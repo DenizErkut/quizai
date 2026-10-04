@@ -1,6 +1,7 @@
 import { renderMathFormula, splitMathText } from '@/lib/math-text'
 
-export default function MathText({ text, highlight = false }: { text: string; highlight?: boolean }) {
+export default function MathText({ text, highlight = false }: { text?: string | null; highlight?: boolean }) {
+  if (typeof text !== 'string') return null
   return <>{splitMathText(text).map((part, index) => {
     if (part.math) {
       const html = renderMathFormula(part.text, part.display)

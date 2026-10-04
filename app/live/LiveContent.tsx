@@ -1,4 +1,5 @@
 'use client'
+import MathText from "@/components/MathText"
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -352,7 +353,7 @@ export default function LiveContent() {
           </div>
         )}
         <div className="card" style={{ marginBottom: '1rem' }}>
-          <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--primary)', lineHeight: 1.65, marginBottom: '1.25rem' }}>{q.q}</div>
+          <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--primary)', lineHeight: 1.65, marginBottom: '1.25rem' }}><MathText text={q.q} /></div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {q.opts.map((opt: string, i: number) => (
               <button key={i} onClick={() => submitAnswer(i)}
@@ -360,7 +361,7 @@ export default function LiveContent() {
                 onMouseEnter={e => { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.background = 'rgba(99,102,241,0.08)' }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg2)' }}>
                 <span style={{ fontWeight: 800, color: '#6366f1', flexShrink: 0 }}>{['A','B','C','D'][i]}</span>
-                {opt}
+                <MathText text={opt} />
               </button>
             ))}
           </div>

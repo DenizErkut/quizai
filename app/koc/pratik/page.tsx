@@ -1,4 +1,5 @@
 'use client'
+import MathText from "@/components/MathText"
 
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -55,14 +56,14 @@ function CoachGuidedPracticeContent() {
     <Link href="/verified-learning" style={{ color: 'var(--primary)', fontSize: 14 }}>← Öğrenme pilotuna dön</Link>
     <h1 style={{ margin: '18px 0 8px' }}>Prof. Prati ile rehberli çalışma</h1>
     <p style={{ color: 'var(--text2)' }}>Önce kendi yanıtını seç, sonra düşünme ipucunu kullanıp yeniden dene ve gerekçeni yaz. İpucuyla yapılan bu çalışma, yardımsız ölçümün yerine geçmez.</p>
-    {message && <p role="status" style={{ color: '#0f766e' }}>{message}</p>}
+    {message && <p role="status" style={{ color: '#0f766e' }}><MathText text={message} /></p>}
     {!practice ? <button className="btn btn-primary" disabled={busy || !cycleId} onClick={() => void action('start')}>Rehberli çalışmayı başlat</button> :
       <section className="card">
-        <h2 style={{ fontSize: 18 }}>{practice.question}</h2>
-        {practice.status === 'completed' ? <p><strong>Çalışma tamamlandı.</strong> {practice.explanation || ''} Şimdi uygun zamanda yardımsız son teste geçebilirsin.</p> : <>
+        <h2 style={{ fontSize: 18 }}><MathText text={practice.question} /></h2>
+        {practice.status === 'completed' ? <p><strong>Çalışma tamamlandı.</strong> <MathText text={practice.explanation || ''} /> Şimdi uygun zamanda yardımsız son teste geçebilirsin.</p> : <>
           {['awaiting_first', 'awaiting_retry'].includes(practice.status) && <div style={{ display: 'grid', gap: 8 }}>
             {practice.options.map((option, index) => <label key={index} style={{ display: 'flex', gap: 8, padding: 9, border: '1px solid var(--border)', borderRadius: 8 }}>
-              <input type="radio" name="coach-practice-choice" checked={choice === index} onChange={() => setChoice(index)} />{option}
+              <input type="radio" name="coach-practice-choice" checked={choice === index} onChange={() => setChoice(index)} /><MathText text={option} />
             </label>)}
             <button className="btn btn-primary" disabled={busy || choice === null} onClick={() => void action(practice.status === 'awaiting_first' ? 'first' : 'retry', { choice })}>{practice.status === 'awaiting_first' ? 'İlk denememi kaydet' : 'Yeniden dene'}</button>
           </div>}
@@ -70,7 +71,7 @@ function CoachGuidedPracticeContent() {
             <p>İlk denemen kaydedildi. Şimdi çözümü göstermeyen bir düşünme ipucu alabilirsin.</p>
             <button className="btn btn-primary" disabled={busy} onClick={() => void action('hint')}>Düşünme ipucu al</button>
           </div>}
-          {practice.status === 'awaiting_retry' && <p style={{ color: '#0f766e' }}>{hint || 'Soruda ne istendiğini ve hangi bilgilerin verildiğini yeniden düşün. Seçenekleri tek tek karşılaştır.'}</p>}
+          {practice.status === 'awaiting_retry' && <p style={{ color: '#0f766e' }}><MathText text={hint || 'Soruda ne istendiğini ve hangi bilgilerin verildiğini yeniden düşün. Seçenekleri tek tek karşılaştır.'} /></p>}
           {practice.status === 'awaiting_explanation' && <div style={{ display: 'grid', gap: 8 }}>
             <label htmlFor="coach-explanation">Yanıtına nasıl ulaştığını kendi cümlelerinle açıkla</label>
             <textarea id="coach-explanation" value={explanation} onChange={event => setExplanation(event.target.value)} rows={4} maxLength={1000} style={{ width: '100%', borderRadius: 9, padding: 10 }} />

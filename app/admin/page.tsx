@@ -1,4 +1,5 @@
 'use client'
+import MathText from '@/components/MathText'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -1439,7 +1440,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     </div>
 
                     <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>
-                      {r.question_text}
+                      <MathText text={r.question_text} />
                     </div>
                     <div style={{ fontSize: '12px', marginBottom: '8px', display: 'flex', gap: '16px' }}>
                       {r.source === 'system_scan' ? (

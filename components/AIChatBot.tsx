@@ -1,4 +1,5 @@
 'use client'
+import LearningMessage from '@/components/LearningMessage'
 // 19 Eylül 2026 — Deniz'in isteği: "her iki maskotta kapatılabilir ve
 // taşınabilir olsun... kullanıcı istediğinde maskotların yerini
 // değiştirebilsin veya kapatsın geçici olarak." Ortak sürükle/gizle mantığı
@@ -260,7 +261,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
                   border: m.role === 'assistant' ? '1px solid #e2e8f0' : 'none',
                   whiteSpace: 'pre-wrap',
                 }}>
-                  {m.content}
+                  {m.role === 'assistant' ? <LearningMessage text={m.content} /> : m.content}
                 </div>
               </div>
             ))}

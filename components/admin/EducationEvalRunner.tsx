@@ -1,4 +1,5 @@
 'use client'
+import MathText from "@/components/MathText"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -136,9 +137,9 @@ export default function EducationEvalRunner() {
             <small>{output.status === 'error' ? `Hata: ${output.error_code || 'çağrı başarısız'}` : output.error_code === 'INVALID_MODEL_OUTPUT'
               ? `Otomatik puanlanamadı · ${output.duration_ms} ms · ${output.input_tokens + output.output_tokens} token`
               : `${output.duration_ms} ms · ${output.input_tokens + output.output_tokens} token`}</small></div>
-          <div><b>{output.item?.objective_code}</b> · {output.item?.objective_title}<div style={{ marginTop: 5 }}>{output.item?.question_snapshot.q}</div>
-            <ol type="A" style={{ margin: '6px 0 0 20px' }}>{output.item?.question_snapshot.opts.map((option, index) => <li key={index}>{option}{output.answer_index === index ? ' ← Model yanıtı' : ''}</li>)}</ol></div>
-          <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{output.explanation}</div>
+          <div><b>{output.item?.objective_code}</b> · {output.item?.objective_title}<div style={{ marginTop: 5 }}><MathText text={output.item?.question_snapshot.q} /></div>
+            <ol type="A" style={{ margin: '6px 0 0 20px' }}>{output.item?.question_snapshot.opts.map((option, index) => <li key={index}><MathText text={option} />{output.answer_index === index ? ' ← Model yanıtı' : ''}</li>)}</ol></div>
+          <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}><MathText text={output.explanation} /></div>
           {output.status === 'completed' && <>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(145px,1fr))', gap: 8 }}>
               {RATING_FIELDS.map(field => <label key={field.key} style={{ fontSize: 12 }}>{field.label}

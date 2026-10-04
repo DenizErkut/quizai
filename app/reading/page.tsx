@@ -1,4 +1,5 @@
 'use client'
+import MathText from "@/components/MathText"
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -690,7 +691,7 @@ export default function ReadingPage() {
                       🎯 Dikkat kontrolü{questions.length > 1 ? ` — soru ${questionIdx + 1} / ${questions.length}` : ''}
                     </div>
                     <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--primary)', marginBottom: '1rem' }}>
-                      {questions[questionIdx].question}
+                      <MathText text={questions[questionIdx].question} />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {questions[questionIdx].options.map((opt, i) => {
@@ -710,7 +711,7 @@ export default function ReadingPage() {
                               border, background: bg, fontSize: '13px', color: 'var(--text)',
                               cursor: chosenIndex !== null ? 'default' : 'pointer', fontFamily: 'var(--font-sans)',
                             }}>
-                            {opt}
+                            <MathText text={opt} />
                           </button>
                         )
                       })}

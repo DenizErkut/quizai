@@ -1,4 +1,6 @@
 'use client'
+import MathText from "@/components/MathText"
+import { plainMathText } from '@/lib/math-text'
 import PageHeader from '@/components/PageHeader'
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -269,7 +271,7 @@ export default function DailyPage() {
             <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '0.75rem' }}>
               Günlük Test · Soru {current + 1}/{challenge.questions.length}
             </div>
-            <p style={{ fontSize: '17px', fontWeight: 500, lineHeight: 1.55, marginBottom: '1.5rem' }}>{q.q}</p>
+            <p style={{ fontSize: '17px', fontWeight: 500, lineHeight: 1.55, marginBottom: '1.5rem' }}><MathText text={q.q} /></p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-0.75rem', marginBottom: '1rem' }}>
               <button
                 type="button"
@@ -291,7 +293,7 @@ export default function DailyPage() {
                         const rightOptions = qq.pairs.map((p: any) => p.right)
                         return (
                           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ flex: 1, padding: '10px 13px', borderRadius: '9px', background: 'var(--bg2)', border: '1.5px solid var(--border)', fontSize: '13px', fontWeight: 600 }}>{pair.left}</div>
+                            <div style={{ flex: 1, padding: '10px 13px', borderRadius: '9px', background: 'var(--bg2)', border: '1.5px solid var(--border)', fontSize: '13px', fontWeight: 600 }}><MathText text={pair.left} /></div>
                             <span style={{ color: 'var(--text4)' }}>→</span>
                             <select disabled={chosen !== null} value={sel ?? ''}
                               onChange={e => {
@@ -305,7 +307,7 @@ export default function DailyPage() {
                               }}
                               style={{ flex: 1, padding: '10px 13px', borderRadius: '9px', border: `1.5px solid ${chosen !== null ? (sel === pair.right ? 'rgba(22,163,74,0.35)' : 'rgba(220,38,38,0.35)') : 'var(--border)'}`, background: chosen !== null ? (sel === pair.right ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', fontSize: '13px', color: 'var(--text)', outline: 'none' }}>
                               <option value="">Seç...</option>
-                              {rightOptions.map((r: string, j: number) => <option key={j} value={r}>{r}</option>)}
+                              {rightOptions.map((r: string, j: number) => <option key={j} value={r}>{plainMathText(r)}</option>)}
                             </select>
                           </div>
                         )
@@ -319,7 +321,7 @@ export default function DailyPage() {
                       {(qq.items as string[]).map((item: string, i: number) => (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ fontSize: '12px', color: 'var(--text4)', width: '20px' }}>{i + 1}.</span>
-                          <div style={{ flex: 1, padding: '10px 13px', borderRadius: '9px', background: 'var(--bg2)', border: '1.5px solid var(--border)', fontSize: '13px' }}>{item}</div>
+                          <div style={{ flex: 1, padding: '10px 13px', borderRadius: '9px', background: 'var(--bg2)', border: '1.5px solid var(--border)', fontSize: '13px' }}><MathText text={item} /></div>
                         </div>
                       ))}
                       {chosen === null && (
@@ -338,7 +340,7 @@ export default function DailyPage() {
                         const correct = multiTFAnswer[statementIndex] === statement.correct
                         return (
                           <div key={statementIndex} style={{ padding: '12px 14px', borderRadius: '10px', border: `1.5px solid ${answered ? (correct ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.3)') : 'var(--border)'}`, background: answered ? (correct ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)' }}>
-                            <div style={{ fontSize: '14px', lineHeight: 1.5, marginBottom: '9px' }}>{statementIndex + 1}. {statement.text}</div>
+                            <div style={{ fontSize: '14px', lineHeight: 1.5, marginBottom: '9px' }}>{statementIndex + 1}. <MathText text={statement.text} /></div>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                               {[true, false].map(value => (
                                 <button key={String(value)} type="button" disabled={answered}
@@ -394,7 +396,7 @@ export default function DailyPage() {
                       return (
                         <button key={i} onClick={() => choose(i)} disabled={chosen !== null}
                           style={{ textAlign: 'left', padding: '12px 15px', borderRadius: '10px', border: `1.5px solid ${border}`, background: bg, color, fontSize: '14px', cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s', width: '100%' }}>
-                          <span style={{ fontWeight: 600, marginRight: '8px', opacity: 0.5 }}>{String.fromCharCode(65 + i)}.</span>{opt}
+                          <span style={{ fontWeight: 600, marginRight: '8px', opacity: 0.5 }}>{String.fromCharCode(65 + i)}.</span><MathText text={opt} />
                         </button>
                       )
                     })}
@@ -405,7 +407,7 @@ export default function DailyPage() {
             {chosen !== null && (
               <>
                 <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', borderLeft: '3px solid var(--accent)', fontSize: '13px', color: 'var(--text2)', lineHeight: 1.65 }}>
-                  <strong style={{ color: chosen === q.ans ? 'var(--green)' : 'var(--red)' }}>{chosen === q.ans ? 'Doğru! ' : 'Yanlış. '}</strong>{q.exp || q.explanation}
+                  <strong style={{ color: chosen === q.ans ? 'var(--green)' : 'var(--red)' }}>{chosen === q.ans ? 'Doğru! ' : 'Yanlış. '}</strong><MathText text={q.exp || q.explanation} />
                 </div>
                 <button className="btn btn-primary" onClick={next} style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}>
                   {current + 1 < challenge.questions.length ? 'Sonraki →' : 'Sonuçlar →'}

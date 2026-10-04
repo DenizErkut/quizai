@@ -1,4 +1,5 @@
 'use client'
+import MathText from "@/components/MathText"
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { noteMatchesObjectiveReview } from '@/lib/objective-review-note'
@@ -179,7 +180,7 @@ export default function ObjectiveMappingReview() {
     {loading ? <p>Yükleniyor…</p> : <div style={{ display: 'grid', gap: 8 }}>
       {items.map(item => <div key={item.key}>
         <button type="button" onClick={() => selected?.key === item.key ? setSelected(null) : select(item)} aria-expanded={selected?.key === item.key} className="card-sm" style={{ width: '100%', textAlign: 'left', cursor: 'pointer', borderColor: selected?.key === item.key ? 'var(--accent)' : undefined }}>
-          <div style={{ fontWeight: 600 }}>{item.question.q || 'Soru metni yok'}</div>
+          <div style={{ fontWeight: 600 }}><MathText text={item.question.q || 'Soru metni yok'} /></div>
           <small>{item.grade} · {item.subject} · {item.topic} · {item.question.learningObjectiveCode || 'Eşleşmemiş'}{item.question.objectiveMappingStatus === 'human_approved' ? ' · İnsan onaylı' : item.question.objectiveMappingStatus === 'human_rejected' ? ' · Reddedildi' : item.question.objectiveMappingStatus === 'ai_approved' ? ' · AI onaylı' : item.question.objectiveMappingStatus === 'ai_rejected' ? ' · Otomatik inceleme: Reddedildi' : ''}</small>
           {item.question.objectiveBackfillReview && <small style={{ display: 'block', marginTop: 4 }}>Kalite: {item.question.objectiveBackfillReview.score}/100 · {item.question.objectiveBackfillReview.reason}</small>}
           {item.question.objectiveProductionReview && <small style={{ display:'block',marginTop:4 }}>Üretim denetimi: {item.question.objectiveProductionReview.score}/100 · {reviewReason(item.question.objectiveReviewException || item.question.objectiveProductionReview.reason)}</small>}
@@ -188,9 +189,9 @@ export default function ObjectiveMappingReview() {
         </button>
         {selected?.key === item.key && <div style={{ border: '1px solid var(--border)', borderTop: 0, borderRadius: '0 0 16px 16px', padding: 18 }}>
           <h3 style={{ marginBottom: 8 }}>Soru incelemesi</h3>
-          <p>{selected.question.q}</p>
-          {Array.isArray(selected.question.opts) && <ol>{selected.question.opts.map((option, index) => <li key={index}>{option}</li>)}</ol>}
-          {selected.question.exp && <p style={{ color: 'var(--text2)' }}>Açıklama: {selected.question.exp}</p>}
+          <p><MathText text={selected.question.q} /></p>
+          {Array.isArray(selected.question.opts) && <ol>{selected.question.opts.map((option, index) => <li key={index}><MathText text={option} /></li>)}</ol>}
+          {selected.question.exp && <p style={{ color: 'var(--text2)' }}>Açıklama: <MathText text={selected.question.exp} /></p>}
           {selected.question.objectiveBackfillReview && <p style={{ marginTop: 10, color: 'var(--text2)' }}>Toplu inceleme: {selected.question.objectiveBackfillReview.score}/100 — {selected.question.objectiveBackfillReview.reason}</p>}
           {selected.question.objectiveProductionReview && <div style={{ marginTop:10,color:'var(--text2)' }}>
             <p>Üretim denetimi: {reviewReason(selected.question.objectiveReviewException || selected.question.objectiveProductionReview.reason)}</p>

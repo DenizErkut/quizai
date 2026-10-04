@@ -1,4 +1,5 @@
 'use client'
+import LearningMessage from '@/components/LearningMessage'
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useVoiceTutor } from '@/lib/use-voice-tutor'
@@ -205,7 +206,7 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
                   border: m.role === 'assistant' ? '1px solid var(--border)' : 'none',
                   whiteSpace: 'pre-wrap',
                 }}>
-                  {m.content}
+                  {m.role === 'assistant' ? <LearningMessage text={m.content} /> : m.content}
                 </div>
               </div>
             ))}

@@ -1,4 +1,5 @@
 'use client'
+import MathText from "@/components/MathText"
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -75,9 +76,9 @@ export default function VerifiedLearningPage() {
       <h2 style={{ fontSize: 18 }}>Tüm soruları yardımsız yanıtla</h2>
       <p style={{ color: 'var(--text3)' }}>Bu ölçümde ipucu ve cevap anahtarı gösterilmez. Sayfadan çıkarsan aynı denemeye dönebilirsin.</p>
       {active.questions.map((question, index) => <div key={index} style={{ borderTop: '1px solid var(--border)', padding: '16px 0' }}>
-        <strong>{index + 1}. {question.text}</strong>
+        <strong>{index + 1}. <MathText text={question.text} /></strong>
         <div style={{ display: 'grid', gap: 6, marginTop: 10 }}>{question.options.map((option, optionIndex) => <label key={optionIndex} style={{ display: 'flex', gap: 8, padding: 8, border: '1px solid var(--border)', borderRadius: 8 }}>
-          <input type="radio" name={`question-${index}`} checked={choices[index] === optionIndex} onChange={() => setChoices(current => current.map((value, i) => i === index ? optionIndex : value))} />{option}
+          <input type="radio" name={`question-${index}`} checked={choices[index] === optionIndex} onChange={() => setChoices(current => current.map((value, i) => i === index ? optionIndex : value))} /><MathText text={option} />
         </label>)}</div>
       </div>)}
       <button className="btn btn-primary" disabled={busy || choices.some(choice => choice < 0)} onClick={() => void submit()}>{busy ? 'Kaydediliyor…' : 'Yanıtları gönder'}</button>

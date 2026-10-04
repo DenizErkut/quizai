@@ -1,4 +1,5 @@
 'use client'
+import LearningMessage from '@/components/LearningMessage'
 // components/CoachMascot.tsx — Pratium Koç'un global maskot ikonu.
 //
 // 17 Eylül 2026 — Deniz'in isteği: "Koç ikonu tüm ekranlarda olsun ve ben
@@ -448,7 +449,7 @@ export default function CoachMascot() {
                               border: m.role === 'assistant' ? '1px solid #e2e8f0' : 'none',
                               whiteSpace: 'pre-line',
                             }}>
-                              {m.content}
+                              {m.role === 'assistant' ? <LearningMessage text={m.content} /> : m.content}
                               {m.action?.type === 'start_practice' && (
                                 <button
                                   onClick={() => startPractice(m.action as CoachAction, m.id)}

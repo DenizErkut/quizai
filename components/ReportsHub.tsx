@@ -1,4 +1,5 @@
 'use client'
+import MathText from "@/components/MathText"
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import StudentReportTable from '@/components/StudentReportTable'
@@ -491,15 +492,15 @@ function OpenEndedArchivePanel({ data }: { data: any }) {
                 <div style={{ padding: '0 14px 16px', borderTop: '1px solid var(--border)' }}>
                   <div style={{ marginTop: '12px' }}>
                     <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Senaryo</div>
-                    <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6, background: 'var(--bg2)', padding: '10px 12px', borderRadius: '8px' }}>{e.scenario}</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6, background: 'var(--bg2)', padding: '10px 12px', borderRadius: '8px' }}><MathText text={e.scenario} /></div>
                   </div>
                   <div style={{ marginTop: '10px' }}>
                     <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Soru</div>
-                    <div style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600, lineHeight: 1.6 }}>{e.question}</div>
+                    <div style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600, lineHeight: 1.6 }}><MathText text={e.question} /></div>
                   </div>
                   <div style={{ marginTop: '10px' }}>
                     <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Öğrencinin Cevabı</div>
-                    <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6, background: 'var(--bg2)', padding: '10px 12px', borderRadius: '8px', whiteSpace: 'pre-wrap' }}>{e.studentAnswer || '—'}</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6, background: 'var(--bg2)', padding: '10px 12px', borderRadius: '8px', whiteSpace: 'pre-wrap' }}><MathText text={e.studentAnswer || '—'} /></div>
                   </div>
                   {Array.isArray(e.criteriaResults) && e.criteriaResults.length > 0 && (
                     <div style={{ marginTop: '10px' }}>
@@ -508,9 +509,9 @@ function OpenEndedArchivePanel({ data }: { data: any }) {
                         <tbody>
                           {e.criteriaResults.map((c: any, i: number) => (
                             <tr key={i}>
-                              <td style={{ padding: '4px 8px 4px 0', color: 'var(--text2)' }}>{c.criterion}</td>
+                              <td style={{ padding: '4px 8px 4px 0', color: 'var(--text2)' }}><MathText text={c.criterion} /></td>
                               <td style={{ padding: '4px 8px', fontWeight: 700, color: 'var(--primary)', whiteSpace: 'nowrap' }}>{c.earnedPoints}/{c.maxPoints}</td>
-                              <td style={{ padding: '4px 0', color: 'var(--text3)', fontSize: '11px' }}>{c.feedback}</td>
+                              <td style={{ padding: '4px 0', color: 'var(--text3)', fontSize: '11px' }}><MathText text={c.feedback} /></td>
                             </tr>
                           ))}
                         </tbody>

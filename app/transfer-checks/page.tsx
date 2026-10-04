@@ -1,4 +1,5 @@
 'use client'
+import MathText from "@/components/MathText"
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -67,14 +68,14 @@ export default function TransferChecksPage() {
     {message && <p role="alert" style={{ color: '#b45309' }}>{message}</p>}
     {feedback && <section className="card" role="status" style={{ margin: '18px 0' }}>
       <strong>{feedback.correct ? 'Doğru yanıtladın.' : 'Bu kez doğru yanıtlanmadı.'}</strong>
-      {feedback.explanation && <p style={{ marginBottom: 0 }}>{feedback.explanation}</p>}
+      {feedback.explanation && <p style={{ marginBottom: 0 }}><MathText text={feedback.explanation} /></p>}
     </section>}
     {active && <section className="card" style={{ margin: '18px 0' }}>
       <div style={{ color: 'var(--text3)', fontSize: 13 }}>{active.subject} · {active.topic} · {active.learningObjectiveCode || 'Kazanım'}</div>
-      <h2 style={{ fontSize: 18, margin: '12px 0' }}>{active.question}</h2>
+      <h2 style={{ fontSize: 18, margin: '12px 0' }}><MathText text={active.question} /></h2>
       <div style={{ display: 'grid', gap: 8 }}>
         {(active.options || []).map((option, index) => <label key={index} style={{ display: 'flex', gap: 9, alignItems: 'center', padding: 10, border: '1px solid var(--border)', borderRadius: 9 }}>
-          <input type="radio" name="transfer-answer" checked={selected === index} onChange={() => setSelected(index)} />{option}
+          <input type="radio" name="transfer-answer" checked={selected === index} onChange={() => setSelected(index)} /><MathText text={option} />
         </label>)}
       </div>
       <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={busy || selected === null} onClick={() => void answer(active)}>Yanıtı gönder</button>

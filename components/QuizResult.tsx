@@ -293,96 +293,10 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
   }
 
   async function exportPDF() {
-    const { default: jsPDF } = await import('jspdf')
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-    doc.setFont('helvetica')
-    const margin = 20, pageW = 210, contentW = pageW - margin * 2
-    let y = margin
-
-    function cleanText(text: string): string {
-      return text
-        .replace(/ğ/g,'g').replace(/Ğ/g,'G').replace(/ü/g,'u').replace(/Ü/g,'U')
-        .replace(/ş/g,'s').replace(/Ş/g,'S').replace(/ı/g,'i').replace(/İ/g,'I')
-        .replace(/ö/g,'o').replace(/Ö/g,'O').replace(/ç/g,'c').replace(/Ç/g,'C')
-    }
-
-    function addText(text: string, fontSize: number, bold = false, color = [0,0,0] as [number,number,number], indent = 0) {
-      doc.setFontSize(fontSize); doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setTextColor(...color)
-      const lines = doc.splitTextToSize(cleanText(text), contentW - indent)
-      const lineH = fontSize * 0.4
-      if (y + lines.length * lineH > 280) { doc.addPage(); y = margin }
-      doc.text(lines, margin + indent, y)
-      y += lines.length * lineH + 2
-    }
-
-    function addLine() {
-      doc.setDrawColor(220, 220, 220); doc.line(margin, y, pageW - margin, y); y += 5
-    }
-
-    // Logo — SVG'yi canvas üzerinden PNG'ye çevir
     try {
-      const svgStr = `<svg width="620" height="190" viewBox="0 0 620 190" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="pGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0F172A"/>
-      <stop offset="100%" stop-color="#14D8A6"/>
-    </linearGradient>
-  </defs>
-  <path d="M55 20V165" stroke="#0F172A" stroke-width="18" stroke-linecap="round"/>
-  <path d="M55 25H105 C140 25 155 45 155 72 C155 100 140 120 105 120H55" stroke="url(#pGrad)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <circle cx="120" cy="52" r="7" fill="#14D8A6"/>
-  <text x="205" y="98" font-size="76" font-family="Arial" font-weight="700" fill="#0F172A">pratium</text>
-  <text x="208" y="140" font-size="22" font-family="Arial" fill="#64748B">Yeni nesil ogrenci platformu</text>
-</svg>`
-      const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' })
-      const svgUrl = URL.createObjectURL(svgBlob)
-      const logoB64 = await new Promise<string>((resolve, reject) => {
-        const img = new Image()
-        img.onload = () => {
-          const canvas = document.createElement('canvas')
-          canvas.width = 620; canvas.height = 190
-          const ctx = canvas.getContext('2d')!
-          ctx.fillStyle = '#ffffff'
-          ctx.fillRect(0, 0, 620, 190)
-          ctx.drawImage(img, 0, 0)
-          URL.revokeObjectURL(svgUrl)
-          resolve(canvas.toDataURL('image/png').split(',')[1])
-        }
-        img.onerror = reject
-        img.src = svgUrl
-      })
-      // Header bar
-      doc.setFillColor(15, 23, 42)  // #0F172A
-      doc.rect(0, 0, pageW, 38, 'F')
-      doc.addImage('data:image/png;base64,' + logoB64, 'PNG', margin, 4, 44, 14)
-      doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.setTextColor(255,255,255)
-      doc.text(cleanText(`Test: ${topic}`), margin + 48, 16)
-      doc.text(new Date().toLocaleDateString('tr-TR'), pageW - margin, 16, { align: 'right' })
-      y = 48
-    } catch {
-      y = margin
-    }
-
-    addText(`Konu: ${topic}`, 12, true)
-    addText(`Zorluk: ${diff.label} | Dil: ${language} | Soru sayisi: ${questions.length}`, 9, false, [100,100,100])
-    y += 4
-    addText('SORULAR', 13, true, [91, 76, 245])
-    addLine()
-
-    questions.forEach((q, i) => {
-      if (y > 260) { doc.addPage(); y = margin }
-      doc.setFillColor(245, 245, 255); doc.roundedRect(margin, y, contentW, 8, 1, 1, 'F')
-      addText(`Soru ${i + 1}`, 10, true, [91, 76, 245])
-      y -= 2; addText(q.q, 10, false, [20,20,20]); y += 2
-      const letters = ['A','B','C','D']
-      const printableOptions = q.opts?.length ? q.opts : [correctAnswerText(q)]
-      printableOptions.forEach((opt, oi) => {
-        addText(`${letters[oi]}. ${opt}`, 9, false, [60,60,60], 4)
-      })
-      y += 4; addLine()
-    })
-
-    doc.save(`Pratium_${cleanText(topic)}_${new Date().toISOString().split('T')[0]}.pdf`)
+      const { printLearningDocument, questionPrintHtml } = await import("@/lib/learning-print");
+      await printLearningDocument("Pratium - " + topic, "Zorluk: " + diff.label + " · Dil: " + language + " · " + questions.length + " soru", questionPrintHtml(questions));
+    } catch (error) { alert(error instanceof Error ? error.message : "PDF görünümü açılamadı."); }
   }
 
   return (
@@ -439,7 +353,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
             </Link>
             <button className="btn" onClick={exportPDF}
               style={{ justifyContent: 'center', fontSize: '13px', padding: '10px', color: 'var(--text2)' }}>
-              📄 PDF
+              📄 Yazdır / PDF kaydet
             </button>
           </div>
         </div>
@@ -516,7 +430,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
                   Kısmi puan: %{Math.round(earned * 100)}
                 </div>}
                 <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px' }}>
-                  Doğru: {correctAnswerText(q)}
+                  Doğru: <MathText text={correctAnswerText(q)} />
                 </div>
                 {/* HATA BİLDİR butonu */}
                 {reportedIdx.has(i) ? (

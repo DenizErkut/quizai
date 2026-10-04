@@ -1,4 +1,5 @@
 'use client'
+import MathText from "@/components/MathText"
 
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -157,8 +158,8 @@ export default function LearningGainPilot({ classrooms }: { classrooms: Classroo
         <div style={{ fontSize: 12, fontWeight: 700 }}>{pre.objectiveCode} · {pre.objectiveTitle}: %{pre.scorePct} → %{post.scorePct}</div>
         {([['Ön test', pre], ['Son test', post]] as const).map(([label, item]) => <details key={item.id} style={{ fontSize: 12, border: '1px solid var(--border)', borderRadius: 8, padding: 9 }}>
           <summary style={{ cursor: 'pointer', fontWeight: 700 }}>{label} sorularını incele ({item.itemCount})</summary>
-          <ol style={{ paddingLeft: 20 }}>{item.questions.map((question, index) => <li key={index} style={{ marginTop: 8 }}>{question.text}
-            {Array.isArray(question.options) && <div style={{ color: 'var(--text3)' }}>Doğru yanıt: {question.options[question.correctIndex ?? -1] ?? '—'}</div>}
+          <ol style={{ paddingLeft: 20 }}>{item.questions.map((question, index) => <li key={index} style={{ marginTop: 8 }}><MathText text={question.text} />
+            {Array.isArray(question.options) && <div style={{ color: 'var(--text3)' }}>Doğru yanıt: <MathText text={question.options[question.correctIndex ?? -1] ?? '—'} /></div>}
           </li>)}</ol>
         </details>)}
         <label style={{ display: 'flex', gap: 7, alignItems: 'flex-start', fontSize: 12 }}>
@@ -184,8 +185,8 @@ export default function LearningGainPilot({ classrooms }: { classrooms: Classroo
       </select>
       {transfer && <details style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 9 }}>
         <summary style={{ cursor: 'pointer' }}>Aktarım sorularını incele ({transfer.itemCount})</summary>
-        <ol style={{ paddingLeft: 20 }}>{transfer.questions.map((question, index) => <li key={index} style={{ marginTop: 8 }}>{question.text}
-          {Array.isArray(question.options) && <div style={{ color: 'var(--text3)' }}>Doğru yanıt: {question.options[question.correctIndex ?? -1] ?? '—'}</div>}
+        <ol style={{ paddingLeft: 20 }}>{transfer.questions.map((question, index) => <li key={index} style={{ marginTop: 8 }}><MathText text={question.text} />
+          {Array.isArray(question.options) && <div style={{ color: 'var(--text3)' }}>Doğru yanıt: <MathText text={question.options[question.correctIndex ?? -1] ?? '—'} /></div>}
         </li>)}</ol>
       </details>}
       {transfer && <label style={{ display: 'flex', gap: 7, alignItems: 'flex-start' }}><input type="checkbox" checked={transferReviewed} onChange={event => setTransferReviewed(event.target.checked)} />Soruların aynı kazanımı yeni bir durumda ölçtüğünü ve cevap anahtarını inceledim.</label>}

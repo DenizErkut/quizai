@@ -1,4 +1,5 @@
 'use client'
+import MathText from "@/components/MathText"
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
@@ -410,7 +411,7 @@ export default function TeacherLivePage() {
           )}
           {/* Soru */}
           <div className="card" style={{ marginBottom: '1rem' }}>
-            <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--primary)', lineHeight: 1.6, marginBottom: '1.25rem' }}>{q.q}</div>
+            <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--primary)', lineHeight: 1.6, marginBottom: '1.25rem' }}><MathText text={q.q} /></div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(180px,100%), 1fr))', gap: '8px' }}>
               {q.opts.map((opt: string, i: number) => {
@@ -422,7 +423,7 @@ export default function TeacherLivePage() {
                     <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: isCorrect ? 'rgba(22,163,74,0.15)' : 'rgba(99,102,241,0.1)', transition: 'width 0.4s' }} />
                     <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '13px', fontWeight: 500, color: isCorrect ? '#15803d' : 'var(--primary)' }}>
-                        <strong>{['A','B','C','D'][i]}.</strong> {opt}
+                        <strong>{['A','B','C','D'][i]}.</strong> <MathText text={opt} />
                       </span>
                       <span style={{ fontSize: '13px', fontWeight: 700, color: isCorrect ? '#16a34a' : '#6366f1' }}>{pct}%</span>
                     </div>

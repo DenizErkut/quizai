@@ -179,100 +179,11 @@ export default function PlanPage() {
 
   async function exportPDF() {
     if (!plan || !profile) return
-    const { default: jsPDF } = await import('jspdf')
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-    doc.setFont('helvetica')
-
-    const margin = 20
-    const pageW = 210
-    const contentW = pageW - margin * 2
-    let y = margin
-
-    function clean(text: string): string {
-      return text
-        .replace(/ğ/g,'g').replace(/Ğ/g,'G').replace(/ü/g,'u').replace(/Ü/g,'U')
-        .replace(/ş/g,'s').replace(/Ş/g,'S').replace(/ı/g,'i').replace(/İ/g,'I')
-        .replace(/ö/g,'o').replace(/Ö/g,'O').replace(/ç/g,'c').replace(/Ç/g,'C')
-    }
-
-    function addText(text: string, size: number, bold = false, color: [number,number,number] = [0,0,0], indent = 0) {
-      doc.setFontSize(size); doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setTextColor(...color)
-      const lines = doc.splitTextToSize(clean(text), contentW - indent)
-      const lh = size * 0.4
-      if (y + lines.length * lh > 280) { doc.addPage(); y = margin }
-      doc.text(lines, margin + indent, y)
-      y += lines.length * lh + 2
-    }
-
-    // Header
-    doc.setFillColor(91, 76, 245)
-    doc.rect(0, 0, pageW, 36, 'F')
-    const logoB64 = await fetch('/pratium-logo.png').then(r => r.blob()).then(b => new Promise<string>(res => { const fr = new FileReader(); fr.onload = () => res((fr.result as string).split(',')[1]); fr.readAsDataURL(b) }))
-    doc.addImage('data:image/png;base64,' + logoB64, 'PNG', margin, 4, 30, 30)
-    doc.setFontSize(11); doc.setFont('helvetica','normal'); doc.setTextColor(255,255,255)
-    doc.text(clean(`${profile.name} - Gelisim Plani`), margin + 34, 16)
-    doc.text(new Date().toLocaleDateString('tr-TR'), pageW - margin, 16, { align: 'right' })
-    doc.text(clean(`${profile.grade} | Ort. %${avgPct}`), margin + 34, 24)
-    y = 46
-
-    // İlerleme özeti
-    const report = calcReport()
-    if (report && report.completed > 0) {
-      doc.setFillColor(237, 233, 255)
-      doc.roundedRect(margin, y, contentW, 14, 2, 2, 'F')
-      doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(91, 76, 245)
-      doc.text(clean(`Tamamlama: %${report.pct} (${report.completed}/${report.total} konu)`), margin + 4, y + 6)
-      doc.setFont('helvetica','normal'); doc.setTextColor(80, 80, 80)
-      doc.text(clean(`Plan baslangici: ${planDate ? new Date(planDate).toLocaleDateString('tr-TR') : '-'} | ${report.daysElapsed}. gun`), margin + 4, y + 11)
-      y += 18
-    }
-
-    // Özet
-    addText('Genel Degerlendirme', 12, true, [91, 76, 245])
-    addText(plan.summary, 10, false, [40,40,40])
-    y += 4
-
-    // Haftalar
-    plan.weeks?.forEach((week) => {
-      if (y > 240) { doc.addPage(); y = margin }
-      doc.setFillColor(91, 76, 245)
-      doc.roundedRect(margin, y, contentW, 8, 2, 2, 'F')
-      doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255)
-      doc.text(clean(`Hafta ${week.week}: ${week.goal}`), margin + 4, y + 5.5)
-      doc.text(`${week.daily_minutes} dk/gun`, pageW - margin - 2, y + 5.5, { align: 'right' })
-      y += 12
-
-      // Konular + tamamlanma
-      week.topics?.forEach(topic => {
-        const done = isCompleted(week.week, topic)
-        doc.setFontSize(9)
-        doc.setTextColor(done ? 22 : 120, done ? 163 : 120, done ? 74 : 120)
-        doc.text(clean(`${done ? '✓' : '○'} ${topic}`), margin + 4, y)
-        y += 5.5
-      })
-      y += 2
-
-      doc.setFontSize(9); doc.setTextColor(80,80,80)
-      const focusLines = doc.splitTextToSize(clean('• ' + week.focus), contentW - 4)
-      doc.text(focusLines, margin + 2, y)
-      y += focusLines.length * 4 + 6
-
-      doc.setDrawColor(220, 220, 220)
-      doc.line(margin, y, pageW - margin, y)
-      y += 4
-    })
-
-    if (plan.motivation) {
-      y += 4
-      doc.setFillColor(245, 244, 255)
-      doc.roundedRect(margin, y, contentW, 12, 2, 2, 'F')
-      doc.setFontSize(10); doc.setFont('helvetica','italic'); doc.setTextColor(91, 76, 245)
-      const motLines = doc.splitTextToSize(clean('"' + plan.motivation + '"'), contentW - 8)
-      doc.text(motLines, margin + 4, y + 5)
-      y += 16
-    }
-
-    doc.save(clean(`Pratium_Gelisim_Plani_${profile.name}_${new Date().toISOString().split('T')[0]}.pdf`))
+    try {
+      const { printLearningDocument, printableMath } = await import("@/lib/learning-print")
+      const content = "<p>" + printableMath(plan.summary) + "</p>" + plan.weeks.map(week => "<section class='print-question'><h2>Hafta " + week.week + ": " + printableMath(week.goal) + "</h2><p>" + week.daily_minutes + " dk/gün</p><ul>" + (week.topics || []).map(topic => "<li>" + (isCompleted(week.week, topic) ? "✓ " : "○ ") + printableMath(topic) + "</li>").join("") + "</ul><p>" + printableMath(week.focus) + "</p></section>").join("") + "<p>" + printableMath(plan.motivation || "") + "</p>"
+      await printLearningDocument("Pratium Gelişim Planı - " + profile.name, [profile.grade, "Ortalama %" + avgPct, planDate ? new Date(planDate).toLocaleDateString("tr-TR") : ""].filter(Boolean).join(" · "), content)
+    } catch (error) { alert(error instanceof Error ? error.message : "PDF görünümü açılamadı.") }
   }
 
   const report = calcReport()
@@ -502,7 +413,7 @@ export default function PlanPage() {
               </button>
               <button className="btn btn-sm" onClick={exportPDF} disabled={generating}
                 style={{ flex: 1, justifyContent: 'center', color: 'var(--accent)', borderColor: 'rgba(91,76,245,0.3)' }}>
-                📄 PDF indir
+                📄 Yazdır / PDF kaydet
               </button>
               <button className="btn btn-sm" onClick={() => printPage({ orientation: 'portrait' })}
                 style={{ justifyContent: 'center', color: 'var(--text2)' }}>
