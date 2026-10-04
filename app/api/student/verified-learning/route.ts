@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { loadCycleMetrics } from '@/lib/load-verified-learning-metrics'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { sameLearningScope } from '@/lib/learning-evidence-scope'
 import { recordQuizLearningEvents } from '@/lib/learning-events'
@@ -72,7 +73,8 @@ export async function GET(req: NextRequest) {
       : !attempts.some(attempt => attempt.stage === 'transfer' && attempt.status === 'completed') ? 'transfer' : null
     const gate = nextStage ? await stageGate(cycle, nextStage, attempts) : null
     const started = attempts.find(attempt => attempt.stage === nextStage && attempt.status === 'started')
-    return { id: cycle.id, status: cycle.status, createdAt: cycle.created_at,
+    const metrics = await loadCycleMetrics(db, cycle).catch(() => null)
+    return { id: cycle.id, status: cycle.status, createdAt: cycle.created_at, metrics,
       objective: objective ? { code: objective.objective_code, title: objective.title, subject: objective.subject } : null,
       nextStage, gate, startedAttempt: started ? { id: started.id, questions: publicVerifiedQuestions(started.questions) } : null,
       attempts: attempts.map(attempt => ({ stage: attempt.stage, status: attempt.status, scorePct: attempt.score_pct, completedAt: attempt.completed_at })),

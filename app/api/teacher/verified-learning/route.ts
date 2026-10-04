@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { loadCycleMetrics } from '@/lib/load-verified-learning-metrics'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { buildTeacherContext, getAuthedUser } from '@/lib/report-context'
 import { questionBankKey } from '@/lib/question-bank'
@@ -59,10 +60,11 @@ export async function GET(req: NextRequest) {
   const { data: attempts } = cycleIds.length
     ? await db.from('verified_learning_attempts').select('cycle_id,stage,status,score_pct,completed_at,quiz_session_id').in('cycle_id', cycleIds)
     : { data: [] }
-  return NextResponse.json({ options, cycles: (cycles || []).map(cycle => ({
+  return NextResponse.json({ options, cycles: await Promise.all((cycles || []).map(async cycle => ({
     ...cycle, objective: objectives?.find(item => item.id === cycle.learning_objective_id),
+    metrics: await loadCycleMetrics(db, { ...cycle, student_id: studentId, classroom_id: classroomId, teacher_id: result.context!.teacherId }).catch(() => null),
     attempts: (attempts || []).filter(attempt => attempt.cycle_id === cycle.id),
-  })) })
+  }))) })
 }
 
 export async function POST(req: NextRequest) {

@@ -70,8 +70,9 @@ function CoachGuidedPracticeContent() {
           {practice.status === 'awaiting_hint' && <div>
             <p>İlk denemen kaydedildi. Şimdi çözümü göstermeyen bir düşünme ipucu alabilirsin.</p>
             <button className="btn btn-primary" disabled={busy} onClick={() => void action('hint')}>Düşünme ipucu al</button>
+            <button className="btn" disabled={busy} onClick={() => void action('independent_retry')}>İpucu almadan yeniden dene</button>
           </div>}
-          {practice.status === 'awaiting_retry' && <p style={{ color: '#0f766e' }}><MathText text={hint || 'Soruda ne istendiğini ve hangi bilgilerin verildiğini yeniden düşün. Seçenekleri tek tek karşılaştır.'} /></p>}
+          {practice.status === 'awaiting_retry' && practice.hintCount > 0 && <p style={{ color: '#0f766e' }}><MathText text={hint || 'Soruda ne istendiğini ve hangi bilgilerin verildiğini yeniden düşün. Seçenekleri tek tek karşılaştır.'} /></p>}
           {practice.status === 'awaiting_explanation' && <div style={{ display: 'grid', gap: 8 }}>
             <label htmlFor="coach-explanation">Yanıtına nasıl ulaştığını kendi cümlelerinle açıkla</label>
             <textarea id="coach-explanation" value={explanation} onChange={event => setExplanation(event.target.value)} rows={4} maxLength={1000} style={{ width: '100%', borderRadius: 9, padding: 10 }} />

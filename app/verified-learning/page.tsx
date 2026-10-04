@@ -1,5 +1,7 @@
 'use client'
 import MathText from "@/components/MathText"
+import VerifiedLearningMetrics from '@/components/VerifiedLearningMetrics'
+import type { verifiedLearningMetrics } from '@/lib/verified-learning-metrics'
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -12,6 +14,7 @@ type Cycle = {
   nextStage: Stage | null; gate: string | null;
   startedAttempt: { id: string; questions: Question[] } | null;
   attempts: { stage: Stage; status: string; scorePct: number | null }[]
+  metrics: ReturnType<typeof verifiedLearningMetrics> | null
 }
 const stageLabel: Record<Stage, string> = { baseline: 'Yardımsız ön test', post: 'Yardımsız son test', transfer: 'Gecikmeli yeni durum testi' }
 
@@ -87,6 +90,7 @@ export default function VerifiedLearningPage() {
       {cycles.map(cycle => <section className="card" key={cycle.id}>
         <h2 style={{ fontSize: 18, marginTop: 0 }}>{cycle.objective?.code || 'Kazanım'} · {cycle.objective?.title || 'Ölçüm'}</h2>
         <p style={{ color: 'var(--text3)' }}>{cycle.objective?.subject} · {cycle.attempts.map(attempt => `${stageLabel[attempt.stage]}: ${attempt.status === 'completed' ? `%${attempt.scorePct}` : 'başlandı'}`).join(' · ') || 'Başlamadı'}</p>
+        {cycle.metrics && <VerifiedLearningMetrics metrics={cycle.metrics} />}
         {cycle.nextStage ? <>
           <strong>Sıradaki adım: {stageLabel[cycle.nextStage]}</strong>
           {cycle.gate && !cycle.startedAttempt ? <p style={{ color: 'var(--text2)' }}>{cycle.gate} {cycle.nextStage === 'post' && <Link href={`/koc/pratik?cycleId=${cycle.id}`}>Prof. Prati ile rehberli çalışmaya git</Link>}</p> :

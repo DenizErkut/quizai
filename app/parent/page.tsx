@@ -235,8 +235,9 @@ function ParentContent() {
 
   async function removeChild(childId: string) {
     if (!confirm('Bu çocuğu listeden kaldırmak istediğinize emin misiniz?')) return
+    const { data: { session } } = await supabase.auth.getSession()
     const response = await fetch('/api/parent/unlink-child', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
       body: JSON.stringify({ childId }),
     })
     if (!response.ok) {

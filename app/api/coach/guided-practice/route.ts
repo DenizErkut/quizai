@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
   const user = await student(req)
   if (!user) return NextResponse.json({ error: 'Oturum gerekli.' }, { status: 401 })
   const body = await req.json().catch(() => null) as { cycleId?: string; action?: string; choice?: number; explanation?: string } | null
-  if (!body || !UUID.test(body.cycleId || '') || !['start', 'first', 'hint', 'retry', 'explain'].includes(body.action || '')) {
+  if (!body || !UUID.test(body.cycleId || '') || !['start', 'first', 'hint', 'independent_retry', 'retry', 'explain'].includes(body.action || '')) {
     return NextResponse.json({ error: 'Geçersiz rehberli çalışma işlemi.' }, { status: 400 })
   }
   const detail = await loadCycle(body.cycleId!, user.id)
@@ -104,11 +104,12 @@ export async function POST(req: NextRequest) {
     if (!updated) return NextResponse.json({ error: 'Bu adım zaten tamamlandı; sayfayı yenileyin.' }, { status: 409 })
     return NextResponse.json({ next: to })
   }
-  if (body.action === 'hint') {
-    const { data: updated } = await db.from('coach_guided_practice_attempts').update({ status: 'awaiting_retry', hint_count: 1 })
+  if (body.action === 'hint' || body.action === 'independent_retry') {
+    const usedHint = body.action === 'hint'
+    const { data: updated } = await db.from('coach_guided_practice_attempts').update({ status: 'awaiting_retry', hint_count: usedHint ? 1 : 0 })
       .eq('id', practice.id).eq('student_id', user.id).eq('status', 'awaiting_hint').select('id').maybeSingle()
     if (!updated) return NextResponse.json({ error: 'İpucu aşaması artık uygun değil.' }, { status: 409 })
-    return NextResponse.json({ hint: REFLECTION_HINT })
+    return NextResponse.json({ hint: usedHint ? REFLECTION_HINT : null })
   }
 
   const explanation = String(body.explanation || '').trim()
@@ -121,7 +122,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Açıklama aşaması uygun değil veya ilk açıklama değiştirildi.' }, { status: 409 })
   }
   const correct = practice.retry_choice === practice.question.ans
-  const answers = [{ userAns: practice.retry_choice, correct, hintUsed: true }]
+  const answers = [{ userAns: practice.retry_choice, correct, hintUsed: practice.hint_count > 0 }]
   const { data: existingSession } = await db.from('quiz_sessions').select('id').eq('id', practice.id).eq('user_id', user.id).maybeSingle()
   if (!existingSession) {
     const { error: insertError } = await db.from('quiz_sessions').insert({

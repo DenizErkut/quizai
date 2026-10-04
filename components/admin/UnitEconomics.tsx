@@ -30,6 +30,7 @@ const LEARNING_METRIC_LABELS: Record<string, string> = {
 }
 
 type UnitEconomicsData = {
+  verified_learning?: { verifiedMasteryRate: number | null; reviewedPairs: number; pendingPairs: number; studentObjectivePairs: number; averageReviewedTransferPct: number | null; supportSessions: number; hintUseRate: number | null; totalHints: number; note: string } | null
   narrative?: string
   missing_sources?: string[]
   cost?: {
@@ -86,8 +87,9 @@ export default function UnitEconomics() {
         if (!cancelled) setData(json)
       } catch {
         if (!cancelled) setError('Bağlantı hatası.')
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-      if (!cancelled) setLoading(false)
     }
     load()
     return () => { cancelled = true }
@@ -117,6 +119,13 @@ export default function UnitEconomics() {
         </p>
       )}
 
+      {data.verified_learning && <section className="card" style={{ marginBottom: 16 }}>
+        <strong>Doğrulanmış kazanım ve yardım kullanımı</strong>
+        <p>Kazanım oranı (%80 eşiği): {pct(data.verified_learning.verifiedMasteryRate)} · {data.verified_learning.reviewedPairs} incelenmiş çift · {data.verified_learning.pendingPairs} bekleyen çift</p>
+        <p>İncelenmiş yardımsız aktarım ortalaması: {data.verified_learning.averageReviewedTransferPct === null ? '—' : `%${data.verified_learning.averageReviewedTransferPct.toFixed(1)}`}</p>
+        <p>Rehberli çalışma: {data.verified_learning.supportSessions} oturum · ipucu kullanılan oturum oranı {pct(data.verified_learning.hintUseRate)} · {data.verified_learning.totalHints} ipucu</p>
+        <p style={{ fontSize: 12, color: 'var(--text3)' }}>{data.verified_learning.note}</p>
+      </section>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
         <div className="card">
           <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>💰 Maliyet (30 gün)</div>

@@ -93,14 +93,16 @@ export async function GET(req: NextRequest) {
   if (profile?.is_admin !== true) return NextResponse.json({ error: 'Yasak.' }, { status: 403 })
 
   const origin = req.nextUrl.origin
-  const [pipeline, coach, adaptive] = await Promise.all([
+  const [pipeline, coach, adaptive, verified] = await Promise.all([
     callInternal<PipelinePayload>(origin, '/api/admin/pipeline-health', authHeader),
     callInternal<CoachPayload>(origin, '/api/admin/coach-analytics', authHeader),
     callInternal<AdaptivePayload>(origin, '/api/admin/adaptive-evaluation', authHeader),
+    callInternal<Record<string, unknown>>(origin, '/api/admin/verified-learning-metrics', authHeader),
   ])
 
   return NextResponse.json({
     generated_at: new Date().toISOString(),
+    verified_learning: verified,
     narrative: buildNarrative(pipeline, coach, adaptive),
     cost: pipeline?.ai ? {
       platform_cost_usd_30d: pipeline.ai.platform_cost_usd,
@@ -145,6 +147,7 @@ export async function GET(req: NextRequest) {
       !pipeline ? 'pipeline-health' : null,
       !coach ? 'coach-analytics' : null,
       !adaptive ? 'adaptive-evaluation' : null,
+      !verified ? 'verified-learning-metrics' : null,
     ].filter(Boolean),
   })
 }

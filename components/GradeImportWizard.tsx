@@ -1,6 +1,6 @@
 'use client'
 import { useState, useMemo, useEffect } from 'react'
-import * as XLSX from 'xlsx'
+import { parseGradeImport } from '@/lib/grade-import-parser'
 import { createClient } from '@/lib/supabase/client'
 import { matchImportStudent } from '@/lib/grade-import-matching'
 
@@ -113,12 +113,7 @@ export default function GradeImportWizard({
 
     try {
     const buf = await file.arrayBuffer()
-    const wb = XLSX.read(buf, { type: 'array', sheetRows: 2002, bookVBA: false })
-    if (!wb.SheetNames.length) { setError('Dosyada okunabilir bir sayfa yok.'); return }
-    const sheet = wb.Sheets[wb.SheetNames[0]]
-    const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false, defval: '' })
-    if (rows.length < 2) { setError('Dosyada yeterli veri bulunamadı (en az 1 başlık + 1 veri satırı gerekli).'); return }
-    if (rows.length > 2001 || rows[0].length > 100) { setError('En fazla 2.000 öğrenci satırı ve 100 sütun yükleyebilirsiniz. Dosyayı bölerek tekrar deneyin.'); return }
+    const rows = parseGradeImport(buf)
 
     const head = rows[0].map((h: any) => String(h ?? '').trim())
     const body = rows.slice(1).map(r => head.map((_, i) => String(r[i] ?? '').trim()))
@@ -138,8 +133,8 @@ export default function GradeImportWizard({
     setSubjectNames(head.map(h => h))
     setStep('mapping')
     loadRoster()
-    } catch {
-      setError('Dosya okunamadı. Geçerli bir Excel veya CSV dosyası yükleyin.')
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Dosya okunamadı. Geçerli bir Excel veya CSV dosyası yükleyin.')
     }
   }
 
