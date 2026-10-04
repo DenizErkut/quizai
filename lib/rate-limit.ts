@@ -12,70 +12,31 @@ const adminDb = createClient(
 interface RateLimitConfig {
   endpoint: string
   limit: number      // günlük max istek
-  windowHours?: number // default 24 saat
 }
 
 interface RateLimitResult {
   allowed: boolean
   remaining: number
   resetAt: string
+  unavailable?: boolean
 }
 
 export async function checkRateLimit(
   userId: string,
   config: RateLimitConfig
 ): Promise<RateLimitResult> {
-  const { endpoint, limit, windowHours = 24 } = config
-  const now = new Date()
-  const windowStart = new Date(now.getTime() - windowHours * 60 * 60 * 1000)
-  const today = now.toISOString().split('T')[0]
-
   try {
-    // Mevcut kaydı getir
-    const { data: existing } = await adminDb
-      .from('api_rate_limits')
-      .select('id, count, window_date')
-      .eq('user_id', userId)
-      .eq('endpoint', endpoint)
-      .eq('window_date', today)
-      .maybeSingle()
-
-    if (!existing) {
-      // İlk istek — kayıt oluştur
-      await adminDb.from('api_rate_limits').insert({
-        user_id: userId,
-        endpoint,
-        count: 1,
-        window_date: today,
-      })
-      return { allowed: true, remaining: limit - 1, resetAt: getResetTime() }
-    }
-
-    if (existing.count >= limit) {
-      return { allowed: false, remaining: 0, resetAt: getResetTime() }
-    }
-
-    // Sayacı artır
-    await adminDb.from('api_rate_limits')
-      .update({ count: existing.count + 1 })
-      .eq('id', existing.id)
-
-    return {
-      allowed: true,
-      remaining: limit - existing.count - 1,
-      resetAt: getResetTime()
-    }
-  } catch {
-    // Rate limit kontrolü başarısız olursa izin ver (graceful degradation)
-    return { allowed: true, remaining: limit, resetAt: getResetTime() }
+    const { data, error } = await adminDb.rpc('consume_daily_api_rate_limit_v1', {
+      p_user_id: userId, p_endpoint: config.endpoint, p_limit: config.limit,
+    })
+    const row = Array.isArray(data) ? data[0] : data
+    if (error || !row || typeof row.allowed !== 'boolean') throw new Error('Rate limit could not be verified')
+    return { allowed: row.allowed, remaining: row.remaining, resetAt: row.reset_at }
+  } catch (error) {
+    // Never permit unmetered paid calls or unlimited invitation guessing.
+    console.error('[rate-limit] verification unavailable', error instanceof Error ? error.message : 'unknown')
+    return { allowed: false, remaining: 0, resetAt: new Date(Date.now() + 60000).toISOString(), unavailable: true }
   }
-}
-
-function getResetTime(): string {
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  tomorrow.setHours(0, 0, 0, 0)
-  return tomorrow.toISOString()
 }
 
 // Response header'larına rate limit bilgisi ekle
@@ -89,9 +50,9 @@ export function rateLimitHeaders(result: RateLimitResult): Record<string, string
 // Limit aşıldığında response
 export function rateLimitExceeded(result: RateLimitResult) {
   return new Response(
-    JSON.stringify({ error: 'Günlük limit aşıldı. Yarın tekrar dene.' }),
+    JSON.stringify({ error: result.unavailable ? 'İstek sınırı doğrulanamadı. Bir dakika sonra yeniden deneyin.' : 'Günlük limit aşıldı. Yarın tekrar dene.' }),
     {
-      status: 429,
+      status: result.unavailable ? 503 : 429,
       headers: {
         'Content-Type': 'application/json',
         ...rateLimitHeaders(result),

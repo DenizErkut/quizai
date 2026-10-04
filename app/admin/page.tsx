@@ -669,27 +669,37 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
 
   async function resetTestCount(userId: string) {
     setUpdating(userId)
-    await supabase.from('profiles')
-      .update({ monthly_test_count: 0 })
-      .eq('id', userId)
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, monthly_test_count: 0 } : u))
-    setUpdating(null)
+    try {
+      if (await profileAction({ action: 'reset-test-count', userId })) {
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, monthly_test_count: 0 } : u))
+      }
+    } finally { setUpdating(null) }
+  }
+
+  async function profileAction(body: Record<string, unknown>): Promise<boolean> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const response = await fetch('/api/admin/profile-actions', { method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify(body) })
+      const result = await response.json()
+      if (!response.ok) { alert(result.error || 'İşlem kaydedilemedi.'); return false }
+      return true
+    } catch { alert('Bağlantı hatası. İşlem doğrulanamadı.'); return false }
   }
 
   async function makeAllPremium(months: number) {
     if (!confirm(`Tüm free kullanıcıları ${months} ay Altın yapılsın mı?`)) return
     setLoading(true)
-    const expires = new Date(Date.now() + months * 30 * 24 * 60 * 60 * 1000).toISOString()
-    await supabase.from('profiles')
-      .update({ plan: 'premium', plan_expires_at: expires, monthly_test_count: 0 })
-      .eq('plan', 'free')
-    await fetchData()
+    try {
+      if (await profileAction({ action: 'bulk-premium', months })) await fetchData()
+    } finally { setLoading(false) }
   }
 
   async function toggleAdmin(userId: string, current: boolean) {
     if (!confirm(`Bu kullanıcıyı ${current ? 'admin\'den çıkar' : 'admin yap'}?`)) return
-    await supabase.from('profiles').update({ is_admin: !current }).eq('id', userId)
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_admin: !current } : u))
+    if (await profileAction({ action: 'set-admin', userId, isAdmin: !current })) {
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_admin: !current } : u))
+    }
   }
 
   const filtered = users.filter(u => {

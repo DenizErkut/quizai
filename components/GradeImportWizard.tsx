@@ -2,6 +2,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
+import { matchImportStudent } from '@/lib/grade-import-matching'
 
 type ColRole = 'ignore' | 'school_no' | 'class' | 'name' | 'subject'
 
@@ -22,16 +23,6 @@ interface MatchedRow {
   studentId: string | null
   matchType: 'school_no' | 'name' | 'manual' | 'none'
   skip: boolean
-}
-
-function normalizeName(s: string): string {
-  return s
-    .toLocaleUpperCase('tr-TR')
-    .replace(/İ/g, 'I').replace(/Ğ/g, 'G').replace(/Ü/g, 'U')
-    .replace(/Ş/g, 'S').replace(/Ö/g, 'O').replace(/Ç/g, 'C')
-    .replace(/[^A-Z0-9]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
 }
 
 export default function GradeImportWizard({
@@ -115,14 +106,19 @@ export default function GradeImportWizard({
     const file = e.target.files?.[0]
     if (!file) return
     setError('')
+    if (file.size > 5 * 1024 * 1024) { setError('Dosya en fazla 5 MB olabilir.'); return }
+    if (!/\.(xlsx|xls|csv)$/i.test(file.name)) { setError('Excel veya CSV dosyası seçin.'); return }
     setFileName(file.name)
     if (!label.trim()) setLabel(file.name.replace(/\.[^.]+$/, ''))
 
+    try {
     const buf = await file.arrayBuffer()
-    const wb = XLSX.read(buf, { type: 'array' })
+    const wb = XLSX.read(buf, { type: 'array', sheetRows: 2002, bookVBA: false })
+    if (!wb.SheetNames.length) { setError('Dosyada okunabilir bir sayfa yok.'); return }
     const sheet = wb.Sheets[wb.SheetNames[0]]
     const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false, defval: '' })
     if (rows.length < 2) { setError('Dosyada yeterli veri bulunamadı (en az 1 başlık + 1 veri satırı gerekli).'); return }
+    if (rows.length > 2001 || rows[0].length > 100) { setError('En fazla 2.000 öğrenci satırı ve 100 sütun yükleyebilirsiniz. Dosyayı bölerek tekrar deneyin.'); return }
 
     const head = rows[0].map((h: any) => String(h ?? '').trim())
     const body = rows.slice(1).map(r => head.map((_, i) => String(r[i] ?? '').trim()))
@@ -142,6 +138,9 @@ export default function GradeImportWizard({
     setSubjectNames(head.map(h => h))
     setStep('mapping')
     loadRoster()
+    } catch {
+      setError('Dosya okunamadı. Geçerli bir Excel veya CSV dosyası yükleyin.')
+    }
   }
 
   async function loadRoster() {
@@ -173,9 +172,6 @@ export default function GradeImportWizard({
       setError('En az bir sütunu "Öğrenci No" veya "İsim" olarak işaretlemelisin (eşleştirme için gerekli).')
       return
     }
-    const rosterBySchoolNo = new Map(roster.filter(r => r.schoolNo).map(r => [String(r.schoolNo).trim(), r]))
-    const rosterByName = new Map(roster.map(r => [normalizeName(r.fullName), r]))
-
     const matches: MatchedRow[] = dataRows.map((row, idx) => {
       const rawSchoolNo = schoolNoColIdx !== -1 ? row[schoolNoColIdx] : ''
       const rawClass = classColIdx !== -1 ? row[classColIdx] : ''
@@ -183,16 +179,7 @@ export default function GradeImportWizard({
       const subjectValues: Record<string, string> = {}
       subjectColIdxs.forEach(ci => { subjectValues[subjectNames[ci] || headers[ci]] = row[ci] })
 
-      let studentId: string | null = null
-      let matchType: MatchedRow['matchType'] = 'none'
-
-      if (rawSchoolNo && rosterBySchoolNo.has(rawSchoolNo.trim())) {
-        studentId = rosterBySchoolNo.get(rawSchoolNo.trim())!.id
-        matchType = 'school_no'
-      } else if (rawName && rosterByName.has(normalizeName(rawName))) {
-        studentId = rosterByName.get(normalizeName(rawName))!.id
-        matchType = 'name'
-      }
+      const { studentId, matchType } = matchImportStudent(roster, rawSchoolNo, rawName, rawClass)
 
       return { rowIndex: idx, rawSchoolNo, rawClass, rawName, subjectValues, studentId, matchType, skip: false }
     })

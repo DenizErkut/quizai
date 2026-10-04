@@ -26,6 +26,9 @@ export async function PATCH(req: NextRequest) {
   if (!actor) return NextResponse.json({ error: 'Yasak.' }, { status: 403 })
   const body = await req.json().catch(() => ({})) as { id?: string; status?: string; note?: string }
   if (!body.id || !['verified', 'in_progress', 'completed', 'rejected'].includes(body.status || '')) return NextResponse.json({ error: 'Geçersiz durum geçişi.' }, { status: 400 })
+  // Destructive requests may enter execution only through the dedicated
+  // preview + confirmation endpoint, never this generic status editor.
+  if (body.status === 'in_progress') return NextResponse.json({ error: 'İşlem başlatmak için etki önizlemesini ve ikinci onay adımını kullanın.' }, { status: 409 })
   const update: Record<string, unknown> = { status: body.status, verification_note: typeof body.note === 'string' ? body.note.trim().slice(0, 500) : null }
   if (body.status === 'completed' || body.status === 'rejected') { update.processed_by = actor.id; update.processed_at = new Date().toISOString() }
   const { data, error } = await db.from('data_lifecycle_requests').update(update).eq('id', body.id).in('status', ['pending', 'verified', 'in_progress']).select('id,status,processed_by,processed_at').maybeSingle()

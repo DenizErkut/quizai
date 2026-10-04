@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { lifecycleTables, lifecycleOwnerColumn } from '@/lib/data-lifecycle-scope'
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const token = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '')
@@ -11,11 +12,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const { data: request } = await db.from('data_lifecycle_requests').select('id,subject_user_id,request_kind,scope,status').eq('id', id).maybeSingle()
   if (!request) return NextResponse.json({ error: 'Talep bulunamadı.' }, { status: 404 })
-  const tables = ['profiles', 'quiz_sessions', 'learning_events', 'student_mastery', 'student_recommendations', 'parent_children'] as const
-  const counts = await Promise.all(tables.map(async table => {
-    const column = table === 'parent_children' ? 'child_id' : table === 'profiles' ? 'id' : table === 'student_recommendations' || table === 'student_mastery' || table === 'learning_events' || table === 'quiz_sessions' ? (table === 'learning_events' ? 'student_id' : 'user_id') : 'id'
-    const { count } = await db.from(table).select('id', { count: 'exact', head: true }).eq(column, request.subject_user_id)
-    return [table, count ?? 0]
+  const counts = await Promise.all(lifecycleTables.map(async table => {
+    const { count, error } = await db.from(table).select('*', { count: 'exact', head: true }).eq(lifecycleOwnerColumn(table), request.subject_user_id)
+    return { table, count, error }
   }))
-  return NextResponse.json({ request, preview: Object.fromEntries(counts), deletion_executed: false })
+  if (counts.some(result => result.error)) {
+    console.error('[data-lifecycle] preview count failed', counts.filter(result => result.error).map(result => result.table))
+    return NextResponse.json({ error: 'Kayıt sayıları doğrulanamadı. Lütfen yeniden deneyin.' }, { status: 500 })
+  }
+  return NextResponse.json({ request, preview: Object.fromEntries(counts.map(result => [result.table, result.count ?? 0])), deletion_executed: false })
 }

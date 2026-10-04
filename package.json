@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npm run e2e",
+    "test": "npm run test:unit && npm run e2e",
+    "test:unit": "node scripts/run-unit-tests.mjs",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "load:test": "node scripts/load-test.mjs"
@@ -21,7 +22,7 @@
     "jspdf": "^4.2.1",
     "jszip": "^3.10.1",
     "katex": "0.19.0",
-    "next": "16.2.6",
+    "next": "16.3.8",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^1.1.1",
     "pg": "^8.22.0",
@@ -33,7 +34,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@playwright/test": "^1.53.1",
+    "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "^4.3.0",
     "@types/katex": "0.16.8",
     "@types/node": "^20",
@@ -42,7 +43,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "16.3.8",
     "tailwindcss": "^4.3.0",
     "typescript": "^5"
   }

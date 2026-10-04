@@ -25,7 +25,7 @@ test('quality gate accepts a verified seventy-percent subset without relaxing ob
 test('a primary rejection receives an independent second opinion and is audited', () => {
   const route = readFileSync(join(process.cwd(), 'app/api/verify-questions/route.ts'), 'utf8')
   expect(route).toContain('primaryCheck?.ok === false')
-  expect(route).toContain('await verifyQuestionWithGemini(verifyPrompt)')
+  expect(route).toContain('verifyQuestionWithMistral(verifyPrompt, reviewContext)')
   expect(route).toContain('verifyQuestionWithClaude(verifyPrompt)')
   expect(route).toContain('objectiveCandidates.length === 1')
   expect(route).toContain('strictQualityPolicy && verified.length > 0')
@@ -198,7 +198,7 @@ test('question booklet records can be viewed, edited and safely deleted by admin
   const admin = readFileSync(join(process.cwd(), 'app/admin/page.tsx'), 'utf8')
   const migration = readFileSync(join(process.cwd(), 'supabase/migrations/20260927184506_update_exam_resource_document_v1.sql'), 'utf8')
   expect(upload).toContain('export async function PUT')
-  expect(upload).toContain("adminDb.rpc('update_exam_resource_document_v1'")
+  expect(upload).toContain("adminDb.rpc('update_exam_resource_document_v2'")
   expect(upload).toContain('const user = await getAdminUser()')
   expect(admin).toContain('👁️ Görüntüle')
   expect(admin).toContain('✏️ Düzelt')

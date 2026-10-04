@@ -169,7 +169,10 @@ export default function QuizQuestion({
 
           {trustedVisual && q.svg && (
             <div style={{ marginBottom: '1rem', padding: '1rem', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', overflow: 'hidden' }}>
-              <div dangerouslySetInnerHTML={{ __html: q.svg }} style={{ width: '100%' }} />
+              {/* SVG in an image context cannot execute scripts or inject
+                  markup into the surrounding application document. */}
+              <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(q.svg)}`}
+                alt="Soruya ait şekil veya grafik" style={{ width: '100%', maxHeight: '480px', objectFit: 'contain' }} />
             </div>
           )}
 

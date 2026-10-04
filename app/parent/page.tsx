@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { resolveIdentities, resolveName } from '@/lib/identity/resolve-client'
+import { resolveIdentities } from '@/lib/identity/resolve-client'
 import ReportsHub from '@/components/ReportsHub'
 import ChildConsentStatus from '@/components/ChildConsentStatus'
 import { Suspense } from 'react'
@@ -221,24 +221,29 @@ function ParentContent() {
   async function addChild() {
     if (!addCode.trim()) return
     setAdding(true); setAddError(''); setAddSuccess('')
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: childProfile } = await supabase.from('profiles').select('id').eq('parent_code', addCode.trim().toLowerCase()).maybeSingle()
-    if (!childProfile) { setAddError('Kod bulunamadı. Çocuğunuzdan doğru kodu aldığınızdan emin olun.'); setAdding(false); return }
-    if (childProfile.id === user.id) { setAddError('Kendi hesabınızı ekleyemezsiniz.'); setAdding(false); return }
-    const { data: existing } = await supabase.from('parent_children').select('id').eq('parent_id', user.id).eq('child_id', childProfile.id).maybeSingle()
-    if (existing) { setAddError('Bu çocuk zaten listenizde.'); setAdding(false); return }
-    const childName = await resolveName(supabase, childProfile.id)
-    await supabase.from('parent_children').insert({ parent_id: user.id, child_id: childProfile.id, nickname: childName })
-    setAddSuccess(`${childName || 'Çocuğunuz'} başarıyla eklendi!`)
+    try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const response = await fetch('/api/parent/link-child', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ code: addCode.trim() }) })
+    const result = await response.json()
+    if (!response.ok) { setAddError(result.error || 'Çocuk eklenemedi.'); return }
+    setAddSuccess('Çocuğunuz başarıyla eklendi!')
     setAddCode('')
     await load()
-    setAdding(false)
+    } catch { setAddError('Bağlantı hatası. Lütfen yeniden deneyin.') }
+    finally { setAdding(false) }
   }
 
   async function removeChild(childId: string) {
     if (!confirm('Bu çocuğu listeden kaldırmak istediğinize emin misiniz?')) return
-    const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('parent_children').delete().eq('parent_id', user.id).eq('child_id', childId)
+    const response = await fetch('/api/parent/unlink-child', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ childId }),
+    })
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null)
+      setAddError(payload?.error || 'Bağlantı kaldırılamadı.')
+      return
+    }
     setChildren(prev => prev.filter(c => c.child_id !== childId))
     setSelectedChild(children.filter(c => c.child_id !== childId)[0]?.child_id ?? null)
   }
