@@ -6,6 +6,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { educationEvalSubjectKey as questionBankKey } from '@/lib/education-eval-subject'
 import { educationEvalGradeKey, isEducationEvalObjectiveInScope } from '@/lib/education-eval-grade'
+import { nextBenchmarkOrdinal } from '@/lib/benchmark-slot'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
@@ -272,9 +273,10 @@ export async function POST(req: NextRequest) {
     return Boolean(data?.signedUrl && !error)
   }))
   if (!evidenceChecks.some(Boolean)) return NextResponse.json({ error: 'Yayın izni kanıt dosyaları açılamıyor. Kitapçıkta kanıtı yenileyin.' }, { status: 400 })
-  const { data: lastItem } = await db.from('education_eval_benchmark_items').select('ordinal').eq('benchmark_set_id', set.id).order('ordinal', { ascending: false }).limit(1).maybeSingle()
-  const ordinal = (lastItem?.ordinal || 0) + 1
-  if (ordinal > set.target_size) return NextResponse.json({ error: '50 soruluk set dolu.' }, { status: 409 })
+  const { data: slots, error: slotError } = await db.from('education_eval_benchmark_items').select('ordinal').eq('benchmark_set_id', set.id)
+  if (slotError) return NextResponse.json({ error: 'Setin boş sıraları kontrol edilemedi. Tekrar deneyin.' }, { status: 503 })
+  const ordinal = nextBenchmarkOrdinal((slots || []).map(item => item.ordinal), set.target_size)
+  if (ordinal === null) return NextResponse.json({ error: '50 soruluk set dolu.' }, { status: 409 })
   const { data: inserted, error } = await db.from('education_eval_benchmark_items').insert({
     benchmark_set_id: set.id, ordinal, case_type: 'benchmark', source_type: 'teacher', source_resource_id: resource.id,
     question_bank_id: bankQuestion.id, source_version: currentSourceVersion, source_reference: `${resource.title} (${resource.id})`,
@@ -285,7 +287,7 @@ export async function POST(req: NextRequest) {
     evidence_verified_by: user.id, evidence_verified_at: new Date().toISOString(), reviewed_by: user.id,
     reviewed_at: new Date().toISOString(), metric_eligible: true,
   }).select('id,ordinal,source_reference,grade,subject,objective_code,objective_title,metric_eligible').single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (error) return NextResponse.json({ error: error.code === '23505' ? 'Soru zaten sette veya başka işlem bu sırayı doldurdu. Yenileyip tekrar deneyin.' : error.message }, { status: error.code === '23505' ? 409 : 400 })
   return NextResponse.json({ success: true, item: inserted })
 }
 

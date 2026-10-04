@@ -229,9 +229,10 @@ export default function EducationEvalBenchmark() {
           </label>
           {selectedResource.evidenceUrls.length === 0 && <small style={{ color: 'var(--red, #b54735)' }}>Kanıt görseli görüntülenemiyor; kaynağı yenileyip tekrar kontrol edin.</small>}
           <button className="btn btn-primary btn-sm" style={{ marginTop: 10 }} disabled={busy || !objectiveId || !confirmed || selectedResource.evidenceUrls.length === 0}
-            onClick={() => void mutate('POST', { action: 'add', sourceResourceId: resourceId, questionBankId: questionId, objectiveId, sourceVersion: selectedResource.sourceVersion, evidenceConfirmed: confirmed })}>Benchmark’a ekle</button>
+            onClick={() => void mutate('POST', { action: 'add', sourceResourceId: resourceId, questionBankId: questionId, objectiveId, sourceVersion: selectedResource.sourceVersion, evidenceConfirmed: confirmed })}>{busy ? 'İşleniyor…' : 'Benchmark’a ekle'}</button>
         </div>}
       </>}
+      {message && <div role="status" aria-live="polite" style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 8 }}>{message}</div>}
       <button className="btn btn-primary" disabled={!canActivate || busy} onClick={() => void mutate('POST', { action: 'activate' })}>50 soruluk seti kilitle ve etkinleştir</button>
       {!canActivate && <small style={{ color: 'var(--text2)' }}>Etkinleştirme, tam 50 uygun soru tamamlandığında açılır. Taslak şu an {eligible}/50.</small>}
     </div>}
