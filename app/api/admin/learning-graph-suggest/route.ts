@@ -44,6 +44,11 @@ function gradeKey(value: unknown) {
   return key(value).replace(/sinif/g, 'sınıf').replace(/(\d+)\s*\.\s*sınıf/g, '$1. sınıf').replace(/^(\d+)$/, '$1. sınıf')
 }
 
+function gradeLabel(value: unknown) {
+  const raw = typeof value === 'string' ? value.trim() : ''
+  return /sınıf/i.test(raw) ? raw : `${raw}. sınıf`
+}
+
 function buildPrompt(subject: string, grade: number, level: string, topics: string[]): string {
   const topicList = topics.map((t, i) => `${i + 1}. ${t}`).join('\n')
   return `Sen bir Türkiye MEB müfredatı eğitim programı uzmanısın. Aşağıda "${level}" seviyesi, ${grade}. sınıf, "${subject}" dersine ait, müfredatta SIRAYLA verilmiş konu listesi var:
@@ -163,8 +168,8 @@ export async function POST(req: NextRequest) {
     }
 
     const { data: packageId, error: packageError } = await adminDb.rpc('create_learning_graph_prerequisite_package_v1', {
-      p_name: `AI ön koşul önerileri · ${curriculum.subject} · ${curriculum.grade}. sınıf`,
-      p_subject: curriculum.subject, p_grade: `${curriculum.grade}. sınıf`,
+      p_name: `AI ön koşul önerileri · ${curriculum.subject} · ${gradeLabel(curriculum.grade)}`,
+      p_subject: curriculum.subject, p_grade: gradeLabel(curriculum.grade),
       p_curriculum_version_id: version.id,
       p_source_reference: `AI öneri isteği ${requestId}`,
       p_created_by: user.id, p_items: validRelations,
