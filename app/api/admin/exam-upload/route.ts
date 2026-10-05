@@ -5,6 +5,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createHash, randomUUID } from 'node:crypto'
 import { bookletBatches } from '@/lib/booklet-processing'
+import { bookletQuestionLabels, printedQuestionObjective } from '@/lib/booklet-objective-label'
 import { callOpenAI } from '@/lib/openai'
 import { questionBankKey } from '@/lib/question-bank'
 import { educationEvalGradeKey } from '@/lib/education-eval-grade'
@@ -195,8 +196,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ exams: withCounts })
 }
 
-async function loadVerifiedBookletObjectives(row: { subject?: string | null; grade?: string | null; learning_objective_codes?: unknown }) {
-  const codes = parseLearningObjectiveCodes(row.learning_objective_codes)
+async function loadVerifiedBookletObjectives(row: { subject?: string | null; grade?: string | null; learning_objective_codes?: unknown; raw_text?: string | null }) {
+  const codes = [...new Set([...parseLearningObjectiveCodes(row.learning_objective_codes), ...bookletQuestionLabels(row.raw_text || '').flatMap(label => label.codes)])]
   if (!codes.length || !row.subject || !row.grade) return []
 
   const { data: benchmarkSet } = await adminDb.from('education_eval_benchmark_sets')
@@ -225,7 +226,8 @@ async function loadVerifiedBookletObjectives(row: { subject?: string | null; gra
 
 async function promoteExactQuestions(row: { id?: string; subject?: string | null; grade?: string | null; topic?: string | null; subtopic?: string | null; raw_text?: string | null; learning_objective_codes?: unknown }, sourceType: 'teacher' | 'ai', batch: string) {
   const sourceLabel = sourceType === 'teacher' ? 'öğretmen imzalı' : 'yapay zekâ ile ayrıca hazırlanmış'
-  const objectiveReferences = await loadVerifiedBookletObjectives(row)
+  const labels = bookletQuestionLabels(batch)
+  const objectiveReferences = await loadVerifiedBookletObjectives({ ...row, learning_objective_codes: [...new Set([...parseLearningObjectiveCodes(row.learning_objective_codes), ...labels.flatMap(label => label.codes)])] })
   const verifiedCodes = objectiveReferences.map(objective => objective.code)
   const objectiveInstruction = objectiveReferences.length
     ? `\nKitapçıkta ilişkilendirilecek doğrulanmış MEB kazanımları: ${JSON.stringify(objectiveReferences)}. Her soruyu içerik bakımından en uygun kodla eşleştir; eşleşme açık değilse objective_code null olsun. Yalnızca bu listede bulunan kodlardan birini kullan; kod uydurma veya listedeki soruyu değiştirme.\n`
@@ -262,7 +264,7 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
     // Preserve the classifier's finer subtopic separately in the question.
     topic_key: questionBankKey(row.subtopic || row.topic || q.topic || 'genel'),
     grade_key: canonicalBookletGrade(row.grade || ''), language_key: 'tr', question_type: 'multiple_choice', difficulty: q.difficulty === 'easy' ? 'kolay' : q.difficulty === 'hard' ? 'zor' : 'normal',
-    question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, requiresBookletVisual: requiresBookletVisual(q), objective: q.topic || row.subtopic || '', learningObjectiveCode: matchVerifiedObjectiveCode(q.objective_code, verifiedCodes), bookletObjectiveCodes: parseLearningObjectiveCodes(row.learning_objective_codes), bookletTopic: row.subtopic || row.topic || '', bookletResourceId: row.id || null, subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' },
+    question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, requiresBookletVisual: requiresBookletVisual(q), objective: q.topic || row.subtopic || '', learningObjectiveCode: labels.some(label => label.codes.length) ? printedQuestionObjective(q.q, labels, verifiedCodes) : matchVerifiedObjectiveCode(q.objective_code, verifiedCodes), bookletObjectiveCodes: verifiedCodes, bookletTopic: row.subtopic || row.topic || '', bookletResourceId: row.id || null, subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' },
     review_status: requiresBookletVisual(q) ? 'candidate' : 'approved', quality_score: requiresBookletVisual(q) ? 0 : 1, source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact', report_count: 0
   }))
   if (!rows.length) return 0
