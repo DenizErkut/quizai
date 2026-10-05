@@ -1537,6 +1537,18 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               }} className="btn btn-sm" style={{ marginLeft: 'auto' }}>
                 🔄 Yükle
               </button>
+              <button onClick={async () => {
+                setCurrLoading(true)
+                const res = await fetch('/api/admin/curriculum', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'backfill-topics' }) })
+                const data = await res.json()
+                setCurrMsg(res.ok ? `✅ ${data.updated || 0} ders kaydının konuları kazanım kataloğundan eşleştirildi.` : `❌ ${data.error || 'Konu eşleştirme başarısız.'}`)
+                const refreshed = await fetch('/api/admin/curriculum')
+                const refreshedData = await refreshed.json()
+                setCurriculum(refreshedData.curriculum || [])
+                setCurrLoading(false)
+              }} className="btn btn-sm">
+                🧩 Kazanımlardan konuları eşleştir
+              </button>
             </div>
 
             {/* Yeni ders ekleme */}

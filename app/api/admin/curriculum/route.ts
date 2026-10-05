@@ -46,7 +46,31 @@ export async function POST(req: NextRequest) {
   const user = await getAdminUser()
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { level, grade, subject, topics } = await req.json()
+  const body = await req.json()
+  if (body?.action === 'backfill-topics') {
+    const [{ data: rows, error: rowsError }, { data: objectives, error: objectivesError }] = await Promise.all([
+      adminDb.from('curriculum').select('id,grade,subject,topics'),
+      adminDb.from('learning_objective_catalog').select('grade,subject,topic,unit')
+        .eq('is_active', true).eq('verification_status', 'verified').limit(10000),
+    ])
+    if (rowsError || objectivesError) return NextResponse.json({ error: rowsError?.message || objectivesError?.message }, { status: 500 })
+    const key = (value: unknown) => typeof value === 'string' ? value.toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ').trim() : ''
+    const gradeKey = (value: unknown) => key(value).replace(/ sınıf/g, '').replace(/\. sınıf/g, '').replace(/[^0-9]/g, '')
+    let updated = 0
+    for (const row of rows || []) {
+      const derived = [...new Set((objectives || []).filter(objective => gradeKey(objective.grade) === gradeKey(row.grade) && key(objective.subject) === key(row.subject))
+        .flatMap(objective => [objective.topic, objective.unit].filter((value): value is string => Boolean(value))))]
+      const existing = Array.isArray(row.topics) ? row.topics.filter((value: unknown): value is string => typeof value === 'string' && Boolean(value.trim())) : []
+      const topics = [...new Set([...existing, ...derived])]
+      if (topics.length && topics.length !== existing.length) {
+        const { error } = await adminDb.from('curriculum').update({ topics }).eq('id', row.id)
+        if (error) return NextResponse.json({ error: error.message, updated }, { status: 500 })
+        updated++
+      }
+    }
+    return NextResponse.json({ ok: true, updated })
+  }
+  const { level, grade, subject, topics } = body
   if (!level || !grade || !subject) {
     return NextResponse.json({ error: 'level, grade, subject zorunlu' }, { status: 400 })
   }
