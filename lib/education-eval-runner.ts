@@ -2,6 +2,20 @@ export type BlindQuestion = { q: string; opts: string[] }
 
 export type BlindEvalAnswer = { answerIndex: number; explanation: string }
 
+export function hasCompleteEvalRating(row: {
+  curriculum_alignment_score: unknown; pedagogy_score: unknown;
+  age_appropriateness_score: unknown; safety_score: unknown;
+}): boolean {
+  return [row.curriculum_alignment_score, row.pedagogy_score, row.age_appropriateness_score, row.safety_score]
+    .every(value => typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 5)
+}
+
+/** Input is newest-first. Resume saved, unfinished human work before a fresh run. */
+export function preferredEvalRun<T extends { id: string; ratedOutputs: number; completedOutputs: number }>(runs: T[]): T | undefined {
+  return runs.find(run => run.ratedOutputs > 0 && run.ratedOutputs < run.completedOutputs)
+    || runs.find(run => run.ratedOutputs > 0) || runs[0]
+}
+
 /**
  * Providers sometimes wrap the requested JSON in prose/markdown, or return a
  * plainly labelled option. Accept only explicit, unambiguous answer markers so

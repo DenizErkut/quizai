@@ -1,5 +1,6 @@
 'use client'
 import MathText from "@/components/MathText"
+import { hasCompleteEvalRating } from '@/lib/education-eval-runner'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -18,6 +19,7 @@ type EvalRun = { id: string; benchmark_version: number; status: 'running' | 'com
 type EvalSummary = { provider: string; model: string; n: number; unscoredOutputs: number; accuracy: number; effectiveAccuracy: number; meanLatencyMs: number; totalCostUsd: number; curriculumAlignment: number; pedagogy: number; ageAppropriateness: number; safety: number }
 type RunnerData = { selectedVersion?: number; versions?: Array<{ version: number; status: string; title: string }>; run: EvalRun | null; results: EvalOutput[]; summary: EvalSummary[] | null; progress?: { completedOutputs: number; ratedOutputs: number; totalOutputs: number; completedItems: number; failedOutputs: number; blinded: boolean }; readiness?: { benchmarkStatus: string; eligibleQuestions: number; target: number; providersConfigured: boolean } }
 type Rating = Record<ScoreKey, number> & { reviewerNotes: string }
+type RunHistory = EvalRun & { completedOutputs: number; ratedOutputs: number }
 
 const RATING_FIELDS: Array<{ key: ScoreKey; label: string }> = [
   { key: 'curriculum_alignment_score', label: 'Kazanım uyumu' },
@@ -27,7 +29,9 @@ const RATING_FIELDS: Array<{ key: ScoreKey; label: string }> = [
 ]
 
 export default function EducationEvalRunner() {
-  const [data, setData] = useState<RunnerData | null>(null)
+  const [data, setData] = useState<(RunnerData & { runHistory?: RunHistory[] }) | null>(null)
+  const [runId, setRunId] = useState('')
+  const [pendingOnly, setPendingOnly] = useState(true)
   const [version, setVersion] = useState(0)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -35,24 +39,29 @@ export default function EducationEvalRunner() {
   const [ratings, setRatings] = useState<Record<string, Rating>>({})
   const stopRequested = useRef(false)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (requestedRunId?: string) => {
     try {
-      const response = await fetch(`/api/admin/education-eval/run${version ? `?version=${version}` : ''}`, { cache: 'no-store' })
+      const query = new URLSearchParams()
+      if (version) query.set('version', String(version))
+      if (requestedRunId || runId) query.set('runId', requestedRunId || runId)
+      const response = await fetch(`/api/admin/education-eval/run?${query}`, { cache: 'no-store' })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Education Eval durumu alınamadı.')
       setData(result)
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Beklenmeyen hata.') }
-  }, [version])
+  }, [version, runId])
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load() }, [load])
 
   const outputs = useMemo(() => data?.results || [], [data?.results])
-  const reviewable = useMemo(() => outputs.filter(output => output.status === 'completed'), [outputs])
+  const reviewable = useMemo(() => outputs.filter(output => output.status === 'completed' && (!pendingOnly || !hasCompleteEvalRating(output))), [outputs, pendingOnly])
   const pages = Math.max(1, Math.ceil(reviewable.length / 10))
-  const visible = reviewable.slice(page * 10, page * 10 + 10)
+  const currentPage = Math.min(page, pages - 1)
+  const visible = reviewable.slice(currentPage * 10, currentPage * 10 + 10)
   const ready = data?.readiness?.benchmarkStatus === 'active' && data.readiness.eligibleQuestions === 50 && data.readiness.providersConfigured
 
   async function startOrContinue() {
+    if (data?.run && data.run.status !== 'running' && !window.confirm('Bu işlem yeni model yanıtları üretir ve yeni çalışma 0/150 insan puanıyla başlar. Mevcut puanlarınız çalışma geçmişinde korunur. Eksik puanları tamamlamak için İptal seçin. Yeni çalışma başlatılsın mı?')) return
     setBusy(true); setMessage(''); stopRequested.current = false
     try {
       let run = data?.run
@@ -77,7 +86,8 @@ export default function EducationEvalRunner() {
         if (result.hadErrors) { setMessage(`Soru ${result.currentOrdinal} için en az bir sağlayıcı hata verdi. Hatalı çağrılar giderilip “Sürdür / hataları yinele” ile devam edilebilir.`); break }
       }
       if (stopRequested.current) setMessage('Çalışma duraklatıldı; aynı yerden daha sonra sürdürebilirsiniz.')
-      await load()
+      setRunId(run.id)
+      await load(run.id)
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Beklenmeyen hata.') }
     finally { setBusy(false) }
   }
@@ -91,9 +101,10 @@ export default function EducationEvalRunner() {
         body: JSON.stringify({ action: 'review', runId: data.run.id, resultId: output.id, ...rating }) })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Puanlama kaydedilemedi.')
+      setRunId(data.run.id)
       setData(current => current ? { ...current, ...result } : result as RunnerData)
       setRatings(current => { const next = { ...current }; delete next[output.id]; return next })
-      setMessage('İnsan değerlendirmesi kaydedildi; sağlayıcı kimlikleri tüm çıktılar tamamlanana kadar gizli kalır.')
+      setMessage(result.summary ? 'Tüm değerlendirmeler tamamlandı. Sağlayıcı sonuç özetini aşağıda görebilirsiniz.' : 'İnsan değerlendirmesi kaydedildi; sağlayıcı kimlikleri tüm çıktılar tamamlanana kadar gizli kalır.')
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Beklenmeyen hata.') }
     finally { setBusy(false) }
   }
@@ -109,11 +120,20 @@ export default function EducationEvalRunner() {
     </div>
     <label>Çalıştırılacak benchmark sürümü
       <select className="input" value={data.selectedVersion} disabled={busy} onChange={event => {
-        setVersion(Number(event.target.value)); setData(null); setPage(0); setRatings({}); setMessage('')
+        setVersion(Number(event.target.value)); setRunId(''); setData(null); setPage(0); setRatings({}); setMessage('')
       }}>
         {data.versions?.map(item => <option key={item.version} value={item.version}>v{item.version} · {item.status === 'active' ? 'Etkin / kilitli' : item.status === 'draft' ? 'Taslak' : 'Geçmiş'}</option>)}
       </select>
     </label>
+    {Boolean(data.runHistory?.length) && <label>Değerlendirme çalışması / geçmiş
+      <select className="input" disabled={busy} value={data.run?.id || ''} onChange={event => {
+        setRunId(event.target.value); setData(null); setPage(0); setRatings({}); setPendingOnly(true); setMessage('')
+      }}>
+        {data.runHistory?.map(run => <option key={run.id} value={run.id}>
+          {new Date(run.created_at).toLocaleString('tr-TR')} · {run.ratedOutputs}/150 puan · {run.status === 'running' ? 'Üretim sürüyor' : 'Üretim tamamlandı'} · {run.id.slice(0, 8)}
+        </option>)}
+      </select>
+    </label>}
     <small>Seçili benchmark: v{data.selectedVersion}. {data.run ? `Gösterilen çalışma: v${data.run.benchmark_version} · ${data.run.id}` : 'Bu sürüm için henüz çalışma yok.'} Önceki sürümlerin çıktıları ve insan puanları yeni çalışmaya taşınmaz.</small>
     <div style={{ padding: 12, borderRadius: 10, background: 'var(--bg2, #f7f1e9)', color: 'var(--text2)', lineHeight: 1.55 }}>
       Model çağrıları yalnızca yönetici “Başlat” dediğinde yapılır. Başlatmak için kilitli 50/50 benchmark ve üç sağlayıcının yapılandırılmış olması gerekir. 50 sorunun her birinde cevap doğruluğu, süre, gerçek token/maliyet kaydı ölçülür; model kimliği, 150 çıktı da insan tarafından puanlanana dek saklanır.
@@ -132,7 +152,9 @@ export default function EducationEvalRunner() {
     </div>
 
     {data.run && data.run.status !== 'running' && <div style={{ display: 'grid', gap: 10 }}>
-      <strong>Kör çıktı puanlaması · sayfa {page + 1}/{pages}</strong>
+      <label><input type="checkbox" checked={pendingOnly} onChange={event => { setPendingOnly(event.target.checked); setPage(0) }} /> Yalnız değerlendirilmemiş çıktıları göster</label>
+      <strong>Kör çıktı puanlaması · {reviewable.length} çıktı · sayfa {currentPage + 1}/{pages}</strong>
+      {pendingOnly && reviewable.length === 0 && <div>Bu çalışmadaki değerlendirmeler tamamlandı. Sonuç özetini aşağıda görebilirsiniz.</div>}
       {visible.map(output => {
         const rating = ratings[output.id] || {
           curriculum_alignment_score: output.curriculum_alignment_score || 0,
@@ -164,9 +186,9 @@ export default function EducationEvalRunner() {
         </article>
       })}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button className="btn btn-sm" disabled={page === 0} onClick={() => setPage(value => Math.max(0, value - 1))}>Önceki</button>
-        <span>{page + 1}/{pages}</span>
-        <button className="btn btn-sm" disabled={page + 1 >= pages} onClick={() => setPage(value => Math.min(pages - 1, value + 1))}>Sonraki</button>
+        <button className="btn btn-sm" disabled={currentPage === 0} onClick={() => setPage(Math.max(0, currentPage - 1))}>Önceki</button>
+        <span>{currentPage + 1}/{pages}</span>
+        <button className="btn btn-sm" disabled={currentPage + 1 >= pages} onClick={() => setPage(Math.min(pages - 1, currentPage + 1))}>Sonraki</button>
       </div>
     </div>}
 

@@ -6,7 +6,7 @@ import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { isProviderConfigured } from '@/lib/ai-gateway'
 import { generateWithRoutedProvider, pickQuizEngine, type ForceProvider } from '@/lib/ai-gateway/quiz-provider-router'
-import { createBlindEvalPrompt, isCompleteBenchmark, parseBlindEvalAnswer, shouldUnblindResults, toBlindQuestion } from '@/lib/education-eval-runner'
+import { createBlindEvalPrompt, hasCompleteEvalRating, preferredEvalRun, isCompleteBenchmark, parseBlindEvalAnswer, shouldUnblindResults, toBlindQuestion } from '@/lib/education-eval-runner'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
@@ -44,7 +44,7 @@ async function loadRun(runId?: string, version?: number) {
   if (resultsError || itemsError) throw resultsError || itemsError
   const resultRows = results || []
   const completed = resultRows.filter(row => row.status === 'completed')
-  const reviewed = completed.filter(row => [row.curriculum_alignment_score, row.pedagogy_score, row.age_appropriateness_score, row.safety_score].every(value => Number.isInteger(value)))
+  const reviewed = completed.filter(hasCompleteEvalRating)
   const unblinded = shouldUnblindResults(completed.length, reviewed.length)
   let providerSummary: any[] | null = null
   let visibleResults: any[] = resultRows.map(({ id, run_id, benchmark_item_id, blind_label, status, answer_index, is_correct, explanation, error_code, duration_ms, input_tokens, output_tokens, cost_usd, curriculum_alignment_score, pedagogy_score, age_appropriateness_score, safety_score, reviewer_notes, reviewed_at }) => ({
@@ -89,15 +89,27 @@ export async function GET(req: NextRequest) {
     if (versionsError) throw versionsError
     const version = Number(req.nextUrl.searchParams.get('version') || versions?.find(item => item.status === 'active')?.version || 1)
     if (!Number.isInteger(version) || version < 1) return NextResponse.json({ error: 'Geçerli benchmark sürümü gerekli.' }, { status: 400 })
+    const { data: history, error: historyError } = await db.from('education_eval_runs')
+      .select('id,benchmark_version,status,created_at,completed_at').eq('benchmark_version', version)
+      .order('created_at', { ascending: false })
+    if (historyError) throw historyError
+    const runHistory = []
+    for (const run of history || []) {
+      const { data: scores, error: scoresError } = await db.from('education_eval_run_results')
+        .select('status,curriculum_alignment_score,pedagogy_score,age_appropriateness_score,safety_score').eq('run_id', run.id)
+      if (scoresError) throw scoresError
+      const completed = (scores || []).filter(row => row.status === 'completed')
+      runHistory.push({ ...run, completedOutputs: completed.length, ratedOutputs: completed.filter(hasCompleteEvalRating).length })
+    }
     const [state, { data: set }] = await Promise.all([
-      loadRun(runId, version),
+      loadRun(runId || preferredEvalRun(runHistory)?.id, version),
       db.from('education_eval_benchmark_sets').select('id,status,target_size').eq('code', 'meb-k12-controlled').eq('version', version).maybeSingle(),
     ])
     if (state.run && state.run.benchmark_version !== version) return NextResponse.json({ error: 'Çalışma seçili benchmark sürümüne ait değil.' }, { status: 409 })
     const { count: eligibleCount } = set ? await db.from('education_eval_benchmark_items').select('id', { count: 'exact', head: true })
       .eq('benchmark_set_id', set.id).eq('metric_eligible', true) : { count: 0 }
     const configured = PROVIDERS.every(provider => isProviderConfigured(provider.key === 'anthropic' ? 'anthropic' : provider.key))
-    return NextResponse.json({ ...state, selectedVersion: version, versions: versions || [], readiness: { benchmarkStatus: set?.status || 'missing', eligibleQuestions: eligibleCount || 0,
+    return NextResponse.json({ ...state, runHistory, selectedVersion: version, versions: versions || [], readiness: { benchmarkStatus: set?.status || 'missing', eligibleQuestions: eligibleCount || 0,
       target: set?.target_size || 50, providersConfigured: configured } })
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Education Eval verisi alınamadı.' }, { status: 500 })
