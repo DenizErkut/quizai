@@ -8,7 +8,7 @@ Soru Kitapçıkları → onaylı öğretmen/AI kitapçığı → Soru görseller
 
 Görsel 2 MB/12 megapiksel ile sınırlıdır. Raster görüntü güvenli SVG image bağlamında saklanır; öğrenci ekranındaki mevcut SVG yolu bunu gösterir. Orijinal PDF değiştirilmez. Görsel soru kaydında tutulur, yeni kullanımlara taşınır. Eski test ve kilitli benchmark anlık görüntüleri değiştirilmez.
 
-Yeni metin çıkarımında şekil gereksinimi saptanan sorular pending durumunda saklanır; görsel incelemesi olmadan onaylı öğrenci havuzuna dahil edilmez. Model tespiti her şekli garanti etmez; kaynakla insan karşılaştırması gereklidir. Görsel onayı AI kalite onayı veya kazanım onayı olarak etiketlenmez.
+Yeni metin çıkarımında şekil gereksinimi saptanan sorular candidate durumunda saklanır; görsel incelemesi olmadan onaylı öğrenci havuzuna dahil edilmez. Model tespiti her şekli garanti etmez; kaynakla insan karşılaştırması gereklidir. Görsel onayı AI kalite onayı veya kazanım onayı olarak etiketlenmez.
 
 ## Sınır
 

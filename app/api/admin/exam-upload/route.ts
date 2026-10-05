@@ -258,7 +258,7 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
     topic_key: questionBankKey(row.subtopic || row.topic || q.topic || 'genel'),
     grade_key: canonicalBookletGrade(row.grade || ''), language_key: 'tr', question_type: 'multiple_choice', difficulty: q.difficulty === 'easy' ? 'kolay' : q.difficulty === 'hard' ? 'zor' : 'normal',
     question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, requiresBookletVisual: requiresBookletVisual(q), objective: q.topic || row.subtopic || '', learningObjectiveCode: matchVerifiedObjectiveCode(q.objective_code, verifiedCodes), bookletObjectiveCodes: parseLearningObjectiveCodes(row.learning_objective_codes), bookletTopic: row.subtopic || row.topic || '', bookletResourceId: row.id || null, subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' },
-    review_status: requiresBookletVisual(q) ? 'pending' : 'approved', quality_score: requiresBookletVisual(q) ? null : 1, source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact', report_count: 0
+    review_status: requiresBookletVisual(q) ? 'candidate' : 'approved', quality_score: requiresBookletVisual(q) ? 0 : 1, source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact', report_count: 0
   }))
   if (!rows.length) return 0
   const result = await adminDb.from('question_bank').upsert(rows, { onConflict: 'fingerprint', ignoreDuplicates: true }).select('id,review_status')

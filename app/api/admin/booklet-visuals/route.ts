@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     db.from('question_bank').select('id,question,updated_at,review_status').eq('id', id).maybeSingle(),
     db.from('exam_resources').select('id,source_type,purpose,review_status').eq('id', resourceId).maybeSingle(),
   ])
-  if (!row || row.question?.bookletResourceId !== resourceId || !resource || !['teacher','ai'].includes(resource.source_type) || resource.purpose !== 'instant_test' || resource.review_status !== 'approved' || !(row.review_status === 'approved' || (row.review_status === 'pending' && row.question.requiresBookletVisual))) return NextResponse.json({ error: 'Onaylı kitapçığa ait onaylı veya görseli bekleyen soru gerekli.' }, { status: 409 })
+  if (!row || row.question?.bookletResourceId !== resourceId || !resource || !['teacher','ai'].includes(resource.source_type) || resource.purpose !== 'instant_test' || resource.review_status !== 'approved' || !(row.review_status === 'approved' || (row.review_status === 'candidate' && row.question.requiresBookletVisual))) return NextResponse.json({ error: 'Onaylı kitapçığa ait onaylı veya görseli bekleyen soru gerekli.' }, { status: 409 })
   try {
     const bytes = Buffer.from(await file.arrayBuffer())
     // Native decoding rejects malformed files before anything is stored.
