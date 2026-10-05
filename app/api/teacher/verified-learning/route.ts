@@ -5,6 +5,7 @@ import { buildTeacherContext, getAuthedUser } from '@/lib/report-context'
 import { questionBankKey } from '@/lib/question-bank'
 import { sameLearningScope } from '@/lib/learning-evidence-scope'
 import { allocateVerifiedItemSets, eligibleVerifiedItem, hasSeparatePracticeItem, type VerifiedBankRow } from '@/lib/verified-learning-cycle'
+import { loadMasteryNextSteps } from '@/lib/load-mastery-next-steps'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -60,7 +61,9 @@ export async function GET(req: NextRequest) {
   const { data: attempts } = cycleIds.length
     ? await db.from('verified_learning_attempts').select('cycle_id,stage,status,score_pct,completed_at,quiz_session_id').in('cycle_id', cycleIds)
     : { data: [] }
-  return NextResponse.json({ options, cycles: await Promise.all((cycles || []).map(async cycle => ({
+  const nextSteps = await loadMasteryNextSteps(db, studentId).catch(() => [])
+  const nextObjective = nextSteps.find(step => step.nextObjective)?.nextObjective || null
+  return NextResponse.json({ options, nextObjective, cycles: await Promise.all((cycles || []).map(async cycle => ({
     ...cycle, objective: objectives?.find(item => item.id === cycle.learning_objective_id),
     metrics: await loadCycleMetrics(db, { ...cycle, student_id: studentId, classroom_id: classroomId, teacher_id: result.context!.teacherId }).catch(() => null),
     attempts: (attempts || []).filter(attempt => attempt.cycle_id === cycle.id),

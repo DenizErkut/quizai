@@ -8,6 +8,7 @@ import InterventionReviewQueue from './InterventionReviewQueue'
 
 type Option = { id: string; objective_code: string; title: string; availableItems: number; ready: boolean }
 type Cycle = { id: string; status: string; metrics?: ReturnType<typeof verifiedLearningMetrics>; objective?: { objective_code: string; title: string }; attempts: { stage: string; status: string; score_pct: number | null }[] }
+type NextObjective = { status: string; candidate: { id: string; objectiveCode: string; title: string } | null; reason: string }
 
 export default function VerifiedLearningPlans({ classroomId, studentId }: { classroomId: string; studentId: string }) {
   const [options, setOptions] = useState<Option[]>([])
@@ -15,6 +16,7 @@ export default function VerifiedLearningPlans({ classroomId, studentId }: { clas
   const [objectiveId, setObjectiveId] = useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [nextObjective, setNextObjective] = useState<NextObjective|null>(null)
 
   const load = useCallback(async () => {
     if (!classroomId || !studentId) return
@@ -24,7 +26,7 @@ export default function VerifiedLearningPlans({ classroomId, studentId }: { clas
       const response = await fetch(`/api/teacher/verified-learning?${new URLSearchParams({ classroomId, studentId })}`, { headers: { Authorization: `Bearer ${session.access_token}` } })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Pilot durumu alınamadı.')
-      setOptions(data.options || []); setCycles(data.cycles || []); setMessage('')
+      setOptions(data.options || []); setCycles(data.cycles || []); setNextObjective(data.nextObjective || null); setMessage('')
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Pilot durumu alınamadı.') }
   }, [classroomId, studentId])
 
@@ -62,6 +64,12 @@ export default function VerifiedLearningPlans({ classroomId, studentId }: { clas
       </select>
       <button className="btn btn-primary" disabled={busy || !options.find(item => item.id === objectiveId)?.ready} onClick={() => void create()}>Öğrenciye ata</button>
     </div>
+    {nextObjective && <div style={{ marginTop: 10, padding: 10, border: '1px solid var(--border)', borderRadius: 8 }}>
+      <strong>Doğrulanmış döngüden sonraki aday</strong>
+      <p style={{ margin: '5px 0', color: 'var(--text3)' }}>{nextObjective.candidate ? `${nextObjective.candidate.objectiveCode} · ${nextObjective.candidate.title}` : 'Güvenilir aday bulunamadı.'}</p>
+      <p style={{ margin: '5px 0', fontSize: 12 }}>{nextObjective.reason}</p>
+      {nextObjective.candidate && <button type="button" onClick={() => setObjectiveId(nextObjective.candidate!.id)} disabled={!options.some(item => item.id === nextObjective.candidate!.id && item.ready)}>Adayı seç</button>}
+    </div>}
     {!options.some(item => item.ready) && <p style={{ color: 'var(--text3)' }}>Bu sınıfta henüz dengeli 15 soruluk hazır kazanım yok. Yönetici panelinde kazanım ve soru kalitesi incelemesi tamamlandıkça burada açılacak.</p>}
     {message && <p role="status">{message}</p>}
     {cycles.length > 0 && <div style={{ marginTop: 12 }}>{cycles.map(cycle => <div key={cycle.id} style={{ padding: '7px 0', borderTop: '1px solid var(--border)' }}>
