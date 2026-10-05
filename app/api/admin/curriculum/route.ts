@@ -28,7 +28,7 @@ export async function GET() {
     adminDb.from('curriculum')
     .select('*').order('level').order('grade').order('sort_order')
     , adminDb.from('learning_objective_catalog').select('grade,subject,topic,unit')
-      .eq('is_active', true).eq('verification_status', 'verified').limit(10000),
+      .eq('is_active', true).limit(10000),
   ])
   const key = (value: unknown) => typeof value === 'string' ? value.toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ').trim() : ''
   const gradeKey = (value: unknown) => key(value).replace(/ sınıf/g, '').replace(/\. sınıf/g, '').replace(/[^0-9]/g, '')
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     const [{ data: rows, error: rowsError }, { data: objectives, error: objectivesError }] = await Promise.all([
       adminDb.from('curriculum').select('id,grade,subject,topics'),
       adminDb.from('learning_objective_catalog').select('grade,subject,topic,unit')
-        .eq('is_active', true).eq('verification_status', 'verified').limit(10000),
+        .eq('is_active', true).limit(10000),
     ])
     if (rowsError || objectivesError) return NextResponse.json({ error: rowsError?.message || objectivesError?.message }, { status: 500 })
     const key = (value: unknown) => typeof value === 'string' ? value.toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ').trim() : ''
