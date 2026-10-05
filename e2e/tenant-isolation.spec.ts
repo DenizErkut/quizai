@@ -39,6 +39,13 @@ test.describe('tenant isolation security contract', () => {
     expect([401, 403]).toContain(response.status())
   })
 
+  test('booklet processing cannot be started with a forged identity', async ({ request }) => {
+    const response = await request.patch('/api/admin/exam-upload', {
+      headers: { Authorization: 'Bearer forged-token' }, data: { action: 'process-next', id: 'another-resource' },
+    })
+    expect([401, 403]).toContain(response.status())
+  })
+
   test('partner institution endpoint rejects malformed integration credentials', async ({ request }) => {
     const response = await request.get('/api/integrations/v1/institution', {
       headers: { Authorization: 'Bearer forged-token' },

@@ -1,6 +1,8 @@
 'use client'
 import MathText from '@/components/MathText'
 import BookletVisuals from '@/components/admin/BookletVisuals'
+import BookletProcessing from '@/components/admin/BookletProcessing'
+import { finishBookletProcessing, readBookletResponse } from '@/lib/booklet-processing'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -1922,11 +1924,12 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     const res = await fetch('/api/admin/exam-upload', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ storage_path: signData.storage_path, file_url: fileUrl, purpose: tab === 'exam-books' ? 'exam' : 'instant_test', ...examForm, topic: examForm.subtopic })
+                      body: JSON.stringify({ storage_path: signData.storage_path, file_url: fileUrl, file_name: examFile.name, purpose: tab === 'exam-books' ? 'exam' : 'instant_test', ...examForm, topic: examForm.subtopic })
                     })
-                    const data = await res.json()
+                    const data = await readBookletResponse(res)
                     if (res.ok) {
                       if (examEvidenceFiles.length && data.resource_id) await uploadExamEvidence(data.resource_id, examEvidenceFiles)
+                      if (data.processingPending && data.resource_id) Object.assign(data, await finishBookletProcessing(data.resource_id, setExamMsg))
                       setExamMsg(tab === 'question-books' && examForm.source_type !== 'anonymous' ? `✅ Yüklendi; ${data.promoted || 0} soru birebir anlık test havuzuna aktarıldı${examEvidenceFiles.length ? ` ve ${examEvidenceFiles.length} yayın izni kanıtı saklandı` : ''}.` : `✅ Yüklendi! ${data.chunks} kaynak parçası işlendi.`)
                       setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '', learningObjectiveCodes: '' })
                       setExamFile(null)
@@ -1940,9 +1943,10 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     fd.append('purpose', tab === 'exam-books' ? 'exam' : 'instant_test')
                     if (tab === 'question-books') fd.append('topic', examForm.subtopic)
                     const res = await fetch('/api/admin/exam-upload', { method: 'POST', body: fd })
-                    const data = await res.json()
+                    const data = await readBookletResponse(res)
                     if (res.ok) {
                       if (examEvidenceFiles.length && data.resource_id) await uploadExamEvidence(data.resource_id, examEvidenceFiles)
+                      if (data.processingPending && data.resource_id) Object.assign(data, await finishBookletProcessing(data.resource_id, setExamMsg))
                       setExamMsg(tab === 'question-books' && examForm.source_type !== 'anonymous' ? `✅ Yüklendi; ${data.promoted || 0} soru birebir anlık test havuzuna aktarıldı${examEvidenceFiles.length ? ` ve ${examEvidenceFiles.length} yayın izni kanıtı saklandı` : ''}.` : `✅ Yüklendi! ${data.chunks} kaynak parçası işlendi.`)
                       setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '', learningObjectiveCodes: '' })
                       setExamFile(null)
@@ -1984,20 +1988,24 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--primary)' }}>{ex.title}</div>
                       {tab === 'question-books' && ['teacher', 'ai'].includes(ex.source_type) && ex.review_status === 'approved' && <BookletVisuals resourceId={ex.id} />}
+                      {tab === 'question-books' && ['teacher', 'ai'].includes(ex.source_type) && ex.review_status !== 'rejected' && <BookletProcessing resourceId={ex.id} />}
                       <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Anlık test kaynağı · {ex.grade ? `${ex.grade}. sınıf · ` : ''}{ex.subject || 'Ders belirtilmedi'}{(ex.topic || ex.subtopic) ? ` · ${ex.topic || ex.subtopic}` : ''} · {ex.chunk_count || 0} parça{Array.isArray(ex.learning_objective_codes) && ex.learning_objective_codes.length ? ` · kazanım: ${ex.learning_objective_codes.join(', ')}` : ''}{ex.publication_evidence_count ? ` · ${ex.publication_evidence_count} izin kanıtı` : ''}</div>
                     </div>
                     <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '99px', background: ex.source_type === 'teacher' ? 'rgba(22,163,74,0.1)' : ex.source_type === 'ai' ? 'rgba(14,165,233,0.1)' : 'rgba(99,102,241,0.1)', color: ex.source_type === 'teacher' ? '#15803d' : ex.source_type === 'ai' ? '#0369a1' : '#6366f1', fontWeight: 600 }}>{ex.source_type === 'teacher' ? 'Öğretmen' : ex.source_type === 'ai' ? 'AI' : 'Anonim'} · {ex.review_status === 'approved' ? 'Onaylı' : 'Bekliyor'}</span>
                     <button onClick={() => void openExamResource(ex.id, 'view')} className="btn btn-sm" style={{ flexShrink: 0 }}>👁️ Görüntüle</button>
                     <button onClick={() => void openExamResource(ex.id, 'edit')} className="btn btn-sm" style={{ flexShrink: 0 }}>✏️ Düzelt</button>
                     {ex.review_status !== 'approved' && <button onClick={async () => {
+                      try {
                       const res = await fetch('/api/admin/exam-upload', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: ex.id, review_status: 'approved' }) })
-                      const data = await res.json()
+                      const data = await readBookletResponse(res)
+                      if (data.processingPending) Object.assign(data, await finishBookletProcessing(ex.id, setExamMsg))
                       if (res.ok) {
                         setExamList(current => current.map(item => item.id === ex.id ? { ...item, review_status: 'approved' } : item))
                         setExamMsg(ex.source_type === 'teacher' || ex.source_type === 'ai'
                           ? `✅ Onaylandı; ${data.promoted || 0} soru anlık test havuzuna aktarıldı.`
                           : '✅ Anonim kitapçık onaylandı; yalnızca benzer/özgün soru üretiminde referans olarak kullanılacak.')
                       } else setExamMsg(`❌ ${data.error || 'Onay başarısız'}`)
+                      } catch (error) { setExamMsg(`❌ ${error instanceof Error ? error.message : 'Onay başarısız'}`) }
                     }} style={{ padding: '5px 9px', borderRadius: '7px', border: '1px solid rgba(22,163,74,0.3)', background: 'rgba(22,163,74,0.08)', color: '#15803d', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>{ex.source_type === 'teacher' || ex.source_type === 'ai' ? '✓ Onayla ve havuza aktar' : '✓ Onayla — referans kullan'}</button>}
                     <button onClick={async () => {
                       // "Önce gör, sonra sil" — exam_chunks için ilk defa buradan

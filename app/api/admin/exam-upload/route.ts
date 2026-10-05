@@ -3,7 +3,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
+import { bookletBatches } from '@/lib/booklet-processing'
 import { callOpenAI } from '@/lib/openai'
 import { questionBankKey } from '@/lib/question-bank'
 import { educationEvalGradeKey } from '@/lib/education-eval-grade'
@@ -86,6 +87,7 @@ async function embedText(text: string): Promise<number[] | null> {
       `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`,
       {
         method: 'POST',
+        signal: AbortSignal.timeout(8000),
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: 'models/text-embedding-004', content: { parts: [{ text: text.slice(0, 2000) }] } })
       }
@@ -101,6 +103,14 @@ async function processExam(params: {
 }) {
   const { title, exam_type, year, subject, answer_key, learning_objective_codes, rawText, fileUrl, fileName, source_type, grade, subtopic, topic, purpose, uploaded_by } = params
 
+  // A retry of an interrupted upload reuses the saved document, not a second
+  // resource with the same questions. Never overwrite a different document.
+  const { data: previous } = await adminDb.from('exam_resources').select('id,raw_text,grade,subject,subtopic,learning_objective_codes')
+    .eq('uploaded_by', uploaded_by || '').eq('title', title).eq('purpose', purpose).eq('source_type', source_type)
+    .eq('review_status', 'pending').order('created_at', { ascending: false }).limit(10)
+  const existing = previous?.find(item => item.raw_text === rawText && item.grade === grade && item.subject === subject
+    && item.subtopic === subtopic && JSON.stringify(item.learning_objective_codes || []) === JSON.stringify(learning_objective_codes))
+  if (existing) return { resource_id: existing.id, chunks: chunkText(rawText).length, embedded: 0, chars: rawText.length }
   // exam_resources tablosuna kaydet
   const { data: examRow, error: rowErr } = await adminDb.from('exam_resources').insert({
     title, exam_type, year: parseInt(year), subject: subject || null,
@@ -123,26 +133,21 @@ async function processExam(params: {
     return { error: `DB kayit hatasi: ${rowErr?.message}` }
   }
 
-  // Chunk'la ve embed et
+  // Save all source chunks in one bounded database call. Embeddings are done
+  // in resumable steps after the upload response and publication evidence.
   const chunks = chunkText(rawText)
-  let embeddedCount = 0
-
-  for (let i = 0; i < chunks.length; i++) {
-    const embedding = await embedText(chunks[i])
-    await adminDb.from('exam_chunks').insert({
+  const { error: chunksError } = await adminDb.from('exam_chunks').insert(chunks.map((content, i) => ({
       exam_resource_id: examRow.id,
       chunk_index: i,
-      content: chunks[i],
-      embedding: embedding ? JSON.stringify(embedding) : null,
+      content,
+      embedding: null,
       exam_type, year: parseInt(year), subject: subject || null,
       source_type, reuse_policy: source_type === 'anonymous' ? 'reference_only' : 'exact_reuse',
       grade: grade || '', subtopic: subtopic || '',
-    })
-    if (embedding) embeddedCount++
-    if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 150))
-  }
+    })))
+  if (chunksError) throw chunksError
 
-  return { resource_id: examRow.id, chunks: chunks.length, embedded: embeddedCount, chars: rawText.length }
+  return { resource_id: examRow.id, chunks: chunks.length, embedded: 0, chars: rawText.length }
 }
 
 // GET: kitapçıkları listele (ya da ?id= ile TEK kitapçığın TAM içeriğini
@@ -218,35 +223,35 @@ async function loadVerifiedBookletObjectives(row: { subject?: string | null; gra
   }).map(objective => ({ code: objective.objective_code, title: objective.title }))
 }
 
-async function promoteExactQuestions(row: { id?: string; subject?: string | null; grade?: string | null; topic?: string | null; subtopic?: string | null; raw_text?: string | null; learning_objective_codes?: unknown }, sourceType: 'teacher' | 'ai') {
+async function promoteExactQuestions(row: { id?: string; subject?: string | null; grade?: string | null; topic?: string | null; subtopic?: string | null; raw_text?: string | null; learning_objective_codes?: unknown }, sourceType: 'teacher' | 'ai', batch: string) {
   const sourceLabel = sourceType === 'teacher' ? 'öğretmen imzalı' : 'yapay zekâ ile ayrıca hazırlanmış'
-  const rawText = String(row.raw_text || '').slice(0, 300000)
-  const answerStart = rawText.search(/\n\s*(?:CEVAP(?:LAR| ANAHTARI)?|YANIT(?:LAR| ANAHTARI)?)\b/iu)
-  const questionSection = answerStart > 0 ? rawText.slice(0, answerStart) : rawText
-  const answerSection = answerStart > 0 ? rawText.slice(answerStart) : ''
-  const numberedBlocks = questionSection.split(/(?=\n\s*\d{1,3}[\.)]\s+)/).filter(part => /^\s*\d{1,3}[\.)]\s+/u.test(part))
-  const batches = numberedBlocks.length > 55
-    ? Array.from({ length: Math.ceil(numberedBlocks.length / 50) }, (_, index) => `${numberedBlocks.slice(index * 50, index * 50 + 50).join('')}\n\n${answerSection}`)
-    : [rawText]
   const objectiveReferences = await loadVerifiedBookletObjectives(row)
   const verifiedCodes = objectiveReferences.map(objective => objective.code)
   const objectiveInstruction = objectiveReferences.length
     ? `\nKitapçıkta ilişkilendirilecek doğrulanmış MEB kazanımları: ${JSON.stringify(objectiveReferences)}. Her soruyu içerik bakımından en uygun kodla eşleştir; eşleşme açık değilse objective_code null olsun. Yalnızca bu listede bulunan kodlardan birini kullan; kod uydurma veya listedeki soruyu değiştirme.\n`
     : '\nobjective_code alanını null döndür.\n'
-  const extractedGroups = await Promise.all(batches.map(async batch => {
+  const extractedGroups = await Promise.all([batch].map(async batch => {
     const prompt = `Aşağıdaki ${sourceLabel} kitapçık bölümündeki çoktan seçmeli soruları AYNI soru metni, AYNI seçenekler ve AYNI doğru cevapla ayıkla. Yeniden yazma, sadeleştirme veya benzer soru üretme. Bölümün sonundaki cevap anahtarından yalnız bu bölümdeki soruların cevaplarını kullan. Açıklama kitapçıkta yoksa doğru cevabı kısaca açıkla. Eksik ya da cevabı belirlenemeyen soruyu atla. En fazla 55 soru döndür. ${objectiveInstruction}Yalnız JSON döndür: {"questions":[{"q":"...","opts":["..."],"ans":0,"exp":"...","topic":"...","difficulty":"easy|medium|hard","objective_code":null}]}\n\n<KITAPCIK_METNI>\n${batch}\n</KITAPCIK_METNI>`
-    const response = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 12000, messages: [{ role: 'user', content: prompt + '\nGörsel/şekil/grafik gerektiren sorularda requires_visual:true döndür. Şekli metinden uydurma. Metin, seçenek ve cevap anahtarı tam ise görseli eksik soruyu da aktar; sistem bunu öğrenciye vermeden insan görsel incelemesine ayıracak.' }] })
+    const response = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 8000, messages: [{ role: 'user', content: prompt + '\nSeçeneksiz kısa cevaplı soruları çoktan seçmeliye dönüştürme; seçenek uydurma, atla. Görsel/şekil/grafik gerektiren sorularda requires_visual:true döndür. Şekli metinden uydurma. Metin, seçenek ve cevap anahtarı tam ise görseli eksik soruyu da aktar; sistem bunu öğrenciye vermeden insan görsel incelemesine ayıracak.' }] }, { timeout: 50000, maxRetries: 0 })
+    if (response.stop_reason === 'max_tokens') throw new Error('Ayıklama çıktısı kesildi; bu grup yeniden denenmeli.')
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
     const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
-    return Array.isArray(parsed.questions) ? parsed.questions : []
+    if (!Array.isArray(parsed.questions)) throw new Error('Ayıklayıcı geçerli soru listesi döndürmedi.')
+    return parsed.questions
   }))
   const extracted = extractedGroups.flat().filter((q: any) => q?.q && Array.isArray(q.opts) && q.opts.length >= 4 && q.opts.length <= 5 && Number.isInteger(q.ans) && q.ans >= 0 && q.ans < q.opts.length && q.exp)
   if (!extracted.length) return 0
   const validationText = await callOpenAI([
     { role: 'system', content: 'Sen bağımsız soru kalite denetçisisin. Soruları değiştirme. Yalnızca doğru cevabı kesin, seçenekleri benzersiz ve soru eksiksiz olan kayıtları onayla. JSON döndür.' },
     { role: 'user', content: `${JSON.stringify({ questions: extracted.map((q: any, index: number) => ({ index, q: q.q, opts: q.opts, ans: q.ans, exp: q.exp })) })}\nYanıt şeması: {"results":[{"index":0,"approved":true,"reason":"..."}]}` },
-  ], { model: process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini', max_tokens: 12000, json: true, operation: `${sourceType}-booklet-validator` })
+  ], { model: process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini', max_tokens: 4000, json: true, timeoutMs: 25000, requireComplete: true, operation: `${sourceType}-booklet-validator` })
   const validation = JSON.parse(validationText)
+  if (!Array.isArray(validation.results) || validation.results.length !== extracted.length
+    || new Set(validation.results.map((item: { index: unknown }) => item.index)).size !== extracted.length
+    || validation.results.some((item: { index: unknown; approved: unknown }) => !Number.isInteger(item.index)
+      || Number(item.index) < 0 || Number(item.index) >= extracted.length || typeof item.approved !== 'boolean')) {
+    throw new Error('Kalite denetçisi bütün sorular için geçerli karar döndürmedi; grup yeniden denenmeli.')
+  }
   const approvedIndexes = new Set<number>((validation.results || []).filter((item: any) => item.approved === true).map((item: any) => Number(item.index)))
   const questions = extracted.filter((q: any, index: number) => approvedIndexes.has(index) || requiresBookletVisual(q))
   const rows = questions.map((q: any) => ({
@@ -411,13 +416,7 @@ export async function POST(req: NextRequest) {
     const result = await processExam({ title, exam_type, year, subject, answer_key, learning_objective_codes, rawText, fileUrl, fileName, source_type, grade, subtopic, topic, purpose, uploaded_by: user.id })
     if ('error' in result) return NextResponse.json({ error: result.error }, { status: 500 })
 
-    let promoted = 0
-    if (purpose === 'instant_test' && source_type !== 'anonymous') {
-      promoted = await promoteExactQuestions({ id: result.resource_id, subject, grade, topic, subtopic, raw_text: rawText, learning_objective_codes }, source_type)
-      await adminDb.from('exam_resources').update({ review_status: 'approved', reuse_policy: 'exact_reuse' }).eq('id', result.resource_id)
-    }
-
-    return NextResponse.json({ success: true, ...result, promoted })
+    return NextResponse.json({ success: true, ...result, promoted: 0, processingPending: true })
 
   } catch (e: any) {
     console.error('[exam-upload]', e)
@@ -470,10 +469,91 @@ export async function PUT(req: NextRequest) {
   return NextResponse.json({ success: true, chunks: data, char_count: rawText.length, learning_objective_codes: learningObjectiveCodes })
 }
 
+async function processNextBooklet(id: string) {
+  const { data: row, error: resourceError } = await adminDb.from('exam_resources')
+    .select('id,source_type,purpose,review_status,subject,grade,topic,subtopic,raw_text,learning_objective_codes')
+    .eq('id', id).maybeSingle()
+  if (resourceError) throw resourceError
+  if (!row || row.review_status === 'rejected') return NextResponse.json({ error: 'İşlenebilir kitapçık bulunamadı.' }, { status: 404 })
+  const exact = row.purpose === 'instant_test' && ['teacher', 'ai'].includes(row.source_type)
+  const batches = exact ? bookletBatches(row.raw_text || '') : []
+  const contentHash = createHash('sha256').update(JSON.stringify([row.raw_text, row.grade, row.subject, row.subtopic, row.learning_objective_codes, row.source_type, 'batch-v1'])).digest('hex')
+  const { error: createError } = await adminDb.from('booklet_processing_jobs').upsert({ resource_id: id, content_hash: contentHash }, { onConflict: 'resource_id', ignoreDuplicates: true })
+  if (createError) throw createError
+  const { data: current, error: readError } = await adminDb.from('booklet_processing_jobs').select('*').eq('resource_id', id).single()
+  if (readError) throw readError
+  if (current.content_hash !== contentHash) return NextResponse.json({ error: 'Kitapçık içeriği işlem sırasında değişmiş. Yeni belge için ayrı yükleme yapın.' }, { status: 409 })
+  if (current.status === 'complete') return NextResponse.json({ success: true, done: true, promoted: current.promoted, progress: 'İşleme tamamlandı.' })
+  const token = randomUUID()
+  const { data: claimed, error: claimError } = await adminDb.from('booklet_processing_jobs')
+    .update({ lease_token: token, lease_until: new Date(Date.now() + 150000).toISOString() })
+    .eq('resource_id', id).eq('content_hash', contentHash).eq('status', 'pending')
+    .lte('lease_until', new Date().toISOString()).select('*').maybeSingle()
+  if (claimError) throw claimError
+  if (!claimed) return NextResponse.json({ error: 'Bu kitapçık başka bir işlemde açık. Birkaç dakika sonra sürdürün.' }, { status: 409 })
+  try {
+    let { data: chunks, error: chunkError } = await adminDb.from('exam_chunks').select('id,content,embedding,chunk_index').eq('exam_resource_id', id).order('chunk_index', { ascending: true })
+    if (chunkError) throw chunkError
+    // Older uploads could time out halfway through sequential chunk inserts.
+    // Restore only absent chunks from the saved text, preserving embeddings.
+    const expectedChunks = chunkText(row.raw_text || '')
+    const present = new Set((chunks || []).map(chunk => chunk.chunk_index))
+    const missing = expectedChunks.map((content, chunk_index) => ({ content, chunk_index })).filter(chunk => !present.has(chunk.chunk_index))
+    if (missing.length) {
+      const { data: metadata, error: metadataError } = await adminDb.from('exam_resources').select('exam_type,year,reuse_policy').eq('id', id).single()
+      if (metadataError) throw metadataError
+      const { error: restoreError } = await adminDb.from('exam_chunks').insert(missing.map(chunk => ({ ...chunk, exam_resource_id: id, embedding: null, ...metadata, subject: row.subject, source_type: row.source_type, grade: row.grade, subtopic: row.subtopic })))
+      if (restoreError) throw restoreError
+      const restored = await adminDb.from('exam_chunks').select('id,content,embedding,chunk_index').eq('exam_resource_id', id).order('chunk_index', { ascending: true })
+      if (restored.error) throw restored.error
+      chunks = restored.data
+    }
+    const next = { next_chunk: claimed.next_chunk, next_batch: claimed.next_batch, promoted: claimed.promoted, status: 'pending' }
+    let progress = ''
+    if (claimed.next_chunk < (chunks || []).length) {
+      const group = (chunks || []).slice(claimed.next_chunk, claimed.next_chunk + 5)
+      await Promise.all(group.map(async chunk => {
+        if (chunk.embedding) return
+        const embedding = await embedText(chunk.content)
+        if (embedding) {
+          const { error } = await adminDb.from('exam_chunks').update({ embedding: JSON.stringify(embedding) }).eq('id', chunk.id)
+          if (error) throw error
+        }
+      }))
+      next.next_chunk += group.length
+      progress = `Kaynak hazırlığı: ${next.next_chunk}/${chunks?.length || 0} parça.`
+    } else if (claimed.next_batch < batches.length) {
+      next.promoted += await promoteExactQuestions(row, row.source_type as 'teacher' | 'ai', batches[claimed.next_batch])
+      next.next_batch++
+      progress = `Soru kontrolü: ${next.next_batch}/${batches.length} grup; ${next.promoted} yeni soru havuzda.`
+    }
+    const done = next.next_chunk >= (chunks || []).length && next.next_batch >= batches.length
+    if (done && exact) {
+      const { error } = await adminDb.from('exam_resources').update({ review_status: 'approved', reuse_policy: 'exact_reuse' }).eq('id', id).neq('review_status', 'rejected')
+      if (error) throw error
+    }
+    if (done) next.status = 'complete'
+    const { error } = await adminDb.from('booklet_processing_jobs').update({ ...next, lease_token: null, lease_until: new Date(0).toISOString(), updated_at: new Date().toISOString() }).eq('resource_id', id).eq('lease_token', token)
+    if (error) throw error
+    return NextResponse.json({ success: true, done, promoted: next.promoted, progress })
+  } finally {
+    // Failed extraction never advances its cursor. Retrying is safe because
+    // question fingerprints remain unique even if a prior response was lost.
+    await adminDb.from('booklet_processing_jobs').update({ lease_token: null, lease_until: new Date(0).toISOString() }).eq('resource_id', id).eq('lease_token', token)
+  }
+}
+
 export async function PATCH(req: NextRequest) {
   const user = await getAdminUser()
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const body = await req.json()
+  if (body?.action === 'process-next') {
+    if (typeof body.id !== 'string') return NextResponse.json({ error: 'Kitapçık kimliği gerekli.' }, { status: 400 })
+    try { return await processNextBooklet(body.id) } catch (error) {
+      console.error('[exam-upload] resumable processing failed', error)
+      return NextResponse.json({ error: 'Bu grup işlenemedi. Kitapçık kaydedildi; “İşlemeyi sürdür” ile tekrar deneyin.' }, { status: 500 })
+    }
+  }
   if (body?.action === 'reprocess-ai-booklet') {
     const id = typeof body.id === 'string' ? body.id : ''
     if (!id) return NextResponse.json({ error: 'Kitapçık kimliği gerekli.' }, { status: 400 })
@@ -484,8 +564,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Onaylı bir AI anlık test kitapçığı gerekli.' }, { status: 400 })
     }
     try {
-      const promoted = await promoteExactQuestions(row, 'ai')
-      return NextResponse.json({ success: true, promoted })
+      return NextResponse.json({ success: true, promoted: 0, processingPending: true, resource_id: id })
     } catch (error) {
       console.error('[exam-upload] AI booklet reprocessing failed', error)
       return NextResponse.json({ error: 'Kitapçık yeniden işlenemedi; sunucu kayıtlarını kontrol edin.' }, { status: 500 })
@@ -497,13 +576,7 @@ export async function PATCH(req: NextRequest) {
   if (!row) return NextResponse.json({ error: 'Bulunamadı' }, { status: 404 })
   const { error } = await adminDb.from('exam_resources').update({ review_status, reuse_policy: row.source_type === 'anonymous' ? 'reference_only' : 'exact_reuse' }).eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  let promoted = 0
-  if (review_status === 'approved' && (row.source_type === 'teacher' || row.source_type === 'ai') && row.purpose === 'instant_test') {
-    try {
-      promoted = await promoteExactQuestions(row, row.source_type)
-    } catch (e) { console.error(`[exam-upload] ${row.source_type} promotion failed`, e) }
-  }
-  return NextResponse.json({ success: true, promoted })
+  return NextResponse.json({ success: true, promoted: 0, processingPending: review_status === 'approved', resource_id: id })
 }
 
 // DELETE: kitapçık sil. Bu tablolar için repoda bir FK/migration

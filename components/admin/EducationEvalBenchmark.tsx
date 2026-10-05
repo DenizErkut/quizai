@@ -4,6 +4,7 @@ import MathText from "@/components/MathText"
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { matchVerifiedObjectiveCode } from '@/lib/learning-objective-codes'
+import { finishBookletProcessing, readBookletResponse } from '@/lib/booklet-processing'
 
 type Objective = { id: string; objective_code: string; title: string }
 type Resource = { id: string; title: string; grade: string; subject: string; sourceVersion: string; evidenceUrls: string[]; evidenceCount: number; questionCount: number; objectives: Objective[] }
@@ -100,8 +101,8 @@ export default function EducationEvalBenchmark() {
     try {
       const response = await fetch('/api/admin/exam-upload', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'reprocess-ai-booklet', id: resource.id }) })
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.error || 'Kitapçık yeniden işlenemedi.')
+      const result = await readBookletResponse(response)
+      if (result.processingPending) Object.assign(result, await finishBookletProcessing(resource.id, setMessage))
       setMessage(`${resource.title}: ${result.promoted} soru havuza aktarıldı; AI değerlendirme havuzu güncellendi.`)
       await load()
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Yeniden işleme başarısız oldu.') }
