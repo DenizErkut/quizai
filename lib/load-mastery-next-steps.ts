@@ -3,6 +3,7 @@ import { masteryNextStep, type LearningStep } from './mastery-next-step'
 import { sameLearningScope } from './learning-evidence-scope'
 import { loadObjectiveIntervention } from './load-objective-intervention'
 import { storedInterventionPlan,publicInterventionPlan } from './objective-intervention'
+import { interventionReviewGate } from './intervention-review'
 
 /** Server-only caller supplies its authenticated student, never a requested peer ID. */
 export async function loadMasteryNextSteps(db: SupabaseClient, studentId: string): Promise<LearningStep[]> {
@@ -48,6 +49,10 @@ export async function loadMasteryNextSteps(db: SupabaseClient, studentId: string
   }
   decisions.sort((a,b)=>Number(b.actionable)-Number(a.actionable))
   const focus=decisions[0]
+  if(focus){
+    const gate=await interventionReviewGate(db,studentId,focus.cycleId)
+    if(gate){focus.action='teacher_review';focus.label='Öğretmen takibini bekle';focus.reason=gate;focus.actionable=false}
+  }
   if(focus?.action==='guided_practice'){
     const objective=catalog.data!.find(o=>o.id===focus.objectiveId)!
     const practice=practices.data?.find(p=>p.cycle_id===focus.cycleId)

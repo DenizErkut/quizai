@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import VerifiedLearningMetrics from '@/components/VerifiedLearningMetrics'
 import type { verifiedLearningMetrics } from '@/lib/verified-learning-metrics'
+import InterventionReviewQueue from './InterventionReviewQueue'
 
 type Option = { id: string; objective_code: string; title: string; availableItems: number; ready: boolean }
 type Cycle = { id: string; status: string; metrics?: ReturnType<typeof verifiedLearningMetrics>; objective?: { objective_code: string; title: string }; attempts: { stage: string; status: string; score_pct: number | null }[] }
@@ -67,5 +68,6 @@ export default function VerifiedLearningPlans({ classroomId, studentId }: { clas
       {cycle.objective?.objective_code || 'Kazanım'} · {cycle.status === 'active' ? 'Sürüyor' : 'Aşamalar tamamlandı'} · {cycle.attempts.map(attempt => `${attempt.stage}: ${attempt.status === 'completed' ? `%${attempt.score_pct}` : attempt.status}`).join(' · ') || 'Ön test bekliyor'}
       {cycle.metrics && <VerifiedLearningMetrics metrics={cycle.metrics} />}
     </div>)}</div>}
+    <InterventionReviewQueue key={`${classroomId}:${studentId}`} classroomId={classroomId} studentId={studentId}/>
   </section>
 }

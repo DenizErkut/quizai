@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadCycleMetrics } from '@/lib/load-verified-learning-metrics'
+import { interventionReviewGate } from '@/lib/intervention-review'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { sameLearningScope } from '@/lib/learning-evidence-scope'
 import { recordQuizLearningEvents } from '@/lib/learning-events'
@@ -21,6 +22,8 @@ async function student(req: NextRequest) {
 }
 
 async function stageGate(cycle: { id: string; student_id: string; teacher_id: string; classroom_id: string; learning_objective_id: string }, stage: VerifiedStage, attempts: Attempt[]) {
+  const reviewGate=await interventionReviewGate(db,cycle.student_id,cycle.id).catch(()=>'Öğretmen inceleme durumu alınamadı; tekrar deneyin.')
+  if(reviewGate)return reviewGate
   const baseline = attempts.find(attempt => attempt.stage === 'baseline')
   const post = attempts.find(attempt => attempt.stage === 'post')
   if (stage === 'baseline') return null
@@ -96,11 +99,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Etkin ve doğrulanmış ölçüm döngüsü bulunamadı.' }, { status: 404 })
     }
     const stage = body.stage!
+    const gate = await stageGate(detail.cycle, stage, detail.attempts)
+    if (gate) return NextResponse.json({ error: gate }, { status: 422 })
     const existing = detail.attempts.find(attempt => attempt.stage === stage)
     if (existing?.status === 'started') return NextResponse.json({ attemptId: existing.id, questions: publicVerifiedQuestions(existing.questions) })
     if (existing) return NextResponse.json({ error: 'Bu aşama zaten tamamlandı veya işleniyor.' }, { status: 409 })
-    const gate = await stageGate(detail.cycle, stage, detail.attempts)
-    if (gate) return NextResponse.json({ error: gate }, { status: 422 })
     const ids = (detail.cycle.item_sets as VerifiedItemSets)?.[stage]
     if (!Array.isArray(ids) || ids.length !== 5 || ids.some(id => !UUID.test(id))) return NextResponse.json({ error: 'Ölçüm soru seti geçersiz.' }, { status: 500 })
     const { data: bank, error: bankError } = await db.from('question_bank').select('id,question,grade_key,subject_key')
@@ -127,6 +130,10 @@ export async function POST(req: NextRequest) {
   if (attempt.status === 'completed') return NextResponse.json({ error: 'Bu deneme zaten tamamlandı.' }, { status: 409 })
   const detail = await cycleData(attempt.cycle_id, user.id)
   if (!detail?.objective) return NextResponse.json({ error: 'Ölçüm döngüsü bulunamadı.' }, { status: 404 })
+  try {
+    const gate=await interventionReviewGate(db,user.id,attempt.cycle_id)
+    if(gate)return NextResponse.json({error:gate},{status:422})
+  } catch {return NextResponse.json({error:'Öğretmen inceleme durumu alınamadı; tekrar deneyin.'},{status:503})}
   const questions = attempt.questions as Array<Record<string, unknown>>
   const scored = scoreVerifiedAnswers(questions, body.choices)
   if (!scored) return NextResponse.json({ error: 'Yanıt sayısı veya seçimi geçersiz.' }, { status: 400 })

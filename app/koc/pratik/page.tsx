@@ -16,6 +16,7 @@ function CoachGuidedPracticeContent() {
   const [hint, setHint] = useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [reviewGate,setReviewGate]=useState<string|null>(null)
 
   const request = useCallback(async (method: 'GET' | 'POST', body?: Record<string, unknown>) => {
     const { data: { session } } = await createClient().auth.getSession()
@@ -31,7 +32,7 @@ function CoachGuidedPracticeContent() {
 
   const load = useCallback(async () => {
     if (!cycleId) return
-    try { setPractice((await request('GET')).practice) }
+    try { const data=await request('GET');setPractice(data.practice);setReviewGate(data.gate||null) }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Çalışma yüklenemedi.') }
   }, [cycleId, request])
 
@@ -57,6 +58,8 @@ function CoachGuidedPracticeContent() {
     <h1 style={{ margin: '18px 0 8px' }}>Prof. Prati ile rehberli çalışma</h1>
     <p style={{ color: 'var(--text2)' }}>Önce kendi yanıtını seç, sonra düşünme ipucunu kullanıp yeniden dene ve gerekçeni yaz. İpucuyla yapılan bu çalışma, yardımsız ölçümün yerine geçmez.</p>
     {message && <p role="status" style={{ color: '#0f766e' }}><MathText text={message} /></p>}
+    {reviewGate&&<p role="alert">{reviewGate}</p>}
+    <fieldset disabled={busy||Boolean(reviewGate)} style={{border:0,padding:0,margin:0,minWidth:0}}>
     {!practice ? <button className="btn btn-primary" disabled={busy || !cycleId} onClick={() => void action('start')}>Rehberli çalışmayı başlat</button> :
       <section className="card">
         {practice.intervention&&<aside style={{padding:12,marginBottom:16,border:'1px solid var(--border)',borderRadius:9}}>
@@ -86,6 +89,7 @@ function CoachGuidedPracticeContent() {
           {practice.status === 'processing' && <p>Sonuç kesinleştiriliyor. Açıklamanı tekrar göndermen gerekirse önceki metni aynen kullan.</p>}
         </>}
       </section>}
+    </fieldset>
   </main>
 }
 

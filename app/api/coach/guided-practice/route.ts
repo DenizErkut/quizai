@@ -6,6 +6,7 @@ import { recordQuizLearningEvents } from '@/lib/learning-events'
 import { eligibleVerifiedItem, type VerifiedBankRow, type VerifiedItemSets } from '@/lib/verified-learning-cycle'
 import { loadObjectiveIntervention } from '@/lib/load-objective-intervention'
 import { contrastiveCandidate,interventionHint,storedInterventionPlan,publicInterventionPlan } from '@/lib/objective-intervention'
+import { interventionReviewGate } from '@/lib/intervention-review'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -51,7 +52,9 @@ export async function GET(req: NextRequest) {
   if (!UUID.test(cycleId)) return NextResponse.json({ error: 'Ölçüm döngüsü geçersiz.' }, { status: 400 })
   const detail = await loadCycle(cycleId, user.id)
   if (!detail) return NextResponse.json({ error: 'Ölçüm döngüsü bulunamadı.' }, { status: 404 })
+  const gate=await interventionReviewGate(db,user.id,cycleId).catch(()=>'Öğretmen inceleme durumu alınamadı; tekrar deneyin.')
   return NextResponse.json({ practice: detail.practice ? safePractice(detail.practice) : null,
+    gate,
     objective: detail.objective ? { title: detail.objective.title, subject: detail.objective.subject } : null })
 }
 
@@ -66,6 +69,10 @@ export async function POST(req: NextRequest) {
   if (!detail?.objective || detail.cycle.status !== 'active' || !detail.objective.is_active || detail.objective.verification_status !== 'verified') {
     return NextResponse.json({ error: 'Etkin pilot veya doğrulanmış kazanım bulunamadı.' }, { status: 404 })
   }
+  try {
+    const gate=await interventionReviewGate(db,user.id,detail.cycle.id)
+    if(gate)return NextResponse.json({error:gate},{status:422})
+  } catch {return NextResponse.json({error:'Öğretmen inceleme durumu alınamadı; tekrar deneyin.'},{status:503})}
   const baseline = detail.stages.find(stage => stage.stage === 'baseline' && stage.status === 'completed' && stage.quiz_session_id)
   const baselineTime=Date.parse(baseline?.completed_at||'')
   const baselineDone = Boolean(baseline&&Number.isFinite(baselineTime)&&baselineTime<=Date.now()&&Date.now()-baselineTime<=90*86400000)

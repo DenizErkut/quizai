@@ -45,12 +45,36 @@ synthetic completion or teacher approval.
 These operational rules have not been validated as a causal or psychological
 diagnosis. The product does not automatically close a misconception as resolved.
 
+## Milestone 3: teacher intervention exceptions
+
+The teacher's per-student measurement panel now includes a pending/history
+intervention review queue (latest 30 cycles). Only an approved teacher owning
+the class with the exact student on its roster may read or write decisions.
+Reviews are append-only records in the existing service-only agent audit table.
+They bind student/class/teacher/objective/cycle/practice and a content/plan
+fingerprint; changed content invalidates the prior review.
+
+Teacher decisions require a rationale: continue, or needs_followup. Follow-up
+pauses subsequent guided-practice and measurement requests, including resume
+and submission, with a fail-closed read error path. The student's next-step card
+and practice page surface the pause. Existing responses, scores and mastery
+evidence remain untouched. Continue releases only this workflow pause; it does
+not confirm a misconception, create a test or approve verified learning.
+Decisions apply to subsequent requests; this is not a transaction-level
+cancellation of an already executing request.
+
+A read-only graph audit found six verified prerequisite edges, but only one
+current edge with a human reviewer. Missing prerequisite links are unknown,
+not proof that an objective has no prerequisites. Automated next-objective
+selection therefore remains a separate milestone requiring reviewed graph
+coverage and actual transfer-reviewed learning evidence.
+
 ## Remaining milestones
 
 1. Validate misconception signals against teacher-reviewed reasoning, and
    evaluate intervention choices/outcomes rather than calling them diagnoses.
-2. Provide a teacher-facing exception workflow and approved objective-specific
-   micro-content; current practice modes are bounded scaffolding, not full lessons.
+2. Provide approved objective-specific micro-content; current practice modes
+   are bounded scaffolding, not full lessons.
 3. Select the next objective using verified evidence and explicit prerequisite
    rules, with a fresh baseline. Until implemented, verified cycles request
    teacher planning rather than inventing a new objective.
