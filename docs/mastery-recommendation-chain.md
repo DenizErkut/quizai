@@ -69,15 +69,25 @@ not proof that an objective has no prerequisites. Automated next-objective
 selection therefore remains a separate milestone requiring reviewed graph
 coverage and actual transfer-reviewed learning evidence.
 
+## Milestone 4: prerequisite-aware next-objective planning
+
+`next-objective-v1` runs only after the current cycle reaches the exact
+teacher-reviewed delayed-transfer threshold. It considers active, verified
+catalog objectives connected by a current `prerequisite_of` edge with a human
+reviewer and matching curriculum/scope. Missing, expired, unreviewed,
+ambiguous or mismatched edges fail closed to teacher review. A single safe
+candidate is shown as non-actionable and still requires teacher planning plus a
+fresh, unaided baseline; the system never creates a cycle or treats an old
+mastery estimate as a new baseline.
+
 ## Remaining milestones
 
 1. Validate misconception signals against teacher-reviewed reasoning, and
    evaluate intervention choices/outcomes rather than calling them diagnoses.
 2. Provide approved objective-specific micro-content; current practice modes
    are bounded scaffolding, not full lessons.
-3. Select the next objective using verified evidence and explicit prerequisite
-   rules, with a fresh baseline. Until implemented, verified cycles request
-   teacher planning rather than inventing a new objective.
+3. Expand reviewed prerequisite coverage and let teachers start a candidate
+   cycle after its fresh baseline is collected.
 4. Version and audit decisions, evaluate policy in shadow mode and run genuine
    student pilots. No student answer or teacher approval may be synthesized.
 

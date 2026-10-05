@@ -1,4 +1,5 @@
 import { verifiedLearningMetrics, type EvidenceAttempt, type EvidenceReview, type SupportPractice } from './verified-learning-metrics'
+import type { NextObjectivePlan } from './next-objective'
 
 export const MASTERY_NEXT_STEP_POLICY = 'mastery-next-step-v1'
 const DAY = 86400000
@@ -9,6 +10,7 @@ export type LearningStep = {
   mastery: { estimate: number|null; confidence: number|null; verified: boolean|null };
   misconception: { id: string; status: 'suspected' }|null;
   intervention?:{policyVersion:string;mode:string;label:string;reason:string;teacherReviewRecommended:boolean}|null;
+  nextObjective?: NextObjectivePlan|null;
 }
 
 /** Decisions use exact student/objective/cycle evidence, never a topic percentage as verification. */
@@ -16,6 +18,7 @@ export function masteryNextStep(input: {
   cycleId: string; objectiveId: string; objectiveCode: string; subject: string; topic: string;
   attempts: EvidenceAttempt[]; reviews: EvidenceReview[]; practice: SupportPractice|null;
   estimate?: number|null; confidence?: number|null; misconceptionId?: string|null; now?: number;
+  nextObjective?: NextObjectivePlan|null;
 }): LearningStep {
   const now = input.now ?? Date.now()
   const metrics = verifiedLearningMetrics(input.attempts, input.reviews, input.practice)
@@ -58,5 +61,10 @@ export function masteryNextStep(input: {
   if (!transfer) return waitAfter(post.completed_at!) || step('transfer','Yeni durumdaki aktarım testini çöz','Son testten en az 24 saat sonra farklı sorularla yardımsız aktarımı kontrol ediyoruz; son test başarısı tek başına öğrenme kanıtı değildir.')
   if (metrics.verifiedMastery === null) return step('teacher_review','Aktarım kanıtını incelet','Aktarım testi tamamlandı ancak gecikme, sunucu puanı ve öğretmen incelemesi birlikte doğrulanmadı.',false)
   if (!metrics.verifiedMastery) return step('replan','Müdahaleyi yeniden planla','Öğretmen incelemeli aktarım puanı %80 ürün eşiğinin altında. Aynı müdahaleyi otomatik tekrarlamak yerine hata nedeni ve yeni çalışma planı incelenmeli.',false)
-  return step('verified','Sonraki kazanım için öğretmen planı bekleniyor','Bu döngüde öğretmen incelemeli gecikmeli aktarım %80 eşiğini karşıladı. Yeni kazanım seçimi ön koşul ve güncel başlangıç kanıtıyla yapılmalı; bu sonuç kalıcı öğrenme garantisi değildir.',false)
+  const next = input.nextObjective ?? null
+  if (next?.status === 'baseline_required' && next.candidate)
+    return {...step('verified','Yeni kazanım için başlangıç ölçümü bekleniyor',next.reason,false), nextObjective: next}
+  if (next?.status === 'teacher_review')
+    return {...step('verified','Sonraki kazanımı öğretmen seçmeli',next.reason,false), nextObjective: next}
+  return {...step('verified','Sonraki kazanım için öğretmen planı bekleniyor','Bu döngüde öğretmen incelemeli gecikmeli aktarım %80 eşiğini karşıladı. Yeni kazanım seçimi ön koşul ve güncel başlangıç kanıtıyla yapılmalı; bu sonuç kalıcı öğrenme garantisi değildir.',false), nextObjective: next}
 }

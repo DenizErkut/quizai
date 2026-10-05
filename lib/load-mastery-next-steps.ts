@@ -4,6 +4,7 @@ import { sameLearningScope } from './learning-evidence-scope'
 import { loadObjectiveIntervention } from './load-objective-intervention'
 import { storedInterventionPlan,publicInterventionPlan } from './objective-intervention'
 import { interventionReviewGate } from './intervention-review'
+import { planNextObjective } from './next-objective'
 
 /** Server-only caller supplies its authenticated student, never a requested peer ID. */
 export async function loadMasteryNextSteps(db: SupabaseClient, studentId: string): Promise<LearningStep[]> {
@@ -16,7 +17,7 @@ export async function loadMasteryNextSteps(db: SupabaseClient, studentId: string
   if (!cycles.data?.length) return []
   const ids = cycles.data.map(c=>c.id), objectives = [...new Set(cycles.data.map(c=>c.learning_objective_id))]
   const [catalog, mastery, attempts, practices, reviews] = await Promise.all([
-    db.from('learning_objective_catalog').select('id,objective_code,title,grade,subject,topic,is_active,verification_status')
+    db.from('learning_objective_catalog').select('id,objective_code,title,grade,subject,topic,is_active,verification_status,graph_node_id,curriculum_version_id')
       .in('id',objectives),
     db.from('student_mastery').select('learning_objective_id,mastery_score,confidence_score,primary_misconception_id,last_mastery_update')
       .eq('student_id',studentId).in('learning_objective_id',objectives).order('last_mastery_update',{ascending:false}).limit(200),
@@ -60,6 +61,21 @@ export async function loadMasteryNextSteps(db: SupabaseClient, studentId: string
     const plan=practice?storedInterventionPlan(practice.question)
       :await loadObjectiveIntervention(db,studentId,objective,baseline?.score_pct??null)
     focus.intervention=publicInterventionPlan(plan)
+  }
+  if (focus?.action === 'verified') {
+    const currentObjective = catalog.data!.find(o => o.id === focus.objectiveId)
+    if (currentObjective?.graph_node_id) {
+      const edgeResult = await db.from('learning_graph_edges').select('id,source_node_id,target_node_id,edge_type,is_verified,reviewed_by,valid_from,valid_to,curriculum_version_id')
+        .eq('source_node_id', currentObjective.graph_node_id).eq('edge_type','prerequisite_of').eq('is_verified',true)
+      if (edgeResult.error) throw new Error('Sonraki kazanım ilişkileri alınamadı.')
+      const targetIds = [...new Set((edgeResult.data || []).map(edge => edge.target_node_id))]
+      const candidateResult = targetIds.length ? await db.from('learning_objective_catalog')
+        .select('id,objective_code,title,grade,subject,topic,is_active,verification_status,graph_node_id,curriculum_version_id').in('graph_node_id',targetIds) : { data: [], error: null }
+      if (candidateResult.error) throw new Error('Sonraki kazanım adayları alınamadı.')
+      focus.nextObjective = planNextObjective({ currentObjective, candidates: candidateResult.data || [], edges: edgeResult.data || [], verifiedMastery: focus.mastery.verified })
+    } else {
+      focus.nextObjective = planNextObjective({ currentObjective: {...currentObjective, graph_node_id: null}, candidates: [], edges: [], verifiedMastery: focus.mastery.verified })
+    }
   }
   return decisions
 }
