@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-type Row = { id: string; question: { q: string; svg?: string; opts: string[]; ans: number }; review_status: string }
+type Row = { id: string; sourceQuestionNumber: number | null; question: { q: string; svg?: string; opts: string[]; ans: number }; review_status: string }
 export default function BookletVisuals({ resourceId }: { resourceId: string }) {
   const [rows, setRows] = useState<Row[]>([])
   const [selected, setSelected] = useState('')
@@ -44,9 +44,9 @@ export default function BookletVisuals({ resourceId }: { resourceId: string }) {
     {open && <div className="card" style={{ marginTop: 8 }}>
       <p>PDF metin çıkarımı şekilleri otomatik taşımaz. Kitapçıktaki ilgili şekli PNG/JPEG olarak kırpıp aşağıdaki soruya bağlayın. Cevap anahtarı veya başka sorular kırpımda bulunmamalı.</p>
       <select className="input" value={selected} onChange={event => { setSelected(event.target.value); setConfirmed(false) }}>
-        <option value="">Soru seç</option>{rows.map(item => <option key={item.id} value={item.id}>{item.question.svg ? '🖼️ ' : ''}{item.question.q}</option>)}
+        <option value="">Soru seç</option>{rows.map(item => <option key={item.id} value={item.id}>{item.sourceQuestionNumber !== null ? `Soru ${item.sourceQuestionNumber} — ` : 'Numara bulunamadı — '}{item.question.svg ? '🖼️ ' : ''}{item.question.q}</option>)}
       </select>
-      {row && <><p>{row.question.q}</p><ol>{row.question.opts.map((option, i) => <li key={i}>{option}{i === row.question.ans ? ' ✓ Kayıtlı cevap' : ''}</li>)}</ol>
+      {row && <><p><strong>{row.sourceQuestionNumber !== null ? `Soru ${row.sourceQuestionNumber} — ` : 'Kaynak numarası bulunamadı — '}</strong>{row.question.q}</p><ol>{row.question.opts.map((option, i) => <li key={i}>{option}{i === row.question.ans ? ' ✓ Kayıtlı cevap' : ''}</li>)}</ol>
         {row.question.svg && <img alt="Havuzdaki görsel" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(row.question.svg)}`} style={{ maxWidth: '100%', maxHeight: 300 }} />}
         <input type="file" accept="image/png,image/jpeg" onChange={event => {
           const image = event.target.files?.[0]

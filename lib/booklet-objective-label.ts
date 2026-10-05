@@ -8,8 +8,15 @@ export function bookletQuestionLabels(text: string) {
     // Only the question heading, never the booklet cover or page footer.
     const heading = block.split('\n').slice(0, 3).join('\n')
     const codes = [...new Set(heading.match(codePattern) || [])]
-    return { text: normalized(block), codes }
+    const number = block.match(/^(?:Soru\s+)?(\d{1,3})\s*(?:\||[.)])/iu)
+    return { text: normalized(block), codes, number: number ? Number(number[1]) : null }
   })
+}
+
+export function printedQuestionNumber(question: string, labels: ReturnType<typeof bookletQuestionLabels>): number | null {
+  const needle = normalized(question)
+  const matches = needle.length >= 15 ? labels.filter(label => label.text.includes(needle)) : []
+  return matches.length === 1 ? matches[0].number : null
 }
 
 export function printedQuestionObjective(question: string, labels: ReturnType<typeof bookletQuestionLabels>, verifiedCodes: string[]) {

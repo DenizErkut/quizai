@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { requireAdmin, supabaseAdmin as db } from '@/lib/auth-middleware'
 import { bookletImageSvg } from '@/lib/booklet-image'
 import { PDFDocument } from 'pdf-lib'
+import { bookletQuestionLabels, printedQuestionNumber } from '@/lib/booklet-objective-label'
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req)
@@ -11,7 +12,12 @@ export async function GET(req: NextRequest) {
   if (!resourceId) return NextResponse.json({ error: 'Kitapçık seçin.' }, { status: 400 })
   const { data, error } = await db.from('question_bank').select('id,question,review_status').contains('question', { bookletResourceId: resourceId }).limit(500)
   if (error) return NextResponse.json({ error: 'Sorular alınamadı.' }, { status: 503 })
-  return NextResponse.json({ questions: data || [] })
+  const { data: resource, error: resourceError } = await db.from('exam_resources').select('raw_text').eq('id', resourceId).maybeSingle()
+  if (resourceError) return NextResponse.json({ error: 'Kaynak soru numaraları alınamadı.' }, { status: 503 })
+  const labels = bookletQuestionLabels(resource?.raw_text || '')
+  const questions = (data || []).map(item => ({ ...item, sourceQuestionNumber: printedQuestionNumber(String(item.question?.q || ''), labels) }))
+    .sort((a, b) => (a.sourceQuestionNumber ?? Infinity) - (b.sourceQuestionNumber ?? Infinity))
+  return NextResponse.json({ questions })
 }
 
 export async function POST(req: NextRequest) {
