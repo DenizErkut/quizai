@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { loadMasteryNextSteps } from '@/lib/load-mastery-next-steps'
+import { MASTERY_NEXT_STEP_POLICY } from '@/lib/mastery-next-step'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
@@ -16,5 +18,8 @@ export async function GET(req: NextRequest) {
     p_student_id: user.id, p_time_budget_minutes: budget, p_next_exam_at: exam || null,
   })
   if (error) return NextResponse.json({ error: 'Öncelikli öneriler alınamadı.' }, { status: 500 })
-  return NextResponse.json({ recommendations: data ?? [], ranking_version: 'recommendation-priority-v2' })
+  const learningSteps = await loadMasteryNextSteps(db,user.id).catch(()=>null)
+  return NextResponse.json({ recommendations: data ?? [], ranking_version: 'recommendation-priority-v2',
+    learningSteps:learningSteps||[], learningDecisionPolicy:MASTERY_NEXT_STEP_POLICY,
+    learningEvidenceStatus:learningSteps===null?'unavailable':'loaded' })
 }

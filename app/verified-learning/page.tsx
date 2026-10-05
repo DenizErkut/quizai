@@ -87,7 +87,7 @@ export default function VerifiedLearningPage() {
       <button className="btn btn-primary" disabled={busy || choices.some(choice => choice < 0)} onClick={() => void submit()}>{busy ? 'Kaydediliyor…' : 'Yanıtları gönder'}</button>
     </section> : <div style={{ display: 'grid', gap: 12 }}>
       {cycles.length === 0 && <section className="card">Öğretmenin tarafından atanmış bir ölçüm döngüsü henüz yok.</section>}
-      {cycles.map(cycle => <section className="card" key={cycle.id}>
+      {cycles.map(cycle => <section className="card" key={cycle.id} id={`cycle-${cycle.id}`}>
         <h2 style={{ fontSize: 18, marginTop: 0 }}>{cycle.objective?.code || 'Kazanım'} · {cycle.objective?.title || 'Ölçüm'}</h2>
         <p style={{ color: 'var(--text3)' }}>{cycle.objective?.subject} · {cycle.attempts.map(attempt => `${stageLabel[attempt.stage]}: ${attempt.status === 'completed' ? `%${attempt.scorePct}` : 'başlandı'}`).join(' · ') || 'Başlamadı'}</p>
         {cycle.metrics && <VerifiedLearningMetrics metrics={cycle.metrics} />}
