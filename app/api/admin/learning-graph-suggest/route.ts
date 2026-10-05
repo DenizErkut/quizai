@@ -82,7 +82,16 @@ export async function POST(req: NextRequest) {
 
     if (cErr || !curriculum) return NextResponse.json({ error: 'Müfredat kaydı bulunamadı.' }, { status: 404 })
 
-    const topics: string[] = Array.isArray(curriculum.topics) ? curriculum.topics : []
+    let topics: string[] = Array.isArray(curriculum.topics) ? curriculum.topics : []
+    // Eski curriculum satırlarında topics boş olabilir; doğrulanmış katalog
+    // kayıtları aynı müfredat kapsamının güvenilir yedeğidir.
+    if (topics.length < 2) {
+      const { data: catalogRows, error: catalogError } = await adminDb.from('learning_objective_catalog')
+        .select('grade,subject,topic,unit').eq('is_active', true).eq('verification_status', 'verified').limit(10000)
+      if (catalogError) return NextResponse.json({ error: catalogError.message }, { status: 500 })
+      topics = [...new Set((catalogRows || []).filter(row => gradeKey(row.grade) === gradeKey(curriculum.grade) && key(row.subject) === key(curriculum.subject))
+        .flatMap(row => [row.topic, row.unit].filter((value): value is string => Boolean(value)) ))]
+    }
     if (topics.length < 2) {
       return NextResponse.json({ error: 'Bu müfredat kaydında ön koşul önerisi için yeterli konu yok (en az 2 konu gerekli).' }, { status: 400 })
     }
