@@ -30,7 +30,7 @@ export default function NextBestAction() {
         const step=data.learningSteps?.[0]
         const recommendation=data.recommendations?.find(item=>item.status==='accepted'||item.status==='active')
         const selected:Action|null=step?{
-          subject:step.subject,topic:`${step.objectiveCode} · ${step.topic}`,reason:step.reason,
+          subject:step.subject,topic:`${step.objectiveCode} · ${step.topic}`,reason:step.intervention?`${step.reason} Çalışma yaklaşımı: ${step.intervention.label}. ${step.intervention.reason}`:step.reason,
           source:'mastery',href:step.href,actionable:step.actionable,label:step.label,dueAt:step.dueAt,
         }:data.learningEvidenceStatus!=='loaded'?{
           subject:'',topic:'Öğrenme kanıtları şu an alınamadı',

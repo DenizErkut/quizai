@@ -4,12 +4,13 @@ import { randomInt } from 'node:crypto'
 import { sameLearningScope } from '@/lib/learning-evidence-scope'
 import { recordQuizLearningEvents } from '@/lib/learning-events'
 import { eligibleVerifiedItem, type VerifiedBankRow, type VerifiedItemSets } from '@/lib/verified-learning-cycle'
+import { loadObjectiveIntervention } from '@/lib/load-objective-intervention'
+import { contrastiveCandidate,interventionHint,storedInterventionPlan,publicInterventionPlan } from '@/lib/objective-intervention'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const REFLECTION_HINT = 'Önce sorunun tam olarak ne istediğini belirle. Verilen bilgileri tek tek işaretle; seçenekleri bu bilgilerle karşılaştır. Sonucu tahmin etmek yerine kendi gerekçeni kur.'
 
 async function student(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
@@ -26,7 +27,7 @@ async function loadCycle(cycleId: string, studentId: string) {
   const [{ data: objective }, { data: stages }, { data: practice }] = await Promise.all([
     db.from('learning_objective_catalog').select('id,title,subject,grade,topic,is_active,verification_status')
       .eq('id', cycle.learning_objective_id).maybeSingle(),
-    db.from('verified_learning_attempts').select('stage,status,completed_at').eq('cycle_id', cycle.id).eq('student_id', studentId),
+    db.from('verified_learning_attempts').select('stage,status,completed_at,quiz_session_id,score_pct').eq('cycle_id', cycle.id).eq('student_id', studentId),
     db.from('coach_guided_practice_attempts').select('id,cycle_id,student_id,question,status,first_choice,retry_choice,hint_count,student_explanation,quiz_session_id,completed_at')
       .eq('cycle_id', cycle.id).eq('student_id', studentId).maybeSingle(),
   ])
@@ -34,7 +35,9 @@ async function loadCycle(cycleId: string, studentId: string) {
 }
 
 function safePractice(row: { id: string; status: string; question: Record<string, unknown>; first_choice: number | null; retry_choice: number | null; hint_count: number; completed_at: string | null }) {
+  const plan=storedInterventionPlan(row.question)
   return { id: row.id, status: row.status, question: row.question.q, options: row.question.opts,
+    intervention:publicInterventionPlan(plan),hint:row.hint_count>0?interventionHint(plan):null,
     firstChoice: row.first_choice, retryChoice: row.retry_choice, hintCount: row.hint_count,
     completedAt: row.completed_at,
     ...(row.status === 'completed' ? { correctIndex: row.question.ans, explanation: row.question.exp || null } : {}),
@@ -63,7 +66,9 @@ export async function POST(req: NextRequest) {
   if (!detail?.objective || detail.cycle.status !== 'active' || !detail.objective.is_active || detail.objective.verification_status !== 'verified') {
     return NextResponse.json({ error: 'Etkin pilot veya doğrulanmış kazanım bulunamadı.' }, { status: 404 })
   }
-  const baselineDone = detail.stages.some(stage => stage.stage === 'baseline' && stage.status === 'completed')
+  const baseline = detail.stages.find(stage => stage.stage === 'baseline' && stage.status === 'completed' && stage.quiz_session_id)
+  const baselineTime=Date.parse(baseline?.completed_at||'')
+  const baselineDone = Boolean(baseline&&Number.isFinite(baselineTime)&&baselineTime<=Date.now()&&Date.now()-baselineTime<=90*86400000)
   const postStarted = detail.stages.some(stage => stage.stage === 'post')
   if (!baselineDone || postStarted) return NextResponse.json({ error: 'Rehberli çalışma ön testten sonra ve son testten önce yapılır.' }, { status: 422 })
 
@@ -82,10 +87,17 @@ export async function POST(req: NextRequest) {
       && sameLearningScope({ grade:row.grade_key,subject:row.subject_key },detail.objective!)
       && eligibleVerifiedItem(row, detail.objective!.id))
     if (!candidates.length) return NextResponse.json({ error: 'Ölçüm sorularından ayrı kalite onaylı çalışma sorusu kalmadı.' }, { status: 409 })
-    const selected = candidates[randomInt(candidates.length)]
+    let plan
+    try { plan=await loadObjectiveIntervention(db,user.id,detail.objective,baseline?.score_pct??null) }
+    catch { return NextResponse.json({error:'Çalışma müdahalesi için kazanım kanıtları alınamadı; tekrar deneyin.'},{status:503}) }
+    const targeted=plan.mode==='contrastive_practice'?candidates.filter(row=>contrastiveCandidate(row.question,plan)):[]
+    if(plan.mode==='contrastive_practice'&&!targeted.length)plan={...plan,mode:'diagnostic_reflection',label:'Gerekçeni açıklayarak çalış',
+      reason:'Tekrarlanan hata sinyali var ancak bu sinyali ölçümden ayrı yoklayan uygun çalışma sorusu bulunamadı. Genel gerekçe çalışması seçildi; öğretmen içerik incelemesi önerilir.',teacherReviewRecommended:true,signal:null}
+    const pool=targeted.length?targeted:candidates
+    const selected = pool[randomInt(pool.length)]
     const { data: inserted, error: insertError } = await db.from('coach_guided_practice_attempts').insert({
       cycle_id: detail.cycle.id, student_id: user.id,
-      question: { ...selected.question, bankQuestionId: selected.id, subject: detail.objective.subject, coachedPractice: true },
+      question: { ...selected.question, bankQuestionId: selected.id, subject: detail.objective.subject, coachedPractice: true,objectiveIntervention:plan },
     }).select('id,cycle_id,student_id,question,status,first_choice,retry_choice,hint_count,completed_at').maybeSingle()
     if (insertError || !inserted) return NextResponse.json({ error: insertError?.code === '23505' ? 'Çalışma başka bir oturumda açıldı; sayfayı yenileyin.' : 'Çalışma başlatılamadı.' }, { status: insertError?.code === '23505' ? 409 : 500 })
     return NextResponse.json({ practice: safePractice(inserted) }, { status: 201 })
@@ -109,7 +121,7 @@ export async function POST(req: NextRequest) {
     const { data: updated } = await db.from('coach_guided_practice_attempts').update({ status: 'awaiting_retry', hint_count: usedHint ? 1 : 0 })
       .eq('id', practice.id).eq('student_id', user.id).eq('status', 'awaiting_hint').select('id').maybeSingle()
     if (!updated) return NextResponse.json({ error: 'İpucu aşaması artık uygun değil.' }, { status: 409 })
-    return NextResponse.json({ hint: usedHint ? REFLECTION_HINT : null })
+    return NextResponse.json({ hint: usedHint ? interventionHint(storedInterventionPlan(practice.question)) : null })
   }
 
   const explanation = String(body.explanation || '').trim()

@@ -8,6 +8,7 @@ export type LearningStep = {
   label: string; reason: string; href: string; actionable: boolean; dueAt: string|null;
   mastery: { estimate: number|null; confidence: number|null; verified: boolean|null };
   misconception: { id: string; status: 'suspected' }|null;
+  intervention?:{policyVersion:string;mode:string;label:string;reason:string;teacherReviewRecommended:boolean}|null;
 }
 
 /** Decisions use exact student/objective/cycle evidence, never a topic percentage as verification. */
