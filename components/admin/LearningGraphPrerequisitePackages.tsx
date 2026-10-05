@@ -67,7 +67,7 @@ export default function LearningGraphPrerequisitePackages() {
         {items.map(item => <div key={item.id} style={{ marginTop: 7, paddingTop: 7, borderTop: '1px solid var(--border)' }}>
           <div>{nodeMap.get(item.source_node_id)?.label} → {nodeMap.get(item.target_node_id)?.label} · güven {item.confidence} · {item.review_status}</div>
           <div style={{ color: 'var(--text3)' }}>{item.rationale}</div>
-          {item.review_status !== 'published' && <div style={{ display: 'flex', gap: 6, marginTop: 5 }}><button className="btn btn-sm" disabled={busy} onClick={() => void act({ action: 'review', itemId: item.id, decision: 'approved' })}>Onayla</button><button className="btn btn-sm" disabled={busy} onClick={() => { const note = window.prompt('Ret gerekçesi (zorunlu)'); if (note) void act({ action: 'review', itemId: item.id, decision: 'rejected', reviewNote: note }) }}>Reddet</button></div>}
+          {item.review_status !== 'published' && <div style={{ display: 'flex', gap: 6, marginTop: 5 }}><button className="btn btn-sm" disabled={busy} onClick={() => { const note = window.prompt('Onay gerekçesi (zorunlu, en az 10 karakter)'); if (note) void act({ action: 'review', itemId: item.id, decision: 'approved', reviewNote: note }) }}>Onayla</button><button className="btn btn-sm" disabled={busy} onClick={() => { const note = window.prompt('Ret gerekçesi (zorunlu, en az 10 karakter)'); if (note) void act({ action: 'review', itemId: item.id, decision: 'rejected', reviewNote: note }) }}>Reddet</button></div>}
         </div>)}
         {pkg.status === 'ready' && <button className="btn btn-sm" style={{ marginTop: 8 }} disabled={busy} onClick={() => void act({ action: 'publish', packageId: pkg.id })}>Döngü kontrolüyle yayımla</button>}
       </div>
