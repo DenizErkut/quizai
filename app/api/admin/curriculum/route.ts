@@ -24,9 +24,21 @@ async function getAdminUser() {
 
 // GET — tüm müfredatı listele
 export async function GET() {
-  const { data } = await adminDb.from('curriculum')
+  const [{ data }, { data: objectives }] = await Promise.all([
+    adminDb.from('curriculum')
     .select('*').order('level').order('grade').order('sort_order')
-  return NextResponse.json({ curriculum: data || [] })
+    , adminDb.from('learning_objective_catalog').select('grade,subject,topic,unit')
+      .eq('is_active', true).eq('verification_status', 'verified').limit(10000),
+  ])
+  const key = (value: unknown) => typeof value === 'string' ? value.toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ').trim() : ''
+  const gradeKey = (value: unknown) => key(value).replace(/ sınıf/g, '').replace(/\. sınıf/g, '').replace(/[^0-9]/g, '')
+  const curriculum = (data || []).map(item => {
+    if (Array.isArray(item.topics) && item.topics.length) return item
+    const matches = (objectives || []).filter(objective => gradeKey(objective.grade) === gradeKey(item.grade) && key(objective.subject) === key(item.subject))
+    const topics = [...new Set(matches.flatMap(objective => [objective.topic, objective.unit].filter((value): value is string => Boolean(value))))]
+    return topics.length ? { ...item, topics } : item
+  })
+  return NextResponse.json({ curriculum })
 }
 
 // POST — yeni ders ekle
@@ -58,7 +70,7 @@ export async function PATCH(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { id, is_active, topics, subject, sort_order } = await req.json()
-  const update: any = {}
+  const update: Record<string, unknown> = {}
   if (is_active !== undefined) update.is_active = is_active
   if (topics !== undefined) update.topics = topics
   if (subject !== undefined) update.subject = subject
