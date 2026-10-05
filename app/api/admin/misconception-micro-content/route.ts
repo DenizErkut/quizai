@@ -102,6 +102,7 @@ export async function PATCH(req: NextRequest) {
   const { error: updateError } = await db.from('misconception_micro_contents').update(update).eq('id', body.id).eq('status', 'draft')
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 })
   const note = clean(body.note, 500)
+  if (note.length < 10) return NextResponse.json({ error: 'Mikro içerik kararı için 10-500 karakterlik uzman gerekçesi zorunludur.' }, { status: 400 })
   const { error } = await db.rpc('review_misconception_micro_content_v1', {
     p_content_id: body.id, p_decision: body.decision, p_note: note || null, p_reviewer_id: userId,
   })

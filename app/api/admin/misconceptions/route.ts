@@ -53,7 +53,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Geçersiz inceleme kararı.' }, { status: 400 })
   }
   const cleanNote = typeof note === 'string' ? note.trim().slice(0, 500) : null
-  if (decision === 'rejected' && !cleanNote) return NextResponse.json({ error: 'Red gerekçesi zorunludur.' }, { status: 400 })
+  if (cleanNote.length < 10) return NextResponse.json({ error: 'Yanılgı kararı için 10-500 karakterlik uzman gerekçesi zorunludur.' }, { status: 400 })
 
   const { error } = await adminDb.rpc('review_misconception', {
     p_misconception_id: id, p_decision: decision, p_note: cleanNote, p_reviewer_id: reviewerId,

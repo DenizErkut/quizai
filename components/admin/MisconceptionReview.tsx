@@ -68,9 +68,9 @@ export default function MisconceptionReview() {
             .map(target => <option key={target.id} value={target.id}>{target.topic} → {target.label} ({target.evidence_count})</option>)}
         </select>
         <div style={{ display: 'flex', gap: 7, marginTop: 8 }}>
-          <button className="btn btn-sm" disabled={busy} onClick={() => decide(item.id, 'verified')}>✓ Doğrula</button>
+          <button className="btn btn-sm" disabled={busy || (notes[item.id] || '').trim().length < 10} onClick={() => decide(item.id, 'verified')}>✓ Doğrula</button>
           <button className="btn btn-sm" disabled={busy || !targets[item.id] || (notes[item.id] || '').trim().length < 3} onClick={() => merge(item.id)}>↪ Kanoniğe birleştir</button>
-          <button className="btn btn-sm" disabled={busy} onClick={() => decide(item.id, 'rejected')} style={{ color: '#dc2626' }}>✕ Reddet</button>
+          <button className="btn btn-sm" disabled={busy || (notes[item.id] || '').trim().length < 10} onClick={() => decide(item.id, 'rejected')} style={{ color: '#dc2626' }}>✕ Reddet</button>
         </div>
       </div>)}
       {!busy && items.length === 0 && <div style={{ color: 'var(--text3)', fontSize: 12 }}>Bekleyen adayları görmek için listeyi yükleyin.</div>}
