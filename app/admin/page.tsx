@@ -1,5 +1,6 @@
 'use client'
 import MathText from '@/components/MathText'
+import BookletVisuals from '@/components/admin/BookletVisuals'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -1982,6 +1983,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>🎯</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--primary)' }}>{ex.title}</div>
+                      {tab === 'question-books' && ['teacher', 'ai'].includes(ex.source_type) && ex.review_status === 'approved' && <BookletVisuals resourceId={ex.id} />}
                       <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Anlık test kaynağı · {ex.grade ? `${ex.grade}. sınıf · ` : ''}{ex.subject || 'Ders belirtilmedi'}{(ex.topic || ex.subtopic) ? ` · ${ex.topic || ex.subtopic}` : ''} · {ex.chunk_count || 0} parça{Array.isArray(ex.learning_objective_codes) && ex.learning_objective_codes.length ? ` · kazanım: ${ex.learning_objective_codes.join(', ')}` : ''}{ex.publication_evidence_count ? ` · ${ex.publication_evidence_count} izin kanıtı` : ''}</div>
                     </div>
                     <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '99px', background: ex.source_type === 'teacher' ? 'rgba(22,163,74,0.1)' : ex.source_type === 'ai' ? 'rgba(14,165,233,0.1)' : 'rgba(99,102,241,0.1)', color: ex.source_type === 'teacher' ? '#15803d' : ex.source_type === 'ai' ? '#0369a1' : '#6366f1', fontWeight: 600 }}>{ex.source_type === 'teacher' ? 'Öğretmen' : ex.source_type === 'ai' ? 'AI' : 'Anonim'} · {ex.review_status === 'approved' ? 'Onaylı' : 'Bekliyor'}</span>

@@ -14,6 +14,8 @@ test.describe('tenant isolation security contract', () => {
     ['/api/admin/pipeline-health', 'get'],
     ['/api/admin/profile-actions', 'post'],
     ['/api/admin/verified-learning-metrics', 'get'],
+    ['/api/admin/booklet-visuals?resourceId=another-resource', 'get'],
+    ['/api/admin/booklet-visuals', 'post'],
     ['/api/parent/link-child', 'post'],
     ['/api/parent/unlink-child', 'post'],
     ['/api/teacher/agent-approvals', 'get'],

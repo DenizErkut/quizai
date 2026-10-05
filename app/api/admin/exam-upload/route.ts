@@ -8,6 +8,7 @@ import { callOpenAI } from '@/lib/openai'
 import { questionBankKey } from '@/lib/question-bank'
 import { educationEvalGradeKey } from '@/lib/education-eval-grade'
 import { educationEvalSubjectKey } from '@/lib/education-eval-subject'
+import { requiresBookletVisual } from '@/lib/booklet-visual-gate'
 import { matchVerifiedObjectiveCode, parseLearningObjectiveCodes } from '@/lib/learning-objective-codes'
 
 const adminDb = createClient(
@@ -234,7 +235,7 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
     : '\nobjective_code alanını null döndür.\n'
   const extractedGroups = await Promise.all(batches.map(async batch => {
     const prompt = `Aşağıdaki ${sourceLabel} kitapçık bölümündeki çoktan seçmeli soruları AYNI soru metni, AYNI seçenekler ve AYNI doğru cevapla ayıkla. Yeniden yazma, sadeleştirme veya benzer soru üretme. Bölümün sonundaki cevap anahtarından yalnız bu bölümdeki soruların cevaplarını kullan. Açıklama kitapçıkta yoksa doğru cevabı kısaca açıkla. Eksik ya da cevabı belirlenemeyen soruyu atla. En fazla 55 soru döndür. ${objectiveInstruction}Yalnız JSON döndür: {"questions":[{"q":"...","opts":["..."],"ans":0,"exp":"...","topic":"...","difficulty":"easy|medium|hard","objective_code":null}]}\n\n<KITAPCIK_METNI>\n${batch}\n</KITAPCIK_METNI>`
-    const response = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 12000, messages: [{ role: 'user', content: prompt }] })
+    const response = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 12000, messages: [{ role: 'user', content: prompt + '\nGörsel/şekil/grafik gerektiren sorularda requires_visual:true döndür. Şekli metinden uydurma. Metin, seçenek ve cevap anahtarı tam ise görseli eksik soruyu da aktar; sistem bunu öğrenciye vermeden insan görsel incelemesine ayıracak.' }] })
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
     const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
     return Array.isArray(parsed.questions) ? parsed.questions : []
@@ -247,7 +248,7 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
   ], { model: process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini', max_tokens: 12000, json: true, operation: `${sourceType}-booklet-validator` })
   const validation = JSON.parse(validationText)
   const approvedIndexes = new Set<number>((validation.results || []).filter((item: any) => item.approved === true).map((item: any) => Number(item.index)))
-  const questions = extracted.filter((_: any, index: number) => approvedIndexes.has(index))
+  const questions = extracted.filter((q: any, index: number) => approvedIndexes.has(index) || requiresBookletVisual(q))
   const rows = questions.map((q: any) => ({
     fingerprint: createHash('sha256').update(`${q.q}|${q.opts.join('|')}`.toLocaleLowerCase('tr')).digest('hex'),
     subject_key: questionBankKey(row.subject || 'genel'),
@@ -256,11 +257,11 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
     // Preserve the classifier's finer subtopic separately in the question.
     topic_key: questionBankKey(row.subtopic || row.topic || q.topic || 'genel'),
     grade_key: canonicalBookletGrade(row.grade || ''), language_key: 'tr', question_type: 'multiple_choice', difficulty: q.difficulty === 'easy' ? 'kolay' : q.difficulty === 'hard' ? 'zor' : 'normal',
-    question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, objective: q.topic || row.subtopic || '', learningObjectiveCode: matchVerifiedObjectiveCode(q.objective_code, verifiedCodes), bookletObjectiveCodes: parseLearningObjectiveCodes(row.learning_objective_codes), bookletTopic: row.subtopic || row.topic || '', bookletResourceId: row.id || null, subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' },
-    review_status: 'approved', quality_score: 1, source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact', report_count: 0
+    question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, requiresBookletVisual: requiresBookletVisual(q), objective: q.topic || row.subtopic || '', learningObjectiveCode: matchVerifiedObjectiveCode(q.objective_code, verifiedCodes), bookletObjectiveCodes: parseLearningObjectiveCodes(row.learning_objective_codes), bookletTopic: row.subtopic || row.topic || '', bookletResourceId: row.id || null, subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' },
+    review_status: requiresBookletVisual(q) ? 'pending' : 'approved', quality_score: requiresBookletVisual(q) ? null : 1, source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact', report_count: 0
   }))
   if (!rows.length) return 0
-  const result = await adminDb.from('question_bank').upsert(rows, { onConflict: 'fingerprint', ignoreDuplicates: true }).select('id')
+  const result = await adminDb.from('question_bank').upsert(rows, { onConflict: 'fingerprint', ignoreDuplicates: true }).select('id,review_status')
   if (result.error) throw result.error
   if (sourceType === 'ai' && row.id) {
     try {
@@ -314,7 +315,7 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
       console.error('[exam-upload] AI Education Eval pool sync failed', error)
     }
   }
-  return result.data?.length || 0
+  return result.data?.filter(item => item.review_status === 'approved').length || 0
 }
 
 // POST: yeni kitapçık yükle
