@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 
 type Check = {
   id: string; subject: string; grade: string | null; topic: string; learningObjectiveCode: string | null;
-  status: 'pending' | 'served'; question?: string; options?: string[]
+  status: 'pending' | 'served'; available?: boolean; question?: string; options?: string[]
 }
 
 export default function TransferChecksPage() {
@@ -85,7 +85,9 @@ export default function TransferChecksPage() {
         <h2 style={{ fontSize: 17 }}>Bekleyen kontroller</h2>
         {checks.map(check => <div key={check.id} style={{ padding: '10px 0', borderTop: '1px solid var(--border)', display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
           <span>{check.subject} · {check.topic} · {check.learningObjectiveCode || 'Kazanım'}</span>
-          <button className="btn" disabled={busy} onClick={() => void claim(check)}>Başla</button>
+          {check.available === false
+            ? <span style={{ color: 'var(--text3)', fontSize: 12 }}>Bu kazanım için uygun yeni soru hazırlanıyor</span>
+            : <button className="btn" disabled={busy} onClick={() => void claim(check)}>Başla</button>}
         </div>)}
       </>}
     </section>}

@@ -14,6 +14,20 @@ async function authenticate(req: NextRequest) {
   return user ?? null
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Db = any
+
+/** Approved, unreported bank rows per objective; filtered per check with the same gate the claim step applies. */
+async function loadStock(db: Db, objectiveIds: string[]) {
+  const stock = new Map<string, Array<{ id: string; question: Record<string, unknown>; grade_key: string; subject_key: string }>>()
+  await Promise.all(objectiveIds.map(async objectiveId => {
+    const { data } = await db.from('question_bank').select('id,question,grade_key,subject_key')
+      .eq('review_status', 'approved').eq('report_count', 0).eq('question->>learningObjectiveId', objectiveId).limit(60)
+    stock.set(objectiveId, (data ?? []) as never)
+  }))
+  return stock
+}
+
 /** Returns due transfer checks without exposing the answer to the client. */
 export async function GET(req: NextRequest) {
   const user = await authenticate(req)
@@ -28,13 +42,28 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: true }).limit(20),
   ])
   if (error) return NextResponse.json({ error: 'Transfer kontrolleri alınamadı.' }, { status: 500 })
-  const due = (data ?? []).filter(check => check.status === 'served' || Number(check.due_after_event_count) <= Number(eventCount ?? 0))
-    .map(check => ({
+  const dueRows = (data ?? []).filter(check => check.status === 'served' || Number(check.due_after_event_count) <= Number(eventCount ?? 0))
+  // `available` lets the page avoid offering a check that cannot be claimed (no independently vetted item yet).
+  const pendingObjectives = [...new Set(dueRows.filter(c => c.status === 'pending' && c.learning_objective_id).map(c => String(c.learning_objective_id)))]
+  const [stock, { data: usedChecks }] = await Promise.all([
+    loadStock(db, pendingObjectives),
+    pendingObjectives.length
+      ? db.from('learning_transfer_checks').select('learning_objective_id,prompt_context').eq('student_id', user.id).in('status', ['served', 'completed']).limit(200)
+      : Promise.resolve({ data: [] as Array<{ learning_objective_id: string | null; prompt_context: Record<string, unknown> | null }> }),
+  ])
+  const used = new Set((usedChecks ?? []).map(item => `${item.learning_objective_id}|${String(item.prompt_context?.bankQuestionId || '')}`))
+  const due = dueRows.map(check => {
+    const objectiveId = String(check.learning_objective_id || '')
+    const available = check.status === 'served' || (stock.get(objectiveId) ?? []).some(row => !used.has(`${objectiveId}|${row.id}`) &&
+      questionBankKey(row.grade_key) === questionBankKey(check.grade) && questionBankKey(row.subject_key) === questionBankKey(check.subject) &&
+      usableTransferQuestion(row.question, objectiveId, String(check.prompt_context?.sourceQuestion || ''), String(check.prompt_context?.sourceDifficulty || '')))
+    return {
       id: check.id, subject: check.subject, grade: check.grade, topic: check.topic,
-      learningObjectiveCode: check.learning_objective_code, status: check.status,
+      learningObjectiveCode: check.learning_objective_code, status: check.status, available,
       ...(check.status === 'served' ? { question: check.prompt_context?.question, options: check.prompt_context?.options } : {}),
-    }))
-  return NextResponse.json({ eventCount: eventCount ?? 0, due })
+    }
+  })
+  return NextResponse.json({ eventCount: eventCount ?? 0, due, availableCount: due.filter(check => check.available).length })
 }
 
 /** Claims a vetted new item or grades the student's response on the server. */
