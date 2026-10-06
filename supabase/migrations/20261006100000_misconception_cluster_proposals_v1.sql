@@ -25,6 +25,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS misconception_cluster_proposals_open_key
   ON public.misconception_cluster_proposals (student_id, member_key) WHERE status = 'proposed';
 CREATE INDEX IF NOT EXISTS misconception_cluster_proposals_status_idx
   ON public.misconception_cluster_proposals (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS misconception_cluster_proposals_canonical_idx
+  ON public.misconception_cluster_proposals (canonical_id);
+CREATE INDEX IF NOT EXISTS misconception_cluster_proposals_reviewer_idx
+  ON public.misconception_cluster_proposals (reviewed_by);
 ALTER TABLE public.misconception_cluster_proposals ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.misconception_cluster_proposals FROM PUBLIC, anon, authenticated;
 GRANT ALL ON public.misconception_cluster_proposals TO service_role;
