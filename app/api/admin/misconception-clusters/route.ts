@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { logAnthropicUsage } from '@/lib/ai-usage'
-import { buildClusterPrompt, clusterMemberKey, groupClusterableRows, parseClusterResponse } from '@/lib/misconception-clustering'
+import { generateClusterProposals } from '@/lib/misconception-cluster-run'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
 const adminDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-const CLUSTER_MODEL = 'claude-sonnet-4-5'
 const GROUPS_PER_RUN = 6
 
 async function adminUserId(): Promise<string | null> {
@@ -42,39 +39,8 @@ export async function GET() {
 export async function POST() {
   if (!await adminUserId()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: 'ANTHROPIC_API_KEY tanımlı değil.' }, { status: 500 })
-  const { data: rows, error } = await adminDb.from('student_misconceptions')
-    .select('student_id,misconception_id,subject,topic,evidence_count,misconception_catalog!inner(label,verification_status)')
-    .neq('status', 'resolved').neq('misconception_catalog.verification_status', 'rejected').limit(5000)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  const flat = (rows ?? []).map(row => ({ ...row, label: (row.misconception_catalog as unknown as { label: string }).label }))
-  const { data: open } = await adminDb.from('misconception_cluster_proposals').select('student_id,member_key').eq('status', 'proposed')
-  const openKeys = new Set((open ?? []).map(row => `${row.student_id}|${row.member_key}`))
-  // Largest groups first; groups already holding an open proposal over all of their members are skipped.
-  const groups = groupClusterableRows(flat).sort((a, b) => b.items.length - a.items.length)
-    .filter(group => !openKeys.has(`${group.studentId}|${clusterMemberKey(group.items.map(item => item.id))}`))
-    .slice(0, GROUPS_PER_RUN)
-
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  let created = 0
-  const failures: string[] = []
-  for (const group of groups) {
-    try {
-      const msg = await anthropic.messages.create({ model: CLUSTER_MODEL, max_tokens: 2000, temperature: 0,
-        messages: [{ role: 'user', content: buildClusterPrompt(group) }] })
-      logAnthropicUsage('misconception-clusters', CLUSTER_MODEL, msg)
-      const block = msg.content[0]
-      const clusters = parseClusterResponse(block?.type === 'text' ? block.text : '', group)
-      for (const cluster of clusters) {
-        const { error: insertError } = await adminDb.from('misconception_cluster_proposals').insert({
-          student_id: group.studentId, subject: group.subject, topic: group.topic, canonical_label: cluster.canonicalLabel,
-          member_ids: cluster.memberIds, member_key: clusterMemberKey(cluster.memberIds), rationale: cluster.rationale, model: CLUSTER_MODEL,
-        })
-        if (insertError && insertError.code !== '23505') failures.push(insertError.message)
-        else if (!insertError) created += 1
-      }
-    } catch (err) { failures.push(err instanceof Error ? err.message : 'LLM çağrısı başarısız') }
-  }
-  return NextResponse.json({ groupsAnalyzed: groups.length, proposalsCreated: created, failures })
+  try { return NextResponse.json(await generateClusterProposals(adminDb, GROUPS_PER_RUN)) }
+  catch (err) { return NextResponse.json({ error: err instanceof Error ? err.message : 'Öneri üretilemedi.' }, { status: 500 }) }
 }
 
 export async function PATCH(req: NextRequest) {
