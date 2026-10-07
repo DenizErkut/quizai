@@ -17,6 +17,18 @@ Kaynak: *Pratium — Durum ve Geliştirme Raporu (7 Ekim 2026)*. Rapor, canlı v
 
 Bu oturumda tamamlananlar (yol haritasının girdisi): transfer kontrolü kullanılabilirlik göstergesi ve dashboard sayacı; uygun soru boşluğu raporu; yanılgı kümeleme önerileri + uzman onayı + günlük cron; admin sekme düzeni (Learning Graph).
 
+## 1b. İlerleme durumu (güncelleme: 7 Ekim, akşam)
+
+| İş | Durum |
+|---|---|
+| 0.1–0.4 | **Tamam** (PR #6): katalog sayfalama, kapsam raporu, tek eşleştirme tanımı, dürüst güvenlik kartı. Max rows = 1000 doğrulandı. |
+| 0.5 | **Tamam** (PR #7): `e2e` kırığı 5 Ekim'deki `c035f0d` yeniden düzenlemesinden kalan bayat kaynak-metin beklentileriydi; kod davranışı değişmemişti. |
+| 0.6 | **Bekliyor**: sağlayıcı maliyeti ve anahtar kararı. |
+| Faz 1 | **Askıda** (kullanıcı kararı). Etkisi: Faz 4'te "izin" halkası boş kalır, Faz 5 pilotu izinsiz başlatılamaz. |
+| 2.2 | **Tamam**: `Öğrenme Döngüsü Zincir Denetimi` paneli (Learning Graph sekmesi). Bulgular aşağıda. |
+
+**2.2 bulguları (canlı veri, 7 Ekim):** 3 döngü var ve üçü de **tek öğrenci ve tek öğretmene** ait (26 öğrencinin olay kaydı var; 7 günde 2 aktif öğrenci). Üç döngüde ön test, rehberli çalışma ve son test tamamlanmış. Bir döngüde (kazanım …`94bafaa8`) aktarım testi de tamamlanmış (ön %40 → son %80 → aktarım %100); bu döngüde **eksik tek halka öğretmenin aktarım incelemesi**. Diğer ikisinde ilk eksik halka öğretmen ön/son incelemesi. Gecikmeli tek maddelik kontroller (`learning_transfer_checks`, 35 kayıt, 0 tamamlanmış) bu döngülerle **bağlı değil**: döngülerin kazanımları için hiç kontrol planlanmamış, yani iki "aktarım" hattı ayrı çalışıyor. Aktarım testi son testten ~1 gün sonra yapılmış; "gecikmeli" kanıt için süre ölçütü tanımlı değil.
+
 ## 2. Önceliklendirme ilkeleri
 1. **Dürüstlük önce:** bir gösterge ölçülmüyorsa "ölçülmedi" yazar; yüksek puan göstermez.
 2. **Zincirin her halkası aynı kazanımda:** ön test → müdahale → son test → öğretmen incelemesi → gecikmeli aktarım.
