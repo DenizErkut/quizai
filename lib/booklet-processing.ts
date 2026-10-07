@@ -6,7 +6,7 @@ export function bookletBatches(raw: string): string[] {
   const answerStart = text.search(/\n\s*(?:CEVAP ANAHTARI|YANIT ANAHTARI|CEVAPLAR|YANITLAR)\s*(?:\r?\n|$)/iu)
   const questions = answerStart >= 0 ? text.slice(0, answerStart) : text
   const answers = answerStart >= 0 ? text.slice(answerStart) : ''
-  const starts = [...questions.matchAll(/(?:^|\n)\s*(?:Soru\s+\d{1,3}\s*(?:\||[.)])|\d{1,3}[.)]\s+)/giu)].map(match => match.index!)
+  const starts = [...questions.matchAll(/(?:^|\n)\s*(?:Soru\s+\d{1,3}\s*(?:\||[.)])|\d{1,3}[.)]\s+(?![Ss][ıiIİ]n[ıiIİ]f))/giu)].map(match => match.index!)
   const blocks = starts.length
     ? starts.map((start, index) => questions.slice(start, starts[index + 1] ?? questions.length))
     : questions.split(/\n{2,}/).filter(Boolean)

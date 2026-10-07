@@ -27,3 +27,14 @@ test('placement comes from the catalog objective only', () => {
   assert.equal(placeMixedQuestion('XX.1', byCode, 'Fen', 'x').verified, false)
   assert.match(mixedObjectiveReferences([{ ...obj, title: 'a'.repeat(300) }]), /^FB\.6\.1\.1 \| Fen Bilimleri \| a{110}$/)
 })
+
+import { bookletQuestionLabels } from '../lib/booklet-objective-label'
+import { bookletBatches } from '../lib/booklet-processing'
+
+test('Turkish two-segment codes are read whole and page footers are not questions', () => {
+  const text = 'Soru 001 | T.O.6.10 | Orta\nÇoktan seçmeli\nSoru?\nA) a\nCevap: A\n6. Sınıf | Altı ders | 300 soru 3\nSoru 002 | ENG.6.1.R3 | Zor\nQ?\n'
+  const labels = bookletQuestionLabels(text)
+  assert.deepEqual(labels.map(label => label.number), [1, 2])
+  assert.deepEqual(labels.map(label => label.codes), [['T.O.6.10'], ['ENG.6.1.R3']])
+  assert.equal(bookletBatches(text).length, 1)
+})

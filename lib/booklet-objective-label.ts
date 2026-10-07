@@ -1,8 +1,9 @@
-const codePattern = /\b[A-ZÇĞİÖŞÜ]{1,12}\.\d{1,2}(?:\.[A-Z0-9]+){1,6}\b/gu
+// Codes such as MAT.6.1.1, ENG.6.1.R3 and Turkish T.O.6.10 / T.Y.6.15 (an extra one-to-three letter segment).
+const codePattern = /(?<![\p{L}\d.])[A-ZÇĞİÖŞÜ]{1,12}(?:\.[A-ZÇĞİÖŞÜ]{1,3})?\.\d{1,2}(?:\.[A-Z0-9]+){1,6}(?![\p{L}\d])/gu
 const normalized = (text: string) => text.normalize('NFKC').toLocaleLowerCase('tr-TR').replace(/[^\p{L}\p{N}]/gu, '')
 
 export function bookletQuestionLabels(text: string) {
-  const starts = [...text.matchAll(/(?:^|\n)\s*(?:Soru\s+\d{1,3}\s*(?:\||[.)])|\d{1,3}[.)]\s+)/giu)].map(item => item.index!)
+  const starts = [...text.matchAll(/(?:^|\n)\s*(?:Soru\s+\d{1,3}\s*(?:\||[.)])|\d{1,3}[.)]\s+(?![Ss][ıiIİ]n[ıiIİ]f))/giu)].map(item => item.index!)
   return starts.map((start, index) => {
     const block = text.slice(start, starts[index + 1] ?? text.length).trim()
     // Only the question heading, never the booklet cover or page footer.
