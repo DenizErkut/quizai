@@ -40,3 +40,14 @@ test('flags pre/post gaps outside 1–90 days, out-of-order stages and closed cy
   })
   assert.deepEqual([...result.rows[0].warnings].sort(), ['cycle_completed_with_missing_links', 'out_of_order', 'pre_post_gap_out_of_range'])
 })
+
+import { questionSignature, sharedQuestionCount } from '../lib/question-signature'
+
+test('question signature ignores case, spacing and unicode form; shared count is per distinct question', () => {
+  assert.equal(questionSignature('  Işık   KAYNAĞI nedir? '), questionSignature('ışık kaynağı nedir?'))
+  assert.equal(questionSignature(null), '')
+  const pre = [{ text: 'A?' }, { text: 'B?' }, { text: 'C?' }]
+  assert.equal(sharedQuestionCount(pre, [{ text: ' b? ' }, { text: 'D?' }, { text: 'b?' }]), 1)
+  assert.equal(sharedQuestionCount(pre, [{ text: 'X?' }]), 0)
+  assert.equal(sharedQuestionCount(pre, [{ text: '' }, {}]), 0)
+})

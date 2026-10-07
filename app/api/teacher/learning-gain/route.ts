@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { data: measurements, error: measurementError } = await db.from('learning_gain_measurements')
-    .select('id,student_id,learning_objective_id,pre_score_pct,post_score_pct,gain_pp,item_count,pre_completed_at,post_completed_at,transfer_session_id,transfer_score_pct,transfer_gain_pp,transfer_completed_at,measurement_version,created_at')
+    .select('id,student_id,learning_objective_id,pre_session_id,post_session_id,pre_score_pct,post_score_pct,gain_pp,item_count,pre_completed_at,post_completed_at,transfer_session_id,transfer_score_pct,transfer_gain_pp,transfer_completed_at,measurement_version,created_at')
     .eq('teacher_id', context!.teacherId).eq('classroom_id', classroomId)
     .order('created_at', { ascending: false }).limit(100)
   if (measurementError) return NextResponse.json({ error: 'Ölçüm kayıtları alınamadı; veritabanı güncellemesini kontrol edin.' }, { status: 500 })

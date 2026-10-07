@@ -1,5 +1,6 @@
 import { answerScore } from './partial-scoring'
 import { hasVerifiedObjectiveMapping, hasVerifiedBankQuality } from './objective-mapping-verification'
+import { questionSignature } from './question-signature'
 
 export const MIN_MEASUREMENT_ITEMS = 5
 export const MIN_MEASUREMENT_GAP_MS = 24 * 60 * 60 * 1000
@@ -60,7 +61,7 @@ export function inspectMeasurementSession(session: MeasurementSession):
       return { evidence: null, reason: 'Soruların kazanım veya kalite doğrulama kanıtı eksik.' }
     }
     ids.add(objectiveId)
-    const signature = typeof question.q === 'string' ? question.q.normalize('NFKC').toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ').trim() : ''
+    const signature = questionSignature(question.q)
     if (!signature) return { evidence: null, reason: 'Soru metni eksik.' }
     signatures.push(signature)
     difficultyProfile.push(typeof question.difficulty === 'string' ? question.difficulty.toLocaleLowerCase('tr-TR').trim() : '')

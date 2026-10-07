@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import LearningEvidenceChain from './LearningEvidenceChain'
 import VerifiedLearningPlans from './VerifiedLearningPlans'
+import { sharedQuestionCount } from '@/lib/question-signature'
 
 type Classroom = { id: string; name: string }
 type Session = {
@@ -13,7 +14,7 @@ type Session = {
   questions: { text?: string; options?: string[]; correctIndex?: number }[]
 }
 type Measurement = {
-  id: string; student_id: string; learning_objective_id: string; studentName: string; objectiveCode: string; objectiveTitle: string;
+  id: string; student_id: string; learning_objective_id: string; pre_session_id: string; post_session_id: string; studentName: string; objectiveCode: string; objectiveTitle: string;
   pre_score_pct: number; post_score_pct: number; gain_pp: number; item_count: number;
   post_completed_at: string; transfer_session_id: string | null; transfer_score_pct: number | null; transfer_gain_pp: number | null
   measurement_version: string
@@ -82,6 +83,10 @@ export default function LearningGainPilot({ classrooms }: { classrooms: Classroo
   const transferOptions = eligible.filter(item => item.objectiveId === transferFor?.learning_objective_id &&
     new Date(item.createdAt).getTime() > new Date(transferFor?.post_completed_at || '').getTime())
   const transfer = transferOptions.find(item => item.id === transferId)
+  // A transfer test must not repeat any question of the measurement's pre or post test (the server rejects it).
+  const referenceQuestions = [transferFor?.pre_session_id, transferFor?.post_session_id]
+    .flatMap(id => (data?.sessions ?? []).find(item => item.id === id)?.questions ?? [])
+  const repeatedQuestions = (item: Session) => sharedQuestionCount(referenceQuestions, item.questions)
 
   async function save() {
     if (!pre || !post || !studentId || !reviewed) return
@@ -203,8 +208,14 @@ export default function LearningGainPilot({ classrooms }: { classrooms: Classroo
       <strong>{transferFor.studentName} · {transferFor.objectiveCode} aktarım ölçümü</strong>
       <select aria-label="Aktarım testi" style={fieldStyle} value={transferId} onChange={event => { setTransferId(event.target.value); setTransferReviewed(false) }}>
         <option value="">Aktarım testi seçin</option>
-        {transferOptions.map(item => <option key={item.id} value={item.id}>{new Date(item.createdAt).toLocaleDateString('tr-TR')} · %{item.scorePct} · {item.itemCount} soru</option>)}
+        {transferOptions.map(item => {
+          const repeated = repeatedQuestions(item)
+          return <option key={item.id} value={item.id} disabled={repeated > 0}>
+            {new Date(item.createdAt).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · %{item.scorePct} · {item.itemCount} soru{repeated > 0 ? ` · ✕ ön/son testle ${repeated} aynı soru` : ''}
+          </option>
+        })}
       </select>
+      {transferOptions.length > 0 && transferOptions.every(item => repeatedQuestions(item) > 0) && <div style={{ color: '#b45309' }}>Bu ölçüm için uygun aktarım testi yok: listedeki testlerin hepsi ön/son testle aynı soruları içeriyor. Aktarım için farklı sorulardan oluşan yeni bir test gerekir.</div>}
       {transfer && <details style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 9 }}>
         <summary style={{ cursor: 'pointer' }}>Aktarım sorularını incele ({transfer.itemCount})</summary>
         <ol style={{ paddingLeft: 20 }}>{transfer.questions.map((question, index) => <li key={index} style={{ marginTop: 8 }}><MathText text={question.text} />
