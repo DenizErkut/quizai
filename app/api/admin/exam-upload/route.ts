@@ -293,16 +293,32 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
     } catch (error) { console.error('[exam-upload] rejection log failed', error) }
   }
   if (!extracted.length) { await recordRejections(); return 0 }
-  const validationText = await callOpenAI([
-    { role: 'system', content: 'Sen bağımsız soru kalite denetçisisin. Soruları değiştirme. Yalnızca doğru cevabı kesin, seçenekleri benzersiz ve soru eksiksiz olan kayıtları onayla. JSON döndür.' },
-    { role: 'user', content: `${JSON.stringify({ questions: extracted.map((q: any, index: number) => ({ index, q: q.q, opts: q.opts, ans: q.ans, exp: q.exp })) })}\nYanıt şeması: {"results":[{"index":0,"approved":true,"reason":"..."}]}` },
-  ], { model: process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini', max_tokens: 4000, json: true, timeoutMs: 25000, requireComplete: true, operation: `${sourceType}-booklet-validator` })
-  const validation = JSON.parse(validationText)
-  if (!Array.isArray(validation.results) || validation.results.length !== extracted.length
-    || new Set(validation.results.map((item: { index: unknown }) => item.index)).size !== extracted.length
-    || validation.results.some((item: { index: unknown; approved: unknown }) => !Number.isInteger(item.index)
-      || Number(item.index) < 0 || Number(item.index) >= extracted.length || typeof item.approved !== 'boolean')) {
-    throw new Error('Kalite denetçisi bütün sorular için geçerli karar döndürmedi; grup yeniden denenmeli.')
+  // The independent validator sees the question type: a short answer has ONE reference answer, which is not a defect.
+  const validateItems = async (items: any[]) => {
+    const text = await callOpenAI([
+      { role: 'system', content: 'Sen bağımsız soru kalite denetçisisin. Soruları değiştirme. Yalnızca doğru cevabı kesin, seçenekleri benzersiz ve soru eksiksiz olan kayıtları onayla. type "short_answer" ise opts tek elemanlıdır ve yalnız referans cevaptır; tek seçenek olması kusur değildir, cevabın doğruluğunu ve sorunun eksiksizliğini değerlendir. "reason" alanın kararınla tutarlı olsun: gerekçen "doğru/onaylanabilir" diyorsa approved true yaz. JSON döndür.' },
+      { role: 'user', content: `${JSON.stringify({ questions: items.map((q: any, index: number) => ({ index, type: q.type === 'short_answer' ? 'short_answer' : 'multiple_choice', q: q.q, opts: q.opts, ans: q.ans, exp: q.exp })) })}\nYanıt şeması: {"results":[{"index":0,"approved":true,"reason":"..."}]}` },
+    ], { model: process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini', max_tokens: 4000, json: true, timeoutMs: 25000, requireComplete: true, operation: `${sourceType}-booklet-validator` })
+    const parsed = JSON.parse(text)
+    if (!Array.isArray(parsed.results) || parsed.results.length !== items.length
+      || new Set(parsed.results.map((item: { index: unknown }) => item.index)).size !== items.length
+      || parsed.results.some((item: { index: unknown; approved: unknown }) => !Number.isInteger(item.index)
+        || Number(item.index) < 0 || Number(item.index) >= items.length || typeof item.approved !== 'boolean')) {
+      throw new Error('Kalite denetçisi bütün sorular için geçerli karar döndürmedi; grup yeniden denenmeli.')
+    }
+    return parsed.results as Array<{ index: number; approved: boolean; reason?: string }>
+  }
+  const validation = { results: await validateItems(extracted) }
+  // A rejection is confirmed by a second, independent pass (single decisions were observed contradicting their own reason).
+  const firstRejected = validation.results.filter(item => !item.approved && !needsVisual(extracted[item.index]))
+  if (firstRejected.length) {
+    const second = await validateItems(firstRejected.map(item => extracted[item.index])).catch(() => null)
+    second?.forEach((verdict, position) => {
+      const original = validation.results.find(item => item.index === firstRejected[position].index)
+      if (!original) return
+      if (verdict.approved) { original.approved = true; original.reason = `İkinci kontrolde onaylandı: ${verdict.reason || ''}` }
+      else original.reason = `${original.reason || ''} | İkinci kontrol: ${verdict.reason || ''}`.slice(0, 480)
+    })
   }
   const approvedIndexes = new Set<number>((validation.results || []).filter((item: any) => item.approved === true).map((item: any) => Number(item.index)))
   const questions = extracted.filter((q: any, index: number) => approvedIndexes.has(index) || needsVisual(q))
