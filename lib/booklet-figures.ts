@@ -38,7 +38,14 @@ export function figureBox(gray: Uint8ClampedArray | Uint8Array, width: number, r
     }
     rows.push(count)
   }
-  const goodRows = rows.map((count, i) => count >= 3 ? region.top + i : -1).filter(y => y >= 0)
+  // A thin rule spanning the page (question separator, header line) is not a figure; a table border is,
+  // because the rows next to it are filled by the table's own vertical lines.
+  const regionWidth = region.right - region.left
+  const isolatedRule = (i: number) => rows[i] > regionWidth * 0.8
+    && [-4, -3, -2, -1, 1, 2, 3, 4].filter(d => rows[i + d] !== undefined).every(d => rows[i + d] < 3 || rows[i + d] > regionWidth * 0.8 && Math.abs(d) <= 1)
+  const ruleRows = new Set<number>()
+  for (let i = 0; i < rows.length; i++) if (isolatedRule(i)) ruleRows.add(i)
+  const goodRows = rows.map((count, i) => count >= 3 && !ruleRows.has(i) ? region.top + i : -1).filter(y => y >= 0)
   const goodCols = [...cols.entries()].filter(([, count]) => count >= 3).map(([x]) => x).sort((a, b) => a - b)
   if (!goodRows.length || !goodCols.length) return null
   const box = { left: goodCols[0], right: goodCols[goodCols.length - 1] + 1, top: goodRows[0], bottom: goodRows[goodRows.length - 1] + 1 }
