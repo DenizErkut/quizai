@@ -81,7 +81,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'question-books' | 'exam-books' | 'question-bank' | 'objective-mapping' | 'education-eval' | 'curriculum' | 'kvkk' | 'adaptive' | 'risk' | 'coaching' | 'coach-usage' | 'unit-economics'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'question-books' | 'exam-books' | 'question-bank' | 'objective-mapping' | 'education-eval' | 'curriculum' | 'learning-graph' | 'kvkk' | 'adaptive' | 'risk' | 'coaching' | 'coach-usage' | 'unit-economics'>('users')
   const [identityMissing, setIdentityMissing] = useState<number | null>(null)
   const [identityScanning, setIdentityScanning] = useState(false)
   const [identityFixing, setIdentityFixing] = useState(false)
@@ -793,6 +793,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             { key: 'objective-mapping', label: '🎯 Kazanım Eşleştirme' },
             { key: 'education-eval', label: '🧭 Education Eval' },
             { key: 'curriculum', label: '📋 Müfredat Yönetimi' },
+            { key: 'learning-graph', label: '🕸️ Learning Graph' },
             { key: 'kvkk', label: '🔐 KVKK Talepleri' },
             { key: 'adaptive', label: '🧪 Adaptive Pilot' },
             { key: 'risk', label: '⚠️ Erken Uyarılar' },
@@ -862,6 +863,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               Maliyet, kullanım ve öğrenme-sonucu verilerini tek bir anlatıda birleştirir — okul/yatırımcı sunumu için tek bakışta özet.
             </p>
             <UnitEconomics />
+            <PipelineHealth />
           </div>
         )}
 
@@ -1771,12 +1773,16 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           <LearningCatalogReview />
           <LearningObjectiveImport openBatchId={objectiveBatchToOpen} onBatchOpened={clearObjectiveBatchToOpen} />
           <CurriculumLifecycleManager />
+        </div>
+        )}
+
+      {tab === 'learning-graph' && (
+        <div className="anim-up">
           <LearningGraphQuality />
           <LearningGraphPrerequisitePackages />
           <LearningGraphRelations />
-                    <RecommendationImpact />
-                    <AgentQuality />
-          <PipelineHealth />
+          <RecommendationImpact />
+          <AgentQuality />
           <MasteryCalibration />
           <RetentionCalibration />
           <QuestionDifficultyCalibration />
@@ -1786,7 +1792,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           <MisconceptionMicroContent />
           <MisconceptionQuality />
         </div>
-        )}
+      )}
 
       {tab === 'question-bank' && (
         <div className="anim-up">
