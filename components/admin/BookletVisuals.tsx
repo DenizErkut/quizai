@@ -3,8 +3,10 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 type Row = { id: string; sourceQuestionNumber: number | null; question: { q: string; svg?: string; opts: string[]; ans: number }; review_status: string }
+type Rejected = { question_number: number | null; question_text: string; stage: string; reason: string }
 export default function BookletVisuals({ resourceId }: { resourceId: string }) {
   const [rows, setRows] = useState<Row[]>([])
+  const [rejected, setRejected] = useState<Rejected[]>([])
   const [selected, setSelected] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState('')
@@ -22,7 +24,7 @@ export default function BookletVisuals({ resourceId }: { resourceId: string }) {
   }
   async function load() {
     setBusy(true)
-    try { const data = await request(`/api/admin/booklet-visuals?resourceId=${resourceId}`); setRows(data.questions); setOpen(true) }
+    try { const data = await request(`/api/admin/booklet-visuals?resourceId=${resourceId}`); setRows(data.questions); setRejected(data.rejected || []); setOpen(true) }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Sorular alınamadı.') }
     finally { setBusy(false) }
   }
@@ -58,6 +60,9 @@ export default function BookletVisuals({ resourceId }: { resourceId: string }) {
         <label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /> Görsel bu soruya ait, eksiksiz ve okunaklı; cevap/çözüm içermiyor. Metin ve seçeneklerle eşleşmesini kontrol ettim.</label>
         <button className="btn btn-primary" disabled={busy || !file || !confirmed} onClick={() => void save()}>Görseli onayla ve soruya bağla</button>
       </>}
+      {rejected.length > 0 && <details style={{ marginTop: 8 }}><summary>Havuza girmeyen sorular ({rejected.length}) ve nedenleri</summary>
+        <ul>{rejected.map((item, index) => <li key={index}><strong>{item.question_number !== null ? `Soru ${item.question_number}` : 'Numara yok'}</strong> ({item.stage === 'validator' ? 'kalite denetçisi' : item.stage === 'not_extracted' ? 'çıkarılmadı' : 'geçersiz biçim'}): {item.reason}{item.question_text ? ` — “${item.question_text.slice(0, 140)}”` : ''}</li>)}</ul>
+      </details>}
       {!rows.length && <p>Bu kitapçık için henüz havuza çıkarılmış soru yok. Önce kitapçığı onaylayıp işleyin.</p>}
     </div>}
     {message && <p role="status">{message}</p>}

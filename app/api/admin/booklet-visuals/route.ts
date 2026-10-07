@@ -17,7 +17,8 @@ export async function GET(req: NextRequest) {
   const labels = bookletQuestionLabels(resource?.raw_text || '')
   const questions = (data || []).map(item => ({ ...item, sourceQuestionNumber: printedQuestionNumber(String(item.question?.q || ''), labels) }))
     .sort((a, b) => (a.sourceQuestionNumber ?? Infinity) - (b.sourceQuestionNumber ?? Infinity))
-  return NextResponse.json({ questions })
+  const { data: rejected } = await db.from('booklet_rejected_questions').select('question_number,question_text,stage,reason').eq('resource_id', resourceId).order('question_number', { ascending: true, nullsFirst: false }).limit(500)
+  return NextResponse.json({ questions, rejected: rejected || [] })
 }
 
 export async function POST(req: NextRequest) {

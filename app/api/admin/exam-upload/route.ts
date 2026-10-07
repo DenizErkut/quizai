@@ -271,8 +271,28 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
     if (!Array.isArray(parsed.questions)) throw new Error('Ayıklayıcı geçerli soru listesi döndürmedi.')
     return parsed.questions
   }))
-  const extracted = extractedGroups.flat().filter((q: any) => q && validBookletQuestion(q))
-  if (!extracted.length) return 0
+  const rawExtracted = extractedGroups.flat()
+  const extracted = rawExtracted.filter((q: any) => q && validBookletQuestion(q))
+  // Every question that does not reach the pool is recorded with its reason (never blocks the import).
+  const rejections: Array<{ number: number | null; text: string; stage: 'not_extracted' | 'invalid_shape' | 'validator'; reason: string }> = []
+  const numberOf = (q: any) => printedQuestionNumber(String(q?.q || ''), labels)
+  rawExtracted.filter((q: any) => !(q && validBookletQuestion(q))).forEach((q: any) =>
+    rejections.push({ number: numberOf(q), text: String(q?.q || '').slice(0, 300), stage: 'invalid_shape', reason: 'Soru biçimi geçersiz: şık sayısı (4-5), cevap indeksi, gerekçe veya kısa cevap kuralı (tek cümle, tek cevap) sağlanmadı.' }))
+  const seenNumbers = new Set(rawExtracted.map(numberOf).filter((n): n is number => n !== null))
+  labels.filter(label => label.number !== null && !seenNumbers.has(label.number)).forEach(label => {
+    const at = batch.search(new RegExp(`(?:^|\\n)\\s*Soru\\s+0*${label.number}\\s*[|.)]`, 'i'))
+    rejections.push({ number: label.number, text: at >= 0 ? batch.slice(at, at + 300).trim() : '', stage: 'not_extracted', reason: 'Çıkarıcı bu soruyu döndürmedi (atlanmış veya yanıt kesilmiş olabilir).' })
+  })
+  const recordRejections = async () => {
+    if (!rejections.length || !row.id) return
+    try {
+      await adminDb.from('booklet_rejected_questions').upsert(rejections.map(item => ({
+        resource_id: row.id, question_number: item.number, question_text: item.text, stage: item.stage, reason: item.reason.slice(0, 500),
+        dedupe_key: createHash('sha256').update(`${item.stage}|${item.number ?? ''}|${item.text}`).digest('hex'),
+      })), { onConflict: 'resource_id,dedupe_key', ignoreDuplicates: true })
+    } catch (error) { console.error('[exam-upload] rejection log failed', error) }
+  }
+  if (!extracted.length) { await recordRejections(); return 0 }
   const validationText = await callOpenAI([
     { role: 'system', content: 'Sen bağımsız soru kalite denetçisisin. Soruları değiştirme. Yalnızca doğru cevabı kesin, seçenekleri benzersiz ve soru eksiksiz olan kayıtları onayla. JSON döndür.' },
     { role: 'user', content: `${JSON.stringify({ questions: extracted.map((q: any, index: number) => ({ index, q: q.q, opts: q.opts, ans: q.ans, exp: q.exp })) })}\nYanıt şeması: {"results":[{"index":0,"approved":true,"reason":"..."}]}` },
@@ -286,6 +306,12 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
   }
   const approvedIndexes = new Set<number>((validation.results || []).filter((item: any) => item.approved === true).map((item: any) => Number(item.index)))
   const questions = extracted.filter((q: any, index: number) => approvedIndexes.has(index) || needsVisual(q))
+  extracted.forEach((q: any, index: number) => {
+    if (approvedIndexes.has(index) || needsVisual(q)) return
+    const verdict = (validation.results || []).find((item: any) => Number(item.index) === index)
+    rejections.push({ number: numberOf(q), text: String(q.q || '').slice(0, 300), stage: 'validator', reason: `Bağımsız kalite denetçisi reddetti: ${String(verdict?.reason || 'gerekçe verilmedi')}` })
+  })
+  await recordRejections()
   let rows = questions.map((q: any) => ({
     fingerprint: createHash('sha256').update(`${q.q}|${q.opts.join('|')}`.toLocaleLowerCase('tr')).digest('hex'),
     subject_key: questionBankKey(row.subject || 'genel'),
