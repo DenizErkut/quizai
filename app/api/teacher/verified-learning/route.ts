@@ -4,7 +4,8 @@ import { createClient } from '@/lib/supabase/server-create-client'
 import { buildTeacherContext, getAuthedUser } from '@/lib/report-context'
 import { questionBankKey } from '@/lib/question-bank'
 import { sameLearningScope } from '@/lib/learning-evidence-scope'
-import { allocateVerifiedItemSets, eligibleVerifiedItem, hasSeparatePracticeItem, type VerifiedBankRow } from '@/lib/verified-learning-cycle'
+import { allocateVerifiedItemSets, eligibleVerifiedItem, excludeSeenItems, hasSeparatePracticeItem, type VerifiedBankRow } from '@/lib/verified-learning-cycle'
+import { loadSeenTextsByObjective } from '@/lib/load-seen-verified-items'
 import { loadMasteryNextSteps } from '@/lib/load-mastery-next-steps'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
@@ -48,14 +49,18 @@ export async function GET(req: NextRequest) {
     ? await db.from('learning_objective_catalog').select('id,objective_code,title,grade,subject,is_active,verification_status').in('id', ids)
     : { data: [], error: null }
   if (objectiveError) return NextResponse.json({ error: 'Kazanım stoğu alınamadı.' }, { status: 500 })
+  const seenByObjective = await loadSeenTextsByObjective(db, studentId).catch(() => null)
+  if (!seenByObjective) return NextResponse.json({ error: 'Öğrencinin önceki soruları alınamadı.' }, { status: 500 })
   const options = (objectives || []).filter(objective => objective.is_active && objective.verification_status === 'verified'
     && gradeNumber(objective.grade) === gradeNumber(classroom.grade)
     && (!classroom.subject || questionBankKey(classroom.subject) === 'tum dersler' || questionBankKey(classroom.subject) === questionBankKey(objective.subject)))
     .map(objective => {
-      const relevant = rows.filter(row => sameLearningScope({ grade:row.grade_key,subject:row.subject_key },objective)
+      const inScope = rows.filter(row => sameLearningScope({ grade:row.grade_key,subject:row.subject_key },objective)
         && eligibleVerifiedItem(row, objective.id))
+      // Only questions this student has not been served before count toward a new cycle.
+      const relevant = excludeSeenItems(inScope, seenByObjective.get(objective.id) ?? new Set())
       const sets = allocateVerifiedItemSets(relevant, objective.id)
-      return { ...objective, availableItems: relevant.length, ready: Boolean(sets && hasSeparatePracticeItem(relevant, objective.id, sets)) }
+      return { ...objective, availableItems: relevant.length, seenItems: inScope.length - relevant.length, ready: Boolean(sets && hasSeparatePracticeItem(relevant, objective.id, sets)) }
     }).sort((a, b) => Number(b.ready) - Number(a.ready) || b.availableItems - a.availableItems)
   const cycleIds = (cycles || []).map(cycle => cycle.id)
   const { data: attempts } = cycleIds.length
@@ -89,10 +94,21 @@ export async function POST(req: NextRequest) {
     (classroom.subject && questionBankKey(classroom.subject) !== 'tum dersler' && questionBankKey(classroom.subject) !== questionBankKey(objective.subject))) {
     return NextResponse.json({ error: 'Öğrenci, sınıf, ders veya doğrulanmış kazanım uyumsuz.' }, { status: 422 })
   }
-  const matching = ((bank || []) as VerifiedBankRow[]).filter(row => sameLearningScope({ grade:row.grade_key,subject:row.subject_key },objective))
+  const inScope = ((bank || []) as VerifiedBankRow[]).filter(row => sameLearningScope({ grade:row.grade_key,subject:row.subject_key },objective))
+  const seenByObjective = await loadSeenTextsByObjective(db, body.studentId!).catch(() => null)
+  if (!seenByObjective) return NextResponse.json({ error: 'Öğrencinin önceki soruları alınamadı.' }, { status: 500 })
+  const matching = excludeSeenItems(inScope, seenByObjective.get(objective.id) ?? new Set())
   const sets = allocateVerifiedItemSets(matching, objective.id)
   const eligibleCount = matching.filter(row => eligibleVerifiedItem(row, objective.id)).length
-  if (!sets || !hasSeparatePracticeItem(matching, objective.id, sets)) return NextResponse.json({ error: 'Üç ölçüm seti ve ayrı rehberli çalışma için en az 16 farklı, kalite doğrulanmış soru gerekiyor.', availableItems: eligibleCount, requiredItems: 16 }, { status: 422 })
+  const seenCount = inScope.filter(row => eligibleVerifiedItem(row, objective.id)).length - eligibleCount
+  if (!sets || !hasSeparatePracticeItem(matching, objective.id, sets)) {
+    return NextResponse.json({
+      error: seenCount > 0
+        ? `Bu öğrenci bu kazanımda daha önce ${seenCount} soruyu gördü. Yeni bir döngü bağımsız kanıt olması için en az 16 yeni (görülmemiş), kalite doğrulanmış soru gerekiyor; şu an ${eligibleCount} var.`
+        : 'Üç ölçüm seti ve ayrı rehberli çalışma için en az 16 farklı, kalite doğrulanmış soru gerekiyor.',
+      availableItems: eligibleCount, seenItems: seenCount, requiredItems: 16,
+    }, { status: 422 })
+  }
   const { data: cycle, error } = await db.from('verified_learning_cycles').insert({
     teacher_id: result.context!.teacherId, classroom_id: body.classroomId, student_id: body.studentId,
     learning_objective_id: objective.id, item_sets: sets,
