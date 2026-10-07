@@ -233,3 +233,38 @@ export function hasStrictQuestionReview(
     && question.difficultyVerified === true
     && (candidates.length === 0 || question.objectiveVerified === true))
 }
+
+/**
+ * Batches still owed after a partial role-mix generation. The plan has TWO
+ * anthropic batches (zor, cok zor), so deficits must be counted per
+ * provider+difficulty — counting per provider made every deficit zero and the
+ * top-up silently added nothing, failing the whole test at 9/10.
+ */
+export function missingRoleBatches(
+  plan: QuestionGenerationBatch[],
+  delivered: Array<{ generationProvider?: unknown; difficulty?: unknown }>,
+  missing: number,
+): QuestionGenerationBatch[] {
+  if (missing <= 0) return []
+  const batches = plan.map(batch => {
+    const have = delivered.filter(question => question.generationProvider === batch.provider
+      && normalizeDifficultyLevel(question.difficulty) === batch.difficulty).length
+    return { ...batch, count: Math.max(0, batch.count - have) }
+  }).filter(batch => batch.count > 0)
+  let total = batches.reduce((sum, batch) => sum + batch.count, 0)
+  // Never ask for more than is missing (mislabelled difficulties inflate deficits).
+  for (let index = batches.length - 1; index >= 0 && total > missing; index--) {
+    const cut = Math.min(batches[index].count, total - missing)
+    batches[index].count -= cut
+    total -= cut
+  }
+  const result = batches.filter(batch => batch.count > 0)
+  // Mislabelled difficulties can hide a deficit; the strongest provider covers the rest.
+  if (total < missing) result.push({ provider: 'anthropic', difficulty: 'zor', count: missing - total })
+  return result
+}
+
+/** Output budget per generated question; visual items (SVG) need far more than plain text. */
+export function roleBatchMaxTokens(count: number): number {
+  return Math.min(8000, Math.max(3000, Math.trunc(count) * 1000))
+}
