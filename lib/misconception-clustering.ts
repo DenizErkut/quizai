@@ -13,10 +13,10 @@ export type ProposedCluster = { canonicalLabel: string; memberIds: string[]; rat
 export const MIN_CLUSTER_SIZE = 3
 export const MAX_GROUP_ITEMS = 40
 
-type Row = { student_id: string; misconception_id: string; subject: string; topic: string; evidence_count: number; label: string }
+export type ClusterRow = { student_id: string; misconception_id: string; subject: string; topic: string; evidence_count: number; label: string }
 
 /** Groups student misconception rows by student+subject+topic; keeps groups able to reach a cluster. */
-export function groupClusterableRows(rows: Row[]): ClusterGroup[] {
+export function groupClusterableRows(rows: ClusterRow[]): ClusterGroup[] {
   const groups = new Map<string, ClusterGroup>()
   for (const row of rows) {
     const key = JSON.stringify([row.student_id, row.subject, row.topic])
@@ -26,6 +26,12 @@ export function groupClusterableRows(rows: Row[]): ClusterGroup[] {
   }
   return [...groups.values()].filter(group => group.items.length >= MIN_CLUSTER_SIZE)
     .map(group => ({ ...group, items: group.items.slice(0, MAX_GROUP_ITEMS) }))
+}
+
+/** Canonical entries (earlier approved clusters or manual merge targets) can never become aliases, so they are not clusterable. */
+export function excludeCanonicalRows<T extends { misconception_id: string }>(rows: T[], canonicalIds: Iterable<string>): T[] {
+  const canonical = new Set(canonicalIds)
+  return rows.filter(row => !canonical.has(row.misconception_id))
 }
 
 export function buildClusterPrompt(group: ClusterGroup): string {

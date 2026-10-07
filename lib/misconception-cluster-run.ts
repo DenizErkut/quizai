@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { logAnthropicUsage } from '@/lib/ai-usage'
-import { buildClusterPrompt, clusterMemberKey, groupClusterableRows, parseClusterResponse } from '@/lib/misconception-clustering'
+import { type ClusterRow, buildClusterPrompt, clusterMemberKey, excludeCanonicalRows, groupClusterableRows, parseClusterResponse } from '@/lib/misconception-clustering'
 
 const CLUSTER_MODEL = 'claude-sonnet-4-5'
 
@@ -10,10 +10,15 @@ type Db = any
 /** Generates review proposals only; nothing is merged until an expert approves. */
 export async function generateClusterProposals(db: Db, maxGroups: number) {
   const { data: rows, error } = await db.from('student_misconceptions')
-    .select('student_id,misconception_id,subject,topic,evidence_count,misconception_catalog!inner(label,verification_status)')
+    .select('student_id,misconception_id,subject,topic,evidence_count,misconception_catalog!inner(label,verification_status,source_type)')
     .neq('status', 'resolved').neq('misconception_catalog.verification_status', 'rejected').limit(5000)
   if (error) throw new Error(error.message)
-  const flat = (rows ?? []).map((row: Record<string, unknown>) => ({ ...row, label: (row.misconception_catalog as { label: string }).label }))
+  const { data: canonicalRows } = await db.from('misconception_aliases').select('canonical_id')
+  const canonicalIds = (canonicalRows ?? []).map((row: { canonical_id: string }) => row.canonical_id)
+  type Joined = ClusterRow & { misconception_catalog: { label: string; source_type: string } }
+  const flat = excludeCanonicalRows(((rows ?? []) as Joined[])
+    .filter(row => row.misconception_catalog.source_type !== 'expert_cluster')
+    .map(row => ({ ...row, label: row.misconception_catalog.label })), canonicalIds)
   const { data: open } = await db.from('misconception_cluster_proposals').select('student_id,member_key').eq('status', 'proposed')
   const openKeys = new Set((open ?? []).map((row: { student_id: string; member_key: string }) => `${row.student_id}|${row.member_key}`))
   // Largest groups first; groups already holding an open proposal over all of their members are skipped.
