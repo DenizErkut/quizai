@@ -110,7 +110,7 @@ Efor: **S** ≤ 2 gün, **M** 3–7 gün, **L** 1–3 hafta (tek geliştirici ta
 
 | İş | Durum |
 |---|---|
-| 7.1 Sayısal derslerde (Matematik, Fen, Biyoloji, Kimya) testlerde en az %30 görsel kuralı **aynen** geçerli; sözel derslerde (Türkçe, Edebiyat, Felsefe, Sosyal Bilgiler, Tarih, Coğrafya, İngilizce, Din Kültürü, Hayat Bilgisi, İnkılap Tarihi…) görsel zorunlu değil, konu uygunsa yaklaşık %10 denenir | **Tamam** (`lib/visual-quota-policy.ts`, istem metni + üretilecek görsel sayısı + banka karışımı) |
+| 7.1 Sayısal derslerde (Matematik, Fen, Biyoloji, Kimya, **Coğrafya**) testlerde en az %30 görsel kuralı **aynen** geçerli; sözel derslerde (Türkçe, Edebiyat, Felsefe, Sosyal Bilgiler, Tarih, İngilizce, Din Kültürü, Hayat Bilgisi, İnkılap Tarihi…) görsel zorunlu değil, konu uygunsa yaklaşık %10 denenir | **Tamam** (`lib/visual-quota-policy.ts`, istem metni + üretilecek görsel sayısı + banka karışımı) |
 | 7.2 Karar noktaları | **Fizik** ve **Geometri** istenen listede yoktu ama sayısal aileden olduğu için sayısal kabul edildi (tek satırda değişir). **Ders bilinmiyor/boş/“Genel” ise eski %30 kuralı** korunur. Sözel oran (%10) bir ürün varsayılanıdır. |
 | 7.3 Ölçüm (sonraki adım) | Sözel derslerde gerçekten üretilen görsel oranını ve görselli soruların doğruluk/şikâyet oranını izlemek; %10'un uygun olup olmadığına buna göre karar vermek. |
 
