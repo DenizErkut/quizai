@@ -12,6 +12,7 @@ import { logAnthropicUsage } from '@/lib/ai-usage'
 import Anthropic from '@anthropic-ai/sdk'
 import { computeTopicMastery, TopicMastery } from './mastery'
 import { analyzeStudyDuration } from './study-duration-model'
+import { keepQuizReadyTopics } from './quiz-ready-topics'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
@@ -46,10 +47,16 @@ export async function computeAutonomousGoals(
     .eq('status', 'active')
     .gt('valid_until', new Date().toISOString())
     .order('priority_score', { ascending: false })
-    .limit(maxGoals)
+    .limit(maxGoals * 4)
 
-  if (recommendations?.length) {
-    return recommendations.map((row: any) => ({
+  // Only topics a quiz can start for this student's grade (see lib/quiz-ready-topics).
+  const { data: profile } = await supabase.from('profiles').select('grade').eq('id', userId).maybeSingle()
+  const startable = recommendations?.length
+    ? (await keepQuizReadyTopics(supabase, profile?.grade, recommendations as any[])).slice(0, maxGoals)
+    : []
+
+  if (startable.length) {
+    return startable.map((row: any) => ({
       topic: row.topic,
       subject: row.subject,
       masteryScore: Number(row.evidence?.masteryScore ?? row.evidence?.prerequisiteMastery ?? 0),
