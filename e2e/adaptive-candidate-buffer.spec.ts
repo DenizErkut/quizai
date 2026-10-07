@@ -161,10 +161,13 @@ test('admin accepts AI question booklets for exact reuse and reference generatio
   expect(admin).toContain('<option value="ai">AI — birebir + yeni soru referansı</option>')
   expect(admin).toContain('<option value="teacher">Öğretmen imzalı — birebir + yeni soru referansı</option>')
   expect(upload).toContain("source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact'")
-  expect(upload).toContain("source_type !== 'anonymous'")
+  // Only teacher/AI booklets are promoted for exact reuse; anonymous ones stay reference-only.
+  expect(upload).toContain("['teacher', 'ai'].includes(row.source_type)")
+  expect(upload).toContain("source_type === 'anonymous' ? 'reference_only' : 'exact_reuse'")
   expect(upload).toContain('canonicalBookletGrade')
-  expect(upload).toContain(".upsert(rows, { onConflict: 'fingerprint', ignoreDuplicates: true }).select('id')")
-  expect(upload).toContain('return result.data?.length || 0')
+  // Only approved rows count as promoted; visual-dependent questions stay candidates.
+  expect(upload).toContain(".upsert(rows, { onConflict: 'fingerprint', ignoreDuplicates: true }).select('id,review_status')")
+  expect(upload).toContain("return result.data?.filter(item => item.review_status === 'approved').length || 0")
   expect(migration).toContain("('anonymous', 'teacher', 'ai')")
 })
 
