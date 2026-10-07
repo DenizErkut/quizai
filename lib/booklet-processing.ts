@@ -1,7 +1,7 @@
 // Keep each extraction small enough for one serverless request. Inline
 // `Cevap: B` belongs to its question, not to a global answer-key section.
 export function bookletBatches(raw: string): string[] {
-  if (raw.length > 300000) throw new Error('Kitapçık metni çok büyük. İçeriği ayrı kitapçıklara bölün; metin sessizce kesilmez.')
+  if (raw.length > 500000) throw new Error('Kitapçık metni çok büyük. İçeriği ayrı kitapçıklara bölün; metin sessizce kesilmez.')
   const text = raw
   const answerStart = text.search(/\n\s*(?:CEVAP ANAHTARI|YANIT ANAHTARI|CEVAPLAR|YANITLAR)\s*(?:\r?\n|$)/iu)
   const questions = answerStart >= 0 ? text.slice(0, answerStart) : text

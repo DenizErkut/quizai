@@ -5,13 +5,18 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createHash, randomUUID } from 'node:crypto'
 import { bookletBatches } from '@/lib/booklet-processing'
-import { bookletQuestionLabels, printedQuestionObjective } from '@/lib/booklet-objective-label'
+import { bookletQuestionLabels, printedQuestionNumber, printedQuestionObjective } from '@/lib/booklet-objective-label'
+import { figuresForPages, type PageFigure } from '@/lib/booklet-figures'
+import { verifyFigure } from '@/lib/booklet-figure-check'
+import { bookletImageSvg } from '@/lib/booklet-image'
+import { phantomVisualIssue } from '@/lib/phantom-visual'
 import { callOpenAI } from '@/lib/openai'
 import { questionBankKey } from '@/lib/question-bank'
 import { educationEvalGradeKey } from '@/lib/education-eval-grade'
 import { educationEvalSubjectKey } from '@/lib/education-eval-subject'
 import { requiresBookletVisual } from '@/lib/booklet-visual-gate'
 import { matchVerifiedObjectiveCode, parseLearningObjectiveCodes } from '@/lib/learning-objective-codes'
+import { bookletDifficulty, isMixedSubject, mixedObjectiveReferences, placeMixedQuestion, validBookletQuestion, type CatalogObjective } from '@/lib/booklet-mixed'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -224,24 +229,49 @@ async function loadVerifiedBookletObjectives(row: { subject?: string | null; gra
   }).map(objective => ({ code: objective.objective_code, title: objective.title }))
 }
 
+// "Karışık" booklets: every verified objective of the grade, across subjects.
+async function loadGradeObjectives(grade: string | null | undefined): Promise<CatalogObjective[]> {
+  const digits = String(grade || '').match(/\d{1,2}/)?.[0]
+  if (!digits) return []
+  const { data: benchmarkSet } = await adminDb.from('education_eval_benchmark_sets')
+    .select('curriculum_version_id').eq('code', 'meb-k12-controlled').order('version', { ascending: false }).limit(1).maybeSingle()
+  if (!benchmarkSet?.curriculum_version_id) return []
+  const { data, error } = await adminDb.from('learning_objective_catalog')
+    .select('objective_code,title,grade,subject,topic,unit')
+    .eq('curriculum_version_id', benchmarkSet.curriculum_version_id)
+    .eq('verification_status', 'verified').eq('lifecycle_status', 'active').eq('is_active', true)
+    .ilike('grade', `${digits}. %`).order('objective_code').limit(1000)
+  if (error) throw error
+  return (data || []).filter(item => educationEvalGradeKey(item.grade) === educationEvalGradeKey(grade)) as CatalogObjective[]
+}
+
 async function promoteExactQuestions(row: { id?: string; subject?: string | null; grade?: string | null; topic?: string | null; subtopic?: string | null; raw_text?: string | null; learning_objective_codes?: unknown }, sourceType: 'teacher' | 'ai', batch: string) {
   const sourceLabel = sourceType === 'teacher' ? 'öğretmen imzalı' : 'yapay zekâ ile ayrıca hazırlanmış'
   const labels = bookletQuestionLabels(batch)
-  const objectiveReferences = await loadVerifiedBookletObjectives({ ...row, learning_objective_codes: [...new Set([...parseLearningObjectiveCodes(row.learning_objective_codes), ...labels.flatMap(label => label.codes)])] })
+  // A question that points at a figure it does not contain waits for its figure instead of entering the pool.
+  const needsVisual = (q: any) => requiresBookletVisual(q) || phantomVisualIssue({ q: q.q, opts: q.opts }) === 'missing_visual'
+  const mixed = isMixedSubject(row.subject)
+  const gradeObjectives = mixed ? await loadGradeObjectives(row.grade) : []
+  const objectiveByCode = new Map(gradeObjectives.map(objective => [objective.objective_code.toLocaleUpperCase('tr-TR'), objective]))
+  const objectiveReferences = mixed
+    ? gradeObjectives.map(objective => ({ code: objective.objective_code, title: objective.title }))
+    : await loadVerifiedBookletObjectives({ ...row, learning_objective_codes: [...new Set([...parseLearningObjectiveCodes(row.learning_objective_codes), ...labels.flatMap(label => label.codes)])] })
   const verifiedCodes = objectiveReferences.map(objective => objective.code)
-  const objectiveInstruction = objectiveReferences.length
+  const objectiveInstruction = mixed
+    ? `\nBu kitapçık KARIŞIK: soruların dersi ve konusu sorudan belirlenir. Her soru için aşağıdaki doğrulanmış MEB kazanımları listesinden (KOD | DERS | KAZANIM) içeriğe en uygun TEK kodu "objective_code" alanına yaz; emin değilsen null yaz. Yalnız listedeki kodları kullan, kod uydurma.\n${mixedObjectiveReferences(gradeObjectives)}\n`
+    : objectiveReferences.length
     ? `\nKitapçıkta ilişkilendirilecek doğrulanmış MEB kazanımları: ${JSON.stringify(objectiveReferences)}. Her soruyu içerik bakımından en uygun kodla eşleştir; eşleşme açık değilse objective_code null olsun. Yalnızca bu listede bulunan kodlardan birini kullan; kod uydurma veya listedeki soruyu değiştirme.\n`
     : '\nobjective_code alanını null döndür.\n'
   const extractedGroups = await Promise.all([batch].map(async batch => {
-    const prompt = `Aşağıdaki ${sourceLabel} kitapçık bölümündeki çoktan seçmeli soruları AYNI soru metni, AYNI seçenekler ve AYNI doğru cevapla ayıkla. Yeniden yazma, sadeleştirme veya benzer soru üretme. Bölümün sonundaki cevap anahtarından yalnız bu bölümdeki soruların cevaplarını kullan. Açıklama kitapçıkta yoksa doğru cevabı kısaca açıkla. Eksik ya da cevabı belirlenemeyen soruyu atla. En fazla 55 soru döndür. ${objectiveInstruction}Yalnız JSON döndür: {"questions":[{"q":"...","opts":["..."],"ans":0,"exp":"...","topic":"...","difficulty":"easy|medium|hard","objective_code":null}]}\n\n<KITAPCIK_METNI>\n${batch}\n</KITAPCIK_METNI>`
-    const response = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 8000, messages: [{ role: 'user', content: prompt + '\nSeçeneksiz kısa cevaplı soruları çoktan seçmeliye dönüştürme; seçenek uydurma, atla. Görsel/şekil/grafik gerektiren sorularda requires_visual:true döndür. Şekli metinden uydurma. Metin, seçenek ve cevap anahtarı tam ise görseli eksik soruyu da aktar; sistem bunu öğrenciye vermeden insan görsel incelemesine ayıracak.' }] }, { timeout: 50000, maxRetries: 0 })
+    const prompt = `Aşağıdaki ${sourceLabel} kitapçık bölümündeki çoktan seçmeli soruları AYNI soru metni, AYNI seçenekler ve AYNI doğru cevapla ayıkla. Yeniden yazma, sadeleştirme veya benzer soru üretme. Bölümün sonundaki cevap anahtarından yalnız bu bölümdeki soruların cevaplarını kullan. Açıklama kitapçıkta yoksa doğru cevabı kısaca açıkla. Eksik ya da cevabı belirlenemeyen soruyu atla. En fazla 55 soru döndür. ${objectiveInstruction}Yalnız JSON döndür: {"questions":[{"q":"...","opts":["..."],"ans":0,"exp":"...","type":"multiple_choice|short_answer","topic":"...","difficulty":"easy|medium|hard|very_hard","objective_code":null}]}\n\n<KITAPCIK_METNI>\n${batch}\n</KITAPCIK_METNI>`
+    const response = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 8000, messages: [{ role: 'user', content: prompt + '\nSeçeneksiz kısa cevaplı bir soru, cevabı kitapçıkta tek cümleyle yazılıysa type:\"short_answer\" olarak döndür: opts tek elemanlı (yalnız o cevap), ans 0; cevap yoksa veya birden fazla cümleyse atla. Çoktan seçmeli sorularda type:\"multiple_choice\". Kitapçıktaki zorluk etiketi çok zor ise difficulty:\"very_hard\". Görsel/şekil/grafik gerektiren sorularda requires_visual:true döndür. Şekli metinden uydurma. Metin, seçenek ve cevap anahtarı tam ise görseli eksik soruyu da aktar; sistem bunu öğrenciye vermeden insan görsel incelemesine ayıracak.' }] }, { timeout: 50000, maxRetries: 0 })
     if (response.stop_reason === 'max_tokens') throw new Error('Ayıklama çıktısı kesildi; bu grup yeniden denenmeli.')
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
     const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
     if (!Array.isArray(parsed.questions)) throw new Error('Ayıklayıcı geçerli soru listesi döndürmedi.')
     return parsed.questions
   }))
-  const extracted = extractedGroups.flat().filter((q: any) => q?.q && Array.isArray(q.opts) && q.opts.length >= 4 && q.opts.length <= 5 && Number.isInteger(q.ans) && q.ans >= 0 && q.ans < q.opts.length && q.exp)
+  const extracted = extractedGroups.flat().filter((q: any) => q && validBookletQuestion(q))
   if (!extracted.length) return 0
   const validationText = await callOpenAI([
     { role: 'system', content: 'Sen bağımsız soru kalite denetçisisin. Soruları değiştirme. Yalnızca doğru cevabı kesin, seçenekleri benzersiz ve soru eksiksiz olan kayıtları onayla. JSON döndür.' },
@@ -255,22 +285,37 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
     throw new Error('Kalite denetçisi bütün sorular için geçerli karar döndürmedi; grup yeniden denenmeli.')
   }
   const approvedIndexes = new Set<number>((validation.results || []).filter((item: any) => item.approved === true).map((item: any) => Number(item.index)))
-  const questions = extracted.filter((q: any, index: number) => approvedIndexes.has(index) || requiresBookletVisual(q))
-  const rows = questions.map((q: any) => ({
+  const questions = extracted.filter((q: any, index: number) => approvedIndexes.has(index) || needsVisual(q))
+  let rows = questions.map((q: any) => ({
     fingerprint: createHash('sha256').update(`${q.q}|${q.opts.join('|')}`.toLocaleLowerCase('tr')).digest('hex'),
     subject_key: questionBankKey(row.subject || 'genel'),
     // `topic_key` is the booklet's selected parent unit so all extracted
     // questions stay together in admin filters and parent-topic bank lookup.
     // Preserve the classifier's finer subtopic separately in the question.
     topic_key: questionBankKey(row.subtopic || row.topic || q.topic || 'genel'),
-    grade_key: canonicalBookletGrade(row.grade || ''), language_key: 'tr', question_type: 'multiple_choice', difficulty: q.difficulty === 'easy' ? 'kolay' : q.difficulty === 'hard' ? 'zor' : 'normal',
-    question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, requiresBookletVisual: requiresBookletVisual(q), objective: q.topic || row.subtopic || '', learningObjectiveCode: labels.some(label => label.codes.length) ? printedQuestionObjective(q.q, labels, verifiedCodes) : matchVerifiedObjectiveCode(q.objective_code, verifiedCodes), bookletObjectiveCodes: verifiedCodes, bookletTopic: row.subtopic || row.topic || '', bookletResourceId: row.id || null, subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' },
-    review_status: requiresBookletVisual(q) ? 'candidate' : 'approved', quality_score: requiresBookletVisual(q) ? 0 : 1, source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact', report_count: 0
+    grade_key: canonicalBookletGrade(row.grade || ''), language_key: 'tr', question_type: q.type === 'short_answer' ? 'short_answer' : 'multiple_choice', difficulty: q.difficulty === 'easy' ? 'kolay' : q.difficulty === 'very_hard' ? 'cok zor' : q.difficulty === 'hard' ? 'zor' : 'normal',
+    question: { q: q.q, ...(printedQuestionNumber(q.q, labels) ? { sourceQuestionNumber: printedQuestionNumber(q.q, labels) } : {}), ...(q.type === 'short_answer' ? { type: 'short_answer' } : {}), opts: q.opts, ans: q.ans, exp: q.exp, requiresBookletVisual: needsVisual(q), objective: q.topic || row.subtopic || '', learningObjectiveCode: labels.some(label => label.codes.length) ? printedQuestionObjective(q.q, labels, verifiedCodes) : matchVerifiedObjectiveCode(q.objective_code, verifiedCodes), bookletObjectiveCodes: verifiedCodes, bookletTopic: row.subtopic || row.topic || '', bookletResourceId: row.id || null, subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' },
+    review_status: needsVisual(q) ? 'candidate' : 'approved', quality_score: needsVisual(q) ? 0 : 1, source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact', report_count: 0
   }))
-  if (!rows.length) return 0
+  if (mixed) {
+    // Subject and unit come from the catalog objective; an unplaced question waits for review instead of entering the pool under a guessed subject.
+    rows = rows.map((item: any, index: number) => {
+      const source: any = questions[index]
+      const place = placeMixedQuestion(source.objective_code, objectiveByCode, source.subject, source.topic)
+      const approved = place.verified && item.review_status === 'approved'
+      return {
+        ...item,
+        subject_key: questionBankKey(place.subject || 'genel'),
+        topic_key: questionBankKey(place.topic || source.topic || 'genel'),
+        review_status: approved ? 'approved' : 'candidate',
+        quality_score: approved ? 1 : 0,
+        question: { ...item.question, subject: place.subject || 'Genel', bookletTopic: place.topic, learningObjectiveCode: place.objectiveCode, mixedPlacement: place.verified ? 'objective' : 'needs_review' },
+      }
+    })
+  }
   const result = await adminDb.from('question_bank').upsert(rows, { onConflict: 'fingerprint', ignoreDuplicates: true }).select('id,review_status')
   if (result.error) throw result.error
-  if (sourceType === 'ai' && row.id) {
+  if (sourceType === 'ai' && row.id && !mixed) {
     try {
       const { data: promotedRows, error: promotedError } = await adminDb.from('question_bank')
         .select('id,question,grade_key,subject_key,review_status,source_engine')
@@ -354,7 +399,7 @@ export async function POST(req: NextRequest) {
       fileUrl = body.file_url
       try {
         const pdfBytes = Buffer.from(await fileData.arrayBuffer())
-        if (pdfBytes.length < 10 * 1024 * 1024) {
+        if (pdfBytes.length < 45 * 1024 * 1024) {
           const pdfParse = require('pdf-parse')
           const parsed = await pdfParse(pdfBytes)
           rawText = parsed.text || ''
@@ -391,7 +436,7 @@ export async function POST(req: NextRequest) {
           fileUrl = u?.publicUrl || ''
         }
         try {
-          if (Buffer.from(bytes).length < 10 * 1024 * 1024) {
+          if (Buffer.from(bytes).length < 45 * 1024 * 1024) {
             const pdfParse = require('pdf-parse')
             const parsed = await pdfParse(Buffer.from(bytes))
             rawText = parsed.text || ''
@@ -471,9 +516,44 @@ export async function PUT(req: NextRequest) {
   return NextResponse.json({ success: true, chunks: data, char_count: rawText.length, learning_objective_codes: learningObjectiveCodes })
 }
 
+const FIGURE_PAGES_PER_STEP = 4
+
+function storagePathFromUrl(url: string | null | undefined): string | null {
+  const marker = '/meb-resources/'
+  const at = (url || '').indexOf(marker)
+  return at < 0 ? null : decodeURIComponent((url as string).slice(at + marker.length).split('?')[0])
+}
+
+type FigureOutcome = 'attached' | 'review' | 'unmatched' | 'skipped'
+
+/** Attaches one cropped figure to the single bank question with that printed number, after a vision check. */
+async function attachFigure(resourceId: string, figure: PageFigure): Promise<FigureOutcome> {
+  const { data: rows } = await adminDb.from('question_bank').select('id,question,updated_at,review_status')
+    .contains('question', { bookletResourceId: resourceId, sourceQuestionNumber: figure.questionNumber }).limit(3)
+  if (!rows || rows.length !== 1) return 'unmatched'
+  const row = rows[0]
+  if (typeof row.question?.svg === 'string' && row.question.svg.includes('<svg')) return 'skipped'
+  const verdict = await verifyFigure(anthropic, figure, row.question)
+  if (!verdict.ok) {
+    const pointsAtFigure = row.question.requiresBookletVisual === true || phantomVisualIssue({ q: row.question.q, opts: row.question.opts }) === 'missing_visual'
+    await adminDb.from('question_bank').update({ question: { ...row.question, visualAutoNote: verdict.reason || 'Otomatik görsel doğrulanamadı.' }, ...(pointsAtFigure ? { review_status: 'candidate', quality_score: 0 } : {}), updated_at: new Date().toISOString() }).eq('id', row.id).eq('updated_at', row.updated_at)
+    return 'review'
+  }
+  const svg = bookletImageSvg(new Uint8Array(figure.data), figure.width, figure.height)
+  const question = { ...row.question, svg, qtype: 'svg', hasVisual: true, requiresBookletVisual: false, visualKind: 'booklet_image', visualQuestionText: row.question.q,
+    visualSource: 'auto_pdf_region_ai_checked', visualReviewedAt: new Date().toISOString() }
+  const fingerprint = createHash('sha256').update(`${question.q}|${question.opts.join('|')}|${svg}`.toLocaleLowerCase('tr')).digest('hex')
+  // A question whose subject/objective is still unplaced stays a candidate even with its figure.
+  const approve = row.question.mixedPlacement !== 'needs_review'
+  const { data, error } = await adminDb.from('question_bank')
+    .update({ question, fingerprint, review_status: approve ? 'approved' : row.review_status, quality_score: approve ? 1 : 0, updated_at: new Date().toISOString() })
+    .eq('id', row.id).eq('updated_at', row.updated_at).select('id').maybeSingle()
+  return error || !data ? 'review' : 'attached'
+}
+
 async function processNextBooklet(id: string) {
   const { data: row, error: resourceError } = await adminDb.from('exam_resources')
-    .select('id,source_type,purpose,review_status,subject,grade,topic,subtopic,raw_text,learning_objective_codes')
+    .select('id,source_type,purpose,review_status,subject,grade,topic,subtopic,raw_text,learning_objective_codes,file_url')
     .eq('id', id).maybeSingle()
   if (resourceError) throw resourceError
   if (!row || row.review_status === 'rejected') return NextResponse.json({ error: 'İşlenebilir kitapçık bulunamadı.' }, { status: 404 })
@@ -510,7 +590,8 @@ async function processNextBooklet(id: string) {
       if (restored.error) throw restored.error
       chunks = restored.data
     }
-    const next = { next_chunk: claimed.next_chunk, next_batch: claimed.next_batch, promoted: claimed.promoted, status: 'pending' }
+    const next = { next_chunk: claimed.next_chunk, next_batch: claimed.next_batch, promoted: claimed.promoted, status: 'pending',
+      next_page: claimed.next_page ?? 0, last_question: claimed.last_question ?? 0, figures_attached: claimed.figures_attached ?? 0, figures_review: claimed.figures_review ?? 0, figure_note: claimed.figure_note ?? null as string | null }
     let progress = ''
     if (claimed.next_chunk < (chunks || []).length) {
       const group = (chunks || []).slice(claimed.next_chunk, claimed.next_chunk + 5)
@@ -528,8 +609,36 @@ async function processNextBooklet(id: string) {
       next.promoted += await promoteExactQuestions(row, row.source_type as 'teacher' | 'ai', batches[claimed.next_batch])
       next.next_batch++
       progress = `Soru kontrolü: ${next.next_batch}/${batches.length} grup; ${next.promoted} yeni soru havuzda.`
+    } else if (exact && next.next_page >= 0) {
+      // Figure phase: crop each question's figure from the PDF and attach it. Never blocks the imported questions.
+      try {
+        const path = storagePathFromUrl(row.file_url)
+        if (!path) throw new Error('PDF dosyası bulunamadı.')
+        if (next.next_page === 0) {
+        }
+        if (next.next_page >= 0) {
+          const { data: file, error: downloadError } = await adminDb.storage.from('meb-resources').download(path)
+          if (downloadError || !file) throw new Error('PDF indirilemedi.')
+          const known = new Set(bookletQuestionLabels(row.raw_text || '').map(label => label.number).filter((n): n is number => n !== null))
+          const result = await figuresForPages(new Uint8Array(await file.arrayBuffer()), { fromPage: next.next_page, pages: FIGURE_PAGES_PER_STEP, lastQuestion: next.last_question, knownNumbers: known })
+          for (const figure of result.figures) {
+            const outcome = await attachFigure(id, figure)
+            if (outcome === 'attached') next.figures_attached++
+            else if (outcome === 'review') next.figures_review++
+          }
+          next.last_question = result.lastQuestion
+          next.next_page += FIGURE_PAGES_PER_STEP
+          if (next.next_page >= result.pageCount) next.next_page = -1
+          progress = `Görsel eşleme: sayfa ${Math.min(result.pageCount, next.next_page < 0 ? result.pageCount : next.next_page)}/${result.pageCount}; ${next.figures_attached} görsel soruya eklendi, ${next.figures_review} görsel elle kontrol bekliyor.`
+        }
+      } catch (figureError) {
+        console.error('[exam-upload] figure phase failed', figureError)
+        next.next_page = -1
+        next.figure_note = figureError instanceof Error ? figureError.message.slice(0, 200) : 'Görsel eşleme çalışmadı.'
+        progress = `Görsel eşleme atlandı (${next.figure_note}); sorular havuzda, görselleri elle ekleyebilirsiniz.`
+      }
     }
-    const done = next.next_chunk >= (chunks || []).length && next.next_batch >= batches.length
+    const done = next.next_chunk >= (chunks || []).length && next.next_batch >= batches.length && (!exact || next.next_page < 0)
     if (done && exact) {
       const { error } = await adminDb.from('exam_resources').update({ review_status: 'approved', reuse_policy: 'exact_reuse' }).eq('id', id).neq('review_status', 'rejected')
       if (error) throw error

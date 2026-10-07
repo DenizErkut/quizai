@@ -23,6 +23,11 @@ test('placeholders, urls and leaked markup are rejected', () => {
   assert.equal(phantomVisualIssue({ q: 'Aşağıdaki görselde ne var?', svg: '<svg><image href="https://x.com/a.png"/></svg>' }), 'missing_visual')
 })
 
+test('embedded data-URI booklet figures count as real visuals', () => {
+  const figure = '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"><image width="2" height="2" href="data:image/png;base64,AAAA"/></svg>'
+  assert.equal(phantomVisualIssue({ q: 'Aşağıdaki grafiğe göre hangisi doğrudur?', svg: figure }), null)
+})
+
 test('ordinary questions are untouched', () => {
   assert.equal(phantomVisualIssue({ q: 'Aşağıdaki şekillerden hangisi bir üçgendir?', opts: ['Kare', 'Üçgen'] }), null)
   assert.equal(phantomVisualIssue({ q: 'Türkiye hangi kıtalar arasında yer alır?', opts: ['Avrupa-Asya'] }), null)
