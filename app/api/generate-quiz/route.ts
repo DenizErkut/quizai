@@ -43,6 +43,7 @@ import { attachQuestionRigorMetadata, summarizeQuestionSetRigor } from '@/lib/qu
 import { verifyVisualWithMistral } from '@/lib/mistral-quality'
 import { verifyVisualWithGemini } from '@/lib/gemini-visual-quality'
 import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, minimumVerifiedQuestionCount, missingRoleBatches, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, roleBatchMaxTokens, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
+import { phantomVisualIssue } from '@/lib/phantom-visual'
 import { isSameGradeSource } from '@/lib/meb-source-scope'
 import { visualProfileForSubject, visualQuotaFor, VERBAL_VISUAL_RATIO } from '@/lib/visual-quota-policy'
 
@@ -965,6 +966,13 @@ function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
   const logRejected = (stage: string, q: any, reason: string) => {
     console.warn(`[content-filter-reject] stage=${stage} reason="${reason}" question_length=${String(q.q || '').length}`)
   }
+
+  // 0) Öğrencinin hiç göremeyeceği görsele atıf (hayalet görsel, yer tutucu, sızan <svg>)
+  qs = qs.filter((q: any) => {
+    const issue = phantomVisualIssue(q)
+    if (issue) logRejected('phantom-visual', q, issue)
+    return !issue
+  })
 
   // 1) Kaynağın kendisi (yazar, ISBN, İçindekiler) hakkında soru
   const bookMetadataPattern = /\bISBN\b|yazar kadrosu|kaç yazar (tarafından|kişi)|kitab(ı|ın)[ıi]n yazarlarından|(ders kitab|kaynağ[ıi]n yer ald[ıi]ğ[ıi] kitab).{0,30}(hazırlanmıştır|hazırlamıştır)|kitab[ıi]n künye|İçindekiler/i

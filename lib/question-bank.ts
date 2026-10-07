@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { phantomVisualIssue } from './phantom-visual'
 import { createHash, randomInt } from 'node:crypto'
 import { hasAutomatedObjectiveApproval } from './objective-mapping-verification'
 import { hasContinuousApproval, CONTINUOUS_REVIEW_POLICY } from './continuous-question-review'
@@ -195,16 +196,16 @@ export async function getQuestionBankSet(
 ): Promise<Question[]> {
   if (count <= 0) return []
   const excluded = new Set(excludedTexts.map(questionBankKey).filter(Boolean))
-  const query = (includeSubject: boolean) => {
+  const query = (includeSubject: boolean, exactDifficulty = true) => {
     let request = db.from('question_bank').select('id, question, fingerprint, use_count, subject_key, topic_key')
       .eq('topic_key', questionBankKey(dimensions.topic))
       .eq('grade_key', questionBankKey(dimensions.grade))
       .eq('language_key', questionBankKey(dimensions.language))
-      .eq('difficulty', dimensions.difficulty)
       .eq('review_status', 'approved').eq('report_count', 0)
       .order('use_count', { ascending: true })
       .order('last_used_at', { ascending: true, nullsFirst: true })
       .limit(Math.max(count * 5, 30))
+    if (exactDifficulty) request = request.eq('difficulty', dimensions.difficulty)
     if (includeSubject) request = request.eq('subject_key', questionBankKey(dimensions.subject || 'genel'))
     const typeFilter = questionBankTypeFilter(dimensions.questionType)
     if (typeFilter) request = request.eq('question_type', typeFilter)
@@ -218,6 +219,19 @@ export async function getQuestionBankSet(
     const fallback = await query(false)
     if (!fallback.error && Array.isArray(fallback.data)) {
       const unique = new Map([...(data || []), ...fallback.data].map((row: any) => [row.id, row]))
+      data = [...unique.values()]
+    }
+  }
+
+  // Pool first: a test mixes four difficulty levels, but rows carry one level
+  // each, so an exact-difficulty match left topics with dozens of approved rows
+  // (e.g. 67, 46, 21) at 'miss'. Rows of the requested difficulty stay first;
+  // other difficulties only fill what is still short, and the AI covers the rest.
+  if (!error && (data?.length || 0) < count) {
+    const widened = await query(true, false)
+    const widenedAny = (widened.error || (widened.data?.length || 0) === 0) ? await query(false, false) : widened
+    if (!widenedAny.error && Array.isArray(widenedAny.data)) {
+      const unique = new Map([...(data || []), ...widenedAny.data].map((row: any) => [row.id, row]))
       data = [...unique.values()]
     }
   }
@@ -263,6 +277,7 @@ export async function getQuestionBankSet(
   if (error || !Array.isArray(data)) return []
   const candidates = data
     .filter((row: any) => !excluded.has(questionBankKey(row.question?.q)))
+    .filter((row: any) => !phantomVisualIssue(row.question || {}))
     .slice(0, Math.min(data.length, count * 2))
   // Havuzda görsel soru varsa her testte yaklaşık %30 oranında seç. Görsel
   // kapasite yetersizse kalan yerler normal sorularla doldurulur.
