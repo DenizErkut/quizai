@@ -1891,6 +1891,10 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                 <input value={examForm.subject} onChange={e => setExamForm(p => ({ ...p, subject: e.target.value }))}
                   placeholder="Matematik, Türkçe, Tüm Dersler..."
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' as const }} />
+                {tab === 'question-books' && <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '8px', fontSize: '12px', color: 'var(--text2)', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={examForm.subject === 'Karışık'} onChange={e => setExamForm(p => ({ ...p, subject: e.target.checked ? 'Karışık' : '' }))} />
+                  <span>Karışık kitapçık: tüm dersler bir arada. Her sorunun dersi ve konusu, eşleştiği doğrulanmış MEB kazanımından belirlenir; eşleşmeyen sorular onay için “aday” kalır. Sınıf yine zorunludur.</span>
+                </label>}
               </div>
             </div>
 

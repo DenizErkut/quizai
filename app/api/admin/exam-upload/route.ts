@@ -12,6 +12,7 @@ import { educationEvalGradeKey } from '@/lib/education-eval-grade'
 import { educationEvalSubjectKey } from '@/lib/education-eval-subject'
 import { requiresBookletVisual } from '@/lib/booklet-visual-gate'
 import { matchVerifiedObjectiveCode, parseLearningObjectiveCodes } from '@/lib/learning-objective-codes'
+import { bookletDifficulty, isMixedSubject, mixedObjectiveReferences, placeMixedQuestion, validBookletQuestion, type CatalogObjective } from '@/lib/booklet-mixed'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -224,24 +225,47 @@ async function loadVerifiedBookletObjectives(row: { subject?: string | null; gra
   }).map(objective => ({ code: objective.objective_code, title: objective.title }))
 }
 
+// "Karışık" booklets: every verified objective of the grade, across subjects.
+async function loadGradeObjectives(grade: string | null | undefined): Promise<CatalogObjective[]> {
+  const digits = String(grade || '').match(/\d{1,2}/)?.[0]
+  if (!digits) return []
+  const { data: benchmarkSet } = await adminDb.from('education_eval_benchmark_sets')
+    .select('curriculum_version_id').eq('code', 'meb-k12-controlled').order('version', { ascending: false }).limit(1).maybeSingle()
+  if (!benchmarkSet?.curriculum_version_id) return []
+  const { data, error } = await adminDb.from('learning_objective_catalog')
+    .select('objective_code,title,grade,subject,topic,unit')
+    .eq('curriculum_version_id', benchmarkSet.curriculum_version_id)
+    .eq('verification_status', 'verified').eq('lifecycle_status', 'active').eq('is_active', true)
+    .ilike('grade', `${digits}. %`).order('objective_code').limit(1000)
+  if (error) throw error
+  return (data || []).filter(item => educationEvalGradeKey(item.grade) === educationEvalGradeKey(grade)) as CatalogObjective[]
+}
+
 async function promoteExactQuestions(row: { id?: string; subject?: string | null; grade?: string | null; topic?: string | null; subtopic?: string | null; raw_text?: string | null; learning_objective_codes?: unknown }, sourceType: 'teacher' | 'ai', batch: string) {
   const sourceLabel = sourceType === 'teacher' ? 'öğretmen imzalı' : 'yapay zekâ ile ayrıca hazırlanmış'
   const labels = bookletQuestionLabels(batch)
-  const objectiveReferences = await loadVerifiedBookletObjectives({ ...row, learning_objective_codes: [...new Set([...parseLearningObjectiveCodes(row.learning_objective_codes), ...labels.flatMap(label => label.codes)])] })
+  const mixed = isMixedSubject(row.subject)
+  const gradeObjectives = mixed ? await loadGradeObjectives(row.grade) : []
+  const objectiveByCode = new Map(gradeObjectives.map(objective => [objective.objective_code.toLocaleUpperCase('tr-TR'), objective]))
+  const objectiveReferences = mixed
+    ? gradeObjectives.map(objective => ({ code: objective.objective_code, title: objective.title }))
+    : await loadVerifiedBookletObjectives({ ...row, learning_objective_codes: [...new Set([...parseLearningObjectiveCodes(row.learning_objective_codes), ...labels.flatMap(label => label.codes)])] })
   const verifiedCodes = objectiveReferences.map(objective => objective.code)
-  const objectiveInstruction = objectiveReferences.length
+  const objectiveInstruction = mixed
+    ? `\nBu kitapçık KARIŞIK: soruların dersi ve konusu sorudan belirlenir. Her soru için aşağıdaki doğrulanmış MEB kazanımları listesinden (KOD | DERS | KAZANIM) içeriğe en uygun TEK kodu "objective_code" alanına yaz; emin değilsen null yaz. Yalnız listedeki kodları kullan, kod uydurma.\n${mixedObjectiveReferences(gradeObjectives)}\n`
+    : objectiveReferences.length
     ? `\nKitapçıkta ilişkilendirilecek doğrulanmış MEB kazanımları: ${JSON.stringify(objectiveReferences)}. Her soruyu içerik bakımından en uygun kodla eşleştir; eşleşme açık değilse objective_code null olsun. Yalnızca bu listede bulunan kodlardan birini kullan; kod uydurma veya listedeki soruyu değiştirme.\n`
     : '\nobjective_code alanını null döndür.\n'
   const extractedGroups = await Promise.all([batch].map(async batch => {
-    const prompt = `Aşağıdaki ${sourceLabel} kitapçık bölümündeki çoktan seçmeli soruları AYNI soru metni, AYNI seçenekler ve AYNI doğru cevapla ayıkla. Yeniden yazma, sadeleştirme veya benzer soru üretme. Bölümün sonundaki cevap anahtarından yalnız bu bölümdeki soruların cevaplarını kullan. Açıklama kitapçıkta yoksa doğru cevabı kısaca açıkla. Eksik ya da cevabı belirlenemeyen soruyu atla. En fazla 55 soru döndür. ${objectiveInstruction}Yalnız JSON döndür: {"questions":[{"q":"...","opts":["..."],"ans":0,"exp":"...","topic":"...","difficulty":"easy|medium|hard","objective_code":null}]}\n\n<KITAPCIK_METNI>\n${batch}\n</KITAPCIK_METNI>`
-    const response = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 8000, messages: [{ role: 'user', content: prompt + '\nSeçeneksiz kısa cevaplı soruları çoktan seçmeliye dönüştürme; seçenek uydurma, atla. Görsel/şekil/grafik gerektiren sorularda requires_visual:true döndür. Şekli metinden uydurma. Metin, seçenek ve cevap anahtarı tam ise görseli eksik soruyu da aktar; sistem bunu öğrenciye vermeden insan görsel incelemesine ayıracak.' }] }, { timeout: 50000, maxRetries: 0 })
+    const prompt = `Aşağıdaki ${sourceLabel} kitapçık bölümündeki çoktan seçmeli soruları AYNI soru metni, AYNI seçenekler ve AYNI doğru cevapla ayıkla. Yeniden yazma, sadeleştirme veya benzer soru üretme. Bölümün sonundaki cevap anahtarından yalnız bu bölümdeki soruların cevaplarını kullan. Açıklama kitapçıkta yoksa doğru cevabı kısaca açıkla. Eksik ya da cevabı belirlenemeyen soruyu atla. En fazla 55 soru döndür. ${objectiveInstruction}Yalnız JSON döndür: {"questions":[{"q":"...","opts":["..."],"ans":0,"exp":"...","type":"multiple_choice|short_answer","topic":"...","difficulty":"easy|medium|hard|very_hard","objective_code":null}]}\n\n<KITAPCIK_METNI>\n${batch}\n</KITAPCIK_METNI>`
+    const response = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 8000, messages: [{ role: 'user', content: prompt + '\nSeçeneksiz kısa cevaplı bir soru, cevabı kitapçıkta tek cümleyle yazılıysa type:\"short_answer\" olarak döndür: opts tek elemanlı (yalnız o cevap), ans 0; cevap yoksa veya birden fazla cümleyse atla. Çoktan seçmeli sorularda type:\"multiple_choice\". Kitapçıktaki zorluk etiketi çok zor ise difficulty:\"very_hard\". Görsel/şekil/grafik gerektiren sorularda requires_visual:true döndür. Şekli metinden uydurma. Metin, seçenek ve cevap anahtarı tam ise görseli eksik soruyu da aktar; sistem bunu öğrenciye vermeden insan görsel incelemesine ayıracak.' }] }, { timeout: 50000, maxRetries: 0 })
     if (response.stop_reason === 'max_tokens') throw new Error('Ayıklama çıktısı kesildi; bu grup yeniden denenmeli.')
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
     const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
     if (!Array.isArray(parsed.questions)) throw new Error('Ayıklayıcı geçerli soru listesi döndürmedi.')
     return parsed.questions
   }))
-  const extracted = extractedGroups.flat().filter((q: any) => q?.q && Array.isArray(q.opts) && q.opts.length >= 4 && q.opts.length <= 5 && Number.isInteger(q.ans) && q.ans >= 0 && q.ans < q.opts.length && q.exp)
+  const extracted = extractedGroups.flat().filter((q: any) => q && validBookletQuestion(q))
   if (!extracted.length) return 0
   const validationText = await callOpenAI([
     { role: 'system', content: 'Sen bağımsız soru kalite denetçisisin. Soruları değiştirme. Yalnızca doğru cevabı kesin, seçenekleri benzersiz ve soru eksiksiz olan kayıtları onayla. JSON döndür.' },
@@ -256,21 +280,36 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
   }
   const approvedIndexes = new Set<number>((validation.results || []).filter((item: any) => item.approved === true).map((item: any) => Number(item.index)))
   const questions = extracted.filter((q: any, index: number) => approvedIndexes.has(index) || requiresBookletVisual(q))
-  const rows = questions.map((q: any) => ({
+  let rows = questions.map((q: any) => ({
     fingerprint: createHash('sha256').update(`${q.q}|${q.opts.join('|')}`.toLocaleLowerCase('tr')).digest('hex'),
     subject_key: questionBankKey(row.subject || 'genel'),
     // `topic_key` is the booklet's selected parent unit so all extracted
     // questions stay together in admin filters and parent-topic bank lookup.
     // Preserve the classifier's finer subtopic separately in the question.
     topic_key: questionBankKey(row.subtopic || row.topic || q.topic || 'genel'),
-    grade_key: canonicalBookletGrade(row.grade || ''), language_key: 'tr', question_type: 'multiple_choice', difficulty: q.difficulty === 'easy' ? 'kolay' : q.difficulty === 'hard' ? 'zor' : 'normal',
-    question: { q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, requiresBookletVisual: requiresBookletVisual(q), objective: q.topic || row.subtopic || '', learningObjectiveCode: labels.some(label => label.codes.length) ? printedQuestionObjective(q.q, labels, verifiedCodes) : matchVerifiedObjectiveCode(q.objective_code, verifiedCodes), bookletObjectiveCodes: verifiedCodes, bookletTopic: row.subtopic || row.topic || '', bookletResourceId: row.id || null, subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' },
+    grade_key: canonicalBookletGrade(row.grade || ''), language_key: 'tr', question_type: q.type === 'short_answer' ? 'short_answer' : 'multiple_choice', difficulty: q.difficulty === 'easy' ? 'kolay' : q.difficulty === 'very_hard' ? 'cok zor' : q.difficulty === 'hard' ? 'zor' : 'normal',
+    question: { q: q.q, ...(q.type === 'short_answer' ? { type: 'short_answer' } : {}), opts: q.opts, ans: q.ans, exp: q.exp, requiresBookletVisual: requiresBookletVisual(q), objective: q.topic || row.subtopic || '', learningObjectiveCode: labels.some(label => label.codes.length) ? printedQuestionObjective(q.q, labels, verifiedCodes) : matchVerifiedObjectiveCode(q.objective_code, verifiedCodes), bookletObjectiveCodes: verifiedCodes, bookletTopic: row.subtopic || row.topic || '', bookletResourceId: row.id || null, subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' },
     review_status: requiresBookletVisual(q) ? 'candidate' : 'approved', quality_score: requiresBookletVisual(q) ? 0 : 1, source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact', report_count: 0
   }))
-  if (!rows.length) return 0
+  if (mixed) {
+    // Subject and unit come from the catalog objective; an unplaced question waits for review instead of entering the pool under a guessed subject.
+    rows = rows.map((item: any, index: number) => {
+      const source: any = questions[index]
+      const place = placeMixedQuestion(source.objective_code, objectiveByCode, source.subject, source.topic)
+      const approved = place.verified && item.review_status === 'approved'
+      return {
+        ...item,
+        subject_key: questionBankKey(place.subject || 'genel'),
+        topic_key: questionBankKey(place.topic || source.topic || 'genel'),
+        review_status: approved ? 'approved' : 'candidate',
+        quality_score: approved ? 1 : 0,
+        question: { ...item.question, subject: place.subject || 'Genel', bookletTopic: place.topic, learningObjectiveCode: place.objectiveCode, mixedPlacement: place.verified ? 'objective' : 'needs_review' },
+      }
+    })
+  }
   const result = await adminDb.from('question_bank').upsert(rows, { onConflict: 'fingerprint', ignoreDuplicates: true }).select('id,review_status')
   if (result.error) throw result.error
-  if (sourceType === 'ai' && row.id) {
+  if (sourceType === 'ai' && row.id && !mixed) {
     try {
       const { data: promotedRows, error: promotedError } = await adminDb.from('question_bank')
         .select('id,question,grade_key,subject_key,review_status,source_engine')
