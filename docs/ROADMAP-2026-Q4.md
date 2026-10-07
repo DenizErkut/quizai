@@ -25,6 +25,7 @@ Bu oturumda tamamlananlar (yol haritasının girdisi): transfer kontrolü kullan
 | 0.5 | **Tamam** (PR #7): `e2e` kırığı 5 Ekim'deki `c035f0d` yeniden düzenlemesinden kalan bayat kaynak-metin beklentileriydi; kod davranışı değişmemişti. |
 | 0.1b | **Tamam**: 1000 satırda kesilen diğer admin/analitik okumaları `readAll` ile tamamlandı (AI maliyet logları, ajan denetimi, koç kullanımı, pipeline sağlığı, risk ekranları, sınıf/kurum listeleri). |
 | 0.6 | **Bekliyor**: sağlayıcı maliyeti ve anahtar kararı. |
+| 2.4 | **Kısmen tamam** (PR bekliyor/merge): tekrar döngüsü, öğrencinin daha önce gördüğü soruları kullanmıyor; yeterli yeni soru (16) yoksa döngü başlamıyor. "Gecikmeli" aktarım için 7 gün **ürün varsayılanı** (karar değil), zincir denetiminde bilgilendirici uyarı. İki aktarım hattı bilerek ayrı bırakıldı. **Engel: soru bankası.** FB.6.1.1'de 29 sorudan 16'sı görülmüş (13 yeni), MAT.6.5.1'de 19'dan 11'i (8 yeni); yeni döngü için 16 gerekir, yani Faz 0.6 olmadan ikinci döngü açılamaz. |
 | Faz 1 | **Askıda** (kullanıcı kararı). Etkisi: Faz 4'te "izin" halkası boş kalır, Faz 5 pilotu izinsiz başlatılamaz. |
 | 2.2 | **Tamam**: `Öğrenme Döngüsü Zincir Denetimi` paneli (Learning Graph sekmesi). Bulgular aşağıda. |
 

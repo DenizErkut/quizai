@@ -22,7 +22,7 @@ test('reports the first missing link and keeps the delayed-check pipeline separa
 })
 
 test('a full chain is complete and a teacher review must match the sessions', () => {
-  const attempts = [attempt('baseline', '2026-10-01T10:00:00Z', 'q1'), attempt('post', '2026-10-03T10:00:00Z', 'q2'), attempt('transfer', '2026-10-05T10:00:00Z', 'q3')]
+  const attempts = [attempt('baseline', '2026-10-01T10:00:00Z', 'q1'), attempt('post', '2026-10-03T10:00:00Z', 'q2'), attempt('transfer', '2026-10-12T10:00:00Z', 'q3')]
   const guided = [{ cycle_id: 'c1', status: 'completed', completed_at: '2026-10-02T10:00:00Z' }]
   const unrelated = { pre_session_id: 'x', post_session_id: 'y', transfer_session_id: null, reviewed_at: '2026-10-04T00:00:00Z', transfer_reviewed_by: null, transfer_reviewed_at: null }
   assert.equal(auditChains({ cycles: [cycle], attempts, guided, reviews: [unrelated], delayed: [] }).rows[0].firstMissing, 'teacher_review_pair')
@@ -39,6 +39,15 @@ test('flags pre/post gaps outside 1–90 days, out-of-order stages and closed cy
     guided: [{ cycle_id: 'c1', status: 'completed', completed_at: '2026-10-02T10:00:00Z' }], reviews: [], delayed: [],
   })
   assert.deepEqual([...result.rows[0].warnings].sort(), ['cycle_completed_with_missing_links', 'out_of_order', 'pre_post_gap_out_of_range'])
+})
+
+test('flags a transfer test sooner than 7 days after the post test as informational', () => {
+  const early = auditChains({
+    cycles: [cycle], attempts: [attempt('baseline', '2026-10-01T10:00:00Z', 'q1'), attempt('post', '2026-10-03T10:00:00Z', 'q2'), attempt('transfer', '2026-10-05T10:00:00Z', 'q3')],
+    guided: [{ cycle_id: 'c1', status: 'completed', completed_at: '2026-10-02T10:00:00Z' }], reviews: [], delayed: [],
+  })
+  assert.ok(early.rows[0].warnings.includes('transfer_not_delayed'))
+  assert.equal(early.rows[0].gapsDays.postToTransfer, 2)
 })
 
 import { questionSignature, sharedQuestionCount } from '../lib/question-signature'

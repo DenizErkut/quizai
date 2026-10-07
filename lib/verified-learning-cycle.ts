@@ -1,4 +1,5 @@
 import { hasVerifiedObjectiveMapping, hasVerifiedBankQuality } from './objective-mapping-verification'
+import { questionSignature } from './question-signature'
 
 export type VerifiedBankRow = { id: string; question: Record<string, unknown>; grade_key: string; subject_key: string }
 export type VerifiedStage = 'baseline' | 'post' | 'transfer'
@@ -64,4 +65,24 @@ export function scoreVerifiedAnswers(questions: Array<Record<string, unknown>>, 
   }
   const score = answers.filter(answer => answer.correct).length
   return { answers, score, scorePct: Math.round(score / questions.length * 10000) / 100 }
+}
+
+/** Texts of the questions a student was actually served in earlier cycles (attempts and the guided-practice item). */
+export function seenQuestionTexts(attempts: Array<{ questions?: unknown }>, guided: Array<{ question?: unknown }>): Set<string> {
+  const texts = new Set<string>()
+  const add = (question: unknown) => {
+    const signature = questionSignature((question as { q?: unknown } | null)?.q)
+    if (signature) texts.add(signature)
+  }
+  for (const attempt of attempts) if (Array.isArray(attempt.questions)) attempt.questions.forEach(add)
+  for (const item of guided) add(item.question)
+  return texts
+}
+
+/**
+ * A repeat cycle on the same objective must not reuse questions the student already saw: that would not be
+ * independent evidence, and its sets could not be paired with the earlier cycle's transfer test.
+ */
+export function excludeSeenItems(rows: VerifiedBankRow[], seen: Set<string>): VerifiedBankRow[] {
+  return rows.filter(row => !seen.has(questionSignature(row.question.q)))
 }

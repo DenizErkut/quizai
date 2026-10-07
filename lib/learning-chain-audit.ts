@@ -23,7 +23,11 @@ const MAX_PRE_POST_DAYS = 90
 const DAY = 86_400_000
 const days = (from: string | null, to: string | null) => from && to ? Math.round(((Date.parse(to) - Date.parse(from)) / DAY) * 100) / 100 : null
 
-export type Warning = 'pre_post_gap_out_of_range' | 'out_of_order' | 'cycle_completed_with_missing_links'
+// Product default, not yet a pedagogical decision: a transfer test sooner than this after the post test
+// is reported as "early" (informational), not blocked.
+export const DELAYED_TRANSFER_MIN_DAYS = 7
+
+export type Warning = 'pre_post_gap_out_of_range' | 'out_of_order' | 'cycle_completed_with_missing_links' | 'transfer_not_delayed'
 
 export function auditChains(input: { cycles: ChainCycle[]; attempts: ChainAttempt[]; guided: ChainGuided[]; reviews: ChainReview[]; delayed: ChainDelayedCheck[] }) {
   const done = (a?: { status: string; completed_at: string | null }) => a?.status === 'completed' && a.completed_at ? a.completed_at : null
@@ -47,12 +51,14 @@ export function auditChains(input: { cycles: ChainCycle[]; attempts: ChainAttemp
     const ordered = [at.baseline, at.guided_practice, at.post, at.transfer].filter((v): v is string => v !== null)
     if (ordered.some((value, i) => i > 0 && Date.parse(value) < Date.parse(ordered[i - 1]))) warnings.push('out_of_order')
     if (cycle.status === 'completed' && firstMissing) warnings.push('cycle_completed_with_missing_links')
+    const postToTransfer = days(at.post, at.transfer)
+    if (postToTransfer !== null && postToTransfer < DELAYED_TRANSFER_MIN_DAYS) warnings.push('transfer_not_delayed')
     const delayed = input.delayed.filter(d => d.student_id === cycle.student_id && d.learning_objective_id === cycle.learning_objective_id)
     return {
       cycleId: cycle.id, studentId: cycle.student_id, objectiveId: cycle.learning_objective_id, status: cycle.status, createdAt: cycle.created_at,
       links, complete: firstMissing === null, firstMissing, warnings,
       scores: { baseline: baseline?.score_pct ?? null, post: post?.score_pct ?? null, transfer: transfer?.score_pct ?? null },
-      gapsDays: { baselineToPost: prePostDays, postToTransfer: days(at.post, at.transfer) },
+      gapsDays: { baselineToPost: prePostDays, postToTransfer },
       delayedChecks: { total: delayed.length, completed: delayed.filter(d => d.status === 'completed').length },
     }
   })

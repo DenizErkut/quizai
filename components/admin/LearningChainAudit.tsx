@@ -12,6 +12,7 @@ type Report = { generatedAt: string; totals: { cycles: number; completeChains: n
 const WARNING: Record<string, string> = {
   pre_post_gap_out_of_range: 'Ön/son test aralığı 1–90 gün dışında', out_of_order: 'Aşamalar zaman sırasına uymuyor',
   cycle_completed_with_missing_links: 'Döngü “tamamlandı” ama halka eksik',
+  transfer_not_delayed: 'Aktarım son testten 7 günden kısa sürede yapılmış (gecikmeli kanıt sayılmaz)',
 }
 const day = (iso: string | null) => iso ? new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', timeZone: 'Europe/Istanbul' }) : ''
 

@@ -6,7 +6,7 @@ import VerifiedLearningMetrics from '@/components/VerifiedLearningMetrics'
 import type { verifiedLearningMetrics } from '@/lib/verified-learning-metrics'
 import InterventionReviewQueue from './InterventionReviewQueue'
 
-type Option = { id: string; objective_code: string; title: string; availableItems: number; ready: boolean }
+type Option = { id: string; objective_code: string; title: string; availableItems: number; seenItems?: number; ready: boolean }
 type Cycle = { id: string; status: string; metrics?: ReturnType<typeof verifiedLearningMetrics>; objective?: { objective_code: string; title: string }; attempts: { stage: string; status: string; score_pct: number | null }[] }
 type NextObjective = { status: string; candidate: { id: string; objectiveCode: string; title: string } | null; reason: string }
 
@@ -60,7 +60,7 @@ export default function VerifiedLearningPlans({ classroomId, studentId }: { clas
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
       <select aria-label="Pilot kazanımı" value={objectiveId} onChange={event => setObjectiveId(event.target.value)} style={{ padding: 9, borderRadius: 8, maxWidth: '100%' }}>
         <option value="">Kazanım seçin</option>
-        {options.map(item => <option key={item.id} value={item.id}>{item.objective_code} · {item.availableItems}/16 doğrulanmış soru {item.ready ? '✓ hazır' : '· eksik'}</option>)}
+        {options.map(item => <option key={item.id} value={item.id}>{item.objective_code} · {item.availableItems}/16 {item.seenItems ? 'yeni ' : ''}doğrulanmış soru{item.seenItems ? ` (öğrenci ${item.seenItems} soruyu gördü)` : ''} {item.ready ? '✓ hazır' : '· eksik'}</option>)}
       </select>
       <button className="btn btn-primary" disabled={busy || !options.find(item => item.id === objectiveId)?.ready} onClick={() => void create()}>Öğrenciye ata</button>
     </div>
