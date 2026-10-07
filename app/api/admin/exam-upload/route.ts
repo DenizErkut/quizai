@@ -9,6 +9,7 @@ import { bookletQuestionLabels, printedQuestionNumber, printedQuestionObjective 
 import { figuresForPages, type PageFigure } from '@/lib/booklet-figures'
 import { verifyFigure } from '@/lib/booklet-figure-check'
 import { bookletImageSvg } from '@/lib/booklet-image'
+import { phantomVisualIssue } from '@/lib/phantom-visual'
 import { callOpenAI } from '@/lib/openai'
 import { questionBankKey } from '@/lib/question-bank'
 import { educationEvalGradeKey } from '@/lib/education-eval-grade'
@@ -247,6 +248,8 @@ async function loadGradeObjectives(grade: string | null | undefined): Promise<Ca
 async function promoteExactQuestions(row: { id?: string; subject?: string | null; grade?: string | null; topic?: string | null; subtopic?: string | null; raw_text?: string | null; learning_objective_codes?: unknown }, sourceType: 'teacher' | 'ai', batch: string) {
   const sourceLabel = sourceType === 'teacher' ? 'öğretmen imzalı' : 'yapay zekâ ile ayrıca hazırlanmış'
   const labels = bookletQuestionLabels(batch)
+  // A question that points at a figure it does not contain waits for its figure instead of entering the pool.
+  const needsVisual = (q: any) => requiresBookletVisual(q) || phantomVisualIssue({ q: q.q, opts: q.opts }) === 'missing_visual'
   const mixed = isMixedSubject(row.subject)
   const gradeObjectives = mixed ? await loadGradeObjectives(row.grade) : []
   const objectiveByCode = new Map(gradeObjectives.map(objective => [objective.objective_code.toLocaleUpperCase('tr-TR'), objective]))
@@ -282,7 +285,7 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
     throw new Error('Kalite denetçisi bütün sorular için geçerli karar döndürmedi; grup yeniden denenmeli.')
   }
   const approvedIndexes = new Set<number>((validation.results || []).filter((item: any) => item.approved === true).map((item: any) => Number(item.index)))
-  const questions = extracted.filter((q: any, index: number) => approvedIndexes.has(index) || requiresBookletVisual(q))
+  const questions = extracted.filter((q: any, index: number) => approvedIndexes.has(index) || needsVisual(q))
   let rows = questions.map((q: any) => ({
     fingerprint: createHash('sha256').update(`${q.q}|${q.opts.join('|')}`.toLocaleLowerCase('tr')).digest('hex'),
     subject_key: questionBankKey(row.subject || 'genel'),
@@ -291,8 +294,8 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
     // Preserve the classifier's finer subtopic separately in the question.
     topic_key: questionBankKey(row.subtopic || row.topic || q.topic || 'genel'),
     grade_key: canonicalBookletGrade(row.grade || ''), language_key: 'tr', question_type: q.type === 'short_answer' ? 'short_answer' : 'multiple_choice', difficulty: q.difficulty === 'easy' ? 'kolay' : q.difficulty === 'very_hard' ? 'cok zor' : q.difficulty === 'hard' ? 'zor' : 'normal',
-    question: { q: q.q, ...(printedQuestionNumber(q.q, labels) ? { sourceQuestionNumber: printedQuestionNumber(q.q, labels) } : {}), ...(q.type === 'short_answer' ? { type: 'short_answer' } : {}), opts: q.opts, ans: q.ans, exp: q.exp, requiresBookletVisual: requiresBookletVisual(q), objective: q.topic || row.subtopic || '', learningObjectiveCode: labels.some(label => label.codes.length) ? printedQuestionObjective(q.q, labels, verifiedCodes) : matchVerifiedObjectiveCode(q.objective_code, verifiedCodes), bookletObjectiveCodes: verifiedCodes, bookletTopic: row.subtopic || row.topic || '', bookletResourceId: row.id || null, subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' },
-    review_status: requiresBookletVisual(q) ? 'candidate' : 'approved', quality_score: requiresBookletVisual(q) ? 0 : 1, source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact', report_count: 0
+    question: { q: q.q, ...(printedQuestionNumber(q.q, labels) ? { sourceQuestionNumber: printedQuestionNumber(q.q, labels) } : {}), ...(q.type === 'short_answer' ? { type: 'short_answer' } : {}), opts: q.opts, ans: q.ans, exp: q.exp, requiresBookletVisual: needsVisual(q), objective: q.topic || row.subtopic || '', learningObjectiveCode: labels.some(label => label.codes.length) ? printedQuestionObjective(q.q, labels, verifiedCodes) : matchVerifiedObjectiveCode(q.objective_code, verifiedCodes), bookletObjectiveCodes: verifiedCodes, bookletTopic: row.subtopic || row.topic || '', bookletResourceId: row.id || null, subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' },
+    review_status: needsVisual(q) ? 'candidate' : 'approved', quality_score: needsVisual(q) ? 0 : 1, source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact', report_count: 0
   }))
   if (mixed) {
     // Subject and unit come from the catalog objective; an unplaced question waits for review instead of entering the pool under a guessed subject.
@@ -529,10 +532,11 @@ async function attachFigure(resourceId: string, figure: PageFigure): Promise<Fig
     .contains('question', { bookletResourceId: resourceId, sourceQuestionNumber: figure.questionNumber }).limit(3)
   if (!rows || rows.length !== 1) return 'unmatched'
   const row = rows[0]
-  if (!row.question?.requiresBookletVisual) return 'skipped'
+  if (typeof row.question?.svg === 'string' && row.question.svg.includes('<svg')) return 'skipped'
   const verdict = await verifyFigure(anthropic, figure, row.question)
   if (!verdict.ok) {
-    await adminDb.from('question_bank').update({ question: { ...row.question, visualAutoNote: verdict.reason || 'Otomatik görsel doğrulanamadı.' }, updated_at: new Date().toISOString() }).eq('id', row.id).eq('updated_at', row.updated_at)
+    const pointsAtFigure = row.question.requiresBookletVisual === true || phantomVisualIssue({ q: row.question.q, opts: row.question.opts }) === 'missing_visual'
+    await adminDb.from('question_bank').update({ question: { ...row.question, visualAutoNote: verdict.reason || 'Otomatik görsel doğrulanamadı.' }, ...(pointsAtFigure ? { review_status: 'candidate', quality_score: 0 } : {}), updated_at: new Date().toISOString() }).eq('id', row.id).eq('updated_at', row.updated_at)
     return 'review'
   }
   const svg = bookletImageSvg(new Uint8Array(figure.data), figure.width, figure.height)
@@ -611,8 +615,6 @@ async function processNextBooklet(id: string) {
         const path = storagePathFromUrl(row.file_url)
         if (!path) throw new Error('PDF dosyası bulunamadı.')
         if (next.next_page === 0) {
-          const { count } = await adminDb.from('question_bank').select('id', { count: 'exact', head: true }).contains('question', { bookletResourceId: id, requiresBookletVisual: true })
-          if (!count) { next.next_page = -1; progress = 'Görsel gerektiren soru yok.' }
         }
         if (next.next_page >= 0) {
           const { data: file, error: downloadError } = await adminDb.storage.from('meb-resources').download(path)

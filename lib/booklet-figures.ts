@@ -22,7 +22,9 @@ export function acceptMarkers(candidates: Marker[], known: Set<number>, last: nu
   let current = last
   for (const marker of [...candidates].sort((a, b) => a.top - b.top)) {
     if (!known.has(marker.n)) continue
-    if (marker.n > current && (current === 0 || marker.n - current <= 3)) { accepted.push(marker); current = marker.n }
+    // The first question starts the sequence ("8. SINIF" on a cover page is not question 8).
+    const continues = current === 0 ? marker.n <= 2 : marker.n - current <= 3
+    if (marker.n > current && continues) { accepted.push(marker); current = marker.n }
   }
   return accepted
 }
@@ -56,20 +58,51 @@ export type PageText = { str: string; box: Box }
 const ANSWER_LINE = /^\s*(?:cevap|yanıt|doğru cevap|zorluk|seviye|ders|kazanım)\b/iu
 const OPTION_LINE = /^\s*\(?[A-E][).]\s/u
 
-/** Short labels touching the figure (axis ticks, legend) belong to it; options, answers and long lines never do. */
+/** Items on the same visual line (same baseline band). */
+function sameLine(a: Box, b: Box): boolean {
+  const mid = (box: Box) => (box.top + box.bottom) / 2
+  return Math.abs(mid(a) - mid(b)) <= Math.max(5, (a.bottom - a.top) * 0.6)
+}
+
+/** Lines that belong to the question, not to the figure: answers, options, and sentences. */
+function questionLines(texts: PageText[]): Set<PageText> {
+  const blocked = new Set<PageText>()
+  for (const text of texts) {
+    const label = text.str.trim()
+    const sentence = label.length > 24 || /[?.:]$/.test(label)
+    if (!label || sentence || ANSWER_LINE.test(label) || OPTION_LINE.test(label) || /^\(?[A-E][).]$/u.test(label)) {
+      for (const other of texts) if (sameLine(text.box, other.box)) blocked.add(other)
+    }
+  }
+  return blocked
+}
+
+/** Short labels touching the figure (axis ticks, legend) belong to it; options, answers and sentences never do. */
 export function expandWithLabels(box: Box, texts: PageText[], pageWidth: number, reach: number): Box {
+  const blocked = questionLines(texts)
   let result = { ...box }
   for (let pass = 0; pass < 2; pass++) {
     for (const text of texts) {
-      const label = text.str.trim()
-      if (!label || label.length > 40 || ANSWER_LINE.test(label) || OPTION_LINE.test(label)) continue
-      if (text.box.right - text.box.left > pageWidth * 0.5) continue
+      if (blocked.has(text) || !text.str.trim() || text.box.right - text.box.left > pageWidth * 0.5) continue
       const near = text.box.right >= result.left - reach && text.box.left <= result.right + reach
         && text.box.bottom >= result.top - reach && text.box.top <= result.bottom + reach
       if (near) result = { left: Math.min(result.left, text.box.left), right: Math.max(result.right, text.box.right), top: Math.min(result.top, text.box.top), bottom: Math.max(result.bottom, text.box.bottom) }
     }
   }
   return result
+}
+
+/** Shrinks the crop so no text line outside the figure is cut or included. */
+export function clampCrop(crop: Box, box: Box, texts: PageText[]): Box {
+  const out = { ...crop }
+  for (const text of texts) {
+    const overlaps = text.box.right > out.left && text.box.left < out.right && text.box.bottom > out.top && text.box.top < out.bottom
+    const inside = text.box.top >= box.top - 2 && text.box.bottom <= box.bottom + 2 && text.box.left >= box.left - 2 && text.box.right <= box.right + 2
+    if (!overlaps || inside) continue
+    if ((text.box.top + text.box.bottom) / 2 < (box.top + box.bottom) / 2) out.top = Math.max(out.top, Math.min(Math.ceil(text.box.bottom) + 1, box.top))
+    else out.bottom = Math.min(out.bottom, Math.max(Math.floor(text.box.top) - 1, box.bottom))
+  }
+  return out
 }
 
 export type PageFigure = { questionNumber: number; data: Buffer; mime: 'image/png' | 'image/jpeg'; width: number; height: number }
@@ -143,7 +176,8 @@ export async function figuresForPages(
         const box = expandWithLabels(found, texts.filter(t => t.box.top >= top - 4 && t.box.bottom <= bottom + 4), width, 14)
         const pad = 10
         const left = Math.max(0, Math.floor(box.left) - pad), right = Math.min(width, Math.ceil(box.right) + pad)
-        const cropTop = Math.max(top, Math.floor(box.top) - pad), cropBottom = Math.min(bottom, Math.ceil(box.bottom) + pad)
+        const clamped = clampCrop({ left, right, top: Math.max(top, Math.floor(box.top) - pad), bottom: Math.min(bottom, Math.ceil(box.bottom) + pad) }, box, texts)
+        const cropTop = Math.floor(clamped.top), cropBottom = Math.ceil(clamped.bottom)
         const cropW = right - left, cropH = cropBottom - cropTop
         if (cropW < 60 || cropH < 50) continue
         const outScale = Math.min(1, 1000 / cropW)

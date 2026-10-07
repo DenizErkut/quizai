@@ -17,15 +17,16 @@ test('figure box ignores hairlines and finds the drawing', () => {
   assert.ok(box && box.left === 20 && box.right === 90 && box.top === 30 && box.bottom === 80, JSON.stringify(box))
 })
 
-test('labels join a figure, answers and options never do', () => {
+test('labels join a figure, answers, options and sentences never do', () => {
   const box = { left: 100, right: 200, top: 100, bottom: 200 }
   const texts = [
-    { str: 'Şub', box: { left: 120, right: 140, top: 205, bottom: 215 } },
-    { str: 'Cevap: B', box: { left: 120, right: 170, top: 205, bottom: 220 } },
-    { str: 'A) 12', box: { left: 100, right: 130, top: 210, bottom: 225 } },
+    { str: 'Şub', box: { left: 120, right: 140, top: 203, bottom: 213 } },
+    { str: 'Hangi çıkarım veriye uygundur?', box: { left: 100, right: 190, top: 220, bottom: 232 } },
+    { str: 'A) ', box: { left: 100, right: 112, top: 238, bottom: 250 } },
+    { str: 'M kesin kuzey', box: { left: 114, right: 170, top: 238, bottom: 250 } },
+    { str: 'Cevap: B', box: { left: 120, right: 170, top: 256, bottom: 268 } },
   ]
-  const expanded = expandWithLabels(box, texts, 600, 14)
-  assert.equal(expanded.bottom, 215)
+  assert.equal(expandWithLabels(box, texts, 600, 80).bottom, 213)
 })
 
 test('crops the chart of question 2 from a real PDF and leaves text-only questions alone', async () => {
