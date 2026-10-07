@@ -11,6 +11,7 @@
     { "path": "/api/cron/adaptive-evidence-checkpoints", "schedule": "15 4 * * *" },
     { "path": "/api/cron/coach-nudge-enqueue", "schedule": "0 7 * * *" },
     { "path": "/api/cron/coach-proactive-nudge", "schedule": "*/15 * * * *" },
-    { "path": "/api/cron/question-bank-review-sweep", "schedule": "20 5 * * *" }
+    { "path": "/api/cron/question-bank-review-sweep", "schedule": "20 5 * * *" },
+    { "path": "/api/cron/misconception-clusters", "schedule": "40 5 * * *" }
   ]
 }

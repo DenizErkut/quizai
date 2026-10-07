@@ -44,6 +44,7 @@ export default function DashboardPage() {
   const [streak, setStreak] = useState(0)
   const [loading, setLoading] = useState(true)
   const [dueCards, setDueCards] = useState(0)
+  const [dueTransfer, setDueTransfer] = useState(0)
   const [greeting, setGreeting] = useState('Merhaba')
 
   useEffect(() => {
@@ -82,6 +83,11 @@ export default function DashboardPage() {
         })
         const srData = await srRes.json()
         setDueCards(srData.totalDue || 0)
+      } catch {}
+      try {
+        const { data: { session: tcSession } } = await supabase.auth.getSession()
+        const tcRes = await fetch('/api/transfer-check', { headers: { Authorization: `Bearer ${tcSession?.access_token}` } })
+        if (tcRes.ok) setDueTransfer((await tcRes.json()).availableCount || 0)
       } catch {}
       setLoading(false)
     }
@@ -233,7 +239,7 @@ export default function DashboardPage() {
                     {item.icon}
                   </div>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', textAlign: 'center', lineHeight: 1.3 }}>
-                    {item.label}
+                    {item.label}{item.href === '/transfer-checks' && dueTransfer > 0 ? ` (${dueTransfer})` : ''}
                   </span>
                 </div>
               </Link>

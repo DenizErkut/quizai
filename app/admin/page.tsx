@@ -19,6 +19,7 @@ import RetentionCalibration from '@/components/admin/RetentionCalibration'
 import QuestionDifficultyCalibration from '@/components/admin/QuestionDifficultyCalibration'
 import MasteryShadowEvaluation from '@/components/admin/MasteryShadowEvaluation'
 import MisconceptionReview from '@/components/admin/MisconceptionReview'
+import MisconceptionClusterReview from '@/components/admin/MisconceptionClusterReview'
 import MisconceptionQuality from '@/components/admin/MisconceptionQuality'
 import MisconceptionMicroContent from '@/components/admin/MisconceptionMicroContent'
 import AgentQuality from '@/components/admin/AgentQuality'
@@ -1781,6 +1782,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           <QuestionDifficultyCalibration />
           <MasteryShadowEvaluation />
           <MisconceptionReview />
+          <MisconceptionClusterReview />
           <MisconceptionMicroContent />
           <MisconceptionQuality />
         </div>
