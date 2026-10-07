@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { fetchAllRows } from '@/lib/paginate'
+import { deriveTopics, type CatalogObjective } from '@/lib/curriculum-coverage'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,19 +24,21 @@ async function getAdminUser() {
   return p?.is_admin ? user : null
 }
 
+// The catalog has thousands of rows; a single select is cut at the API's Max rows (1000).
+async function loadCatalogObjectives(): Promise<CatalogObjective[]> {
+  return fetchAllRows<CatalogObjective>((from, to) => adminDb.from('learning_objective_catalog')
+    .select('grade,subject,topic,unit,is_active,verification_status,lifecycle_status').order('id').range(from, to))
+}
+
 // GET — tüm müfredatı listele
 export async function GET() {
-  const [{ data }, { data: objectives }] = await Promise.all([
-    adminDb.from('curriculum')
-    .select('*').order('level').order('grade').order('sort_order')
-    , adminDb.from('learning_objective_catalog').select('grade,subject,topic,unit').limit(10000),
-  ])
-  const key = (value: unknown) => typeof value === 'string' ? value.toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ').trim() : ''
-  const gradeKey = (value: unknown) => key(value).replace(/ sınıf/g, '').replace(/\. sınıf/g, '').replace(/[^0-9]/g, '')
+  let objectives: CatalogObjective[]
+  const { data } = await adminDb.from('curriculum').select('*').order('level').order('grade').order('sort_order')
+  try { objectives = await loadCatalogObjectives() }
+  catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Katalog okunamadı.' }, { status: 500 }) }
   const curriculum = (data || []).map(item => {
     if (Array.isArray(item.topics) && item.topics.length) return item
-    const matches = (objectives || []).filter(objective => gradeKey(objective.grade) === gradeKey(item.grade) && key(objective.subject) === key(item.subject))
-    const topics = [...new Set(matches.flatMap(objective => [objective.topic, objective.unit].filter((value): value is string => Boolean(value))))]
+    const topics = deriveTopics(item, objectives)
     return topics.length ? { ...item, topics } : item
   })
   return NextResponse.json({ curriculum })
@@ -47,18 +51,15 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   if (body?.action === 'backfill-topics') {
-    const [{ data: rows, error: rowsError }, { data: objectives, error: objectivesError }] = await Promise.all([
-      adminDb.from('curriculum').select('id,grade,subject,topics'),
-      adminDb.from('learning_objective_catalog').select('grade,subject,topic,unit').limit(10000),
-    ])
-    if (rowsError || objectivesError) return NextResponse.json({ error: rowsError?.message || objectivesError?.message }, { status: 500 })
-    const key = (value: unknown) => typeof value === 'string' ? value.toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ').trim() : ''
-    const gradeKey = (value: unknown) => key(value).replace(/ sınıf/g, '').replace(/\. sınıf/g, '').replace(/[^0-9]/g, '')
+    const { data: rows, error: rowsError } = await adminDb.from('curriculum').select('id,grade,subject,topics')
+    let objectives: CatalogObjective[]
+    try { objectives = await loadCatalogObjectives() }
+    catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Katalog okunamadı.' }, { status: 500 }) }
+    if (rowsError) return NextResponse.json({ error: rowsError.message }, { status: 500 })
     let updated = 0
     let matchedRows = 0
     for (const row of rows || []) {
-      const derived = [...new Set((objectives || []).filter(objective => gradeKey(objective.grade) === gradeKey(row.grade) && key(objective.subject) === key(row.subject))
-        .flatMap(objective => [objective.topic, objective.unit].filter((value): value is string => Boolean(value))))]
+      const derived = deriveTopics(row, objectives)
       const existing = Array.isArray(row.topics) ? row.topics.filter((value: unknown): value is string => typeof value === 'string' && Boolean(value.trim())) : []
       const topics = [...new Set([...existing, ...derived])]
       if (derived.length) matchedRows++
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
         updated++
       }
     }
-    return NextResponse.json({ ok: true, updated, matchedRows, catalogCount: (objectives || []).length })
+    return NextResponse.json({ ok: true, updated, matchedRows, catalogCount: objectives.length })
   }
   const { level, grade, subject, topics } = body
   if (!level || !grade || !subject) {
