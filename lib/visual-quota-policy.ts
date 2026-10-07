@@ -11,11 +11,12 @@ export const NUMERIC_VISUAL_RATIO = 0.3
 export const VERBAL_VISUAL_RATIO = 0.1
 export const NEW_GENERATION_VISUAL_RATIO = 0.5 // "yeni nesil" requests, numeric subjects only
 
-// Matematik, Fen (Bilimleri / ve Teknoloji), Biyoloji, Kimya as requested, plus Fizik and Geometri,
-// which are the same family (Fizik is not on the requested list; remove it here to treat it as verbal).
-const NUMERIC_SUBJECT = /^(matematik|geometri|fen( bilimleri| ve teknoloji)?|fizik|kimya|biyoloji)( |$)/
+// Matematik, Fen (Bilimleri / ve Teknoloji), Biyoloji, Kimya as requested, Cografya at the owner's request
+// (maps, charts and climate data), plus Fizik and Geometri, which are the same family as the sciences
+// (Fizik and Geometri were not on the requested list; remove them here to treat them as verbal).
+const NUMERIC_SUBJECT = /^(matematik|geometri|fen( bilimleri| ve teknoloji)?|fizik|kimya|biyoloji|cografya)( |$)/
 
-const KNOWN_VERBAL_SUBJECT = /^(turkce|turk dili|edebiyat|felsefe|sosyal bilgiler|tarih|cografya|ingilizce|almanca|fransizca|arapca|din kulturu|hayat bilgisi|t\.c\. inkilap|inkilap|psikoloji|sosyoloji|mantik)/
+const KNOWN_VERBAL_SUBJECT = /^(turkce|turk dili|edebiyat|felsefe|sosyal bilgiler|tarih|ingilizce|almanca|fransizca|arapca|din kulturu|hayat bilgisi|t\.c\. inkilap|inkilap|psikoloji|sosyoloji|mantik)/
 
 function asciiKey(subject: unknown): string {
   return dimensionKey(subject).replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c')

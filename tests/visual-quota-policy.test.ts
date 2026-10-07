@@ -4,9 +4,9 @@ import { bankVisualTarget, visualProfileForSubject, visualQuotaFor } from '../li
 import { visualAttemptCount, requiredVisualCount } from '../lib/quiz-generation-policy'
 
 test('numeric subjects keep the 30% rule; verbal subjects are loosened', () => {
-  for (const subject of ['Matematik', 'Fen Bilimleri', 'Fen ve Teknoloji', 'Biyoloji', 'Kimya', 'Fizik', 'Geometri', 'MATEMATİK', ' fen bilimleri '])
+  for (const subject of ['Matematik', 'Fen Bilimleri', 'Fen ve Teknoloji', 'Biyoloji', 'Kimya', 'Fizik', 'Geometri', 'Coğrafya', 'COĞRAFYA', 'MATEMATİK', ' fen bilimleri '])
     assert.equal(visualProfileForSubject(subject), 'numeric', subject)
-  for (const subject of ['Türkçe', 'Türk Dili ve Edebiyatı', 'Edebiyat', 'Felsefe', 'Sosyal Bilgiler', 'Tarih', 'Coğrafya', 'İngilizce',
+  for (const subject of ['Türkçe', 'Türk Dili ve Edebiyatı', 'Edebiyat', 'Felsefe', 'Sosyal Bilgiler', 'Tarih', 'İngilizce',
     'Din Kültürü ve Ahlak Bilgisi', 'Hayat Bilgisi', 'T.C. İnkılap Tarihi ve Atatürkçülük'])
     assert.equal(visualProfileForSubject(subject), 'verbal', subject)
 })
