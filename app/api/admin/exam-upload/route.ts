@@ -301,7 +301,9 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
     // Subject and unit come from the catalog objective; an unplaced question waits for review instead of entering the pool under a guessed subject.
     rows = rows.map((item: any, index: number) => {
       const source: any = questions[index]
-      const place = placeMixedQuestion(source.objective_code, objectiveByCode, source.subject, source.topic)
+      // The code printed in the question heading is more reliable than the extractor's pick.
+      const printed = printedQuestionObjective(source.q, labels, verifiedCodes)
+      const place = placeMixedQuestion(printed || source.objective_code, objectiveByCode, source.subject, source.topic)
       const approved = place.verified && item.review_status === 'approved'
       return {
         ...item,
