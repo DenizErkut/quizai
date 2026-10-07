@@ -5,7 +5,10 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createHash, randomUUID } from 'node:crypto'
 import { bookletBatches } from '@/lib/booklet-processing'
-import { bookletQuestionLabels, printedQuestionObjective } from '@/lib/booklet-objective-label'
+import { bookletQuestionLabels, printedQuestionNumber, printedQuestionObjective } from '@/lib/booklet-objective-label'
+import { figuresForPages, type PageFigure } from '@/lib/booklet-figures'
+import { verifyFigure } from '@/lib/booklet-figure-check'
+import { bookletImageSvg } from '@/lib/booklet-image'
 import { callOpenAI } from '@/lib/openai'
 import { questionBankKey } from '@/lib/question-bank'
 import { educationEvalGradeKey } from '@/lib/education-eval-grade'
@@ -288,7 +291,7 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
     // Preserve the classifier's finer subtopic separately in the question.
     topic_key: questionBankKey(row.subtopic || row.topic || q.topic || 'genel'),
     grade_key: canonicalBookletGrade(row.grade || ''), language_key: 'tr', question_type: q.type === 'short_answer' ? 'short_answer' : 'multiple_choice', difficulty: q.difficulty === 'easy' ? 'kolay' : q.difficulty === 'very_hard' ? 'cok zor' : q.difficulty === 'hard' ? 'zor' : 'normal',
-    question: { q: q.q, ...(q.type === 'short_answer' ? { type: 'short_answer' } : {}), opts: q.opts, ans: q.ans, exp: q.exp, requiresBookletVisual: requiresBookletVisual(q), objective: q.topic || row.subtopic || '', learningObjectiveCode: labels.some(label => label.codes.length) ? printedQuestionObjective(q.q, labels, verifiedCodes) : matchVerifiedObjectiveCode(q.objective_code, verifiedCodes), bookletObjectiveCodes: verifiedCodes, bookletTopic: row.subtopic || row.topic || '', bookletResourceId: row.id || null, subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' },
+    question: { q: q.q, ...(printedQuestionNumber(q.q, labels) ? { sourceQuestionNumber: printedQuestionNumber(q.q, labels) } : {}), ...(q.type === 'short_answer' ? { type: 'short_answer' } : {}), opts: q.opts, ans: q.ans, exp: q.exp, requiresBookletVisual: requiresBookletVisual(q), objective: q.topic || row.subtopic || '', learningObjectiveCode: labels.some(label => label.codes.length) ? printedQuestionObjective(q.q, labels, verifiedCodes) : matchVerifiedObjectiveCode(q.objective_code, verifiedCodes), bookletObjectiveCodes: verifiedCodes, bookletTopic: row.subtopic || row.topic || '', bookletResourceId: row.id || null, subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' },
     review_status: requiresBookletVisual(q) ? 'candidate' : 'approved', quality_score: requiresBookletVisual(q) ? 0 : 1, source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact', report_count: 0
   }))
   if (mixed) {
@@ -393,7 +396,7 @@ export async function POST(req: NextRequest) {
       fileUrl = body.file_url
       try {
         const pdfBytes = Buffer.from(await fileData.arrayBuffer())
-        if (pdfBytes.length < 10 * 1024 * 1024) {
+        if (pdfBytes.length < 45 * 1024 * 1024) {
           const pdfParse = require('pdf-parse')
           const parsed = await pdfParse(pdfBytes)
           rawText = parsed.text || ''
@@ -430,7 +433,7 @@ export async function POST(req: NextRequest) {
           fileUrl = u?.publicUrl || ''
         }
         try {
-          if (Buffer.from(bytes).length < 10 * 1024 * 1024) {
+          if (Buffer.from(bytes).length < 45 * 1024 * 1024) {
             const pdfParse = require('pdf-parse')
             const parsed = await pdfParse(Buffer.from(bytes))
             rawText = parsed.text || ''
@@ -510,9 +513,43 @@ export async function PUT(req: NextRequest) {
   return NextResponse.json({ success: true, chunks: data, char_count: rawText.length, learning_objective_codes: learningObjectiveCodes })
 }
 
+const FIGURE_PAGES_PER_STEP = 4
+
+function storagePathFromUrl(url: string | null | undefined): string | null {
+  const marker = '/meb-resources/'
+  const at = (url || '').indexOf(marker)
+  return at < 0 ? null : decodeURIComponent((url as string).slice(at + marker.length).split('?')[0])
+}
+
+type FigureOutcome = 'attached' | 'review' | 'unmatched' | 'skipped'
+
+/** Attaches one cropped figure to the single bank question with that printed number, after a vision check. */
+async function attachFigure(resourceId: string, figure: PageFigure): Promise<FigureOutcome> {
+  const { data: rows } = await adminDb.from('question_bank').select('id,question,updated_at,review_status')
+    .contains('question', { bookletResourceId: resourceId, sourceQuestionNumber: figure.questionNumber }).limit(3)
+  if (!rows || rows.length !== 1) return 'unmatched'
+  const row = rows[0]
+  if (!row.question?.requiresBookletVisual) return 'skipped'
+  const verdict = await verifyFigure(anthropic, figure, row.question)
+  if (!verdict.ok) {
+    await adminDb.from('question_bank').update({ question: { ...row.question, visualAutoNote: verdict.reason || 'Otomatik görsel doğrulanamadı.' }, updated_at: new Date().toISOString() }).eq('id', row.id).eq('updated_at', row.updated_at)
+    return 'review'
+  }
+  const svg = bookletImageSvg(new Uint8Array(figure.data), figure.width, figure.height)
+  const question = { ...row.question, svg, qtype: 'svg', hasVisual: true, requiresBookletVisual: false, visualKind: 'booklet_image', visualQuestionText: row.question.q,
+    visualSource: 'auto_pdf_region_ai_checked', visualReviewedAt: new Date().toISOString() }
+  const fingerprint = createHash('sha256').update(`${question.q}|${question.opts.join('|')}|${svg}`.toLocaleLowerCase('tr')).digest('hex')
+  // A question whose subject/objective is still unplaced stays a candidate even with its figure.
+  const approve = row.question.mixedPlacement !== 'needs_review'
+  const { data, error } = await adminDb.from('question_bank')
+    .update({ question, fingerprint, review_status: approve ? 'approved' : row.review_status, quality_score: approve ? 1 : 0, updated_at: new Date().toISOString() })
+    .eq('id', row.id).eq('updated_at', row.updated_at).select('id').maybeSingle()
+  return error || !data ? 'review' : 'attached'
+}
+
 async function processNextBooklet(id: string) {
   const { data: row, error: resourceError } = await adminDb.from('exam_resources')
-    .select('id,source_type,purpose,review_status,subject,grade,topic,subtopic,raw_text,learning_objective_codes')
+    .select('id,source_type,purpose,review_status,subject,grade,topic,subtopic,raw_text,learning_objective_codes,file_url')
     .eq('id', id).maybeSingle()
   if (resourceError) throw resourceError
   if (!row || row.review_status === 'rejected') return NextResponse.json({ error: 'İşlenebilir kitapçık bulunamadı.' }, { status: 404 })
@@ -549,7 +586,8 @@ async function processNextBooklet(id: string) {
       if (restored.error) throw restored.error
       chunks = restored.data
     }
-    const next = { next_chunk: claimed.next_chunk, next_batch: claimed.next_batch, promoted: claimed.promoted, status: 'pending' }
+    const next = { next_chunk: claimed.next_chunk, next_batch: claimed.next_batch, promoted: claimed.promoted, status: 'pending',
+      next_page: claimed.next_page ?? 0, last_question: claimed.last_question ?? 0, figures_attached: claimed.figures_attached ?? 0, figures_review: claimed.figures_review ?? 0, figure_note: claimed.figure_note ?? null as string | null }
     let progress = ''
     if (claimed.next_chunk < (chunks || []).length) {
       const group = (chunks || []).slice(claimed.next_chunk, claimed.next_chunk + 5)
@@ -567,8 +605,38 @@ async function processNextBooklet(id: string) {
       next.promoted += await promoteExactQuestions(row, row.source_type as 'teacher' | 'ai', batches[claimed.next_batch])
       next.next_batch++
       progress = `Soru kontrolü: ${next.next_batch}/${batches.length} grup; ${next.promoted} yeni soru havuzda.`
+    } else if (exact && next.next_page >= 0) {
+      // Figure phase: crop each question's figure from the PDF and attach it. Never blocks the imported questions.
+      try {
+        const path = storagePathFromUrl(row.file_url)
+        if (!path) throw new Error('PDF dosyası bulunamadı.')
+        if (next.next_page === 0) {
+          const { count } = await adminDb.from('question_bank').select('id', { count: 'exact', head: true }).contains('question', { bookletResourceId: id, requiresBookletVisual: true })
+          if (!count) { next.next_page = -1; progress = 'Görsel gerektiren soru yok.' }
+        }
+        if (next.next_page >= 0) {
+          const { data: file, error: downloadError } = await adminDb.storage.from('meb-resources').download(path)
+          if (downloadError || !file) throw new Error('PDF indirilemedi.')
+          const known = new Set(bookletQuestionLabels(row.raw_text || '').map(label => label.number).filter((n): n is number => n !== null))
+          const result = await figuresForPages(new Uint8Array(await file.arrayBuffer()), { fromPage: next.next_page, pages: FIGURE_PAGES_PER_STEP, lastQuestion: next.last_question, knownNumbers: known })
+          for (const figure of result.figures) {
+            const outcome = await attachFigure(id, figure)
+            if (outcome === 'attached') next.figures_attached++
+            else if (outcome === 'review') next.figures_review++
+          }
+          next.last_question = result.lastQuestion
+          next.next_page += FIGURE_PAGES_PER_STEP
+          if (next.next_page >= result.pageCount) next.next_page = -1
+          progress = `Görsel eşleme: sayfa ${Math.min(result.pageCount, next.next_page < 0 ? result.pageCount : next.next_page)}/${result.pageCount}; ${next.figures_attached} görsel soruya eklendi, ${next.figures_review} görsel elle kontrol bekliyor.`
+        }
+      } catch (figureError) {
+        console.error('[exam-upload] figure phase failed', figureError)
+        next.next_page = -1
+        next.figure_note = figureError instanceof Error ? figureError.message.slice(0, 200) : 'Görsel eşleme çalışmadı.'
+        progress = `Görsel eşleme atlandı (${next.figure_note}); sorular havuzda, görselleri elle ekleyebilirsiniz.`
+      }
     }
-    const done = next.next_chunk >= (chunks || []).length && next.next_batch >= batches.length
+    const done = next.next_chunk >= (chunks || []).length && next.next_batch >= batches.length && (!exact || next.next_page < 0)
     if (done && exact) {
       const { error } = await adminDb.from('exam_resources').update({ review_status: 'approved', reuse_policy: 'exact_reuse' }).eq('id', id).neq('review_status', 'rejected')
       if (error) throw error

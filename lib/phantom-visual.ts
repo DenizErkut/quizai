@@ -24,7 +24,8 @@ function text(question: Q): string {
 /** A real, self-contained visual: inline <svg> without external images, or structured table data. */
 export function hasRealVisualAsset(question: Q): boolean {
   const svg = typeof question.svg === 'string' ? question.svg : ''
-  if (/<svg\b[\s\S]*<\/svg>/i.test(svg) && !/<image\b|href\s*=\s*["']https?:/i.test(svg)) return true
+  // Embedded data: images (booklet figures) are real; links to remote images are not.
+  if (/<svg\b[\s\S]*<\/svg>/i.test(svg) && !/href\s*=\s*["']\s*(?:https?:)?\/\//i.test(svg)) return true
   const table = question.tableData as { rows?: unknown[] } | undefined
   return Array.isArray(table?.rows) && table.rows.length > 0
 }
