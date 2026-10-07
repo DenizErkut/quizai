@@ -92,7 +92,8 @@ test('education AI safety scorecard uses live evidence and admin authorization',
   expect(route).toContain("from('agent_decision_audit')")
   expect(route).toContain("from('agent_action_approval_queue')")
   expect(route).toContain("from('learning_transfer_checks')")
-  expect(route).toContain('privacy_access')
+  const scoring = readFileSync(join(process.cwd(), 'lib/safety-scorecard.ts'), 'utf8')
+  expect(scoring).toContain('privacy_access')
   expect(admin).toContain('<EducationAISafetyScorecard />')
 })
 

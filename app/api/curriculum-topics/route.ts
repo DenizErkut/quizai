@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { extractGradeNumber } from '@/lib/subject-map-grade'
+import { fetchAllRows } from '@/lib/paginate'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -40,23 +41,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Aktif MEB müfredatı bulunamadı.' }, { status: 503 })
   }
 
-  const { data, error } = await adminDb
-    .from('learning_objective_catalog')
-    .select('subject,grade,unit,topic,objective_code')
-    .eq('curriculum_version_id', version.id)
-    .eq('verification_status', 'verified')
-    .eq('lifecycle_status', 'active')
-    .eq('is_active', true)
-    .eq('grade', `${gradeNumber}. sınıf`)
-    .not('current_revision_id', 'is', null)
-    .order('subject')
-    .order('objective_code')
-    .limit(5000)
-
-  if (error) return NextResponse.json({ error: 'Müfredat konuları alınamadı.' }, { status: 500 })
+  let data: Array<{ subject: string | null; grade: string | null; unit: string | null; topic: string | null; objective_code: string | null }>
+  try {
+    data = await fetchAllRows((from, to) => adminDb
+      .from('learning_objective_catalog')
+      .select('subject,grade,unit,topic,objective_code')
+      .eq('curriculum_version_id', version.id)
+      .eq('verification_status', 'verified')
+      .eq('lifecycle_status', 'active')
+      .eq('is_active', true)
+      .eq('grade', `${gradeNumber}. sınıf`)
+      .not('current_revision_id', 'is', null)
+      .order('subject')
+      .order('objective_code')
+      .order('id')
+      .range(from, to))
+  } catch {
+    return NextResponse.json({ error: 'Müfredat konuları alınamadı.' }, { status: 500 })
+  }
 
   const topicsBySubject: Record<string, string[]> = {}
-  for (const row of data || []) {
+  for (const row of data) {
     const subject = clean(row.subject)
     const topic = clean(row.unit) || clean(row.topic)
     if (!subject || !topic) continue
