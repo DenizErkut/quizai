@@ -18,13 +18,16 @@ export type Marker = { n: number; top: number; x: number }
  * advance the question sequence.
  */
 export function acceptMarkers(candidates: Marker[], known: Set<number>, last: number): Marker[] {
+  const sorted = [...known].sort((a, b) => a - b)
   const accepted: Marker[] = []
   let current = last
   for (const marker of [...candidates].sort((a, b) => a.top - b.top)) {
     if (!known.has(marker.n)) continue
-    // The first question starts the sequence ("8. SINIF" on a cover page is not question 8).
-    const continues = current === 0 ? marker.n <= 2 : marker.n - current <= 3
-    if (marker.n > current && continues) { accepted.push(marker); current = marker.n }
+    // A marker must be one of the next three question numbers the booklet really contains, so a
+    // booklet with gaps (a re-import of a few questions) works, and "1. … 2. …" lists inside a
+    // question or a cover line such as "8. SINIF" do not advance the sequence.
+    const upcoming = sorted.filter(n => n > current).slice(0, 3)
+    if (upcoming.includes(marker.n)) { accepted.push(marker); current = marker.n }
   }
   return accepted
 }
