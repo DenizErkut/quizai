@@ -9,6 +9,12 @@ test('markers must continue the numbering; lists inside a question are skipped',
   assert.deepEqual(accepted.map(marker => marker.n), [17, 18])
 })
 
+test('booklets with gaps in their numbering still work', () => {
+  const known = new Set([2, 3, 12, 16, 36])
+  const markers = [2, 3, 12, 16, 36].map((n, i) => ({ n, top: i * 100, x: 10 }))
+  assert.deepEqual(acceptMarkers(markers, known, 0).map(marker => marker.n), [2, 3, 12, 16, 36])
+})
+
 test('figure box ignores hairlines and finds the drawing', () => {
   const width = 100, gray = new Uint8Array(width * 100).fill(255)
   for (let x = 0; x < width; x++) gray[5 * width + x] = 0 // 1px rule: too thin to count as a figure on its own
@@ -47,4 +53,21 @@ test('crops the chart of question 2 from a real PDF and leaves text-only questio
   assert.deepEqual(result.figures.map(figure => figure.questionNumber), [2])
   assert.equal(result.lastQuestion, 3)
   assert.ok(result.figures[0].width > 100 && result.figures[0].height > 100)
+})
+
+test('a PDF with an embedded raster picture renders without crashing the process', async () => {
+  const { createCanvas } = await import('@napi-rs/canvas')
+  const canvas = createCanvas(200, 120)
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#2255aa'; ctx.fillRect(0, 0, 200, 120)
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(40, 40, 120, 40)
+  const doc = await PDFDocument.create()
+  const font = await doc.embedFont(StandardFonts.Helvetica)
+  const page = doc.addPage([595, 842])
+  page.drawText('1. Which picture is blue?', { x: 50, y: 800, size: 11, font })
+  const image = await doc.embedPng(canvas.toBuffer('image/png'))
+  page.drawImage(image, { x: 80, y: 600, width: 200, height: 120 })
+  page.drawText('A) this one   B) none', { x: 50, y: 570, size: 11, font })
+  const result = await figuresForPages(new Uint8Array(await doc.save()), { fromPage: 0, pages: 1, lastQuestion: 0, knownNumbers: new Set([1]) })
+  assert.deepEqual(result.figures.map(figure => figure.questionNumber), [1])
 })
