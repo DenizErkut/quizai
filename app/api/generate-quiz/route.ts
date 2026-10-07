@@ -42,7 +42,7 @@ import { decideQuizProvider, getQuizProviderPolicy, QUIZ_PROVIDER_POLICY_VERSION
 import { attachQuestionRigorMetadata, summarizeQuestionSetRigor } from '@/lib/question-rigor'
 import { verifyVisualWithMistral } from '@/lib/mistral-quality'
 import { verifyVisualWithGemini } from '@/lib/gemini-visual-quality'
-import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, minimumVerifiedQuestionCount, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
+import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, minimumVerifiedQuestionCount, missingRoleBatches, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, roleBatchMaxTokens, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
 import { isSameGradeSource } from '@/lib/meb-source-scope'
 import { visualProfileForSubject, visualQuotaFor, VERBAL_VISUAL_RATIO } from '@/lib/visual-quota-policy'
 
@@ -1231,7 +1231,7 @@ async function generateProviderQuestionBatch(args: {
       { role: 'user', content: rolePrompt },
     ], {
       model: 'gpt-4.1-mini',
-      max_tokens: Math.min(6000, Math.max(2000, batch.count * 650)),
+      max_tokens: roleBatchMaxTokens(batch.count),
       json: true,
       timeoutMs: 45000,
       operation: 'generate-quiz:role-openai-easy',
@@ -1244,7 +1244,7 @@ async function generateProviderQuestionBatch(args: {
     if (!adapter.isConfigured()) throw new Error('Mistral is not configured for normal-difficulty generation')
     const response = await adapter.execute({
       messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: rolePrompt }],
-      maxTokens: Math.min(6000, Math.max(2000, batch.count * 650)),
+      maxTokens: roleBatchMaxTokens(batch.count),
       json: true,
       timeoutMs: 45000,
     }, {
@@ -1260,7 +1260,7 @@ async function generateProviderQuestionBatch(args: {
     const timeoutMs = Math.max(20000, 100000 - (Date.now() - args.requestStartTime))
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5',
-      max_tokens: Math.min(6000, Math.max(2000, batch.count * 650)),
+      max_tokens: roleBatchMaxTokens(batch.count),
       system: systemPrompt,
       messages: [{ role: 'user', content: rolePrompt }],
     }, { timeout: timeoutMs, maxRetries: 0 })
@@ -2330,15 +2330,7 @@ export async function POST(req: NextRequest) {
         try {
           let topupQuestions: any[] = []
           if (roleMixEnabled) {
-            const rolePlan = buildQuestionGenerationPlan(aiQuestionCount)
-            const providerCounts: Record<string, number> = { openai: 0, mistral: 0, anthropic: 0 }
-            for (const question of questions) {
-              const provider = question.generationProvider
-              if (typeof provider === 'string' && provider in providerCounts) providerCounts[provider]++
-            }
-            const deficits = rolePlan
-              .map(batch => ({ ...batch, count: Math.max(0, batch.count - providerCounts[batch.provider]) }))
-              .filter(batch => batch.count > 0)
+            const deficits = missingRoleBatches(buildQuestionGenerationPlan(aiQuestionCount), questions, missing)
             const recoveredBatches = await Promise.all(deficits.map(batch => generateProviderQuestionBatch({
               batch,
               prompt,
@@ -2402,22 +2394,7 @@ export async function POST(req: NextRequest) {
           ]
           topupQuestions = filterOutNearDuplicates(topupQuestions, alreadyAsked)
           if (roleMixEnabled) {
-            const rolePlan = buildQuestionGenerationPlan(aiQuestionCount)
-            const currentByProvider: Record<string, number> = { openai: 0, mistral: 0, anthropic: 0 }
-            for (const question of questions) {
-              const provider = question.generationProvider
-              if (typeof provider === 'string' && provider in currentByProvider) currentByProvider[provider]++
-            }
-            const remainingByProvider = { ...currentByProvider }
-            for (const question of topupQuestions) {
-              const provider = question.generationProvider
-              const target = rolePlan.find(batch => batch.provider === provider)?.count || 0
-              if (provider in remainingByProvider && remainingByProvider[provider] < target) {
-                questions.push(question)
-                remainingByProvider[provider]++
-              }
-            }
-            questions = questions.slice(0, aiQuestionCount)
+            questions = [...questions, ...topupQuestions].slice(0, aiQuestionCount)
           } else {
             questions = [...questions, ...topupQuestions].slice(0, aiQuestionCount)
           }
