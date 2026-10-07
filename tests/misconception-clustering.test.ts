@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { groupClusterableRows, parseClusterResponse, clusterMemberKey } from '../lib/misconception-clustering'
+import { groupClusterableRows, parseClusterResponse, clusterMemberKey, excludeCanonicalRows } from '../lib/misconception-clustering'
 
 const row = (student: string, id: string, topic = 'T', label = `label ${id}`) =>
   ({ student_id: student, misconception_id: id, subject: 'Matematik', topic, evidence_count: 1, label })
@@ -28,4 +28,10 @@ test('accepts a valid cluster and rejects unsafe ones', () => {
 
 test('member key is order independent', () => {
   assert.equal(clusterMemberKey(['b', 'a', 'c']), clusterMemberKey(['c', 'a', 'b']))
+})
+
+test('already-canonical entries are not clusterable', () => {
+  const rows = [row('a', 'mc_1'), row('a', 'mcc_x'), row('a', 'mc_2')]
+  assert.deepEqual(excludeCanonicalRows(rows, ['mcc_x']).map(r => r.misconception_id), ['mc_1', 'mc_2'])
+  assert.equal(groupClusterableRows(excludeCanonicalRows(rows, ['mcc_x'])).length, 0)
 })
