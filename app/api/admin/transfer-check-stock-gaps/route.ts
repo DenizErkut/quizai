@@ -4,6 +4,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { questionBankKey } from '@/lib/question-bank'
 import { usableTransferQuestion } from '@/lib/transfer-check-scoring'
+import { readAll } from '@/lib/paginate'
 
 export const runtime = 'nodejs'
 
@@ -22,8 +23,8 @@ async function isAdmin(): Promise<boolean> {
 /** Objectives with pending transfer checks but no independently vetted bank item: these can never be served. */
 export async function GET() {
   if (!await isAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  const { data: checks, error } = await db.from('learning_transfer_checks')
-    .select('learning_objective_id,learning_objective_code,subject,grade').eq('status', 'pending').limit(2000)
+  const { data: checks, error } = await readAll(() => db.from('learning_transfer_checks')
+    .select('learning_objective_id,learning_objective_code,subject,grade').eq('status', 'pending'))
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   const byObjective = new Map<string, { code: string | null; subject: string; grade: string | null; pending: number }>()
   for (const check of checks ?? []) {

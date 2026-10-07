@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { readAll } from '@/lib/paginate'
 
 const adminDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
@@ -23,7 +24,7 @@ export async function GET() {
     adminDb.from('recommendation_impact_measurements')
       .select('id,subject,topic,action_type,graph_used,graph_relation_version,baseline_mastery,post_mastery,mastery_delta,event_score_pct,event_count,applied_at,evaluated_at,measurement_version')
       .order('applied_at', { ascending: false }).limit(50),
-    adminDb.from('agent_decision_audit').select('decision_summary,created_at').eq('agent_name','recommendation-shadow-v1').gte('created_at',new Date(Date.now()-30*86_400_000).toISOString()).order('created_at',{ascending:false}).limit(5000),
+    readAll(() => adminDb.from('agent_decision_audit').select('decision_summary,created_at').eq('agent_name','recommendation-shadow-v1').gte('created_at',new Date(Date.now()-30*86_400_000).toISOString())),
   ])
   const error = summaryResult.error || recentResult.error || shadowResult.error
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

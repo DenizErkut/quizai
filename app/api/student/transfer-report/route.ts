@@ -16,7 +16,8 @@ export async function GET(req: NextRequest) {
     db.from('learning_transfer_checks').select('subject,grade,topic,learning_objective_code,transfer_result,completed_at')
       .eq('student_id', user.id).eq('status', 'completed').order('completed_at', { ascending: false }).limit(500),
     db.from('learning_events').select('subject,topic,learning_objective_id,result,score,max_score,source_type,occurred_at')
-      .eq('student_id', user.id).neq('source_type', 'transfer_check').order('occurred_at', { ascending: false }).limit(2000),
+      // Latest 1000 events only: the API caps a response at 1000 rows, so a larger limit would silently be 1000 anyway.
+      .eq('student_id', user.id).neq('source_type', 'transfer_check').order('occurred_at', { ascending: false }).limit(1000),
   ])
   if (checkError || eventError) return NextResponse.json({ error: 'Transfer raporu alınamadı.' }, { status: 500 })
 

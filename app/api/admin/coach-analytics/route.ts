@@ -14,6 +14,7 @@
 // eşlemesi burada elle kuruluyor.
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { readAll } from '@/lib/paginate'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
@@ -30,11 +31,11 @@ export async function GET(req: NextRequest) {
   const [conversationsResult, messagesResult, clicksResult, nudgesResult, sessionsResult] = await Promise.all([
     // Tüm zamanlar — "hiç koçu denedi mi" (adoption) için sınırsız gerekiyor,
     // Faz B bugün teslim edildiğinden hacim henüz küçük.
-    db.from('coach_conversations').select('id,user_id,started_at').limit(50000),
-    db.from('coach_messages').select('id,conversation_id,role,action,created_at').gte('created_at', since).limit(50000),
-    db.from('coach_action_clicks').select('id,user_id,clicked_at').gte('clicked_at', since).limit(50000),
-    db.from('notifications').select('id,user_id,created_at').eq('type', 'coach_nudge').gte('created_at', since).limit(50000),
-    db.from('quiz_sessions').select('user_id').eq('completed', true).limit(50000),
+    readAll(() => db.from('coach_conversations').select('id,user_id,started_at')),
+    readAll(() => db.from('coach_messages').select('id,conversation_id,role,action,created_at').gte('created_at', since)),
+    readAll(() => db.from('coach_action_clicks').select('id,user_id,clicked_at').gte('clicked_at', since)),
+    readAll(() => db.from('notifications').select('id,user_id,created_at').eq('type', 'coach_nudge').gte('created_at', since)),
+    readAll(() => db.from('quiz_sessions').select('user_id').eq('completed', true)),
   ])
   const errors = [conversationsResult.error, messagesResult.error, clicksResult.error, nudgesResult.error, sessionsResult.error].filter(Boolean)
   if (errors.length) return NextResponse.json({ error: 'Koç analitikleri alınamadı.' }, { status: 500 })

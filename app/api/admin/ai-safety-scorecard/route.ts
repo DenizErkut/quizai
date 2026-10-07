@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { buildScorecard, type ApprovalRow, type AuditRow, type TransferRow } from '@/lib/safety-scorecard'
+import { readAll } from '@/lib/paginate'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
@@ -14,9 +15,9 @@ export async function GET(req: NextRequest) {
 
   const since = new Date(Date.now() - 30 * 86_400_000).toISOString()
   const [audits, approvals, transfers] = await Promise.all([
-    db.from('agent_decision_audit').select('agent_name,policy_version,decision_summary,created_at').gte('created_at', since).limit(5000),
-    db.from('agent_action_approval_queue').select('status,created_at').gte('created_at', since).limit(2000),
-    db.from('learning_transfer_checks').select('status,transfer_result,created_at').gte('created_at', since).limit(5000),
+    readAll(() => db.from('agent_decision_audit').select('agent_name,policy_version,decision_summary,created_at').gte('created_at', since)),
+    readAll(() => db.from('agent_action_approval_queue').select('status,created_at').gte('created_at', since)),
+    readAll(() => db.from('learning_transfer_checks').select('status,transfer_result,created_at').gte('created_at', since)),
   ])
   if (audits.error || approvals.error || transfers.error) return NextResponse.json({ error: 'Safety Scorecard verisi alınamadı.' }, { status: 500 })
   return NextResponse.json(buildScorecard({

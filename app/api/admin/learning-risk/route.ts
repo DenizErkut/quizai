@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 import { buildLearningRiskOverview, MasteryRiskRow, StudentClass } from '@/lib/learning-risk-overview'
+import { readAll } from '@/lib/paginate'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
@@ -20,14 +21,14 @@ export async function GET(req: NextRequest) {
   if (classroomId && !targetClasses.length) return NextResponse.json({ error: 'Sınıf bulunamadı.' }, { status: 404 })
   if (!targetClasses.length) return NextResponse.json({ classrooms: classrooms ?? [], counts: { high_students: 0, medium_students: 0, total_warnings: 0 }, warnings: [] })
 
-  const { data: members, error: memberError } = await db.from('classroom_students').select('classroom_id,student_id').in('classroom_id', targetClasses.map(item => item.id)).limit(10000)
+  const { data: members, error: memberError } = await readAll(() => db.from('classroom_students').select('classroom_id,student_id').in('classroom_id', targetClasses.map(item => item.id)), ['classroom_id', 'student_id'])
   if (memberError) return NextResponse.json({ error: 'Sınıf üyeleri alınamadı.' }, { status: 500 })
   const studentIds = [...new Set((members ?? []).map(item => item.student_id))]
   if (!studentIds.length) return NextResponse.json({ classrooms: classrooms ?? [], counts: { high_students: 0, medium_students: 0, total_warnings: 0 }, warnings: [] })
 
-  const { data: mastery, error: masteryError } = await db.from('student_mastery')
+  const { data: mastery, error: masteryError } = await readAll(() => db.from('student_mastery')
     .select('student_id,subject,topic,mastery_score,confidence_score,retention_score,attempt_count,trend,last_practiced_at')
-    .in('student_id', studentIds).eq('learning_objective_key', '').gte('attempt_count', 3).gte('confidence_score', 0.3).limit(10000)
+    .in('student_id', studentIds).eq('learning_objective_key', '').gte('attempt_count', 3).gte('confidence_score', 0.3))
   if (masteryError) return NextResponse.json({ error: 'Risk verisi alınamadı.' }, { status: 500 })
 
   const classById = new Map(targetClasses.map(item => [item.id, item]))

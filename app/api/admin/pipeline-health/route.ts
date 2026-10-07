@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { readAll } from '@/lib/paginate'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
@@ -14,10 +15,10 @@ export async function GET(req: NextRequest) {
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
   const dbProbeStarted = Date.now()
   const [usageResult, sessionResult, eventResult, bankEventResult, dbProbe] = await Promise.all([
-    db.from('ai_usage_logs').select('duration_ms,user_id,quiz_session_id,cost_usd,created_at,operation,provider,model,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,pricing_version').gte('created_at', since).limit(30000),
-    db.from('quiz_sessions').select('id,user_id,topic,question_count,completed,created_at,gen_engine').gte('created_at', since).limit(30000),
-    db.from('learning_events').select('source_id,created_at').gte('created_at', since).limit(30000),
-    db.from('question_bank_events').select('topic_key,requested_count,bank_count,ai_count,outcome,created_at').gte('created_at', since).limit(30000),
+    readAll(() => db.from('ai_usage_logs').select('duration_ms,user_id,quiz_session_id,cost_usd,created_at,operation,provider,model,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,pricing_version').gte('created_at', since)),
+    readAll(() => db.from('quiz_sessions').select('id,user_id,topic,question_count,completed,created_at,gen_engine').gte('created_at', since)),
+    readAll(() => db.from('learning_events').select('source_id,created_at').gte('created_at', since)),
+    readAll(() => db.from('question_bank_events').select('topic_key,requested_count,bank_count,ai_count,outcome,created_at').gte('created_at', since)),
     db.from('profiles').select('id', { count: 'exact', head: true }),
   ])
   const errors = [usageResult.error, sessionResult.error, eventResult.error, bankEventResult.error].filter(Boolean)
