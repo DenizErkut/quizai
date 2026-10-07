@@ -44,6 +44,7 @@ import { verifyVisualWithMistral } from '@/lib/mistral-quality'
 import { verifyVisualWithGemini } from '@/lib/gemini-visual-quality'
 import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, minimumVerifiedQuestionCount, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
 import { isSameGradeSource } from '@/lib/meb-source-scope'
+import { visualProfileForSubject, visualQuotaFor, VERBAL_VISUAL_RATIO } from '@/lib/visual-quota-policy'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -324,8 +325,16 @@ function visualFormatGuidance(category: string | null): string {
   return category ? (guides[category] || guides.geometry) : 'somut bir şekil, harita veya ölçüm diyagramı'
 }
 
-function visualPedagogyInstruction(topic: string, count: number): string {
+function visualPedagogyInstruction(topic: string, count: number, subject?: string): string {
   const formatHint = visualFormatGuidance(detectVisualCategory(topic))
+  if (visualProfileForSubject(subject) === 'verbal') {
+    // Sözel dersler: görsel zorunlu değil, fırsat odaklı (sayısal derslerdeki %30 kuralı burada uygulanmaz).
+    const ceiling = Math.max(1, Math.ceil(count * Math.max(VERBAL_VISUAL_RATIO, 0.2)))
+    const newGeneration = isNewGenerationRequest(topic)
+      ? ' Kullanıcı yeni nesil/beceri temelli soru istedi: kısa tanım yerine metin, belge, tablo veya harita yorumlama gerektiren sorular kur; görsel şart değildir.'
+      : ''
+    return `\n\nGÖRSEL KURALI (SÖZEL DERS, ESNEK): Bu bir sözel ders; görsel zorunlu değildir. Soruları öncelikle metin, kavram ve yorum üzerine kur.${newGeneration} Konu doğal olarak gerektiriyorsa (harita, zaman şeridi, şema, tablo, grafik) en fazla ${ceiling}/${count} soruda görsel kullan; görseli yalnızca soruyu çözmeye gerçekten yardımcıysa ekle, süs olarak ekleme. Görsel kullanırsan nesne, sayı ve etiketler soru metniyle birebir aynı olmalı ve görsel cevabı göstermemeli.`
+  }
   if (isNewGenerationRequest(topic)) {
     const minimum = Math.max(1, Math.ceil(count * 0.5))
     const maxTables = Math.max(1, Math.floor(minimum / 3))
@@ -388,9 +397,9 @@ function canonicalQuestionDifficulty(value: unknown, fallback: string): string {
   return ['kolay', 'normal', 'zor', 'cok zor'].includes(normalized) ? normalized : fallback
 }
 
-function visualQuestionIndexes(questions: any[], category: string | null, requestedCount: number): number[] {
+function visualQuestionIndexes(questions: any[], category: string | null, requestedCount: number, attemptsOverride?: number): number[] {
   if (!category || requestedCount <= 0) return []
-  const target = visualAttemptCount(requestedCount)
+  const target = attemptsOverride ?? visualAttemptCount(requestedCount)
   const preferred = questions
     .map((question, index) => ({ question, index }))
     .filter(({ question }) => visualQuestionCandidate(question, category))
@@ -1822,7 +1831,7 @@ export async function POST(req: NextRequest) {
       // calisir, cunku o filtre zaten bankQuestions'i kucultmus olabilir;
       // gorsel kontrolu bu guncel kumeye gore yapilmali.
       const bankVisualCategory = detectVisualCategory(topic)
-      if (bankQuestions.length === safeQCount && bankVisualCategory) {
+      if (bankQuestions.length === safeQCount && bankVisualCategory && visualProfileForSubject(subject) === 'numeric') {
         const targetVisualRatio = isNewGenerationRequest(topic) ? 0.5 : 0.3
         const neededReal = Math.max(1, Math.ceil(safeQCount * targetVisualRatio))
         const realCount = bankQuestions.filter(hasRealVisualAsset).length
@@ -1923,7 +1932,7 @@ export async function POST(req: NextRequest) {
     // tekrar çağrılıyor (saf/yan etkisiz fonksiyon, aşağıda zaten tekrar
     // çağrılacak — maliyeti sıfıra yakın, kod tekrarını önlemek riskli olurdu).
     const fullPrompt = buildPrompt(questionType, topic, grade, resolvedDifficulty, effectiveLang, aiQuestionCount, fileContent || '', gradeContext, mebContext, profile.department || undefined, subject)
-      + visualPedagogyInstruction(topic, aiQuestionCount)
+      + visualPedagogyInstruction(topic, aiQuestionCount, subject)
       + chartDataInstruction(detectVisualCategory(topic))
 
     // 5 Eylül 2026 — P0 prompt caching (bkz. K12_STATIC_* tanımları ve
@@ -2677,8 +2686,10 @@ export async function POST(req: NextRequest) {
     // yanlıştı: tek kabul edilen yedek soruda ceil(1*0.30)=1 olup kota
     // fiilen %100'e çıkıyordu. Mevcut oturumdaki görselleri de say ve yalnız
     // birleşik testin %30 hedefinde eksik kalan kadar görsel iste.
-    let batchVisualMinimum = requiredVisualCount(safeQCount)
-    if (adaptiveCandidateBatch && continueSessionId) {
+    const visualQuota = visualQuotaFor(subject, safeQCount)
+    let batchVisualMinimum = visualQuota.required
+    // The cumulative adaptive correction below is only meaningful for subjects that have a required minimum.
+    if (visualQuota.profile === 'numeric' && adaptiveCandidateBatch && continueSessionId) {
       const { data: visualContextSession } = await supabase
         .from('quiz_sessions')
         .select('questions')
@@ -2696,8 +2707,8 @@ export async function POST(req: NextRequest) {
 
     const REQUEST_HARD_DEADLINE_MS = 112000 // 120sn'den DB yazımı/response için pay bırak
     const visualBudgetMs = REQUEST_HARD_DEADLINE_MS - (Date.now() - requestStartTime)
-    const visualIndexes = batchVisualMinimum > 0
-      ? visualQuestionIndexes(questions, visualCategory, safeQCount)
+    const visualIndexes = (visualQuota.profile === 'verbal' ? visualQuota.attempts > 0 : batchVisualMinimum > 0)
+      ? visualQuestionIndexes(questions, visualCategory, safeQCount, visualQuota.profile === 'verbal' ? visualQuota.attempts : undefined)
       : []
     const shouldGenerateVisuals = Boolean(visualCategory && visualIndexes.length > 0 && visualBudgetMs > 15000)
     if (visualCategory && visualIndexes.length > 0 && !shouldGenerateVisuals) {

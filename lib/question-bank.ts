@@ -2,6 +2,7 @@
 import { createHash, randomInt } from 'node:crypto'
 import { hasAutomatedObjectiveApproval } from './objective-mapping-verification'
 import { hasContinuousApproval, CONTINUOUS_REVIEW_POLICY } from './continuous-question-review'
+import { bankVisualTarget } from './visual-quota-policy'
 
 type AnyDb = any
 type Question = Record<string, any>
@@ -87,9 +88,9 @@ function isNewGenerationTopic(topic: string): boolean {
   return /yeni nesil|beceri temelli|yorum gerektiren|gercek yasam|gunluk hayat/.test(key)
 }
 
-function selectWithVisualQuota(rows: any[], count: number, topic: string): any[] {
-  const ratio = isNewGenerationTopic(topic) ? 0.5 : 0.3
-  const target = Math.min(count, Math.max(1, Math.ceil(count * ratio)))
+function selectWithVisualQuota(rows: any[], count: number, topic: string, subject?: string | null): any[] {
+  // Numeric subjects: 30% (50% for "yeni nesil"); verbal subjects: about 10%, possibly none (see visual-quota-policy).
+  const target = bankVisualTarget(subject, count, isNewGenerationTopic(topic))
   const exactRows = shuffled(rows.filter(row => ['teacher_exact', 'ai_exact'].includes(row.question?.sourcePolicy))).slice(0, count)
   const chosen = new Set(exactRows.map(row => row.id))
   const exactVisualCount = exactRows.filter(row => hasRealVisualAsset(row.question)).length
@@ -265,7 +266,7 @@ export async function getQuestionBankSet(
     .slice(0, Math.min(data.length, count * 2))
   // Havuzda görsel soru varsa her testte yaklaşık %30 oranında seç. Görsel
   // kapasite yetersizse kalan yerler normal sorularla doldurulur.
-  const selected = selectWithVisualQuota(candidates, count, dimensions.topic)
+  const selected = selectWithVisualQuota(candidates, count, dimensions.topic, dimensions.subject)
 
   const { error: usageError } = await db.rpc('mark_question_bank_used', {
     p_ids: selected.map((row: any) => row.id),
