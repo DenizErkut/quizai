@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { buildTeacherContext, getAuthedUser } from '@/lib/report-context'
 import { inspectMeasurementPair, inspectMeasurementSession, type MeasurementSession } from '@/lib/learning-gain-measurement'
+import { readAll } from '@/lib/paginate'
+import { cycleTransferSessionFor } from '@/lib/learning-chain-audit'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -67,8 +69,14 @@ export async function GET(req: NextRequest) {
   if (objectiveError) return NextResponse.json({ error: 'Kazanım bilgileri alınamadı.' }, { status: 500 })
   const objectiveById = new Map((objectives ?? []).map(row => [row.id, row]))
   const rosterById = new Map(context!.roster.map(item => [item.id, item.fullName]))
+  // Which completed transfer test belongs to each measurement's own cycle, so the teacher is not left to guess among look-alike tests.
+  const measuredStudentIds = [...new Set((measurements ?? []).map(row => row.student_id))]
+  const { data: cycleAttempts } = measuredStudentIds.length
+    ? await readAll(() => db.from('verified_learning_attempts').select('cycle_id,stage,status,quiz_session_id').in('student_id', measuredStudentIds))
+    : { data: [] }
   const rows = (measurements ?? []).map(row => ({
     ...row,
+    cycleTransferSessionId: cycleTransferSessionFor(cycleAttempts ?? [], row.pre_session_id, row.post_session_id),
     studentName: rosterById.get(row.student_id) ?? 'Öğrenci',
     objectiveCode: objectiveById.get(row.learning_objective_id)?.objective_code ?? '—',
     objectiveTitle: objectiveById.get(row.learning_objective_id)?.title ?? '—',

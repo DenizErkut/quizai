@@ -67,3 +67,13 @@ export function auditChains(input: { cycles: ChainCycle[]; attempts: ChainAttemp
     rows,
   }
 }
+
+/** The completed transfer attempt of the cycle whose baseline and post attempts are exactly this measurement's pre/post sessions. */
+export function cycleTransferSessionFor(
+  attempts: Array<{ cycle_id: string; stage: string; status: string; quiz_session_id: string | null }>,
+  preSessionId: string, postSessionId: string,
+): string | null {
+  const cycle = attempts.find(a => a.stage === 'baseline' && a.status === 'completed' && a.quiz_session_id === preSessionId
+    && attempts.some(b => b.cycle_id === a.cycle_id && b.stage === 'post' && b.status === 'completed' && b.quiz_session_id === postSessionId))
+  return cycle ? attempts.find(a => a.cycle_id === cycle.cycle_id && a.stage === 'transfer' && a.status === 'completed')?.quiz_session_id ?? null : null
+}

@@ -51,3 +51,14 @@ test('question signature ignores case, spacing and unicode form; shared count is
   assert.equal(sharedQuestionCount(pre, [{ text: 'X?' }]), 0)
   assert.equal(sharedQuestionCount(pre, [{ text: '' }, {}]), 0)
 })
+
+import { cycleTransferSessionFor } from '../lib/learning-chain-audit'
+
+test('finds the transfer test of the cycle that owns a pre/post pair, and not another cycle’s', () => {
+  const at = (cycle_id: string, stage: string, quiz_session_id: string, status = 'completed') => ({ cycle_id, stage, status, quiz_session_id })
+  const attempts = [at('c1', 'baseline', 'b1'), at('c1', 'post', 'p1'), at('c1', 'transfer', 't1'), at('c2', 'baseline', 'b2'), at('c2', 'post', 'p2')]
+  assert.equal(cycleTransferSessionFor(attempts, 'b1', 'p1'), 't1')
+  assert.equal(cycleTransferSessionFor(attempts, 'b2', 'p2'), null)      // second cycle has no transfer yet
+  assert.equal(cycleTransferSessionFor(attempts, 'p1', 't1'), null)      // a manual pairing that is not a cycle's pair
+  assert.equal(cycleTransferSessionFor([at('c1', 'baseline', 'b1'), at('c1', 'post', 'p1'), at('c1', 'transfer', 't1', 'started')], 'b1', 'p1'), null)
+})

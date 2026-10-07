@@ -16,7 +16,7 @@ type Session = {
 type Measurement = {
   id: string; student_id: string; learning_objective_id: string; pre_session_id: string; post_session_id: string; studentName: string; objectiveCode: string; objectiveTitle: string;
   pre_score_pct: number; post_score_pct: number; gain_pp: number; item_count: number;
-  post_completed_at: string; transfer_session_id: string | null; transfer_score_pct: number | null; transfer_gain_pp: number | null
+  pre_completed_at: string; post_completed_at: string; cycleTransferSessionId: string | null; transfer_session_id: string | null; transfer_score_pct: number | null; transfer_gain_pp: number | null
   measurement_version: string
 }
 type Data = {
@@ -194,10 +194,11 @@ export default function LearningGainPilot({ classrooms }: { classrooms: Classroo
     </div>}
     {!!data?.measurements.length && <details open={listOpen} onToggle={event => setListOpen((event.currentTarget as HTMLDetailsElement).open)} style={{ fontSize: 12 }}><summary style={{ cursor: 'pointer', fontWeight: 700 }}>Kaydedilmiş ölçümler ({data.measurements.length})</summary>
       <div style={{ maxHeight: 260, overflowY: 'auto', marginTop: 8 }}>{data.measurements.map(item => <div key={item.id} style={{ padding: '7px 0', borderTop: '1px solid var(--border)' }}>
-        {item.studentName} · {item.objectiveCode} · %{item.pre_score_pct} → %{item.post_score_pct} · <strong>{Number(item.gain_pp) >= 0 ? '+' : ''}{item.gain_pp} puan</strong>
+        {item.studentName} · {item.objectiveCode} · {new Date(item.pre_completed_at).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })} %{item.pre_score_pct} → {new Date(item.post_completed_at).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })} %{item.post_score_pct} · <strong>{Number(item.gain_pp) >= 0 ? '+' : ''}{item.gain_pp} puan</strong>
         {item.measurement_version === 'learning-gain-v2-server-scored-transfer' ? ' · sunucuda puanlanmış, öğretmen incelemeli' : ' · betimleyici pilot'}
         {item.transfer_session_id ? ` · aktarım %${item.transfer_score_pct} (başlangıca göre ${Number(item.transfer_gain_pp) >= 0 ? '+' : ''}${item.transfer_gain_pp} puan)` : ' · aktarım bekleniyor'}
-        {!item.transfer_session_id && studentId === item.student_id && <button className="btn" style={{ marginLeft: 8 }} onClick={() => { setTransferForId(item.id); setTransferId(''); setTransferReviewed(false); setTransferStatus(null) }}>Aktarım testi ekle</button>}
+        {!item.transfer_session_id && !item.cycleTransferSessionId && <span style={{ color: 'var(--text3)' }}> · bu ölçümün döngüsünde tamamlanmış aktarım testi yok</span>}
+        {!item.transfer_session_id && studentId === item.student_id && <button className="btn" style={{ marginLeft: 8 }} onClick={() => { setTransferForId(item.id); setTransferId(item.cycleTransferSessionId ?? ''); setTransferReviewed(false); setTransferStatus(null) }}>{item.cycleTransferSessionId ? 'Aktarım testi ekle (önerilen test hazır)' : 'Aktarım testi ekle'}</button>}
       </div>)}</div>
     </details>}
     {transferStatus && <div ref={transferStatusRef} role={transferStatus.kind === 'error' ? 'alert' : 'status'} style={{
@@ -211,7 +212,7 @@ export default function LearningGainPilot({ classrooms }: { classrooms: Classroo
         {transferOptions.map(item => {
           const repeated = repeatedQuestions(item)
           return <option key={item.id} value={item.id} disabled={repeated > 0}>
-            {new Date(item.createdAt).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · %{item.scorePct} · {item.itemCount} soru{repeated > 0 ? ` · ✕ ön/son testle ${repeated} aynı soru` : ''}
+            {new Date(item.createdAt).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · %{item.scorePct} · {item.itemCount} soru{item.id === transferFor?.cycleTransferSessionId ? ' · ★ bu ölçümün döngüsünün aktarım testi' : ''}{repeated > 0 ? ` · ✕ ön/son testle ${repeated} aynı soru` : ''}
           </option>
         })}
       </select>
