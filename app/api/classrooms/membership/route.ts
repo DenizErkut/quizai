@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { readAll } from '@/lib/paginate'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 export const dynamic = 'force-dynamic'
@@ -63,12 +64,10 @@ export async function GET(req: NextRequest) {
   }
 
   const classIds = classes.map((classroom) => classroom.id)
-  const { data: roster, error: rosterError } = await db
+  const { data: roster, error: rosterError } = await readAll(() => db
     .from('classroom_students')
     .select('classroom_id, student_id, joined_at')
-    .in('classroom_id', classIds)
-    .order('joined_at', { ascending: true })
-    .limit(5000)
+    .in('classroom_id', classIds), ['joined_at', 'classroom_id', 'student_id'])
 
   if (rosterError) {
     console.error('[classrooms/membership] roster lookup failed:', rosterError.message)

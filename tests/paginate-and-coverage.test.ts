@@ -66,3 +66,24 @@ test('scorecard scores only what has a denominator and blocked outputs never rai
   assert.equal(card.coverage.measured, 3)
   assert.equal(card.status, 'action_required')
 })
+
+import { readAll } from '../lib/paginate'
+
+test('readAll pages a builder in a total order and reports errors like a response', async () => {
+  const rows = Array.from({ length: 2500 }, (_, i) => ({ id: i }))
+  const orders: string[] = []
+  const builder = () => {
+    const state = { cols: [] as string[] }
+    const api = {
+      order(column: string) { state.cols.push(column); orders.push(column); return api },
+      range(from: number, to: number) { return Promise.resolve({ data: rows.slice(from, Math.min(to + 1, from + 1000)), error: null }) },
+    }
+    return api
+  }
+  const result = await readAll(builder, ['a', 'b'])
+  assert.equal(result.data.length, 2500)
+  assert.equal(result.error, null)
+  assert.ok(orders.includes('a') && orders.includes('b'))
+  const failing = await readAll(() => ({ order() { return this }, range: () => Promise.resolve({ data: null, error: { message: 'nope' } }) }))
+  assert.deepEqual(failing, { data: [], error: { message: 'nope' } })
+})

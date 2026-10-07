@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server-create-client'
 import { isProviderConfigured } from './model-registry'
 import { pickQuizEngine, type ForceProvider, type QuizRoutingDecision } from './quiz-provider-router'
+import { readAll } from '@/lib/paginate'
 
 type ProviderKey = 'openai' | 'mistral' | 'anthropic'
 type Metric = { provider: ProviderKey; calls: number; outcomeSample: number; operationalSuccessRate: number | null; costPerCall: number | null; p95Ms: number | null }
@@ -26,9 +27,9 @@ async function loadMetrics(): Promise<Metric[]> {
   if (cache && cache.expiresAt > Date.now()) return cache.metrics
   const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
   const since = new Date(Date.now() - 30 * 86_400_000).toISOString()
-  const { data, error } = await db.from('ai_usage_logs')
-    .select('provider,operation,cost_usd,duration_ms,meta').gte('created_at', since).limit(30000)
-  if (error) throw error
+  const { data, error } = await readAll(() => db.from('ai_usage_logs')
+    .select('provider,operation,cost_usd,duration_ms,meta').gte('created_at', since))
+  if (error) throw new Error(error.message)
 
   const groups = new Map<ProviderKey, { calls: number; costs: number; priced: number; durations: number[]; success: number; failed: number }>()
   for (const row of data || []) {

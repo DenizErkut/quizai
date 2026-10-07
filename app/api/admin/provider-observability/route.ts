@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { readAll } from '@/lib/paginate'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
   const { data: profile } = await db.from('profiles').select('is_admin').eq('id', user.id).maybeSingle()
   if (profile?.is_admin !== true) return NextResponse.json({ error: 'Yasak.' }, { status: 403 })
   const since = new Date(Date.now() - 30 * 86_400_000).toISOString()
-  const { data, error } = await db.from('ai_usage_logs').select('provider,model,operation,input_tokens,output_tokens,cost_usd,duration_ms,pricing_version,meta,created_at').gte('created_at', since).limit(30000)
+  const { data, error } = await readAll(() => db.from('ai_usage_logs').select('provider,model,operation,input_tokens,output_tokens,cost_usd,duration_ms,pricing_version,meta,created_at').gte('created_at', since))
   if (error) return NextResponse.json({ error: 'Sağlayıcı ölçümleri alınamadı.' }, { status: 500 })
   type Bucket = { provider:string; calls:number; inputTokens:number; outputTokens:number; costUsd:number; durations:number[]; priced:number; successEvidence:number; failureEvidence:number; models:Set<string>; operations:Map<string,number> }
   const map = new Map<string, Bucket>()

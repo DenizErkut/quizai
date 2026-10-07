@@ -18,6 +18,7 @@
 // tutarlı).
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { readAll } from '@/lib/paginate'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
@@ -68,16 +69,16 @@ export async function GET(req: NextRequest) {
     rangeMessagesResult,
     rangeCostResult,
   ] = await Promise.all([
-    db.from('coach_conversations').select('id,user_id').limit(50000),
-    db.from('ai_usage_logs').select('cost_usd').ilike('operation', 'coach-%').limit(200000),
-    db.from('coach_messages').select('id,conversation_id,created_at').eq('role', 'user')
-      .gte('created_at', todayStart.toISOString()).lt('created_at', todayEnd.toISOString()).limit(50000),
-    db.from('ai_usage_logs').select('cost_usd').ilike('operation', 'coach-%')
-      .gte('created_at', todayStart.toISOString()).lt('created_at', todayEnd.toISOString()).limit(50000),
-    db.from('coach_messages').select('id,conversation_id,created_at').eq('role', 'user')
-      .gte('created_at', rangeStart.toISOString()).lte('created_at', rangeEnd.toISOString()).limit(200000),
-    db.from('ai_usage_logs').select('cost_usd,created_at').ilike('operation', 'coach-%')
-      .gte('created_at', rangeStart.toISOString()).lte('created_at', rangeEnd.toISOString()).limit(200000),
+    readAll(() => db.from('coach_conversations').select('id,user_id')),
+    readAll(() => db.from('ai_usage_logs').select('cost_usd').ilike('operation', 'coach-%')),
+    readAll(() => db.from('coach_messages').select('id,conversation_id,created_at').eq('role', 'user')
+      .gte('created_at', todayStart.toISOString()).lt('created_at', todayEnd.toISOString())),
+    readAll(() => db.from('ai_usage_logs').select('cost_usd').ilike('operation', 'coach-%')
+      .gte('created_at', todayStart.toISOString()).lt('created_at', todayEnd.toISOString())),
+    readAll(() => db.from('coach_messages').select('id,conversation_id,created_at').eq('role', 'user')
+      .gte('created_at', rangeStart.toISOString()).lte('created_at', rangeEnd.toISOString())),
+    readAll(() => db.from('ai_usage_logs').select('cost_usd,created_at').ilike('operation', 'coach-%')
+      .gte('created_at', rangeStart.toISOString()).lte('created_at', rangeEnd.toISOString())),
   ])
 
   const errors = [conversationsResult, allTimeCostResult, todayMessagesResult, todayCostResult, rangeMessagesResult, rangeCostResult]

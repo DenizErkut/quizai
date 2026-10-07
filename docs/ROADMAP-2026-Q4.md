@@ -23,6 +23,7 @@ Bu oturumda tamamlananlar (yol haritasının girdisi): transfer kontrolü kullan
 |---|---|
 | 0.1–0.4 | **Tamam** (PR #6): katalog sayfalama, kapsam raporu, tek eşleştirme tanımı, dürüst güvenlik kartı. Max rows = 1000 doğrulandı. |
 | 0.5 | **Tamam** (PR #7): `e2e` kırığı 5 Ekim'deki `c035f0d` yeniden düzenlemesinden kalan bayat kaynak-metin beklentileriydi; kod davranışı değişmemişti. |
+| 0.1b | **Tamam**: 1000 satırda kesilen diğer admin/analitik okumaları `readAll` ile tamamlandı (AI maliyet logları, ajan denetimi, koç kullanımı, pipeline sağlığı, risk ekranları, sınıf/kurum listeleri). |
 | 0.6 | **Bekliyor**: sağlayıcı maliyeti ve anahtar kararı. |
 | Faz 1 | **Askıda** (kullanıcı kararı). Etkisi: Faz 4'te "izin" halkası boş kalır, Faz 5 pilotu izinsiz başlatılamaz. |
 | 2.2 | **Tamam**: `Öğrenme Döngüsü Zincir Denetimi` paneli (Learning Graph sekmesi). Bulgular aşağıda. |

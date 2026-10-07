@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { type ClusterRow, buildClusterPrompt, clusterMemberKey, excludeCanonicalRows, groupClusterableRows, parseClusterResponse } from '@/lib/misconception-clustering'
+import { readAll } from '@/lib/paginate'
 
 const CLUSTER_MODEL = 'claude-sonnet-4-5'
 
@@ -9,9 +10,9 @@ type Db = any
 
 /** Generates review proposals only; nothing is merged until an expert approves. */
 export async function generateClusterProposals(db: Db, maxGroups: number) {
-  const { data: rows, error } = await db.from('student_misconceptions')
+  const { data: rows, error } = await readAll(() => db.from('student_misconceptions')
     .select('student_id,misconception_id,subject,topic,evidence_count,misconception_catalog!inner(label,verification_status,source_type)')
-    .neq('status', 'resolved').neq('misconception_catalog.verification_status', 'rejected').limit(5000)
+    .neq('status', 'resolved').neq('misconception_catalog.verification_status', 'rejected'), ['student_id', 'misconception_id'])
   if (error) throw new Error(error.message)
   const { data: canonicalRows } = await db.from('misconception_aliases').select('canonical_id')
   const canonicalIds = (canonicalRows ?? []).map((row: { canonical_id: string }) => row.canonical_id)

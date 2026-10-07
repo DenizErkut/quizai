@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { readAll } from '@/lib/paginate'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
@@ -11,12 +12,13 @@ export async function GET(req: NextRequest) {
   const { data: profile } = await db.from('profiles').select('is_admin').eq('id', user.id).maybeSingle()
   if (profile?.is_admin !== true) return NextResponse.json({ error: 'Yasak.' }, { status: 403 })
 
-  const { data: snapshots, error: snapshotError } = await db.from('learning_risk_snapshots').select('id,student_id,subject,topic,risk_score,risk_level,observed_at').order('observed_at', { ascending: false }).limit(10000)
+  const { data: snapshotRows, error: snapshotError } = await readAll(() => db.from('learning_risk_snapshots').select('id,student_id,subject,topic,risk_score,risk_level,observed_at'))
+  const snapshots = [...snapshotRows].sort((a, b) => b.observed_at.localeCompare(a.observed_at))
   if (snapshotError) return NextResponse.json({ error: 'Risk snapshot verisi alınamadı.' }, { status: 500 })
   const ids = [...new Set((snapshots ?? []).map(row => row.student_id))]
   const earliestSnapshot = snapshots?.reduce((earliest, row) => Math.min(earliest, new Date(row.observed_at).getTime()), Date.now()) ?? Date.now()
   const { data: events, error: eventError } = ids.length
-    ? await db.from('learning_events').select('student_id,subject,topic,score,max_score,occurred_at').in('student_id', ids).gte('occurred_at', new Date(earliestSnapshot).toISOString()).limit(20000)
+    ? await readAll(() => db.from('learning_events').select('student_id,subject,topic,score,max_score,occurred_at').in('student_id', ids).gte('occurred_at', new Date(earliestSnapshot).toISOString()))
     : { data: [], error: null }
   if (eventError) return NextResponse.json({ error: 'Takip olayları alınamadı.' }, { status: 500 })
 
