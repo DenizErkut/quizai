@@ -109,7 +109,8 @@ export type PageFigure = { questionNumber: number; data: Buffer; mime: 'image/pn
 export type FigurePageResult = { pageCount: number; lastQuestion: number; figures: PageFigure[] }
 
 const SCALE = 2
-const MARKER = /^\s*(?:Soru\s*)?(\d{1,4})\s*(?:\||[.)])/iu
+// "6. Sınıf | …" page footers are not question starts.
+const MARKER = /^\s*(?:[Ss][Oo][Rr][Uu]\s*)?(\d{1,4})\s*(?:\||[.)])(?!\s*[Ss][ıiIİ]n[ıiIİ]f)/u
 
 export async function figuresForPages(
   pdf: Uint8Array,
