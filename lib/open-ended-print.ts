@@ -22,7 +22,8 @@ const SHEET_STYLE = `<style>
 .oe-meta{font-size:9.5pt;color:#555;margin:0 0 10pt}
 .oe-question{margin:14pt 0 18pt;break-inside:avoid}
 .oe-question h2{margin:0 0 4pt}
-.oe-lines{margin-top:8pt;background:repeating-linear-gradient(to bottom,transparent 0,transparent 8.4mm,#9aa 8.4mm,#9aa 8.8mm)}
+.oe-lines{margin-top:8pt}
+.oe-line{height:8.4mm;border-bottom:0.4mm solid #9aa}
 .oe-rubric td,.oe-rubric th{font-size:10pt}
 .oe-page-break{break-before:page}
 </style>`
@@ -40,7 +41,7 @@ export function openEndedStudentSheetHtml(items: PrintableOpenEnded[], options: 
 <p class="oe-meta">${meta}${meta ? ' · ' : ''}Ödev kodu: <strong>${escapePrintText(options.code)}</strong> · Her soruyu ilgili alana, soru numarasını belirterek yazınız.</p>
 ${items.map((item, index) => `<section class="oe-question"><h2>Soru ${index + 1} <span style="font-weight:400;font-size:10pt">(${total(item)} puan)</span></h2>
 <div class="print-passage">${printableMath(item.scenario)}</div><p><strong>${printableMath(item.question)}</strong></p>
-<div class="oe-lines" style="height:${lines * 8.8}mm"></div></section>`).join('')}`
+<div class="oe-lines">${Array.from({ length: lines }, () => '<div class="oe-line"></div>').join('')}</div></section>`).join('')}`
 }
 
 /** Teacher copy: question, rubric and expected criteria. */

@@ -406,7 +406,7 @@ export default function TeacherAssignPage() {
                         <div>
                           <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>Soru sayısı (aynı konuda farklı açık uçlu sorular)</label>
                           <select value={oeCount} onChange={e => setOeCount(Number(e.target.value))} style={inputStyle}>
-                            {[1, 2, 3, 4, 5, 6, 8, 10].map(n => <option key={n} value={n}>{n} soru</option>)}
+                            {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n} soru</option>)}
                           </select>
                         </div>
                         <button className="btn btn-primary" onClick={generateOeWithAI} disabled={oeGenerating}

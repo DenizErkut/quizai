@@ -21,3 +21,12 @@ test('answer space follows the school level; code is stable', () => {
   assert.deepEqual(['ilkokul 3. sınıf', 'ortaokul 6. sınıf', 'lise 10. sınıf', '', '6'].map(answerLineCount), [6, 8, 11, 8, 8])
   assert.equal(shortSheetCode('3b8a5e5f-0d38-45e4-8489-b5e24358e995'), '3B8A5E5F')
 })
+
+test('printed sheet is not hidden by site print css and uses border-based answer lines', async () => {
+  const fs = await import('node:fs')
+  const learning = fs.readFileSync('lib/learning-print.ts', 'utf8')
+  assert.match(learning, /@media print\{html body \*\{visibility:visible!important\}/)
+  const html = openEndedStudentSheetHtml([{ scenario: 'Senaryo X', question: 'Soru Y', rubric: [{ criterion: 'k', maxPoints: 2 }] }], { code: 'ABCD1234', title: 't', grade: '6' })
+  assert.ok(!html.includes('linear-gradient'))
+  assert.equal((html.match(/class="oe-line"/g) || []).length, 8)
+})
