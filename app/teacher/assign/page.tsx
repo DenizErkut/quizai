@@ -4,6 +4,13 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
+// '6' -> 'ortaokul 6. sınıf' (the test generator expects the school-level form).
+function gradeLabel(grade: string | null | undefined): string {
+  const n = Number(String(grade || '').match(/\d{1,2}/)?.[0])
+  if (!n) return String(grade || '')
+  return `${n <= 4 ? 'ilkokul' : n <= 8 ? 'ortaokul' : 'lise'} ${n}. sınıf`
+}
+
 const DIFFICULTIES = [
   { value: 'kolay', label: 'Kolay' },
   { value: 'normal', label: 'Normal' },
@@ -52,6 +59,10 @@ export default function TeacherAssignPage() {
   const [oeError, setOeError] = useState('')
   const [oeGenerated, setOeGenerated] = useState(false) // AI ile üretildi mi (önizleme aşaması)
   const [oeUsedMeb, setOeUsedMeb] = useState(false) // uretim gercek MEB kaynagina mi dayandi
+  const [oeCount, setOeCount] = useState(1) // ayni konuda kac farkli soru uretilecek
+  const [oeItems, setOeItems] = useState<{ scenario: string; question: string; rubric: { criterion: string; maxPoints: number; description: string }[] }[] | null>(null)
+  const [printBusy, setPrintBusy] = useState('')
+  const [printMessage, setPrintMessage] = useState('')
   const router = useRouter()
   const supabase = createClient() as any
 
@@ -159,6 +170,7 @@ export default function TeacherAssignPage() {
       { criterion: '', maxPoints: 25, description: '' },
     ])
     setOeGenerated(false); setOeUsedMeb(false); setOeError('')
+    setOeCount(1); setOeItems(null)
   }
 
   async function generateOeWithAI() {
@@ -169,12 +181,15 @@ export default function TeacherAssignPage() {
       const res = await fetch('/api/teacher/create-open-ended', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ mode: 'ai', preview: true, ...oeForm }),
+        body: JSON.stringify({ mode: 'ai', preview: true, count: oeCount, ...oeForm }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) { setOeError(data?.error || 'Soru üretilemedi.'); return }
       // preview modunda dogrudan assignment kaydedilmedi, sadece uretilen
       // icerik donuyor - once ogretmen onaylasin
+      if (Array.isArray(data.items) && data.items.length > 1) {
+        setOeItems(data.items.map((item: any) => ({ scenario: item.scenario, question: item.question, rubric: (item.rubric || []).map((r: any) => ({ criterion: r.criterion, maxPoints: r.maxPoints, description: r.description || '' })) })))
+      } else setOeItems(null)
       setOeScenario(data.scenario); setOeQuestion(data.question)
       setOeRubric(data.rubric.map((r: any) => ({ criterion: r.criterion, maxPoints: r.maxPoints, description: r.description || '' })))
       setOeUsedMeb(!!data.usedMebSource)
@@ -189,9 +204,10 @@ export default function TeacherAssignPage() {
 
   async function saveOeAssignment() {
     if (!oeForm.classroom_id || !oeForm.title.trim()) { setOeError('Sınıf ve başlık zorunlu.'); return }
-    if (!oeScenario.trim() || !oeQuestion.trim()) { setOeError('Senaryo ve soru zorunlu.'); return }
+    if (oeItems && oeItems.length > 1 && oeItems.some(item => !item.scenario.trim() || !item.question.trim())) { setOeError('Her sorunun senaryosu ve sorusu dolu olmalı.'); return }
+    if (!(oeItems && oeItems.length > 1) && (!oeScenario.trim() || !oeQuestion.trim())) { setOeError('Senaryo ve soru zorunlu.'); return }
     const validRubric = oeRubric.filter(r => r.criterion.trim() && r.maxPoints > 0)
-    if (validRubric.length === 0) { setOeError('En az bir puanlama kriteri girmelisiniz.'); return }
+    if (!(oeItems && oeItems.length > 1) && validRubric.length === 0) { setOeError('En az bir puanlama kriteri girmelisiniz.'); return }
 
     setOeError(''); setOeSaving(true)
     try {
@@ -203,12 +219,12 @@ export default function TeacherAssignPage() {
           mode: 'manual', // hem AI-onaylanmis hem manuel icerik ayni sekilde kalici kaydedilir
           created_via: oeGenerated ? 'ai' : 'manual',
           ...oeForm,
-          scenario: oeScenario, question: oeQuestion, rubric: validRubric,
+          ...(oeItems && oeItems.length > 1 ? { items: oeItems } : { scenario: oeScenario, question: oeQuestion, rubric: validRubric }),
         }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) { setOeError(data?.error || 'Ödev kaydedilemedi.'); return }
-      setOpenEndedAssignments(prev => [data.assignment, ...prev])
+      setOpenEndedAssignments(prev => [...(data.assignments ?? [data.assignment]), ...prev])
       setShowForm(false)
       resetOeForm()
     } catch (e) {
@@ -223,6 +239,72 @@ export default function TeacherAssignPage() {
     if (!confirm('Bu açık uçlu ödevi silmek istediğine emin misin?')) return
     await supabase.from('open_ended_assignments').delete().eq('id', id)
     setOpenEndedAssignments(prev => prev.filter(a => a.id !== id))
+  }
+
+  // One card per batch of open-ended questions (a batch shares batch_id).
+  const oeGroups: any[][] = []
+  const oeByBatch = new Map<string, any[]>()
+  for (const a of openEndedAssignments) {
+    if (a.batch_id) {
+      const group = oeByBatch.get(a.batch_id)
+      if (group) group.push(a); else { const created = [a]; oeByBatch.set(a.batch_id, created); oeGroups.push(created) }
+    } else oeGroups.push([a])
+  }
+  oeGroups.forEach(group => group.sort((x, y) => (x.batch_index ?? 0) - (y.batch_index ?? 0)))
+  const baseTitle = (title: string) => String(title || '').replace(/ — Soru \d+\/\d+$/, '')
+
+  async function deleteOeGroup(group: any[]) {
+    if (!confirm(group.length > 1 ? `Bu ${group.length} soruluk açık uçlu ödevi silmek istediğine emin misin?` : 'Bu açık uçlu ödevi silmek istediğine emin misin?')) return
+    const ids = group.map(a => a.id)
+    await supabase.from('open_ended_assignments').delete().in('id', ids)
+    setOpenEndedAssignments(prev => prev.filter(a => !ids.includes(a.id)))
+  }
+
+  async function printOpenEndedGroup(group: any[], withKey: boolean) {
+    const first = group[0]
+    setPrintBusy(`oe-${first.id}`); setPrintMessage('')
+    try {
+      const { openEndedStudentSheetHtml, openEndedTeacherKeyHtml, shortSheetCode } = await import('@/lib/open-ended-print')
+      const { printLearningDocument } = await import('@/lib/learning-print')
+      const code = shortSheetCode(first.batch_id || first.id)
+      const items = group.map(a => ({ scenario: a.scenario, question: a.question, rubric: a.rubric || [] }))
+      const title = baseTitle(first.title)
+      const html = openEndedStudentSheetHtml(items, { code, title, grade: gradeLabel(first.grade), subject: first.subject, topic: first.topic })
+        + (withKey ? openEndedTeacherKeyHtml(items, { code }) : '')
+      await printLearningDocument(title, `${first.classrooms?.name || ''} · ${group.length} soru`, html)
+    } catch (e: any) { setPrintMessage(e?.message || 'Yazdırma görünümü açılamadı.') }
+    finally { setPrintBusy('') }
+  }
+
+  // Quiz assignments store only topic/difficulty/count (each student gets freshly generated questions),
+  // so a printable class copy is generated once here with the same quality pipeline.
+  async function printQuizAssignment(a: any, withKey: boolean) {
+    setPrintBusy(`quiz-${a.id}`); setPrintMessage('Basılı test hazırlanıyor… (30-90 saniye sürebilir)')
+    try {
+      const classroom = classrooms.find(c => c.id === a.classroom_id)
+      const topicText = String(a.topic || '')
+      const fromFile = topicText.length > 200
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/generate-quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          teacherPrint: true, topic: fromFile ? a.title : topicText, ...(fromFile ? { fileContent: topicText } : {}),
+          subject: classroom?.subject || undefined, grade: gradeLabel(a.grade || classroom?.grade),
+          difficulty: a.difficulty || 'normal', questionCount: Math.min(Number(a.question_count) || 10, 30),
+          questionType: a.question_type || 'mixed', includeVisuals: true, language: 'tr',
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !Array.isArray(data?.questions) || !data.questions.length) {
+        setPrintMessage(data?.message || (data?.error === 'insufficient_questions' ? 'Kalite kontrolünden yeterli soru geçmedi, birkaç saniye sonra tekrar deneyin.' : (data?.error || 'Test hazırlanamadı.')))
+        return
+      }
+      const { printLearningDocument, questionPrintHtml, answerKeyHtml } = await import('@/lib/learning-print')
+      await printLearningDocument(a.title, `${classroom?.name || ''} · ${data.questions.length} soru · Ad Soyad: ..............................`, questionPrintHtml(data.questions) + (withKey ? answerKeyHtml(data.questions) : ''))
+      setPrintMessage('')
+    } catch (e: any) { setPrintMessage(e?.message || 'Test hazırlanamadı.') }
+    finally { setPrintBusy('') }
   }
 
   const rubricTotal = oeRubric.reduce((s, r) => s + (Number(r.maxPoints) || 0), 0)
@@ -319,6 +401,12 @@ export default function TeacherAssignPage() {
                       <>
                         <input placeholder="Konu (örn: Su döngüsü ve buharlaşma)" value={oeForm.topic}
                           onChange={e => setOeForm(p => ({ ...p, topic: e.target.value }))} style={inputStyle} />
+                        <div>
+                          <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>Soru sayısı (aynı konuda farklı açık uçlu sorular)</label>
+                          <select value={oeCount} onChange={e => setOeCount(Number(e.target.value))} style={inputStyle}>
+                            {[1, 2, 3, 4, 5, 6, 8, 10].map(n => <option key={n} value={n}>{n} soru</option>)}
+                          </select>
+                        </div>
                         <button className="btn btn-primary" onClick={generateOeWithAI} disabled={oeGenerating}
                           style={{ justifyContent: 'center', opacity: oeGenerating ? 0.6 : 1 }}>
                           {oeGenerating ? '✨ Üretiliyor...' : '🤖 Yapay Zeka ile Oluştur'}
@@ -326,7 +414,32 @@ export default function TeacherAssignPage() {
                       </>
                     )}
 
-                    {(oeMethod === 'manual' || (oeMethod === 'ai' && oeGenerated)) && (
+                    {oeMethod === 'ai' && oeGenerated && oeItems && oeItems.length > 1 && (
+                      <>
+                        <div style={{ fontSize: '11px', color: 'var(--green)', fontWeight: 600 }}>✓ {oeItems.length} farklı soru üretildi — göndermeden önce düzenleyebilir veya silebilirsin</div>
+                        {oeItems.map((item, index) => (
+                          <div key={index} style={{ border: '1px solid var(--border)', borderRadius: '12px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <strong style={{ fontSize: '12px' }}>Soru {index + 1}</strong>
+                              <button onClick={() => setOeItems(prev => prev && prev.length > 2 ? prev.filter((_, j) => j !== index) : prev)} disabled={oeItems.length <= 2}
+                                style={{ fontSize: '11px', color: 'var(--red)', background: 'none', border: 'none', cursor: oeItems.length <= 2 ? 'default' : 'pointer', opacity: oeItems.length <= 2 ? 0.4 : 1 }}>Sil</button>
+                            </div>
+                            <textarea value={item.scenario} rows={3} onChange={e => setOeItems(prev => prev && prev.map((x, j) => j === index ? { ...x, scenario: e.target.value } : x))}
+                              style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--font-sans)' }} aria-label={`Soru ${index + 1} senaryo`} />
+                            <textarea value={item.question} rows={2} onChange={e => setOeItems(prev => prev && prev.map((x, j) => j === index ? { ...x, question: e.target.value } : x))}
+                              style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--font-sans)' }} aria-label={`Soru ${index + 1} soru metni`} />
+                            <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Puanlama: {item.rubric.map(r => `${r.criterion} (${r.maxPoints})`).join(' · ')}</div>
+                          </div>
+                        ))}
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                          <button className="btn" onClick={generateOeWithAI} disabled={oeGenerating} style={{ justifyContent: 'center' }}>{oeGenerating ? '⏳' : '🔄 Yeniden Üret'}</button>
+                          <button className="btn btn-primary" onClick={saveOeAssignment} disabled={oeSaving || !oeForm.title.trim()}
+                            style={{ flex: 1, justifyContent: 'center', opacity: oeSaving ? 0.6 : 1 }}>{oeSaving ? 'Kaydediliyor...' : `✓ Onayla ve ${oeItems.length} Ödevi Oluştur`}</button>
+                        </div>
+                      </>
+                    )}
+
+                    {(oeMethod === 'manual' || (oeMethod === 'ai' && oeGenerated)) && !(oeItems && oeItems.length > 1) && (
                       <>
                         {oeMethod === 'ai' && oeGenerated && (
                           <div style={{ fontSize: '11px', color: 'var(--green)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -544,13 +657,17 @@ export default function TeacherAssignPage() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {openEndedAssignments.map((a: any) => (
-              <div key={`oe-${a.id}`} className="card" style={{ padding: '14px 16px', borderLeft: '3px solid #6366f1' }}>
+            {printMessage && <div role="status" style={{ padding: '10px 12px', background: 'var(--bg2)', borderRadius: '9px', fontSize: '13px', color: 'var(--text2)' }}>{printMessage}</div>}
+            {oeGroups.map((group: any[]) => {
+              const a = group[0]
+              const busy = printBusy === `oe-${a.id}`
+              return (
+              <div key={`oe-${a.batch_id || a.id}`} className="card" style={{ padding: '14px 16px', borderLeft: '3px solid #6366f1' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '5px' }}>{a.title}</div>
+                    <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '5px' }}>{group.length > 1 ? baseTitle(a.title) : a.title}</div>
                     <div style={{ fontSize: '12px', color: 'var(--text3)', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                      <span>💬 Açık Uçlu</span>
+                      <span>💬 Açık Uçlu{group.length > 1 ? ` · ${group.length} soru` : ''}</span>
                       {a.subject && <span>📚 {a.subject}</span>}
                       <span>🏫 {a.classrooms?.name}</span>
                       <span>{a.created_via === 'ai' ? '🤖 AI ile' : '✍️ Manuel'}</span>
@@ -560,14 +677,19 @@ export default function TeacherAssignPage() {
                         </span>
                       )}
                     </div>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
+                      <button className="btn btn-sm" disabled={busy} onClick={() => void printOpenEndedGroup(group, false)}>🖨️ Öğrenci formu (PDF)</button>
+                      <button className="btn btn-sm" disabled={busy} onClick={() => void printOpenEndedGroup(group, true)}>👩‍🏫 Puanlama anahtarıyla</button>
+                    </div>
                   </div>
-                  <button onClick={() => deleteOeAssignment(a.id)}
-                    style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '7px', border: '1px solid rgba(220,38,38,0.25)', background: 'transparent', color: 'var(--red)', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0, marginLeft: '10px' }}>
+                  <button onClick={() => deleteOeGroup(group)}
+                    style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '7px', border: '1px solid rgba(220,38,38,0.25)', background: 'transparent', color: 'var(--red)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
                     Sil
                   </button>
                 </div>
               </div>
-            ))}
+              )
+            })}
             {assignments.map((a: any) => {
               const isOverdue = a.due_date && new Date(a.due_date) < new Date()
               const completions = a.assignment_completions?.[0]?.count || 0
@@ -587,6 +709,10 @@ export default function TeacherAssignPage() {
                             🕐 {new Date(a.due_date).toLocaleDateString('tr-TR')}{isOverdue ? ' (süresi doldu)' : ''}
                           </span>
                         )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
+                        <button className="btn btn-sm" disabled={printBusy === `quiz-${a.id}`} onClick={() => void printQuizAssignment(a, false)}>🖨️ Basılı test (PDF)</button>
+                        <button className="btn btn-sm" disabled={printBusy === `quiz-${a.id}`} onClick={() => void printQuizAssignment(a, true)}>👩‍🏫 Cevap anahtarıyla</button>
                       </div>
                     </div>
                     <button onClick={() => deleteAssignment(a.id)}

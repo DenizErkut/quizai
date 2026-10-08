@@ -27,3 +27,19 @@ test('matching worksheet lists candidates separately instead of printing solved 
   assert.ok(!html.includes('Kesir — 6/100'))
   assert.match(html, /Eşleştirme seçenekleri/)
 })
+
+test('questions with a figure print it as an image (scripts in svg never run)', () => {
+  const html = questionPrintHtml([{ q: 'Grafiğe göre?', opts: ['a', 'b'], svg: '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><circle r="3"/></svg>' }])
+  assert.match(html, /<img alt="Soru görseli" src="data:image\/svg\+xml/)
+  assert.doesNotMatch(html, /<script>/)
+  assert.equal(questionPrintHtml([{ q: 'Şekilsiz', svg: 'not svg' }]).includes('<img'), false)
+})
+
+import { answerKeyHtml, answerKeyText } from '../lib/learning-print'
+test('answer key covers the common question types', () => {
+  assert.equal(answerKeyText({ q: 'x', opts: ['a', 'b', 'c'], ans: 1 }), 'B) b')
+  assert.equal(answerKeyText({ type: 'true_false', statement: true }), 'Doğru')
+  assert.equal(answerKeyText({ type: 'short_answer', opts: ['Güneş'], ans: 0 }), 'Güneş')
+  assert.equal(answerKeyText({ type: 'ordering', items: ['a', 'b', 'c'], correctOrder: [2, 0, 1] }), 'c → a → b')
+  assert.match(answerKeyHtml([{ opts: ['a', 'b'], ans: 0 }]), /Cevap anahtarı[\s\S]*A\) a/)
+})

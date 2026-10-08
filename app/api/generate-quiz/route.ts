@@ -1496,11 +1496,14 @@ export async function POST(req: NextRequest) {
     const forcedClaude = forceProviderTest === 'claude'
 
     const plan = profile.plan || 'free'
+    // Approved teachers can request a PRINT test for their class: same quality pipeline, own limits (no student quota).
+    const teacherPrint = body?.teacherPrint === true
+      && Boolean((await supabase.from('teachers').select('approved').eq('user_id', user.id).maybeSingle()).data?.approved)
     const today = new Date().toISOString().split('T')[0]
 
     // Premium ve Unlimited planlarda HİÇBİR soru/test sınırı yok — sadece
     // freemium/silver için günlük/aylık limit uygulanır.
-    if (!isDailyChallengeRequest && plan !== 'premium' && plan !== 'unlimited') {
+    if (!isDailyChallengeRequest && !teacherPrint && plan !== 'premium' && plan !== 'unlimited') {
       // 6 Eylül 2026 — Deniz'in talebiyle: "free" plan artık YENİ kayıtlara
       // verilmiyor (bkz. profiles.plan kolon varsayılanı artık 'none').
       // Mevcut 'free' kullanıcılar dokunulmadan eski haklarında (10/gün,
@@ -1549,7 +1552,7 @@ export async function POST(req: NextRequest) {
     const questionType = normalizeRequestedQuestionType(rawQuestionType)
 
     const MAX_QCOUNT: Record<string, number> = { free: 5, silver: 10, premium: 20, unlimited: 20 }
-    const maxQ = MAX_QCOUNT[plan] ?? 0
+    const maxQ = teacherPrint ? 30 : (MAX_QCOUNT[plan] ?? 0)
     const safeQCount = isDailyChallengeRequest ? Math.min(questionCount, 10) : Math.min(questionCount, maxQ)
     // Normal test creation must still deliver the exact requested count.
     // An adaptive continuation is a reserve batch, however: allow a 70%
@@ -1562,7 +1565,7 @@ export async function POST(req: NextRequest) {
     // kullanıcı ve oturumla atomik olmayan bir sonradan eşleştirmeye ihtiyaç duymaz.
     usageSessionId = continueSessionId ? undefined : crypto.randomUUID()
 
-    const grade = productionTestGrade(profile.grade || 'ortaokul 6. sinif', body.grade, forceProviderTest !== null)
+    const grade = productionTestGrade(profile.grade || 'ortaokul 6. sinif', body.grade, forceProviderTest !== null || teacherPrint)
 
     if (!fileContent && !isInCurriculum(topic, plan, grade)) {
       return NextResponse.json({ error: 'out_of_curriculum' }, { status: 403 })
