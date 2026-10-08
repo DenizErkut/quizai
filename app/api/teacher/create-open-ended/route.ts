@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
       mode: 'ai' | 'manual'; classroom_id: string; title: string
       grade?: string; subject?: string; topic?: string; due_date?: string; preview?: boolean
     }
-    const questionCount = Math.min(10, Math.max(1, Math.trunc(Number((body as any).count) || 1)))
+    const questionCount = Math.min(5, Math.max(1, Math.trunc(Number((body as any).count) || 1)))
 
     // preview: SADECE üret, kaydetme — öğretmen önce önizler/düzenler,
     // asıl kayıt 'manual' modla (onaylanmış içerikle) yapılır.
