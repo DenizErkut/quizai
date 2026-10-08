@@ -273,7 +273,7 @@ export default function TeacherAssignPage() {
       const title = baseTitle(first.title)
       const html = openEndedStudentSheetHtml(items, { code, title, grade: gradeLabel(first.grade), subject: first.subject, topic: first.topic })
         + (withKey ? openEndedTeacherKeyHtml(items, { code }) : '')
-      await printLearningDocument(title, `${first.classrooms?.name || ''} · ${group.length} soru`, html)
+      await printLearningDocument(title, `${first.classrooms?.name || ''} · ${group.length} soru`, html, { studentLine: false })
     } catch (e: any) { setPrintMessage(e?.message || 'Yazdırma görünümü açılamadı.') }
     finally { setPrintBusy('') }
   }
