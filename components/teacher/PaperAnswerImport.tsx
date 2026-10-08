@@ -30,6 +30,7 @@ export default function PaperAnswerImport({ group, onClose }: { group: Assignmen
   const [info, setInfo] = useState<{ codeMatches: boolean | null; sheetCode: string | null; expectedCode: string; studentNameOnPaper: string | null } | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [imported, setImported] = useState<Array<{ studentId: string; source: string; earned: number; possible: number }>>([])
   const ids = group.map(item => item.id)
 
   async function call(body: Record<string, unknown>) {
@@ -49,8 +50,26 @@ export default function PaperAnswerImport({ group, onClose }: { group: Assignmen
       const data = await res.json().catch(() => null)
       setStudents((data?.students || []).filter((student: Student) => student.classroomId === group[0].classroom_id))
     })()
+    void refreshStatus()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  async function refreshStatus() {
+    const { ok, data } = await call({ action: 'status', student_id: undefined })
+    if (ok) setImported(data.imported || [])
+  }
+
+  async function removeImport(target: Student) {
+    if (!confirm(`${target.fullName} için aktarılan kâğıt cevapları ve puanları silinsin mi? Sonra kâğıdı yeniden yükleyebilirsiniz.`)) return
+    setBusy(true)
+    try {
+      const { ok, data } = await call({ action: 'delete', student_id: target.id })
+      if (!ok) { setMessage(data?.error || 'Silinemedi.'); return }
+      setMessage(`${target.fullName} için aktarım silindi; kâğıdı yeniden yükleyebilirsiniz.`)
+      setStudentId(target.id)
+      await refreshStatus()
+    } finally { setBusy(false) }
+  }
 
   async function transcribe() {
     if (!studentId || !files.length) return
@@ -76,6 +95,7 @@ export default function PaperAnswerImport({ group, onClose }: { group: Assignmen
       }
       if (!ok) { setMessage(data?.error || 'Kaydedilemedi.'); return }
       setResults(data.results)
+      void refreshStatus()
       setScores(Object.fromEntries(data.results.map((result: Result) => [result.assignmentId, result.criteriaResults.map(c => c.earnedPoints)])))
       setMessage('')
     } catch { setMessage('Beklenmeyen bir hata oluştu.') }
@@ -93,6 +113,7 @@ export default function PaperAnswerImport({ group, onClose }: { group: Assignmen
   }
 
   const student = students.find(item => item.id === studentId)
+  const importedIds = new Set(imported.map(item => item.studentId))
   return (
     <div className="card" style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -102,8 +123,20 @@ export default function PaperAnswerImport({ group, onClose }: { group: Assignmen
       {!answers && <>
         <select value={studentId} onChange={event => setStudentId(event.target.value)} aria-label="Öğrenci seç">
           <option value="">Öğrenci seç…</option>
-          {students.map(item => <option key={item.id} value={item.id}>{item.schoolNo ? `${item.schoolNo} — ` : ''}{item.fullName}</option>)}
+          {students.filter(item => !importedIds.has(item.id)).map(item => <option key={item.id} value={item.id}>{item.schoolNo ? `${item.schoolNo} — ` : ''}{item.fullName}</option>)}
         </select>
+        {imported.length > 0 && <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {imported.map(entry => {
+            const person = students.find(item => item.id === entry.studentId)
+            if (!person) return null
+            return (
+              <div key={entry.studentId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 12, padding: '6px 0', borderTop: '1px solid var(--border)' }}>
+                <span><strong>{person.schoolNo ? `${person.schoolNo} — ` : ''}{person.fullName}</strong> · <span style={{ color: 'var(--green)' }}>✓ Aktarıldı (import ok)</span> · {entry.earned} / {entry.possible}{entry.source === 'online' ? ' · çevrim içi çözdü' : ''}</span>
+                {entry.source === 'paper' && <button className="btn btn-sm" disabled={busy} onClick={() => void removeImport(person)}>🗑️ Sil ve yeniden yükle</button>}
+              </div>
+            )
+          })}
+        </div>}
         <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={event => setFiles(Array.from(event.target.files || []))} aria-label="Cevap kâğıdı fotoğrafları" />
         <div style={{ fontSize: 11, color: 'var(--text3)' }}>Bu öğrencinin doldurduğu kâğıdın tüm sayfalarını (en fazla 6 fotoğraf) yükleyin. Fotoğraflar yalnızca okunmak için işlenir, saklanmaz.</div>
         <button className="btn btn-primary" disabled={busy || !studentId || !files.length} onClick={() => void transcribe()}>{busy ? '⏳ Okunuyor…' : 'Kâğıdı oku'}</button>
