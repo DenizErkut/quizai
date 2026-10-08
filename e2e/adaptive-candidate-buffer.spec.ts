@@ -236,6 +236,7 @@ test('teacher publication evidence stays private and admin-managed', () => {
 test('open-ended grading accepts age-appropriate concise student language', () => {
   const generate = readFileSync(join(process.cwd(), 'app/api/generate-open-ended/route.ts'), 'utf8')
   const grade = readFileSync(join(process.cwd(), 'app/api/grade-open-ended/route.ts'), 'utf8')
+    + readFileSync(join(process.cwd(), 'lib/open-ended-grading.ts'), 'utf8') // grading prompt lives in the shared module
   const teacher = readFileSync(join(process.cwd(), 'app/api/teacher/create-open-ended/route.ts'), 'utf8')
   expect(generate).toContain('YAŞA UYGUN CEVAP STANDARDI — ZORUNLU')
   expect(generate).toContain('Ortaokul için 1-3 kısa ve açık cümle')
