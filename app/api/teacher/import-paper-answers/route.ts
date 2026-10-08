@@ -24,7 +24,7 @@ const MAX_IMAGES = 6
 const MAX_BASE64_CHARS = 4_200_000
 const MEDIA_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
-async function authorize(req: NextRequest, assignmentIds: unknown, studentId: unknown) {
+async function authorize(req: NextRequest, assignmentIds: unknown, studentId: unknown, needStudent = true) {
   const token = req.headers.get('Authorization')?.replace('Bearer ', '')
   if (!token) return { error: NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 }) }
   const { data: { user }, error } = await supabase.auth.getUser(token)
@@ -32,7 +32,7 @@ async function authorize(req: NextRequest, assignmentIds: unknown, studentId: un
   const { data: teacher } = await supabase.from('teachers').select('id, approved').eq('user_id', user.id).maybeSingle()
   if (!teacher?.approved) return { error: NextResponse.json({ error: 'Onaylı öğretmen hesabı gerekir.' }, { status: 403 }) }
   const ids = Array.isArray(assignmentIds) ? [...new Set(assignmentIds.filter((id): id is string => typeof id === 'string'))] : []
-  if (!ids.length || ids.length > 10 || typeof studentId !== 'string' || !studentId) {
+  if (!ids.length || ids.length > 10 || (needStudent && (typeof studentId !== 'string' || !studentId))) {
     return { error: NextResponse.json({ error: 'Ödev ve öğrenci seçin.' }, { status: 400 }) }
   }
   const { data: rows } = await supabase.from('open_ended_assignments').select('*').in('id', ids)
@@ -45,6 +45,7 @@ async function authorize(req: NextRequest, assignmentIds: unknown, studentId: un
   if (new Set(list.map(row => row.classroom_id)).size !== 1) {
     return { error: NextResponse.json({ error: 'Seçilen ödevler aynı sınıfa ait olmalı.' }, { status: 400 }) }
   }
+  if (!needStudent) return { user, teacher, assignments: list.sort((a, b) => (a.batch_index ?? 0) - (b.batch_index ?? 0)) }
   const { data: membership } = await supabase.from('classroom_students').select('student_id')
     .eq('classroom_id', list[0].classroom_id).eq('student_id', studentId).maybeSingle()
   if (!membership) return { error: NextResponse.json({ error: 'Bu öğrenci ödevin atandığı sınıfta değil.' }, { status: 403 }) }
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null)
     if (!body || typeof body.action !== 'string') return NextResponse.json({ error: 'Geçersiz istek.' }, { status: 400 })
-    const auth = await authorize(req, body.assignment_ids ?? (body.assignment_id ? [body.assignment_id] : []), body.student_id)
+    const auth = await authorize(req, body.assignment_ids ?? (body.assignment_id ? [body.assignment_id] : []), body.student_id, body.action !== 'status')
     if ('error' in auth) return auth.error
     const { user, assignments } = auth
 
@@ -95,12 +96,38 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    if (body.action === 'status') {
+      // Which students already have this sheet imported (paper) or completed (online)?
+      const { data: rows } = await supabase.from('open_ended_sessions').select('user_id, assignment_id, source, total_earned, total_possible, graded_at')
+        .in('assignment_id', assignments.map(a => a.id)).not('graded_at', 'is', null)
+      const byStudent = new Map<string, { source: string; earned: number; possible: number; count: number }>()
+      for (const row of rows || []) {
+        const entry = byStudent.get(row.user_id) || { source: row.source, earned: 0, possible: 0, count: 0 }
+        entry.earned += Number(row.total_earned) || 0; entry.possible += Number(row.total_possible) || 0; entry.count += 1
+        if (row.source === 'online') entry.source = 'online'
+        byStudent.set(row.user_id, entry)
+      }
+      return NextResponse.json({ imported: [...byStudent.entries()].map(([studentId, entry]) => ({ studentId, ...entry })) })
+    }
+
+    if (body.action === 'delete') {
+      const { data: rows } = await supabase.from('open_ended_sessions').select('id, source')
+        .eq('user_id', body.student_id).in('assignment_id', assignments.map(a => a.id))
+      if ((rows || []).some(row => row.source !== 'paper')) {
+        return NextResponse.json({ error: 'Öğrenci bu ödevi çevrim içi çözmüş; yalnızca kâğıttan aktarılan kayıtlar silinebilir.' }, { status: 409 })
+      }
+      const { error: deleteError } = await supabase.from('open_ended_sessions').delete().in('id', (rows || []).map(row => row.id))
+      if (deleteError) return NextResponse.json({ error: 'Kayıt silinemedi.' }, { status: 500 })
+      return NextResponse.json({ deleted: (rows || []).length })
+    }
+
     if (body.action === 'save') {
       const submitted: Array<{ assignmentId: string; text: string }> = Array.isArray(body.answers) ? body.answers : []
       const textById = new Map(submitted.map(item => [String(item.assignmentId), String(item.text || '').trim().slice(0, 4000)]))
-      const { data: existingRows } = await supabase.from('open_ended_sessions').select('id, assignment_id, graded_at')
+      const { data: existingRows } = await supabase.from('open_ended_sessions').select('id, assignment_id, graded_at, source')
         .eq('user_id', body.student_id).in('assignment_id', assignments.map(a => a.id))
       const existing = new Map((existingRows || []).map(row => [row.assignment_id as string, row]))
+      if ((existingRows || []).some(row => row.graded_at && row.source === 'online')) return NextResponse.json({ error: 'Öğrenci bu ödevi çevrim içi çözmüş; kâğıttan aktarım yapılamaz.' }, { status: 409 })
       const conflicts = assignments.filter(a => existing.get(a.id)?.graded_at).map(a => a.title)
       if (conflicts.length && body.replace !== true) {
         return NextResponse.json({ error: 'Bu öğrenci bu ödev(ler)i zaten tamamlamış. Üzerine yazmak için onaylayın.', conflicts }, { status: 409 })
