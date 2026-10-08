@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import PaperAnswerImport from '@/components/teacher/PaperAnswerImport'
 
 // '6' -> 'ortaokul 6. sınıf' (the test generator expects the school-level form).
 function gradeLabel(grade: string | null | undefined): string {
@@ -63,6 +64,7 @@ export default function TeacherAssignPage() {
   const [oeItems, setOeItems] = useState<{ scenario: string; question: string; rubric: { criterion: string; maxPoints: number; description: string }[] }[] | null>(null)
   const [printBusy, setPrintBusy] = useState('')
   const [printMessage, setPrintMessage] = useState('')
+  const [importGroup, setImportGroup] = useState('') // açık uçlu ödev grubunun kâğıt içe aktarma paneli
   const router = useRouter()
   const supabase = createClient() as any
 
@@ -680,7 +682,9 @@ export default function TeacherAssignPage() {
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
                       <button className="btn btn-sm" disabled={busy} onClick={() => void printOpenEndedGroup(group, false)}>🖨️ Öğrenci formu (PDF)</button>
                       <button className="btn btn-sm" disabled={busy} onClick={() => void printOpenEndedGroup(group, true)}>👩‍🏫 Puanlama anahtarıyla</button>
+                      <button className="btn btn-sm" onClick={() => setImportGroup(importGroup === (a.batch_id || a.id) ? '' : (a.batch_id || a.id))}>📥 Kâğıt cevapları aktar</button>
                     </div>
+                    {importGroup === (a.batch_id || a.id) && <PaperAnswerImport group={group} onClose={() => setImportGroup('')} />}
                   </div>
                   <button onClick={() => deleteOeGroup(group)}
                     style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '7px', border: '1px solid rgba(220,38,38,0.25)', background: 'transparent', color: 'var(--red)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>

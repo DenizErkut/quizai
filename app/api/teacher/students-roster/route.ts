@@ -60,6 +60,7 @@ export async function GET(req: NextRequest) {
     fullName: identities[m.student_id]?.full_name ?? 'İsimsiz',
     grade: profileMap.get(m.student_id)?.grade ?? null,
     classroomName: classroomMap.get(m.classroom_id) ?? null,
+    classroomId: m.classroom_id,
   }))
 
   return NextResponse.json({ teacherId: teacher.id, students })
