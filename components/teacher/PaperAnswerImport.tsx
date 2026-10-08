@@ -132,7 +132,7 @@ export default function PaperAnswerImport({ group, onClose }: { group: Assignmen
             <div style={{ fontSize: 12, fontWeight: 600 }}>Soru {result.index + 1}: {result.totalEarned} / {result.totalPossible}{result.answered ? '' : ' (cevap yok)'}</div>
             {result.criteriaResults.map((criterion, index) => (
               <label key={index} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 11, margin: '3px 0' }}>
-                <input type="number" min={0} max={criterion.maxPoints} value={scores[result.assignmentId]?.[index] ?? criterion.earnedPoints} style={{ width: 56 }}
+                <input type="number" min={0} max={criterion.maxPoints} value={scores[result.assignmentId]?.[index] ?? criterion.earnedPoints} style={{ width: 76, minWidth: 76, padding: '8px 10px', textAlign: 'center' }}
                   onChange={event => setScores(prev => ({ ...prev, [result.assignmentId]: result.criteriaResults.map((c, i) => i === index ? Number(event.target.value) : (prev[result.assignmentId]?.[i] ?? c.earnedPoints)) }))} />
                 / {criterion.maxPoints} — {criterion.criterion}{criterion.feedback ? ` · ${criterion.feedback}` : ''}
               </label>
