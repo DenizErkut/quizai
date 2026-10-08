@@ -111,11 +111,15 @@ async function searchMebContext(origin: string, subject: string, topic: string, 
   return ''
 }
 
-async function generateWithAI(subject: string, topic: string, grade: string, origin: string, userId: string, accessToken: string) {
+async function generateWithAI(subject: string, topic: string, grade: string, origin: string, userId: string, accessToken: string, count = 1) {
   const effectiveGrade = grade || 'ortaokul 6. sınıf'
   const level = getLevel(effectiveGrade)
   const mebContext = await searchMebContext(origin, subject, topic, effectiveGrade, level, accessToken)
-  const prompt = buildPrompt(level, effectiveGrade, subject, topic, mebContext)
+  const basePrompt = buildPrompt(level, effectiveGrade, subject, topic, mebContext)
+  // Several questions at once must differ from each other: one prompt asks for all of them so the model can avoid repeats.
+  const prompt = count > 1
+    ? `${basePrompt}\n\n🔁 ÇOKLU ÜRETİM (bu talimat yukarıdaki tek-soru çıktı biçiminin YERİNE geçer): Aynı konuda TAM ${count} FARKLI açık uçlu soru üret. Her soru konunun FARKLI bir alt becerisini, kazanımını veya gündelik bağlamını ölçsün; senaryolar, sayılar ve soru kökleri birbirini TEKRAR ETMESİN. Her sorunun kendi 3-4 kriterli, toplamı 100 olan rubriği olsun. SADECE şu JSON'u döndür: {"items":[{"scenario":"...","question":"...","rubric":[{"criterion":"...","maxPoints":30,"description":"..."}]}, ...]} (items uzunluğu tam ${count}).`
+    : basePrompt
 
   // 22 Eylül 2026 — Deniz'in fark ettiği gibi bu uç nokta hâlâ SADECE Claude
   // kullanıyordu. Aynı çoklu-sağlayıcı tasarım burada da devreye alınıyor
@@ -127,7 +131,7 @@ async function generateWithAI(subject: string, topic: string, grade: string, ori
     const result = await generateWithRoutedProvider(decision, {
       systemPrompt: '',
       userPrompt: prompt,
-      maxTokens: 1500,
+      maxTokens: Math.min(8000, 1500 * count),
       operationTag: `teacher:create-open-ended:${decision.genEngineTag}`,
       userId,
     })
@@ -137,7 +141,7 @@ async function generateWithAI(subject: string, topic: string, grade: string, ori
     if (decision.engine === 'claude-sonnet' || decision.engine === 'claude-haiku') throw primaryError
     const fallback = await generateWithRoutedProvider(
       { engine: 'claude-sonnet', experimentVariant: null, genEngineTag: 'claude-sonnet-fallback' },
-      { systemPrompt: '', userPrompt: prompt, maxTokens: 1500, operationTag: 'teacher:create-open-ended:fallback-claude', userId }
+      { systemPrompt: '', userPrompt: prompt, maxTokens: Math.min(8000, 1500 * count), operationTag: 'teacher:create-open-ended:fallback-claude', userId }
     )
     text = fallback.text
   }
@@ -150,22 +154,24 @@ async function generateWithAI(subject: string, topic: string, grade: string, ori
     if (match) parsed = JSON.parse(match[0])
     else throw new Error('AI yanıtı ayrıştırılamadı.')
   }
-  if (!parsed?.scenario || !parsed?.question || !Array.isArray(parsed?.rubric)) {
-    throw new Error('Soru üretilemedi.')
-  }
   // Ders Çince/Japonca/Korece ise senaryo/soru bilerek o alfabede üretiliyor
   // — stripForeignScripts çalışırsa hedef dilin kendisini silerdi.
   const skipStrip = isForeignLanguageSubject(subject)
-  return {
-    scenario: skipStrip ? parsed.scenario : stripForeignScripts(parsed.scenario),
-    question: skipStrip ? parsed.question : stripForeignScripts(parsed.question),
-    rubric: parsed.rubric.map((r: any) => ({
+  const normalize = (item: any) => ({
+    scenario: skipStrip ? item.scenario : stripForeignScripts(item.scenario),
+    question: skipStrip ? item.question : stripForeignScripts(item.question),
+    rubric: item.rubric.map((r: any) => ({
       criterion: stripForeignScripts(r.criterion || ''),
       maxPoints: Number(r.maxPoints) || 0,
       description: stripForeignScripts(r.description || ''),
     })),
-    usedMebSource: !!mebContext,
+  })
+  const rawItems: any[] = count > 1 && Array.isArray(parsed?.items) ? parsed.items : [parsed]
+  const items = rawItems.filter(item => item?.scenario && item?.question && Array.isArray(item?.rubric)).map(normalize).slice(0, count)
+  if (!items.length || (count > 1 && items.length < Math.min(count, 2))) {
+    throw new Error('Soru üretilemedi.')
   }
+  return { ...items[0], items, usedMebSource: !!mebContext }
 }
 
 export async function POST(req: NextRequest) {
@@ -185,6 +191,7 @@ export async function POST(req: NextRequest) {
       mode: 'ai' | 'manual'; classroom_id: string; title: string
       grade?: string; subject?: string; topic?: string; due_date?: string; preview?: boolean
     }
+    const questionCount = Math.min(10, Math.max(1, Math.trunc(Number((body as any).count) || 1)))
 
     // preview: SADECE üret, kaydetme — öğretmen önce önizler/düzenler,
     // asıl kayıt 'manual' modla (onaylanmış içerikle) yapılır.
@@ -193,7 +200,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Ders ve konu zorunlu.' }, { status: 400 })
       }
       try {
-        const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin, user.id, token)
+        const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin, user.id, token, questionCount)
         return NextResponse.json(result)
       } catch (e: any) {
         return NextResponse.json({ error: e?.message || 'Soru üretilemedi, tekrar dene.' }, { status: 500 })
@@ -209,6 +216,41 @@ export async function POST(req: NextRequest) {
     const { data: classroom } = await supabase.from('classrooms').select('id, teacher_id').eq('id', classroom_id).maybeSingle()
     if (!classroom || classroom.teacher_id !== teacherRow.id) {
       return NextResponse.json({ error: 'Bu sınıf size ait değil.' }, { status: 403 })
+    }
+
+    // Several questions on one topic: saved as one BATCH (shared batch_id) of ordinary
+    // open-ended assignments, so students, grading and reports keep working per question.
+    const batchRaw = mode === 'manual' ? (body as any).items : null
+    if (Array.isArray(batchRaw) && batchRaw.length > 1) {
+      if (batchRaw.length > 10) return NextResponse.json({ error: 'Bir seferde en fazla 10 soru kaydedilebilir.' }, { status: 400 })
+      const items = batchRaw.map((item: any) => ({
+        scenario: String(item?.scenario || '').trim(),
+        question: String(item?.question || '').trim(),
+        rubric: (Array.isArray(item?.rubric) ? item.rubric : []).map((r: any) => ({
+          criterion: String(r?.criterion || '').trim(), maxPoints: Number(r?.maxPoints) || 0, description: String(r?.description || '').trim(),
+        })).filter((r: any) => r.criterion && r.maxPoints > 0),
+      }))
+      const bad = items.findIndex(item => !item.scenario || !item.question || item.rubric.length === 0)
+      if (bad >= 0) return NextResponse.json({ error: `Soru ${bad + 1}: senaryo, soru ve en az bir puanlama kriteri zorunlu.` }, { status: 400 })
+      const checks = await Promise.all(items.map(item => verifyQuestionWithOpenAI(
+        `Bir öğretmen, ${grade || 'belirtilmemiş'} seviyesindeki öğrencilerine "${subject || 'belirtilmemiş'}" dersinde şu açık uçlu soruyu ödev olarak atamak istiyor. Bu içerik MEB müfredatına, yaş grubuna ve güvenlik kurallarına uygun mu?\n\nSENARYO: "${item.scenario}"\nSORU: "${item.question}"\nPUANLAMA KRİTERLERİ: ${item.rubric.map((r: any) => `${r.criterion} (${r.maxPoints}p)`).join(', ')}\n\nSadece şu JSON formatında yanıt ver:\n{"ok": true veya false, "reason": "Türkçe, kısa (1 cümle) gerekçe"}`)))
+      const failed = checks.findIndex(check => check?.ok === false)
+      if (failed >= 0) {
+        return NextResponse.json({ error: `Soru ${failed + 1} MEB uygunluk kontrolünden geçemedi: ${checks[failed]?.reason || 'Uygun bulunmadı.'} Lütfen düzenleyip tekrar dene.` }, { status: 422 })
+      }
+      const batchId = crypto.randomUUID()
+      const createdVia = (body as any).created_via === 'ai' ? 'ai' : 'manual'
+      const { data: createdBatch, error: batchError } = await supabase.from('open_ended_assignments').insert(items.map((item, index) => ({
+        teacher_id: teacherRow.id, classroom_id, title: `${title.trim()} — Soru ${index + 1}/${items.length}`,
+        grade: grade || null, subject: subject?.trim() || null, topic: topic?.trim() || null,
+        scenario: item.scenario, question: item.question, rubric: item.rubric, created_via: createdVia,
+        due_date: due_date || null, verified: true, batch_id: batchId, batch_index: index,
+      }))).select('*, classrooms(name)')
+      if (batchError || !createdBatch) {
+        console.error('[create-open-ended] toplu kayıt hatası:', batchError)
+        return NextResponse.json({ error: 'Ödevler kaydedilemedi.' }, { status: 500 })
+      }
+      return NextResponse.json({ assignments: createdBatch })
     }
 
     let scenario = ''
