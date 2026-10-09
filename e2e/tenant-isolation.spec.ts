@@ -59,4 +59,24 @@ test.describe('tenant isolation security contract', () => {
     })
     expect(response.status()).toBe(401)
   })
+  for (const path of ['students/identified', 'classrooms', 'quizzes', 'open-ended', 'mastery', 'grades', 'links']) {
+    test(`partner ${path} export rejects malformed integration credentials`, async ({ request }) => {
+      const response = await request.get(`/api/integrations/v1/${path}?limit=3`, { headers: { Authorization: 'Bearer forged-token' } })
+      expect(response.status()).toBe(401)
+    })
+  }
+
+  test('partner import endpoints reject malformed integration credentials', async ({ request }) => {
+    for (const path of ['grades', 'links']) {
+      const response = await request.post(`/api/integrations/v1/${path}`, { headers: { Authorization: 'Bearer forged-token' }, data: {} })
+      expect(response.status()).toBe(401)
+    }
+  })
+
+  test('partner openapi description is public and lists the import endpoints', async ({ request }) => {
+    const response = await request.get('/api/integrations/v1/openapi')
+    expect(response.status()).toBe(200)
+    const spec = await response.json()
+    expect(Object.keys(spec.paths)).toEqual(expect.arrayContaining(['/grades', '/links', '/students/identified']))
+  })
 })

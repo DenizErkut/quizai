@@ -23,12 +23,25 @@ const card: React.CSSProperties = {
   boxShadow: '0 4px 18px rgba(20,40,32,.05)',
 }
 
+const EXTRA_SCOPES = [
+  { scope: 'institution:read:identity', label: 'Kurum kimliği', help: 'kurum kodu, iletişim e-postası, durum' },
+  { scope: 'students:read:identified', label: 'Öğrenci kimlik bilgileri', help: 'ad soyad, okul no, sınıf/şube, CRM kimlik eşleşmeleri (telefon ve e-posta paylaşılmaz)' },
+  { scope: 'classrooms:read', label: 'Sınıflar ve öğretmenler', help: 'sınıf listeleri, öğretmen adı, üyelikler' },
+  { scope: 'results:read', label: 'Test ve açık uçlu sonuçları', help: 'puanlar, konular, tarihler (soru ve cevap metni paylaşılmaz)' },
+  { scope: 'mastery:read', label: 'Konu hâkimiyeti', help: 'konu bazlı doğru/yanlış sayıları' },
+  { scope: 'grades:read', label: 'Okul notlarını okuma', help: 'içe aktarılmış ders notları' },
+  { scope: 'grades:write', label: 'Okul notlarını yazma', help: 'CRM/ERP’den not aktarımı' },
+  { scope: 'students:link', label: 'CRM kayıt eşleştirme', help: 'dış sistem öğrenci kimliklerini eşleştirme' },
+]
+
 export default function InstitutionIntegrationsPage() {
   const router = useRouter()
   const [institutionId, setInstitutionId] = useState('')
   const [items, setItems] = useState<Integration[]>([])
   const [name, setName] = useState('')
   const [studentsScope, setStudentsScope] = useState(true)
+  const [extraScopes, setExtraScopes] = useState<string[]>([])
+  const [ack, setAck] = useState(false)
   const [secret, setSecret] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -79,6 +92,7 @@ export default function InstitutionIntegrationsPage() {
   async function createIntegration(event: React.FormEvent) {
     event.preventDefault()
     if (!name.trim()) { setError('Entegrasyona bir ad verin.'); return }
+    if (extraScopes.length && !ack) { setError('Kimlik bilgili veri paylaşımı için sorumluluk onayını işaretleyin.'); return }
     setSaving(true); setError(''); setNotice(''); setSecret('')
     try {
       const token = await currentToken()
@@ -88,7 +102,8 @@ export default function InstitutionIntegrationsPage() {
         body: JSON.stringify({
           institutionId,
           name: name.trim(),
-          scopes: ['institution:read', ...(studentsScope ? ['students:read:pseudonymous'] : [])],
+          scopes: ['institution:read', ...(studentsScope ? ['students:read:pseudonymous'] : []), ...extraScopes],
+          ...(extraScopes.length ? { acknowledgeDataProcessing: true } : {}),
         }),
       })
       const result = await response.json().catch(() => ({}))
@@ -174,8 +189,24 @@ export default function InstitutionIntegrationsPage() {
             Takma adlı öğrenci listesi ve sınıf düzeyi okuma izni
           </label>
           <div style={{ fontSize: 12, color: 'var(--text3, #68736e)', marginBottom: 14 }}>
-            Öğrenci adı, iletişim bilgisi, okul numarası ve ham cevap geçmişi bu izinle paylaşılmaz.
+            Bu izinle öğrenci adı, iletişim bilgisi, okul numarası ve ham cevap geçmişi paylaşılmaz. Aşağıdaki ek izinler bunların bir kısmını açar.
           </div>
+          <fieldset style={{ border: '1px solid var(--border, #d8cec4)', borderRadius: 12, padding: 12, margin: '0 0 14px' }}>
+            <legend style={{ fontSize: 13, fontWeight: 700, padding: '0 6px' }}>Ek veri izinleri (kimlik bilgili)</legend>
+            {EXTRA_SCOPES.map(item => (
+              <label key={item.scope} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '8px 0', fontSize: 13, lineHeight: 1.45 }}>
+                <input type="checkbox" checked={extraScopes.includes(item.scope)} style={{ marginTop: 3 }}
+                  onChange={event => setExtraScopes(prev => event.target.checked ? [...prev, item.scope] : prev.filter(scope => scope !== item.scope))} />
+                <span><strong>{item.label}</strong> — {item.help}</span>
+              </label>
+            ))}
+            {extraScopes.length > 0 && (
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 12, padding: 10, background: 'var(--amber-bg, #fff4dc)', borderRadius: 10, fontSize: 12.5, lineHeight: 1.5 }}>
+                <input type="checkbox" checked={ack} onChange={event => setAck(event.target.checked)} style={{ marginTop: 3 }} />
+                <span>Kurum olarak veri sorumlusu olduğumuzu, bu verilerin aktarılacağı sistemle KVKK kapsamında gerekli aydınlatma ve sözleşme süreçlerini yürüttüğümüzü onaylıyorum. Erişimler kaydedilir; anahtarı istediğim an iptal edebilirim.</span>
+              </label>
+            )}
+          </fieldset>
           <button type="submit" disabled={saving} style={{ ...primaryButton, opacity: saving ? .65 : 1 }}>
             {saving ? 'Oluşturuluyor…' : 'Güvenli anahtar oluştur'}
           </button>

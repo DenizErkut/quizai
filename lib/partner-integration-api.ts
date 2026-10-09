@@ -15,11 +15,21 @@ export type PartnerIntegration = {
   pseudonym_key: string
   scopes: string[]
   expires_at: string | null
+  created_by: string
 }
 
 export type PartnerAuthResult =
   | { ok: true; integration: PartnerIntegration; requestId: string }
   | { ok: false; response: Response }
+
+import { ALL_PARTNER_SCOPES, BASE_SCOPES, IDENTIFIED_SCOPES, needsDataProcessingAck } from '@/lib/partner-scopes'
+export { ALL_PARTNER_SCOPES, BASE_SCOPES, IDENTIFIED_SCOPES, needsDataProcessingAck }
+
+/** Student reference for an export row: real id for identified integrations, pseudonym otherwise. */
+export function studentRef(integration: PartnerIntegration, userId: string): Record<string, string> {
+  const ref = pseudonymFor(integration.pseudonym_key, userId)
+  return integration.scopes.includes('students:read:identified') ? { student_id: userId, student_ref: ref } : { student_ref: ref }
+}
 
 export function jsonNoStore(body: unknown, status = 200, headers?: HeadersInit) {
   const responseHeaders = new Headers(headers)
@@ -82,7 +92,7 @@ export async function authorizePartner(request: Request, requiredScope: string):
 
   const { data: integration, error } = await db
     .from('partner_integrations')
-    .select('id, institution_id, name, pseudonym_key, scopes, expires_at')
+    .select('id, institution_id, name, pseudonym_key, scopes, expires_at, created_by')
     .eq('token_hash', sha256(rawToken))
     .is('revoked_at', null)
     .maybeSingle()

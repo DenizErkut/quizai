@@ -9,7 +9,7 @@ export async function GET(request: Request) {
 
   const { data: institution, error } = await getPartnerDb()
     .from('institutions')
-    .select('name')
+    .select('name, code, admin_email, active, created_at')
     .eq('id', auth.integration.institution_id)
     .maybeSingle()
   if (error || !institution) {
@@ -24,7 +24,13 @@ export async function GET(request: Request) {
   const audited = await writePartnerAudit(auth.integration, 'institution_read', '/api/integrations/v1/institution', 200, auth.requestId)
   if (!audited) return apiError('temporarily_unavailable', 'Denetim kaydı oluşturulamadı.', auth.requestId, 503)
   return jsonNoStore({
-    data: { institution_ref: institutionRef, name: institution.name },
+    data: {
+      institution_ref: institutionRef,
+      name: institution.name,
+      ...(auth.integration.scopes.includes('institution:read:identity')
+        ? { institution_id: auth.integration.institution_id, code: institution.code, contact_email: institution.admin_email, active: institution.active, created_at: institution.created_at }
+        : {}),
+    },
     request_id: auth.requestId,
   })
 }
