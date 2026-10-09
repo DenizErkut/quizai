@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { gateTeacherFeature } from '@/lib/teacher-access'
 import { createClient } from '@/lib/supabase/server-create-client'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
@@ -11,6 +12,8 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   const { data: teacher } = await db.from('teachers').select('id,approved').eq('user_id', user.id).maybeSingle()
   if (!teacher?.approved) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
+  const blocked = await gateTeacherFeature(user.id, 'analytics')
+  if (blocked) return blocked
   const { data: classes } = await db.from('classrooms').select('id').eq('teacher_id', teacher.id)
   const { data: members } = classes?.length ? await db.from('classroom_students').select('student_id').in('classroom_id', classes.map(c => c.id)) : { data: [] }
   const ids = [...new Set((members ?? []).map(m => m.student_id))]

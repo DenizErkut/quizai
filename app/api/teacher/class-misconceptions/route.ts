@@ -3,6 +3,7 @@
 // app/api/teacher/class-risk-summary/route.ts ile BİREBİR aynı
 // auth/sınıf-seçme deseni — sadece hesaplama fonksiyonu farklı.
 import { NextRequest, NextResponse } from 'next/server'
+import { gateTeacherFeature } from '@/lib/teacher-access'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 import { computeClassMisconceptionSummary } from '@/lib/teacher-misconception-insight'
@@ -30,6 +31,8 @@ export async function GET(req: NextRequest) {
   const { data: teacher } = await supabaseAdmin
     .from('teachers').select('id, approved').eq('user_id', user.id).maybeSingle()
   if (!teacher?.approved) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
+  const blocked = await gateTeacherFeature(user.id, 'analytics')
+  if (blocked) return blocked
 
   const classroomId = req.nextUrl.searchParams.get('classroomId')
 

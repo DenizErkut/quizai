@@ -22,27 +22,27 @@ export async function GET(req: NextRequest) {
 
   switch (report) {
     case 'progress':
-      return NextResponse.json({ ...(await buildProgressReport(roster)), classrooms })
+      return NextResponse.json({ ...(await buildProgressReport(roster)), classrooms, limitedTo: ctx.limitedTo ?? null })
     case 'weak-topics':
-      return NextResponse.json({ ...(await buildWeakTopicsReport(roster)), classrooms })
+      return NextResponse.json({ ...(await buildWeakTopicsReport(roster)), classrooms, limitedTo: ctx.limitedTo ?? null })
     case 'inactivity':
-      return NextResponse.json({ ...(await buildInactivityReport(roster)), classrooms })
+      return NextResponse.json({ ...(await buildInactivityReport(roster)), classrooms, limitedTo: ctx.limitedTo ?? null })
     case 'reading':
-      return NextResponse.json({ ...(await buildReadingReport(roster)), classrooms })
+      return NextResponse.json({ ...(await buildReadingReport(roster)), classrooms, limitedTo: ctx.limitedTo ?? null })
     case 'comparison': {
       const importId = req.nextUrl.searchParams.get('importId')
-      return NextResponse.json({ ...(await buildGradeComparisonReport(roster, importId)), classrooms })
+      return NextResponse.json({ ...(await buildGradeComparisonReport(roster, importId)), classrooms, limitedTo: ctx.limitedTo ?? null })
     }
     case 'classroom-compare':
-      return NextResponse.json({ ...(await buildClassroomCompareReport(roster, 'classroomName')), classrooms })
+      return NextResponse.json({ ...(await buildClassroomCompareReport(roster, 'classroomName')), classrooms, limitedTo: ctx.limitedTo ?? null })
     case 'open-ended':
-      return NextResponse.json({ ...(await buildOpenEndedReport(roster)), classrooms })
+      return NextResponse.json({ ...(await buildOpenEndedReport(roster)), classrooms, limitedTo: ctx.limitedTo ?? null })
     case 'open-ended-archive':
-      return NextResponse.json({ ...(await buildOpenEndedArchiveReport(roster)), classrooms })
+      return NextResponse.json({ ...(await buildOpenEndedArchiveReport(roster)), classrooms, limitedTo: ctx.limitedTo ?? null })
     case 'assignments':
-      return NextResponse.json({ ...(await buildAssignmentsReport(roster, classroomIds)), classrooms })
+      return NextResponse.json({ ...(await buildAssignmentsReport(roster, classroomIds)), classrooms, limitedTo: ctx.limitedTo ?? null })
     case 'live-quiz':
-      return NextResponse.json({ ...(await buildLiveQuizReport(classroomIds)), classrooms })
+      return NextResponse.json({ ...(await buildLiveQuizReport(classroomIds)), classrooms, limitedTo: ctx.limitedTo ?? null })
     default:
       return NextResponse.json({ error: 'Geçersiz rapor türü.' }, { status: 400 })
   }

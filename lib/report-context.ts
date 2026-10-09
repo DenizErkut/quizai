@@ -5,6 +5,7 @@
 import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 import { ReportStudentBase } from '@/lib/student-reports'
+import { dashboardStudentCap } from '@/lib/teacher-access'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -60,6 +61,8 @@ export interface TeacherContext {
   teacherId: string
   roster: ReportStudentBase[]
   classrooms: { id: string; name: string }[]
+  /** Set when the teacher is on the limited tier: the dashboard only covers this many students. */
+  limitedTo?: number
 }
 
 export async function buildTeacherContext(userId: string, classroomId?: string | null): Promise<TeacherContext | null> {
@@ -94,7 +97,12 @@ export async function buildTeacherContext(userId: string, classroomId?: string |
     classroomName: classroomMap.get(m.classroom_id) ?? null,
   }))
 
-  return { teacherId: teacher.id, roster, classrooms }
+  const cap = await dashboardStudentCap(userId)
+  if (cap !== null && roster.length > cap) {
+    const ordered = [...roster].sort((a, b) => a.id.localeCompare(b.id))
+    return { teacherId: teacher.id, roster: ordered.slice(0, cap), classrooms, limitedTo: cap }
+  }
+  return { teacherId: teacher.id, roster, classrooms, ...(cap !== null ? { limitedTo: cap } : {}) }
 }
 
 export interface ParentContext {

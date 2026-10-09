@@ -8,6 +8,7 @@
 //   adjust     → the teacher can correct any criterion score afterwards
 // Scan images are only sent to the model for transcription; they are NOT stored.
 import { NextRequest, NextResponse } from 'next/server'
+import { gateTeacherFeature } from '@/lib/teacher-access'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { logAnthropicUsage } from '@/lib/ai-usage'
@@ -31,6 +32,8 @@ async function authorize(req: NextRequest, assignmentIds: unknown, studentId: un
   if (error || !user) return { error: NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 }) }
   const { data: teacher } = await supabase.from('teachers').select('id, approved').eq('user_id', user.id).maybeSingle()
   if (!teacher?.approved) return { error: NextResponse.json({ error: 'Onaylı öğretmen hesabı gerekir.' }, { status: 403 }) }
+  const blocked = await gateTeacherFeature(user.id, 'export_import')
+  if (blocked) return { error: blocked }
   const ids = Array.isArray(assignmentIds) ? [...new Set(assignmentIds.filter((id): id is string => typeof id === 'string'))] : []
   if (!ids.length || ids.length > 10 || (needStudent && (typeof studentId !== 'string' || !studentId))) {
     return { error: NextResponse.json({ error: 'Ödev ve öğrenci seçin.' }, { status: 400 }) }

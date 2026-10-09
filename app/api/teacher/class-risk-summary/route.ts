@@ -3,6 +3,7 @@
 // sınıf analizi/önerisi. Query param: classroomId (verilmezse öğretmenin
 // TÜM öğrencileri tek bir havuzda değerlendirilir).
 import { NextRequest, NextResponse } from 'next/server'
+import { gateTeacherFeature } from '@/lib/teacher-access'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 import { computeClassRiskSummary } from '@/lib/class-risk'
@@ -31,6 +32,8 @@ export async function GET(req: NextRequest) {
   const { data: teacher } = await supabaseAdmin
     .from('teachers').select('id, approved').eq('user_id', user.id).maybeSingle()
   if (!teacher?.approved) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
+  const blocked = await gateTeacherFeature(user.id, 'analytics')
+  if (blocked) return blocked
 
   const classroomId = req.nextUrl.searchParams.get('classroomId')
 

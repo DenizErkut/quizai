@@ -9,6 +9,7 @@
 //   kaydedilir — 'created_via' alanında bu iki oluşturma yöntemi
 //   frontend tarafından ayrıca işaretlenip gönderilir.
 import { NextRequest, NextResponse } from 'next/server'
+import { gateTeacherFeature, recordTeacherUsage } from '@/lib/teacher-access'
 export const maxDuration = 60
 export const runtime = 'nodejs'
 import { generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
@@ -193,6 +194,11 @@ export async function POST(req: NextRequest) {
     }
     const questionCount = Math.min(5, Math.max(1, Math.trunc(Number((body as any).count) || 1)))
 
+    if (mode === 'ai') {
+      const blocked = await gateTeacherFeature(user.id, 'ai_generation')
+      if (blocked) return blocked
+    }
+
     // preview: SADECE üret, kaydetme — öğretmen önce önizler/düzenler,
     // asıl kayıt 'manual' modla (onaylanmış içerikle) yapılır.
     if (mode === 'ai' && preview) {
@@ -201,6 +207,7 @@ export async function POST(req: NextRequest) {
       }
       try {
         const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin, user.id, token, questionCount)
+        await recordTeacherUsage(user.id, 'ai_generation')
         return NextResponse.json(result)
       } catch (e: any) {
         return NextResponse.json({ error: e?.message || 'Soru üretilemedi, tekrar dene.' }, { status: 500 })
@@ -267,6 +274,7 @@ export async function POST(req: NextRequest) {
       try {
         const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin, user.id, token)
         scenario = result.scenario; question = result.question; rubric = result.rubric
+        await recordTeacherUsage(user.id, 'ai_generation')
       } catch (e: any) {
         return NextResponse.json({ error: e?.message || 'Soru üretilemedi, tekrar dene.' }, { status: 500 })
       }

@@ -1,5 +1,6 @@
 // app/api/teacher/import-grades/route.ts
 import { NextRequest, NextResponse } from 'next/server'
+import { gateTeacherFeature } from '@/lib/teacher-access'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { commitGradeImport, ImportRow } from '@/lib/grades-import'
 
@@ -23,6 +24,8 @@ export async function POST(req: NextRequest) {
   const { data: teacher } = await supabaseAdmin
     .from('teachers').select('id, approved').eq('user_id', user.id).maybeSingle()
   if (!teacher?.approved) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
+  const blocked = await gateTeacherFeature(user.id, 'export_import')
+  if (blocked) return blocked
 
   const body = await req.json()
   const { label, sourceFilename, rows } = body as { label: string; sourceFilename?: string; rows: ImportRow[] }

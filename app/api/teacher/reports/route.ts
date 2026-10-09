@@ -1,5 +1,6 @@
 // app/api/teacher/reports/route.ts
 import { NextRequest, NextResponse } from 'next/server'
+import { dashboardStudentCap } from '@/lib/teacher-access'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 import { attachGradesAndStats, buildSectionalReport, ReportStudentBase } from '@/lib/student-reports'
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest) {
   const { data: profiles } = await supabaseAdmin.from('profiles').select('id, class_number, grade').in('id', userIds)
   const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]))
 
-  const roster: ReportStudentBase[] = members.map((m: any) => ({
+  const fullRoster: ReportStudentBase[] = members.map((m: any) => ({
     id: m.student_id,
     fullName: identities[m.student_id]?.full_name ?? 'İsimsiz',
     schoolNo: profileMap.get(m.student_id)?.class_number ?? null,
@@ -66,12 +67,16 @@ export async function GET(req: NextRequest) {
     classroomName: classroomMap.get(m.classroom_id) ?? null,
   }))
 
+  const cap = await dashboardStudentCap(user.id)
+  const roster = cap !== null ? [...fullRoster].sort((a, b) => a.id.localeCompare(b.id)).slice(0, cap) : fullRoster
+  const limitedTo = cap !== null && fullRoster.length > cap ? cap : null
+
   const mode = req.nextUrl.searchParams.get('mode')
   if (mode === 'sectional') {
     const { students, subjects } = await buildSectionalReport(roster, importId)
-    return NextResponse.json({ imports, selectedImportId: importId, students, subjects, classrooms })
+    return NextResponse.json({ imports, selectedImportId: importId, students, subjects, classrooms, limitedTo })
   }
 
   const { students, subjectColumns } = await attachGradesAndStats(roster, importId)
-  return NextResponse.json({ imports, selectedImportId: importId, students, subjectColumns, classrooms })
+  return NextResponse.json({ imports, selectedImportId: importId, students, subjectColumns, classrooms, limitedTo })
 }

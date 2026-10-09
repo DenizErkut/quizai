@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { gateTeacherFeature } from '@/lib/teacher-access'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 import { buildLearningRiskOverview, MasteryRiskRow, StudentClass } from '@/lib/learning-risk-overview'
@@ -14,6 +15,8 @@ export async function GET(req: NextRequest) {
 
   const { data: teacher } = await db.from('teachers').select('id,approved').eq('user_id', user.id).maybeSingle()
   if (!teacher?.approved) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
+  const blocked = await gateTeacherFeature(user.id, 'analytics')
+  if (blocked) return blocked
 
   const { data: classrooms, error: classError } = await db.from('classrooms').select('id,name').eq('teacher_id', teacher.id).order('name')
   if (classError) return NextResponse.json({ error: 'Sınıflar alınamadı.' }, { status: 500 })
