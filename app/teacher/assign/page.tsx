@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import PaperAnswerImport from '@/components/teacher/PaperAnswerImport'
+import { useTeacherEntitlement, LOCKED_MESSAGE } from '@/components/teacher/useTeacherEntitlement'
 
 // '6' -> 'ortaokul 6. sınıf' (the test generator expects the school-level form).
 function gradeLabel(grade: string | null | undefined): string {
@@ -64,6 +65,7 @@ export default function TeacherAssignPage() {
   const [oeItems, setOeItems] = useState<{ scenario: string; question: string; rubric: { criterion: string; maxPoints: number; description: string }[] }[] | null>(null)
   const [printBusy, setPrintBusy] = useState('')
   const [printMessage, setPrintMessage] = useState('')
+  const { limited: planLimited } = useTeacherEntitlement()
   const [importGroup, setImportGroup] = useState('') // açık uçlu ödev grubunun kâğıt içe aktarma paneli
   const router = useRouter()
   const supabase = createClient() as any
@@ -263,6 +265,7 @@ export default function TeacherAssignPage() {
   }
 
   async function printOpenEndedGroup(group: any[], withKey: boolean) {
+    if (planLimited) { setPrintMessage(LOCKED_MESSAGE); return }
     const first = group[0]
     setPrintBusy(`oe-${first.id}`); setPrintMessage('')
     try {
@@ -281,6 +284,7 @@ export default function TeacherAssignPage() {
   // Quiz assignments store only topic/difficulty/count (each student gets freshly generated questions),
   // so a printable class copy is generated once here with the same quality pipeline.
   async function printQuizAssignment(a: any, withKey: boolean) {
+    if (planLimited) { setPrintMessage(LOCKED_MESSAGE); return }
     setPrintBusy(`quiz-${a.id}`); setPrintMessage('Basılı test hazırlanıyor… (30-90 saniye sürebilir)')
     try {
       const classroom = classrooms.find(c => c.id === a.classroom_id)
@@ -682,7 +686,7 @@ export default function TeacherAssignPage() {
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
                       <button className="btn btn-sm" disabled={busy} onClick={() => void printOpenEndedGroup(group, false)}>🖨️ Öğrenci formu (PDF)</button>
                       <button className="btn btn-sm" disabled={busy} onClick={() => void printOpenEndedGroup(group, true)}>👩‍🏫 Puanlama anahtarıyla</button>
-                      <button className="btn btn-sm" onClick={() => setImportGroup(importGroup === (a.batch_id || a.id) ? '' : (a.batch_id || a.id))}>📥 Kâğıt cevapları aktar</button>
+                      <button className="btn btn-sm" onClick={() => planLimited ? setPrintMessage(LOCKED_MESSAGE) : setImportGroup(importGroup === (a.batch_id || a.id) ? '' : (a.batch_id || a.id))}>📥 Kâğıt cevapları aktar</button>
                     </div>
                     {importGroup === (a.batch_id || a.id) && <PaperAnswerImport group={group} onClose={() => setImportGroup('')} />}
                   </div>

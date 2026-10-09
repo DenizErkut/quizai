@@ -1,5 +1,6 @@
 // app/api/teacher/analyze/route.ts
 import { NextRequest, NextResponse } from 'next/server'
+import { gateTeacherFeature } from '@/lib/teacher-access'
 import { createClient } from '@/lib/supabase/server-create-client'
 import Anthropic from '@anthropic-ai/sdk'
 import { logAnthropicUsage } from '@/lib/ai-usage'
@@ -37,6 +38,8 @@ export async function POST(req: NextRequest) {
     .eq('user_id', user.id)
     .single()
   if (!teacher?.approved) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
+  const blocked = await gateTeacherFeature(user.id, 'analytics')
+  if (blocked) return blocked
 
   const { student_id, assignment_id } = await req.json()
   if (!student_id || !assignment_id) {

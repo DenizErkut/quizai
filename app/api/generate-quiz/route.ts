@@ -1,3 +1,4 @@
+import { gateTeacherFeature } from '@/lib/teacher-access'
 import { after, NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 120
 export const runtime = 'nodejs'
@@ -1499,6 +1500,10 @@ export async function POST(req: NextRequest) {
     // Approved teachers can request a PRINT test for their class: same quality pipeline, own limits (no student quota).
     const teacherPrint = body?.teacherPrint === true
       && Boolean((await supabase.from('teachers').select('approved').eq('user_id', user.id).maybeSingle()).data?.approved)
+    if (teacherPrint) {
+      const blocked = await gateTeacherFeature(user.id, 'export_import')
+      if (blocked) return blocked
+    }
     const today = new Date().toISOString().split('T')[0]
 
     // Premium ve Unlimited planlarda HİÇBİR soru/test sınırı yok — sadece

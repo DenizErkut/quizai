@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { gateTeacherFeature, recordTeacherUsage } from '@/lib/teacher-access'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
 import { pickMeasuredQuizEngine } from '@/lib/ai-gateway/measured-quiz-router'
@@ -22,6 +23,9 @@ export async function POST(req: NextRequest) {
 
   const { data: teacher } = await supabase.from('teachers').select('id,approved').eq('user_id', user.id).single()
   if (!teacher?.approved) return NextResponse.json({ error: 'Onaylı öğretmen değilsiniz.' }, { status: 403 })
+
+  const blocked = await gateTeacherFeature(user.id, 'live_quiz')
+  if (blocked) return blocked
 
   const { classroom_id, topic, question_count = 5, difficulty = 'normal', question_type = 'multiple_choice', time_per_question = 30 } = await req.json()
   if (!classroom_id || !topic) return NextResponse.json({ error: 'Eksik parametre.' }, { status: 400 })
@@ -90,6 +94,7 @@ SADECE geçerli JSON döndür:
 
   // live_quizzes tablosuna kaydet
   const joinCode = Math.random().toString(36).substring(2, 7).toUpperCase()
+  await recordTeacherUsage(user.id, 'live_quiz')
   const { data: liveQuiz } = await supabase.from('live_quizzes').insert({
     teacher_id: teacher.id,
     classroom_id,
