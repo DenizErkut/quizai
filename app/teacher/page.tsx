@@ -1,4 +1,5 @@
 'use client'
+import TeacherInviteLink from '@/components/teacher/TeacherInviteLink'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -230,6 +231,7 @@ export default function TeacherDashboard() {
               </h1>
               <p style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '4px' }}>{teacher?.school}</p>
             </div>
+            <TeacherInviteLink classrooms={classrooms} />
 
             {/* Özet kartlar */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '1.5rem' }}>

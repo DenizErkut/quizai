@@ -23,7 +23,12 @@ function JoinContent() {
 
   async function loadMyClasses() {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setCheckingMembership(false); return }
+    if (!user) {
+      // A teacher's invite link opened by a logged-out student: sign up / log in first, then come back and join.
+      const inviteCode = searchParams.get('code')?.toUpperCase()
+      if (inviteCode && /^[A-Z0-9]{4,8}$/.test(inviteCode)) { router.replace(`/register?next=${encodeURIComponent('/join?code=' + inviteCode)}`); return }
+      setCheckingMembership(false); return
+    }
 
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { setCheckingMembership(false); return }
@@ -53,7 +58,7 @@ function JoinContent() {
     setLoading(true); setError('')
 
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { router.push('/login'); setLoading(false); return }
+    if (!session) { router.push(joinCode ? `/register?next=${encodeURIComponent('/join?code=' + joinCode)}` : '/login'); setLoading(false); return }
 
     const response = await fetch('/api/classrooms/join', {
       method: 'POST',
