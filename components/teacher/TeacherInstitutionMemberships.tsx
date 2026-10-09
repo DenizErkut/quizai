@@ -15,6 +15,7 @@ export default function TeacherInstitutionMemberships() {
   const [institutionCode, setInstitutionCode] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [leaving, setLeaving] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const supabase = useMemo(() => createClient(), [])
@@ -44,6 +45,30 @@ export default function TeacherInstitutionMemberships() {
     })()
     return () => { cancelled = true }
   }, [loadInstitutions])
+
+  async function leaveInstitution(institution: InstitutionMembership) {
+    if (!window.confirm(`${institution.name} kurumundan ayrılmak istiyor musunuz?\n\nSınıflarınız ve öğrencileriniz sizde kalır. Kurum bağlantısı kalktığı için kurumdan gelen tam erişim sona erer; tekrar bağlanmak için kurum kodunu girmeniz gerekir.`)) return
+    setError('')
+    setNotice('')
+    setLeaving(institution.id)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Oturum bulunamadı. Lütfen yeniden giriş yapın.')
+      const response = await fetch('/api/teacher/institutions', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ institution_id: institution.id }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload.error || 'Kurumdan ayrılma işlemi tamamlanamadı.')
+      setNotice(`${institution.name} kurumundan ayrıldınız.`)
+      await loadInstitutions(session.access_token)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Kurumdan ayrılma işlemi tamamlanamadı.')
+    } finally {
+      setLeaving('')
+    }
+  }
 
   async function joinInstitution(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -129,6 +154,9 @@ export default function TeacherInstitutionMemberships() {
               <span style={{ color: institution.active ? 'var(--green)' : 'var(--text3)', whiteSpace: 'nowrap' }}>
                 {institution.active ? 'Öğretmen bağlantısı aktif' : 'Kurum pasif'}
               </span>
+              <button type="button" className="btn btn-sm" disabled={leaving === institution.id} onClick={() => void leaveInstitution(institution)}>
+                {leaving === institution.id ? 'Ayrılıyor…' : 'Kurumdan ayrıl'}
+              </button>
             </li>)}
           </ul>}
     </div>

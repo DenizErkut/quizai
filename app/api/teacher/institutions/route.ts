@@ -115,3 +115,35 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ success: true, already_member: false, institution_name: institution.name }, { status: 201 })
 }
+
+// A teacher can leave an institution at any time. Only the teacher link of this teacher is removed;
+// classrooms, students and the institution's own data stay untouched.
+export async function DELETE(req: NextRequest) {
+  const auth = await getApprovedTeacher(req)
+  if ('error' in auth) return auth.error
+
+  const limit = await checkRateLimit(auth.user.id, { endpoint: 'teacher-institution-leave', limit: 10 })
+  if (!limit.allowed) return rateLimitExceeded(limit)
+
+  const body = await req.json().catch(() => null)
+  const institutionId = body && typeof body.institution_id === 'string' ? body.institution_id : ''
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(institutionId)) {
+    return NextResponse.json({ error: 'Kurum bilgisi geçersiz.' }, { status: 400 })
+  }
+
+  const { data: removed, error } = await db
+    .from('institution_users')
+    .delete()
+    .eq('institution_id', institutionId)
+    .eq('user_id', auth.user.id)
+    .eq('role', 'teacher')
+    .select('institution_id')
+    .maybeSingle()
+
+  if (error) {
+    console.error('[teacher/institutions] leave failed:', error.message)
+    return NextResponse.json({ error: 'Kurumdan ayrılma işlemi tamamlanamadı.' }, { status: 500 })
+  }
+  if (!removed) return NextResponse.json({ error: 'Bu kurumda öğretmen bağlantınız bulunamadı.' }, { status: 404 })
+  return NextResponse.json({ success: true })
+}
