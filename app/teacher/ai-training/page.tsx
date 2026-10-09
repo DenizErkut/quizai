@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import PeriodicAiQuiz from '@/components/teacher/PeriodicAiQuiz'
 import { TEACHER_AI_TRAINING_MODULES, type TeacherTrainingModuleId } from '@/lib/teacher-ai-training-course'
 
 type ModuleProgress = { module_id: TeacherTrainingModuleId; passed: boolean; score: number; attempt_count: number; attested_at: string; passed_at: string | null }
@@ -73,6 +74,7 @@ export default function TeacherAITrainingPage() {
           <div style={{ color: 'var(--text2)' }}>Dört kısa modül · 16 uygulamalı soru · geçiş için her modülde en az 3/4</div></div>
         <div className="card" style={{ minWidth: 130, textAlign: 'center' }}><b>{passedCount}/4</b><div style={{ fontSize: 12, color: 'var(--text2)' }}>tamamlanan modül</div></div>
       </div>
+      <PeriodicAiQuiz />
       <div className="card" style={{ color: 'var(--text2)', lineHeight: 1.6 }}>
         Bu, Pratium içi bir pilot tamamlama rozetidir; resmî veya akredite mesleki sertifika değildir. Konular: AI çıktısını doğrulama, MEB kazanım uyumu, yaşa uygun geri bildirim ve öğrenci verisi/güvenliği. İçerik modül testlerini geçerek tamamlanır; model çağrısı yapılmaz.
       </div>

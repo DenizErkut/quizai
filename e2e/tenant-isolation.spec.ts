@@ -83,4 +83,8 @@ test.describe('tenant isolation security contract', () => {
     const response = await request.delete('/api/teacher/institutions', { data: { institution_id: '00000000-0000-4000-8000-000000000000' } })
     expect(response.status()).toBe(401)
   })
+  test('teacher AI quiz requires a teacher session', async ({ request }) => {
+    expect((await request.get('/api/teacher/ai-quiz')).status()).toBe(403)
+    expect((await request.post('/api/teacher/ai-quiz', { data: { action: 'start' } })).status()).toBe(403)
+  })
 })
