@@ -243,11 +243,15 @@ export default function InstitutionIntegrationsPage() {
       <section style={card}>
         <h2 style={{ margin: '0 0 8px', fontSize: 19 }}>API bağlantı bilgisi</h2>
         <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text3, #68736e)' }}>
-          Bu sürüm kurum bilgisini ve takma adlı öğrenci listesini okur; sınıf ayrıntıları, ilerleme özeti ve CRM’den Pratium’a kayıt aktarımı sonraki aşamalardadır.
+          Anahtarınızın izinlerine göre kurum, öğrenci, sınıf, sonuç, konu hâkimiyeti ve okul notlarını okuyabilir; okul notlarını ve CRM kayıt eşleştirmelerini yazabilirsiniz. Tüm uç noktalar için <a href="/api/integrations/v1/openapi" style={{ color: 'inherit', textDecoration: 'underline' }}>OpenAPI açıklamasına</a> bakın.
         </p>
         <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', padding: 14, background: 'var(--bg2, #f7f4ef)', borderRadius: 10, fontSize: 12, lineHeight: 1.6 }}>
           GET https://pratium.com/api/integrations/v1/institution<br />
           GET https://pratium.com/api/integrations/v1/students?limit=50<br />
+          GET https://pratium.com/api/integrations/v1/students/identified?limit=50&amp;format=csv<br />
+          GET https://pratium.com/api/integrations/v1/grades?updated_since=2026-10-01T00:00:00Z<br />
+          POST https://pratium.com/api/integrations/v1/grades<br />
+          POST https://pratium.com/api/integrations/v1/links<br />
           Authorization: Bearer &lt;kuruma-özel-anahtar&gt;
         </pre>
         <p style={{ margin: 0, fontSize: 12, color: 'var(--text3, #68736e)' }}>
