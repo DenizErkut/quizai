@@ -2,7 +2,9 @@ import { NextRequest } from 'next/server'
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@/lib/supabase/server-create-client'
 import {
+  ALL_PARTNER_SCOPES,
   apiError,
+  needsDataProcessingAck,
   jsonNoStore,
   newPartnerSecret,
   newPseudonymKey,
@@ -12,7 +14,7 @@ import {
 
 export const runtime = 'nodejs'
 
-const allowedScopes = new Set(['institution:read', 'students:read:pseudonymous'])
+const allowedScopes = new Set(ALL_PARTNER_SCOPES)
 
 async function getInstitutionAdmin(req: NextRequest) {
   const header = req.headers.get('authorization')
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest) {
   const user = await getInstitutionAdmin(req)
   if (!user) return apiError('unauthorized', 'Oturum açmış kurum yöneticisi gerekli.', requestId, 401)
 
-  let body: { institutionId?: unknown; name?: unknown; scopes?: unknown; expiresAt?: unknown }
+  let body: { institutionId?: unknown; name?: unknown; scopes?: unknown; expiresAt?: unknown; acknowledgeDataProcessing?: unknown }
   try {
     const raw = await req.text()
     if (raw.length > 16_384) return apiError('payload_too_large', 'İstek gövdesi çok büyük.', requestId, 413)
@@ -52,6 +54,10 @@ export async function POST(req: NextRequest) {
     new Set(body.scopes).size !== body.scopes.length
   ) {
     return apiError('invalid_request', 'Kurum, ad veya izin kapsamı geçersiz.', requestId, 422)
+  }
+
+  if (needsDataProcessingAck(body.scopes as string[]) && body.acknowledgeDataProcessing !== true) {
+    return apiError('acknowledgement_required', 'Kimlik bilgili veri paylaşımı için kurumun veri işleme sorumluluğu onayı gerekir.', requestId, 422)
   }
 
   let expiresAt = new Date(Date.now() + 90 * 86400_000).toISOString()
@@ -92,6 +98,7 @@ export async function POST(req: NextRequest) {
       scopes: body.scopes,
       created_by: user.id,
       expires_at: expiresAt,
+      ...(needsDataProcessingAck(body.scopes as string[]) ? { pii_acknowledged_at: new Date().toISOString(), pii_acknowledged_by: user.id } : {}),
     })
     .select('id, name, institution_id, scopes, created_at, expires_at')
     .single()
