@@ -10,12 +10,13 @@
 // (bkz. app/koc/page.tsx). Model aracı çağırmazsa (çoğu turda çağırmaz)
 // action null kalır — her mesaja zorla bir buton eklemek yerine, koç
 // SADECE gerçekten somut bir öneri yaptığında bir buton çıkıyor.
+import { CLAUDE_SONNET, SONNET_PARAMS, sonnetTokens } from '@/lib/claude-models'
 import Anthropic from '@anthropic-ai/sdk'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { CoachContext, formatCoachContextForPrompt } from '@/lib/coach-context'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
-export const COACH_MODEL = 'claude-sonnet-4-5'
+export const COACH_MODEL = CLAUDE_SONNET
 
 // Faz F — plana göre farklılaştırılmış günlük mesaj sınırı. Faz B/C'de
 // herkes için sabit 40'tı; bu hem ücretsiz kullanıcılar için gereksiz
@@ -135,7 +136,8 @@ export async function generateCoachReply(
 ): Promise<CoachTurn> {
   const message = (await anthropic.messages.create({
     model: COACH_MODEL,
-    max_tokens: 500,
+    ...SONNET_PARAMS,
+    max_tokens: sonnetTokens(500),
     system: buildCoachSystemPrompt(ctx),
     tools: [SUGGEST_PRACTICE_TOOL],
     messages: history.length ? history : [{ role: 'user', content: 'Merhaba' }],
@@ -147,7 +149,8 @@ export async function generateCoachReply(
 export async function generateCoachOpening(ctx: CoachContext, userId: string, operation: string): Promise<CoachTurn> {
   const message = (await anthropic.messages.create({
     model: COACH_MODEL,
-    max_tokens: 400,
+    ...SONNET_PARAMS,
+    max_tokens: sonnetTokens(400),
     system: buildCoachSystemPrompt(ctx),
     tools: [SUGGEST_PRACTICE_TOOL],
     messages: [{

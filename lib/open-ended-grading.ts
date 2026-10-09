@@ -1,5 +1,6 @@
 // Shared rubric grading for open-ended answers (online answers and imported paper answers use the
 // SAME prompt, so a paper answer is graded exactly like a typed one).
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import Anthropic from '@anthropic-ai/sdk'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 
@@ -85,13 +86,13 @@ SADECE aşağıdaki JSON formatında yanıt ver:
 }`
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5',
-    max_tokens: 1500,
+    model: CLAUDE_SONNET, ...SONNET_PARAMS,
+    max_tokens: sonnetTokens(1500),
     messages: [{ role: 'user', content: prompt }],
   })
-  await logAnthropicUsage(operation, 'claude-sonnet-4-5', response, { userId })
+  await logAnthropicUsage(operation, CLAUDE_SONNET, response, { userId })
 
-  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  const text = responseText(response)
   let parsed
   try {
     const clean = text.replace(/```json|```/g, '').trim()

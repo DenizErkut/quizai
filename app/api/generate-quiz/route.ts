@@ -1,3 +1,4 @@
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import { gateTeacherFeature } from '@/lib/teacher-access'
 import { after, NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 120
@@ -1268,18 +1269,18 @@ async function generateProviderQuestionBatch(args: {
   } else {
     const timeoutMs = Math.max(20000, 100000 - (Date.now() - args.requestStartTime))
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: roleBatchMaxTokens(batch.count),
+      model: CLAUDE_SONNET, ...SONNET_PARAMS,
+      max_tokens: sonnetTokens(roleBatchMaxTokens(batch.count)),
       system: systemPrompt,
       messages: [{ role: 'user', content: rolePrompt }],
     }, { timeout: timeoutMs, maxRetries: 0 })
-    await logAnthropicUsage('generate-quiz:role-claude-hard', 'claude-sonnet-4-5', response, {
+    await logAnthropicUsage('generate-quiz:role-claude-hard', CLAUDE_SONNET, response, {
       userId: args.userId,
       quizSessionId: args.sessionId,
       requestId: args.requestId,
       meta: { count: batch.count, difficulty: batch.difficulty },
     })
-    raw = response.content[0]?.type === 'text' ? response.content[0].text : ''
+    raw = responseText(response)
   }
 
   const providerQuestions = extractProviderQuestions(raw)
@@ -2154,8 +2155,9 @@ export async function POST(req: NextRequest) {
       const CLAUDE_MAIN_CALL_DEADLINE_MS = 100000 // 120sn bütçeden DB yazımı+response için pay bırak
       const claudeCallTimeoutMs = Math.max(20000, CLAUDE_MAIN_CALL_DEADLINE_MS - (Date.now() - requestStartTime))
       const response = await anthropic.messages.create({
-        model: useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5',
-        max_tokens: genMaxTokens,
+        model: useHaiku ? 'claude-haiku-4-5-20251001' : CLAUDE_SONNET,
+        ...(useHaiku ? {} : SONNET_PARAMS),
+        max_tokens: useHaiku ? genMaxTokens : sonnetTokens(genMaxTokens),
         system: isUniversityLevel
           ? 'Sen üniversite düzeyinde soru üreten bir eğitim asistanısın. MEB K-12 müfredatı kısıtı burada geçerli değil; öğrencinin bölümüne/seviyesine uygun, akademik olarak doğru sorular üret. Siyasi, dini tartışma yaratabilecek veya uygunsuz içerik üretme. Her sorunun doğruluğunu teyit et.'
           : [
@@ -2166,14 +2168,14 @@ export async function POST(req: NextRequest) {
       }, { timeout: claudeCallTimeoutMs, maxRetries: 0 })
       const claudeDurationMs = Date.now() - claudeStartedAt
       console.log(`[generate-quiz] ${forcedClaude ? 'ADMIN TEST' : ''} model=${useHaiku ? 'haiku' : 'sonnet'} qCount=${aiQuestionCount} ms=${claudeDurationMs}`)
-      await logAnthropicUsage(forcedClaude ? 'generate-quiz:admin-test-claude' : 'generate-quiz', useHaiku ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5', response, {
+      await logAnthropicUsage(forcedClaude ? 'generate-quiz:admin-test-claude' : 'generate-quiz', useHaiku ? 'claude-haiku-4-5-20251001' : CLAUDE_SONNET, response, {
         userId: user.id,
         quizSessionId: usageSessionId,
         requestId: usageRequestId,
         durationMs: claudeDurationMs,
         meta: { qCount: aiQuestionCount, topic, hasMebContext: !!mebContext, bankQuestionCount: bankQuestions.length },
       })
-      text = response.content[0].type === 'text' ? response.content[0].text : ''
+      text = responseText(response)
     }
     const clean = text.replace(/```json|```/g, '').trim()
 
@@ -2376,20 +2378,20 @@ export async function POST(req: NextRequest) {
             const topupPrompt = `${prompt}\n\nÖNEMLİ: Bu sefer TAM OLARAK ${missing} adet YENİ ve BİRBİRİNDEN FARKLI soru üret. Eksik zorluk kotası tam olarak ${formatDifficultyQuota(remainingDifficultyQuota)}. Daha önce üretilenlerle aynı/benzer soru üretme. Yanıtın SADECE geçerli, TAMAMLANMIŞ JSON olmalı.`
             const topupCallTimeoutMs = Math.max(15000, TOPUP_TIME_BUDGET_MS - (Date.now() - requestStartTime))
             const topupResponse = await anthropic.messages.create({
-              model: 'claude-sonnet-4-5',
-              max_tokens: Math.min(8000, Math.max(3000, missing * 700)),
+              model: CLAUDE_SONNET, ...SONNET_PARAMS,
+              max_tokens: sonnetTokens(Math.min(8000, Math.max(3000, missing * 700))),
               system: isUniversityLevel
                 ? undefined
                 : [{ type: 'text' as const, text: getStaticSystemBlock(questionType, effectiveLang), cache_control: { type: 'ephemeral' as const } }],
               messages: [{ role: 'user', content: topupPrompt }],
             }, { timeout: topupCallTimeoutMs, maxRetries: 0 })
-            await logAnthropicUsage('generate-quiz:topup', 'claude-sonnet-4-5', topupResponse, {
+            await logAnthropicUsage('generate-quiz:topup', CLAUDE_SONNET, topupResponse, {
               userId: user.id,
               quizSessionId: usageSessionId,
               requestId: usageRequestId,
               meta: { round: round + 1, missing },
             })
-            const topupText = topupResponse.content[0].type === 'text' ? topupResponse.content[0].text : ''
+            const topupText = responseText(topupResponse)
             let topupParsed: any
             try { topupParsed = JSON.parse(topupText.replace(/```json|```/g, '').trim()) } catch { topupParsed = null }
             if (!topupParsed?.questions?.length) {
@@ -2567,8 +2569,8 @@ export async function POST(req: NextRequest) {
           const remainingMs = replenishDeadline - Date.now()
           try {
             const recoveryResponse = await anthropic.messages.create({
-              model: 'claude-sonnet-4-5',
-              max_tokens: Math.min(6000, Math.max(2000, finalMissing * 650)),
+              model: CLAUDE_SONNET, ...SONNET_PARAMS,
+              max_tokens: sonnetTokens(Math.min(6000, Math.max(2000, finalMissing * 650))),
               system: isUniversityLevel
                 ? undefined
                 : [
@@ -2577,13 +2579,13 @@ export async function POST(req: NextRequest) {
                   ],
               messages: [{ role: 'user', content: `${prompt}\n\nRECOVERY: Produce exactly ${finalMissing} fresh replacement questions. Preserve the requested class, course, topic, learning outcomes and question type. Avoid every prepared question listed here: ${[...existingTexts, ...replacements.map((question: any) => question?.q).filter(Boolean)].slice(-12).join(' | ').slice(0, 3500)}.` }],
             }, { timeout: Math.max(1000, Math.min(45000, remainingMs)), maxRetries: 0 })
-            await logAnthropicUsage('generate-quiz:verification-recovery', 'claude-sonnet-4-5', recoveryResponse, {
+            await logAnthropicUsage('generate-quiz:verification-recovery', CLAUDE_SONNET, recoveryResponse, {
               userId: user.id,
               quizSessionId: usageSessionId,
               requestId: usageRequestId,
               meta: { requested: finalMissing, recoveryRound: recoveryRound + 1, subject, grade, topic },
             })
-            const recoveryText = recoveryResponse.content[0]?.type === 'text' ? recoveryResponse.content[0].text : ''
+            const recoveryText = responseText(recoveryResponse)
             replacements.push(...extractProviderQuestions(recoveryText).map((question: any) => ({
               ...question,
               generationProvider: question.generationProvider || 'anthropic',

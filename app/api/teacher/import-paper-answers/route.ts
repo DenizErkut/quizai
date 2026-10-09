@@ -7,6 +7,7 @@
 //                and stored as an ordinary open_ended_sessions row (source: 'paper')
 //   adjust     → the teacher can correct any criterion score afterwards
 // Scan images are only sent to the model for transcription; they are NOT stored.
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import { NextRequest, NextResponse } from 'next/server'
 import { gateTeacherFeature } from '@/lib/teacher-access'
 import Anthropic from '@anthropic-ai/sdk'
@@ -76,14 +77,14 @@ export async function POST(req: NextRequest) {
       }
       const questionList = assignments.map((a, index) => `Soru ${index + 1}: ${String(a.question).slice(0, 220)}`).join('\n')
       const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5', max_tokens: 3500,
+        model: CLAUDE_SONNET, ...SONNET_PARAMS, max_tokens: sonnetTokens(3500),
         messages: [{ role: 'user', content: [
           ...images.map((image: any) => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: image.mediaType, data: image.data } })),
           { type: 'text' as const, text: `Bu görseller bir öğrencinin ELLE doldurduğu açık uçlu soru kâğıdıdır. Kâğıtta ${assignments.length} soru var:\n${questionList}\n\nGÖREVİN YALNIZCA TRANSKRİPSİYON: her sorunun cevap alanına yazılanı AYNEN, öğrencinin yazdığı gibi kopyala. Yazım hatalarını düzeltme, eksik cümleyi tamamlama, yorum yapma, puanlama yapma. Okunamayan sözcüğü [okunamadı] yaz. Kesirleri a/b, çarpmayı × biçiminde yaz; sayıları ve rakamları (özellikle 2/3/7/1 gibi karışabilenleri) tek tek dikkatle oku, bir rakamdan emin değilsen onu yazıp hemen ardına [?] ekle (örn. 3[?]/4) ve note alanında belirt. Soru metnindeki sayılara göre tahmin ETME; kâğıtta gördüğünü yaz. Cevabı soru numarasına/alanına göre eşle; cevap yazılmamışsa text boş olsun. Kâğıtta yazan öğrenci adını ve "Ödev kodu" varsa onu da oku (yoksa null).\nSADECE JSON: {"studentName":null,"sheetCode":null,"answers":[{"question":1,"text":"...","legible":true,"note":""}]}` },
         ] }],
       })
-      await logAnthropicUsage('import-paper-transcribe', 'claude-sonnet-4-5', response, { userId: user.id })
-      const text = response.content[0]?.type === 'text' ? response.content[0].text : ''
+      await logAnthropicUsage('import-paper-transcribe', CLAUDE_SONNET, response, { userId: user.id })
+      const text = responseText(response)
       let parsed: any
       try { parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) } catch { parsed = null }
       if (!parsed || !Array.isArray(parsed.answers)) return NextResponse.json({ error: 'Kâğıt okunamadı. Daha net ve düz bir fotoğrafla tekrar deneyin.' }, { status: 422 })

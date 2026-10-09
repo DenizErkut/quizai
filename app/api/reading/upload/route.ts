@@ -9,6 +9,7 @@
 // asla tamamlanmıyor ve yükleme %40-70 arasında takılı kalıyordu. Storage üzerinden
 // akış bu sorunu kökten çözer.
 
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import Anthropic from '@anthropic-ai/sdk'
@@ -185,8 +186,8 @@ async function extractText(buffer: Buffer, ext: string): Promise<{ text: string;
           try {
             const base64 = batchBuf.toString('base64')
             const message = await anthropic.messages.create({
-              model: 'claude-sonnet-4-5',
-              max_tokens: 4000,
+              model: CLAUDE_SONNET, ...SONNET_PARAMS,
+              max_tokens: sonnetTokens(4000),
               messages: [{
                 role: 'user',
                 content: [
@@ -195,7 +196,7 @@ async function extractText(buffer: Buffer, ext: string): Promise<{ text: string;
                 ],
               }],
             }) as any
-            return (message.content[0]?.text || '').trim()
+            return responseText(message).trim()
           } catch (e) {
             console.warn('[reading/upload] Claude batch basarisiz:', (e as any)?.message)
             return ''

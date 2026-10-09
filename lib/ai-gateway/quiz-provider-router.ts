@@ -25,6 +25,7 @@
 // kullanılmıyor — sadece GPT-4.1-mini gövde + Mistral payı uygulanıyor.
 // Yalnızca canlı quiz'de (öğretmen 'zor' seçebiliyor) hardDifficulty devrede.
 
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import Anthropic from '@anthropic-ai/sdk'
 import { callOpenAI } from '@/lib/openai'
 import { MistralAdapter, isProviderConfigured } from '@/lib/ai-gateway'
@@ -234,11 +235,12 @@ export async function generateWithRoutedProvider(
   const requestStartTime = params.requestStartTime ?? startedAt
   const deadline = params.claudeCallDeadlineMs ?? 100000
   const timeoutMs = Math.max(20000, deadline - (Date.now() - requestStartTime))
-  const model = decision.engine === 'claude-haiku' ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5'
+  const model = decision.engine === 'claude-haiku' ? 'claude-haiku-4-5-20251001' : CLAUDE_SONNET
   let response
   try { response = await anthropic.messages.create({
     model,
-    max_tokens: params.maxTokens,
+    ...(model === CLAUDE_SONNET ? SONNET_PARAMS : {}),
+    max_tokens: model === CLAUDE_SONNET ? sonnetTokens(params.maxTokens) : params.maxTokens,
     system: params.systemPrompt,
     messages: [{ role: 'user', content: params.userPrompt }],
   }, { timeout: timeoutMs, maxRetries: 0 }) } catch (error) {
@@ -253,6 +255,6 @@ export async function generateWithRoutedProvider(
     durationMs,
     meta: routingMeta,
   })
-  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  const text = responseText(response)
   return { text, durationMs }
 }

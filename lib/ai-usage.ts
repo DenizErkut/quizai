@@ -29,7 +29,7 @@ type PricePeriod = Price & { version: string; from: string; until?: string }
 const PRICES: Record<string, Price> = {
   // Anthropic
   // 23 Eylül 2026 — kodda henüz hiçbir çağrı noktası claude-opus-*/claude-sonnet-5
-  // kullanmıyor (tüm route'lar hâlâ claude-sonnet-4-5/haiku-4-5). Ancak
+  // kullanmıyor (route'lar claude-sonnet-5-5/haiku-4-5 kullanıyor). Ancak
   // lib/ai-gateway/model-registry.ts'deki `claudePremium` girişi
   // process.env.ANTHROPIC_PREMIUM_MODEL ile bu modellerden birine
   // ENV DEĞİŞKENİYLE geçirilebiliyor — o zaman burada fiyat kaydı
@@ -42,6 +42,9 @@ const PRICES: Record<string, Price> = {
   'claude-opus-4-7':             { input: 5.0,  output: 25.0, cacheRead: 0.50, cacheWrite: 6.25 },
   'claude-opus-4-6':             { input: 5.0,  output: 25.0, cacheRead: 0.50, cacheWrite: 6.25 },
   'claude-opus-4-5':             { input: 5.0,  output: 25.0, cacheRead: 0.50, cacheWrite: 6.25 },
+  // 9 Ekim 2026 — tüm Sonnet çağrıları claude-sonnet-5-5'e taşındı (Sonnet 4.5, 30 Kasım 2026'da kapanıyor).
+  // 4.5 kaydı geçmiş log satırlarını doğru fiyatlandırmak için duruyor.
+  'claude-sonnet-5-5':           { input: 2.0,  output: 10.0, cacheRead: 0.20, cacheWrite: 2.50 },
   'claude-sonnet-5':             { input: 2.0,  output: 10.0, cacheRead: 0.20, cacheWrite: 2.50 },
   'claude-sonnet-4-6':           { input: 3.0,  output: 15.0, cacheRead: 0.30, cacheWrite: 3.75 },
   'claude-sonnet-4-5':          { input: 3.0,  output: 15.0, cacheRead: 0.30, cacheWrite: 3.75 },

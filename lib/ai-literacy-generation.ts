@@ -9,11 +9,12 @@
 // (hesaplama hatası, kavram yanılgısı, uydurma bilgi, eksik muhakeme).
 // Öğrenci ikisini ayırt etmeye çalışır — amaç doğru cevabı ezberletmek
 // değil, "AI her zaman haklı değildir" refleksini alıştırmak.
+import { CLAUDE_SONNET, SONNET_PARAMS, sonnetTokens } from '@/lib/claude-models'
 import Anthropic from '@anthropic-ai/sdk'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
-export const AI_LITERACY_MODEL = 'claude-sonnet-4-5'
+export const AI_LITERACY_MODEL = CLAUDE_SONNET
 
 export type FlawType = 'hesaplama_hatasi' | 'kavram_yanilgisi' | 'halusinasyon' | 'eksik_muhakeme'
 
@@ -85,7 +86,8 @@ Yalnızca şu JSON formatında yanıt ver, başka hiçbir şey yazma:
 
   const message = (await anthropic.messages.create({
     model: AI_LITERACY_MODEL,
-    max_tokens: 900,
+    ...SONNET_PARAMS,
+    max_tokens: sonnetTokens(900),
     messages: [{ role: 'user', content: prompt }],
   })) as any
   await logAnthropicUsage('ai-literacy-generate', AI_LITERACY_MODEL, message, { userId })

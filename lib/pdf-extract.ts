@@ -11,6 +11,7 @@
 // KULLANMADIĞI, sadece bare pdf-parse ile calisip taranmis PDF'lerde
 // sessizce "0.0K karakter" ürettiği bulundu -- bu dosya o eksikliği
 // gideriyor.
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
@@ -80,8 +81,8 @@ export async function extractPdfText(buffer: Buffer, opts?: { minLength?: number
     try {
       const base64 = buffer.toString('base64')
       const message = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 4000,
+        model: CLAUDE_SONNET, ...SONNET_PARAMS,
+        max_tokens: sonnetTokens(4000),
         messages: [{
           role: 'user',
           content: [
@@ -90,7 +91,7 @@ export async function extractPdfText(buffer: Buffer, opts?: { minLength?: number
           ],
         }],
       }) as any
-      const text = (message.content?.[0]?.text || '').trim()
+      const text = responseText(message).trim()
       if (text.length > 0) return { text, engine: 'claude', pageCount }
     } catch (e) {
       console.warn('[pdf-extract] Claude fallback başarısız:', e)

@@ -1,3 +1,4 @@
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 30
 import Anthropic from '@anthropic-ai/sdk'
@@ -119,13 +120,13 @@ SADECE JSON döndür:
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 1000,
+      model: CLAUDE_SONNET, ...SONNET_PARAMS,
+      max_tokens: sonnetTokens(1000),
       system: 'Sadece geçerli JSON döndür, markdown kullanma.',
       messages: [{ role: 'user', content: prompt }],
     })
-    await logAnthropicUsage('topic-summary', 'claude-sonnet-4-5', response, { userId: user.id })
-    const text = response.content[0].type === 'text' ? response.content[0].text : ''
+    await logAnthropicUsage('topic-summary', CLAUDE_SONNET, response, { userId: user.id })
+    const text = responseText(response)
     const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
 
     // Havuza yaz — bir daha kimse bu ders+sınıf+konu+dil için AI çağrısı

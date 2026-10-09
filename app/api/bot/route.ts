@@ -1,3 +1,4 @@
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 30
 import Anthropic from '@anthropic-ai/sdk'
@@ -42,14 +43,14 @@ export async function POST(req: NextRequest) {
     const { messages, system } = await req.json()
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 512,
+      model: CLAUDE_SONNET, ...SONNET_PARAMS,
+      max_tokens: sonnetTokens(512),
       system,
       messages: messages.map((m: any) => ({ role: m.role, content: m.content })),
     })
 
-    await logAnthropicUsage('bot', 'claude-sonnet-4-5', response, { userId: botUserId })
-    const reply = response.content[0].type === 'text' ? response.content[0].text : ''
+    await logAnthropicUsage('bot', CLAUDE_SONNET, response, { userId: botUserId })
+    const reply = responseText(response)
     return NextResponse.json({ reply })
   } catch {
     return NextResponse.json({ reply: 'Bir hata olustu, lutfen tekrar dene.' }, { status: 500 })

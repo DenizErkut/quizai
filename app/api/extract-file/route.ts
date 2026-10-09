@@ -1,6 +1,7 @@
 // app/api/extract-file/route.ts
 // Güncellenmiş versiyon: Gemini Vision (görsel PDF) + Gemini Audio (ses) entegrasyonu
 
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { extractPdfText } from '@/lib/pdf-extract'
@@ -173,8 +174,8 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
     const base64 = buffer.toString('base64')
     const mediaType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg'
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 2000,
+      model: CLAUDE_SONNET, ...SONNET_PARAMS,
+      max_tokens: sonnetTokens(2000),
       messages: [{
         role: 'user',
         content: [
@@ -183,7 +184,7 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
         ],
       }],
     }) as any
-    return { content: message.content[0].text, type: 'image', filename }
+    return { content: responseText(message), type: 'image', filename }
   }
 
   // ── SES (MP3, M4A, WAV, OGG) — Gemini Audio ──

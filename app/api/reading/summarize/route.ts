@@ -14,6 +14,7 @@
 // metin veritabanında SAKLANMAZ, sadece bu istek/yanıt sırasında bellekte
 // işlenir. Sadece üretilen ÖZET metni (parçalanmış haliyle) istemciye döner.
 
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { requireAuth } from '@/lib/auth-middleware'
@@ -96,12 +97,12 @@ ${sourceText}
 SADECE özet metnini döndür — başlık, açıklama, markdown veya "İşte özet:" gibi giriş cümlesi EKLEME.`
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 4000,
+      model: CLAUDE_SONNET, ...SONNET_PARAMS,
+      max_tokens: sonnetTokens(4000),
       messages: [{ role: 'user', content: prompt }],
     })
 
-    const summary = (response.content[0].type === 'text' ? response.content[0].text : '').trim()
+    const summary = (responseText(response)).trim()
     if (summary.length < 100) {
       return NextResponse.json({ error: 'Özet üretilemedi, tekrar dene.' }, { status: 500 })
     }

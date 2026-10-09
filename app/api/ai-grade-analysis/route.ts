@@ -1,4 +1,5 @@
 // app/api/ai-grade-analysis/route.ts
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import Anthropic from '@anthropic-ai/sdk'
@@ -28,8 +29,8 @@ export async function POST(req: NextRequest) {
   if (!gradeNotes) return NextResponse.json({ error: 'Veri eksik.' }, { status: 400 })
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5',
-    max_tokens: 800,
+    model: CLAUDE_SONNET, ...SONNET_PARAMS,
+    max_tokens: sonnetTokens(800),
     messages: [{
       role: 'user',
       content: `Sen deneyimli bir Türk eğitim danışmanısın. Öğrencinin karne notlarını analiz et ve kısa, pratik öneriler sun.
@@ -54,8 +55,8 @@ Lütfen şu formatta Türkçe analiz yaz:
 Kısa ve motive edici tut, maksimum 250 kelime.`
     }],
   })
-    await logAnthropicUsage('ai-grade-analysis', 'claude-sonnet-4-5', response, { userId: user.id })
+    await logAnthropicUsage('ai-grade-analysis', CLAUDE_SONNET, response, { userId: user.id })
 
-  const analysis = response.content[0].type === 'text' ? response.content[0].text : ''
+  const analysis = responseText(response)
   return NextResponse.json({ analysis })
 }
