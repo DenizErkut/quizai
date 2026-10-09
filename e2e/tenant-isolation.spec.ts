@@ -79,4 +79,8 @@ test.describe('tenant isolation security contract', () => {
     const spec = await response.json()
     expect(Object.keys(spec.paths)).toEqual(expect.arrayContaining(['/grades', '/links', '/students/identified']))
   })
+  test('teacher cannot leave an institution without a session', async ({ request }) => {
+    const response = await request.delete('/api/teacher/institutions', { data: { institution_id: '00000000-0000-4000-8000-000000000000' } })
+    expect(response.status()).toBe(401)
+  })
 })
