@@ -18,7 +18,7 @@ export default function TeacherDashboard() {
   const [assignments, setAssignments] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'students' | 'assign' | 'performance' | 'notify' | 'report' | 'institutions'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'students' | 'assign' | 'performance' | 'notify' | 'report' | 'institutions' | 'invite'>('dashboard')
   const [selectedClass, setSelectedClass] = useState<string>('all')
   const [notifyClass, setNotifyClass] = useState<string>('')
   const [notifyMsg, setNotifyMsg] = useState('')
@@ -181,6 +181,7 @@ export default function TeacherDashboard() {
           {[
             { key: 'dashboard', label: '📊 Dashboard' },
             { key: 'students', label: '👥 Öğrenciler' },
+            { key: 'invite', label: '🔗 DAVET KODU' },
             { key: 'assign', label: '📝 Ödev Ata' },
             { key: 'performance', label: '📈 Analiz' },
             { key: 'notify', label: '🔔 Bildirim' },
@@ -218,6 +219,8 @@ export default function TeacherDashboard() {
 
         {activeTab === 'institutions' && <TeacherInstitutionMemberships />}
 
+        {activeTab === 'invite' && <TeacherInviteLink classrooms={classrooms} />}
+
         {/* DASHBOARD */}
         {activeTab === 'dashboard' && (
           <div>
@@ -231,7 +234,6 @@ export default function TeacherDashboard() {
               </h1>
               <p style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '4px' }}>{teacher?.school}</p>
             </div>
-            <TeacherInviteLink classrooms={classrooms} />
 
             {/* Özet kartlar */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '1.5rem' }}>
