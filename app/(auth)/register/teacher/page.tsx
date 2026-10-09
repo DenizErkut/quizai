@@ -1,4 +1,5 @@
 'use client'
+import TeacherMembershipNotice from '@/components/teacher/TeacherMembershipNotice'
 import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -185,6 +186,8 @@ function RegisterTeacherContent() {
             Admin onayindan sonra panele erisebilirsiniz
           </p>
         </div>
+
+        <TeacherMembershipNotice compact />
 
         {/* Adım göstergesi */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem' }}>

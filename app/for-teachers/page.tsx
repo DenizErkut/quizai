@@ -1,3 +1,4 @@
+import TeacherMembershipNotice from '@/components/teacher/TeacherMembershipNotice'
 import Link from 'next/link'
 import SiteFooter from '@/components/SiteFooter'
 
@@ -57,6 +58,8 @@ export default function ForTeachersPage() {
             <p style={{ fontSize: '14px', lineHeight: 1.8, color: 'var(--text)' }}>{f.content}</p>
           </div>
         ))}
+
+        <TeacherMembershipNotice />
 
         <div className="card" style={{ marginBottom: '2rem', background: 'var(--bg2)' }}>
           <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)', marginBottom: '0.6rem' }}>Kurumunuz İçin</h2>
