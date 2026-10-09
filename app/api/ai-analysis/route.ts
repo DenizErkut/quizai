@@ -1,3 +1,4 @@
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import Anthropic from '@anthropic-ai/sdk'
@@ -27,8 +28,8 @@ export async function POST(req: NextRequest) {
   const { weakTopics } = body
 
   const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5',
-    max_tokens: 1000,
+    model: CLAUDE_SONNET, ...SONNET_PARAMS,
+    max_tokens: sonnetTokens(1000),
     messages: [{
       role: 'user',
       content: `Sen bir eğitim koçusun. ${displayName} adlı ${profile?.grade} öğrencisi için analiz yap.
@@ -43,7 +44,7 @@ Zayıf konular: ${weakTopics}
 Kısa ve motive edici yaz. Maksimum 200 kelime.`,
     }],
   }) as any
-    await logAnthropicUsage('ai-analysis', 'claude-sonnet-4-5', message, { userId: user.id })
+    await logAnthropicUsage('ai-analysis', CLAUDE_SONNET, message, { userId: user.id })
 
-  return NextResponse.json({ analysis: message.content[0].text })
+  return NextResponse.json({ analysis: responseText(message) })
 }

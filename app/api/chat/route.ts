@@ -1,3 +1,4 @@
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -145,8 +146,8 @@ SOKRATİK ÖĞRETİM KURALLARI (interaktif sohbette geçerli — tek seferlik an
 
     const startedAt = Date.now()
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 1024,
+      model: CLAUDE_SONNET, ...SONNET_PARAMS,
+      max_tokens: sonnetTokens(1024),
       system: systemPrompt + approvalBoundary,
       messages: safeMessages.map(m => ({
         role: m.role,
@@ -154,13 +155,13 @@ SOKRATİK ÖĞRETİM KURALLARI (interaktif sohbette geçerli — tek seferlik an
       })),
     })
 
-    const rawReply = response.content[0].type === 'text' ? response.content[0].text : ''
+    const rawReply = responseText(response)
     const outputSafety = inspectTutorOutput(rawReply)
     const reply = 'code' in outputSafety ? outputSafety.reply : rawReply
     const requiresTeacherReview = /öğretmen onayı|not değiştir|puan değiştir|ödev ata|sınıf planı/i.test(reply)
     await writeAgentDecisionAudit(adminDb, { actor_id: user.id, agent_name:agent, policy_version: 'tutor-safety-v3', input_summary: { topic, has_quiz_context: hasQuizContext, message_count: safeMessages.length, wrong_question_count: wrongQuestions.length }, decision_summary: { response_length: reply.length, requires_teacher_review: requiresTeacherReview, output_blocked:'code' in outputSafety } })
     await Promise.allSettled([
-      logAnthropicUsage('tutor-response', 'claude-sonnet-4-5', response, { userId: user.id, durationMs: Date.now() - startedAt, meta: { policy_version: 'tutor-safety-v3', has_quiz_context: hasQuizContext } }),
+      logAnthropicUsage('tutor-response', CLAUDE_SONNET, response, { userId: user.id, durationMs: Date.now() - startedAt, meta: { policy_version: 'tutor-safety-v3', has_quiz_context: hasQuizContext } }),
     ])
     return NextResponse.json({ reply, policy_version: 'tutor-safety-v2', requires_teacher_review: requiresTeacherReview, safety_intervention:'code' in outputSafety?outputSafety.code:null })
   } catch (error) {

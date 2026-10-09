@@ -1,3 +1,4 @@
+import { CLAUDE_SONNET } from '@/lib/claude-models'
 import type { AIProvider, IntelligenceLevel, ModelTarget } from './contracts'
 
 export interface RegisteredModel extends ModelTarget {
@@ -10,7 +11,7 @@ const MODELS: Record<string, RegisteredModel> = {
   approvedContent: { provider: 'approved_content', model: 'approved-content-v1', level: 'L1', capabilities: ['text', 'json'] },
   mistralPrimary: { provider: 'mistral', model: process.env.MISTRAL_PRIMARY_MODEL || 'mistral-large-latest', level: 'L3', capabilities: ['text', 'json', 'reasoning'], environmentKey: 'MISTRAL_API_KEY' },
   openaiValidator: { provider: 'openai', model: process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini', level: 'L4', capabilities: ['text', 'json', 'reasoning', 'validation'], environmentKey: 'OPENAI_API_KEY' },
-  claudePremium: { provider: 'anthropic', model: process.env.ANTHROPIC_PREMIUM_MODEL || 'claude-sonnet-4-5', level: 'L5', capabilities: ['text', 'json', 'reasoning'], environmentKey: 'ANTHROPIC_API_KEY' },
+  claudePremium: { provider: 'anthropic', model: process.env.ANTHROPIC_PREMIUM_MODEL || CLAUDE_SONNET, level: 'L5', capabilities: ['text', 'json', 'reasoning'], environmentKey: 'ANTHROPIC_API_KEY' },
   geminiMultimodal: { provider: 'google', model: process.env.GEMINI_MULTIMODAL_MODEL || 'gemini-3.6-flash', level: 'L4', capabilities: ['text', 'json', 'vision'], environmentKey: 'GEMINI_API_KEY' },
 }
 

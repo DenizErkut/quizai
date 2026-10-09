@@ -1,9 +1,10 @@
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import Anthropic from '@anthropic-ai/sdk'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { type ClusterRow, buildClusterPrompt, clusterMemberKey, excludeCanonicalRows, groupClusterableRows, parseClusterResponse } from '@/lib/misconception-clustering'
 import { readAll } from '@/lib/paginate'
 
-const CLUSTER_MODEL = 'claude-sonnet-4-5'
+const CLUSTER_MODEL = CLAUDE_SONNET
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = any
@@ -32,11 +33,10 @@ export async function generateClusterProposals(db: Db, maxGroups: number) {
   const failures: string[] = []
   for (const group of groups) {
     try {
-      const msg = await anthropic.messages.create({ model: CLUSTER_MODEL, max_tokens: 2000, temperature: 0,
+      const msg = await anthropic.messages.create({ model: CLUSTER_MODEL, ...SONNET_PARAMS, max_tokens: sonnetTokens(2000),
         messages: [{ role: 'user', content: buildClusterPrompt(group) }] })
       logAnthropicUsage('misconception-clusters', CLUSTER_MODEL, msg)
-      const block = msg.content[0]
-      for (const cluster of parseClusterResponse(block?.type === 'text' ? block.text : '', group)) {
+      for (const cluster of parseClusterResponse(responseText(msg), group)) {
         const { error: insertError } = await db.from('misconception_cluster_proposals').insert({
           student_id: group.studentId, subject: group.subject, topic: group.topic, canonical_label: cluster.canonicalLabel,
           member_ids: cluster.memberIds, member_key: clusterMemberKey(cluster.memberIds), rationale: cluster.rationale, model: CLUSTER_MODEL,

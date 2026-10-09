@@ -1,4 +1,5 @@
 // app/api/teacher/analyze/route.ts
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import { NextRequest, NextResponse } from 'next/server'
 import { gateTeacherFeature } from '@/lib/teacher-access'
 import { createClient } from '@/lib/supabase/server-create-client'
@@ -185,13 +186,13 @@ Lütfen şu formatta kısa ve öz bir analiz yaz (Türkçe):
 (Düşük / Orta / Yüksek — öğrenci ne kadar desteğe ihtiyaç duyuyor)`
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5',
-    max_tokens: 1000,
+    model: CLAUDE_SONNET, ...SONNET_PARAMS,
+    max_tokens: sonnetTokens(1000),
     messages: [{ role: 'user', content: prompt }],
   })
-    await logAnthropicUsage('teacher:analyze', 'claude-sonnet-4-5', response, { userId: user.id })
+    await logAnthropicUsage('teacher:analyze', CLAUDE_SONNET, response, { userId: user.id })
 
-  const analysis = response.content[0].type === 'text' ? response.content[0].text : ''
+  const analysis = responseText(response)
 
   await writeAgentDecisionAudit(supabaseAdmin, { actor_id: user.id, agent_name: agent, policy_version: 'assigned-student-analysis-v1', input_summary: { event: 'analysis_generated', recent_session_count: recentSessions?.length ?? 0, wrong_answer_count: wrongAnswers.length }, decision_summary: { cached: false, analysis_length: analysis.length } })
 

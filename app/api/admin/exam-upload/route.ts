@@ -1,3 +1,4 @@
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server-create-client'
@@ -264,9 +265,9 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
     : '\nobjective_code alanını null döndür.\n'
   const extractedGroups = await Promise.all([batch].map(async batch => {
     const prompt = `Aşağıdaki ${sourceLabel} kitapçık bölümündeki çoktan seçmeli soruları AYNI soru metni, AYNI seçenekler ve AYNI doğru cevapla ayıkla. Yeniden yazma, sadeleştirme veya benzer soru üretme. Bölümün sonundaki cevap anahtarından yalnız bu bölümdeki soruların cevaplarını kullan. Açıklama kitapçıkta yoksa doğru cevabı kısaca açıkla. Eksik ya da cevabı belirlenemeyen soruyu atla. En fazla 55 soru döndür. ${objectiveInstruction}Yalnız JSON döndür: {"questions":[{"q":"...","opts":["..."],"ans":0,"exp":"...","type":"multiple_choice|short_answer","topic":"...","difficulty":"easy|medium|hard|very_hard","objective_code":null}]}\n\n<KITAPCIK_METNI>\n${batch}\n</KITAPCIK_METNI>`
-    const response = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 8000, messages: [{ role: 'user', content: prompt + '\nSeçeneksiz kısa cevaplı bir soru, cevabı kitapçıkta tek cümleyle yazılıysa type:\"short_answer\" olarak döndür: opts tek elemanlı (yalnız o cevap), ans 0; cevap yoksa veya birden fazla cümleyse atla. Çoktan seçmeli sorularda type:\"multiple_choice\". Kitapçıktaki zorluk etiketi çok zor ise difficulty:\"very_hard\". Görsel/şekil/grafik gerektiren sorularda requires_visual:true döndür. Şekli metinden uydurma. Metin, seçenek ve cevap anahtarı tam ise görseli eksik soruyu da aktar; sistem bunu öğrenciye vermeden insan görsel incelemesine ayıracak.' }] }, { timeout: 50000, maxRetries: 0 })
+    const response = await anthropic.messages.create({ model: CLAUDE_SONNET, ...SONNET_PARAMS, max_tokens: sonnetTokens(8000), messages: [{ role: 'user', content: prompt + '\nSeçeneksiz kısa cevaplı bir soru, cevabı kitapçıkta tek cümleyle yazılıysa type:\"short_answer\" olarak döndür: opts tek elemanlı (yalnız o cevap), ans 0; cevap yoksa veya birden fazla cümleyse atla. Çoktan seçmeli sorularda type:\"multiple_choice\". Kitapçıktaki zorluk etiketi çok zor ise difficulty:\"very_hard\". Görsel/şekil/grafik gerektiren sorularda requires_visual:true döndür. Şekli metinden uydurma. Metin, seçenek ve cevap anahtarı tam ise görseli eksik soruyu da aktar; sistem bunu öğrenciye vermeden insan görsel incelemesine ayıracak.' }] }, { timeout: 50000, maxRetries: 0 })
     if (response.stop_reason === 'max_tokens') throw new Error('Ayıklama çıktısı kesildi; bu grup yeniden denenmeli.')
-    const text = response.content[0].type === 'text' ? response.content[0].text : ''
+    const text = responseText(response)
     const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
     if (!Array.isArray(parsed.questions)) throw new Error('Ayıklayıcı geçerli soru listesi döndürmedi.')
     return parsed.questions

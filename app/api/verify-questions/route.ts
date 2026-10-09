@@ -1,6 +1,7 @@
 // app/api/verify-questions/route.ts
 // Tüm soru tipleri için AI doğrulama — generate-quiz sonrası otomatik çalışır
 
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 90
 export const runtime = 'nodejs'
@@ -99,12 +100,12 @@ function buildVerifyPrompt(q: any, lang: string, objective?: ObjectiveCandidate 
 async function verifyQuestionWithClaude(verifyPrompt: string): Promise<{ ok: boolean; reason?: string; difficultyMatches?: boolean; objectiveMatches?: boolean } | null> {
   try {
     const res = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 180,
+      model: CLAUDE_SONNET, ...SONNET_PARAMS,
+      max_tokens: sonnetTokens(180),
       messages: [{ role: 'user', content: verifyPrompt }],
     })
-    logAnthropicUsage('verify-questions:claude-fallback', 'claude-sonnet-4-5', res)
-    const text = res.content[0].type === 'text' ? res.content[0].text.trim() : ''
+    logAnthropicUsage('verify-questions:claude-fallback', CLAUDE_SONNET, res)
+    const text = responseText(res).trim()
     const match = text.match(/\{[\s\S]*\}/)
     if (!match) return null
     const parsed = JSON.parse(match[0])
@@ -340,12 +341,12 @@ export async function POST(req: NextRequest) {
                 ? verifyQuestionWithOpenAI(verifyPrompt)
                 : (async () => {
                   const res = await anthropic.messages.create({
-                    model: 'claude-sonnet-4-5',
-                    max_tokens: 150,
+                    model: CLAUDE_SONNET, ...SONNET_PARAMS,
+                    max_tokens: sonnetTokens(150),
                     messages: [{ role: 'user', content: verifyPrompt }],
                   })
-                  logAnthropicUsage('verify-questions:claude', 'claude-sonnet-4-5', res)
-                  const text = res.content[0].type === 'text' ? res.content[0].text.trim() : ''
+                  logAnthropicUsage('verify-questions:claude', CLAUDE_SONNET, res)
+                  const text = responseText(res).trim()
                   const match = text.match(/\{[\s\S]*\}/)
                   return match ? JSON.parse(match[0]) : { ok: true }
                 })(),
@@ -494,15 +495,15 @@ Return ONLY valid JSON:
 {"questions":[{"type":"${replaceType}","q":"...","opts":["A","B","C","D"],"ans":0,"exp":"step by step solution"}]}`
 
         const replaceRes = await anthropic.messages.create({
-          model: 'claude-sonnet-4-5',
-          max_tokens: 2000,
+          model: CLAUDE_SONNET, ...SONNET_PARAMS,
+          max_tokens: sonnetTokens(2000),
           messages: [{ role: 'user', content: replacePrompt }],
         })
-        logAnthropicUsage('verify-questions:replace', 'claude-sonnet-4-5', replaceRes, {
+        logAnthropicUsage('verify-questions:replace', CLAUDE_SONNET, replaceRes, {
           meta: { rejectedCount: rejected.length },
         })
 
-        const rText = replaceRes.content[0].type === 'text' ? replaceRes.content[0].text : ''
+        const rText = responseText(replaceRes)
         const rMatch = rText.replace(/```json|```/g, '').trim().match(/\{[\s\S]*\}/)
         if (rMatch) {
           const parsed = JSON.parse(rMatch[0])

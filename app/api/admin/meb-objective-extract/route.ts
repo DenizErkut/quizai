@@ -1,3 +1,4 @@
+import { CLAUDE_SONNET, sonnetParams, sonnetTokens } from '@/lib/claude-models'
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server-create-client'
@@ -85,8 +86,9 @@ ${sourceText}
 </kaynak_metni>`
 
     const response = await anthropic.messages.create({
-      model: process.env.ANTHROPIC_PREMIUM_MODEL || 'claude-sonnet-4-5',
-      max_tokens: 9000,
+      model: process.env.ANTHROPIC_PREMIUM_MODEL || CLAUDE_SONNET,
+      ...sonnetParams(process.env.ANTHROPIC_PREMIUM_MODEL || CLAUDE_SONNET),
+      max_tokens: sonnetTokens(9000),
       messages: [{ role: 'user', content: prompt }],
     })
     await logAnthropicUsage('meb-objective-extraction', response.model, response)

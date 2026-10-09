@@ -7,6 +7,7 @@
 // AI'ın kendi takdirine bırakılıyordu. Bu modül hedefleri DETERMİNİSTİK
 // olarak (Faz 1'in mastery skoruna göre) sistem tarafından seçer, AI'a
 // sadece bu hedefler etrafında bir anlatı/haftalık program yazdırır.
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import Anthropic from '@anthropic-ai/sdk'
@@ -201,8 +202,8 @@ export async function generateStudyPlan(
   } catch { /* opsiyonel içgörü, hata olursa sessiz geç */ }
 
   const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5',
-    max_tokens: 1500,
+    model: CLAUDE_SONNET, ...SONNET_PARAMS,
+    max_tokens: sonnetTokens(1500),
     messages: [{
       role: 'user',
       content: `Sen bir egitim kocusun. ${opts.displayName || 'Öğrenci'} icin 4 haftalik kisisel calisma plani olustur.
@@ -221,10 +222,10 @@ SADECE JSON don:
 {"summary":"2-3 cumle","weeks":[{"week":1,"goal":"hedef","topics":["konu1"],"daily_minutes":20,"focus":"odak"}],"motivation":"motivasyon"}`,
     }],
   }) as any
-    logAnthropicUsage('study-plan-generator', 'claude-sonnet-4-5', message)
+    logAnthropicUsage('study-plan-generator', CLAUDE_SONNET, message)
 
   try {
-    const raw = message.content[0].text.replace(/```json|```/g, '').trim()
+    const raw = responseText(message).replace(/```json|```/g, '').trim()
     const plan = JSON.parse(raw) as StudyPlan
     return { plan, goals }
   } catch {

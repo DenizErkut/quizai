@@ -1,3 +1,4 @@
+import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 30
 import Anthropic from '@anthropic-ai/sdk'
@@ -73,8 +74,8 @@ export async function POST(req: NextRequest) {
 
     // Uzun/açıklama gerektiren cevaplar için AI kullan
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 100,
+      model: CLAUDE_SONNET, ...SONNET_PARAMS,
+      max_tokens: sonnetTokens(100),
       messages: [{
         role: 'user',
         content: `You are a teacher grading a fill-in-the-blank question.
@@ -93,8 +94,8 @@ Respond with ONLY: {"correct": true} or {"correct": false}`
       }]
     })
 
-    await logAnthropicUsage('check-answer', 'claude-sonnet-4-5', response, { userId: user.id })
-    const text = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
+    await logAnthropicUsage('check-answer', CLAUDE_SONNET, response, { userId: user.id })
+    const text = responseText(response).trim()
     const result = JSON.parse(text)
     return NextResponse.json(result)
   } catch {
