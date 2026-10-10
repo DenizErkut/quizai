@@ -49,3 +49,30 @@ export function phantomVisualIssue(question: Q, options: { deferMissingVisual?: 
   if (!options.deferMissingVisual && VISUAL_CLAIM.test(stem) && !hasInlineTextTable(stem)) return 'missing_visual'
   return null
 }
+
+const INLINE_SVG = /<svg\b[\s\S]*?<\/svg>/i
+
+/**
+ * Some models paste the figure markup into the question text instead of the `svg` field. When the markup is a
+ * complete, self-contained <svg>, move it into the figure slot (and strip it from the stem) instead of discarding
+ * an otherwise good question. Anything unsafe or incomplete is left untouched so the phantom check still rejects it.
+ */
+export function salvageLeakedSvg<T extends Q>(question: T): T {
+  const stem = typeof question.q === 'string' ? question.q : ''
+  if (!/<svg\b/i.test(stem)) return question
+  const match = stem.match(INLINE_SVG)
+  if (!match) return question
+  const svg = match[0]
+  if (/<script\b|\son\w+\s*=|href\s*=\s*["']\s*(?:https?:)?\/\//i.test(svg)) return question
+  const cleaned = stem
+    .replace(INLINE_SVG, ' ')
+    .replace(/```\s*(svg|xml|html)?\s*```/gi, ' ')
+    .replace(/```\s*(svg|xml|html)?/gi, ' ')
+    .replace(/^\s*svg\s*$/gim, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  if (cleaned.length < 12) return question
+  const existing = typeof question.svg === 'string' ? question.svg : ''
+  return { ...question, q: cleaned, svg: /<svg\b[\s\S]*<\/svg>/i.test(existing) ? existing : svg }
+}

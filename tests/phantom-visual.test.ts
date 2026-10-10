@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { phantomVisualIssue } from '../lib/phantom-visual'
+import { phantomVisualIssue, salvageLeakedSvg } from '../lib/phantom-visual'
 
 const svg = '<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="3"/></svg>'
 
@@ -40,4 +40,18 @@ test('a figure claim is only deferred, never excused: markup/placeholders still 
   assert.equal(phantomVisualIssue({ q: '[Şekil: ABC üçgeni] çevresi?', opts: [] }, { deferMissingVisual: true }), 'placeholder')
   assert.equal(phantomVisualIssue({ q: '<svg></svg> alan?', opts: [] }, { deferMissingVisual: true }), 'leaked_markup')
   assert.equal(phantomVisualIssue({ ...claim, svg: '<svg viewBox="0 0 10 10"><rect/></svg>' }), null)
+})
+
+test('salvageLeakedSvg moves complete inline svg out of the stem', () => {
+  const out = salvageLeakedSvg({ q: 'Aşağıdaki şekilde ABC üçgeninin alanı kaçtır?\n<svg viewBox="0 0 10 10"><rect width="5" height="5"/></svg>', opts: ['A', 'B'] })
+  assert.match(String((out as { svg?: string }).svg), /<svg/)
+  assert.doesNotMatch(String(out.q), /<svg/)
+  assert.equal(phantomVisualIssue(out), null)
+})
+
+test('salvageLeakedSvg leaves unsafe or incomplete markup untouched', () => {
+  const bad = { q: 'Alan? <svg><script>x</script></svg>', opts: [] }
+  assert.equal(salvageLeakedSvg(bad), bad)
+  const partial = { q: 'Alan? <svg viewBox="0 0 1 1">', opts: [] }
+  assert.equal(salvageLeakedSvg(partial), partial)
 })
