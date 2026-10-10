@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentityBySupabaseId } from '@/lib/identity/client'
 import { buildCoachContext, CoachContext } from '@/lib/coach-context'
+import { keepQuizReadyTopics } from '@/lib/quiz-ready-topics'
 import { generateCoachReply, generateCoachOpening, getCoachDailyMessageLimit } from '@/lib/coach-generation'
 import { isPaidCoachPlan, COACH_PLAN_REQUIRED_MESSAGE } from '@/lib/coach-access'
 import { requireAgentCapability, requireOwnStudentScope, writeAgentDecisionAudit } from '@/lib/agent-security-policy'
@@ -67,6 +68,14 @@ async function getOrCreateConversation(supabase: any, userId: string): Promise<s
   return created.id as string
 }
 
+// The suggest_practice button must start a quiz: drop actions whose topic has no verified catalog objective
+// for the student's grade (the quiz page would answer "Kazanım bulunamadı").
+async function startableAction<T extends { action: { topic: string; subject?: string } | null }>(supabase: any, ctx: CoachContext, turn: T): Promise<T> {
+  if (!turn.action) return turn
+  const ready = await keepQuizReadyTopics(supabase, ctx.grade, [{ topic: turn.action.topic, subject: turn.action.subject ?? null }])
+  return ready.length ? turn : { ...turn, action: null }
+}
+
 async function loadCoachContext(supabase: any, userId: string): Promise<CoachContext> {
   const { data: profile } = await supabase.from('profiles').select('grade,language').eq('id', userId).single()
   const identity = await getIdentityBySupabaseId(userId)
@@ -113,7 +122,7 @@ export async function GET(req: NextRequest) {
 
     if (!messages || messages.length === 0) {
       const ctx = await loadCoachContext(supabaseAdmin, user.id)
-      const opening = await generateCoachOpening(ctx, user.id, 'coach-chat-opening')
+      const opening = await startableAction(supabaseAdmin, ctx, await generateCoachOpening(ctx, user.id, 'coach-chat-opening'))
       await writeAgentDecisionAudit(supabaseAdmin, { actor_id: user.id, agent_name: agent, policy_version: 'coach-boundary-v1', input_summary: { event: 'opening', context_topic_count: ctx.history.topics.length }, decision_summary: { response_length: opening.text.length, action_type: opening.action?.type ?? null } })
       const { data: inserted, error } = await supabaseAdmin
         .from('coach_messages')
@@ -195,7 +204,7 @@ export async function POST(req: NextRequest) {
       .limit(MAX_HISTORY_MESSAGES)
     const history = (historyDesc ?? []).slice().reverse()
 
-    const reply = await generateCoachReply(ctx, history as { role: 'user' | 'assistant'; content: string }[], user.id, 'coach-chat')
+    const reply = await startableAction(supabaseAdmin, ctx, await generateCoachReply(ctx, history as { role: 'user' | 'assistant'; content: string }[], user.id, 'coach-chat'))
 
     await writeAgentDecisionAudit(supabaseAdmin, { actor_id: user.id, agent_name: agent, policy_version: 'coach-boundary-v1', input_summary: { event: 'reply', history_message_count: history.length, context_topic_count: ctx.history.topics.length }, decision_summary: { response_length: reply.text.length, action_type: reply.action?.type ?? null } })
 

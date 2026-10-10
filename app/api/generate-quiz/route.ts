@@ -45,7 +45,7 @@ import { attachQuestionRigorMetadata, summarizeQuestionSetRigor } from '@/lib/qu
 import { verifyVisualWithMistral } from '@/lib/mistral-quality'
 import { verifyVisualWithGemini } from '@/lib/gemini-visual-quality'
 import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, minimumNormalTestCount, minimumVerifiedQuestionCount, missingRoleBatches, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, roleBatchMaxTokens, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
-import { phantomVisualIssue } from '@/lib/phantom-visual'
+import { phantomVisualIssue, salvageLeakedSvg } from '@/lib/phantom-visual'
 import { isSameGradeSource } from '@/lib/meb-source-scope'
 import { visualProfileForSubject, visualQuotaFor, VERBAL_VISUAL_RATIO } from '@/lib/visual-quota-policy'
 
@@ -970,6 +970,8 @@ function applyContentQualityFilters(qs: any[], mebContext: string, options: { vi
   }
 
   // 0) Öğrencinin hiç göremeyeceği görsele atıf (hayalet görsel, yer tutucu, sızan <svg>)
+  // Şekil işaretlemesi soru metnine sızdıysa (Sonnet 5.5 sık yapıyor) soruyu atmak yerine şekil alanına taşı.
+  qs = qs.map((q: any) => salvageLeakedSvg(q))
   qs = qs.filter((q: any) => {
     const issue = phantomVisualIssue(q, { deferMissingVisual: options.visualsWillBeAttached === true })
     if (issue) logRejected('phantom-visual', q, issue)
@@ -2339,7 +2341,7 @@ export async function POST(req: NextRequest) {
       questions = questions.slice(0, aiQuestionCount)
     } else if (questions.length < aiQuestionCount) {
       const maxTopupRounds = 4
-      const TOPUP_TIME_BUDGET_MS = 95000 // 120sn'lik toplam bütçeden DB yazımı/response için pay bırak
+      const TOPUP_TIME_BUDGET_MS = visualsWillBeAttached ? 70000 : 95000 // şekil üretimine ~40sn ayır; 120sn'lik toplam bütçeden DB yazımı/response için pay bırak
       let consecutiveNoProgress = 0
       for (let round = 0; round < maxTopupRounds && questions.length < aiQuestionCount; round++) {
         if (Date.now() - requestStartTime > TOPUP_TIME_BUDGET_MS) {
@@ -2524,7 +2526,8 @@ export async function POST(req: NextRequest) {
     // Use the remaining request budget for verified replacements instead of
     // giving recovery an arbitrary 36-second ceiling. This is shared by every
     // grade/subject path, including university and forced single-provider runs.
-    const replenishDeadline = Math.min(requestStartTime + 113000, Date.now() + 55000)
+    // Şekil gerektiren testlerde şekil üretimi için son ~40sn ayrılır; aksi halde şekiller atlanıp sorular elenir.
+    const replenishDeadline = Math.min(requestStartTime + (visualsWillBeAttached ? 72000 : 113000), Date.now() + 55000)
     for (let recoveryRound = 0; verifiedQuestions.length < safeQCount && recoveryRound < 4; recoveryRound++) {
       if (Date.now() >= replenishDeadline) break
       const missing = safeQCount - verifiedQuestions.length
