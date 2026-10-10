@@ -40,7 +40,9 @@ test('verification recovery tops up rejected questions for every class and subje
   expect(route).toContain('if (replacements.length < missing && Date.now() < replenishDeadline)')
   expect(route).toContain("'generate-quiz:verification-recovery'")
   expect(route).toContain('including university and forced single-provider runs')
-  expect(route).toContain('verifiedQuestions.length < minimumVerifiedCount')
+  // Recovery keeps trying for the full requested count; the 80% minimum only decides the final accept/reject.
+  expect(route).toContain('verifiedQuestions.length < safeQCount')
+  expect(route).toContain('verifiedCandidateCount < minimumVerifiedCount')
 })
 
 test('unlocalized whole-set review feedback no longer erases individually verified questions', () => {

@@ -188,6 +188,17 @@ export function minimumVerifiedQuestionCount(count: number, ratio = 0.7): number
   return Math.max(1, Math.round(size * ratio))
 }
 
+/**
+ * Normal (non-adaptive) tests: after every recovery attempt, a set that is at least 80% of the requested size
+ * is delivered instead of failing the whole test. Per-question verification is unchanged - only questions that
+ * passed it are ever delivered; the test is just allowed to be a question or two shorter. 1-2 questions stay exact.
+ */
+export function minimumNormalTestCount(count: number, ratio = 0.8): number {
+  const size = Math.max(0, Math.trunc(count))
+  if (size <= 2) return size
+  return Math.max(2, Math.floor(size * ratio))
+}
+
 export function visualAttemptCount(questionCount: number): number {
   const size = Math.max(0, Math.trunc(questionCount))
   if (!size) return 0

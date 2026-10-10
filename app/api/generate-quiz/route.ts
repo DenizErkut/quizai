@@ -44,7 +44,7 @@ import { decideQuizProvider, getQuizProviderPolicy, QUIZ_PROVIDER_POLICY_VERSION
 import { attachQuestionRigorMetadata, summarizeQuestionSetRigor } from '@/lib/question-rigor'
 import { verifyVisualWithMistral } from '@/lib/mistral-quality'
 import { verifyVisualWithGemini } from '@/lib/gemini-visual-quality'
-import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, minimumVerifiedQuestionCount, missingRoleBatches, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, roleBatchMaxTokens, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
+import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, minimumNormalTestCount, minimumVerifiedQuestionCount, missingRoleBatches, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, roleBatchMaxTokens, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
 import { phantomVisualIssue } from '@/lib/phantom-visual'
 import { isSameGradeSource } from '@/lib/meb-source-scope'
 import { visualProfileForSubject, visualQuotaFor, VERBAL_VISUAL_RATIO } from '@/lib/visual-quota-policy'
@@ -1560,12 +1560,12 @@ export async function POST(req: NextRequest) {
     const MAX_QCOUNT: Record<string, number> = { free: 5, silver: 10, premium: 20, unlimited: 20 }
     const maxQ = teacherPrint ? 30 : (MAX_QCOUNT[plan] ?? 0)
     const safeQCount = isDailyChallengeRequest ? Math.min(questionCount, 10) : Math.min(questionCount, maxQ)
-    // Normal test creation must still deliver the exact requested count.
-    // An adaptive continuation is a reserve batch, however: allow a 70%
-    // verified subset so one over-strict rejection cannot stall the live test.
+    // Every question that is delivered has passed per-question verification. The recovery loops below still
+    // try to reach the full requested count; what changed is that a set of at least 80% (adaptive reserve
+    // batches: 70%) is delivered instead of failing the whole test with "Sorular tamamlanamadı".
     const minimumVerifiedCount = adaptiveCandidateBatch
       ? minimumVerifiedQuestionCount(safeQCount)
-      : safeQCount
+      : minimumNormalTestCount(safeQCount)
     usageRequestId = crypto.randomUUID()
     // Yeni oturumun kimliği üretimden önce bilinir; böylece AI maliyet kaydı
     // kullanıcı ve oturumla atomik olmayan bir sonradan eşleştirmeye ihtiyaç duymaz.
@@ -2512,6 +2512,9 @@ export async function POST(req: NextRequest) {
     }).catch(() => null)
 
     const initialVerification = await verifyQuestionCandidates(questions)
+    if (Array.isArray(initialVerification?.rejectReasons) && initialVerification.rejectReasons.length) {
+      console.warn(`[generate-quiz] verification_rejected topic=${topic} reasons=${JSON.stringify(initialVerification.rejectReasons).slice(0, 900)}`)
+    }
     let verifiedQuestions: any[] = Array.isArray(initialVerification?.questions) ? initialVerification.questions : []
 
     // Quality review can reject otherwise complete candidate batches. Replace
@@ -2522,7 +2525,7 @@ export async function POST(req: NextRequest) {
     // giving recovery an arbitrary 36-second ceiling. This is shared by every
     // grade/subject path, including university and forced single-provider runs.
     const replenishDeadline = Math.min(requestStartTime + 113000, Date.now() + 55000)
-    for (let recoveryRound = 0; verifiedQuestions.length < minimumVerifiedCount && recoveryRound < 4; recoveryRound++) {
+    for (let recoveryRound = 0; verifiedQuestions.length < safeQCount && recoveryRound < 4; recoveryRound++) {
       if (Date.now() >= replenishDeadline) break
       const missing = safeQCount - verifiedQuestions.length
       const existingTexts = [...questions, ...verifiedQuestions].map((question: any) => question?.q).filter(Boolean)
@@ -2629,7 +2632,7 @@ export async function POST(req: NextRequest) {
     questions = verifiedQuestions.map((question: any) => normalizeInteractiveQuestionShape(question, effectiveLang))
     questions = filterQuestionsByRequestedType(questions, questionType)
     const adaptiveBatchHasMinimum = adaptiveCandidateBatch && questions.length > 0 && questions.length >= minimumVerifiedCount
-    if (!adaptiveBatchHasMinimum && (questions.length < minimumVerifiedCount || questions.length !== safeQCount)) {
+    if (!adaptiveBatchHasMinimum && questions.length < minimumVerifiedCount) {
       console.error(`[generate-quiz] question_type_mismatch expected=${questionType} accepted=${questions.length}/${safeQCount}`)
       return NextResponse.json({ error: 'quality_policy_failed', reason: 'question_type_mismatch', message: 'Seçtiğin soru tipine uymayan sorular öğrenciye gösterilmeden elendi. Lütfen yeniden dene.' }, { status: 503 })
     }
