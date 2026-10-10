@@ -34,14 +34,18 @@ function hasInlineTextTable(q: string): boolean {
   return q.split('\n').filter(line => (line.match(/\|/g) || []).length >= 2).length >= 2
 }
 
-/** Returns why the question is unanswerable, or null when it is fine. */
-export function phantomVisualIssue(question: Q): 'leaked_markup' | 'placeholder' | 'image_url' | 'missing_visual' | null {
+/**
+ * Returns why the question is unanswerable, or null when it is fine.
+ * `deferMissingVisual`: the generator attaches a figure to the question later in the same request, so a
+ * figure reference without an asset is not an error yet (re-check after attachment without the option).
+ */
+export function phantomVisualIssue(question: Q, options: { deferMissingVisual?: boolean } = {}): 'leaked_markup' | 'placeholder' | 'image_url' | 'missing_visual' | null {
   const all = text(question)
   if (LEAKED_MARKUP.test(all)) return 'leaked_markup'
   if (PLACEHOLDER.test(all)) return 'placeholder'
   if (IMAGE_URL.test(all)) return 'image_url'
   if (hasRealVisualAsset(question)) return null
   const stem = String(question.q ?? '')
-  if (VISUAL_CLAIM.test(stem) && !hasInlineTextTable(stem)) return 'missing_visual'
+  if (!options.deferMissingVisual && VISUAL_CLAIM.test(stem) && !hasInlineTextTable(stem)) return 'missing_visual'
   return null
 }

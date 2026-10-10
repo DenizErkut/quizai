@@ -32,3 +32,12 @@ test('ordinary questions are untouched', () => {
   assert.equal(phantomVisualIssue({ q: 'Aşağıdaki şekillerden hangisi bir üçgendir?', opts: ['Kare', 'Üçgen'] }), null)
   assert.equal(phantomVisualIssue({ q: 'Türkiye hangi kıtalar arasında yer alır?', opts: ['Avrupa-Asya'] }), null)
 })
+
+test('a figure claim is only deferred, never excused: markup/placeholders still fail and the final check still fails', () => {
+  const claim = { q: 'Aşağıdaki şekilde verilen üçgenin çevresi kaç cm’dir?', opts: ['10', '12', '14', '16'] }
+  assert.equal(phantomVisualIssue(claim), 'missing_visual')
+  assert.equal(phantomVisualIssue(claim, { deferMissingVisual: true }), null)
+  assert.equal(phantomVisualIssue({ q: '[Şekil: ABC üçgeni] çevresi?', opts: [] }, { deferMissingVisual: true }), 'placeholder')
+  assert.equal(phantomVisualIssue({ q: '<svg></svg> alan?', opts: [] }, { deferMissingVisual: true }), 'leaked_markup')
+  assert.equal(phantomVisualIssue({ ...claim, svg: '<svg viewBox="0 0 10 10"><rect/></svg>' }), null)
+})
