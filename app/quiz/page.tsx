@@ -152,6 +152,8 @@ function QuizPageContent() {
   // görür), bu bayrak state'in gerçekten güncellendiği render'ı bekleyip
   // useEffect içinde startQuiz()'i tetikler (aşağıya bkz.).
   const [autoCalibrationPending, setAutoCalibrationPending] = useState(false)
+  // Coach "Çalışmayı başlat" link (/quiz?topic=…): fill the form, then start once the profile is ready.
+  const [coachAutoStart, setCoachAutoStart] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false) // Gelişmiş ayarlar
   const [favorites, setFavorites] = useState<string[]>([]) // Favori konular
   const [mebTopics, setMebTopics] = useState<Record<string, string[]>>({}) // subject -> units (grade filtreli)
@@ -391,12 +393,16 @@ function QuizPageContent() {
     const asgDiff = searchParams.get('difficulty')
     const asgType = searchParams.get('type')
     const retrySession = searchParams.get('retry_session')
-    const recommendationId = searchParams.get('recommendationId')
 
-    if (recommendationId && asgTopic) {
+    // The coach button sends topic/subject/count with or without a recommendationId; only assignment and
+    // retry links carry their own flow below.
+    if (asgTopic && !asgId && !retrySession) {
       setCustomTopic(decodeURIComponent(asgTopic))
       const recommendedSubject = searchParams.get('subject')
       if (recommendedSubject) setSelectedSubject(decodeURIComponent(recommendedSubject))
+      const coachCount = asgCount ? parseInt(asgCount) : NaN
+      if (Number.isFinite(coachCount)) setQCount(Math.min(30, Math.max(3, coachCount)))
+      setCoachAutoStart(true)
 
       // Öneri bağlantısı yalnızca ilk açılışta formu doldurur. Parametreler
       // adreste kalırsa F5/geri dönüşte tamamlanmış eski konu tekrar forma
@@ -420,6 +426,16 @@ function QuizPageContent() {
       if (asgDiff) setDifficulty(asgDiff)
     }
   }, [searchParams])
+
+  // Coach link: everything the URL carried is now in state; start the quiz exactly once.
+  useEffect(() => {
+    if (coachAutoStart && profile && screen === 'topic' && customTopic.trim()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCoachAutoStart(false)
+      void startQuiz()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coachAutoStart, profile, screen, customTopic, selectedSubject, qCount])
 
   // Auto-trigger quiz start when assignment params + profile ready
   useEffect(() => {
