@@ -35,7 +35,7 @@ test('a primary rejection receives an independent second opinion and is audited'
 
 test('verification recovery tops up rejected questions for every class and subject path', () => {
   const route = readFileSync(join(process.cwd(), 'app/api/generate-quiz/route.ts'), 'utf8')
-  expect(route).toContain('requestStartTime + 113000')
+  expect(route).toContain('requestStartTime + (visualsWillBeAttached ? 72000 : 113000)')
   expect(route).toContain('recoveryRound < 4')
   expect(route).toContain('if (replacements.length < missing && Date.now() < replenishDeadline)')
   expect(route).toContain("'generate-quiz:verification-recovery'")
