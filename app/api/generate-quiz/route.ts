@@ -955,7 +955,7 @@ function stripStaticPartsForCaching(fullPrompt: string, type: string, language: 
 // Öğretmen geri bildirimleriyle bulunan 4 ayrı içerik kalitesi hatasına
 // karşı TEK, paylaşılan filtre fonksiyonu (hem ana üretim hem eksik-soru
 // tamamlama turu bunu kullanır — kopya mantık yok).
-function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
+function applyContentQualityFilters(qs: any[], mebContext: string, options: { visualsWillBeAttached?: boolean } = {}): any[] {
   // 29 Ağustos 2026 — Deniz'in gerçek log karşılaştırmasıyla bulunan sorun:
   // bu filtreler bazı çağrılarda üretilen soruların %60-100'ünü eliyordu
   // (log: "5 -> 2", "2 -> 0", "5 -> 2") ama HANGİ filtrenin HANGİ soruyu
@@ -971,7 +971,7 @@ function applyContentQualityFilters(qs: any[], mebContext: string): any[] {
 
   // 0) Öğrencinin hiç göremeyeceği görsele atıf (hayalet görsel, yer tutucu, sızan <svg>)
   qs = qs.filter((q: any) => {
-    const issue = phantomVisualIssue(q)
+    const issue = phantomVisualIssue(q, { deferMissingVisual: options.visualsWillBeAttached === true })
     if (issue) logRejected('phantom-visual', q, issue)
     return !issue
   })
@@ -2283,7 +2283,10 @@ export async function POST(req: NextRequest) {
     // ağı: bu paterne uyan bir soru sızarsa listeden çıkarılır. (Öğrenci
     // için eksik bir soru, hatalı/anlamsız bir sorudan daha iyidir.)
     const beforeFilterCount = questions.length
-    questions = applyContentQualityFilters(questions, mebContext)
+    // Geometry/chart topics get their figure generated further down (after verification), so a question that
+    // points at "the figure" is only rejected here when no figure can be attached to it.
+    const visualsWillBeAttached = includeVisuals && Boolean(visualCategory)
+    questions = applyContentQualityFilters(questions, mebContext, { visualsWillBeAttached })
     if (questions.length < beforeFilterCount) {
       console.warn(`[generate-quiz] filtreler sonrası ${beforeFilterCount - questions.length} soru elendi (${beforeFilterCount} -> ${questions.length})`)
     }
@@ -2402,7 +2405,7 @@ export async function POST(req: NextRequest) {
           }
           topupQuestions = topupQuestions.map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
           topupQuestions = filterQuestionsByRequestedType(topupQuestions, questionType)
-          topupQuestions = applyContentQualityFilters(topupQuestions, mebContext)
+          topupQuestions = applyContentQualityFilters(topupQuestions, mebContext, { visualsWillBeAttached })
           // Yakın-tekrar kontrolü: hem önceki parçanın sorularına (excludeQuestionTexts)
           // hem de bu çağrıda ŞİMDİYE KADAR kabul edilmiş sorulara (questions) karşı.
           const alreadyAsked = [
@@ -2598,7 +2601,7 @@ export async function POST(req: NextRequest) {
         let generated = replacements
           .map((question: any) => normalizeInteractiveQuestionShape(question, effectiveLang))
         generated = filterQuestionsByRequestedType(generated, questionType)
-        generated = applyContentQualityFilters(generated, mebContext)
+        generated = applyContentQualityFilters(generated, mebContext, { visualsWillBeAttached })
         generated = filterOutNearDuplicates(generated, [...existingTexts, ...bankQuestions.map((question: any) => question.q).filter(Boolean), ...verifiedQuestions.map((question: any) => question.q).filter(Boolean)])
         replacements = generated
       }
@@ -2702,9 +2705,15 @@ export async function POST(req: NextRequest) {
 
     const REQUEST_HARD_DEADLINE_MS = 112000 // 120sn'den DB yazımı/response için pay bırak
     const visualBudgetMs = REQUEST_HARD_DEADLINE_MS - (Date.now() - requestStartTime)
-    const visualIndexes = (visualQuota.profile === 'verbal' ? visualQuota.attempts > 0 : batchVisualMinimum > 0)
+    const quotaVisualIndexes = (visualQuota.profile === 'verbal' ? visualQuota.attempts > 0 : batchVisualMinimum > 0)
       ? visualQuestionIndexes(questions, visualCategory, safeQCount, visualQuota.profile === 'verbal' ? visualQuota.attempts : undefined)
       : []
+    // Every question that points at "the figure" needs one, whatever the quota says; those left without a
+    // figure are dropped below instead of reaching a student as an unanswerable question.
+    const figureClaimIndexes = visualsWillBeAttached
+      ? questions.map((question: any, index: number) => (phantomVisualIssue(question) === 'missing_visual' ? index : -1)).filter((index: number) => index >= 0)
+      : []
+    const visualIndexes = [...new Set([...quotaVisualIndexes, ...figureClaimIndexes])]
     const shouldGenerateVisuals = Boolean(visualCategory && visualIndexes.length > 0 && visualBudgetMs > 15000)
     if (visualCategory && visualIndexes.length > 0 && !shouldGenerateVisuals) {
       console.warn(`[generate-quiz] required visual quota skipped: insufficient time (${visualBudgetMs}ms)`)
@@ -2725,6 +2734,23 @@ export async function POST(req: NextRequest) {
         }
         console.log(`[generate-quiz] visual generated for q[${i}] contextScore=${visual.contextQuality.score}`)
       }
+    }
+
+    const beforePhantomSweep = questions.length
+    questions = questions.filter((question: any) => {
+      const issue = phantomVisualIssue(question)
+      if (issue) console.warn(`[content-filter-reject] stage=phantom-visual-final reason="${issue}" question_length=${String(question?.q || '').length}`)
+      return !issue
+    })
+    if (questions.length < beforePhantomSweep) console.warn(`[generate-quiz] görselsiz kalan ${beforePhantomSweep - questions.length} soru elendi (${beforePhantomSweep} -> ${questions.length})`)
+    if (questions.length < minimumVerifiedCount) {
+      console.error(`[generate-quiz] incomplete_set_after_visuals requested=${safeQCount} minimum=${minimumVerifiedCount} delivered=${questions.length} topic=${topic}`)
+      return NextResponse.json({
+        error: 'insufficient_questions',
+        message: 'Soruların tamamı kalite kontrolünden geçemedi. Lütfen birkaç saniye sonra yeniden dene.',
+        requestedCount: safeQCount,
+        deliveredCount: questions.length,
+      }, { status: 503 })
     }
 
     // Görsel hedefi kalite için tercih edilen bir oran olarak kalır; görsel
