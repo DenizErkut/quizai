@@ -5,10 +5,12 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 type Practice = { id: string; status: string; question: string; options: string[]; firstChoice: number | null; retryChoice: number | null; hintCount: number; hint?:string|null;correctIndex?: number; explanation?: string | null;intervention?:{label:string;reason:string;teacherReviewRecommended:boolean}|null }
 
 function CoachGuidedPracticeContent() {
+  const { t: tr } = useT()
   const cycleId = useSearchParams().get('cycleId') || ''
   const [practice, setPractice] = useState<Practice | null>(null)
   const [choice, setChoice] = useState<number | null>(null)
@@ -20,20 +22,20 @@ function CoachGuidedPracticeContent() {
 
   const request = useCallback(async (method: 'GET' | 'POST', body?: Record<string, unknown>) => {
     const { data: { session } } = await createClient().auth.getSession()
-    if (!session) throw new Error('Önce giriş yapmalısın.')
+    if (!session) throw new Error(tr('Önce giriş yapmalısın.'))
     const response = await fetch(method === 'GET' ? `/api/coach/guided-practice?${new URLSearchParams({ cycleId })}` : '/api/coach/guided-practice', {
       method, headers: { Authorization: `Bearer ${session.access_token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
       ...(body ? { body: JSON.stringify({ cycleId, ...body }) } : {}),
     })
     const data = await response.json()
-    if (!response.ok) throw new Error(data.error || 'Çalışma yüklenemedi.')
+    if (!response.ok) throw new Error(data.error || tr('Çalışma yüklenemedi.'))
     return data
-  }, [cycleId])
+  }, [cycleId, tr])
 
   const load = useCallback(async () => {
     if (!cycleId) return
     try { const data=await request('GET');setPractice(data.practice);setReviewGate(data.gate||null) }
-    catch (error) { setMessage(error instanceof Error ? error.message : 'Çalışma yüklenemedi.') }
+    catch (error) { setMessage(error instanceof Error ? error.message : tr('Çalışma yüklenemedi.')) }
   }, [cycleId, request])
 
   useEffect(() => {
@@ -46,55 +48,60 @@ function CoachGuidedPracticeContent() {
     try {
       const result = await request('POST', { action: name, ...payload })
       if (result.hint) setHint(result.hint)
-      if (name === 'explain') setMessage(`${result.correct ? 'Yeniden denemede doğru.' : 'Yeniden denemede doğru değil.'} ${result.explanation || ''} ${result.note || ''}`)
+      if (name === 'explain') setMessage(`${result.correct ? tr('Yeniden denemede doğru.') : tr('Yeniden denemede doğru değil.')} ${result.explanation || ''} ${result.note || ''}`)
       setChoice(null)
       await load()
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'İşlem tamamlanamadı.') }
+    } catch (error) { setMessage(error instanceof Error ? error.message : tr('İşlem tamamlanamadı.')) }
     finally { setBusy(false) }
   }
 
   return <main style={{ maxWidth: 760, margin: '40px auto', padding: '0 18px', color: 'var(--text)' }}>
-    <Link href="/verified-learning" style={{ color: 'var(--primary)', fontSize: 14 }}>← Öğrenme pilotuna dön</Link>
-    <h1 style={{ margin: '18px 0 8px' }}>Prof. Prati ile rehberli çalışma</h1>
-    <p style={{ color: 'var(--text2)' }}>Önce kendi yanıtını seç, sonra düşünme ipucunu kullanıp yeniden dene ve gerekçeni yaz. İpucuyla yapılan bu çalışma, yardımsız ölçümün yerine geçmez.</p>
+    <Link href="/verified-learning" style={{ color: 'var(--primary)', fontSize: 14 }}>{tr('← Öğrenme pilotuna dön')}</Link>
+    <h1 style={{ margin: '18px 0 8px' }}>{tr('Prof. Prati ile rehberli çalışma')}</h1>
+    <p style={{ color: 'var(--text2)' }}>{tr('Önce kendi yanıtını seç, sonra düşünme ipucunu kullanıp yeniden dene ve gerekçeni yaz. İpucuyla yapılan bu çalışma, yardımsız ölçümün yerine geçmez.')}</p>
     {message && <p role="status" style={{ color: '#0f766e' }}><MathText text={message} /></p>}
     {reviewGate&&<p role="alert">{reviewGate}</p>}
     <fieldset disabled={busy||Boolean(reviewGate)} style={{border:0,padding:0,margin:0,minWidth:0}}>
-    {!practice ? <button className="btn btn-primary" disabled={busy || !cycleId} onClick={() => void action('start')}>Rehberli çalışmayı başlat</button> :
+    {!practice ? <button className="btn btn-primary" disabled={busy || !cycleId} onClick={() => void action('start')}>{tr('Rehberli çalışmayı başlat')}</button> :
       <section className="card">
         {practice.intervention&&<aside style={{padding:12,marginBottom:16,border:'1px solid var(--border)',borderRadius:9}}>
-          <strong>Çalışma yaklaşımı: {practice.intervention.label}</strong>
+          <strong>{tr('Çalışma yaklaşımı: {label}', { label: tr(practice.intervention.label) })}</strong>
           <p style={{fontSize:13,margin:'8px 0'}}>{practice.intervention.reason}</p>
-          {practice.intervention.teacherReviewRecommended&&<p style={{fontSize:13}}>Öğretmen incelemesi önerilir. Bu çalışma kesin yanılgı teşhisi veya öğrenme doğrulaması değildir.</p>}
+          {practice.intervention.teacherReviewRecommended&&<p style={{fontSize:13}}>{tr('Öğretmen incelemesi önerilir. Bu çalışma kesin yanılgı teşhisi veya öğrenme doğrulaması değildir.')}</p>}
         </aside>}
         <h2 style={{ fontSize: 18 }}><MathText text={practice.question} /></h2>
-        {practice.status === 'completed' ? <p><strong>Çalışma tamamlandı.</strong> <MathText text={practice.explanation || ''} /> Şimdi uygun zamanda yardımsız son teste geçebilirsin.</p> : <>
+        {practice.status === 'completed' ? <p><strong>{tr('Çalışma tamamlandı.')}</strong> <MathText text={practice.explanation || ''} /> {tr('Şimdi uygun zamanda yardımsız son teste geçebilirsin.')}</p> : <>
           {['awaiting_first', 'awaiting_retry'].includes(practice.status) && <div style={{ display: 'grid', gap: 8 }}>
             {practice.options.map((option, index) => <label key={index} style={{ display: 'flex', gap: 8, padding: 9, border: '1px solid var(--border)', borderRadius: 8 }}>
               <input type="radio" name="coach-practice-choice" checked={choice === index} onChange={() => setChoice(index)} /><MathText text={option} />
             </label>)}
-            <button className="btn btn-primary" disabled={busy || choice === null} onClick={() => void action(practice.status === 'awaiting_first' ? 'first' : 'retry', { choice })}>{practice.status === 'awaiting_first' ? 'İlk denememi kaydet' : 'Yeniden dene'}</button>
+            <button className="btn btn-primary" disabled={busy || choice === null} onClick={() => void action(practice.status === 'awaiting_first' ? 'first' : 'retry', { choice })}>{practice.status === 'awaiting_first' ? tr('İlk denememi kaydet') : tr('Yeniden dene')}</button>
           </div>}
           {practice.status === 'awaiting_hint' && <div>
-            <p>İlk denemen kaydedildi. Şimdi çözümü göstermeyen bir düşünme ipucu alabilirsin.</p>
-            <button className="btn btn-primary" disabled={busy} onClick={() => void action('hint')}>Düşünme ipucu al</button>
-            <button className="btn" disabled={busy} onClick={() => void action('independent_retry')}>İpucu almadan yeniden dene</button>
+            <p>{tr('İlk denemen kaydedildi. Şimdi çözümü göstermeyen bir düşünme ipucu alabilirsin.')}</p>
+            <button className="btn btn-primary" disabled={busy} onClick={() => void action('hint')}>{tr('Düşünme ipucu al')}</button>
+            <button className="btn" disabled={busy} onClick={() => void action('independent_retry')}>{tr('İpucu almadan yeniden dene')}</button>
           </div>}
-          {practice.status === 'awaiting_retry' && practice.hintCount > 0 && <p style={{ color: '#0f766e' }}><MathText text={practice.hint || hint || 'Soruda ne istendiğini ve hangi bilgilerin verildiğini yeniden düşün. Seçenekleri tek tek karşılaştır.'} /></p>}
+          {practice.status === 'awaiting_retry' && practice.hintCount > 0 && <p style={{ color: '#0f766e' }}><MathText text={practice.hint || hint || tr('Soruda ne istendiğini ve hangi bilgilerin verildiğini yeniden düşün. Seçenekleri tek tek karşılaştır.')} /></p>}
           {practice.status === 'awaiting_explanation' && <div style={{ display: 'grid', gap: 8 }}>
-            <label htmlFor="coach-explanation">Yanıtına nasıl ulaştığını kendi cümlelerinle açıkla</label>
+            <label htmlFor="coach-explanation">{tr('Yanıtına nasıl ulaştığını kendi cümlelerinle açıkla')}</label>
             <textarea id="coach-explanation" value={explanation} onChange={event => setExplanation(event.target.value)} rows={4} maxLength={1000} style={{ width: '100%', borderRadius: 9, padding: 10 }} />
-            <button className="btn btn-primary" disabled={busy || explanation.trim().length < 10} onClick={() => void action('explain', { explanation })}>Gerekçemi kaydet ve sonucu gör</button>
+            <button className="btn btn-primary" disabled={busy || explanation.trim().length < 10} onClick={() => void action('explain', { explanation })}>{tr('Gerekçemi kaydet ve sonucu gör')}</button>
           </div>}
-          {practice.status === 'processing' && <p>Sonuç kesinleştiriliyor. Açıklamanı tekrar göndermen gerekirse önceki metni aynen kullan.</p>}
+          {practice.status === 'processing' && <p>{tr('Sonuç kesinleştiriliyor. Açıklamanı tekrar göndermen gerekirse önceki metni aynen kullan.')}</p>}
         </>}
       </section>}
     </fieldset>
   </main>
 }
 
+function LoadingPractice() {
+  const { t: tr } = useT()
+  return <main style={{ maxWidth: 760, margin: '40px auto', padding: 18 }}>{tr('Çalışma yükleniyor…')}</main>
+}
+
 export default function CoachGuidedPracticePage() {
-  return <Suspense fallback={<main style={{ maxWidth: 760, margin: '40px auto', padding: 18 }}>Çalışma yükleniyor…</main>}>
+  return <Suspense fallback={<LoadingPractice />}>
     <CoachGuidedPracticeContent />
   </Suspense>
 }

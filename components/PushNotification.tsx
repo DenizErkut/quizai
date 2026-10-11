@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
 
@@ -14,6 +15,7 @@ function urlBase64ToUint8Array(base64String: string) {
 }
 
 export default function PushNotificationToggle() {
+  const { t: tr } = useT()
   const [supported, setSupported] = useState(false)
   const [subscribed, setSubscribed] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -87,10 +89,10 @@ export default function PushNotificationToggle() {
     }}>
       <div>
         <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text)' }}>
-          🔔 Günlük Test Bildirimleri
+          {tr('🔔 Günlük Test Bildirimleri')}
         </div>
         <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>
-          {subscribed ? 'Bildirimler açık — her gün hatırlatma alırsın' : 'Streakini korumak için bildirim aç'}
+          {subscribed ? tr('Bildirimler açık — her gün hatırlatma alırsın') : tr('Streakini korumak için bildirim aç')}
         </div>
       </div>
       <button onClick={toggle} disabled={loading}
@@ -101,7 +103,7 @@ export default function PushNotificationToggle() {
           fontSize: '13px', fontWeight: 600, fontFamily: 'var(--font-sans)',
           transition: 'all 0.15s', flexShrink: 0,
         }}>
-        {loading ? '...' : subscribed ? 'Kapat' : 'Aç'}
+        {loading ? '...' : subscribed ? tr('Kapat') : tr('Aç')}
       </button>
     </div>
   )

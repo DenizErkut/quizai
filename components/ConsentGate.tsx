@@ -12,6 +12,7 @@
 // başarılı olur ve gerçekten eksik/eski bir onay varsa modal gösterilir.
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 const CONSENT_LABELS: Record<string, string> = {
   aydinlatma: 'Aydınlatma Metni',
@@ -20,6 +21,7 @@ const CONSENT_LABELS: Record<string, string> = {
 }
 
 export default function ConsentGate() {
+  const { t: tr } = useT()
   const supabase = createClient() as any
   const [needsReconsent, setNeedsReconsent] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
@@ -54,11 +56,11 @@ export default function ConsentGate() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || 'Kaydedilemedi.')
+        throw new Error(data.error || tr('Kaydedilemedi.'))
       }
       setNeedsReconsent([])
     } catch (e: any) {
-      setError(e.message || 'Bir hata oluştu, tekrar dene.')
+      setError(e.message || tr('Bir hata oluştu, tekrar dene.'))
     } finally {
       setSubmitting(false)
     }
@@ -69,16 +71,16 @@ export default function ConsentGate() {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
       <div className="card" style={{ maxWidth: '440px', width: '100%' }}>
-        <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '8px' }}>📋 Şartlarımız güncellendi</div>
+        <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '8px' }}>{tr('📋 Şartlarımız güncellendi')}</div>
         <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '14px', lineHeight: 1.6 }}>
-          Devam edebilmek için aşağıdaki güncellenmiş şartları onaylaman gerekiyor:
+          {tr('Devam edebilmek için aşağıdaki güncellenmiş şartları onaylaman gerekiyor:')}
           <ul style={{ marginTop: '8px', marginBottom: 0, paddingLeft: '20px' }}>
-            {needsReconsent.map(t => <li key={t}>{CONSENT_LABELS[t] || t}</li>)}
+            {needsReconsent.map(t => <li key={t}>{CONSENT_LABELS[t] ? tr(CONSENT_LABELS[t]) : t}</li>)}
           </ul>
         </div>
         {error && <div style={{ fontSize: '12px', color: 'var(--red)', marginBottom: '10px' }}>{error}</div>}
         <button disabled={submitting} onClick={approve} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-          {submitting ? 'Kaydediliyor...' : 'Onaylıyorum, devam et'}
+          {submitting ? tr('Kaydediliyor...') : tr('Onaylıyorum, devam et')}
         </button>
       </div>
     </div>
