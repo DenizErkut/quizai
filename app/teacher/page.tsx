@@ -13,6 +13,7 @@ import TeacherInstitutionMemberships from '@/components/teacher/TeacherInstituti
 import LearningGainPilot from '@/components/teacher/LearningGainPilot'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
+import PanelLanguageSwitch from '@/components/PanelLanguageSwitch'
 
 export default function TeacherDashboard() {
   const { t: tr, locale } = useT()
@@ -149,6 +150,7 @@ export default function TeacherDashboard() {
           <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
             {tr('Öğretmen başvurunuz admin onayı bekliyor. Onaylandığında e-posta ile bildirileceksiniz.')}
           </p>
+          <PanelLanguageSwitch />
           <button onClick={() => { supabase.auth.signOut(); router.push('/login') }}
             className="btn" style={{ justifyContent: 'center' }}>{tr('Çıkış Yap')}</button>
         </div>
