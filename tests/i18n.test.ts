@@ -344,3 +344,8 @@ test('translate falls back to a case-insensitive match and keeps a numeric suffi
   assert.equal(translate(dictionary, 'Güneş sistemi ve tutulmalar (1)'), 'The Solar System and Eclipses (1)')
   assert.equal(translate(dictionary, 'Bilinmeyen Konu'), 'Bilinmeyen Konu')
 })
+
+test('translate ignores Turkish diacritics when matching stored topic names', () => {
+  const dictionary = { 'Hücre ve organeller': 'Cells and organelles' }
+  assert.equal(translate(dictionary, 'Hucre ve Organeller'), 'Cells and organelles')
+})
