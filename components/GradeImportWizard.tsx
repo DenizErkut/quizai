@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { parseGradeImport } from '@/lib/grade-import-parser'
 import { createClient } from '@/lib/supabase/client'
 import { matchImportStudent } from '@/lib/grade-import-matching'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 type ColRole = 'ignore' | 'school_no' | 'class' | 'name' | 'subject'
 
@@ -34,6 +35,7 @@ export default function GradeImportWizard({
   rosterEndpoint: string
   commitEndpoint: string
 }) {
+  const { t: tr } = useT()
   const supabase = createClient() as any
   const [mode, setMode] = useState<'file' | 'manual'>('file')
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview' | 'done'>('upload')
@@ -72,12 +74,12 @@ export default function GradeImportWizard({
   }
 
   async function submitManual() {
-    if (!manualStudentId) { setError('Önce bir öğrenci seç.'); return }
+    if (!manualStudentId) { setError(tr('Önce bir öğrenci seç.')); return }
     const subjects: Record<string, string> = {}
     for (const r of manualSubjects) {
       if (r.name.trim() && r.value.trim()) subjects[r.name.trim()] = r.value.trim()
     }
-    if (Object.keys(subjects).length === 0) { setError('En az bir ders + not girmelisin.'); return }
+    if (Object.keys(subjects).length === 0) { setError(tr('En az bir ders + not girmelisin.')); return }
 
     setManualSaving(true)
     setError('')
@@ -92,11 +94,11 @@ export default function GradeImportWizard({
         }),
       })
       const json = await res.json()
-      if (!res.ok) { setError(json.error || 'Kaydetme başarısız.'); setManualSaving(false); return }
+      if (!res.ok) { setError(json.error || tr('Kaydetme başarısız.')); setManualSaving(false); return }
       setManualResult({ gradesInserted: json.gradesInserted })
       setManualSubjects([{ name: '', value: '' }])
     } catch (e: any) {
-      setError(e?.message || 'Kaydetme başarısız.')
+      setError(e?.message || tr('Kaydetme başarısız.'))
     }
     setManualSaving(false)
   }
@@ -106,8 +108,8 @@ export default function GradeImportWizard({
     const file = e.target.files?.[0]
     if (!file) return
     setError('')
-    if (file.size > 5 * 1024 * 1024) { setError('Dosya en fazla 5 MB olabilir.'); return }
-    if (!/\.(xlsx|xls|csv)$/i.test(file.name)) { setError('Excel veya CSV dosyası seçin.'); return }
+    if (file.size > 5 * 1024 * 1024) { setError(tr('Dosya en fazla 5 MB olabilir.')); return }
+    if (!/\.(xlsx|xls|csv)$/i.test(file.name)) { setError(tr('Excel veya CSV dosyası seçin.')); return }
     setFileName(file.name)
     if (!label.trim()) setLabel(file.name.replace(/\.[^.]+$/, ''))
 
@@ -134,7 +136,7 @@ export default function GradeImportWizard({
     setStep('mapping')
     loadRoster()
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Dosya okunamadı. Geçerli bir Excel veya CSV dosyası yükleyin.')
+      setError(error instanceof Error ? error.message : tr('Dosya okunamadı. Geçerli bir Excel veya CSV dosyası yükleyin.'))
     }
   }
 
@@ -164,7 +166,7 @@ export default function GradeImportWizard({
 
   function buildMatches() {
     if (schoolNoColIdx === -1 && nameColIdx === -1) {
-      setError('En az bir sütunu "Öğrenci No" veya "İsim" olarak işaretlemelisin (eşleştirme için gerekli).')
+      setError(tr('En az bir sütunu "Öğrenci No" veya "İsim" olarak işaretlemelisin (eşleştirme için gerekli).'))
       return
     }
     const matches: MatchedRow[] = dataRows.map((row, idx) => {
@@ -211,11 +213,11 @@ export default function GradeImportWizard({
         body: JSON.stringify({ label: label.trim(), sourceFilename: fileName, rows }),
       })
       const json = await res.json()
-      if (!res.ok) { setError(json.error || 'Kaydetme başarısız.'); setSaving(false); return }
+      if (!res.ok) { setError(json.error || tr('Kaydetme başarısız.')); setSaving(false); return }
       setResult(json)
       setStep('done')
     } catch (e: any) {
-      setError(e?.message || 'Kaydetme başarısız.')
+      setError(e?.message || tr('Kaydetme başarısız.'))
     }
     setSaving(false)
   }
@@ -226,7 +228,7 @@ export default function GradeImportWizard({
   }
 
   const roleLabels: Record<ColRole, string> = {
-    ignore: 'Yoksay', school_no: 'Öğrenci No', class: 'Sınıf', name: 'İsim', subject: 'Ders',
+    ignore: tr('Yoksay'), school_no: tr('Öğrenci No'), class: tr('Sınıf‖sınıf grubu'), name: tr('İsim'), subject: tr('Ders'),
   }
 
   return (
@@ -234,11 +236,11 @@ export default function GradeImportWizard({
       <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem' }}>
         <button className="btn btn-sm" onClick={() => setMode('file')}
           style={mode === 'file' ? { background: 'var(--accent)', color: '#fff', borderColor: 'var(--accent)' } : {}}>
-          📄 Dosyadan İçe Aktar
+          {tr('📄 Dosyadan İçe Aktar')}
         </button>
         <button className="btn btn-sm" onClick={() => setMode('manual')}
           style={mode === 'manual' ? { background: 'var(--accent)', color: '#fff', borderColor: 'var(--accent)' } : {}}>
-          ✍️ Elle Gir
+          {tr('✍️ Elle Gir')}
         </button>
       </div>
 
@@ -251,43 +253,43 @@ export default function GradeImportWizard({
       {mode === 'manual' ? (
         <div>
           <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '1rem' }}>
-            Tek bir öğrenciye, dosya yüklemeden doğrudan not/değer gir.
+            {tr('Tek bir öğrenciye, dosya yüklemeden doğrudan not/değer gir.')}
           </p>
           {rosterLoading ? <div className="spinner" /> : (
             <>
               <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap' }}>
                 <select className="input" style={{ minWidth: '220px' }} value={manualStudentId} onChange={e => setManualStudentId(e.target.value)}>
-                  <option value="">— Öğrenci seç —</option>
+                  <option value="">{tr('— Öğrenci seç —')}</option>
                   {roster.map(s => (
                     <option key={s.id} value={s.id}>
-                      {s.fullName}{s.schoolNo ? ` (No: ${s.schoolNo})` : ''}{s.classroomName ? ` · ${s.classroomName}` : ''}
+                      {s.fullName}{s.schoolNo ? ` ${tr('(No: {no})', { no: s.schoolNo })}` : ''}{s.classroomName ? ` · ${s.classroomName}` : ''}
                     </option>
                   ))}
                 </select>
-                <input className="input" placeholder="Etiket (örn. 1. Dönem 2. Yazılı)" value={manualLabel}
+                <input className="input" placeholder={tr('Etiket (örn. 1. Dönem 2. Yazılı)')} value={manualLabel}
                   onChange={e => setManualLabel(e.target.value)} style={{ minWidth: '220px' }} />
               </div>
 
               {manualSubjects.map((r, i) => (
                 <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                  <input className="input" placeholder="Ders (örn. Matematik)" value={r.name}
+                  <input className="input" placeholder={tr('Ders (örn. Matematik)')} value={r.name}
                     onChange={e => updateManualSubjectRow(i, 'name', e.target.value)} style={{ flex: 1 }} />
-                  <input className="input" placeholder="Not (örn. 85)" value={r.value}
+                  <input className="input" placeholder={tr('Not (örn. 85)')} value={r.value}
                     onChange={e => updateManualSubjectRow(i, 'value', e.target.value)} style={{ width: '120px' }} />
                   <button className="btn btn-sm" onClick={() => removeManualSubjectRow(i)}>✕</button>
                 </div>
               ))}
-              <button className="btn btn-sm" onClick={addManualSubjectRow} style={{ marginBottom: '1.25rem' }}>+ Ders Ekle</button>
+              <button className="btn btn-sm" onClick={addManualSubjectRow} style={{ marginBottom: '1.25rem' }}>{tr('+ Ders Ekle')}</button>
 
               <div>
                 <button className="btn btn-primary" onClick={submitManual} disabled={manualSaving || !manualStudentId}>
-                  {manualSaving ? 'Kaydediliyor…' : 'Kaydet'}
+                  {manualSaving ? tr('Kaydediliyor…') : tr('Kaydet')}
                 </button>
               </div>
 
               {manualResult && (
                 <p style={{ marginTop: '1rem', fontSize: '13px', color: 'var(--green)', fontWeight: 600 }}>
-                  ✅ {manualResult.gradesInserted} not kaydedildi.
+                  {tr('✅ {n} not kaydedildi.', { n: manualResult.gradesInserted })}
                 </p>
               )}
             </>
@@ -300,15 +302,14 @@ export default function GradeImportWizard({
       {step === 'upload' && (
         <div>
           <p style={{ fontSize: '14px', color: 'var(--text2)', marginBottom: '1rem' }}>
-            Excel (.xlsx) veya CSV dosyası yükle. İlk satır sütun başlığı olmalı — örn. <b>Ö.No</b>, <b>Sınıf</b>, <b>İsim</b>,
-            sonrasında ders sütunları (<b>Türkçe</b>, <b>Matematik</b>, ... gibi).
+            {tr('Excel (.xlsx) veya CSV dosyası yükle. İlk satır sütun başlığı olmalı — örn. Ö.No, Sınıf, İsim, sonrasında ders sütunları (Türkçe, Matematik, ... gibi).')}
           </p>
           <a href="/templates/not-ice-aktar-sablonu.xlsx" download
             style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 16px', borderRadius: '9px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontWeight: 600, textDecoration: 'none', marginBottom: '1rem' }}>
-            📥 Excel Şablonunu İndir
+            {tr('📥 Excel Şablonunu İndir')}
           </a>
           <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '1rem', marginTop: '-6px' }}>
-            Şablonu indirip kendi öğrenci/not verilerinizle doldurun, ardından aşağıdan yükleyin.
+            {tr('Şablonu indirip kendi öğrenci/not verilerinizle doldurun, ardından aşağıdan yükleyin.')}
           </div>
           <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile}
             style={{ fontSize: '13px' }} className="input" />
@@ -319,13 +320,13 @@ export default function GradeImportWizard({
       {step === 'mapping' && (
         <div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
-            <input className="input" placeholder="İçe aktarım adı (örn. Mozaik TG5 - Nisan 2026)"
+            <input className="input" placeholder={tr('İçe aktarım adı (örn. Mozaik TG5 - Nisan 2026)')}
               value={label} onChange={e => setLabel(e.target.value)} style={{ maxWidth: '360px' }} />
-            <span style={{ fontSize: '12px', color: 'var(--text3)' }}>{fileName} · {dataRows.length} satır</span>
+            <span style={{ fontSize: '12px', color: 'var(--text3)' }}>{tr('{file} · {n} satır', { file: fileName, n: dataRows.length })}</span>
           </div>
 
           <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '10px' }}>
-            Her sütunun ne olduğunu seç. Ders sütunlarının adını (kayıtlarda görünecek ders/kolon adı) düzenleyebilirsin.
+            {tr('Her sütunun ne olduğunu seç. Ders sütunlarının adını (kayıtlarda görünecek ders/kolon adı) düzenleyebilirsin.')}
           </p>
 
           <div style={{ overflowX: 'auto' }}>
@@ -334,7 +335,7 @@ export default function GradeImportWizard({
                 <tr>
                   {headers.map((h, i) => (
                     <th key={i} style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '1px solid var(--border)', minWidth: '130px' }}>
-                      <div style={{ fontWeight: 700, marginBottom: '4px' }}>{h || `Sütun ${i + 1}`}</div>
+                      <div style={{ fontWeight: 700, marginBottom: '4px' }}>{h || tr('Sütun {n}', { n: i + 1 })}</div>
                       <select className="input" style={{ fontSize: '11px', padding: '4px 6px' }}
                         value={colRoles[i]} onChange={e => setColRole(i, e.target.value as ColRole)}>
                         {(['school_no', 'class', 'name', 'subject', 'ignore'] as ColRole[]).map(r => (
@@ -344,7 +345,7 @@ export default function GradeImportWizard({
                       {colRoles[i] === 'subject' && (
                         <input className="input" style={{ fontSize: '11px', padding: '4px 6px', marginTop: '4px' }}
                           value={subjectNames[i]} onChange={e => setSubjectName(i, e.target.value)}
-                          placeholder="Ders adı" />
+                          placeholder={tr('Ders adı')} />
                       )}
                     </th>
                   ))}
@@ -361,12 +362,12 @@ export default function GradeImportWizard({
               </tbody>
             </table>
           </div>
-          <p style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px' }}>İlk 5 satır önizleme olarak gösteriliyor.</p>
+          <p style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px' }}>{tr('İlk 5 satır önizleme olarak gösteriliyor.')}</p>
 
           <div style={{ display: 'flex', gap: '10px', marginTop: '1.25rem' }}>
-            <button className="btn" onClick={reset}>← Baştan başla</button>
+            <button className="btn" onClick={reset}>{tr('← Baştan başla')}</button>
             <button className="btn btn-primary" onClick={buildMatches} disabled={rosterLoading}>
-              {rosterLoading ? 'Öğrenci listesi yükleniyor…' : 'Devam Et →'}
+              {rosterLoading ? tr('Öğrenci listesi yükleniyor…') : tr('Devam Et →')}
             </button>
           </div>
         </div>
@@ -376,17 +377,17 @@ export default function GradeImportWizard({
       {step === 'preview' && (
         <div>
           <div style={{ display: 'flex', gap: '16px', marginBottom: '1rem', flexWrap: 'wrap', fontSize: '13px' }}>
-            <span style={{ color: 'var(--green)', fontWeight: 600 }}>✅ {matchedCount} eşleşti</span>
-            {unmatchedCount > 0 && <span style={{ color: 'var(--red)', fontWeight: 600 }}>⚠️ {unmatchedCount} eşleşmedi</span>}
-            <span style={{ color: 'var(--text3)' }}>Toplam {matchedRows.length} satır</span>
+            <span style={{ color: 'var(--green)', fontWeight: 600 }}>{tr('✅ {n} eşleşti', { n: matchedCount })}</span>
+            {unmatchedCount > 0 && <span style={{ color: 'var(--red)', fontWeight: 600 }}>{tr('⚠️ {n} eşleşmedi', { n: unmatchedCount })}</span>}
+            <span style={{ color: 'var(--text3)' }}>{tr('Toplam {n} satır', { n: matchedRows.length })}</span>
           </div>
 
           <div style={{ overflowX: 'auto', maxHeight: '480px', overflowY: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
               <thead>
                 <tr style={{ position: 'sticky', top: 0, background: 'var(--bg)' }}>
-                  <th style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>Dosyadaki İsim / No</th>
-                  <th style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>Eşleşen Öğrenci</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>{tr('Dosyadaki İsim / No')}</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>{tr('Eşleşen Öğrenci')}</th>
                   {subjectColIdxs.map(ci => (
                     <th key={ci} style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>{subjectNames[ci]}</th>
                   ))}
@@ -397,23 +398,23 @@ export default function GradeImportWizard({
                 {matchedRows.map(r => (
                   <tr key={r.rowIndex} style={{ opacity: r.skip ? 0.4 : 1 }}>
                     <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border)' }}>
-                      {r.rawSchoolNo && <div style={{ color: 'var(--text3)' }}>No: {r.rawSchoolNo}</div>}
+                      {r.rawSchoolNo && <div style={{ color: 'var(--text3)' }}>{tr('No: {no}', { no: r.rawSchoolNo })}</div>}
                       <div>{r.rawName || '—'}</div>
                       {r.rawClass && <div style={{ color: 'var(--text3)' }}>{r.rawClass}</div>}
                     </td>
                     <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border)' }}>
                       <select className="input" style={{ fontSize: '11px', padding: '4px 6px', minWidth: '160px' }}
                         value={r.studentId ?? ''} onChange={e => setManualMatch(r.rowIndex, e.target.value)}>
-                        <option value="">— Eşleşmedi, seç —</option>
+                        <option value="">{tr('— Eşleşmedi, seç —')}</option>
                         {roster.map(s => (
                           <option key={s.id} value={s.id}>
-                            {s.fullName}{s.schoolNo ? ` (No: ${s.schoolNo})` : ''}{s.classroomName ? ` · ${s.classroomName}` : ''}
+                            {s.fullName}{s.schoolNo ? ` ${tr('(No: {no})', { no: s.schoolNo })}` : ''}{s.classroomName ? ` · ${s.classroomName}` : ''}
                           </option>
                         ))}
                       </select>
                       {r.matchType !== 'none' && r.studentId && (
                         <div style={{ fontSize: '10px', color: 'var(--green)', marginTop: '2px' }}>
-                          {r.matchType === 'school_no' ? 'Okul no ile eşleşti' : r.matchType === 'name' ? 'İsimle eşleşti' : 'Elle seçildi'}
+                          {r.matchType === 'school_no' ? tr('Okul no ile eşleşti') : r.matchType === 'name' ? tr('İsimle eşleşti') : tr('Elle seçildi')}
                         </div>
                       )}
                     </td>
@@ -424,7 +425,7 @@ export default function GradeImportWizard({
                     ))}
                     <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border)' }}>
                       <button className="btn btn-sm" onClick={() => toggleSkip(r.rowIndex)}>
-                        {r.skip ? 'Geri al' : 'Atla'}
+                        {r.skip ? tr('Geri al') : tr('Atla')}
                       </button>
                     </td>
                   </tr>
@@ -434,9 +435,9 @@ export default function GradeImportWizard({
           </div>
 
           <div style={{ display: 'flex', gap: '10px', marginTop: '1.25rem' }}>
-            <button className="btn" onClick={() => setStep('mapping')}>← Sütunlara dön</button>
+            <button className="btn" onClick={() => setStep('mapping')}>{tr('← Sütunlara dön')}</button>
             <button className="btn btn-primary" onClick={commit} disabled={saving || matchedCount === 0}>
-              {saving ? 'Kaydediliyor…' : `${matchedCount} öğrenci için Kaydet`}
+              {saving ? tr('Kaydediliyor…') : tr('{n} öğrenci için Kaydet', { n: matchedCount })}
             </button>
           </div>
         </div>
@@ -446,11 +447,11 @@ export default function GradeImportWizard({
       {step === 'done' && result && (
         <div style={{ textAlign: 'center', padding: '2rem 0' }}>
           <div style={{ fontSize: '32px', marginBottom: '10px' }}>✅</div>
-          <p style={{ fontSize: '15px', fontWeight: 700, color: 'var(--primary)', marginBottom: '6px' }}>İçe aktarma tamamlandı</p>
+          <p style={{ fontSize: '15px', fontWeight: 700, color: 'var(--primary)', marginBottom: '6px' }}>{tr('İçe aktarma tamamlandı')}</p>
           <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '1.25rem' }}>
-            {result.matchedRows}/{result.totalRows} satır eşleşti, {result.gradesInserted} not kaydedildi.
+            {tr('{matched}/{total} satır eşleşti, {n} not kaydedildi.', { matched: result.matchedRows, total: result.totalRows, n: result.gradesInserted })}
           </p>
-          <button className="btn btn-primary" onClick={reset}>Yeni Dosya Yükle</button>
+          <button className="btn btn-primary" onClick={reset}>{tr('Yeni Dosya Yükle')}</button>
         </div>
       )}
       </>

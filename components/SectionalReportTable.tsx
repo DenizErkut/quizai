@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback, Fragment } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import SubjectPerformanceChart from '@/components/SubjectPerformanceChart'
 import { printPage } from '@/lib/print-page'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 
 interface SectionalCell {
   importedGrade: string | null
@@ -28,6 +30,8 @@ interface ReportData {
 }
 
 export default function SectionalReportTable({ fetchEndpoint }: { fetchEndpoint: string }) {
+  const { t: tr, locale } = useT()
+  const dl = intlLocale(locale)
   const supabase = createClient() as any
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -50,14 +54,14 @@ export default function SectionalReportTable({ fetchEndpoint }: { fetchEndpoint:
         headers: { Authorization: `Bearer ${session?.access_token}` },
       })
       const json = await res.json()
-      if (!res.ok) { setError(json.error || 'Rapor yüklenemedi.'); setLoading(false); return }
+      if (!res.ok) { setError(json.error || tr('Rapor yüklenemedi.')); setLoading(false); return }
       setData(json)
       if (json.selectedImportId) setImportId(json.selectedImportId)
     } catch (e: any) {
-      setError(e?.message || 'Rapor yüklenemedi.')
+      setError(e?.message || tr('Rapor yüklenemedi.'))
     }
     setLoading(false)
-  }, [fetchEndpoint])
+  }, [fetchEndpoint, tr])
 
   useEffect(() => { load() }, [])
 
@@ -65,7 +69,7 @@ export default function SectionalReportTable({ fetchEndpoint }: { fetchEndpoint:
   if (error) return <div style={{ padding: '1rem', color: 'var(--red)', fontSize: '13px' }}>{error}</div>
   if (!data) return null
 
-  const filtered = data.students.filter(s => !search.trim() || s.fullName.toLocaleLowerCase('tr-TR').includes(search.toLocaleLowerCase('tr-TR')))
+  const filtered = data.students.filter(s => !search.trim() || s.fullName.toLocaleLowerCase(dl).includes(search.toLocaleLowerCase(dl)))
   const hasClassroomCol = filtered.some(s => s.classroomName)
 
   // "Sınıf Performansı" grafiği için — şu an görünen (arama/sınıf filtresine
@@ -87,36 +91,35 @@ export default function SectionalReportTable({ fetchEndpoint }: { fetchEndpoint:
     .filter((x): x is { subject: string; avgPct: number; testCount: number } => x != null)
 
   return (
-    <div data-print-content data-print-title="Ders Bazlı Rapor" className="print-report-surface">
+    <div data-print-content data-print-title={tr('Ders Bazlı Rapor')} className="print-report-surface">
       <div className="print-controls" style={{ display: 'flex', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
         {data.imports.length > 0 && (
           <select className="input" style={{ maxWidth: '260px' }} value={importId}
             onChange={e => { setImportId(e.target.value); load({ importId: e.target.value }) }}>
             {data.imports.map(imp => (
-              <option key={imp.id} value={imp.id}>{imp.label} · {new Date(imp.created_at).toLocaleDateString('tr-TR')}</option>
+              <option key={imp.id} value={imp.id}>{imp.label} · {new Date(imp.created_at).toLocaleDateString(dl)}</option>
             ))}
           </select>
         )}
         {data.classrooms && data.classrooms.length > 1 && (
           <select className="input" style={{ maxWidth: '200px' }} value={classroomId}
             onChange={e => { setClassroomId(e.target.value); load({ classroomId: e.target.value }) }}>
-            <option value="">Tüm sınıflarım</option>
+            <option value="">{tr('Tüm sınıflarım')}</option>
             {data.classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         )}
-        <input className="input" placeholder="İsimle ara…" value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: '200px' }} />
-        <button className="btn btn-sm" style={{ marginLeft: 'auto' }} onClick={() => printPage()}>🖨️ Yazdır</button>
+        <input className="input" placeholder={tr('İsimle ara…')} value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: '200px' }} />
+        <button className="btn btn-sm" style={{ marginLeft: 'auto' }} onClick={() => printPage()}>{tr('🖨️ Yazdır')}</button>
       </div>
 
       <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px' }}>
-        Her ders başlığı altında: soldaki sütun içe aktarılan okul notu, sağdaki sütun o dersle ilgili
-        Pratium'da çözülen testlerin ortalama başarı yüzdesi (parantez içinde test sayısı).
+        {tr("Her ders başlığı altında: soldaki sütun içe aktarılan okul notu, sağdaki sütun o dersle ilgili Pratium'da çözülen testlerin ortalama başarı yüzdesi (parantez içinde test sayısı).")}
       </p>
 
       {classPerformance.length > 0 && (
         <div className="card" style={{ marginBottom: '1.25rem' }}>
           <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
-            📊 Sınıf Performansı
+            {tr('📊 Sınıf Performansı')}
           </div>
           <SubjectPerformanceChart data={classPerformance} />
         </div>
@@ -126,9 +129,9 @@ export default function SectionalReportTable({ fetchEndpoint }: { fetchEndpoint:
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
           <thead>
             <tr style={{ background: 'var(--bg2)' }}>
-              <th rowSpan={2} style={thBase}>Ö.No</th>
-              <th rowSpan={2} style={thBase}>İsim</th>
-              <th rowSpan={2} style={thBase}>{hasClassroomCol ? 'Sınıf' : 'Seviye'}</th>
+              <th rowSpan={2} style={thBase}>{tr('Ö.No')}</th>
+              <th rowSpan={2} style={thBase}>{tr('İsim')}</th>
+              <th rowSpan={2} style={thBase}>{hasClassroomCol ? tr('Sınıf‖sınıf grubu') : tr('Seviye')}</th>
               {data.subjects.map(subj => (
                 <th key={subj} colSpan={2} style={{ ...thBase, textAlign: 'center', borderLeft: '2px solid var(--border2)' }}>{subj}</th>
               ))}
@@ -136,8 +139,8 @@ export default function SectionalReportTable({ fetchEndpoint }: { fetchEndpoint:
             <tr style={{ background: 'var(--bg2)' }}>
               {data.subjects.map(subj => (
                 <Fragment key={subj}>
-                  <th style={{ ...thSub, borderLeft: '2px solid var(--border2)' }}>Okul Notu</th>
-                  <th style={{ ...thSub, color: 'var(--accent)' }}>Pratium %</th>
+                  <th style={{ ...thSub, borderLeft: '2px solid var(--border2)' }}>{tr('Okul Notu')}</th>
+                  <th style={{ ...thSub, color: 'var(--accent)' }}>{tr('Pratium %')}</th>
                 </Fragment>
               ))}
             </tr>
@@ -165,7 +168,7 @@ export default function SectionalReportTable({ fetchEndpoint }: { fetchEndpoint:
         </table>
       </div>
       {filtered.length === 0 && (
-        <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', padding: '2rem 0' }}>Gösterilecek öğrenci bulunamadı.</p>
+        <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', padding: '2rem 0' }}>{tr('Gösterilecek öğrenci bulunamadı.')}</p>
       )}
     </div>
   )
