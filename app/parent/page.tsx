@@ -500,7 +500,7 @@ function ParentContent() {
             topicMap[s.topic].count += 1
           })
           const topicData = Object.entries(topicMap)
-            .map(([topic, v]) => ({ topic: topic.length > 16 ? topic.slice(0,16)+'…' : topic, avg: Math.round(v.total/v.count) }))
+            .map(([topic, v]) => ({ topic: tr(topic).length > 16 ? tr(topic).slice(0,16)+'…' : tr(topic), avg: Math.round(v.total/v.count) }))
             .sort((a,b) => b.avg - a.avg)
 
           return (
@@ -668,7 +668,7 @@ function ParentContent() {
                       <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderRadius: '10px', background: t.riskKind === 'reaktif' ? 'rgba(239,68,68,0.06)' : 'rgba(245,158,11,0.06)', border: `1px solid ${t.riskKind === 'reaktif' ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.25)'}` }}>
                         <div style={{ fontSize: '18px', flexShrink: 0 }}>{t.riskKind === 'reaktif' ? '⚠️' : '📉'}</div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 700, fontSize: '13px', color: t.riskKind === 'reaktif' ? '#dc2626' : '#b45309' }}>{t.topic}</div>
+                          <div style={{ fontWeight: 700, fontSize: '13px', color: t.riskKind === 'reaktif' ? '#dc2626' : '#b45309' }}>{tr(t.topic)}</div>
                           <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>
                             {t.riskKind === 'reaktif'
                               ? tr('Son çalışmalar bu konuda desteğe ihtiyaç olduğunu gösteriyor (ilerleme göstergesi %{score}).', { score: t.masteryScore })

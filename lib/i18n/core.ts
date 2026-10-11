@@ -46,8 +46,36 @@ export function localeDir(locale: Locale): 'ltr' | 'rtl' {
  * The same Turkish word can need different translations ("Sıralama": leaderboard vs ordering); append
  * `‖context` to the key to tell them apart. The context is dropped from the fallback text.
  */
+const normalizedCache = new WeakMap<Dictionary, Map<string, string>>()
+const normalizeKey = (value: string) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('tr-TR')
+
+// Veri tabanından gelen konu adları yazım/büyük-küçük harf farkı taşıyabilir ("Güneş Sistemi Ve Tutulmalar");
+// tam eşleşme yoksa normalize edilmiş eşleşmeyi ve "Ad (1)" gibi sayı ekini dener.
+function lookup(dictionary: Dictionary | undefined, text: string): string | undefined {
+  if (!dictionary) return undefined
+  const exact = dictionary[text]
+  if (exact !== undefined) return exact
+  if (text.includes('‖') || text.includes('{')) return undefined
+  let map = normalizedCache.get(dictionary)
+  if (!map) {
+    map = new Map()
+    for (const key of Object.keys(dictionary)) {
+      if (!key.includes('‖')) map.set(normalizeKey(key), dictionary[key])
+    }
+    normalizedCache.set(dictionary, map)
+  }
+  const hit = map.get(normalizeKey(text))
+  if (hit !== undefined) return hit
+  const suffixed = text.match(/^(.*?)(\s*\(\d+\))$/)
+  if (suffixed) {
+    const base = map.get(normalizeKey(suffixed[1]))
+    if (base !== undefined) return base + suffixed[2]
+  }
+  return undefined
+}
+
 export function translate(dictionary: Dictionary | undefined, text: string, params?: Record<string, string | number>): string {
-  const template = dictionary?.[text] ?? text.replace(/‖.*$/, '')
+  const template = lookup(dictionary, text) ?? text.replace(/‖.*$/, '')
   if (!params) return template
   return template.replace(/\{(\w+)\}/g, (match, key: string) => (key in params ? String(params[key]) : match))
 }
