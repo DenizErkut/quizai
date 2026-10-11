@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 type Tool = 'to-word' | 'compress' | null
 
@@ -14,45 +15,46 @@ function formatBytes(bytes: number) {
 }
 
 // Hata kodlarına göre kullanıcı dostu mesaj
-function friendlyError(err: any): { title: string; detail: string; action?: { label: string; href: string } } {
+function friendlyError(err: any, t: (text: string, params?: Record<string, string | number>) => string): { title: string; detail: string; action?: { label: string; href: string } } {
   const code = err?.error || ''
   const msg = err?.message || err?.detail || ''
 
   if (code === 'pdf_image_only') {
     return {
-      title: 'Bu PDF metin içermiyor',
-      detail: 'Taranmış (görsel) PDF\'ler desteklenmez. Önce OCR işlemi yapman gerekiyor.',
-      action: { label: 'Ücretsiz OCR yap →', href: 'https://www.ilovepdf.com/ocr-pdf' },
+      title: t('Bu PDF metin içermiyor'),
+      detail: t("Taranmış (görsel) PDF'ler desteklenmez. Önce OCR işlemi yapman gerekiyor."),
+      action: { label: t('Ücretsiz OCR yap →'), href: 'https://www.ilovepdf.com/ocr-pdf' },
     }
   }
   if (msg.includes('too large') || msg.includes('Content Too Large') || msg.includes('413') || code === 'file_too_large') {
     return {
-      title: 'Dosya çok büyük',
-      detail: 'Sunucu limiti 4MB. Daha büyük dosyaları ücretsiz araçlarla küçülttükten sonra tekrar dene.',
-      action: { label: 'Online PDF küçült →', href: 'https://bigconvert.11zon.com/' },
+      title: t('Dosya çok büyük'),
+      detail: t('Sunucu limiti 4MB. Daha büyük dosyaları ücretsiz araçlarla küçülttükten sonra tekrar dene.'),
+      action: { label: t('Online PDF küçült →'), href: 'https://bigconvert.11zon.com/' },
     }
   }
   if (msg.includes('Yetkisiz') || msg.includes('401') || msg.includes('auth')) {
     return {
-      title: 'Oturum süresi dolmuş',
-      detail: 'Sayfayı yenile ve tekrar giriş yap.',
+      title: t('Oturum süresi dolmuş'),
+      detail: t('Sayfayı yenile ve tekrar giriş yap.'),
     }
   }
   if (msg.includes('formData') || msg.includes('body')) {
     return {
-      title: 'Yükleme hatası',
-      detail: 'Dosya yüklenirken sorun oluştu. Farklı bir tarayıcı dene veya sayfayı yenile.',
+      title: t('Yükleme hatası'),
+      detail: t('Dosya yüklenirken sorun oluştu. Farklı bir tarayıcı dene veya sayfayı yenile.'),
     }
   }
   return {
-    title: 'İşlem başarısız',
-    detail: msg || 'Beklenmedik bir hata oluştu. Lütfen tekrar dene.',
-    action: { label: 'Alternatif araç →', href: 'https://bigconvert.11zon.com/' },
+    title: t('İşlem başarısız'),
+    detail: msg || t('Beklenmedik bir hata oluştu. Lütfen tekrar dene.'),
+    action: { label: t('Alternatif araç →'), href: 'https://bigconvert.11zon.com/' },
   }
 }
 
 export default function PdfToolsPage() {
   const router = useRouter()
+  const { t } = useT()
   const [selectedTool, setSelectedTool] = useState<Tool>(null)
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
@@ -74,17 +76,17 @@ export default function PdfToolsPage() {
     if (!f.name.toLowerCase().endsWith('.pdf')) {
       setResult({
         success: false,
-        title: 'Desteklenmeyen format',
-        message: 'Yalnızca PDF dosyaları kabul edilir. Dosya uzantısının .pdf olduğundan emin ol.',
+        title: t('Desteklenmeyen format'),
+        message: t('Yalnızca PDF dosyaları kabul edilir. Dosya uzantısının .pdf olduğundan emin ol.'),
       })
       return
     }
     if (f.size > 4 * 1024 * 1024) {
       setResult({
         success: false,
-        title: 'Dosya çok büyük',
-        message: `Yüklediğin dosya ${formatBytes(f.size)} — sunucu limiti 4MB.`,
-        action: { label: 'Önce buradan küçült →', href: 'https://bigconvert.11zon.com/' },
+        title: t('Dosya çok büyük'),
+        message: t('Yüklediğin dosya {size} — sunucu limiti 4MB.', { size: formatBytes(f.size) }),
+        action: { label: t('Önce buradan küçült →'), href: 'https://bigconvert.11zon.com/' },
       })
       return
     }
@@ -101,7 +103,7 @@ export default function PdfToolsPage() {
       const { data: { session } } = await supabase.auth.getSession()
 
       if (!session?.access_token) {
-        setResult({ success: false, title: 'Oturum süresi dolmuş', message: 'Sayfayı yenile ve tekrar giriş yap.' })
+        setResult({ success: false, title: t('Oturum süresi dolmuş'), message: t('Sayfayı yenile ve tekrar giriş yap.') })
         setLoading(false)
         return
       }
@@ -118,7 +120,7 @@ export default function PdfToolsPage() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        const friendly = friendlyError(err)
+        const friendly = friendlyError(err, t)
         setResult({ success: false, title: friendly.title, message: friendly.detail, action: friendly.action })
         setLoading(false)
         return
@@ -146,8 +148,10 @@ export default function PdfToolsPage() {
         success: true,
         downloadName,
         message: selectedTool === 'to-word'
-          ? `"${downloadName}" başarıyla oluşturuldu ve indirildi!`
-          : `PDF küçültüldü! ${reduction > 0 ? `%${reduction} daha küçük (${formatBytes(originalSize)} → ${formatBytes(compressedSize)})` : 'Dosya zaten optimize edilmiş.'}`,
+          ? t('"{name}" başarıyla oluşturuldu ve indirildi!', { name: downloadName })
+          : reduction > 0
+            ? t('PDF küçültüldü! %{pct} daha küçük ({from} → {to})', { pct: reduction, from: formatBytes(originalSize), to: formatBytes(compressedSize) })
+            : t('PDF küçültüldü! Dosya zaten optimize edilmiş.'),
         reduction,
         originalSize,
         compressedSize,
@@ -156,10 +160,10 @@ export default function PdfToolsPage() {
       const isNetwork = e?.message?.includes('fetch') || e?.message?.includes('network') || e?.name === 'TypeError'
       setResult({
         success: false,
-        title: isNetwork ? 'Bağlantı hatası' : 'Beklenmedik hata',
+        title: isNetwork ? t('Bağlantı hatası') : t('Beklenmedik hata'),
         message: isNetwork
-          ? 'İnternet bağlantını kontrol et ve tekrar dene.'
-          : (e?.message || 'Beklenmedik bir hata oluştu.'),
+          ? t('İnternet bağlantını kontrol et ve tekrar dene.')
+          : (e?.message || t('Beklenmedik bir hata oluştu.')),
       })
     }
     setLoading(false)
@@ -169,47 +173,47 @@ export default function PdfToolsPage() {
     {
       key: 'to-word' as Tool,
       icon: '📄',
-      title: 'PDF → Word',
-      desc: 'PDF\'ini Word (.docx) dosyasına çevir. Ders notlarını düzenle, quiz için hazırla.',
+      title: t('PDF → Word'),
+      desc: t("PDF'ini Word (.docx) dosyasına çevir. Ders notlarını düzenle, quiz için hazırla."),
       color: '#2563eb',
       bg: 'rgba(37,99,235,0.06)',
       border: 'rgba(37,99,235,0.2)',
-      tips: ['Metin tabanlı PDF\'ler için idealdir', 'Taranan (görsel) PDF\'ler desteklenmez', 'Sonucu quiz sayfasına yükleyebilirsin'],
+      tips: [t("Metin tabanlı PDF'ler için idealdir"), t("Taranan (görsel) PDF'ler desteklenmez"), t('Sonucu quiz sayfasına yükleyebilirsin')],
     },
     {
       key: 'compress' as Tool,
       icon: '🗜️',
-      title: 'PDF Küçült',
-      desc: 'Büyük PDF dosyalarını sıkıştır. Ders kitaplarını Pratium\'a kolayca yükle.',
+      title: t('PDF Küçült'),
+      desc: t("Büyük PDF dosyalarını sıkıştır. Ders kitaplarını Pratium'a kolayca yükle."),
       color: '#16a34a',
       bg: 'rgba(22,163,74,0.06)',
       border: 'rgba(22,163,74,0.2)',
-      tips: ['Görsel ağırlıklı PDF\'lerde daha etkili', '4MB üstü için bigconvert.11zon.com kullan', 'Kalite kaybı olmadan sıkıştırır'],
+      tips: [t("Görsel ağırlıklı PDF'lerde daha etkili"), t('4MB üstü için bigconvert.11zon.com kullan'), t('Kalite kaybı olmadan sıkıştırır')],
     },
   ]
 
   return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingTop: 0, padding: '0', paddingBottom: '5rem' }}>
-      <PageHeader title="PDF Araçları" subtitle="Ders notlarını dönüştür, büyük PDF'leri küçült. Maks. 4MB." icon="🛠️" color="#7c3aed" backHref="/quiz" backLabel="Teste dön" />
+      <PageHeader title={t('PDF Araçları')} subtitle={t("Ders notlarını dönüştür, büyük PDF'leri küçült. Maks. 4MB.")} icon="🛠️" color="#7c3aed" backHref="/quiz" backLabel={t('Teste dön')} />
       <div style={{ maxWidth: '680px', margin: '0 auto' }}>
 
         {/* Header */}
         <div style={{ marginBottom: '1.5rem' }}>
-          <Link href="/quiz" style={{ fontSize: '13px', color: 'var(--text3)', textDecoration: 'none', display: 'inline-block', marginBottom: '12px' }}>← Teste dön</Link>
+          <Link href="/quiz" style={{ fontSize: '13px', color: 'var(--text3)', textDecoration: 'none', display: 'inline-block', marginBottom: '12px' }}>{t('← Teste dön')}</Link>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 800, color: 'var(--primary)', marginBottom: '4px' }}>
-            🛠️ PDF Araçları
+            {t('🛠️ PDF Araçları')}
           </h1>
-          <p style={{ fontSize: '13px', color: 'var(--text3)' }}>Ders notlarını dönüştür, büyük PDF'leri küçült. <strong>Maks. 4MB.</strong></p>
+          <p style={{ fontSize: '13px', color: 'var(--text3)' }}>{t("Ders notlarını dönüştür, büyük PDF'leri küçült.")} <strong>{t('Maks. 4MB.')}</strong></p>
         </div>
 
         {/* Araç seçimi */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '1.5rem' }}>
-          {tools.map(t => (
-            <button key={t.key} onClick={() => { setSelectedTool(t.key); setFile(null); setResult(null) }}
-              style={{ padding: '18px 16px', borderRadius: '16px', border: `2px solid ${selectedTool === t.key ? t.color : t.border}`, background: selectedTool === t.key ? t.bg : 'var(--bg)', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-sans)', transition: 'all 0.15s', boxShadow: selectedTool === t.key ? `0 4px 20px ${t.bg}` : 'none' }}>
-              <div style={{ fontSize: '28px', marginBottom: '8px' }}>{t.icon}</div>
-              <div style={{ fontWeight: 700, fontSize: '15px', color: selectedTool === t.key ? t.color : 'var(--primary)', marginBottom: '4px' }}>{t.title}</div>
-              <div style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.5 }}>{t.desc}</div>
+          {tools.map(tool => (
+            <button key={tool.key} onClick={() => { setSelectedTool(tool.key); setFile(null); setResult(null) }}
+              style={{ padding: '18px 16px', borderRadius: '16px', border: `2px solid ${selectedTool === tool.key ? tool.color : tool.border}`, background: selectedTool === tool.key ? tool.bg : 'var(--bg)', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-sans)', transition: 'all 0.15s', boxShadow: selectedTool === tool.key ? `0 4px 20px ${tool.bg}` : 'none' }}>
+              <div style={{ fontSize: '28px', marginBottom: '8px' }}>{tool.icon}</div>
+              <div style={{ fontWeight: 700, fontSize: '15px', color: selectedTool === tool.key ? tool.color : 'var(--primary)', marginBottom: '4px' }}>{tool.title}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.5 }}>{tool.desc}</div>
             </button>
           ))}
         </div>
@@ -219,7 +223,7 @@ export default function PdfToolsPage() {
           <div className="card anim-up">
             {/* İpuçları */}
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1rem' }}>
-              {tools.find(t => t.key === selectedTool)?.tips.map((tip, i) => (
+              {tools.find(tool => tool.key === selectedTool)?.tips.map((tip, i) => (
                 <span key={i} style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '999px', background: 'var(--bg2)', color: 'var(--text3)', border: '1px solid var(--border)' }}>
                   💡 {tip}
                 </span>
@@ -238,13 +242,13 @@ export default function PdfToolsPage() {
                 <div>
                   <div style={{ fontSize: '32px', marginBottom: '8px' }}>📄</div>
                   <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--green)', marginBottom: '4px' }}>{file.name}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{formatBytes(file.size)} · Değiştirmek için tıkla</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{t('{size} · Değiştirmek için tıkla', { size: formatBytes(file.size) })}</div>
                 </div>
               ) : (
                 <div>
                   <div style={{ fontSize: '40px', marginBottom: '10px' }}>📁</div>
-                  <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>PDF dosyasını sürükle veya tıkla</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text3)' }}>Maks. 4MB · Yalnızca .pdf</div>
+                  <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>{t('PDF dosyasını sürükle veya tıkla')}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{t('Maks. 4MB · Yalnızca .pdf')}</div>
                 </div>
               )}
             </div>
@@ -255,10 +259,10 @@ export default function PdfToolsPage() {
               {loading ? (
                 <>
                   <span className="spinner" style={{ width: 18, height: 18, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} />
-                  İşleniyor... (bu 10-30 saniye sürebilir)
+                  {t('İşleniyor... (bu 10-30 saniye sürebilir)')}
                 </>
               ) : (
-                selectedTool === 'to-word' ? '📄 Word\'e Dönüştür & İndir' : '🗜️ PDF\'i Küçült & İndir'
+                selectedTool === 'to-word' ? t("📄 Word'e Dönüştür & İndir") : t("🗜️ PDF'i Küçült & İndir")
               )}
             </button>
 
@@ -281,7 +285,7 @@ export default function PdfToolsPage() {
                 {result.success && selectedTool === 'to-word' && (
                   <div style={{ marginTop: '12px', padding: '12px 14px', borderRadius: '10px', background: 'rgba(37,99,235,0.08)', border: '1px solid rgba(37,99,235,0.2)' }}>
                     <div style={{ fontSize: '12px', color: '#1d4ed8', marginBottom: '8px' }}>
-                      💡 <strong>Sonraki adım:</strong> İndirilen dosyayı quiz oluşturmak için kullan
+                      💡 <strong>{t('Sonraki adım:')}</strong> {t('İndirilen dosyayı quiz oluşturmak için kullan')}
                     </div>
                     <button
                       onClick={() => {
@@ -303,7 +307,7 @@ export default function PdfToolsPage() {
                         }
                       }}
                       style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', background: '#2563eb', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 700, fontFamily: 'var(--font-sans)' }}>
-                      ⚡ Quiz oluştur →
+                      {t('⚡ Quiz oluştur →')}
                     </button>
                   </div>
                 )}
@@ -312,12 +316,12 @@ export default function PdfToolsPage() {
                 {result.success && selectedTool === 'compress' && (
                   <div style={{ marginTop: '12px', padding: '12px 14px', borderRadius: '10px', background: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.2)' }}>
                     <div style={{ fontSize: '12px', color: '#15803d', marginBottom: '8px' }}>
-                      💡 Küçültülen PDF'i quiz oluşturmak için doğrudan yükleyebilirsin
+                      💡 {t("Küçültülen PDF'i quiz oluşturmak için doğrudan yükleyebilirsin")}
                     </div>
                     <button
                       onClick={() => router.push('/quiz')}
                       style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', background: '#16a34a', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 700, fontFamily: 'var(--font-sans)' }}>
-                      ⚡ Quiz oluştur →
+                      {t('⚡ Quiz oluştur →')}
                     </button>
                   </div>
                 )}
@@ -340,9 +344,9 @@ export default function PdfToolsPage() {
         {!selectedTool && (
           <div className="card" style={{ textAlign: 'center', padding: '2.5rem', background: 'linear-gradient(135deg, rgba(8,36,101,0.03), rgba(30,207,184,0.03))', border: '1.5px dashed var(--border)' }}>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>🛠️</div>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary)', marginBottom: '6px' }}>Bir araç seçerek başla</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary)', marginBottom: '6px' }}>{t('Bir araç seçerek başla')}</div>
             <div style={{ fontSize: '13px', color: 'var(--text3)', lineHeight: 1.6 }}>
-              PDF'lerini dönüştür ve Pratium'da daha kolay çalış.
+              {t("PDF'lerini dönüştür ve Pratium'da daha kolay çalış.")}
             </div>
           </div>
         )}

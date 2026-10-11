@@ -3,6 +3,8 @@ import MathText from "@/components/MathText"
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 
 const QUESTION_INTERVAL_SECONDS = 90 // dikkat sorusu aralığı
 
@@ -23,6 +25,7 @@ interface Question {
 
 export default function ReadingPage() {
   const router = useRouter()
+  const { t, locale } = useT()
   const supabase = createClient() as any
 
   const [phase, setPhase] = useState<Phase>('upload')
@@ -117,11 +120,11 @@ export default function ReadingPage() {
   async function handleFile(file: File) {
     const ext = file.name.split('.').pop()?.toLowerCase() || ''
     if (!['pdf', 'docx', 'txt'].includes(ext)) {
-      setUploadError('Sadece PDF, Word (.docx) veya düz metin (.txt) dosyaları desteklenir.')
+      setUploadError(t('Sadece PDF, Word (.docx) veya düz metin (.txt) dosyaları desteklenir.'))
       return
     }
     if (file.size > 50 * 1024 * 1024) {
-      setUploadError('Dosya çok büyük (en fazla 50MB).')
+      setUploadError(t('Dosya çok büyük (en fazla 50MB).'))
       return
     }
     setUploadError('')
@@ -139,7 +142,7 @@ export default function ReadingPage() {
       const { error: upErr } = await supabase.storage
         .from('reading-uploads')
         .upload(storagePath, file, { contentType: file.type || undefined, upsert: false })
-      if (upErr) throw new Error('Dosya yüklenemedi: ' + upErr.message)
+      if (upErr) throw new Error(t('Dosya yüklenemedi: {msg}', { msg: upErr.message }))
 
       // 2) API'ye işlet — metin çıkarma/OCR bu aşamada
       setUploadProgress(60)
@@ -151,7 +154,7 @@ export default function ReadingPage() {
         body: JSON.stringify({ path: storagePath, ext, title: file.name.replace(/\.[^.]+$/, '') }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'Dosya işlenemedi.')
+      if (!res.ok) throw new Error(data?.error || t('Dosya işlenemedi.'))
 
       setProcessingText(false)
       setUploadProgress(100)
@@ -183,7 +186,7 @@ export default function ReadingPage() {
         setPhase('ready')
       }
     } catch (e: any) {
-      setUploadError(e.message || 'Dosya yüklenemedi.')
+      setUploadError(e.message || t('Dosya yüklenemedi.'))
     } finally {
       setUploading(false)
       setProcessingText(false)
@@ -214,7 +217,7 @@ export default function ReadingPage() {
       })
       const data = await res.json()
       if (!res.ok || !Array.isArray(data.summary_chunks) || data.summary_chunks.length === 0) {
-        throw new Error(data?.error || 'Özet üretilemedi.')
+        throw new Error(data?.error || t('Özet üretilemedi.'))
       }
       setChunks(data.summary_chunks)
       setReadMode('summary')
@@ -226,7 +229,7 @@ export default function ReadingPage() {
         supabase.from('reading_sessions').update({ total_chunks: data.summary_chunks.length }).eq('id', sessionId).then(() => {})
       }
     } catch (e: any) {
-      setSummarizeError(e.message || 'Özet üretilemedi, lütfen tekrar dene.')
+      setSummarizeError(e.message || t('Özet üretilemedi, lütfen tekrar dene.'))
     } finally {
       setSummarizing(false)
     }
@@ -451,9 +454,9 @@ export default function ReadingPage() {
       <div style={{ maxWidth: '640px', margin: '0 auto' }}>
 
         <div style={{ marginBottom: '1.5rem' }}>
-          <h1 className="serif" style={{ fontSize: '24px', color: 'var(--primary)' }}>🎧 Sesli Okuma</h1>
+          <h1 className="serif" style={{ fontSize: '24px', color: 'var(--primary)' }}>{t('🎧 Sesli Okuma')}</h1>
           <p style={{ color: 'var(--text2)', fontSize: '13px', marginTop: '4px' }}>
-            Bir kitap veya metin yükle, sesli dinle — arada dikkat soruları sorulacak.
+            {t('Bir kitap veya metin yükle, sesli dinle — arada dikkat soruları sorulacak.')}
           </p>
         </div>
 
@@ -475,9 +478,9 @@ export default function ReadingPage() {
               }}>
               <div style={{ fontSize: '36px', marginBottom: '10px' }}>📚</div>
               <div style={{ fontWeight: 600, color: 'var(--primary)', marginBottom: '4px' }}>
-                Kitabını buraya sürükle veya tıkla
+                {t('Kitabını buraya sürükle veya tıkla')}
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--text3)' }}>PDF, Word (.docx) veya düz metin (.txt)</div>
+              <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{t('PDF, Word (.docx) veya düz metin (.txt)')}</div>
               <input ref={fileInputRef} type="file" accept=".pdf,.docx,.txt" style={{ display: 'none' }}
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
             </div>
@@ -492,8 +495,8 @@ export default function ReadingPage() {
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '6px', textAlign: 'center' }}>
                   {processingText
-                    ? '📖 Kitap taranıyor ve metin çıkarılıyor... (taranmış sayfalarda birkaç dakika sürebilir)'
-                    : `Yükleniyor... ${uploadProgress}%`}
+                    ? t('📖 Kitap taranıyor ve metin çıkarılıyor... (taranmış sayfalarda birkaç dakika sürebilir)')
+                    : t('Yükleniyor... {pct}%', { pct: uploadProgress })}
                 </div>
                 <style>{`@keyframes pulse-bar { 0%,100% { opacity: 1 } 50% { opacity: 0.5 } }`}</style>
               </div>
@@ -511,7 +514,7 @@ export default function ReadingPage() {
         {phase === 'upload' && library.length > 0 && (
           <div className="card anim-up" style={{ padding: '1.25rem', marginTop: '1.25rem' }}>
             <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '10px' }}>
-              📚 Daha Önce Dinlediklerin
+              {t('📚 Daha Önce Dinlediklerin')}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {library.map(item => (
@@ -524,13 +527,13 @@ export default function ReadingPage() {
                     📖 {item.title}
                   </span>
                   <span style={{ color: 'var(--text3)', fontSize: '11px', flexShrink: 0, marginLeft: '10px' }}>
-                    {new Date(item.created_at).toLocaleDateString('tr-TR')}
+                    {new Date(item.created_at).toLocaleDateString(intlLocale(locale))}
                   </span>
                 </div>
               ))}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '10px' }}>
-              Not: Kitapların içeriği saklanmaz, sadece hangi kitapları dinlediğin burada listelenir. Tekrar dinlemek için dosyayı yeniden yüklemen gerekir.
+              {t('Not: Kitapların içeriği saklanmaz, sadece hangi kitapları dinlediğin burada listelenir. Tekrar dinlemek için dosyayı yeniden yüklemen gerekir.')}
             </div>
           </div>
         )}
@@ -541,7 +544,7 @@ export default function ReadingPage() {
             <div style={{ fontSize: '36px', marginBottom: '10px' }}>📚</div>
             <div style={{ fontWeight: 700, fontSize: '17px', color: 'var(--primary)', marginBottom: '6px' }}>{title}</div>
             <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '1.5rem' }}>
-              Bu, birkaç sayfadan uzun bir metin (~{fullEstMinutes} dk tam dinleme). Nasıl dinlemek istersin?
+              {t('Bu, birkaç sayfadan uzun bir metin (~{min} dk tam dinleme). Nasıl dinlemek istersin?', { min: fullEstMinutes })}
             </div>
 
             {summarizeError && (
@@ -554,7 +557,7 @@ export default function ReadingPage() {
                 onClick={chooseFullText}
                 disabled={summarizing}
                 style={{ width: '100%', justifyContent: 'center', padding: '14px', opacity: summarizing ? 0.5 : 1 }}>
-                📖 Tam Metni Dinle <span style={{ opacity: 0.75, fontWeight: 400 }}>· ~{fullEstMinutes} dk</span>
+                {t('📖 Tam Metni Dinle')} <span style={{ opacity: 0.75, fontWeight: 400 }}>{t('· ~{min} dk', { min: fullEstMinutes })}</span>
               </button>
               <button
                 className="btn"
@@ -563,16 +566,16 @@ export default function ReadingPage() {
                 style={{ width: '100%', justifyContent: 'center', padding: '14px', border: '1.5px solid var(--accent)', color: 'var(--accent)' }}>
                 {summarizing ? (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                    <span className="spinner" style={{ width: 16, height: 16 }} /> Özet hazırlanıyor...
+                    <span className="spinner" style={{ width: 16, height: 16 }} /> {t('Özet hazırlanıyor...')}
                   </span>
                 ) : (
-                  <>✨ Özetini Dinle <span style={{ opacity: 0.75, fontWeight: 400 }}>· daha kısa</span></>
+                  <>{t('✨ Özetini Dinle')} <span style={{ opacity: 0.75, fontWeight: 400 }}>{t('· daha kısa')}</span></>
                 )}
               </button>
             </div>
 
             <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '1rem' }}>
-              Özet, ana olay örgüsünü/önemli noktaları korur ama tam metnin yerini tutmaz — istersen sonra tam metne de geçebilirsin.
+              {t('Özet, ana olay örgüsünü/önemli noktaları korur ama tam metnin yerini tutmaz — istersen sonra tam metne de geçebilirsin.')}
             </div>
           </div>
         )}
@@ -588,28 +591,28 @@ export default function ReadingPage() {
                 background: readMode === 'summary' ? 'rgba(99,102,241,0.1)' : 'var(--bg2)',
                 color: readMode === 'summary' ? '#6366f1' : 'var(--text3)', marginBottom: '10px',
               }}>
-                {readMode === 'summary' ? '✨ Özet modu' : '📖 Tam metin'}
+                {readMode === 'summary' ? t('✨ Özet modu') : t('📖 Tam metin')}
               </div>
             )}
             <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '1.5rem' }}>
-              Tahmini süre: ~{estMinutes} dk · {chunks.length} bölüm
+              {t('Tahmini süre: ~{min} dk · {n} bölüm', { min: estMinutes, n: chunks.length })}
             </div>
 
             <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '13px', color: 'var(--text2)', marginBottom: '1.25rem', cursor: 'pointer' }}>
               <input type="checkbox" checked={showText} onChange={e => setShowText(e.target.checked)} />
-              Okurken metni ekranda da göster
+              {t('Okurken metni ekranda da göster')}
             </label>
 
             <button className="btn btn-primary" onClick={startReading} style={{ width: '100%', justifyContent: 'center' }}>
-              ▶️ Okumaya Başla
+              {t('▶️ Okumaya Başla')}
             </button>
             {longEnoughForChoice && (
               <button onClick={() => setPhase('choose')} style={{ marginTop: '10px', background: 'none', border: 'none', color: 'var(--accent)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', display: 'block', width: '100%' }}>
-                {readMode === 'summary' ? '📖 Bunun yerine tam metni dinle' : '✨ Bunun yerine özetini dinle'}
+                {readMode === 'summary' ? t('📖 Bunun yerine tam metni dinle') : t('✨ Bunun yerine özetini dinle')}
               </button>
             )}
             <button onClick={resetAll} style={{ marginTop: '8px', background: 'none', border: 'none', color: 'var(--text3)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-              Farklı bir dosya yükle
+              {t('Farklı bir dosya yükle')}
             </button>
           </div>
         )}
@@ -643,7 +646,7 @@ export default function ReadingPage() {
                     <div>
                       <div style={{ fontSize: '32px', marginBottom: '8px' }}>{isPlaying ? '🔊' : '⏸️'}</div>
                       <div style={{ fontSize: '13px', color: 'var(--text3)' }}>
-                        {isPlaying ? 'Dinliyorsun...' : 'Durduruldu'}
+                        {isPlaying ? t('Dinliyorsun...') : t('Durduruldu')}
                       </div>
                     </div>
                   )}
@@ -651,7 +654,7 @@ export default function ReadingPage() {
 
                 {needsResumeTap && (
                   <button className="btn btn-primary" onClick={() => playChunk(currentIndex)} style={{ width: '100%', justifyContent: 'center', marginBottom: '10px' }}>
-                    ▶️ Devam etmek için dokun
+                    {t('▶️ Devam etmek için dokun')}
                   </button>
                 )}
 
@@ -660,7 +663,7 @@ export default function ReadingPage() {
                     ⏮
                   </button>
                   <button className="btn btn-primary" onClick={togglePlayPause} style={{ minWidth: '110px', justifyContent: 'center' }}>
-                    {isPlaying ? '⏸ Duraklat' : '▶️ Oynat'}
+                    {isPlaying ? t('⏸ Duraklat') : t('▶️ Oynat')}
                   </button>
                   <button className="btn" disabled={currentIndex >= chunks.length - 1} onClick={() => { const n = currentIndex + 1; setCurrentIndex(n); playChunk(n) }}>
                     ⏭
@@ -674,21 +677,21 @@ export default function ReadingPage() {
                 {questionLoading && (
                   <div style={{ textAlign: 'center', padding: '2rem 0' }}>
                     <span className="spinner" style={{ width: 24, height: 24 }} />
-                    <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '10px' }}>Dikkat soruları hazırlanıyor...</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '10px' }}>{t('Dikkat soruları hazırlanıyor...')}</div>
                   </div>
                 )}
 
                 {!questionLoading && questionError && (
                   <div style={{ textAlign: 'center', padding: '2rem 0' }}>
                     <div style={{ fontSize: '28px', marginBottom: '8px' }}>⚠️</div>
-                    <div style={{ fontSize: '13px', color: 'var(--text2)' }}>Bu bölüm için soru hazırlanamadı, okumaya devam ediliyor...</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text2)' }}>{t('Bu bölüm için soru hazırlanamadı, okumaya devam ediliyor...')}</div>
                   </div>
                 )}
 
                 {!questionLoading && !questionError && questions.length > 0 && (
                   <div>
                     <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(30,207,184,0.08)', border: '1px solid rgba(30,207,184,0.2)', fontSize: '12px', color: '#0f766e', marginBottom: '1rem', textAlign: 'center' }}>
-                      🎯 Dikkat kontrolü{questions.length > 1 ? ` — soru ${questionIdx + 1} / ${questions.length}` : ''}
+                      {questions.length > 1 ? t('🎯 Dikkat kontrolü — soru {i} / {n}', { i: questionIdx + 1, n: questions.length }) : t('🎯 Dikkat kontrolü')}
                     </div>
                     <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--primary)', marginBottom: '1rem' }}>
                       <MathText text={questions[questionIdx].question} />
@@ -719,7 +722,7 @@ export default function ReadingPage() {
 
                     {chosenIndex !== null && (
                       <button className="btn btn-primary" onClick={nextQuestionOrResume} style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem' }}>
-                        {questionIdx < questions.length - 1 ? 'Sıradaki Soru →' : 'Okumaya Devam Et →'}
+                        {questionIdx < questions.length - 1 ? t('Sıradaki Soru →') : t('Okumaya Devam Et →')}
                       </button>
                     )}
                   </div>
@@ -733,12 +736,12 @@ export default function ReadingPage() {
         {phase === 'finished' && (
           <div className="card anim-up" style={{ padding: '2rem', textAlign: 'center' }}>
             <div style={{ fontSize: '40px', marginBottom: '10px' }}>🎉</div>
-            <div style={{ fontWeight: 700, fontSize: '18px', color: 'var(--primary)', marginBottom: '6px' }}>Kitabı bitirdin!</div>
+            <div style={{ fontWeight: 700, fontSize: '18px', color: 'var(--primary)', marginBottom: '6px' }}>{t('Kitabı bitirdin!')}</div>
             <div style={{ fontSize: '14px', color: 'var(--text2)', marginBottom: '1.5rem' }}>
-              Dikkat skoru: <strong>{score.correct} / {score.total}</strong> doğru
+              {t('Dikkat skoru: {correct} / {total} doğru', { correct: score.correct, total: score.total })}
             </div>
             <button className="btn btn-primary" onClick={resetAll} style={{ width: '100%', justifyContent: 'center' }}>
-              📚 Yeni Kitap Yükle
+              {t('📚 Yeni Kitap Yükle')}
             </button>
           </div>
         )}
