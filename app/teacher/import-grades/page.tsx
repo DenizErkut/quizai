@@ -4,8 +4,10 @@ import { useRouter } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
 import GradeImportWizard from '@/components/GradeImportWizard'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 export default function TeacherImportGradesPage() {
+  const { t } = useT()
   const router = useRouter()
   const supabase = createClient() as any
   const [loading, setLoading] = useState(true)
@@ -46,8 +48,7 @@ export default function TeacherImportGradesPage() {
       />
       <div style={{ maxWidth: '900px', margin: '0 auto', padding: '1.5rem' }}>
         <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '1.25rem' }}>
-          MOZAİK, e-Okul veya kendi hazırladığın Excel/CSV dosyalarındaki öğrenci numarası, sınıf,
-          isim ve ders notlarını sınıflarındaki öğrencilerle eşleştirip içeri aktar.
+          {t('MOZAİK, e-Okul veya kendi hazırladığın Excel/CSV dosyalarındaki öğrenci numarası, sınıf, isim ve ders notlarını sınıflarındaki öğrencilerle eşleştirip içeri aktar.')}
         </p>
         <GradeImportWizard scope="teacher" rosterEndpoint="/api/teacher/students-roster" commitEndpoint="/api/teacher/import-grades" />
       </div>

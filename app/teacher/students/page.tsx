@@ -4,8 +4,10 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities } from '@/lib/identity/resolve-client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 function TeacherStudentsContent() {
+  const { t: tr } = useT()
   const [teacher, setTeacher] = useState<any>(null)
   const [classrooms, setClassrooms] = useState<any[]>([])
   const [selectedClass, setSelectedClass] = useState<string | null>(null)
@@ -79,7 +81,7 @@ function TeacherStudentsContent() {
 
     const merged = cs.map((c: any) => ({
       ...c,
-      profiles: { ...(profileMap[c.student_id] || {}), name: identities[c.student_id]?.full_name || 'İsimsiz' },
+      profiles: { ...(profileMap[c.student_id] || {}), name: identities[c.student_id]?.full_name || tr('İsimsiz') },
     }))
     setStudents(merged)
     return merged
@@ -116,7 +118,7 @@ function TeacherStudentsContent() {
     )
     // İsimleri TR-PG'den ekle
     const candidateIdentities = await resolveIdentities(supabase, filtered.map((c: any) => c.id))
-    const withNames = filtered.map((c: any) => ({ ...c, name: candidateIdentities[c.id]?.full_name || 'İsimsiz' }))
+    const withNames = filtered.map((c: any) => ({ ...c, name: candidateIdentities[c.id]?.full_name || tr('İsimsiz') }))
     setSuggestedStudents(withNames.slice(0, 8))
   }
 
@@ -138,7 +140,7 @@ function TeacherStudentsContent() {
     setCreating(false)
     if (error || !data) {
       console.error('Classroom insert error:', error)
-      alert('Hata: ' + (error?.message || 'Bilinmeyen hata'))
+      alert(tr('Hata: {msg}', { msg: error?.message || tr('Bilinmeyen hata') }))
       return
     }
     const updated = [data, ...classrooms]
@@ -178,7 +180,7 @@ function TeacherStudentsContent() {
   }
 
   async function deleteClassroom(id: string) {
-    if (!confirm('Bu sınıfı silmek istediğine emin misin?')) return
+    if (!confirm(tr('Bu sınıfı silmek istediğine emin misin?'))) return
     await supabase.from('classrooms').delete().eq('id', id)
     const updated = classrooms.filter(c => c.id !== id)
     setClassrooms(updated)
@@ -207,8 +209,8 @@ function TeacherStudentsContent() {
     <main style={{ minHeight: '100vh', background: 'var(--bg)', padding: '1.5rem', paddingBottom: '5rem' }}>
       <div style={{ maxWidth: '720px', margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.5rem' }}>
-          <Link href="/teacher" style={{ color: 'var(--text3)', fontSize: '13px', textDecoration: 'none' }}>← Panel</Link>
-          <h1 style={{ fontSize: '20px', fontWeight: 700 }}>Öğrenci Yönetimi</h1>
+          <Link href="/teacher" style={{ color: 'var(--text3)', fontSize: '13px', textDecoration: 'none' }}>{tr('← Panel')}</Link>
+          <h1 style={{ fontSize: '20px', fontWeight: 700 }}>{tr('Öğrenci Yönetimi')}</h1>
         </div>
 
         {/* Sınıf sekmeleri */}
@@ -226,32 +228,32 @@ function TeacherStudentsContent() {
           ))}
           <button onClick={() => setShowCreate(true)}
             style={{ padding: '7px 14px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', border: '1.5px dashed var(--border)', background: 'transparent', color: 'var(--text3)', fontFamily: 'var(--font-sans)' }}>
-            + Yeni sınıf
+            {tr('+ Yeni sınıf')}
           </button>
         </div>
 
         {/* Yeni sınıf formu */}
         {showCreate && (
           <div className="card anim-up" style={{ marginBottom: '1.5rem' }}>
-            <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>Yeni Sınıf Oluştur</div>
+            <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>{tr('Yeni Sınıf Oluştur')}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <input placeholder="Sınıf adı (örn: 6-D Matematik)" value={newClass.name}
+              <input placeholder={tr('Sınıf adı (örn: 6-D Matematik)')} value={newClass.name}
                 onChange={e => setNewClass(p => ({ ...p, name: e.target.value }))} style={inputStyle}
                 autoFocus />
               <select value={newClass.grade} onChange={e => setNewClass(p => ({ ...p, grade: e.target.value }))} style={inputStyle}>
-                <option value="">Sınıf seviyesi seç</option>
-                {['5','6','7','8','9','10','11','12'].map(g => <option key={g} value={g}>{g}. Sınıf</option>)}
+                <option value="">{tr('Sınıf seviyesi seç')}</option>
+                {['5','6','7','8','9','10','11','12'].map(g => <option key={g} value={g}>{tr('{g}. Sınıf', { g })}</option>)}
               </select>
-              <input placeholder="Ders (isteğe bağlı)" value={newClass.subject}
+              <input placeholder={tr('Ders (isteğe bağlı)')} value={newClass.subject}
                 onChange={e => setNewClass(p => ({ ...p, subject: e.target.value }))} style={inputStyle} />
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button className="btn btn-primary" onClick={createClassroom}
                   disabled={creating || !newClass.name.trim() || !newClass.grade}
                   style={{ flex: 1, justifyContent: 'center', opacity: creating ? 0.6 : 1 }}>
-                  {creating ? 'Oluşturuluyor...' : 'Oluştur'}
+                  {creating ? tr('Oluşturuluyor...') : tr('Oluştur')}
                 </button>
                 <button className="btn" onClick={() => { setShowCreate(false); setNewClass({ name: '', grade: '', subject: '' }) }}
-                  style={{ justifyContent: 'center' }}>İptal</button>
+                  style={{ justifyContent: 'center' }}>{tr('İptal')}</button>
               </div>
             </div>
           </div>
@@ -265,25 +267,25 @@ function TeacherStudentsContent() {
                 <div>
                   <div style={{ fontSize: '15px', fontWeight: 700 }}>{activeClass.name}</div>
                   <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '4px' }}>
-                    Davet kodu:{' '}
+                    {tr('Davet kodu:')}{' '}
                     <span style={{ fontWeight: 700, letterSpacing: '0.12em', color: 'var(--primary)', fontSize: '13px' }}>
                       {activeClass.invite_code}
                     </span>
-                    {' · '}{students.length} öğrenci
+                    {' · '}{tr('{n} öğrenci', { n: students.length })}
                   </div>
                 </div>
                 <button onClick={() => deleteClassroom(activeClass.id)}
                   style={{ fontSize: '12px', padding: '5px 10px', borderRadius: '8px', border: '1px solid rgba(220,38,38,0.3)', background: 'var(--red-bg)', color: 'var(--red)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                  Sınıfı sil
+                  {tr('Sınıfı sil')}
                 </button>
               </div>
 
               {students.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text3)' }}>
                   <div style={{ fontSize: '32px', marginBottom: '8px' }}>👥</div>
-                  <div style={{ fontSize: '13px' }}>Henüz öğrenci yok.</div>
+                  <div style={{ fontSize: '13px' }}>{tr('Henüz öğrenci yok.')}</div>
                   <div style={{ fontSize: '12px', marginTop: '6px' }}>
-                    Öğrenciler <strong style={{ color: 'var(--primary)' }}>{activeClass.invite_code}</strong> kodunu kullanarak katılabilir.
+                    {tr('Öğrenciler {code} kodunu kullanarak katılabilir.', { code: activeClass.invite_code })}
                   </div>
                 </div>
               ) : (
@@ -295,16 +297,16 @@ function TeacherStudentsContent() {
                           {(s.profiles?.name || 'İ').slice(0, 2).toUpperCase()}
                         </div>
                         <div>
-                          <div style={{ fontSize: '13px', fontWeight: 500 }}>{s.profiles?.name || 'İsimsiz'}</div>
+                          <div style={{ fontSize: '13px', fontWeight: 500 }}>{s.profiles?.name || tr('İsimsiz')}</div>
                           <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
                             {s.profiles?.grade && `${s.profiles.grade} · `}
-                            {s.profiles?.monthly_test_count || 0} test bu ay
+                            {tr('{n} test bu ay', { n: s.profiles?.monthly_test_count || 0 })}
                           </div>
                         </div>
                       </div>
                       <button onClick={() => removeStudent(s.student_id)}
                         style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '7px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text3)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                        Çıkar
+                        {tr('Çıkar')}
                       </button>
                     </div>
                   ))}
@@ -316,10 +318,10 @@ function TeacherStudentsContent() {
             {suggestedStudents.length > 0 && (
               <div className="card anim-up" style={{ borderLeft: '3px solid #fdd31d' }}>
                 <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '4px' }}>
-                  💡 Önerilen öğrenciler
+                  {tr('💡 Önerilen öğrenciler')}
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '1rem' }}>
-                  {teacher.school ? `${teacher.school} okulundan` : `${activeClass.grade}. sınıf seviyesinden`} öğrenciler
+                  {teacher.school ? tr('{school} okulundan öğrenciler', { school: teacher.school }) : tr('{grade}. sınıf seviyesinden öğrenciler', { grade: activeClass.grade })}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {suggestedStudents.map((s: any) => (
@@ -339,7 +341,7 @@ function TeacherStudentsContent() {
                         onClick={() => addSuggestedStudent(s.id)}
                         disabled={addingStudent === s.id}
                         style={{ fontSize: '12px', padding: '5px 12px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #082465, #1ECFB8)', color: '#fff', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', opacity: addingStudent === s.id ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-                        {addingStudent === s.id ? '...' : '+ Ekle'}
+                        {addingStudent === s.id ? '...' : tr('+ Ekle')}
                       </button>
                     </div>
                   ))}
@@ -352,10 +354,10 @@ function TeacherStudentsContent() {
         {classrooms.length === 0 && !showCreate && (
           <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>🏫</div>
-            <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Henüz sınıfın yok</div>
-            <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '1.5rem' }}>İlk sınıfını oluştur ve öğrencilerini ekle.</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>{tr('Henüz sınıfın yok')}</div>
+            <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '1.5rem' }}>{tr('İlk sınıfını oluştur ve öğrencilerini ekle.')}</div>
             <button className="btn btn-primary" onClick={() => setShowCreate(true)} style={{ justifyContent: 'center' }}>
-              + Sınıf Oluştur
+              {tr('+ Sınıf Oluştur')}
             </button>
           </div>
         )}

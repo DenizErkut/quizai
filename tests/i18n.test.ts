@@ -276,3 +276,19 @@ test('teacher panel entries are used by the teacher dashboard and its components
   const unused = teacherPanelEntries.map(e => e[0]).filter(key => !sources.includes(key.replace(/'/g, "\\'")) && !sources.includes(key))
   assert.deepEqual(unused, [])
 })
+
+for (const [name, entriesFile, exportName, files] of [
+  ['teacher students', 'teacher-students', 'teacherStudentsEntries', ['app/teacher/students/page.tsx']],
+  ['teacher notify', 'teacher-notify', 'teacherNotifyEntries', ['app/teacher/notify/page.tsx', 'app/teacher/reports/page.tsx', 'app/teacher/import-grades/page.tsx']],
+  ['teacher report', 'teacher-report', 'teacherReportEntries', ['app/teacher/report/page.tsx']],
+  ['teacher ai training', 'teacher-ai-training', 'teacherAiTrainingEntries', ['app/teacher/ai-training/page.tsx']],
+  ['teacher assign', 'teacher-assign', 'teacherAssignEntries', ['app/teacher/assign/page.tsx']],
+] as const) {
+  test(`${name} entries are used by their pages`, async () => {
+    const { readFileSync } = await import('node:fs')
+    const entries = (await import(`../lib/i18n/entries/${entriesFile}`))[exportName] as Array<[string, ...string[]]>
+    const source = files.map(file => readFileSync(file, 'utf8')).join('\n')
+    const unused = entries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+    assert.deepEqual(unused, [])
+  })
+}
