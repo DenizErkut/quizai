@@ -1,6 +1,8 @@
 'use client'
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale, type Locale } from '@/lib/i18n/core'
 
 type Session = {
   id: string
@@ -45,7 +47,7 @@ function toLocalDateStr(iso: string): string {
   return d.toLocaleDateString('sv-SE') // ISO format: YYYY-MM-DD, locale-independent
 }
 
-function dateGroup(iso: string): string {
+function dateGroup(iso: string, t: (text: string) => string, locale: Locale): string {
   const sessionDate = toLocalDateStr(iso)
   const now = new Date()
   const todayStr = now.toLocaleDateString('sv-SE')
@@ -54,11 +56,11 @@ function dateGroup(iso: string): string {
   const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7)
   const monthAgo = new Date(now); monthAgo.setDate(now.getDate() - 30)
 
-  if (sessionDate === todayStr) return 'Bugün'
-  if (sessionDate === yesterdayStr) return 'Dün'
-  if (new Date(iso) >= weekAgo) return 'Bu Hafta'
-  if (new Date(iso) >= monthAgo) return 'Bu Ay'
-  return new Date(iso).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
+  if (sessionDate === todayStr) return t('Bugün')
+  if (sessionDate === yesterdayStr) return t('Dün')
+  if (new Date(iso) >= weekAgo) return t('Bu Hafta')
+  if (new Date(iso) >= monthAgo) return t('Bu Ay')
+  return new Date(iso).toLocaleDateString(intlLocale(locale), { month: 'long', year: 'numeric' })
 }
 
 // Shared Unicode and mathematical print/PDF layout.
@@ -68,6 +70,7 @@ async function exportQuizPDF(session: Session) {
 }
 
 export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
+  const { t, locale } = useT()
   const [search, setSearch] = useState('')
   const [gradeFilter, setGradeFilter] = useState('all')
   const [scoreFilter, setScoreFilter] = useState('all')
@@ -125,7 +128,7 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
     const groups: { label: string; items: Session[] }[] = []
     let currentLabel = ''
     filtered.forEach(s => {
-      const label = dateGroup(s.created_at)
+      const label = dateGroup(s.created_at, t, locale)
       if (label !== currentLabel) {
         currentLabel = label
         groups.push({ label, items: [] })
@@ -133,7 +136,7 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
       groups[groups.length - 1].items.push(s)
     })
     return groups
-  }, [filtered])
+  }, [filtered, t, locale])
 
   const activeFilters = [gradeFilter, typeFilter, scoreFilter, dateFilter].filter(f => f !== 'all').length
 
@@ -146,7 +149,7 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
       await exportQuizPDF(session)
     } catch (err) {
       console.error('PDF export error:', err)
-      alert('PDF oluşturulurken hata oluştu.')
+      alert(t('PDF oluşturulurken hata oluştu.'))
     } finally {
       setExportingId(null)
     }
@@ -158,10 +161,10 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
       {/* Header */}
       <div style={{ marginBottom: '1.5rem' }}>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)', marginBottom: '4px' }}>
-          📦 Soru Arşivi
+          {t('📦 Soru Arşivi')}
         </h1>
         <p style={{ fontSize: '13px', color: 'var(--text3)' }}>
-          {sessions.length} test · {filtered.length !== sessions.length ? `${filtered.length} sonuç gösteriliyor` : 'Tümü'}
+          {t('{n} test · {m}', { n: sessions.length, m: filtered.length !== sessions.length ? t('{n} sonuç gösteriliyor', { n: filtered.length }) : t('Tümü') })}
         </p>
       </div>
 
@@ -177,7 +180,7 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
             const isActive = activeStatFilter === s.filter
             return (
             <button key={i} onClick={() => setActiveStatFilter(prev => prev === s.filter ? 'all' : s.filter)}
-              title={s.desc}
+              title={t(s.desc)}
               style={{
                 textAlign: 'center', padding: '12px 8px',
                 borderRadius: '14px', border: `2px solid ${isActive ? (s.color || 'var(--accent)') : 'var(--border)'}`,
@@ -189,9 +192,9 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
               }}>
               <div style={{ fontSize: '20px', marginBottom: '4px' }}>{s.icon}</div>
               <div style={{ fontWeight: 800, fontSize: '18px', color: s.color || 'var(--primary)' }}>{s.value}</div>
-              <div style={{ fontSize: '10px', color: isActive ? (s.color || 'var(--accent)') : 'var(--text3)', marginTop: '2px', fontWeight: isActive ? 600 : 400 }}>{s.label}</div>
+              <div style={{ fontSize: '10px', color: isActive ? (s.color || 'var(--accent)') : 'var(--text3)', marginTop: '2px', fontWeight: isActive ? 600 : 400 }}>{t(s.label)}</div>
               {s.sub && <div style={{ fontSize: '9px', color: 'var(--text3)', marginTop: '1px' }}>{s.sub}</div>}
-              {isActive && <div style={{ fontSize: '9px', color: s.color || 'var(--accent)', marginTop: '4px', fontWeight: 600 }}>✓ Filtre aktif</div>}
+              {isActive && <div style={{ fontSize: '9px', color: s.color || 'var(--accent)', marginTop: '4px', fontWeight: 600 }}>{t('✓ Filtre aktif')}</div>}
             </button>
           )})}
         </div>
@@ -202,57 +205,57 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
         <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
           <input
             type="text"
-            placeholder="🔍 Konuya göre ara..."
+            placeholder={t('🔍 Konuya göre ara...')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', outline: 'none' }}
           />
           <button onClick={() => setShowFilters(v => !v)}
             style={{ padding: '10px 14px', borderRadius: '10px', border: `1.5px solid ${activeFilters > 0 ? 'var(--accent)' : 'var(--border)'}`, background: activeFilters > 0 ? 'var(--accent-bg)' : 'var(--bg2)', color: activeFilters > 0 ? 'var(--accent)' : 'var(--text3)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            🎛️ Filtreler {activeFilters > 0 && <span style={{ background: 'var(--accent)', color: '#fff', borderRadius: '999px', fontSize: '10px', padding: '1px 6px', fontWeight: 700 }}>{activeFilters}</span>}
+            {t('🎛️ Filtreler')} {activeFilters > 0 && <span style={{ background: 'var(--accent)', color: '#fff', borderRadius: '999px', fontSize: '10px', padding: '1px 6px', fontWeight: 700 }}>{activeFilters}</span>}
           </button>
         </div>
 
         {showFilters && (
           <div className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '8px' }}>
             <div>
-              <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Sıralama</label>
+              <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>{t('Sıralama‖arşiv')}</label>
               <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} style={selectStyle}>
-                <option value="date">En yeni</option>
-                <option value="pct_desc">En yüksek puan</option>
-                <option value="pct_asc">En düşük puan</option>
+                <option value="date">{t('En yeni')}</option>
+                <option value="pct_desc">{t('En yüksek puan')}</option>
+                <option value="pct_asc">{t('En düşük puan')}</option>
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Sınıf</label>
+              <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>{t('Sınıf')}</label>
               <select value={gradeFilter} onChange={e => setGradeFilter(e.target.value)} style={selectStyle}>
-                <option value="all">Tümü</option>
+                <option value="all">{t('Tümü')}</option>
                 {grades.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Puan Aralığı</label>
+              <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>{t('Puan Aralığı')}</label>
               <select value={scoreFilter} onChange={e => setScoreFilter(e.target.value)} style={selectStyle}>
-                <option value="all">Tümü</option>
-                <option value="good">İyi (%80+)</option>
-                <option value="mid">Orta (%55-79)</option>
-                <option value="weak">Zayıf (-%55)</option>
+                <option value="all">{t('Tümü')}</option>
+                <option value="good">{t('İyi (%80+)')}</option>
+                <option value="mid">{t('Orta (%55-79)')}</option>
+                <option value="weak">{t('Zayıf (-%55)')}</option>
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Tarih</label>
+              <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>{t('Tarih')}</label>
               <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} style={selectStyle}>
-                <option value="all">Tümü</option>
-                <option value="week">Bu hafta</option>
-                <option value="month">Bu ay</option>
+                <option value="all">{t('Tümü')}</option>
+                <option value="week">{t('Bu hafta')}</option>
+                <option value="month">{t('Bu ay')}</option>
               </select>
             </div>
             {types.length > 0 && (
               <div>
-                <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Soru Tipi</label>
+                <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>{t('Soru Tipi')}</label>
                 <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={selectStyle}>
-                  <option value="all">Tümü</option>
-                  {types.map(t => <option key={t} value={t}>{QUESTION_TYPE_LABELS[t!] || t}</option>)}
+                  <option value="all">{t('Tümü')}</option>
+                  {types.map(ty => <option key={ty} value={ty}>{QUESTION_TYPE_LABELS[ty!] ? t(QUESTION_TYPE_LABELS[ty!]) : ty}</option>)}
                 </select>
               </div>
             )}
@@ -260,7 +263,7 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
               <div style={{ display: 'flex', alignItems: 'flex-end' }}>
                 <button onClick={() => { setGradeFilter('all'); setScoreFilter('all'); setTypeFilter('all'); setDateFilter('all'); setSortBy('date') }}
                   style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(220,38,38,0.3)', background: 'var(--red-bg)', color: 'var(--red)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 600, width: '100%' }}>
-                  Filtreleri Temizle
+                  {t('Filtreleri Temizle')}
                 </button>
               </div>
             )}
@@ -271,19 +274,19 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
       {activeStatFilter !== 'all' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', padding: '8px 12px', borderRadius: '10px', background: 'var(--accent-bg)', border: '1px solid var(--accent)' }}>
           <span style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 600 }}>
-            {activeStatFilter === 'weak' ? '⚠️ Zayıf testler filtreleniyor' : activeStatFilter === 'good' ? '📊 İyi testler filtreleniyor' : '🏆 En iyi test gösteriliyor'}
+            {activeStatFilter === 'weak' ? t('⚠️ Zayıf testler filtreleniyor') : activeStatFilter === 'good' ? t('📊 İyi testler filtreleniyor') : t('🏆 En iyi test gösteriliyor')}
           </span>
           <button onClick={() => setActiveStatFilter('all')} style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
-            × Temizle
+            {t('× Temizle')}
           </button>
         </div>
       )}
       {activeFilters > 0 && !showFilters && (
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {gradeFilter !== 'all' && <FilterTag label={`Sınıf: ${gradeFilter}`} onRemove={() => setGradeFilter('all')} />}
-            {scoreFilter !== 'all' && <FilterTag label={scoreFilter === 'good' ? 'İyi testler' : scoreFilter === 'mid' ? 'Orta testler' : 'Zayıf testler'} onRemove={() => setScoreFilter('all')} />}
-            {typeFilter !== 'all' && <FilterTag label={QUESTION_TYPE_LABELS[typeFilter] || typeFilter} onRemove={() => setTypeFilter('all')} />}
-            {dateFilter !== 'all' && <FilterTag label={dateFilter === 'week' ? 'Bu hafta' : 'Bu ay'} onRemove={() => setDateFilter('all')} />}
+            {gradeFilter !== 'all' && <FilterTag label={t('Sınıf: {grade}', { grade: gradeFilter })} onRemove={() => setGradeFilter('all')} />}
+            {scoreFilter !== 'all' && <FilterTag label={scoreFilter === 'good' ? t('İyi testler') : scoreFilter === 'mid' ? t('Orta testler') : t('Zayıf testler')} onRemove={() => setScoreFilter('all')} />}
+            {typeFilter !== 'all' && <FilterTag label={QUESTION_TYPE_LABELS[typeFilter] ? t(QUESTION_TYPE_LABELS[typeFilter]) : typeFilter} onRemove={() => setTypeFilter('all')} />}
+            {dateFilter !== 'all' && <FilterTag label={dateFilter === 'week' ? t('Bu hafta') : t('Bu ay')} onRemove={() => setDateFilter('all')} />}
           </div>
         )}
       </div>
@@ -292,10 +295,10 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
       {filtered.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
           <div style={{ fontSize: '48px', marginBottom: '12px' }}>📭</div>
-          <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--primary)', marginBottom: '6px' }}>Sonuç bulunamadı</div>
-          <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '1rem' }}>Filtrelerini değiştirmeyi dene.</div>
+          <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--primary)', marginBottom: '6px' }}>{t('Sonuç bulunamadı')}</div>
+          <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '1rem' }}>{t('Filtrelerini değiştirmeyi dene.')}</div>
           <button onClick={() => { setSearch(''); setGradeFilter('all'); setScoreFilter('all'); setTypeFilter('all'); setDateFilter('all') }}
-            className="btn" style={{ justifyContent: 'center', fontSize: '13px' }}>Tümünü Göster</button>
+            className="btn" style={{ justifyContent: 'center', fontSize: '13px' }}>{t('Tümünü Göster')}</button>
         </div>
       ) : (
         <div>
@@ -326,15 +329,15 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
                         </div>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '11px', color: 'var(--text3)' }}>
                           {s.grade && <span>📚 {s.grade}</span>}
-                          <span>❓ {s.question_count} soru</span>
+                          <span>{t('❓ {n} soru', { n: s.question_count })}</span>
                           {s.question_type && s.question_type !== 'multiple_choice' && (
-                            <span>{QUESTION_TYPE_LABELS[s.question_type] || s.question_type}</span>
+                            <span>{QUESTION_TYPE_LABELS[s.question_type] ? t(QUESTION_TYPE_LABELS[s.question_type]) : s.question_type}</span>
                           )}
                         </div>
                       </div>
 
                       <div style={{ fontSize: '11px', color: 'var(--text4)', flexShrink: 0, textAlign: 'right' }}>
-                        {new Date(s.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', timeZone: 'Europe/Istanbul' })}
+                        {new Date(s.created_at).toLocaleDateString(intlLocale(locale), { day: 'numeric', month: 'short', timeZone: 'Europe/Istanbul' })}
                       </div>
                     </Link>
 
@@ -343,7 +346,7 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
                       <button
                         onClick={(e) => handleExport(e, s)}
                         disabled={exportingId === s.id}
-                        title="Yazdır / PDF olarak kaydet"
+                        title={t('Yazdır / PDF olarak kaydet')}
                         style={{
                           position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
                           width: 32, height: 32, borderRadius: '8px',

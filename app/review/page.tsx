@@ -4,9 +4,11 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 export default function ReviewPage() {
   const router = useRouter()
+  const { t } = useT()
   const supabase = createClient() as any
   const [cards, setCards] = useState<any[]>([])
   const [current, setCurrent] = useState(0)
@@ -64,10 +66,10 @@ export default function ReviewPage() {
       <PageHeader title="Tekrar Zamanı" subtitle="Spaced repetition" icon="🧠" color="#8b5cf6" backHref="/quiz" backLabel="Teste dön" />
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '2rem 1rem', textAlign: 'center' }}>
         <div style={{ fontSize: '64px', marginBottom: '16px' }}>🎉</div>
-        <div style={{ fontWeight: 700, fontSize: '18px', color: 'var(--primary)', marginBottom: '8px' }}>Bugünlük hepsi tamam!</div>
-        <div style={{ fontSize: '14px', color: 'var(--text2)', marginBottom: '2rem' }}>Bugün tekrar edilecek kart yok. Yarın kontrol et.</div>
+        <div style={{ fontWeight: 700, fontSize: '18px', color: 'var(--primary)', marginBottom: '8px' }}>{t('Bugünlük hepsi tamam!')}</div>
+        <div style={{ fontSize: '14px', color: 'var(--text2)', marginBottom: '2rem' }}>{t('Bugün tekrar edilecek kart yok. Yarın kontrol et.')}</div>
         <button onClick={() => router.push('/quiz')} style={{ padding: '12px 24px', borderRadius: '12px', background: '#8b5cf6', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: '14px' }}>
-          Yeni Test Çöz
+          {t('Yeni Test Çöz')}
         </button>
       </div>
     </main>
@@ -78,23 +80,23 @@ export default function ReviewPage() {
       <PageHeader title="Oturum Tamamlandı" subtitle="Harika iş!" icon="✅" color="#8b5cf6" backHref="/quiz" backLabel="Teste dön" />
       <div style={{ maxWidth: '400px', margin: '0 auto', padding: '2rem 1rem', textAlign: 'center' }}>
         <div style={{ fontSize: '64px', marginBottom: '16px' }}>🧠</div>
-        <div style={{ fontWeight: 800, fontSize: '22px', color: 'var(--primary)', marginBottom: '1.5rem' }}>{cards.length} kart tamamlandı!</div>
+        <div style={{ fontWeight: 800, fontSize: '22px', color: 'var(--primary)', marginBottom: '1.5rem' }}>{t('{n} kart tamamlandı!', { n: cards.length })}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px', marginBottom: '2rem' }}>
           <div className="card" style={{ textAlign: 'center', padding: '12px 8px' }}>
             <div style={{ fontSize: '24px', fontWeight: 800, color: '#16a34a' }}>{stats.correct}</div>
-            <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Doğru</div>
+            <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{t('Doğru‖istatistik')}</div>
           </div>
           <div className="card" style={{ textAlign: 'center', padding: '12px 8px' }}>
             <div style={{ fontSize: '24px', fontWeight: 800, color: '#d97706' }}>{stats.hard}</div>
-            <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Zor</div>
+            <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{t('Zor')}</div>
           </div>
           <div className="card" style={{ textAlign: 'center', padding: '12px 8px' }}>
             <div style={{ fontSize: '24px', fontWeight: 800, color: '#dc2626' }}>{stats.wrong}</div>
-            <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Yanlış</div>
+            <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{t('Yanlış‖istatistik')}</div>
           </div>
         </div>
         <button onClick={() => router.push('/quiz')} style={{ width: '100%', padding: '13px', borderRadius: '12px', background: '#8b5cf6', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: '15px' }}>
-          Teste Dön
+          {t('Teste Dön')}
         </button>
       </div>
     </main>
@@ -102,7 +104,7 @@ export default function ReviewPage() {
 
   return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: '80px' }}>
-      <PageHeader title="Tekrar Zamanı" subtitle={`${current + 1}/${cards.length} kart · ${totalDue} bekliyor`} icon="🧠" color="#8b5cf6" backHref="/quiz" backLabel="Teste dön" />
+      <PageHeader title="Tekrar Zamanı" subtitle={t('{a}/{b} kart · {n} bekliyor', { a: current + 1, b: cards.length, n: totalDue })} icon="🧠" color="#8b5cf6" backHref="/quiz" backLabel="Teste dön" />
 
       <div style={{ maxWidth: '560px', margin: '0 auto', padding: '0 1rem' }}>
         {/* İlerleme */}
@@ -146,20 +148,20 @@ export default function ReviewPage() {
 
         {!showAnswer ? (
           <button onClick={() => setShowAnswer(true)} style={{ width: '100%', padding: '13px', borderRadius: '12px', border: 'none', background: '#8b5cf6', color: '#fff', fontWeight: 700, fontSize: '15px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-            Cevabı Gör
+            {t('Cevabı Gör')}
           </button>
         ) : (
           <div>
-            <div style={{ fontSize: '12px', color: 'var(--text2)', textAlign: 'center', marginBottom: '10px' }}>Ne kadar kolaydı?</div>
+            <div style={{ fontSize: '12px', color: 'var(--text2)', textAlign: 'center', marginBottom: '10px' }}>{t('Ne kadar kolaydı?')}</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px' }}>
               <button onClick={() => rateCard(1)} style={{ padding: '12px 8px', borderRadius: '12px', border: '2px solid #dc2626', background: 'rgba(220,38,38,0.08)', color: '#dc2626', fontWeight: 700, fontSize: '13px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                😓 Yanlış<br /><span style={{ fontSize: '10px', fontWeight: 400, opacity: 0.8 }}>yarın tekrar</span>
+                {t('😓 Yanlış')}<br /><span style={{ fontSize: '10px', fontWeight: 400, opacity: 0.8 }}>{t('yarın tekrar')}</span>
               </button>
               <button onClick={() => rateCard(3)} style={{ padding: '12px 8px', borderRadius: '12px', border: '2px solid #d97706', background: 'rgba(217,119,6,0.08)', color: '#d97706', fontWeight: 700, fontSize: '13px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                🤔 Zordu<br /><span style={{ fontSize: '10px', fontWeight: 400, opacity: 0.8 }}>kısa süre</span>
+                {t('🤔 Zordu')}<br /><span style={{ fontSize: '10px', fontWeight: 400, opacity: 0.8 }}>{t('kısa süre')}</span>
               </button>
               <button onClick={() => rateCard(5)} style={{ padding: '12px 8px', borderRadius: '12px', border: '2px solid #16a34a', background: 'rgba(22,163,74,0.08)', color: '#16a34a', fontWeight: 700, fontSize: '13px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                😎 Kolaydı<br /><span style={{ fontSize: '10px', fontWeight: 400, opacity: 0.8 }}>uzun süre</span>
+                {t('😎 Kolaydı')}<br /><span style={{ fontSize: '10px', fontWeight: 400, opacity: 0.8 }}>{t('uzun süre')}</span>
               </button>
             </div>
           </div>

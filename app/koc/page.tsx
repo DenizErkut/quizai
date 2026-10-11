@@ -14,6 +14,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 interface CoachAction {
   type: 'start_practice'
@@ -32,6 +33,7 @@ interface CoachMessage {
 }
 
 export default function PratiumKocPage() {
+  const { t } = useT()
   const router = useRouter()
   const supabase = createClient() as any
   const [messages, setMessages] = useState<CoachMessage[]>([])
@@ -68,9 +70,9 @@ export default function PratiumKocPage() {
       const audio = new Audio(url)
       audioRef.current = audio
       audio.onended = () => { URL.revokeObjectURL(url); setSpeakingId(null) }
-      audio.onerror = () => { URL.revokeObjectURL(url); setSpeakingId(null); setError('Ses oynatılamadı.') }
+      audio.onerror = () => { URL.revokeObjectURL(url); setSpeakingId(null); setError(t('Ses oynatılamadı.')) }
       await audio.play()
-    } catch { setSpeakingId(null); setError('Koçun sesi şu anda hazırlanamadı.') }
+    } catch { setSpeakingId(null); setError(t('Koçun sesi şu anda hazırlanamadı.')) }
   }
 
   useEffect(() => {
@@ -85,7 +87,7 @@ export default function PratiumKocPage() {
         const data = await res.json()
         if (!res.ok) {
           if (data.code === 'plan_required') { setPlanBlocked(true); setLoading(false); return }
-          setError(data.error || 'Koç yüklenemedi.'); setLoading(false); return
+          setError(data.error || t('Koç yüklenemedi.')); setLoading(false); return
         }
         setMessages(data.messages || [])
         // Öğrenci koçu açtığında, Faz D'nin cron'unun bıraktığı proaktif
@@ -95,7 +97,7 @@ export default function PratiumKocPage() {
         void supabase.from('notifications').update({ read: true })
           .eq('user_id', user.id).eq('type', 'coach_nudge').eq('read', false)
       } catch {
-        setError('Bağlantı hatası, lütfen sayfayı yenile.')
+        setError(t('Bağlantı hatası, lütfen sayfayı yenile.'))
       }
       setLoading(false)
     }
@@ -157,10 +159,10 @@ export default function PratiumKocPage() {
         body: JSON.stringify({ message: text }),
       })
       const data = await res.json()
-      if (!res.ok) { setError(data.error || 'Koç yanıt veremedi.'); setSending(false); return }
+      if (!res.ok) { setError(data.error || t('Koç yanıt veremedi.')); setSending(false); return }
       setMessages(m => [...m, data.message])
     } catch {
-      setError('Bağlantı hatası, lütfen tekrar dene.')
+      setError(t('Bağlantı hatası, lütfen tekrar dene.'))
     }
     setSending(false)
   }
@@ -172,22 +174,21 @@ export default function PratiumKocPage() {
           <Link href="/dashboard" className="btn-ghost btn" style={{ padding: '6px 10px' }}>←</Link>
           <span style={{ fontSize: '22px' }}>🎓</span>
           <div>
-            <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--primary)' }}>Profesör Prati</div>
-            <div style={{ fontSize: '12px', color: 'var(--text3)' }}>Kişisel AI öğrenme koçu</div>
+            <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--primary)' }}>{t('Profesör Prati')}</div>
+            <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{t('Kişisel AI öğrenme koçu')}</div>
           </div>
         </div>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1.25rem' }}>
           <div style={{ maxWidth: '420px', textAlign: 'center' }}>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>🎓</div>
             <h1 style={{ fontSize: '19px', fontWeight: 800, color: 'var(--primary)', marginBottom: '10px' }}>
-              Profesör Prati ücretli üyelere özel
+              {t('Profesör Prati ücretli üyelere özel')}
             </h1>
             <p style={{ fontSize: '13.5px', color: 'var(--text3)', lineHeight: 1.6, marginBottom: '20px' }}>
-              Seni tanıyan, verine dayanan kişisel bir öğrenme koçu istiyorsan
-              bir plana geçmen gerekiyor — koç, ücretsiz planda kullanılamıyor.
+              {t('Seni tanıyan, verine dayanan kişisel bir öğrenme koçu istiyorsan bir plana geçmen gerekiyor — koç, ücretsiz planda kullanılamıyor.')}
             </p>
             <button className="btn btn-primary" onClick={() => router.push('/checkout')}>
-              Planları görüntüle
+              {t('Planları görüntüle')}
             </button>
           </div>
         </div>
@@ -201,8 +202,8 @@ export default function PratiumKocPage() {
         <Link href="/dashboard" className="btn-ghost btn" style={{ padding: '6px 10px' }}>←</Link>
         <span style={{ fontSize: '22px' }}>✦</span>
         <div>
-          <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--primary)' }}>Pratium Koç</div>
-          <div style={{ fontSize: '12px', color: 'var(--text3)' }}>Sana özel, verine dayanan öneriler</div>
+          <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--primary)' }}>{t('Pratium Koç')}</div>
+          <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{t('Sana özel, verine dayanan öneriler')}</div>
         </div>
       </div>
 
@@ -230,7 +231,7 @@ export default function PratiumKocPage() {
                   {m.role === 'assistant' ? <LearningMessage text={m.content} /> : m.content}
                   {m.role === 'assistant' && m.id && (
                     <button onClick={() => speak(m.id)} className="btn btn-ghost" style={{ marginTop: '8px', padding: '5px 9px', fontSize: '12px' }}>
-                      {speakingId === m.id ? '⏸ Sesi durdur' : '🔊 Koçu dinle'}
+                      {speakingId === m.id ? t('⏸ Sesi durdur') : t('🔊 Koçu dinle')}
                     </button>
                   )}
                   {m.action?.type === 'start_practice' && (
@@ -239,7 +240,7 @@ export default function PratiumKocPage() {
                       className="btn btn-primary"
                       style={{ marginTop: '10px', width: '100%', fontSize: '13px', padding: '8px 12px' }}
                     >
-                      ▶ Çalışmayı başlat: {m.action.topic}
+                      {t('▶ Çalışmayı başlat: {topic}', { topic: m.action.topic })}
                     </button>
                   )}
                 </div>
@@ -248,7 +249,7 @@ export default function PratiumKocPage() {
             {sending && (
               <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '10px' }}>
                 <div style={{ padding: '10px 14px', borderRadius: '14px', background: 'var(--bg2)', fontSize: '13px', color: 'var(--text3)' }}>
-                  ⏳ yazıyor…
+                  {t('⏳ yazıyor…')}
                 </div>
               </div>
             )}
@@ -266,7 +267,7 @@ export default function PratiumKocPage() {
       )}
 
       <div style={{ maxWidth: '640px', width: '100%', margin: '0 auto', padding: '0 1.25rem', boxSizing: 'border-box', fontSize: '10.5px', color: 'var(--text3)' }}>
-        🔊 Koç sesi yapay zekâ tarafından üretilir.
+        {t('🔊 Koç sesi yapay zekâ tarafından üretilir.')}
       </div>
       <form
         onSubmit={e => { e.preventDefault(); send() }}
@@ -275,11 +276,11 @@ export default function PratiumKocPage() {
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
-          placeholder="Koça bir şey sor…"
+          placeholder={t('Koça bir şey sor…')}
           disabled={loading || sending}
           style={{ flex: 1, padding: '10px 14px', borderRadius: '12px', border: '1.5px solid var(--border)', fontSize: '14px', background: 'var(--bg)', color: 'var(--text)' }}
         />
-        <button type="submit" className="btn btn-primary" disabled={loading || sending || !input.trim()}>Gönder</button>
+        <button type="submit" className="btn btn-primary" disabled={loading || sending || !input.trim()}>{t('Gönder')}</button>
       </form>
     </main>
   )

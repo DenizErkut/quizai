@@ -3,8 +3,10 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import ArchiveClient from './ArchiveClient'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 export default function ArchivePage() {
+  const { t } = useT()
   const [sessions, setSessions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
@@ -33,7 +35,7 @@ export default function ArchivePage() {
 
   if (loading) return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
-      <div style={{ color: 'var(--text3)', fontSize: '14px' }}>Yükleniyor...</div>
+      <div style={{ color: 'var(--text3)', fontSize: '14px' }}>{t('Yükleniyor...')}</div>
     </main>
   )
 

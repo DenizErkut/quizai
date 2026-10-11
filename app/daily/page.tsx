@@ -6,6 +6,8 @@ import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 
 interface Question { q: string; opts?: string[]; ans: number; exp?: string; explanation?: string; type?: string; pairs?: {left: string; right: string}[]; items?: string[]; blank?: string; statements?: {text: string; correct: boolean}[]; bankQuestionId?: string; bankSubject?: string; bankTopic?: string }
 interface Streak { current_streak: number; longest_streak: number; total_points: number; last_activity_date: string | null }
@@ -13,6 +15,7 @@ interface Challenge { id: string; date: string; topic: string; subject: string; 
 
 export default function DailyPage() {
   const router = useRouter()
+  const { t, locale } = useT()
   const [profile, setProfile] = useState<any>(null)
   const [streak, setStreak] = useState<Streak | null>(null)
   const [challenge, setChallenge] = useState<Challenge | null>(null)
@@ -52,11 +55,11 @@ export default function DailyPage() {
         setAlreadyDone(payload.challenge.completed === true)
       } else {
         setChallenge(null)
-        setChallengeError(payload.error || 'Günlük 10 soru şu an hazırlanamadı.')
+        setChallengeError(payload.error || t('Günlük 10 soru şu an hazırlanamadı.'))
       }
     } catch {
       setChallenge(null)
-      setChallengeError('Günlük test bağlantısı kurulamadı. Lütfen tekrar dene.')
+      setChallengeError(t('Günlük test bağlantısı kurulamadı. Lütfen tekrar dene.'))
     } finally {
       setGenerating(false)
       setLoading(false)
@@ -107,7 +110,7 @@ export default function DailyPage() {
       if (error) throw error
       setReportedQuestions(previous => new Set([...previous, current]))
     } catch (error: any) {
-      setReportError(error?.message || 'Bildirim gönderilemedi.')
+      setReportError(error?.message || t('Bildirim gönderilemedi.'))
     } finally {
       setReportingQuestion(null)
     }
@@ -152,10 +155,10 @@ export default function DailyPage() {
       <div style={{ maxWidth: '560px', margin: '0 auto' }}>
 
         <div className="anim-up" style={{ marginBottom: '2rem' }}>
-          <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>Günlük</div>
-          <h1 className="serif" style={{ fontSize: '28px' }}>Günlük test</h1>
+          <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>{t('Günlük')}</div>
+          <h1 className="serif" style={{ fontSize: '28px' }}>{t('Günlük test')}</h1>
           <p style={{ color: 'var(--text2)', fontSize: '14px', marginTop: '4px' }}>
-            Her gün 10 karma soru — serini koru!
+            {t('Her gün 10 karma soru — serini koru!')}
           </p>
         </div>
 
@@ -165,17 +168,17 @@ export default function DailyPage() {
           <div style={{ fontSize: '48px', fontWeight: 700, color: flameColor(streak?.current_streak || 0), lineHeight: 1 }}>
             {streak?.current_streak || 0}
           </div>
-          <div style={{ fontSize: '14px', color: 'var(--text2)', marginTop: '4px' }}>günlük seri</div>
+          <div style={{ fontSize: '14px', color: 'var(--text2)', marginTop: '4px' }}>{t('günlük seri')}</div>
 
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginTop: '1.25rem' }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '20px', fontWeight: 600, color: 'var(--accent)' }}>{streak?.longest_streak || 0}</div>
-              <div style={{ fontSize: '11px', color: 'var(--text3)' }}>En uzun seri</div>
+              <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{t('En uzun seri')}</div>
             </div>
             <div style={{ width: '1px', background: 'var(--border)' }} />
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '20px', fontWeight: 600, color: 'var(--accent)' }}>{streak?.total_points || 0}</div>
-              <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Toplam puan</div>
+              <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{t('Toplam puan')}</div>
             </div>
           </div>
         </div>
@@ -186,26 +189,26 @@ export default function DailyPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>
-                  {new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  {new Date().toLocaleDateString(intlLocale(locale), { weekday: 'long', day: 'numeric', month: 'long' })}
                 </div>
                 <div style={{ fontWeight: 600, fontSize: '18px' }}>{challenge.topic}</div>
-                <div style={{ fontSize: '13px', color: 'var(--text2)', marginTop: '2px' }}>10 karma soru · Kişiselleştirilmiş</div>
+                <div style={{ fontSize: '13px', color: 'var(--text2)', marginTop: '2px' }}>{t('10 karma soru · Kişiselleştirilmiş')}</div>
               </div>
               <div style={{ fontSize: '32px' }}>📝</div>
             </div>
 
             {alreadyDone ? (
               <div style={{ marginTop: '1rem', padding: '12px', borderRadius: '10px', background: 'var(--green-bg)', border: '1px solid rgba(22,163,74,0.2)', fontSize: '13px', color: 'var(--green)', textAlign: 'center' }}>
-                ✓ Bugünkü testi tamamladın! Yarın tekrar gel.
+                {t('✓ Bugünkü testi tamamladın! Yarın tekrar gel.')}
               </div>
             ) : generating ? (
               <div style={{ marginTop: '1rem', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: 'var(--text2)' }}>
-                <div className="spinner" style={{ width: 16, height: 16 }} /> Sorular hazırlanıyor...
+                <div className="spinner" style={{ width: 16, height: 16 }} /> {t('Sorular hazırlanıyor...')}
               </div>
             ) : (
               <button className="btn btn-primary" onClick={() => setScreen('quiz')}
                 style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}>
-                Teste başla 🔥
+                {t('Teste başla 🔥')}
               </button>
             )}
           </div>
@@ -215,23 +218,23 @@ export default function DailyPage() {
           <div className="card anim-up-2" style={{ marginBottom: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' }}>
               <div>
-                <div style={{ fontWeight: 700, fontSize: '18px' }}>Bugünün 10 sorusu</div>
+                <div style={{ fontWeight: 700, fontSize: '18px' }}>{t('Bugünün 10 sorusu')}</div>
                 <div style={{ fontSize: '13px', color: 'var(--text2)', marginTop: '4px', lineHeight: 1.5 }}>
-                  {challengeError || 'Sana özel 10 soruluk günlük görev hazırlanıyor.'}
+                  {challengeError || t('Sana özel 10 soruluk günlük görev hazırlanıyor.')}
                 </div>
               </div>
               <div style={{ fontSize: '30px' }}>📝</div>
             </div>
             <button className="btn btn-primary" onClick={() => void generateDailyChallenge()} disabled={generating}
               style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}>
-              {generating ? '10 soru hazırlanıyor...' : '10 soruluk testi hazırla'}
+              {generating ? t('10 soru hazırlanıyor...') : t('10 soruluk testi hazırla')}
             </button>
           </div>
         )}
 
         {/* Streak milestones */}
         <div className="card anim-up-3">
-          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Seri hedefleri</div>
+          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>{t('Seri hedefleri')}</div>
           <div style={{ display: 'flex', gap: '8px' }}>
             {[
               { days: 3, emoji: '⭐', label: '3 gün' },
@@ -243,7 +246,7 @@ export default function DailyPage() {
               return (
                 <div key={m.days} style={{ flex: 1, textAlign: 'center', padding: '10px 6px', borderRadius: '8px', background: done ? 'var(--accent-bg)' : 'var(--bg2)', border: `1px solid ${done ? 'rgba(91,76,245,0.2)' : 'var(--border)'}` }}>
                   <div style={{ fontSize: '20px' }}>{m.emoji}</div>
-                  <div style={{ fontSize: '11px', color: done ? 'var(--accent)' : 'var(--text3)', marginTop: '4px', fontWeight: done ? 600 : 400 }}>{m.label}</div>
+                  <div style={{ fontSize: '11px', color: done ? 'var(--accent)' : 'var(--text3)', marginTop: '4px', fontWeight: done ? 600 : 400 }}>{t(m.label)}</div>
                 </div>
               )
             })}
@@ -261,15 +264,15 @@ export default function DailyPage() {
       <main style={{ minHeight: '100vh', padding: '1.5rem', background: 'var(--bg)' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span className="serif" style={{ fontSize: '18px' }}>GÜNÜN 10 DAKİKASI</span>
-            <span style={{ fontSize: '13px', color: 'var(--text2)' }}>🔥 {streak?.current_streak || 0} gün seri</span>
+            <span className="serif" style={{ fontSize: '18px' }}>{t('GÜNÜN 10 DAKİKASI')}</span>
+            <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{t('🔥 {n} gün seri', { n: streak?.current_streak || 0 })}</span>
           </div>
           <div className="progress-bar" style={{ marginBottom: '1.5rem' }}>
             <div className="progress-fill" style={{ width: `${progPct}%` }} />
           </div>
           <div className="card anim-up">
             <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '0.75rem' }}>
-              Günlük Test · Soru {current + 1}/{challenge.questions.length}
+              {t('Günlük Test · Soru {a}/{b}', { a: current + 1, b: challenge.questions.length })}
             </div>
             <p style={{ fontSize: '17px', fontWeight: 500, lineHeight: 1.55, marginBottom: '1.5rem' }}><MathText text={q.q} /></p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-0.75rem', marginBottom: '1rem' }}>
@@ -278,7 +281,7 @@ export default function DailyPage() {
                 onClick={reportCurrentQuestion}
                 disabled={reportedQuestions.has(current) || reportingQuestion === current}
                 style={{ border: 'none', background: 'transparent', color: reportedQuestions.has(current) ? 'var(--green)' : 'var(--text3)', fontSize: '12px', cursor: reportedQuestions.has(current) ? 'default' : 'pointer', padding: '4px 0' }}>
-                {reportedQuestions.has(current) ? '✓ Hata bildirimi gönderildi' : reportingQuestion === current ? 'Gönderiliyor...' : '⚠️ Bu soruyu bildir'}
+                {reportedQuestions.has(current) ? t('✓ Hata bildirimi gönderildi') : reportingQuestion === current ? t('Gönderiliyor...') : t('⚠️ Bu soruyu bildir')}
               </button>
             </div>
             {reportError && <div style={{ color: 'var(--red)', fontSize: '12px', marginBottom: '1rem', textAlign: 'right' }}>{reportError}</div>}
@@ -306,7 +309,7 @@ export default function DailyPage() {
                                 } else { setChosen(next as any) }
                               }}
                               style={{ flex: 1, padding: '10px 13px', borderRadius: '9px', border: `1.5px solid ${chosen !== null ? (sel === pair.right ? 'rgba(22,163,74,0.35)' : 'rgba(220,38,38,0.35)') : 'var(--border)'}`, background: chosen !== null ? (sel === pair.right ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg2)', fontSize: '13px', color: 'var(--text)', outline: 'none' }}>
-                              <option value="">Seç...</option>
+                              <option value="">{t('Seç...')}</option>
                               {rightOptions.map((r: string, j: number) => <option key={j} value={r}>{plainMathText(r)}</option>)}
                             </select>
                           </div>
@@ -326,7 +329,7 @@ export default function DailyPage() {
                       ))}
                       {chosen === null && (
                         <button onClick={() => choose(qq.ans)} className="btn btn-primary" style={{ marginTop: '8px', justifyContent: 'center', fontSize: '13px' }}>
-                          Sıralamayı Onayla
+                          {t('Sıralamayı Onayla')}
                         </button>
                       )}
                     </div>
@@ -346,10 +349,10 @@ export default function DailyPage() {
                                 <button key={String(value)} type="button" disabled={answered}
                                   onClick={() => setMultiTFAnswer(previous => ({ ...previous, [statementIndex]: value }))}
                                   style={{ padding: '7px 14px', borderRadius: '8px', border: `1.5px solid ${multiTFAnswer[statementIndex] === value ? (value ? 'rgba(22,163,74,0.5)' : 'rgba(220,38,38,0.4)') : 'var(--border)'}`, background: multiTFAnswer[statementIndex] === value ? (value ? 'var(--green-bg)' : 'var(--red-bg)') : 'var(--bg3)', color: 'var(--text)', fontWeight: 600, cursor: answered ? 'default' : 'pointer' }}>
-                                  {value ? '✓ Doğru' : '✗ Yanlış'}
+                                  {value ? t('✓ Doğru') : t('✗ Yanlış')}
                                 </button>
                               ))}
-                              {answered && <span style={{ fontSize: '12px', fontWeight: 700, color: correct ? 'var(--green)' : 'var(--red)' }}>{correct ? '✓' : `✗ Doğrusu: ${statement.correct ? 'Doğru' : 'Yanlış'}`}</span>}
+                              {answered && <span style={{ fontSize: '12px', fontWeight: 700, color: correct ? 'var(--green)' : 'var(--red)' }}>{correct ? '✓' : t('✗ Doğrusu: {v}', { v: statement.correct ? t('Doğru') : t('Yanlış') })}</span>}
                             </div>
                           </div>
                         )
@@ -359,7 +362,7 @@ export default function DailyPage() {
                           disabled={qq.statements.some((_: any, index: number) => multiTFAnswer[index] === undefined)}
                           onClick={() => choose(qq.statements.every((statement: any, index: number) => multiTFAnswer[index] === statement.correct) ? qq.ans : -1)}
                           style={{ width: '100%', justifyContent: 'center', marginTop: '4px' }}>
-                          Cevapları onayla ✓
+                          {t('Cevapları onayla ✓')}
                         </button>
                       )}
                     </div>
@@ -377,7 +380,7 @@ export default function DailyPage() {
                         return (
                           <button key={i} onClick={() => choose(i)} disabled={chosen !== null}
                             style={{ flex: 1, padding: '16px', borderRadius: '12px', border: `2px solid ${border}`, background: bg, color, fontSize: '15px', fontWeight: 700, cursor: chosen !== null ? 'default' : 'pointer', transition: 'all 0.15s' }}>
-                            {i === 0 ? '✓ ' : '✗ '}{lbl}
+                            {i === 0 ? '✓ ' : '✗ '}{t(lbl)}
                           </button>
                         )
                       })}
@@ -407,10 +410,10 @@ export default function DailyPage() {
             {chosen !== null && (
               <>
                 <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', borderLeft: '3px solid var(--accent)', fontSize: '13px', color: 'var(--text2)', lineHeight: 1.65 }}>
-                  <strong style={{ color: chosen === q.ans ? 'var(--green)' : 'var(--red)' }}>{chosen === q.ans ? 'Doğru! ' : 'Yanlış. '}</strong><MathText text={q.exp || q.explanation} />
+                  <strong style={{ color: chosen === q.ans ? 'var(--green)' : 'var(--red)' }}>{chosen === q.ans ? t('Doğru!') : t('Yanlış.')} </strong><MathText text={q.exp || q.explanation} />
                 </div>
                 <button className="btn btn-primary" onClick={next} style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}>
-                  {current + 1 < challenge.questions.length ? 'Sonraki →' : 'Sonuçlar →'}
+                  {current + 1 < challenge.questions.length ? t('Sonraki →') : t('Sonuçlar →')}
                 </button>
               </>
             )}
@@ -431,17 +434,17 @@ export default function DailyPage() {
           <div style={{ fontSize: '64px', marginBottom: '1rem' }}>
             {pct === 100 ? '🏆' : pct >= 60 ? '🎉' : '💪'}
           </div>
-          <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.5rem' }}>Günlük test tamam!</h2>
+          <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.5rem' }}>{t('Günlük test tamam!')}</h2>
           <div style={{ fontSize: '42px', fontWeight: 700, color: pct >= 60 ? 'var(--green)' : 'var(--red)', marginBottom: '0.5rem' }}>
             {score}/10
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '1.5rem' }}>
             <span style={{ fontSize: '24px' }}>🔥</span>
-            <span style={{ fontSize: '20px', fontWeight: 600, color: flameColor(newStreak) }}>{newStreak} gün seri!</span>
+            <span style={{ fontSize: '20px', fontWeight: 600, color: flameColor(newStreak) }}>{t('{n} gün seri!', { n: newStreak })}</span>
           </div>
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-            <Link href="/quiz" className="btn btn-primary" style={{ justifyContent: 'center' }}>Yeni test yap</Link>
-            <Link href="/dashboard" className="btn" style={{ justifyContent: 'center' }}>Dashboard</Link>
+            <Link href="/quiz" className="btn btn-primary" style={{ justifyContent: 'center' }}>{t('Yeni test yap')}</Link>
+            <Link href="/dashboard" className="btn" style={{ justifyContent: 'center' }}>{t('Dashboard')}</Link>
           </div>
         </div>
       </main>

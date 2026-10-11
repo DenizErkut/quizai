@@ -97,6 +97,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@/lib/user-context'
+import { useT } from '@/lib/i18n/I18nProvider'
 import { createClient } from '@/lib/supabase/client'
 import { isPaidCoachPlan } from '@/lib/coach-access'
 import { useDraggableMascot } from '@/lib/useDraggableMascot'
@@ -119,6 +120,7 @@ interface CoachMessage {
 
 export default function CoachMascot() {
   const router = useRouter()
+  const { t } = useT()
   const { user, profile, loading, isTeacher, isParent, isInstitution } = useUser()
   const [unread, setUnread] = useState(0)
   const [bubbleDismissed, setBubbleDismissed] = useState(false)
@@ -182,7 +184,7 @@ export default function CoachMascot() {
         if (cancelled) return
         if (!res.ok) {
           if (data.code === 'plan_required') { setPlanBlocked(true); setChatLoading(false); setChatLoaded(true); return }
-          setChatError(data.error || 'Koç yüklenemedi.'); setChatLoading(false); setChatLoaded(true); return
+          setChatError(data.error || t('Koç yüklenemedi.')); setChatLoading(false); setChatLoaded(true); return
         }
         setMessages(data.messages || [])
         // Panel açıldığında proaktif bildirimleri okunmuş işaretle — rozet
@@ -191,7 +193,7 @@ export default function CoachMascot() {
           .eq('user_id', user.id).eq('type', 'coach_nudge').eq('read', false)
         setUnread(0)
       } catch {
-        if (!cancelled) setChatError('Bağlantı hatası, lütfen tekrar dene.')
+        if (!cancelled) setChatError(t('Bağlantı hatası, lütfen tekrar dene.'))
       }
       if (!cancelled) { setChatLoading(false); setChatLoaded(true) }
     }
@@ -248,10 +250,10 @@ export default function CoachMascot() {
         body: JSON.stringify({ message: text }),
       })
       const data = await res.json()
-      if (!res.ok) { setChatError(data.error || 'Koç yanıt veremedi.'); setSending(false); return }
+      if (!res.ok) { setChatError(data.error || t('Koç yanıt veremedi.')); setSending(false); return }
       setMessages(m => [...m, data.message])
     } catch {
-      setChatError('Bağlantı hatası, lütfen tekrar dene.')
+      setChatError(t('Bağlantı hatası, lütfen tekrar dene.'))
     }
     setSending(false)
   }
@@ -277,11 +279,11 @@ export default function CoachMascot() {
       const audio = new Audio(url)
       audioRef.current = audio
       audio.onended = () => { URL.revokeObjectURL(url); setSpeakingId(null) }
-      audio.onerror = () => { URL.revokeObjectURL(url); setSpeakingId(null); setChatError('Ses oynatılamadı.') }
+      audio.onerror = () => { URL.revokeObjectURL(url); setSpeakingId(null); setChatError(t('Ses oynatılamadı.')) }
       await audio.play()
     } catch {
       setSpeakingId(null)
-      setChatError('Koçun sesi şu anda hazırlanamadı.')
+      setChatError(t('Koçun sesi şu anda hazırlanamadı.'))
     }
   }
 
@@ -322,8 +324,8 @@ export default function CoachMascot() {
       {hidden ? (
         <button
           onClick={show}
-          aria-label="Prof. Prati'yi tekrar göster"
-          title="Koç'u göster"
+          aria-label={t("Prof. Prati'yi tekrar göster")}
+          title={t("Koç'u göster")}
           className="coach-launcher-restore"
           style={{
             width: 44, height: 44, borderRadius: '50%',
@@ -352,7 +354,7 @@ export default function CoachMascot() {
             >
               <button
                 onClick={e => { e.stopPropagation(); setBubbleDismissed(true) }}
-                aria-label="Kapat"
+                aria-label={t('Kapat')}
                 style={{
                   position: 'absolute', top: '-8px', right: '-8px',
                   width: 22, height: 22, borderRadius: '50%',
@@ -363,12 +365,10 @@ export default function CoachMascot() {
                 }}
               >×</button>
               <div style={{ fontSize: '14px', fontWeight: 800, color: '#082465', marginBottom: '5px' }}>
-                🎓 Profesör Prati
+                {t('🎓 Profesör Prati')}
               </div>
               <div style={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.55 }}>
-                Seni tanıyan kişisel AI öğrenme koçun.<br />
-                Sadece sorularını cevaplamaz —<br />
-                nasıl öğrendiğini anlar.
+                {t('Seni tanıyan kişisel AI öğrenme koçun. Sadece sorularını cevaplamaz — nasıl öğrendiğini anlar.')}
               </div>
               {/* balon kuyruğu */}
               <div style={{
@@ -403,16 +403,16 @@ export default function CoachMascot() {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '5px' }}>
-                    <img src="/mascot-coach-human.webp" alt="Profesör Prati" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src="/mascot-coach-human.webp" alt={t('Profesör Prati')} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
                   <div>
-                    <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>Profesör Prati</div>
+                    <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>{t('Profesör Prati')}</div>
                     <Link href="/koc" style={{ color: 'rgba(255,255,255,0.8)', fontSize: '11px', textDecoration: 'underline' }}>
-                      Tam sayfada aç ↗
+                      {t('Tam sayfada aç ↗')}
                     </Link>
                   </div>
                 </div>
-                <button onClick={() => setOpen(false)} aria-label="Sohbeti kapat" style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', fontSize: '22px', lineHeight: 1, padding: '4px' }}>×</button>
+                <button onClick={() => setOpen(false)} aria-label={t('Sohbeti kapat')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', fontSize: '22px', lineHeight: 1, padding: '4px' }}>×</button>
               </div>
 
               {planBlocked ? (
@@ -420,13 +420,13 @@ export default function CoachMascot() {
                   <div>
                     <div style={{ fontSize: '32px', marginBottom: '10px' }}>🎓</div>
                     <div style={{ fontSize: '14px', fontWeight: 700, color: '#082465', marginBottom: '8px' }}>
-                      Profesör Prati ücretli üyelere özel
+                      {t('Profesör Prati ücretli üyelere özel')}
                     </div>
                     <p style={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.6, marginBottom: '16px' }}>
-                      Seni tanıyan, verine dayanan kişisel bir öğrenme koçu istiyorsan bir plana geçmen gerekiyor.
+                      {t('Seni tanıyan, verine dayanan kişisel bir öğrenme koçu istiyorsan bir plana geçmen gerekiyor.')}
                     </p>
                     <button className="btn btn-primary" onClick={() => { setOpen(false); router.push('/checkout') }}>
-                      Planları görüntüle
+                      {t('Planları görüntüle')}
                     </button>
                   </div>
                 </div>
@@ -456,7 +456,7 @@ export default function CoachMascot() {
                                   className="btn btn-primary"
                                   style={{ marginTop: '10px', width: '100%', fontSize: '12.5px', padding: '8px 12px', background: 'linear-gradient(135deg, #6d28d9, #a855f7)' }}
                                 >
-                                  ▶ Çalışmayı başlat: {m.action.topic}
+                                  {t('▶ Çalışmayı başlat: {topic}', { topic: m.action.topic })}
                                 </button>
                               )}
                               {m.role === 'assistant' && m.id && (
@@ -465,7 +465,7 @@ export default function CoachMascot() {
                                   className="btn btn-ghost"
                                   style={{ marginTop: '8px', padding: '5px 9px', fontSize: '12px' }}
                                 >
-                                  {speakingId === m.id ? '⏸ Sesi durdur' : '🔊 Koçu dinle'}
+                                  {speakingId === m.id ? t('⏸ Sesi durdur') : t('🔊 Koçu dinle')}
                                 </button>
                               )}
                             </div>
@@ -474,7 +474,7 @@ export default function CoachMascot() {
                         {sending && (
                           <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
                             <div style={{ padding: '10px 14px', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '13px', color: '#64748b' }}>
-                              ⏳ yazıyor…
+                              {t('⏳ yazıyor…')}
                             </div>
                           </div>
                         )}
@@ -492,7 +492,7 @@ export default function CoachMascot() {
                   )}
 
                   <div style={{ padding: '0 14px', fontSize: '10.5px', color: '#94a3b8' }}>
-                    🔊 Koç sesi yapay zekâ tarafından üretilir.
+                    {t('🔊 Koç sesi yapay zekâ tarafından üretilir.')}
                   </div>
 
                   {/* Input */}
@@ -503,7 +503,7 @@ export default function CoachMascot() {
                     <input
                       value={input}
                       onChange={e => setInput(e.target.value)}
-                      placeholder="Koça bir şey sor…"
+                      placeholder={t('Koça bir şey sor…')}
                       disabled={chatLoading || sending}
                       style={{
                         flex: 1, padding: '10px 14px', borderRadius: '20px',
@@ -538,7 +538,7 @@ export default function CoachMascot() {
             <button
               ref={elRef}
               {...dragHandlers}
-              aria-label={open ? "Profesör Prati'yi kapat" : 'Prof. Prati ile sohbet et'}
+              aria-label={open ? t("Profesör Prati'yi kapat") : t('Prof. Prati ile sohbet et')}
               onClick={(e) => { if (wasDragged()) { e.preventDefault(); return } setOpen(v => !v); setBubbleDismissed(true) }}
               className="coach-launcher"
               style={{
@@ -560,8 +560,8 @@ export default function CoachMascot() {
             </button>
             <button
               onClick={e => { e.preventDefault(); e.stopPropagation(); hide(); setBubbleDismissed(true) }}
-              aria-label="Koç'u geçici olarak gizle"
-              title="Geçici olarak gizle"
+              aria-label={t("Koç'u geçici olarak gizle")}
+              title={t('Geçici olarak gizle')}
               style={{
                 position: 'absolute', top: '-6px', left: '-6px',
                 width: 20, height: 20, borderRadius: '50%',

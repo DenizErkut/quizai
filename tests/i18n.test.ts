@@ -115,3 +115,51 @@ test('quiz flow entries are used by the quiz page', async () => {
   const unused = quizFlowEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
   assert.deepEqual(unused, [])
 })
+
+test('community entries are used by leaderboard or the shared page header', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { communityEntries } = await import('../lib/i18n/entries/community')
+  const source = ['app/leaderboard/page.tsx', 'components/PageHeader.tsx'].map(f => readFileSync(f, 'utf8')).join('\n')
+  const unused = communityEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})
+
+test('coach entries are used by the coach page or widget', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { coachEntries } = await import('../lib/i18n/entries/coach')
+  const source = ['app/koc/page.tsx', 'components/CoachMascot.tsx'].map(f => readFileSync(f, 'utf8')).join('\n')
+  const unused = coachEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})
+
+test('review entries are used by the review page or shared header', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { reviewEntries } = await import('../lib/i18n/entries/review')
+  const source = readFileSync('app/review/page.tsx', 'utf8')
+  const unused = reviewEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})
+
+test('archive entries are used by the archive pages', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { archiveEntries } = await import('../lib/i18n/entries/archive')
+  const source = ['app/archive/ArchiveClient.tsx', 'app/archive/page.tsx', 'app/archive/[id]/page.tsx'].map(f => readFileSync(f, 'utf8')).join('\n')
+  const unused = archiveEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})
+
+test('daily entries are used by the daily page, shared header or already defined elsewhere', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { dailyEntries } = await import('../lib/i18n/entries/daily')
+  const source = readFileSync('app/daily/page.tsx', 'utf8')
+  const unused = dailyEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})
+
+test('analysis entries are used by the analysis page', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { analysisEntries } = await import('../lib/i18n/entries/analysis')
+  const source = readFileSync('app/analysis/page.tsx', 'utf8')
+  const unused = analysisEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})

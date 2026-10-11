@@ -7,5 +7,11 @@ import { quizSetupEntries } from './quiz-setup'
 import { quizQuestionEntries } from './quiz-question'
 import { quizResultEntries } from './quiz-result'
 import { quizFlowEntries } from './quiz-flow'
+import { communityEntries } from './community'
+import { coachEntries } from './coach'
+import { reviewEntries } from './review'
+import { archiveEntries } from './archive'
+import { dailyEntries } from './daily'
+import { analysisEntries } from './analysis'
 
-export const ALL_ENTRIES: Entry[] = [...navbarEntries, ...publicEntries, ...dashboardPricingEntries, ...profileEntries, ...quizSetupEntries, ...quizQuestionEntries, ...quizResultEntries, ...quizFlowEntries]
+export const ALL_ENTRIES: Entry[] = [...navbarEntries, ...publicEntries, ...dashboardPricingEntries, ...profileEntries, ...quizSetupEntries, ...quizQuestionEntries, ...quizResultEntries, ...quizFlowEntries, ...communityEntries, ...coachEntries, ...reviewEntries, ...archiveEntries, ...dailyEntries, ...analysisEntries]

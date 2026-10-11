@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities } from '@/lib/identity/resolve-client'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 
 interface LeaderEntry {
   id: string; name: string; grade: string
@@ -67,6 +69,8 @@ function maskFullName(fullName: string): string {
 }
 
 export default function LeaderboardPage() {
+  const { t, locale } = useT()
+  const displayName = (name: string) => (name === 'İsimsiz' ? t('İsimsiz') : name)
   const router = useRouter()
   const [entries, setEntries] = useState<LeaderEntry[]>([])
   const [myEntry, setMyEntry] = useState<LeaderEntry | null>(null)
@@ -156,19 +160,19 @@ export default function LeaderboardPage() {
       <div style={{ maxWidth: '640px', margin: '0 auto' }}>
 
         <div className="anim-up" style={{ marginBottom: '1.5rem' }}>
-          <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>Topluluk</div>
-          <h1 className="serif" style={{ fontSize: '28px' }}>Sıralama & Rozetler</h1>
+          <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>{t('Topluluk')}</div>
+          <h1 className="serif" style={{ fontSize: '28px' }}>{t('Sıralama & Rozetler')}</h1>
           <p style={{ color: 'var(--text2)', fontSize: '14px', marginTop: '4px' }}>
-            Test çöz, puan kazan, rozetler topla.
+            {t('Test çöz, puan kazan, rozetler topla.')}
           </p>
         </div>
 
         {/* Tab seçici */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem' }} className="anim-up-1">
-          {[['leaderboard', '🏆 Sıralama'], ['badges', '🎖 Rozetlerim']].map(([t, l]) => (
-            <button key={t} onClick={() => setTab(t as any)}
-              style={{ flex: 1, padding: '10px', borderRadius: '10px', border: `1.5px solid ${tab === t ? 'var(--accent)' : 'var(--border)'}`, background: tab === t ? 'var(--accent-bg)' : 'var(--bg)', color: tab === t ? 'var(--accent)' : 'var(--text2)', fontWeight: tab === t ? 700 : 500, fontSize: '14px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-              {l}
+          {[['leaderboard', '🏆 Sıralama'], ['badges', '🎖 Rozetlerim']].map(([tabKey, l]) => (
+            <button key={tabKey} onClick={() => setTab(tabKey as any)}
+              style={{ flex: 1, padding: '10px', borderRadius: '10px', border: `1.5px solid ${tab === tabKey ? 'var(--accent)' : 'var(--border)'}`, background: tab === tabKey ? 'var(--accent-bg)' : 'var(--bg)', color: tab === tabKey ? 'var(--accent)' : 'var(--text2)', fontWeight: tab === tabKey ? 700 : 500, fontSize: '14px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+              {t(l)}
             </button>
           ))}
         </div>
@@ -180,8 +184,8 @@ export default function LeaderboardPage() {
               {Object.entries(GROUP_LABELS).map(([key, label]) => (
                 <button key={key} onClick={() => setGroup(key)}
                   style={{ padding: '6px 14px', borderRadius: '99px', border: `1.5px solid ${group === key ? 'var(--accent)' : 'var(--border)'}`, background: group === key ? 'var(--accent-bg)' : 'var(--bg)', color: group === key ? 'var(--accent)' : 'var(--text2)', fontSize: '13px', fontWeight: group === key ? 700 : 500, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                  {label}
-                  {key !== 'all' && key === gradeGroup(myGrade) && <span style={{ marginLeft: '4px', fontSize: '10px', opacity: 0.7 }}>• sen</span>}
+                  {t(label)}
+                  {key !== 'all' && key === gradeGroup(myGrade) && <span style={{ marginLeft: '4px', fontSize: '10px', opacity: 0.7 }}>{t('• sen')}</span>}
                 </button>
               ))}
             </div>
@@ -194,14 +198,14 @@ export default function LeaderboardPage() {
                     {medalEmoji(myFiltered.rank)}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: '15px' }}>{myFiltered.name} <span style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 400 }}>(sen)</span></div>
+                    <div style={{ fontWeight: 600, fontSize: '15px' }}>{displayName(myFiltered.name)} <span style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 400 }}>{t('(sen)')}</span></div>
                     <div style={{ fontSize: '12px', color: 'var(--text2)', marginTop: '2px' }}>
-                      {myFiltered.grade} · {myFiltered.total_tests} test · ort. %{myFiltered.avg_pct}
+                      {t('{grade} · {n} test · ort. %{pct}', { grade: myFiltered.grade, n: myFiltered.total_tests, pct: myFiltered.avg_pct })}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--accent)' }}>{myFiltered.points}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text3)' }}>puan</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{t('puan')}</div>
                   </div>
                   {myFiltered.streak > 0 && (
                     <div style={{ textAlign: 'center' }}>
@@ -212,7 +216,7 @@ export default function LeaderboardPage() {
                 </div>
                 <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                   {myBadges.slice(0, 5).map(b => (
-                    <span key={b.badge_key} style={{ fontSize: '18px' }} title={BADGE_DEFS[b.badge_key]?.label}>
+                    <span key={b.badge_key} style={{ fontSize: '18px' }} title={BADGE_DEFS[b.badge_key] ? t(BADGE_DEFS[b.badge_key].label) : undefined}>
                       {BADGE_DEFS[b.badge_key]?.icon || '🎖'}
                     </span>
                   ))}
@@ -231,9 +235,9 @@ export default function LeaderboardPage() {
                     border: `1.5px solid ${i === 1 ? 'rgba(30,207,184,0.4)' : 'var(--border)'}`,
                   }}>
                     <div style={{ fontSize: i === 1 ? '38px' : '28px' }}>{i === 1 ? '🥇' : i === 0 ? '🥈' : '🥉'}</div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, marginTop: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: i === 1 ? '#fff' : 'var(--text)' }}>{e.name}</div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, marginTop: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: i === 1 ? '#fff' : 'var(--text)' }}>{displayName(e.name)}</div>
                     <div style={{ fontSize: '20px', fontWeight: 700, color: i === 1 ? '#1ECFB8' : 'var(--text)', marginTop: '4px' }}>{e.points}</div>
-                    <div style={{ fontSize: '10px', color: i === 1 ? 'rgba(255,255,255,0.5)' : 'var(--text3)' }}>puan</div>
+                    <div style={{ fontSize: '10px', color: i === 1 ? 'rgba(255,255,255,0.5)' : 'var(--text3)' }}>{t('puan')}</div>
                   </div>
                 ))}
               </div>
@@ -258,10 +262,10 @@ export default function LeaderboardPage() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: isMe ? 600 : 400, fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {e.name}{isMe ? ' (sen)' : ''}
+                        {displayName(e.name)}{isMe ? ` ${t('(sen)')}` : ''}
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--text3)' }}>
-                        {e.grade} · {e.total_tests} test · ort. %{e.avg_pct}
+                        {t('{grade} · {n} test · ort. %{pct}', { grade: e.grade, n: e.total_tests, pct: e.avg_pct })}
                       </div>
                     </div>
                     {e.streak > 0 && (
@@ -271,20 +275,20 @@ export default function LeaderboardPage() {
                     )}
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <div style={{ fontSize: '15px', fontWeight: 700, color: isMe ? 'var(--accent)' : 'var(--text)' }}>{e.points}</div>
-                      <div style={{ fontSize: '10px', color: 'var(--text3)' }}>pt</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text3)' }}>{t('pt')}</div>
                     </div>
                   </div>
                 )
               })}
               {ranked.length === 0 && (
                 <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text2)', fontSize: '14px' }}>
-                  Bu grupta henüz sıralama yok. Test çöz, ilk sen ol!
+                  {t('Bu grupta henüz sıralama yok. Test çöz, ilk sen ol!')}
                 </div>
               )}
             </div>
 
             <div className="card-sm anim-up-4" style={{ marginTop: '1rem', fontSize: '12px', color: 'var(--text3)', textAlign: 'center', lineHeight: 1.8 }}>
-              Her doğru cevap 10 puan · Günlük streak bonusu · Yüksek skor bonusu
+              {t('Her doğru cevap 10 puan · Günlük streak bonusu · Yüksek skor bonusu')}
             </div>
           </>
         )}
@@ -295,7 +299,7 @@ export default function LeaderboardPage() {
             {myBadges.length > 0 && (
               <div className="card" style={{ marginBottom: '1rem' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '1rem' }}>
-                  Kazandıkların ({myBadges.length})
+                  {t('Kazandıkların ({n})', { n: myBadges.length })}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }}>
                   {myBadges.map(b => {
@@ -304,10 +308,10 @@ export default function LeaderboardPage() {
                     return (
                       <div key={b.badge_key} style={{ padding: '14px', borderRadius: '12px', background: `${def.color}12`, border: `1.5px solid ${def.color}30`, textAlign: 'center' }}>
                         <div style={{ fontSize: '32px', marginBottom: '6px' }}>{def.icon}</div>
-                        <div style={{ fontSize: '12px', fontWeight: 700, color: def.color, marginBottom: '2px' }}>{def.label}</div>
-                        <div style={{ fontSize: '10px', color: 'var(--text3)', lineHeight: 1.4 }}>{def.desc}</div>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: def.color, marginBottom: '2px' }}>{t(def.label)}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text3)', lineHeight: 1.4 }}>{t(def.desc)}</div>
                         <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '4px' }}>
-                          {new Date(b.earned_at).toLocaleDateString('tr-TR')}
+                          {new Date(b.earned_at).toLocaleDateString(intlLocale(locale))}
                         </div>
                       </div>
                     )
@@ -319,7 +323,7 @@ export default function LeaderboardPage() {
             {/* Tüm rozetler */}
             <div className="card">
               <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '1rem' }}>
-                Tüm rozetler
+                {t('Tüm rozetler')}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {Object.entries(BADGE_DEFS).map(([key, def]) => {
@@ -328,12 +332,12 @@ export default function LeaderboardPage() {
                     <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '12px', borderRadius: '12px', background: earned ? `${def.color}10` : 'var(--bg2)', border: `1.5px solid ${earned ? def.color + '30' : 'var(--border)'}`, opacity: earned ? 1 : 0.5 }}>
                       <div style={{ fontSize: '28px', flexShrink: 0 }}>{def.icon}</div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: earned ? def.color : 'var(--text2)' }}>{def.label}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{def.desc}</div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: earned ? def.color : 'var(--text2)' }}>{t(def.label)}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{t(def.desc)}</div>
                       </div>
                       {earned
-                        ? <span style={{ fontSize: '11px', color: def.color, fontWeight: 600 }}>✓ Kazanıldı</span>
-                        : <span style={{ fontSize: '11px', color: 'var(--text3)' }}>Kilitli</span>
+                        ? <span style={{ fontSize: '11px', color: def.color, fontWeight: 600 }}>{t('✓ Kazanıldı')}</span>
+                        : <span style={{ fontSize: '11px', color: 'var(--text3)' }}>{t('Kilitli')}</span>
                       }
                     </div>
                   )
