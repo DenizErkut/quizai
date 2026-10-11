@@ -31,13 +31,12 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const { profile, updateLanguage } = useUser()
   const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE)
 
-  // Stored choice wins (also covers logged-out visitors), then the account language, then the browser.
+  // Stored choice wins (also covers logged-out visitors), then the account language; otherwise Turkish.
   useEffect(() => {
     const stored = readStored()
     if (stored) { setLocaleState(stored); return }
     if (profile?.language) { setLocaleState(localeFromLanguage(profile.language)); return }
-    const browser = typeof navigator !== 'undefined' ? localeFromLanguage(navigator.language) : DEFAULT_LOCALE
-    setLocaleState(browser)
+    setLocaleState(DEFAULT_LOCALE)
   }, [profile?.language])
 
   useEffect(() => {
