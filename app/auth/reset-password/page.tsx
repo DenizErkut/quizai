@@ -2,9 +2,11 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
+  const { t: tr } = useT()
   const [pass, setPass] = useState('')
   const [passConfirm, setPassConfirm] = useState('')
   const [showPass, setShowPass] = useState(false)
@@ -20,20 +22,21 @@ export default function ResetPasswordPage() {
     // Listener bazı tarayıcılarda hash işlendikten sonra bağlanabiliyor; mevcut
     // oturumu da kontrol ederek geçerli linkte formun takılı kalmasını önle.
     const queryError = new URLSearchParams(window.location.search).get('error_code')
-    if (queryError === 'otp_expired') setError('Bu sıfırlama bağlantısının süresi dolmuş. Giriş sayfasından yeni bağlantı isteyin.')
+    if (queryError === 'otp_expired') setError(tr('Bu sıfırlama bağlantısının süresi dolmuş. Giriş sayfasından yeni bağlantı isteyin.'))
     supabase.auth.getSession().then(({ data: { session } }: any) => { if (active && session) setReady(true) })
     const { data: listener } = supabase.auth.onAuthStateChange((event: string) => { if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') setReady(true) })
     return () => { active = false; listener?.subscription?.unsubscribe() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleReset() {
-    if (pass.length < 6) { setError('Şifre en az 6 karakter olmalıdır.'); return }
-    if (pass !== passConfirm) { setError('Şifreler eşleşmiyor.'); return }
+    if (pass.length < 6) { setError(tr('Şifre en az 6 karakter olmalıdır.')); return }
+    if (pass !== passConfirm) { setError(tr('Şifreler eşleşmiyor.')); return }
     setError(''); setLoading(true)
     const { error: err } = await supabase.auth.updateUser({ password: pass })
     setLoading(false)
     if (err) {
-      const message = /same|different|password/i.test(err.message) ? 'Yeni şifreniz önceki şifrenizden farklı olmalıdır.' : /expired|session/i.test(err.message) ? 'Bağlantının süresi dolmuş. Yeni bir sıfırlama bağlantısı isteyin.' : 'Şifre güncellenemedi. Lütfen bağlantıyı yenileyip tekrar deneyin.'
+      const message = /same|different|password/i.test(err.message) ? tr('Yeni şifreniz önceki şifrenizden farklı olmalıdır.') : /expired|session/i.test(err.message) ? tr('Bağlantının süresi dolmuş. Yeni bir sıfırlama bağlantısı isteyin.') : tr('Şifre güncellenemedi. Lütfen bağlantıyı yenileyip tekrar deneyin.')
       setError(message); return
     }
     setDone(true)
@@ -51,33 +54,33 @@ export default function ResetPasswordPage() {
           {done ? (
             <>
               <div style={{ textAlign: 'center', fontSize: '48px', marginBottom: '1rem' }}>✅</div>
-              <h1 className="serif" style={{ fontSize: '22px', marginBottom: '0.5rem', textAlign: 'center' }}>Şifren güncellendi!</h1>
-              <p style={{ color: 'var(--text2)', fontSize: '14px', textAlign: 'center' }}>Yönlendiriliyorsun...</p>
+              <h1 className="serif" style={{ fontSize: '22px', marginBottom: '0.5rem', textAlign: 'center' }}>{tr('Şifren güncellendi!')}</h1>
+              <p style={{ color: 'var(--text2)', fontSize: '14px', textAlign: 'center' }}>{tr('Yönlendiriliyorsun...')}</p>
             </>
           ) : !ready ? (
             <>
-              <h1 className="serif" style={{ fontSize: '22px', marginBottom: '0.75rem' }}>{error ? 'Bağlantı geçersiz' : 'Bağlantı doğrulanıyor...'}</h1>
+              <h1 className="serif" style={{ fontSize: '22px', marginBottom: '0.75rem' }}>{error ? tr('Bağlantı geçersiz') : tr('Bağlantı doğrulanıyor...')}</h1>
               <p style={{ color: 'var(--text2)', fontSize: '14px', lineHeight: 1.7 }}>
-                {error || 'E-postanızdaki sıfırlama bağlantısına tıklayarak bu sayfaya gelmelisiniz.'}
+                {error || tr('E-postanızdaki sıfırlama bağlantısına tıklayarak bu sayfaya gelmelisiniz.')}
               </p>
               <button className="btn" onClick={() => router.push('/login')} style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem' }}>
-                Giriş sayfasına dön
+                {tr('Giriş sayfasına dön')}
               </button>
             </>
           ) : (
             <>
-              <h1 className="serif" style={{ fontSize: '22px', marginBottom: '0.25rem' }}>Yeni şifre belirle</h1>
-              <p style={{ color: 'var(--text2)', fontSize: '14px', marginBottom: '1.5rem' }}>En az 6 karakter olmalıdır.</p>
+              <h1 className="serif" style={{ fontSize: '22px', marginBottom: '0.25rem' }}>{tr('Yeni şifre belirle')}</h1>
+              <p style={{ color: 'var(--text2)', fontSize: '14px', marginBottom: '1.5rem' }}>{tr('En az 6 karakter olmalıdır.')}</p>
 
-              <label className="field-label">Yeni şifre</label>
+              <label className="field-label">{tr('Yeni şifre')}</label>
               <div style={{ position: 'relative' }}><input className="input" type={showPass ? 'text' : 'password'} placeholder="••••••••" value={pass}
-                onChange={e => setPass(e.target.value)} autoFocus style={{ paddingRight: '46px' }} /><button type="button" aria-label={showPass ? 'Şifreyi gizle' : 'Şifreyi göster'} onClick={() => setShowPass(v => !v)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', border: 0, background: 'transparent', cursor: 'pointer', fontSize: 18 }}>{showPass ? '🙈' : '👁️'}</button></div>
+                onChange={e => setPass(e.target.value)} autoFocus style={{ paddingRight: '46px' }} /><button type="button" aria-label={showPass ? tr('Şifreyi gizle') : tr('Şifreyi göster')} onClick={() => setShowPass(v => !v)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', border: 0, background: 'transparent', cursor: 'pointer', fontSize: 18 }}>{showPass ? '🙈' : '👁️'}</button></div>
 
-              <label className="field-label" style={{ marginTop: '8px' }}>Şifre tekrar</label>
+              <label className="field-label" style={{ marginTop: '8px' }}>{tr('Şifre tekrar')}</label>
               <div style={{ position: 'relative' }}><input className="input" type={showPassConfirm ? 'text' : 'password'} placeholder="••••••••" value={passConfirm}
                 onChange={e => setPassConfirm(e.target.value)} style={{ paddingRight: '46px' }}
                 onKeyDown={e => e.key === 'Enter' && handleReset()} />
-                <button type="button" aria-label={showPassConfirm ? 'Şifreyi gizle' : 'Şifreyi göster'} onClick={() => setShowPassConfirm(v => !v)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', border: 0, background: 'transparent', cursor: 'pointer', fontSize: 18 }}>{showPassConfirm ? '🙈' : '👁️'}</button></div>
+                <button type="button" aria-label={showPassConfirm ? tr('Şifreyi gizle') : tr('Şifreyi göster')} onClick={() => setShowPassConfirm(v => !v)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', border: 0, background: 'transparent', cursor: 'pointer', fontSize: 18 }}>{showPassConfirm ? '🙈' : '👁️'}</button></div>
 
               {error && (
                 <div style={{ marginTop: '10px', padding: '10px 12px', background: 'var(--red-bg)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)' }}>
@@ -87,7 +90,7 @@ export default function ResetPasswordPage() {
 
               <button className="btn btn-primary" onClick={handleReset} disabled={loading}
                 style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem' }}>
-                {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Şifremi güncelle →'}
+                {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : tr('Şifremi güncelle →')}
               </button>
             </>
           )}

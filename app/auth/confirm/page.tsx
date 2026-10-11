@@ -28,6 +28,7 @@ import { useState } from 'react'
 import { Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 type Status = 'idle' | 'verifying' | 'error' | 'done'
 type OtpType = 'signup' | 'recovery' | 'email_change' | 'invite' | 'magiclink'
@@ -57,6 +58,7 @@ function resolveNextPath(next: string | null, fallback: string): string {
 
 function ConfirmInner() {
   const router = useRouter()
+  const { t: tr } = useT()
   const searchParams = useSearchParams()
   const supabase = createClient() as any
 
@@ -72,7 +74,7 @@ function ConfirmInner() {
 
   async function handleConfirm() {
     if (!tokenHash) {
-      setError('Bağlantı eksik veya bozuk görünüyor. Lütfen e-postandaki bağlantıya tekrar tıkla.')
+      setError(tr('Bağlantı eksik veya bozuk görünüyor. Lütfen e-postandaki bağlantıya tekrar tıkla.'))
       setStatus('error')
       return
     }
@@ -82,8 +84,8 @@ function ConfirmInner() {
     if (err) {
       const expired = /expired|not found|invalid/i.test(err.message || '')
       setError(expired
-        ? 'Bu bağlantının süresi dolmuş veya daha önce kullanılmış olabilir. Lütfen yeni bir bağlantı iste.'
-        : 'Onaylama sırasında bir sorun oluştu. Lütfen tekrar dene.')
+        ? tr('Bu bağlantının süresi dolmuş veya daha önce kullanılmış olabilir. Lütfen yeni bir bağlantı iste.')
+        : tr('Onaylama sırasında bir sorun oluştu. Lütfen tekrar dene.'))
       setStatus('error')
       return
     }
@@ -102,27 +104,27 @@ function ConfirmInner() {
           {status === 'done' ? (
             <>
               <div style={{ fontSize: '48px', marginBottom: '1rem' }}>✅</div>
-              <h1 className="serif" style={{ fontSize: '22px', marginBottom: '0.5rem' }}>Onaylandı!</h1>
-              <p style={{ color: 'var(--text2)', fontSize: '14px' }}>Yönlendiriliyorsun...</p>
+              <h1 className="serif" style={{ fontSize: '22px', marginBottom: '0.5rem' }}>{tr('Onaylandı!')}</h1>
+              <p style={{ color: 'var(--text2)', fontSize: '14px' }}>{tr('Yönlendiriliyorsun...')}</p>
             </>
           ) : status === 'error' ? (
             <>
               <div style={{ fontSize: '48px', marginBottom: '1rem' }}>⚠️</div>
-              <h1 className="serif" style={{ fontSize: '22px', marginBottom: '0.5rem' }}>Bir sorun oluştu</h1>
+              <h1 className="serif" style={{ fontSize: '22px', marginBottom: '0.5rem' }}>{tr('Bir sorun oluştu')}</h1>
               <p style={{ color: 'var(--text2)', fontSize: '14px', lineHeight: 1.7, marginBottom: '1.25rem' }}>{error}</p>
               <button className="btn" onClick={() => router.push('/login')} style={{ width: '100%', justifyContent: 'center' }}>
-                Giriş sayfasına dön
+                {tr('Giriş sayfasına dön')}
               </button>
             </>
           ) : (
             <>
               <div style={{ fontSize: '48px', marginBottom: '1rem' }}>{labels.icon}</div>
-              <h1 className="serif" style={{ fontSize: '22px', marginBottom: '0.5rem' }}>{labels.title}</h1>
+              <h1 className="serif" style={{ fontSize: '22px', marginBottom: '0.5rem' }}>{tr(labels.title)}</h1>
               <p style={{ color: 'var(--text2)', fontSize: '14px', lineHeight: 1.7, marginBottom: '1.25rem' }}>
-                Devam etmek için aşağıdaki butona tıkla.
+                {tr('Devam etmek için aşağıdaki butona tıkla.')}
               </p>
               <button className="btn" disabled={status === 'verifying'} onClick={handleConfirm} style={{ width: '100%', justifyContent: 'center' }}>
-                {status === 'verifying' ? 'Onaylanıyor…' : labels.cta}
+                {status === 'verifying' ? tr('Onaylanıyor…') : tr(labels.cta)}
               </button>
             </>
           )}
