@@ -31,6 +31,7 @@ const BODY_TEMPLATES: { re: RegExp; key: string; names: string[] }[] = [
   { re: /^Seviye (\d+)\/(\d+)\. Dört kısa soru; her başarıdan sonra sorular zorlaşır\.$/, key: 'Seviye {level}/{max}. Dört kısa soru; her başarıdan sonra sorular zorlaşır.', names: ['level', 'max'] },
   { re: /^([\s\S]+) konusunda kısa bir tekrar yapman öneriliyor\.$/, key: '{topic} konusunda kısa bir tekrar yapman öneriliyor.', names: ['topic'] },
   { re: /^([\s\S]+), (\d+) gündür pratik yapmadı \(önceki dönemde haftada ortalama ([\d.,]+) test çözüyordu\)\.$/, key: '{child}, {days} gündür pratik yapmadı (önceki dönemde haftada ortalama {avg} test çözüyordu).', names: ['child', 'days', 'avg'] },
+  { re: /^Günlük tarama (\d+) üretilmiş soru \+ (\d+) kaynak\/chunk içinden (\d+) tanesinde olası kalite sorunu buldu\. Hata Bildirimleri panelinden inceleyebilirsin\.$/, key: 'Günlük tarama {questions} üretilmiş soru + {sources} kaynak/chunk içinden {flagged} tanesinde olası kalite sorunu buldu. Hata Bildirimleri panelinden inceleyebilirsin.', names: ['questions', 'sources', 'flagged'] },
   { re: /^([\s\S]+) ajanında son 7 günde boş karar oranı %(\d+) seviyesinde\.$/, key: '{agent} ajanında son 7 günde boş karar oranı %{rate} seviyesinde.', names: ['agent', 'rate'] },
 ]
 
