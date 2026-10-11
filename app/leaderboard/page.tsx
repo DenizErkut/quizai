@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities } from '@/lib/identity/resolve-client'
 import { useT } from '@/lib/i18n/I18nProvider'
+import { gradeLabel } from '@/lib/i18n/grade'
 import { intlLocale } from '@/lib/i18n/core'
 
 interface LeaderEntry {
@@ -200,7 +201,7 @@ export default function LeaderboardPage() {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: '15px' }}>{displayName(myFiltered.name)} <span style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 400 }}>{t('(sen)')}</span></div>
                     <div style={{ fontSize: '12px', color: 'var(--text2)', marginTop: '2px' }}>
-                      {t('{grade} · {n} test · ort. %{pct}', { grade: myFiltered.grade, n: myFiltered.total_tests, pct: myFiltered.avg_pct })}
+                      {t('{grade} · {n} test · ort. %{pct}', { grade: gradeLabel(myFiltered.grade, t), n: myFiltered.total_tests, pct: myFiltered.avg_pct })}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
@@ -265,7 +266,7 @@ export default function LeaderboardPage() {
                         {displayName(e.name)}{isMe ? ` ${t('(sen)')}` : ''}
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--text3)' }}>
-                        {t('{grade} · {n} test · ort. %{pct}', { grade: e.grade, n: e.total_tests, pct: e.avg_pct })}
+                        {t('{grade} · {n} test · ort. %{pct}', { grade: gradeLabel(e.grade, t), n: e.total_tests, pct: e.avg_pct })}
                       </div>
                     </div>
                     {e.streak > 0 && (

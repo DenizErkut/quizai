@@ -366,7 +366,7 @@ export default function AnalysisPage() {
             <div className="card">
               <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>{t('🕐 Son Testler')}</div>
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={sessions.slice(0, 10).reverse().map((s, i) => ({ name: `#${i + 1}`, pct: s.pct, topic: s.topic }))}>
+                <BarChart data={sessions.slice(0, 10).reverse().map((s, i) => ({ name: `#${i + 1}`, pct: s.pct, topic: t(s.topic) }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                   <YAxis domain={[0, 100]} tickFormatter={v => `%${v}`} tick={{ fontSize: 11 }} />
@@ -389,7 +389,7 @@ export default function AnalysisPage() {
               <div className="card">
                 <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>{t('⚠️ En Zayıf Konular')}</div>
                 <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={weakTopics.slice(0, 8).map(w => ({ topic: w.topic.length > 18 ? w.topic.slice(0, 18) + '…' : w.topic, oran: Math.round(w.wrong_count / w.total_count * 100), yanlış: w.wrong_count, toplam: w.total_count }))} layout="vertical">
+                  <BarChart data={weakTopics.slice(0, 8).map(w => ({ topic: t(w.topic).length > 18 ? t(w.topic).slice(0, 18) + '…' : t(w.topic), oran: Math.round(w.wrong_count / w.total_count * 100), yanlış: w.wrong_count, toplam: w.total_count }))} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis type="number" domain={[0, 100]} tickFormatter={v => `%${v}`} tick={{ fontSize: 11 }} />
                     <YAxis type="category" dataKey="topic" width={140} tick={{ fontSize: 11, fill: 'var(--text2)' }} />

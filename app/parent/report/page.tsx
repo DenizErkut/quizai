@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import SubjectPerformanceChart from '@/components/SubjectPerformanceChart'
 import { useT } from '@/lib/i18n/I18nProvider'
+import { gradeLabel } from '@/lib/i18n/grade'
 
 function pctColor(p: number) { return p >= 80 ? 'var(--green)' : p >= 50 ? '#f59e0b' : 'var(--red)' }
 
@@ -17,7 +18,7 @@ function StudentCard({ s, onClick }: { s: any; onClick: () => void }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--primary)' }}>{s.nickname || s.name}</div>
-          <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{s.grade}</div>
+          <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{gradeLabel(s.grade, tr)}</div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: '22px', fontWeight: 800, color: pctColor(s.avgPct || 0) }}>%{s.avgPct || 0}</div>
@@ -69,7 +70,7 @@ function DetailReport({ childId, onBack }: { childId: string; onBack: () => void
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <div>
           <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>{nickname || name}</h2>
-          <div style={{ fontSize: '13px', color: 'var(--text3)' }}>{tr('{grade} · 🔥 {n} gün seri', { grade, n: streak?.current_streak || 0 })}</div>
+          <div style={{ fontSize: '13px', color: 'var(--text3)' }}>{tr('{grade} · 🔥 {n} gün seri', { grade: gradeLabel(grade, tr), n: streak?.current_streak || 0 })}</div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: '32px', fontWeight: 800, color: pctColor(stats.avgPct) }}>%{stats.avgPct}</div>

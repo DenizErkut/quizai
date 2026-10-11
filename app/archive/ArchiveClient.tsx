@@ -2,6 +2,7 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useT } from '@/lib/i18n/I18nProvider'
+import { gradeLabel } from '@/lib/i18n/grade'
 import { intlLocale, type Locale } from '@/lib/i18n/core'
 
 type Session = {
@@ -174,7 +175,7 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
           {([
             { label: 'Toplam Test', value: stats.total, icon: '📝', filter: 'all' as const, desc: 'Tüm testleri göster' },
             { label: 'Genel Ort.', value: `%${stats.avg}`, icon: '📊', color: pctColor(stats.avg), filter: 'good' as const, desc: '%80+ testleri filtrele' },
-            { label: 'En İyi', value: `%${stats.best.pct}`, icon: '🏆', color: 'var(--green)', sub: stats.best.topic.slice(0, 12) + '…', filter: 'best' as const, desc: 'En iyi teste git' },
+            { label: 'En İyi', value: `%${stats.best.pct}`, icon: '🏆', color: 'var(--green)', sub: t(stats.best.topic).slice(0, 12) + '…', filter: 'best' as const, desc: 'En iyi teste git' },
             { label: 'Zayıf Test', value: stats.weakCount, icon: '⚠️', color: stats.weakCount > 0 ? 'var(--red)' : 'var(--green)', filter: 'weak' as const, desc: 'Zayıf testleri filtrele' },
           ] as {label:string;value:any;icon:string;color?:string;sub?:string;filter:'all'|'good'|'best'|'weak';desc:string}[]).map((s, i) => {
             const isActive = activeStatFilter === s.filter
@@ -230,7 +231,7 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
               <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>{t('Sınıf')}</label>
               <select value={gradeFilter} onChange={e => setGradeFilter(e.target.value)} style={selectStyle}>
                 <option value="all">{t('Tümü')}</option>
-                {grades.map(g => <option key={g} value={g}>{g}</option>)}
+                {grades.map(g => <option key={g} value={g}>{gradeLabel(g, t)}</option>)}
               </select>
             </div>
             <div>
@@ -283,7 +284,7 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
       )}
       {activeFilters > 0 && !showFilters && (
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {gradeFilter !== 'all' && <FilterTag label={t('Sınıf: {grade}', { grade: gradeFilter })} onRemove={() => setGradeFilter('all')} />}
+            {gradeFilter !== 'all' && <FilterTag label={t('Sınıf: {grade}', { grade: gradeLabel(gradeFilter, t) })} onRemove={() => setGradeFilter('all')} />}
             {scoreFilter !== 'all' && <FilterTag label={scoreFilter === 'good' ? t('İyi testler') : scoreFilter === 'mid' ? t('Orta testler') : t('Zayıf testler')} onRemove={() => setScoreFilter('all')} />}
             {typeFilter !== 'all' && <FilterTag label={QUESTION_TYPE_LABELS[typeFilter] ? t(QUESTION_TYPE_LABELS[typeFilter]) : typeFilter} onRemove={() => setTypeFilter('all')} />}
             {dateFilter !== 'all' && <FilterTag label={dateFilter === 'week' ? t('Bu hafta') : t('Bu ay')} onRemove={() => setDateFilter('all')} />}
@@ -328,7 +329,7 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
                           {t(s.topic)}
                         </div>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '11px', color: 'var(--text3)' }}>
-                          {s.grade && <span>📚 {s.grade}</span>}
+                          {s.grade && <span>📚 {gradeLabel(s.grade, t)}</span>}
                           <span>{t('❓ {n} soru', { n: s.question_count })}</span>
                           {s.question_type && s.question_type !== 'multiple_choice' && (
                             <span>{QUESTION_TYPE_LABELS[s.question_type] ? t(QUESTION_TYPE_LABELS[s.question_type]) : s.question_type}</span>

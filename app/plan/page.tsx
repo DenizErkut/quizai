@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/i18n/I18nProvider'
-import { intlLocale } from '@/lib/i18n/core'
+import { intlLocale, languageFromLocale } from '@/lib/i18n/core'
 import { resolveName } from '@/lib/identity/resolve-client'
 import { printPage } from '@/lib/print-page'
 
@@ -93,7 +93,7 @@ export default function PlanPage() {
     const res = await fetch('/api/study-plan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ weakTopics: weakList, avgPct, totalTests: stats.sessions.length }),
+      body: JSON.stringify({ weakTopics: weakList, avgPct, totalTests: stats.sessions.length, uiLanguage: languageFromLocale(locale) }),
     })
     const data = await res.json()
     if (data.plan) {
