@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 import Link from 'next/link'
 
 interface OnboardingModalProps {
@@ -14,7 +15,7 @@ const STEPS = [
   {
     id: 1,
     icon: '👋',
-    title: 'Pratium\'a Hoş Geldin!',
+    title: "Pratium'a Hoş Geldin!",
     color: '#082465',
     gradient: 'linear-gradient(135deg, #082465 0%, #1ECFB8 100%)',
   },
@@ -35,12 +36,13 @@ const STEPS = [
 ]
 
 export default function OnboardingModal({ userName, grade, onComplete }: OnboardingModalProps) {
+  const { t: tr } = useT()
   const [step, setStep] = useState(1)
   const [leaving, setLeaving] = useState(false)
   const router = useRouter()
   const supabase = createClient() as any
 
-  const firstName = userName?.split(' ')[0] || 'öğrenci'
+  const firstName = userName?.split(' ')[0] || tr('öğrenci')
 
   async function completeOnboarding() {
     try {
@@ -98,7 +100,7 @@ export default function OnboardingModal({ userName, grade, onComplete }: Onboard
 
           <div style={{ fontSize: '56px', marginBottom: '12px', position: 'relative' }}>{currentStep.icon}</div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: '#fff', marginBottom: '6px', position: 'relative' }}>
-            {step === 1 ? `Merhaba, ${firstName}!` : currentStep.title}
+            {step === 1 ? tr('Merhaba, {name}!', { name: firstName }) : tr(currentStep.title)}
           </h2>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', position: 'relative' }}>
             {step === 1 && grade ? grade : ''}
@@ -122,13 +124,13 @@ export default function OnboardingModal({ userName, grade, onComplete }: Onboard
           {step === 1 && (
             <div>
               <p style={{ fontSize: '15px', fontWeight: 600, color: 'var(--primary)', marginBottom: '1rem', textAlign: 'center' }}>
-                Pratium nasıl çalışır?
+                {tr('Pratium nasıl çalışır?')}
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {[
-                  { icon: '⚡', title: 'Konu seç', desc: 'MEB müfredatından ders ve konu seç' },
-                  { icon: '🤖', title: 'AI test üretir', desc: 'Yapay zeka sana özel sorular hazırlar' },
-                  { icon: '📊', title: 'Gelişimini gör', desc: 'Zayıf konularını analiz et, ilerlemeyi takip et' },
+                  { icon: '⚡', title: tr('Konu seç'), desc: tr('MEB müfredatından ders ve konu seç') },
+                  { icon: '🤖', title: tr('AI test üretir'), desc: tr('Yapay zeka sana özel sorular hazırlar') },
+                  { icon: '📊', title: tr('Gelişimini gör'), desc: tr('Zayıf konularını analiz et, ilerlemeyi takip et') },
                 ].map((item, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '12px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
                     <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'rgba(8,36,101,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>{item.icon}</div>
@@ -145,14 +147,14 @@ export default function OnboardingModal({ userName, grade, onComplete }: Onboard
           {step === 2 && (
             <div>
               <p style={{ fontSize: '15px', fontWeight: 600, color: 'var(--primary)', marginBottom: '1rem', textAlign: 'center' }}>
-                İlk testini nasıl oluşturursun?
+                {tr('İlk testini nasıl oluşturursun?')}
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {[
-                  { num: '1', text: '"Ders seç" bölümünden dersine tıkla', color: '#082465' },
-                  { num: '2', text: 'Açılan listeden bir konu seç', color: '#0ea5e9' },
-                  { num: '3', text: '"Test oluştur" butonuna bas', color: '#1ECFB8' },
-                  { num: '4', text: '5-10 saniye bekle, sorular hazır!', color: '#7c3aed' },
+                  { num: '1', text: tr('"Ders seç" bölümünden dersine tıkla'), color: '#082465' },
+                  { num: '2', text: tr('Açılan listeden bir konu seç'), color: '#0ea5e9' },
+                  { num: '3', text: tr('"Test oluştur" butonuna bas'), color: '#1ECFB8' },
+                  { num: '4', text: tr('5-10 saniye bekle, sorular hazır!'), color: '#7c3aed' },
                 ].map((item, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ width: 28, height: 28, borderRadius: '50%', background: item.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 800, color: '#fff', flexShrink: 0 }}>{item.num}</div>
@@ -162,7 +164,7 @@ export default function OnboardingModal({ userName, grade, onComplete }: Onboard
               </div>
 
               <div style={{ marginTop: '1rem', padding: '10px 14px', borderRadius: '10px', background: 'rgba(30,207,184,0.08)', border: '1px solid rgba(30,207,184,0.2)', fontSize: '12px', color: '#0f766e', textAlign: 'center' }}>
-                💡 İstersen PDF veya ses dosyası yükleyerek de test oluşturabilirsin
+                {tr('💡 İstersen PDF veya ses dosyası yükleyerek de test oluşturabilirsin')}
               </div>
             </div>
           )}
@@ -170,14 +172,14 @@ export default function OnboardingModal({ userName, grade, onComplete }: Onboard
           {step === 3 && (
             <div>
               <p style={{ fontSize: '15px', fontWeight: 600, color: 'var(--primary)', marginBottom: '1rem', textAlign: 'center' }}>
-                Seni neler bekliyor?
+                {tr('Seni neler bekliyor?')}
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 {[
-                  { icon: '🔥', title: 'Streak', desc: 'Her gün test çöz, serisini koru' },
-                  { icon: '🏆', title: 'Sıralama', desc: 'Arkadaşlarınla yarış' },
-                  { icon: '📈', title: 'Analiz', desc: 'Zayıf konularını tespit et' },
-                  { icon: '🎯', title: 'Rozet', desc: 'Başarılarını koleksiyon yap' },
+                  { icon: '🔥', title: tr('Streak'), desc: tr('Her gün test çöz, serisini koru') },
+                  { icon: '🏆', title: tr('Sıralama'), desc: tr('Arkadaşlarınla yarış') },
+                  { icon: '📈', title: tr('Analiz'), desc: tr('Zayıf konularını tespit et') },
+                  { icon: '🎯', title: tr('Rozet'), desc: tr('Başarılarını koleksiyon yap') },
                 ].map((item, i) => (
                   <div key={i} style={{ padding: '12px', borderRadius: '12px', background: 'var(--bg2)', border: '1px solid var(--border)', textAlign: 'center' }}>
                     <div style={{ fontSize: '24px', marginBottom: '4px' }}>{item.icon}</div>
@@ -189,8 +191,8 @@ export default function OnboardingModal({ userName, grade, onComplete }: Onboard
 
               <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '12px', background: 'linear-gradient(135deg, rgba(8,36,101,0.06), rgba(30,207,184,0.06))', border: '1px solid var(--border)', textAlign: 'center' }}>
                 <div style={{ fontSize: '20px', marginBottom: '4px' }}>🎉</div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)' }}>İlk testini çöz, rozetini kazan!</div>
-                <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>Hoş geldin rozeti seni bekliyor</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)' }}>{tr('İlk testini çöz, rozetini kazan!')}</div>
+                <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>{tr('Hoş geldin rozeti seni bekliyor')}</div>
               </div>
             </div>
           )}
@@ -200,7 +202,7 @@ export default function OnboardingModal({ userName, grade, onComplete }: Onboard
             <button
               onClick={skip}
               style={{ flex: 1, padding: '11px', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text3)', fontSize: '13px', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 500 }}>
-              Atla
+              {tr('Atla')}
             </button>
             <button
               onClick={next}
@@ -212,7 +214,7 @@ export default function OnboardingModal({ userName, grade, onComplete }: Onboard
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                 boxShadow: '0 4px 16px rgba(8,36,101,0.2)',
               }}>
-              {step === 3 ? '🚀 İlk Testimi Çöz' : 'Devam →'}
+              {step === 3 ? tr('🚀 İlk Testimi Çöz') : tr('Devam →')}
             </button>
           </div>
         </div>

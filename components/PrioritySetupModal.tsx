@@ -21,6 +21,7 @@
 // gerçek cevaplara göre kalibre eder.
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 import { getSubjectsForGrade } from '@/lib/subject-map-grade'
 import type { SelfReportLevel, PrioritySubject } from '@/lib/onboarding-priorities'
 
@@ -49,6 +50,7 @@ const SELF_REPORT_OPTIONS: { value: SelfReportLevel; label: string }[] = [
 const MAX_PRIORITY_SUBJECTS = 2
 
 export default function PrioritySetupModal({ grade, onComplete }: PrioritySetupModalProps) {
+  const { t: tr } = useT()
   const [step, setStep] = useState<'exam' | 'subjects'>('exam')
   const [leaving, setLeaving] = useState(false)
   const [targetExam, setTargetExam] = useState<string | null>(null)
@@ -137,10 +139,10 @@ export default function PrioritySetupModal({ grade, onComplete }: PrioritySetupM
           <div style={{ position: 'absolute', bottom: -20, left: -20, width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
           <div style={{ fontSize: '48px', marginBottom: '10px', position: 'relative' }}>{step === 'exam' ? '🎯' : '📊'}</div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: '#fff', marginBottom: '6px', position: 'relative' }}>
-            {step === 'exam' ? 'Hedefin ne?' : 'Nereden başlayalım?'}
+            {step === 'exam' ? tr('Hedefin ne?') : tr('Nereden başlayalım?')}
           </h2>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.75)', position: 'relative' }}>
-            {step === 'exam' ? 'Sana en uygun yaklaşımı seçelim — 15 saniye sürer' : 'En fazla 2 ders seç, sana özel başlayalım'}
+            {step === 'exam' ? tr('Sana en uygun yaklaşımı seçelim — 15 saniye sürer') : tr('En fazla 2 ders seç, sana özel başlayalım')}
           </p>
           <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', marginTop: '16px', position: 'relative' }}>
             {['exam', 'subjects'].map(s => (
@@ -167,7 +169,7 @@ export default function PrioritySetupModal({ grade, onComplete }: PrioritySetupM
                     transition: 'all 0.15s',
                   }}>
                   <span style={{ fontSize: '22px' }}>{opt.icon}</span>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary)' }}>{opt.label}</span>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary)' }}>{opt.value === 'yok' ? tr(opt.label) : opt.label}</span>
                 </button>
               ))}
             </div>
@@ -192,7 +194,7 @@ export default function PrioritySetupModal({ grade, onComplete }: PrioritySetupM
                         opacity: disabled ? 0.5 : 1,
                         transition: 'all 0.15s',
                       }}>
-                      {subject}
+                      {tr(subject)}
                     </button>
                   )
                 })}
@@ -200,7 +202,7 @@ export default function PrioritySetupModal({ grade, onComplete }: PrioritySetupM
 
               {selectedSubjects.map(subject => (
                 <div key={subject} style={{ marginBottom: '10px', padding: '10px 12px', borderRadius: '12px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--primary)', marginBottom: '7px' }}>{subject}'de kendini nasıl görüyorsun?</div>
+                  <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--primary)', marginBottom: '7px' }}>{tr('{subject} dersinde kendini nasıl görüyorsun?', { subject: tr(subject) })}</div>
                   <div style={{ display: 'flex', gap: '6px' }}>
                     {SELF_REPORT_OPTIONS.map(opt => (
                       <button key={opt.value}
@@ -212,7 +214,7 @@ export default function PrioritySetupModal({ grade, onComplete }: PrioritySetupM
                           background: selfReports[subject] === opt.value ? '#7c3aed' : 'var(--bg)',
                           color: selfReports[subject] === opt.value ? '#fff' : 'var(--text2)',
                         }}>
-                        {opt.label}
+                        {tr(opt.label)}
                       </button>
                     ))}
                   </div>
@@ -224,7 +226,7 @@ export default function PrioritySetupModal({ grade, onComplete }: PrioritySetupM
           <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
             <button onClick={skipAll} disabled={saving}
               style={{ flex: 1, padding: '11px', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text3)', fontSize: '13px', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 500 }}>
-              Atla
+              {tr('Atla')}
             </button>
             {step === 'exam' ? (
               <button onClick={goToSubjects} disabled={!targetExam}
@@ -234,7 +236,7 @@ export default function PrioritySetupModal({ grade, onComplete }: PrioritySetupM
                   color: '#fff', fontSize: '13px', fontWeight: 700, cursor: targetExam ? 'pointer' : 'default',
                   fontFamily: 'var(--font-sans)', opacity: targetExam ? 1 : 0.5,
                 }}>
-                Devam →
+                {tr('Devam →')}
               </button>
             ) : (
               <button onClick={finish} disabled={saving}
@@ -243,7 +245,7 @@ export default function PrioritySetupModal({ grade, onComplete }: PrioritySetupM
                   background: 'linear-gradient(135deg, #7c3aed 0%, #1ECFB8 100%)',
                   color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)',
                 }}>
-                {saving ? 'Kaydediliyor…' : '🚀 Hazırım'}
+                {saving ? tr('Kaydediliyor…') : tr('🚀 Hazırım')}
               </button>
             )}
           </div>

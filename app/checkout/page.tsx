@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { BILLING_PLANS, resolveBillingPlanKey, type BillingPlanKey } from '@/lib/subscription-plans'
 import { discountedPrice } from '@/lib/automatic-discount'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 type AnnualBillingPlanKey = Extract<BillingPlanKey, `${string}_yearly`>
 const BASE_PRICES: Record<AnnualBillingPlanKey, number> = {
@@ -58,15 +59,21 @@ interface PlanDisplay {
 // Bir indirim varsa, PLANS'ın fiyat alanlarını indirimli hale
 // getirir ve originalPrice ekler (checkout ekranındaki üstü çizili fiyat
 // gösterimi zaten bu alanı destekliyordu, sadece hiç doldurulmuyordu).
-function applyDiscount(discountRate: number): Record<AnnualBillingPlanKey, PlanDisplay> {
+function applyDiscount(discountRate: number, tr: (text: string, params?: Record<string, string | number>) => string): Record<AnnualBillingPlanKey, PlanDisplay> {
   const out = JSON.parse(JSON.stringify(PLANS)) as Record<AnnualBillingPlanKey, PlanDisplay>
+  ;(Object.keys(out) as AnnualBillingPlanKey[]).forEach(key => {
+    out[key].name = tr(out[key].name)
+    out[key].badge = out[key].badge ? tr(out[key].badge) : ''
+    out[key].features = out[key].features.map(f => tr(f))
+    out[key].period = tr(out[key].period)
+  })
   if (discountRate <= 0) return out
   ;(Object.keys(BASE_PRICES) as Array<keyof typeof BASE_PRICES>).forEach(key => {
     const base = BASE_PRICES[key]
     const discounted = discountedPrice(base, discountRate)
     out[key].price = formatTRY(discounted)
     out[key].originalPrice = formatTRY(base)
-    out[key].badge = out[key].badge ? `${out[key].badge} · %${discountRate} indirimli` : `%${discountRate} indirimli 🎉`
+    out[key].badge = out[key].badge ? tr('{badge} · %{rate} indirimli', { badge: out[key].badge, rate: discountRate }) : tr('%{rate} indirimli 🎉', { rate: discountRate })
   })
   return out
 }
@@ -77,6 +84,7 @@ function applyDiscount(discountRate: number): Record<AnnualBillingPlanKey, PlanD
 // app/api/paytr/callback/route.ts). Bu ekran o bildirim gelene kadar
 // kullanıcıyı bilgilendirip /api/paytr/status'u kısa aralıklarla polluyor.
 function PaytrProcessingScreen({ oid }: { oid: string }) {
+  const { t: tr } = useT()
   const [status, setStatus] = useState<'pending' | 'active' | 'failed' | 'not_found'>('pending')
   const [attempts, setAttempts] = useState(0)
   const supabase = createClient() as any
@@ -108,16 +116,16 @@ function PaytrProcessingScreen({ oid }: { oid: string }) {
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: '1.5rem' }}>
       <div style={{ maxWidth: '440px', textAlign: 'center' }} className="anim-up">
         <div style={{ fontSize: '64px', marginBottom: '1rem' }}>🎉</div>
-        <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>Ödemen alındı! 🎉</h2>
+        <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>{tr('Ödemen alındı! 🎉')}</h2>
         <p style={{ color: 'var(--text2)', fontSize: '15px', marginBottom: '2rem', lineHeight: 1.7 }}>
-          Planın aktive edildi. Hemen teste başlayabilirsin.
+          {tr('Planın aktive edildi. Hemen teste başlayabilirsin.')}
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '280px', margin: '0 auto' }}>
           <Link href="/quiz" className="btn btn-primary btn-lg" style={{ justifyContent: 'center' }}>
-            ⚡ Teste başla
+            {tr('⚡ Teste başla')}
           </Link>
           <Link href="/dashboard" className="btn btn-lg" style={{ justifyContent: 'center' }}>
-            Dashboard
+            {tr('Dashboard')}
           </Link>
         </div>
       </div>
@@ -128,12 +136,12 @@ function PaytrProcessingScreen({ oid }: { oid: string }) {
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: '1.5rem' }}>
       <div style={{ maxWidth: '440px', textAlign: 'center' }} className="anim-up">
         <div style={{ fontSize: '64px', marginBottom: '1rem' }}>❌</div>
-        <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>Ödeme başarısız</h2>
+        <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>{tr('Ödeme başarısız')}</h2>
         <p style={{ color: 'var(--text2)', fontSize: '15px', marginBottom: '2rem' }}>
-          Ödeme işlemi tamamlanamadı. Tekrar deneyebilirsin.
+          {tr('Ödeme işlemi tamamlanamadı. Tekrar deneyebilirsin.')}
         </p>
         <Link href="/checkout" className="btn btn-primary btn-lg" style={{ justifyContent: 'center' }}>
-          Tekrar dene
+          {tr('Tekrar dene')}
         </Link>
       </div>
     </main>
@@ -144,19 +152,19 @@ function PaytrProcessingScreen({ oid }: { oid: string }) {
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: '1.5rem' }}>
       <div style={{ maxWidth: '440px', textAlign: 'center' }} className="anim-up">
         <div className="spinner" style={{ margin: '0 auto 1.5rem' }} />
-        <h2 className="serif" style={{ fontSize: '24px', marginBottom: '0.75rem' }}>Ödemen işleniyor...</h2>
+        <h2 className="serif" style={{ fontSize: '24px', marginBottom: '0.75rem' }}>{tr('Ödemen işleniyor...')}</h2>
         <p style={{ color: 'var(--text2)', fontSize: '14px', lineHeight: 1.7, marginBottom: '1.5rem' }}>
           {attempts < MAX_ATTEMPTS
-            ? 'PayTR ödemeni onaylıyor, bu birkaç saniye sürebilir. Bu sayfada kalabilirsin.'
-            : 'Bu biraz uzun sürüyor ama ödemen kaybolmadı — onaylandığında hesabına otomatik yansıyacak ve bildirim alacaksın.'}
+            ? tr('PayTR ödemeni onaylıyor, bu birkaç saniye sürebilir. Bu sayfada kalabilirsin.')
+            : tr('Bu biraz uzun sürüyor ama ödemen kaybolmadı — onaylandığında hesabına otomatik yansıyacak ve bildirim alacaksın.')}
         </p>
         {attempts >= MAX_ATTEMPTS && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '280px', margin: '0 auto' }}>
             <button className="btn btn-primary btn-lg" onClick={() => setAttempts(0)} style={{ justifyContent: 'center' }}>
-              Tekrar kontrol et
+              {tr('Tekrar kontrol et')}
             </button>
             <Link href="/dashboard" className="btn btn-lg" style={{ justifyContent: 'center' }}>
-              Dashboard'a dön
+              {tr('Dashboard\'a dön')}
             </Link>
           </div>
         )}
@@ -166,6 +174,7 @@ function PaytrProcessingScreen({ oid }: { oid: string }) {
 }
 
 function CheckoutContent() {
+  const { t: tr } = useT()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [selectedPlan, setSelectedPlan] = useState<AnnualBillingPlanKey>(() => {
@@ -186,11 +195,12 @@ function CheckoutContent() {
   const [codeError, setCodeError] = useState('')
   const [codeChecking, setCodeChecking] = useState(false)
   const supabase = createClient() as any
+  const DISCOUNT_ERR = tr('İndirim bilgisi doğrulanamadı. Ödemeye geçmeden önce sayfayı yenileyin.')
   // Elle girilip uygulanan bir satıcı/kurum kodu varsa, kayıt anında profile
   // bağlanmış olan otomatik indirimin YERİNE geçer (bkz. app/api/paytr/checkout
   // route'undaki aynı öncelik mantığı — ikisi tutarlı olmalı).
   const effectiveDiscountRate = appliedCode ? appliedCode.discountRate : discountRate
-  const displayPlans = applyDiscount(effectiveDiscountRate)
+  const displayPlans = applyDiscount(effectiveDiscountRate, tr)
 
   // Ödeme sonucu kontrol. 'processing': PayTR'ın iframe içinden yaptığı
   // tarayıcı yönlendirmesi (merchant_ok_url) — bu GÜVENİLİR bir onay DEĞİL,
@@ -216,10 +226,10 @@ function CheckoutContent() {
           setDiscountSource(d.source || 'none')
           setDiscountLabel(d.label || '')
         } else {
-          setError('İndirim bilgisi doğrulanamadı. Ödemeye geçmeden önce sayfayı yenileyin.')
+          setError(DISCOUNT_ERR)
         }
       } catch {
-        setError('İndirim bilgisi doğrulanamadı. Ödemeye geçmeden önce sayfayı yenileyin.')
+        setError(DISCOUNT_ERR)
       } finally { setDiscountLoading(false) }
     }
     loadDiscount()
@@ -244,13 +254,13 @@ function CheckoutContent() {
       const data = await res.json()
       if (!res.ok || !data.valid) {
         setAppliedCode(null)
-        setCodeError(data.error || 'Kod bulunamadı veya artık geçerli değil.')
+        setCodeError(data.error || tr('Kod bulunamadı veya artık geçerli değil.'))
         return
       }
-      setAppliedCode({ code, discountRate: data.discount_rate || 0, label: data.label || 'Kod uygulandı' })
+      setAppliedCode({ code, discountRate: data.discount_rate || 0, label: data.label || tr('Kod uygulandı') })
     } catch {
       setAppliedCode(null)
-      setCodeError('Kod doğrulanamadı, tekrar dene.')
+      setCodeError(tr('Kod doğrulanamadı, tekrar dene.'))
     } finally {
       setCodeChecking(false)
     }
@@ -302,7 +312,7 @@ function CheckoutContent() {
 
       setPaytrToken(data.token)
     } catch (e: any) {
-      setError(e.message || 'Ödeme başlatılamadı.')
+      setError(e.message || tr('Ödeme başlatılamadı.'))
     } finally {
       setLoading(false)
     }
@@ -317,16 +327,16 @@ function CheckoutContent() {
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: '1.5rem' }}>
       <div style={{ maxWidth: '440px', textAlign: 'center' }} className="anim-up">
         <div style={{ fontSize: '64px', marginBottom: '1rem' }}>🎉</div>
-        <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>Ödemen alındı! 🎉</h2>
+        <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>{tr('Ödemen alındı! 🎉')}</h2>
         <p style={{ color: 'var(--text2)', fontSize: '15px', marginBottom: '2rem', lineHeight: 1.7 }}>
-          Planın aktive edildi. Hemen teste başlayabilirsin.
+          {tr('Planın aktive edildi. Hemen teste başlayabilirsin.')}
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '280px', margin: '0 auto' }}>
           <Link href="/quiz" className="btn btn-primary btn-lg" style={{ justifyContent: 'center' }}>
-            ⚡ Teste başla
+            {tr('⚡ Teste başla')}
           </Link>
           <Link href="/dashboard" className="btn btn-lg" style={{ justifyContent: 'center' }}>
-            Dashboard
+            {tr('Dashboard')}
           </Link>
         </div>
       </div>
@@ -338,13 +348,13 @@ function CheckoutContent() {
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: '1.5rem' }}>
       <div style={{ maxWidth: '440px', textAlign: 'center' }} className="anim-up">
         <div style={{ fontSize: '64px', marginBottom: '1rem' }}>❌</div>
-        <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>Ödeme başarısız</h2>
+        <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>{tr('Ödeme başarısız')}</h2>
         <p style={{ color: 'var(--text2)', fontSize: '15px', marginBottom: '2rem' }}>
-          Ödeme işlemi tamamlanamadı. Tekrar deneyebilirsin.
+          {tr('Ödeme işlemi tamamlanamadı. Tekrar deneyebilirsin.')}
         </p>
         <button className="btn btn-primary btn-lg" onClick={() => router.push('/checkout')}
           style={{ justifyContent: 'center' }}>
-          Tekrar dene
+          {tr('Tekrar dene')}
         </button>
       </div>
     </main>
@@ -359,44 +369,44 @@ function CheckoutContent() {
           <Link href="/" className="serif" style={{ fontSize: '20px', textDecoration: 'none', color: 'var(--text)' }}>
             PRATIUM
           </Link>
-          <Link href="/pricing" className="btn btn-ghost btn-sm">← Planlara dön</Link>
+          <Link href="/pricing" className="btn btn-ghost btn-sm">{tr('← Planlara dön')}</Link>
         </nav>
 
         {!paytrToken ? (
           <>
             {/* Plan seçimi */}
             <div className="anim-up" style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>Üyelik</div>
-              <h1 className="serif" style={{ fontSize: '30px' }}>Plan seç</h1>
+              <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>{tr('Üyelik')}</div>
+              <h1 className="serif" style={{ fontSize: '30px' }}>{tr('Plan seç')}</h1>
             </div>
 
             {/* İndirim kodu / Satıcı kodu / Kurum kodu — planların hemen üstünde, fark edilir yerde */}
             {!appliedCode && discountRate > 0 && (
               <div role="status" style={{ marginBottom: '1rem', padding: '12px 16px', background: 'var(--green-bg)', color: 'var(--green)', borderRadius: '10px', fontSize: '14px', fontWeight: 700 }}>
-                ✓ {discountLabel || 'İndirim'} otomatik uygulandı · %{discountRate}
+                ✓ {tr('{label} otomatik uygulandı · %{rate}', { label: discountLabel || tr('İndirim'), rate: discountRate })}
               </div>
             )}
             <div className="card-sm anim-up-1" style={{ marginBottom: '1.25rem', border: '1.5px dashed var(--accent)' }}>
               {appliedCode ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
                   <div style={{ fontSize: '13px', color: 'var(--green)' }}>
-                    ✓ <strong>{appliedCode.code}</strong> — {appliedCode.label} (%{appliedCode.discountRate} indirim)
+                    ✓ <strong>{appliedCode.code}</strong> — {tr('{label} (%{rate} indirim)', { label: appliedCode.label, rate: appliedCode.discountRate })}
                   </div>
-                  <button className="btn btn-ghost btn-sm" onClick={removeCode}>Kaldır</button>
+                  <button className="btn btn-ghost btn-sm" onClick={removeCode}>{tr('Kaldır')}</button>
                 </div>
               ) : (
                 <>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <input
                       className="input"
-                      placeholder="İndirim kodu / Satıcı kodu / Kurum kodu"
+                      placeholder={tr('İndirim kodu / Satıcı kodu / Kurum kodu')}
                       value={codeInput}
                       onChange={e => { setCodeInput(e.target.value); setCodeError('') }}
                       onKeyDown={e => { if (e.key === 'Enter') applyCode() }}
                       style={{ flex: 1 }}
                     />
                     <button className="btn btn-sm" onClick={applyCode} disabled={codeChecking || !codeInput.trim()}>
-                      {codeChecking ? <span className="spinner" style={{ width: 16, height: 16 }} /> : 'Uygula'}
+                      {codeChecking ? <span className="spinner" style={{ width: 16, height: 16 }} /> : tr('Uygula')}
                     </button>
                   </div>
                   {codeError && (
@@ -425,15 +435,15 @@ function CheckoutContent() {
                   )}
                   <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '6px' }}>{plan.name}</div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '4px' }}>
-                    <span className="serif" style={{ fontSize: '32px', color: 'var(--text)' }}>{discountLoading ? 'Fiyat hesaplanıyor…' : `₺${plan.price}`}</span>
+                    <span className="serif" style={{ fontSize: '32px', color: 'var(--text)' }}>{discountLoading ? tr('Fiyat hesaplanıyor…') : `₺${plan.price}`}</span>
                     <span style={{ fontSize: '13px', color: 'var(--text3)' }}>/{plan.period}</span>
                   </div>
                   {plan.originalPrice && !discountLoading && (
                     <div style={{ fontSize: '13px', color: 'var(--text3)' }}>
-                      Normal fiyat: <s>₺{plan.originalPrice}/{plan.period}</s>
+                      {tr('Normal fiyat:')} <s>₺{plan.originalPrice}/{plan.period}</s>
                     </div>
                   )}
-                  {plan.originalPrice && !discountLoading && <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--green)' }}>{appliedCode ? 'Kodlu' : discountSource === 'institution' ? 'Kuruma özel' : 'İndirimli'} fiyat · %{effectiveDiscountRate}</div>}
+                  {plan.originalPrice && !discountLoading && <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--green)' }}>{tr('{kind} fiyat · %{rate}', { kind: appliedCode ? tr('Kodlu') : discountSource === 'institution' ? tr('Kuruma özel') : tr('İndirimli'), rate: effectiveDiscountRate })}</div>}
                   <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
                     {plan.features.slice(0, 4).map(f => (
                       <div key={f} style={{ fontSize: '12px', color: selectedPlan === key ? 'var(--accent)' : 'var(--text2)', display: 'flex', gap: '6px' }}>
@@ -447,10 +457,10 @@ function CheckoutContent() {
 
             {/* Güven unsurları */}
             <div className="card-sm anim-up-2" style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '1.5rem', fontSize: '12px', color: 'var(--text2)' }}>
-              <span>🔒 SSL ile güvenli ödeme</span>
-              <span>💳 PayTR güvencesi</span>
-              <span>🔄 İstediğin zaman iptal</span>
-              <span>📧 Fatura e-postayla</span>
+              <span>{tr('🔒 SSL ile güvenli ödeme')}</span>
+              <span>{tr('💳 PayTR güvencesi')}</span>
+              <span>{tr('🔄 İstediğin zaman iptal')}</span>
+              <span>{tr('📧 Fatura e-postayla')}</span>
             </div>
 
             {error && (
@@ -459,15 +469,15 @@ function CheckoutContent() {
               </div>
             )}
 
-            <button className="btn btn-primary btn-lg" onClick={startPayment} disabled={loading || discountLoading || Boolean(error && error.includes('İndirim bilgisi doğrulanamadı'))}
+            <button className="btn btn-primary btn-lg" onClick={startPayment} disabled={loading || discountLoading || Boolean(error && error === DISCOUNT_ERR)}
               style={{ width: "100%", justifyContent: "center" }}>
               {loading
-                ? <><span className="spinner" style={{ width: 18, height: 18 }} /> Yükleniyor...</>
-                : discountLoading ? 'Fiyat hesaplanıyor…' : `₺${displayPlans[selectedPlan].price} — Ödemeye geç →`}
+                ? <><span className="spinner" style={{ width: 18, height: 18 }} /> {tr('Yükleniyor...')}</>
+                : discountLoading ? tr('Fiyat hesaplanıyor…') : tr('₺{price} — Ödemeye geç →', { price: displayPlans[selectedPlan].price })}
             </button>
 
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', fontSize: '12px', color: 'var(--text3)' }}>
-              PayTR ile öde — Mastercard, Visa, Troy
+              {tr('PayTR ile öde — Mastercard, Visa, Troy')}
             </div>
 
             <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text3)', marginTop: '0.75rem' }}>
@@ -479,7 +489,7 @@ function CheckoutContent() {
           /* PayTR iframe ödeme formu */
           <div className="anim-up">
             <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-              <h2 className="serif" style={{ fontSize: '24px' }}>Ödeme bilgileri</h2>
+              <h2 className="serif" style={{ fontSize: '24px' }}>{tr('Ödeme bilgileri')}</h2>
               <p style={{ color: 'var(--text2)', fontSize: '13px', marginTop: '4px' }}>
                 {displayPlans[selectedPlan].name} — ₺{displayPlans[selectedPlan].price}
               </p>
@@ -495,7 +505,7 @@ function CheckoutContent() {
             </div>
             <button className="btn btn-ghost btn-sm" onClick={() => setPaytrToken('')}
               style={{ marginTop: '1rem', width: '100%', justifyContent: 'center' }}>
-              ← Geri dön
+              {tr('← Geri dön')}
             </button>
           </div>
         )}
