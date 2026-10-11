@@ -3,11 +3,12 @@
 // Supabase client'ı kimlik verisi (ad, e-posta, yaş, veli bilgisi) için ASLA kullanılmaz.
 
 import { Pool } from 'pg'
+import { identityDbSsl } from './ssl'
 
 // TR-PG bağlantı havuzu (VPS'teki Postgres)
 const trPool = new Pool({
   connectionString: process.env.TR_IDENTITY_DB_URL, // örn: postgresql://user:pass@tr-vps-ip:5432/pratium_identity
-  ssl: process.env.TR_IDENTITY_DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+  ssl: identityDbSsl(),
   max: 10,
   idleTimeoutMillis: 30000,
 })
