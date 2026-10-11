@@ -337,3 +337,10 @@ test('stored Turkish notification texts are translated by template', async () =>
     'The deadline for “Üslü sayılar” is tomorrow. Solve it now!')
   assert.equal(localizeNotificationBody('Öğretmen yazısı olduğu gibi kalır', t), 'Öğretmen yazısı olduğu gibi kalır')
 })
+
+test('translate falls back to a case-insensitive match and keeps a numeric suffix', () => {
+  const dictionary = { 'Güneş Sistemi ve Tutulmalar': 'The Solar System and Eclipses' }
+  assert.equal(translate(dictionary, 'Güneş Sistemi Ve Tutulmalar'), 'The Solar System and Eclipses')
+  assert.equal(translate(dictionary, 'Güneş sistemi ve tutulmalar (1)'), 'The Solar System and Eclipses (1)')
+  assert.equal(translate(dictionary, 'Bilinmeyen Konu'), 'Bilinmeyen Konu')
+})
