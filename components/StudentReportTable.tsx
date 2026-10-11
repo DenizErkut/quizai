@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { printPage } from '@/lib/print-page'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 
 interface ReportStudent {
   id: string
@@ -22,6 +24,8 @@ interface ReportData {
 }
 
 export default function StudentReportTable({ fetchEndpoint }: { fetchEndpoint: string }) {
+  const { t: tr, locale } = useT()
+  const dl = intlLocale(locale)
   const supabase = createClient() as any
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -45,14 +49,14 @@ export default function StudentReportTable({ fetchEndpoint }: { fetchEndpoint: s
         headers: { Authorization: `Bearer ${session?.access_token}` },
       })
       const json = await res.json()
-      if (!res.ok) { setError(json.error || 'Rapor yüklenemedi.'); setLoading(false); return }
+      if (!res.ok) { setError(json.error || tr('Rapor yüklenemedi.')); setLoading(false); return }
       setData(json)
       if (json.selectedImportId) setImportId(json.selectedImportId)
     } catch (e: any) {
-      setError(e?.message || 'Rapor yüklenemedi.')
+      setError(e?.message || tr('Rapor yüklenemedi.'))
     }
     setLoading(false)
-  }, [fetchEndpoint])
+  }, [fetchEndpoint, tr])
 
   useEffect(() => { load() }, [])
 
@@ -60,18 +64,18 @@ export default function StudentReportTable({ fetchEndpoint }: { fetchEndpoint: s
   if (error) return <div style={{ padding: '1rem', color: 'var(--red)', fontSize: '13px' }}>{error}</div>
   if (!data) return null
 
-  const filtered = data.students.filter(s => !search.trim() || s.fullName.toLocaleLowerCase('tr-TR').includes(search.toLocaleLowerCase('tr-TR')))
+  const filtered = data.students.filter(s => !search.trim() || s.fullName.toLocaleLowerCase(dl).includes(search.toLocaleLowerCase(dl)))
   const hasClassroomCol = filtered.some(s => s.classroomName)
 
   return (
-    <div data-print-content data-print-title="Öğrenci Raporları" className="print-report-surface">
+    <div data-print-content data-print-title={tr('Öğrenci Raporları')} className="print-report-surface">
       <div className="print-controls" style={{ display: 'flex', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
         {data.imports.length > 0 && (
           <select className="input" style={{ maxWidth: '260px' }} value={importId}
             onChange={e => { setImportId(e.target.value); load({ importId: e.target.value }) }}>
             {data.imports.map(imp => (
               <option key={imp.id} value={imp.id}>
-                {imp.label} · {new Date(imp.created_at).toLocaleDateString('tr-TR')}
+                {imp.label} · {new Date(imp.created_at).toLocaleDateString(dl)}
               </option>
             ))}
           </select>
@@ -79,17 +83,17 @@ export default function StudentReportTable({ fetchEndpoint }: { fetchEndpoint: s
         {data.classrooms && data.classrooms.length > 1 && (
           <select className="input" style={{ maxWidth: '200px' }} value={classroomId}
             onChange={e => { setClassroomId(e.target.value); load({ classroomId: e.target.value }) }}>
-            <option value="">Tüm sınıflarım</option>
+            <option value="">{tr('Tüm sınıflarım')}</option>
             {data.classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         )}
-        <input className="input" placeholder="İsimle ara…" value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: '200px' }} />
-        <button className="btn btn-sm" style={{ marginLeft: 'auto' }} onClick={() => printPage()}>🖨️ Yazdır</button>
+        <input className="input" placeholder={tr('İsimle ara…')} value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: '200px' }} />
+        <button className="btn btn-sm" style={{ marginLeft: 'auto' }} onClick={() => printPage()}>{tr('🖨️ Yazdır')}</button>
       </div>
 
       {data.imports.length === 0 && (
         <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px' }}>
-          Henüz içe aktarılmış bir not bulunmuyor — sadece Pratium test sonuçları gösteriliyor.
+          {tr('Henüz içe aktarılmış bir not bulunmuyor — sadece Pratium test sonuçları gösteriliyor.')}
         </p>
       )}
 
@@ -97,14 +101,14 @@ export default function StudentReportTable({ fetchEndpoint }: { fetchEndpoint: s
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
           <thead>
             <tr style={{ background: 'var(--bg2)' }}>
-              <th style={th}>Ö.No</th>
-              <th style={th}>İsim</th>
-              {hasClassroomCol && <th style={th}>Sınıf</th>}
-              {!hasClassroomCol && <th style={th}>Seviye</th>}
+              <th style={th}>{tr('Ö.No')}</th>
+              <th style={th}>{tr('İsim')}</th>
+              {hasClassroomCol && <th style={th}>{tr('Sınıf‖sınıf grubu')}</th>}
+              {!hasClassroomCol && <th style={th}>{tr('Seviye')}</th>}
               {data.subjectColumns.map(subj => <th key={subj} style={th}>{subj}</th>)}
-              <th style={{ ...th, color: 'var(--accent)' }}>Pratium Ort. %</th>
-              <th style={{ ...th, color: 'var(--accent)' }}>Test Sayısı</th>
-              <th style={{ ...th, color: 'var(--accent)' }}>🔥 Streak</th>
+              <th style={{ ...th, color: 'var(--accent)' }}>{tr('Pratium Ort. %')}</th>
+              <th style={{ ...th, color: 'var(--accent)' }}>{tr('Test Sayısı')}</th>
+              <th style={{ ...th, color: 'var(--accent)' }}>{tr('🔥 Streak')}</th>
             </tr>
           </thead>
           <tbody>
@@ -126,7 +130,7 @@ export default function StudentReportTable({ fetchEndpoint }: { fetchEndpoint: s
         </table>
       </div>
       {filtered.length === 0 && (
-        <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', padding: '2rem 0' }}>Gösterilecek öğrenci bulunamadı.</p>
+        <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', padding: '2rem 0' }}>{tr('Gösterilecek öğrenci bulunamadı.')}</p>
       )}
     </div>
   )

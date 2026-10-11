@@ -1,11 +1,14 @@
+'use client'
 import type { verifiedLearningMetrics } from '@/lib/verified-learning-metrics'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 export default function VerifiedLearningMetrics({ metrics }: { metrics: ReturnType<typeof verifiedLearningMetrics> }) {
+  const { t: tr } = useT()
   return <div style={{ marginTop: 12, padding: 12, border: '1px solid var(--border)', borderRadius: 10 }}>
-    <strong>Yardımsız aktarım ve yardım kullanımı</strong>
-    <p>Öğretmen incelemeli aktarım başarısı: {metrics.verifiedTransferScorePct === null ? 'Henüz doğrulanmadı' : `%${metrics.verifiedTransferScorePct}`}</p>
-    <p>Ürün eşiğine göre kazanım durumu (%80): {metrics.verifiedMastery === null ? 'İnceleme bekliyor' : metrics.verifiedMastery ? 'Doğrulandı' : 'Çalışma gerekiyor'}</p>
-    {metrics.support && <p>Rehberli çalışmada {metrics.support.hintCount} ipucu · ilk deneme {metrics.support.firstAttemptCorrect ? 'doğru' : 'yanlış'} · son deneme {metrics.support.retryCorrect ? 'doğru' : 'yanlış'}</p>}
+    <strong>{tr('Yardımsız aktarım ve yardım kullanımı')}</strong>
+    <p>{tr('Öğretmen incelemeli aktarım başarısı: {value}', { value: metrics.verifiedTransferScorePct === null ? tr('Henüz doğrulanmadı') : `%${metrics.verifiedTransferScorePct}` })}</p>
+    <p>{tr('Ürün eşiğine göre kazanım durumu (%80): {value}', { value: metrics.verifiedMastery === null ? tr('İnceleme bekliyor') : metrics.verifiedMastery ? tr('Doğrulandı') : tr('Çalışma gerekiyor') })}</p>
+    {metrics.support && <p>{tr('Rehberli çalışmada {hints} ipucu · ilk deneme {first} · son deneme {last}', { hints: metrics.support.hintCount, first: metrics.support.firstAttemptCorrect ? tr('doğru') : tr('yanlış'), last: metrics.support.retryCorrect ? tr('doğru') : tr('yanlış') })}</p>}
     <p style={{ fontSize: 12, color: 'var(--text3)' }}>{metrics.note}</p>
   </div>
 }

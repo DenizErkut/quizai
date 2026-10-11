@@ -6,6 +6,7 @@
 // grafiğin birden fazla dosyada kopyalanıp zamanla birbirinden sapması
 // (daha önce SiteFooter'da yaşanan sorun) burada tekrar edilmesin diye
 // bilinçli olarak paylaşılan bir bileşen olarak kuruldu.
+import { useT } from '@/lib/i18n/I18nProvider'
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 export interface SubjectPerformanceDatum {
@@ -25,6 +26,7 @@ export default function SubjectPerformanceChart({
   data: SubjectPerformanceDatum[]
   height?: number
 }) {
+  const { t: tr } = useT()
   if (!data.length) return null
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -34,8 +36,8 @@ export default function SubjectPerformanceChart({
         <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--text3)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `%${v}`} />
         <Tooltip
           formatter={(value: any, _name: any, props: any) => [
-            `%${value}${props?.payload?.testCount ? ` (${props.payload.testCount} test)` : ''}`,
-            'Ortalama',
+            props?.payload?.testCount ? tr('{pct} ({n} test)', { pct: `%${value}`, n: props.payload.testCount }) : `%${value}`,
+            tr('Ortalama'),
           ]}
         />
         <Bar dataKey="avgPct" radius={[9, 9, 2, 2]} maxBarSize={48}>

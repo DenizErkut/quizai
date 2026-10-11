@@ -6,6 +6,7 @@
 // app/parent/page.tsx'teki seçili çocuk kartına embed edilir.
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 const CONSENT_LABELS: Record<string, string> = {
   aydinlatma: 'Aydınlatma Metni',
@@ -14,6 +15,7 @@ const CONSENT_LABELS: Record<string, string> = {
 }
 
 export default function ChildConsentStatus({ childId }: { childId: string }) {
+  const { t: tr } = useT()
   const supabase = createClient() as any
   const [status, setStatus] = useState<any[] | null>(null)
   const [loading, setLoading] = useState(true)
@@ -44,18 +46,18 @@ export default function ChildConsentStatus({ childId }: { childId: string }) {
   return (
     <div className="card" style={{ marginTop: '1rem' }}>
       <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
-        📋 Rıza Durumu
+        {tr('📋 Rıza Durumu')}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {status.map((s: any) => (
           <div key={s.consentType} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-            <span>{CONSENT_LABELS[s.consentType] || s.consentType}</span>
+            <span>{CONSENT_LABELS[s.consentType] ? tr(CONSENT_LABELS[s.consentType]) : s.consentType}</span>
             <span style={{
               padding: '2px 8px', borderRadius: '99px', fontWeight: 600,
               color: s.needsReconsent ? 'var(--red)' : s.latestGranted ? 'var(--green)' : 'var(--text3)',
               background: s.needsReconsent ? 'var(--red-bg)' : s.latestGranted ? 'var(--green-bg)' : 'var(--bg2)',
             }}>
-              {s.needsReconsent ? '⏳ Güncel onay bekleniyor' : s.latestGranted ? '✓ Onaylandı' : '✗ Onaylanmadı'}
+              {s.needsReconsent ? tr('⏳ Güncel onay bekleniyor') : s.latestGranted ? tr('✓ Onaylandı') : tr('✗ Onaylanmadı')}
             </span>
           </div>
         ))}
