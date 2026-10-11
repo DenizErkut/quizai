@@ -3,11 +3,12 @@
 // Supabase client'ı kimlik verisi (ad, e-posta, yaş, veli bilgisi) için ASLA kullanılmaz.
 
 import { Pool } from 'pg'
+import { identityDbSsl } from './ssl'
 
 // TR-PG bağlantı havuzu (VPS'teki Postgres)
 const trPool = new Pool({
   connectionString: process.env.TR_IDENTITY_DB_URL, // örn: postgresql://user:pass@tr-vps-ip:5432/pratium_identity
-  ssl: process.env.TR_IDENTITY_DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+  ssl: identityDbSsl(),
   max: 10,
   idleTimeoutMillis: 30000,
 })
@@ -113,7 +114,7 @@ export async function recordConsent(params: {
 // alınıyordu, versiyon değişikliğinde yeniden onay istenmiyordu, ve
 // veli_onayi=false olan bir kullanıcı hiçbir şekilde engellenmiyordu.
 
-// Sözleşme/aydınlatma metni her değiştiğinde bu sabit güncellenir — kodun
+// Sözleşme/aydınlatma metni her değiştikinde bu sabit güncellenir — kodun
 // TEK kaynağı. app/api/auth/create-identity/route.ts (ilk kayıt) ve
 // app/api/auth/consent-status/route.ts (yeniden-onay) İKİSİ DE buradan okur.
 export const CURRENT_CONSENT_VERSIONS: Record<string, string> = {
@@ -159,7 +160,7 @@ export async function getConsentStatus(identityId: string, applicableTypes: stri
 
 // Enforcement — 18 yaş altı bir öğrenci için veli AÇIKÇA onay VERMEDİYSE
 // (granted:false kaydı varsa) veri-yoğun özellikler (açık uçlu soru, sınav
-// simülasyonu) engellenir. KAPSAM BİLİNÇLİ OLARAK DAR: hiç consent kaydı
+// simülasyonu) engellenir. KAPSAM BİLİNCİYLE DAR: hiç consent kaydı
 // OLMAYAN (consent takibinden önce kayıt olmuş) kullanıcılar ENGELLENMEZ —
 // aksi halde geriye dönük, migration'sız bir kesinti/regresyon riski
 // olurdu. Bu, planın "minimum enforcement" hedefinin güvenli bir okuması.
