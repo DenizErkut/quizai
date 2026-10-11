@@ -8,6 +8,8 @@ import ReportsHub from '@/components/ReportsHub'
 import LearningRiskOverview from '@/components/LearningRiskOverview'
 import InstitutionComparisons from '@/components/institution/InstitutionComparisons'
 import InstitutionTeachers from '@/components/institution/InstitutionTeachers'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Cell
@@ -28,7 +30,15 @@ const GRADES = [
   { value: 'lise 12. sinif', label: 'Lise 12. Sınıf' },
 ]
 
+function gradeOptionLabel(value: string, tr: (text: string, params?: Record<string, string | number>) => string): string {
+  const [level, num] = value.split(' ')
+  const n = parseInt(num)
+  return tr(level === 'ilkokul' ? 'İlkokul {n}. Sınıf' : level === 'ortaokul' ? 'Ortaokul {n}. Sınıf' : 'Lise {n}. Sınıf', { n })
+}
+
 export default function InstitutionPage() {
+  const { t: tr, locale } = useT()
+  const dateLocale = intlLocale(locale)
   const [institution, setInstitution] = useState<any>(null)
   const [students, setStudents] = useState<any[]>([])
   const [analytics, setAnalytics] = useState<any>(null)
@@ -96,10 +106,10 @@ export default function InstitutionPage() {
   }
 
   async function handleAddStudent() {
-    if (!asName.trim() || !asSurname.trim()) { setAsError('Ad ve soyad zorunludur.'); return }
-    if (!asEmail.trim()) { setAsError('E-posta zorunludur.'); return }
-    if (!asGrade) { setAsError('Sınıf zorunludur.'); return }
-    if (asAge && (parseInt(asAge) < 5 || parseInt(asAge) > 35)) { setAsError('Geçerli bir yaş girin (5-35).'); return }
+    if (!asName.trim() || !asSurname.trim()) { setAsError(tr('Ad ve soyad zorunludur.')); return }
+    if (!asEmail.trim()) { setAsError(tr('E-posta zorunludur.')); return }
+    if (!asGrade) { setAsError(tr('Sınıf zorunludur.')); return }
+    if (asAge && (parseInt(asAge) < 5 || parseInt(asAge) > 35)) { setAsError(tr('Geçerli bir yaş girin (5-35).')); return }
 
     setAsError(''); setAsLoading(true)
     try {
@@ -119,7 +129,7 @@ export default function InstitutionPage() {
       })
       let data: any = null
       try { data = await res.json() } catch { /* 5xx bazen JSON degil */ }
-      if (!res.ok) { setAsError(data?.error || 'Kayıt oluşturulamadı. Lütfen tekrar dene.'); return }
+      if (!res.ok) { setAsError(data?.error || tr('Kayıt oluşturulamadı. Lütfen tekrar dene.')); return }
 
       setAsCreated({ email: data.email, password: data.password })
       // Formu temizle ama basari kartini gostermeye devam et
@@ -128,7 +138,7 @@ export default function InstitutionPage() {
       load() // ogrenci listesini tazele
     } catch (e: any) {
       console.error('[handleAddStudent] beklenmeyen hata:', e)
-      setAsError('Beklenmeyen bir hata oluştu. Lütfen tekrar dene.')
+      setAsError(tr('Beklenmeyen bir hata oluştu. Lütfen tekrar dene.'))
     } finally {
       setAsLoading(false)
     }
@@ -138,7 +148,7 @@ export default function InstitutionPage() {
     const hasExisting = !!institution?.code
     if (hasExisting) {
       const confirmed = window.confirm(
-        'Yeni bir davet kodu oluşturursan mevcut kod (' + institution.code + ') artık geçersiz olur — bu kodu paylaştığın öğrenciler yeni kayıt için yeni kodu kullanmalı. Zaten kayıtlı öğrenciler etkilenmez. Devam edilsin mi?'
+        tr('Yeni bir davet kodu oluşturursan mevcut kod ({code}) artık geçersiz olur — bu kodu paylaştığın öğrenciler yeni kayıt için yeni kodu kullanmalı. Zaten kayıtlı öğrenciler etkilenmez. Devam edilsin mi?', { code: institution.code })
       )
       if (!confirmed) return
     }
@@ -151,11 +161,11 @@ export default function InstitutionPage() {
         headers: { 'Authorization': `Bearer ${session?.access_token}` },
       })
       const json = await res.json()
-      if (!res.ok) throw new Error(json?.error || 'Kod oluşturulamadı.')
+      if (!res.ok) throw new Error(json?.error || tr('Kod oluşturulamadı.'))
       setInstitution((prev: any) => ({ ...prev, code: json.code }))
-      setRegenMsg('✅ Yeni davet kodu oluşturuldu.')
+      setRegenMsg(tr('✅ Yeni davet kodu oluşturuldu.'))
     } catch (e: any) {
-      setRegenMsg('❌ ' + (e.message || 'Kod oluşturulamadı.'))
+      setRegenMsg('❌ ' + (e.message || tr('Kod oluşturulamadı.')))
     } finally {
       setRegenerating(false)
       setTimeout(() => setRegenMsg(''), 4000)
@@ -198,14 +208,14 @@ export default function InstitutionPage() {
   const leaderboard = [...students].filter(s => s.totalTests > 0).sort((a, b) => (b.avgPct ?? 0) - (a.avgPct ?? 0))
 
   const TABS = [
-    { key: 'overview',   label: '📊 Genel Bakış' },
-    { key: 'students',   label: '👥 Öğrenciler' },
-    { key: 'teachers',   label: '👩‍🏫 Öğretmenlerimiz' },
-    { key: 'analytics',  label: '📈 Analitik' },
-    { key: 'risk',       label: `⚠️ Risk${analytics?.riskStudents?.length ? ` (${analytics.riskStudents.length})` : ''}` },
-    { key: 'reports',    label: '📋 RAPORLAR' },
-    { key: 'import',     label: '📥 Not İçe Aktar' },
-    { key: 'profile',    label: '⚙️ Profil' },
+    { key: 'overview',   label: tr('📊 Genel Bakış') },
+    { key: 'students',   label: tr('👥 Öğrenciler') },
+    { key: 'teachers',   label: tr('👩‍🏫 Öğretmenlerimiz') },
+    { key: 'analytics',  label: tr('📈 Analitik') },
+    { key: 'risk',       label: `${tr('⚠️ Risk')}${analytics?.riskStudents?.length ? ` (${analytics.riskStudents.length})` : ''}` },
+    { key: 'reports',    label: tr('📋 RAPORLAR') },
+    { key: 'import',     label: tr('📥 Not İçe Aktar') },
+    { key: 'profile',    label: tr('⚙️ Profil') },
   ]
 
   if (loading) return (
@@ -235,11 +245,11 @@ export default function InstitutionPage() {
           ))}
           <Link href="/institution/integrations"
             style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', fontSize: '12px', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
-            🔌 Entegrasyonlar
+            {tr('🔌 Entegrasyonlar')}
           </Link>
           <button onClick={() => { supabase.auth.signOut(); router.push('/login') }}
             style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', marginLeft: '4px', whiteSpace: 'nowrap', flexShrink: 0 }}>
-            Çıkış
+            {tr('Çıkış')}
           </button>
         </div>
       </nav>
@@ -250,20 +260,20 @@ export default function InstitutionPage() {
         {activeTab === 'overview' && (
           <div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.25rem' }}>
-              Kurum Paneli
+              {tr('Kurum Paneli')}
             </h1>
 
             {/* KPI Kartları */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '1.5rem' }}>
               {[
-                { icon: '👥', label: 'Kayıtlı', value: stats?.total ?? 0, color: '#6366f1' },
-                { icon: '⚡', label: 'Aktif', value: stats?.active ?? 0, color: '#0891b2', sub: 'test çözdü' },
-                { icon: '📊', label: 'Ort. Başarı', value: stats?.overallAvg ? `%${stats.overallAvg}` : '—', color: pctColor(stats?.overallAvg) },
-                { icon: '📝', label: 'Bu Hafta', value: analytics?.thisWeekTests ?? 0, color: '#7c3aed', sub: `önceki: ${analytics?.prevWeekTests ?? 0}` },
-                { icon: '⚠️', label: 'Risk', value: analytics?.riskStudents?.length ?? 0, color: '#dc2626', sub: 'öğrenci' },
+                { icon: '👥', label: tr('Kayıtlı'), value: stats?.total ?? 0, color: '#6366f1' },
+                { icon: '⚡', label: tr('Aktif'), value: stats?.active ?? 0, color: '#0891b2', sub: tr('test çözdü') },
+                { icon: '📊', label: tr('Ort. Başarı'), value: stats?.overallAvg ? `%${stats.overallAvg}` : '—', color: pctColor(stats?.overallAvg) },
+                { icon: '📝', label: tr('Bu Hafta'), value: analytics?.thisWeekTests ?? 0, color: '#7c3aed', sub: tr('önceki: {n}', { n: analytics?.prevWeekTests ?? 0 }) },
+                { icon: '⚠️', label: tr('Risk'), value: analytics?.riskStudents?.length ?? 0, color: '#dc2626', sub: tr('öğrenci') },
               ].map((s, i) => (
-                <div key={i} className="card" style={{ textAlign: 'center', padding: '14px 10px', cursor: s.label === 'Risk' ? 'pointer' : undefined }}
-                  onClick={() => s.label === 'Risk' && setActiveTab('risk')}>
+                <div key={i} className="card" style={{ textAlign: 'center', padding: '14px 10px', cursor: s.label === tr('Risk') ? 'pointer' : undefined }}
+                  onClick={() => s.label === tr('Risk') && setActiveTab('risk')}>
                   <div style={{ fontSize: '22px', marginBottom: '4px' }}>{s.icon}</div>
                   <div style={{ fontWeight: 800, fontSize: '20px', color: s.color }}>{s.value}</div>
                   <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{s.label}</div>
@@ -276,24 +286,24 @@ export default function InstitutionPage() {
             <div className="card" style={{ marginBottom: '1rem', background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(30,207,184,0.07))' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '8px' }}>
                 <div>
-                  <div style={{ fontSize: '11px', fontWeight: 800, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Kurum öğrenme içgörüsü</div>
-                  <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--primary)', marginTop: '4px' }}>Bu hafta hangi aksiyon öncelikli?</div>
+                  <div style={{ fontSize: '11px', fontWeight: 800, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{tr('Kurum öğrenme içgörüsü')}</div>
+                  <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--primary)', marginTop: '4px' }}>{tr('Bu hafta hangi aksiyon öncelikli?')}</div>
                 </div>
                 <span style={{ fontSize: '22px' }}>🏫</span>
               </div>
               <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}>
                 {(analytics?.riskStudents?.length ?? 0) > 0
-                  ? `${analytics.riskStudents.length} öğrencide erken destek sinyali var. İlgili öğretmenlerle kısa bir konu bazlı tekrar planı oluşturun.`
+                  ? tr('{n} öğrencide erken destek sinyali var. İlgili öğretmenlerle kısa bir konu bazlı tekrar planı oluşturun.', { n: analytics.riskStudents.length })
                   : (stats?.active ?? 0) > 0
-                    ? `${stats.active} aktif öğrencinin kurum ortalaması ${stats.overallAvg ? `%${stats.overallAvg}` : 'hesaplanıyor'}. Sınıflar arasında konu bazlı farklılıkları analiz ederek ortak destek materyali planlayın.`
-                    : 'Henüz yeterli performans verisi oluşmadı. Öğrencilerin ilk testlerini tamamlamasını bekleyin.'}
+                    ? tr('{n} aktif öğrencinin kurum ortalaması {avg}. Sınıflar arasında konu bazlı farklılıkları analiz ederek ortak destek materyali planlayın.', { n: stats.active, avg: stats.overallAvg ? `%${stats.overallAvg}` : tr('hesaplanıyor') })
+                    : tr('Henüz yeterli performans verisi oluşmadı. Öğrencilerin ilk testlerini tamamlamasını bekleyin.')}
               </div>
             </div>
 
             {/* Haftalık Trend Mini */}
             {analytics?.weeklyTrend && (
               <div className="card" style={{ marginBottom: '1rem' }}>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>📈 Haftalık Test Trendi</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>{tr('📈 Haftalık Test Trendi')}</div>
                 <ResponsiveContainer width="100%" height={160}>
                   <AreaChart data={analytics.weeklyTrend}>
                     <defs>
@@ -306,7 +316,7 @@ export default function InstitutionPage() {
                     <XAxis dataKey="week" tick={{ fontSize: 10, fill: 'var(--text3)' }} />
                     <YAxis tick={{ fontSize: 10, fill: 'var(--text3)' }} />
                     <Tooltip contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
-                    <Area type="monotone" dataKey="tests" name="Test Sayısı" stroke="#6366f1" fill="url(#trendGrad)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="tests" name={tr('Test Sayısı')} stroke="#6366f1" fill="url(#trendGrad)" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -314,7 +324,7 @@ export default function InstitutionPage() {
 
             {/* Top 5 Liderlik */}
             <div className="card">
-              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>🏆 Top 5 Öğrenci</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>{tr('🏆 Top 5 Öğrenci')}</div>
               {leaderboard.slice(0, 5).map((s: any, i: number) => (
                 <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
                   <div style={{ fontSize: i < 3 ? '18px' : '13px', fontWeight: 700, width: 28, textAlign: 'center', color: 'var(--text3)' }}>
@@ -325,7 +335,7 @@ export default function InstitutionPage() {
                   <div style={{ fontWeight: 800, fontSize: '15px', color: pctColor(s.avgPct) }}>%{s.avgPct}</div>
                 </div>
               ))}
-              {leaderboard.length === 0 && <div style={{ fontSize: '13px', color: 'var(--text3)', textAlign: 'center', padding: '1rem' }}>Henüz test çözen öğrenci yok.</div>}
+              {leaderboard.length === 0 && <div style={{ fontSize: '13px', color: 'var(--text3)', textAlign: 'center', padding: '1rem' }}>{tr('Henüz test çözen öğrenci yok.')}</div>}
             </div>
           </div>
         )}
@@ -334,17 +344,17 @@ export default function InstitutionPage() {
         {activeTab === 'students' && (
           <div>
             <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', flex: 1 }}>👥 Öğrenciler</h1>
+              <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', flex: 1 }}>{tr('👥 Öğrenciler')}</h1>
               <button onClick={() => { setShowAddStudent(v => !v); setAsCreated(null); setAsError('') }}
                 style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', background: '#6366f1', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap' }}>
-                {showAddStudent ? '✕ Kapat' : '➕ Öğrenci Kaydet'}
+                {showAddStudent ? tr('✕ Kapat') : tr('➕ Öğrenci Kaydet')}
               </button>
               <select value={sortBy} onChange={e => setSortBy(e.target.value as any)}
                 style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '12px', fontFamily: 'var(--font-sans)' }}>
-                <option value="avgPct">Başarıya Göre</option>
-                <option value="totalTests">Test Sayısına Göre</option>
-                <option value="streak">Seriye Göre</option>
-                <option value="name">İsme Göre</option>
+                <option value="avgPct">{tr('Başarıya Göre')}</option>
+                <option value="totalTests">{tr('Test Sayısına Göre')}</option>
+                <option value="streak">{tr('Seriye Göre')}</option>
+                <option value="name">{tr('İsme Göre')}</option>
               </select>
             </div>
 
@@ -354,106 +364,106 @@ export default function InstitutionPage() {
                   <div style={{ textAlign: 'center', padding: '1rem 0' }}>
                     <div style={{ fontSize: '40px', marginBottom: '8px' }}>✅</div>
                     <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--primary)', marginBottom: '4px' }}>
-                      Öğrenci hesabı oluşturuldu!
+                      {tr('Öğrenci hesabı oluşturuldu!')}
                     </div>
                     <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '14px' }}>
-                      Bu bilgileri öğrenciyle paylaş — giriş yaptıktan sonra şifresini değiştirebilir.
+                      {tr('Bu bilgileri öğrenciyle paylaş — giriş yaptıktan sonra şifresini değiştirebilir.')}
                     </div>
                     <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', textAlign: 'left', maxWidth: '320px', margin: '0 auto' }}>
-                      <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>E-posta</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>{tr('E-posta')}</div>
                       <div style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>{asCreated.email}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>Geçici Şifre</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>{tr('Geçici Şifre')}</div>
                       <div style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: 'var(--primary)' }}>{asCreated.password}</div>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '14px' }}>
                       <button onClick={() => {
-                        navigator.clipboard.writeText(`E-posta: ${asCreated.email}\nŞifre: ${asCreated.password}`)
+                        navigator.clipboard.writeText(tr('E-posta: {email}\nŞifre: {password}', { email: asCreated.email, password: asCreated.password }))
                         setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000)
                       }}
                         style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                        {linkCopied ? '✓ Kopyalandı' : '📋 Kopyala'}
+                        {linkCopied ? tr('✓ Kopyalandı') : tr('📋 Kopyala')}
                       </button>
                       <button onClick={() => setAsCreated(null)}
                         style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#6366f1', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                        + Başka Öğrenci Ekle
+                        {tr('+ Başka Öğrenci Ekle')}
                       </button>
                     </div>
                   </div>
                 ) : (
                   <>
-                    <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '10px' }}>Yeni Öğrenci Kaydı</div>
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '10px' }}>{tr('Yeni Öğrenci Kaydı')}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                       <div>
-                        <label className="field-label">Ad *</label>
+                        <label className="field-label">{tr('Ad *')}</label>
                         <input className="input" value={asName} onChange={e => setAsName(e.target.value)} placeholder="Ahmet" />
                       </div>
                       <div>
-                        <label className="field-label">Soyad *</label>
+                        <label className="field-label">{tr('Soyad *')}</label>
                         <input className="input" value={asSurname} onChange={e => setAsSurname(e.target.value)} placeholder="Yılmaz" />
                       </div>
                       <div>
-                        <label className="field-label">Yaş</label>
+                        <label className="field-label">{tr('Yaş')}</label>
                         <input className="input" type="number" value={asAge} onChange={e => setAsAge(e.target.value)} placeholder="14" />
                       </div>
                       <div>
-                        <label className="field-label">Sınıf *</label>
+                        <label className="field-label">{tr('Sınıf *')}</label>
                         <select className="input" value={asGrade} onChange={e => setAsGrade(e.target.value)} style={{ cursor: 'pointer' }}>
-                          <option value="">Seç...</option>
-                          {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+                          <option value="">{tr('Seç...')}</option>
+                          {GRADES.map(g => <option key={g.value} value={g.value}>{gradeOptionLabel(g.value, tr)}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="field-label">Sınıf Numarası</label>
-                        <input className="input" value={asClassNumber} onChange={e => setAsClassNumber(e.target.value)} placeholder="Örn: 14" />
+                        <label className="field-label">{tr('Sınıf Numarası')}</label>
+                        <input className="input" value={asClassNumber} onChange={e => setAsClassNumber(e.target.value)} placeholder={tr('Örn: 14')} />
                       </div>
                       <div>
-                        <label className="field-label">E-posta *</label>
+                        <label className="field-label">{tr('E-posta *')}</label>
                         <input className="input" type="email" value={asEmail} onChange={e => setAsEmail(e.target.value)} placeholder="ogrenci@mail.com" />
                       </div>
                       <div>
-                        <label className="field-label">Veli E-postası (Opsiyonel)</label>
+                        <label className="field-label">{tr('Veli E-postası (Opsiyonel)')}</label>
                         <input className="input" type="email" value={asParentEmail} onChange={e => setAsParentEmail(e.target.value)} placeholder="veli@mail.com" />
                       </div>
                       <div>
-                        <label className="field-label">Telefon (Opsiyonel)</label>
+                        <label className="field-label">{tr('Telefon (Opsiyonel)')}</label>
                         <input className="input" type="tel" value={asPhone} onChange={e => setAsPhone(e.target.value)} placeholder="05xx xxx xx xx" />
                       </div>
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text3)', margin: '8px 0 12px' }}>
-                      Hesap otomatik olarak onaylı oluşturulur — öğrencinin e-posta doğrulaması yapmasına gerek yok. Okul adı ({institution?.name}) otomatik atanır.
+                      {tr('Hesap otomatik olarak onaylı oluşturulur — öğrencinin e-posta doğrulaması yapmasına gerek yok. Okul adı ({name}) otomatik atanır.', { name: institution?.name ?? '' })}
                     </div>
                     {asError && <div style={{ padding: '10px 12px', background: 'var(--red-bg)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)', marginBottom: '10px' }}>{asError}</div>}
                     <button onClick={handleAddStudent} disabled={asLoading}
                       style={{ width: '100%', padding: '11px', borderRadius: '10px', border: 'none', background: asLoading ? 'var(--bg2)' : '#6366f1', color: asLoading ? 'var(--text3)' : '#fff', fontSize: '14px', fontWeight: 700, cursor: asLoading ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)' }}>
-                      {asLoading ? 'Oluşturuluyor...' : 'Öğrenci Hesabı Oluştur →'}
+                      {asLoading ? tr('Oluşturuluyor...') : tr('Öğrenci Hesabı Oluştur →')}
                     </button>
                   </>
                 )}
               </div>
             )}
             <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="🔍 Öğrenci veya sınıf ara..."
+              placeholder={tr('🔍 Öğrenci veya sınıf ara...')}
               style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box', marginBottom: '1rem' }} />
 
             {filtered.length === 0 ? (
               <div className="card" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
                 <div style={{ fontSize: '48px', marginBottom: '12px' }}>👥</div>
                 <div style={{ fontSize: '14px', color: 'var(--text2)', fontWeight: 600 }}>
-                  {students.length === 0 ? 'Henüz kayıtlı öğrenci yok' : 'Sonuç bulunamadı'}
+                  {students.length === 0 ? tr('Henüz kayıtlı öğrenci yok') : tr('Sonuç bulunamadı')}
                 </div>
                 {students.length === 0 && (
                   <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '8px', lineHeight: 1.6 }}>
                     {institution?.code ? (
                       <>
-                        Kurum kodunu paylaşın:<br />
+                        {tr('Kurum kodunu paylaşın:')}<br />
                         <strong style={{ fontFamily: 'monospace', fontSize: '20px', color: '#6366f1', letterSpacing: '0.1em' }}>{institution.code}</strong>
                       </>
                     ) : (
                       <>
-                        Henüz bir davet kodunuz yok.<br />
+                        {tr('Henüz bir davet kodunuz yok.')}<br />
                         <button onClick={() => setActiveTab('profile')}
                           style={{ marginTop: '8px', padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#6366f1', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                          ✨ Profil sekmesinden oluştur
+                          {tr('✨ Profil sekmesinden oluştur')}
                         </button>
                       </>
                     )}
@@ -471,11 +481,11 @@ export default function InstitutionPage() {
                       <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary)' }}>{s.name}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         {s.grade && <span>📚 {s.grade}</span>}
-                        <span>📝 {s.totalTests} test</span>
-                        {s.streak > 0 && <span>🔥 {s.streak} gün</span>}
-                        {s.weeklyTests > 0 && <span style={{ color: '#16a34a' }}>+{s.weeklyTests} bu hafta</span>}
+                        <span>{tr('📝 {n} test', { n: s.totalTests })}</span>
+                        {s.streak > 0 && <span>{tr('🔥 {n} gün', { n: s.streak })}</span>}
+                        {s.weeklyTests > 0 && <span style={{ color: '#16a34a' }}>{tr('+{n} bu hafta', { n: s.weeklyTests })}</span>}
                         <span style={{ color: 'var(--text4)', fontSize: '10px' }}>
-                          {s.lastActive ? `Son: ${new Date(s.lastActive).toLocaleDateString('tr-TR')}` : 'Aktif değil'}
+                          {s.lastActive ? tr('Son: {date}‖aktivite', { date: new Date(s.lastActive).toLocaleDateString(dateLocale) }) : tr('Aktif değil')}
                         </span>
                       </div>
                       {s.weakTopics?.length > 0 && (
@@ -492,7 +502,7 @@ export default function InstitutionPage() {
                       <div style={{ fontWeight: 800, fontSize: '20px', color: pctColor(s.avgPct) }}>
                         {s.avgPct !== null ? `%${s.avgPct}` : '—'}
                       </div>
-                      <div style={{ fontSize: '10px', color: 'var(--text4)' }}>ortalama</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text4)' }}>{tr('ortalama')}</div>
                     </div>
                   </div>
                 ))}
@@ -504,20 +514,20 @@ export default function InstitutionPage() {
         {/* ── ANALİTİK ────────────────────────────────────────────────────── */}
         {activeTab === 'analytics' && analytics && (
           <div>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.25rem' }}>📈 Detaylı Analitik</h1>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.25rem' }}>{tr('📈 Detaylı Analitik')}</h1>
             <InstitutionComparisons />
 
             {/* Sınıf bazlı kırılım */}
             {analytics.gradeBreakdown?.length > 0 && (
               <div className="card" style={{ marginBottom: '1rem' }}>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>📚 Sınıf Bazlı Başarı</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>{tr('📚 Sınıf Bazlı Başarı')}</div>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={analytics.gradeBreakdown} barSize={32}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="grade" tick={{ fontSize: 11, fill: 'var(--text3)' }} />
                     <YAxis tick={{ fontSize: 11, fill: 'var(--text3)' }} domain={[0, 100]} unit="%" />
-                    <Tooltip formatter={(v: any) => [`%${v}`, 'Ortalama']} contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
-                    <Bar dataKey="avgPct" name="Ortalama" radius={[6, 6, 0, 0]}>
+                    <Tooltip formatter={(v: any) => [`%${v}`, tr('Ortalama')]} contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
+                    <Bar dataKey="avgPct" name={tr('Ortalama')} radius={[6, 6, 0, 0]}>
                       {analytics.gradeBreakdown.map((entry: any, i: number) => (
                         <Cell key={i} fill={entry.avgPct >= 70 ? '#16a34a' : entry.avgPct >= 50 ? '#d97706' : '#dc2626'} />
                       ))}
@@ -528,7 +538,7 @@ export default function InstitutionPage() {
                   {analytics.gradeBreakdown.map((g: any) => (
                     <div key={g.grade} style={{ padding: '6px 10px', borderRadius: '8px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '12px' }}>
                       <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{g.grade}</span>
-                      <span style={{ color: 'var(--text3)', marginLeft: '6px' }}>{g.count} öğrenci · {g.tests} test</span>
+                      <span style={{ color: 'var(--text3)', marginLeft: '6px' }}>{tr('{n} öğrenci · {tests} test', { n: g.count, tests: g.tests })}</span>
                     </div>
                   ))}
                 </div>
@@ -537,7 +547,7 @@ export default function InstitutionPage() {
 
             {/* Haftalık test trendi */}
             <div className="card" style={{ marginBottom: '1rem' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>📈 8 Haftalık Test & Başarı Trendi</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>{tr('📈 8 Haftalık Test & Başarı Trendi')}</div>
               <ResponsiveContainer width="100%" height={200}>
                 <AreaChart data={analytics.weeklyTrend}>
                   <defs>
@@ -554,8 +564,8 @@ export default function InstitutionPage() {
                   <XAxis dataKey="week" tick={{ fontSize: 10, fill: 'var(--text3)' }} />
                   <YAxis tick={{ fontSize: 10, fill: 'var(--text3)' }} />
                   <Tooltip contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
-                  <Area type="monotone" dataKey="tests" name="Test Sayısı" stroke="#6366f1" fill="url(#testGrad)" strokeWidth={2} />
-                  <Area type="monotone" dataKey="avgPct" name="Ortalama %" stroke="#16a34a" fill="url(#pctGrad)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="tests" name={tr('Test Sayısı')} stroke="#6366f1" fill="url(#testGrad)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="avgPct" name={tr('Ortalama %')} stroke="#16a34a" fill="url(#pctGrad)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -563,8 +573,8 @@ export default function InstitutionPage() {
             {/* Konu haritası */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="card">
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#dc2626', marginBottom: '12px' }}>⚠️ Zayıf Konular</div>
-                {analytics.weakTopics?.length === 0 && <div style={{ fontSize: '12px', color: 'var(--text3)' }}>Zayıf konu yok! 🎉</div>}
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#dc2626', marginBottom: '12px' }}>{tr('⚠️ Zayıf Konular')}</div>
+                {analytics.weakTopics?.length === 0 && <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{tr('Zayıf konu yok! 🎉')}</div>}
                 {analytics.weakTopics?.map((t: any, i: number) => (
                   <div key={i} style={{ marginBottom: '10px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
@@ -574,14 +584,14 @@ export default function InstitutionPage() {
                     <div style={{ height: 6, borderRadius: 99, background: 'var(--bg2)', overflow: 'hidden' }}>
                       <div style={{ height: '100%', width: `${t.avg}%`, background: '#dc2626', borderRadius: 99 }} />
                     </div>
-                    <div style={{ fontSize: '10px', color: 'var(--text4)', marginTop: '2px' }}>{t.count} test</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text4)', marginTop: '2px' }}>{tr('{n} test', { n: t.count })}</div>
                   </div>
                 ))}
               </div>
 
               <div className="card">
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#16a34a', marginBottom: '12px' }}>✅ Güçlü Konular</div>
-                {analytics.strongTopics?.length === 0 && <div style={{ fontSize: '12px', color: 'var(--text3)' }}>Henüz yeterli veri yok.</div>}
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#16a34a', marginBottom: '12px' }}>{tr('✅ Güçlü Konular')}</div>
+                {analytics.strongTopics?.length === 0 && <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{tr('Henüz yeterli veri yok.')}</div>}
                 {analytics.strongTopics?.map((t: any, i: number) => (
                   <div key={i} style={{ marginBottom: '10px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
@@ -591,7 +601,7 @@ export default function InstitutionPage() {
                     <div style={{ height: 6, borderRadius: 99, background: 'var(--bg2)', overflow: 'hidden' }}>
                       <div style={{ height: '100%', width: `${t.avg}%`, background: '#16a34a', borderRadius: 99 }} />
                     </div>
-                    <div style={{ fontSize: '10px', color: 'var(--text4)', marginTop: '2px' }}>{t.count} test</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text4)', marginTop: '2px' }}>{tr('{n} test', { n: t.count })}</div>
                   </div>
                 ))}
               </div>
@@ -604,17 +614,17 @@ export default function InstitutionPage() {
         {/* ── RİSK ALARMI ─────────────────────────────────────────────────── */}
         {activeTab === 'risk' && (
           <div>
-            <LearningRiskOverview endpoint="/api/institution/learning-risk" title="Kurum erken uyarıları" />
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '4px' }}>⚠️ Risk Alarmı</h1>
+            <LearningRiskOverview endpoint="/api/institution/learning-risk" title={tr('Kurum erken uyarıları')} />
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '4px' }}>{tr('⚠️ Risk Alarmı')}</h1>
             <p style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '1.25rem' }}>
-              7+ gün aktif olmayan veya ortalaması %40 altında olan öğrenciler
+              {tr('7+ gün aktif olmayan veya ortalaması %40 altında olan öğrenciler')}
             </p>
 
             {!analytics?.riskStudents?.length ? (
               <div className="card" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
                 <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary)' }}>Risk altında öğrenci yok!</div>
-                <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '8px' }}>Tüm öğrenciler aktif ve başarılı görünüyor.</div>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary)' }}>{tr('Risk altında öğrenci yok!')}</div>
+                <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '8px' }}>{tr('Tüm öğrenciler aktif ve başarılı görünüyor.')}</div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -632,8 +642,8 @@ export default function InstitutionPage() {
                         <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           {s.grade && <span>📚 {s.grade}</span>}
                           {s.reason === 'inactive'
-                            ? <span style={{ color: '#d97706' }}>⏰ {daysSince !== null ? `${daysSince} gündür aktif değil` : 'Hiç aktif olmadı'}</span>
-                            : <span style={{ color: '#dc2626' }}>📉 Ortalama %{s.avgPct}</span>
+                            ? <span style={{ color: '#d97706' }}>⏰ {daysSince !== null ? tr('{n} gündür aktif değil', { n: daysSince }) : tr('Hiç aktif olmadı')}</span>
+                            : <span style={{ color: '#dc2626' }}>📉 {tr('Ortalama %{n}', { n: s.avgPct })}</span>
                           }
                         </div>
                       </div>
@@ -642,7 +652,7 @@ export default function InstitutionPage() {
                           {s.avgPct !== null ? `%${s.avgPct}` : '—'}
                         </div>
                         <div style={{ fontSize: '10px', color: '#dc2626', fontWeight: 600, marginTop: '2px' }}>
-                          {s.reason === 'inactive' ? 'İnaktif' : 'Düşük Puan'}
+                          {s.reason === 'inactive' ? tr('İnaktif') : tr('Düşük Puan')}
                         </div>
                       </div>
                     </div>
@@ -656,7 +666,7 @@ export default function InstitutionPage() {
         {/* ── RAPORLAR ────────────────────────────────────────────────────── */}
         {activeTab === 'reports' && (
           <div>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.25rem' }}>📋 Raporlar</h1>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.25rem' }}>{tr('📋 Raporlar')}</h1>
             <ReportsHub scope="institution" gradesEndpoint="/api/institution/reports" sectionalEndpoint="/api/institution/reports" hubEndpoint="/api/institution/reports-hub" />
           </div>
         )}
@@ -664,10 +674,9 @@ export default function InstitutionPage() {
         {/* ── NOT İÇE AKTAR ───────────────────────────────────────────────── */}
         {activeTab === 'import' && (
           <div>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.25rem' }}>📥 Not / Veri İçe Aktar</h1>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.25rem' }}>{tr('📥 Not / Veri İçe Aktar')}</h1>
             <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '1.25rem' }}>
-              MOZAİK, e-Okul veya kendi hazırladığın Excel/CSV dosyalarındaki öğrenci numarası, sınıf,
-              isim ve ders notlarını kuruma kayıtlı öğrencilerle eşleştirip içeri aktar.
+              {tr('MOZAİK, e-Okul veya kendi hazırladığın Excel/CSV dosyalarındaki öğrenci numarası, sınıf, isim ve ders notlarını kuruma kayıtlı öğrencilerle eşleştirip içeri aktar.')}
             </p>
             <GradeImportWizard scope="institution" rosterEndpoint="/api/institution/students-roster" commitEndpoint="/api/institution/import-grades" />
           </div>
@@ -676,18 +685,18 @@ export default function InstitutionPage() {
         {/* ── PROFİL ──────────────────────────────────────────────────────── */}
         {activeTab === 'profile' && (
           <div>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.25rem' }}>⚙️ Kurum Profili</h1>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.25rem' }}>{tr('⚙️ Kurum Profili')}</h1>
             <div className="card" style={{ marginBottom: '1rem' }}>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>🏛️ Kurum Bilgileri</div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>{tr('🏛️ Kurum Bilgileri')}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
                 {[
-                  { label: 'Kurum Adı', value: institution?.name },
-                  { label: 'Kurum Kodu', value: institution?.code, mono: true },
-                  { label: 'E-posta', value: institution?.admin_email },
-                  { label: 'İndirim Oranı', value: institution?.discount_rate ? `%${institution.discount_rate}` : 'Yok' },
-                  { label: 'Durum', value: institution?.active ? '✅ Aktif' : '🔴 Pasif' },
-                  { label: 'Kayıt Tarihi', value: institution?.created_at ? new Date(institution.created_at).toLocaleDateString('tr-TR') : '—' },
-                  ...(institution?.sellers ? [{ label: 'Satıcı', value: `${institution.sellers.full_name} (${institution.sellers.code})` }] : []),
+                  { label: tr('Kurum Adı'), value: institution?.name },
+                  { label: tr('Kurum Kodu'), value: institution?.code, mono: true },
+                  { label: tr('E-posta'), value: institution?.admin_email },
+                  { label: tr('İndirim Oranı'), value: institution?.discount_rate ? `%${institution.discount_rate}` : tr('Yok') },
+                  { label: tr('Durum'), value: institution?.active ? tr('✅ Aktif') : tr('🔴 Pasif') },
+                  { label: tr('Kayıt Tarihi'), value: institution?.created_at ? new Date(institution.created_at).toLocaleDateString(dateLocale) : '—' },
+                  ...(institution?.sellers ? [{ label: tr('Satıcı'), value: `${institution.sellers.full_name} (${institution.sellers.code})` }] : []),
                 ].map((item, i) => (
                   <div key={i} style={{ padding: '10px 14px', background: 'var(--bg2)', borderRadius: '10px' }}>
                     <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '4px', fontWeight: 600 }}>{item.label}</div>
@@ -700,7 +709,7 @@ export default function InstitutionPage() {
             </div>
 
             <div className="card">
-              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>📋 Kurum Davet Kodu ve Linki</div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>{tr('📋 Kurum Davet Kodu ve Linki')}</div>
               <div style={{ padding: '20px', background: 'var(--bg2)', borderRadius: '12px', display: 'flex', gap: '24px', alignItems: 'center', flexWrap: 'wrap' }}>
 
                 {/* Sol: QR kod — kayıt linkine bağlı, doğrudan taranarak açılır */}
@@ -710,29 +719,29 @@ export default function InstitutionPage() {
                       <div style={{ padding: '10px', background: '#fff', borderRadius: '14px', display: 'inline-block', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
                         <img
                           src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&color=082465&bgcolor=ffffff&data=${encodeURIComponent(registerLink)}`}
-                          alt={`${institution.name} kayıt QR kodu`}
+                          alt={tr('{name} kayıt QR kodu', { name: institution.name })}
                           width={160} height={160}
                           style={{ display: 'block' }}
                         />
                       </div>
                       <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '8px', maxWidth: '180px' }}>
-                        Öğrenciler telefonla okutunca doğrudan kurumunuza bağlı kayıt ekranı açılır
+                        {tr('Öğrenciler telefonla okutunca doğrudan kurumunuza bağlı kayıt ekranı açılır')}
                       </div>
                     </>
                   ) : (
                     <div style={{ width: 160, height: 160, borderRadius: '14px', background: '#fff', border: '1.5px dashed var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'var(--text3)', textAlign: 'center', padding: '10px' }}>
-                      Kod oluşturunca<br />QR burada görünecek
+                      {tr('Kod oluşturunca QR burada görünecek')}
                     </div>
                   )}
                 </div>
 
                 {/* Sağ: kod, link ve işlemler */}
                 <div style={{ flex: 1, minWidth: '220px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>Öğrenciler kayıt sırasında bu kodu kullanacak</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>{tr('Öğrenciler kayıt sırasında bu kodu kullanacak')}</div>
                   {institution?.code ? (
                     <div style={{ fontFamily: 'monospace', fontSize: '32px', fontWeight: 900, color: '#6366f1', letterSpacing: '0.15em' }}>{institution.code}</div>
                   ) : (
-                    <div style={{ fontSize: '13px', color: 'var(--text3)', fontStyle: 'italic' }}>Henüz davet kodu oluşturulmadı</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text3)', fontStyle: 'italic' }}>{tr('Henüz davet kodu oluşturulmadı')}</div>
                   )}
 
                   {institution?.code && (
@@ -742,7 +751,7 @@ export default function InstitutionPage() {
                       </code>
                       <button onClick={copyRegisterLink}
                         style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: '#fff', color: 'var(--primary)', fontSize: '11px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap' }}>
-                        {linkCopied ? '✅ Kopyalandı' : '🔗 Linki Kopyala'}
+                        {linkCopied ? tr('✅ Kopyalandı') : tr('🔗 Linki Kopyala')}
                       </button>
                     </div>
                   )}
@@ -755,7 +764,7 @@ export default function InstitutionPage() {
                       fontFamily: 'var(--font-sans)', display: 'inline-flex', alignItems: 'center', gap: '8px',
                     }}>
                     {regenerating ? <span className="spinner" style={{ width: 14, height: 14 }} /> : (institution?.code ? '🔄' : '✨')}
-                    {institution?.code ? 'Yeni Kod Oluştur' : 'Davet Kodu Oluştur'}
+                    {institution?.code ? tr('Yeni Kod Oluştur') : tr('Davet Kodu Oluştur')}
                   </button>
                   {regenMsg && (
                     <div style={{ fontSize: '12px', marginTop: '10px', color: regenMsg.startsWith('✅') ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>
@@ -763,7 +772,7 @@ export default function InstitutionPage() {
                     </div>
                   )}
                   <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '10px', lineHeight: 1.5 }}>
-                    Bu kod (veya QR / link) ile kayıt olan tüm öğrenciler otomatik olarak kurumunuzun öğrenci listesine eklenir.
+                    {tr('Bu kod (veya QR / link) ile kayıt olan tüm öğrenciler otomatik olarak kurumunuzun öğrenci listesine eklenir.')}
                   </div>
                 </div>
               </div>
