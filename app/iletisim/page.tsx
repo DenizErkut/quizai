@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
 import SiteFooter from '@/components/SiteFooter'
+import Tr from '@/components/Tr'
 
 export default function ContactPage() {
   return (
@@ -11,12 +12,12 @@ export default function ContactPage() {
           <Link href="/" style={{ textDecoration: 'none', display: 'inline-block', marginBottom: '1.5rem' }}>
             <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '52px' }} />
           </Link>
-          <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>İletişim</div>
-          <h1 className="serif" style={{ fontSize: '28px', marginBottom: '0.5rem' }}>İletişim</h1>
+          <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}><Tr text="İletişim" /></div>
+          <h1 className="serif" style={{ fontSize: '28px', marginBottom: '0.5rem' }}><Tr text="İletişim" /></h1>
         </div>
 
         <div className="card" style={{ marginBottom: '1rem' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--accent)', marginBottom: '0.75rem' }}>Veri Sorumlusu</h2>
+          <h2 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--accent)', marginBottom: '0.75rem' }}><Tr text="Veri Sorumlusu" /></h2>
           <p style={{ fontSize: '14px', lineHeight: 1.9, color: 'var(--text)' }}>
             Dumerk Elektronik Sanayi ve Ticaret Limited Şirketi (&ldquo;Pratium&rdquo;)<br />
             Ticaret Sicil No: 206257-5<br />
@@ -30,8 +31,8 @@ export default function ContactPage() {
         <div style={{ textAlign: 'center', marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
           <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '8px' }}>© 2026 Dumerk Elektronik Sanayi ve Ticaret Limited Şirketi. Tüm hakları saklıdır.</p>
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link href="/hakkimizda" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}>Hakkımızda</Link>
-            <Link href="/" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}>← Ana sayfaya dön</Link>
+            <Link href="/hakkimizda" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}><Tr text="Hakkımızda" /></Link>
+            <Link href="/" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}><Tr text="← Ana sayfaya dön" /></Link>
           </div>
         </div>
       </div>

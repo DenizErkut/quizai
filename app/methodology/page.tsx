@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Tr from '@/components/Tr'
 import SiteFooter from '@/components/SiteFooter'
 
 export const metadata = {
@@ -43,25 +44,23 @@ export default function MethodologyPage() {
           <Link href="/" style={{ textDecoration: 'none', display: 'inline-block', marginBottom: '1.5rem' }}>
             <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '52px' }} />
           </Link>
-          <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>Metodoloji</div>
-          <h1 className="serif" style={{ fontSize: '30px', marginBottom: '0.75rem' }}>Pratium nasıl çalışır?</h1>
-          <p style={{ color: 'var(--text2)', fontSize: '15px', lineHeight: 1.7 }}>
-            Pratium'un yapay zeka soru üretiminden pedagojik yaklaşımına kadar temel çalışma prensipleri.
-          </p>
+          <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}><Tr text="Metodoloji" /></div>
+          <h1 className="serif" style={{ fontSize: '30px', marginBottom: '0.75rem' }}><Tr text="Pratium nasıl çalışır?" /></h1>
+          <p style={{ color: 'var(--text2)', fontSize: '15px', lineHeight: 1.7 }}><Tr text="Pratium'un yapay zeka soru üretiminden pedagojik yaklaşımına kadar temel çalışma prensipleri." /></p>
         </div>
 
         {sections.map((s, i) => (
           <div key={i} className="card" style={{ marginBottom: '1rem' }}>
-            <div className={`badge badge-${s.badge}`} style={{ marginBottom: '0.6rem' }}>{s.title}</div>
-            <p style={{ fontSize: '14px', lineHeight: 1.8, color: 'var(--text)' }}>{s.content}</p>
+            <div className={`badge badge-${s.badge}`} style={{ marginBottom: '0.6rem' }}><Tr text={s.title} /></div>
+            <p style={{ fontSize: '14px', lineHeight: 1.8, color: 'var(--text)' }}><Tr text={s.content} /></p>
           </div>
         ))}
 
         <div style={{ textAlign: 'center', paddingTop: '1rem', borderTop: '1px solid var(--border)', marginTop: '1.5rem' }}>
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link href="/for-students" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}>Öğrenciler için →</Link>
-            <Link href="/faq" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}>Sık Sorulan Sorular →</Link>
-            <Link href="/hakkimizda" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}>Hakkımızda →</Link>
+            <Link href="/for-students" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}><Tr text="Öğrenciler için →" /></Link>
+            <Link href="/faq" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}><Tr text="Sık Sorulan Sorular →" /></Link>
+            <Link href="/hakkimizda" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}><Tr text="Hakkımızda →" /></Link>
           </div>
         </div>
       </div>

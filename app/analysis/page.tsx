@@ -410,7 +410,7 @@ export default function AnalysisPage() {
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
                       <div style={{ width: 32, height: 32, borderRadius: '8px', background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>⚠️</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '3px' }}>{w.topic}</div>
+                        <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '3px' }}>{t(w.topic)}</div>
                         <div style={{ height: '5px', background: 'var(--border)', borderRadius: '3px' }}>
                           <div style={{ height: '5px', background: '#ef4444', borderRadius: '3px', width: `${errorRate}%` }} />
                         </div>

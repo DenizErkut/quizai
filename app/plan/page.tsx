@@ -234,7 +234,7 @@ export default function PlanPage() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {stats.weakTopics.slice(0, 5).map((w: any, i: number) => (
                   <span key={i} style={{ fontSize: '12px', padding: '3px 10px', borderRadius: '99px', background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid rgba(220,38,38,0.15)' }}>
-                    {w.topic}
+                    {tr(w.topic)}
                   </span>
                 ))}
               </div>

@@ -289,6 +289,8 @@ for (const [name, entriesFile, exportName, files] of [
   ['institution parts', 'institution-parts', 'institutionPartsEntries', ['components/institution/InstitutionTeachers.tsx', 'components/institution/InstitutionComparisons.tsx']],
   ['institution integrations', 'institution-integrations', 'institutionIntegrationsEntries', ['app/institution/integrations/page.tsx']],
   ['reports hub', 'reports-hub', 'reportsHubEntries', ['components/ReportsHub.tsx']],
+  ['notification text', 'notification-text', 'notificationTextEntries', ['lib/i18n/notification-text.ts']],
+  ['public pages more', 'public-pages-more', 'publicPagesMoreEntries', ['app/methodology/page.tsx', 'app/hakkimizda/page.tsx', 'app/iletisim/page.tsx', 'app/ozel-kocluk/page.tsx', 'app/ai-literacy/page.tsx']],
   ['marketing pages', 'marketing-pages', 'marketingPagesEntries', ['app/for-students/page.tsx', 'app/for-teachers/page.tsx', 'app/for-parents/page.tsx', 'app/faq/page.tsx']],
   ['student pages misc', 'student-pages-misc', 'studentPagesMiscEntries', ['app/koc/pratik/page.tsx', 'app/verified-learning/page.tsx', 'app/transfer-checks/page.tsx', 'app/challenge/[code]/page.tsx', 'app/offline/page.tsx', 'components/ConsentGate.tsx', 'components/CookieConsent.tsx', 'components/DepartmentSelect.tsx', 'components/PushNotification.tsx', 'components/ThemeToggleFloating.tsx', 'components/teacher/TeacherMembershipNotice.tsx']],
   ['student learning', 'student-learning', 'studentLearningEntries', ['components/student/LearningSummary.tsx', 'components/student/LearningRiskCard.tsx', 'components/student/AgentInsights.tsx', 'components/student/NextBestAction.tsx', 'components/student/RecommendationLifecycle.tsx', 'lib/mastery-next-step.ts', 'lib/next-objective.ts', 'lib/objective-intervention.ts']],
@@ -320,4 +322,18 @@ test('teacher, parent and institution dashboards embed the language switch', asy
     const switchAt = source.lastIndexOf('<PanelLanguageSwitch />', signOut)
     assert.ok(navStart >= 0 && signOut > navStart && switchAt > navStart, file)
   }
+})
+
+test('stored Turkish notification texts are translated by template', async () => {
+  const { ALL_ENTRIES } = await import('../lib/i18n/entries')
+  const { localizeNotificationTitle, localizeNotificationBody } = await import('../lib/i18n/notification-text')
+  const english = new Map(ALL_ENTRIES.map(entry => [entry[0], entry[1]]))
+  const t = (text: string, params: Record<string, string | number> = {}) =>
+    (english.get(text) ?? text).replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? `{${name}}`))
+  assert.equal(localizeNotificationTitle('⚠️ Ajan kalite alarmı', t), '⚠️ Agent quality alert')
+  assert.equal(localizeNotificationBody('boxing-agent ajanında son 7 günde boş karar oranı %100 seviyesinde.', t),
+    'The empty-decision rate for the boxing-agent agent over the last 7 days is 100%.')
+  assert.equal(localizeNotificationBody('"Üslü sayılar" ödevinin son tarihi yarın. Hemen çöz!', t),
+    'The deadline for “Üslü sayılar” is tomorrow. Solve it now!')
+  assert.equal(localizeNotificationBody('Öğretmen yazısı olduğu gibi kalır', t), 'Öğretmen yazısı olduğu gibi kalır')
 })
