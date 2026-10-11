@@ -30,6 +30,13 @@ export function languageFromLocale(locale: Locale): string {
   return LOCALES.find(l => l.code === locale)?.language ?? 'Türkçe'
 }
 
+const INTL: Record<Locale, string> = { tr: 'tr-TR', en: 'en-GB', de: 'de-DE', fr: 'fr-FR', es: 'es-ES', ar: 'ar' }
+
+/** BCP-47 tag for Intl/Date formatting. */
+export function intlLocale(locale: Locale): string {
+  return INTL[locale]
+}
+
 export function localeDir(locale: Locale): 'ltr' | 'rtl' {
   return LOCALES.find(l => l.code === locale)?.dir ?? 'ltr'
 }

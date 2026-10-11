@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import SiteFooter from '@/components/SiteFooter'
 import { BILLING_PLANS } from '@/lib/subscription-plans'
 import { discountedPrice } from '@/lib/automatic-discount'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 
 interface Profile {
   plan: string
@@ -19,6 +21,7 @@ interface Profile {
 
 export default function PricingPage() {
   const { track } = useABTest('pricing_cta')
+  const { t, locale } = useT()
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [referralCount, setReferralCount] = useState(0)
@@ -136,16 +139,16 @@ export default function PricingPage() {
 
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '2.5rem' }} className="anim-up">
-          <div className="badge badge-purple" style={{ marginBottom: '1rem' }}>Planlar</div>
+          <div className="badge badge-purple" style={{ marginBottom: '1rem' }}>{t('Planlar')}</div>
           <h1 className="serif" style={{ fontSize: '38px', lineHeight: 1.15, marginBottom: '0.75rem' }}>
-            Öğrenmek için doğru plan
+            {t('Öğrenmek için doğru plan')}
           </h1>
           <p style={{ color: 'var(--text2)', fontSize: '16px' }}>
-            İhtiyacına uygun planı seç, hemen başla.
+            {t('İhtiyacına uygun planı seç, hemen başla.')}
           </p>
         </div>
 
-        {discountRate > 0 && <div role="status" style={{ marginBottom: '1.5rem', padding: '12px 16px', borderRadius: '10px', background: 'var(--green-bg)', color: 'var(--green)', textAlign: 'center', fontWeight: 700, fontSize: '14px' }}>✓ {discountLabel || 'İndirim'} otomatik uygulanacak · %{discountRate}</div>}
+        {discountRate > 0 && <div role="status" style={{ marginBottom: '1.5rem', padding: '12px 16px', borderRadius: '10px', background: 'var(--green-bg)', color: 'var(--green)', textAlign: 'center', fontWeight: 700, fontSize: '14px' }}>✓ {discountLabel || t('İndirim')} {t('otomatik uygulanacak')} · %{discountRate}</div>}
 
         {/* Plan cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px,100%), 1fr))', gap: '14px', marginBottom: '2.5rem' }} className="anim-up-1">
@@ -155,36 +158,36 @@ export default function PricingPage() {
               <div key={p.id} className="card" style={{ position: 'relative', border: p.accent ? `2px solid ${p.color}` : undefined, display: 'flex', flexDirection: 'column' }}>
                 {p.badge && (
                   <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: p.color, color: '#fff', fontSize: '10px', fontWeight: 700, padding: '3px 12px', borderRadius: '99px', whiteSpace: 'nowrap' }}>
-                    {p.badge}
+                    {t(p.badge)}
                   </div>
                 )}
                 {isCurrent && (
-                  <div className="badge badge-green" style={{ marginBottom: '0.75rem', display: 'inline-flex', alignSelf: 'flex-start' }}>Mevcut planın ✓</div>
+                  <div className="badge badge-green" style={{ marginBottom: '0.75rem', display: 'inline-flex', alignSelf: 'flex-start' }}>{t('Mevcut planın ✓')}</div>
                 )}
-                <div style={{ fontSize: '12px', fontWeight: 700, color: p.color, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>{p.label}</div>
-                {discountRate > 0 && <div style={{ fontSize: '14px', color: 'var(--text3)' }}>Normal fiyat: <s>₺{p.price.toLocaleString('tr-TR')}</s></div>}
+                <div style={{ fontSize: '12px', fontWeight: 700, color: p.color, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>{t(p.label)}</div>
+                {discountRate > 0 && <div style={{ fontSize: '14px', color: 'var(--text3)' }}>{t('Normal fiyat:')} <s>₺{p.price.toLocaleString('tr-TR')}</s></div>}
                 <div style={{ fontSize: '28px', fontWeight: 700, marginBottom: '2px' }}>₺{discountedPrice(p.price, discountRate).toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</div>
-                {discountRate > 0 && <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--green)' }}>{discountSource === 'institution' ? 'Kuruma özel' : 'İndirimli'} fiyat · %{discountRate}</div>}
-                <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '1.25rem' }}>{p.sub}</div>
+                {discountRate > 0 && <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--green)' }}>{discountSource === 'institution' ? t('Kuruma özel') : t('İndirimli')} {t('fiyat')} · %{discountRate}</div>}
+                <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '1.25rem' }}>{t(p.sub)}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '1.5rem', flex: 1 }}>
                   {p.features.map(f => (
                     <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: '7px', fontSize: '13px' }}>
                       <span style={{ color: p.color, fontWeight: 700, flexShrink: 0, marginTop: '1px' }}>✓</span>
-                      <span>{f}</span>
+                      <span>{t(f)}</span>
                     </div>
                   ))}
                 </div>
                 {isCurrent ? (
                   <div style={{ padding: '10px', borderRadius: '10px', background: 'var(--green-bg)', border: '1px solid rgba(22,163,74,0.2)', fontSize: '12px', color: 'var(--green)', textAlign: 'center' }}>
-                    ✓ Aktif
+                    {t('✓ Aktif')}
                     {profile?.plan_expires_at && (
                       <div style={{ fontSize: '10px', marginTop: '2px' }}>
-                        {new Date(profile.plan_expires_at).toLocaleDateString('tr-TR')} kadar
+                        {new Date(profile.plan_expires_at).toLocaleDateString(intlLocale(locale))} {t('kadar')}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <Link href={p.ctaHref} className="btn btn-primary" onClick={() => track('click')} style={{ width: '100%', justifyContent: 'center', display: 'flex', background: p.color, borderColor: p.color }}>{p.cta}</Link>
+                  <Link href={p.ctaHref} className="btn btn-primary" onClick={() => track('click')} style={{ width: '100%', justifyContent: 'center', display: 'flex', background: p.color, borderColor: p.color }}>{t(p.cta)}</Link>
                 )}
               </div>
             )
@@ -192,31 +195,31 @@ export default function PricingPage() {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'center', margin: '0 0 1.5rem', fontSize: '13px', color: 'var(--text2)' }}>
-          💳 PayTR ile güvenli ödeme — Mastercard, Visa, Troy
+          {t('💳 PayTR ile güvenli ödeme — Mastercard, Visa, Troy')}
         </div>
 
         {/* Kullanım durumu */}
         {profile && (
           <div className="card-sm anim-up-2" style={{ marginBottom: '1.5rem', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>Bu ay</div>
-              <div style={{ fontWeight: 600 }}>{profile.monthly_test_count} test çözüldü</div>
+              <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>{t('Bu ay')}</div>
+              <div style={{ fontWeight: 600 }}>{t('{n} test çözüldü', { n: profile.monthly_test_count })}</div>
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>Bugün</div>
-              <div style={{ fontWeight: 600 }}>{dailyUsed} test · {(() => {
+              <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>{t('Bugün')}</div>
+              <div style={{ fontWeight: 600 }}>{t('{n} test', { n: dailyUsed })} · {(() => {
                 // 6 Eylül 2026 — 'none' (yeni, henüz plan seçmemiş kullanıcı)
                 // için eski kod yanlışlıkla "10 kaldı" gösteriyordu (aslında
                 // 0 hakkı var). DAILY_LIMIT tablosuna açıkça bakıyoruz.
                 const DAILY_LIMIT: Record<string, number> = { free: 10, silver: 10, premium: 25 }
-                if (profile.plan === 'unlimited') return 'Sınırsız'
-                return `${Math.max(0, (DAILY_LIMIT[profile.plan] ?? 0) - dailyUsed)} kaldı`
+                if (profile.plan === 'unlimited') return t('Sınırsız')
+                return t('{n} kaldı', { n: Math.max(0, (DAILY_LIMIT[profile.plan] ?? 0) - dailyUsed) })
               })()}</div>
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>Plan</div>
+              <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>{t('Plan')}</div>
               <div style={{ fontWeight: 600, textTransform: 'capitalize', color: profile.plan === 'unlimited' ? '#0d9488' : profile.plan === 'premium' ? '#2563eb' : 'var(--text)' }}>
-                {profile.plan === 'silver' ? 'Gümüş' : profile.plan === 'premium' ? 'Altın' : profile.plan === 'unlimited' ? 'Platin' : profile.plan === 'free' ? 'Ücretsiz (eski)' : 'Plan seçilmedi'}
+                {profile.plan === 'silver' ? t('Gümüş') : profile.plan === 'premium' ? t('Altın') : profile.plan === 'unlimited' ? t('Platin') : profile.plan === 'free' ? t('Ücretsiz (eski)') : t('Plan seçilmedi')}
               </div>
             </div>
           </div>
@@ -227,12 +230,12 @@ export default function PricingPage() {
           <div className="card anim-up-3" style={{ marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '1.25rem' }}>
               <div>
-                <h2 style={{ fontSize: '18px', fontWeight: 500, marginBottom: '4px' }}>🎁 Arkadaşlarını davet et</h2>
+                <h2 style={{ fontSize: '18px', fontWeight: 500, marginBottom: '4px' }}>{t('🎁 Arkadaşlarını davet et')}</h2>
                 <p style={{ fontSize: '13px', color: 'var(--text2)' }}>
-                  Her 10 ücretli davette, eşiği tamamlayan satın alma aylıksa <strong>1 ay</strong>, yıllıksa <strong>1 yıl ücretsiz Altın</strong> kazanırsın.
+                  {t('Her 10 ücretli davette, eşiği tamamlayan satın alma aylıksa 1 ay, yıllıksa 1 yıl ücretsiz Altın kazanırsın.')}
                 </p>
               </div>
-              <div className="badge badge-purple">{referralCount} / {nextMilestone} ücretli üyelik</div>
+              <div className="badge badge-purple">{t('{n} / {m} ücretli üyelik', { n: referralCount, m: nextMilestone })}</div>
             </div>
             <div className="progress-bar" style={{ marginBottom: '1rem' }}>
               <div className="progress-fill" style={{ width: `${progressPct}%` }} />
@@ -242,12 +245,12 @@ export default function PricingPage() {
                 value={profile.referral_code ? `${typeof window !== 'undefined' ? window.location.origin : ''}/register?ref=${profile.referral_code}` : ''}
                 style={{ flex: 1, fontSize: '12px' }} />
               <button className="btn btn-sm" onClick={copyReferral} style={{ flexShrink: 0 }}>
-                {copied ? '✓ Kopyalandı' : 'Kopyala'}
+                {copied ? t('✓ Kopyalandı') : t('Kopyala')}
               </button>
             </div>
             {referralCount > 0 && (
               <p style={{ fontSize: '12px', color: 'var(--green)', marginTop: '8px' }}>
-                {referralCount} davetin ücretli üyeliğe geçti — {10 - (referralCount % 10)} ücretli üyelik daha; ödül süresi satın alınan plana bağlı.
+                {t('{n} davetin ücretli üyeliğe geçti — {m} ücretli üyelik daha; ödül süresi satın alınan plana bağlı.', { n: referralCount, m: 10 - (referralCount % 10) })}
               </p>
             )}
           </div>
@@ -255,7 +258,7 @@ export default function PricingPage() {
 
         {/* SSS */}
         <div className="card anim-up-4">
-          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Sık sorulan sorular</div>
+          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>{t('Sık sorulan sorular')}</div>
           {[
             { q: 'Ödeme güvenli mi?', a: 'Evet. Tüm ödemeler PayTR altyapısıyla SSL koruması altında işlenir. Kart bilgileriniz sitemizde saklanmaz.' },
             { q: 'İptal edebilir miyim?', a: 'Evet, istediğin zaman iptal edebilirsin. Gümüş, Altın veya Platin süren dolana kadar özelliklerden yararlanmaya devam edersin.' },
@@ -265,8 +268,8 @@ export default function PricingPage() {
             { q: 'Davet ile Altın nasıl çalışır?', a: 'Davet linkini paylaş. Her 10 ücretli davette, eşiği tamamlayan kişinin satın aldığı dönem kadar ücretsiz Altın kazanırsın: aylık üyelikte 1 ay, yıllık üyelikte 1 yıl. Ücretsiz kayıtlar ödül hesabına dahil edilmez.' },
           ].map((item, i) => (
             <div key={i} style={{ padding: '12px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
-              <div style={{ fontWeight: 500, fontSize: '14px', marginBottom: '4px' }}>{item.q}</div>
-              <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}>{item.a}</div>
+              <div style={{ fontWeight: 500, fontSize: '14px', marginBottom: '4px' }}>{t(item.q)}</div>
+              <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}>{t(item.a)}</div>
             </div>
           ))}
         </div>
