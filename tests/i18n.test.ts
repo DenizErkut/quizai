@@ -243,3 +243,27 @@ test('open-ended entries are used by the open-ended page', async () => {
   const unused = openEndedEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
   assert.deepEqual(unused, [])
 })
+
+test('teacher register entries are used by the teacher register page', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { teacherRegisterEntries } = await import('../lib/i18n/entries/teacher-register')
+  const source = readFileSync('app/(auth)/register/teacher/page.tsx', 'utf8')
+  const unused = teacherRegisterEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})
+
+test('pdf tools entries are used by the pdf tools page', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { pdfToolsEntries } = await import('../lib/i18n/entries/pdf-tools')
+  const source = readFileSync('app/pdf-tools/page.tsx', 'utf8')
+  const unused = pdfToolsEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})
+
+test('reading entries are used by the reading page', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { readingEntries } = await import('../lib/i18n/entries/reading')
+  const source = readFileSync('app/reading/page.tsx', 'utf8')
+  const unused = readingEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})

@@ -23,5 +23,8 @@ import { studentSchoolEntries } from './student-school'
 import { referralEntries } from './referral'
 import { notificationsEntries } from './notifications'
 import { openEndedEntries } from './open-ended'
+import { teacherRegisterEntries } from './teacher-register'
+import { pdfToolsEntries } from './pdf-tools'
+import { readingEntries } from './reading'
 
-export const ALL_ENTRIES: Entry[] = [...navbarEntries, ...publicEntries, ...dashboardPricingEntries, ...profileEntries, ...quizSetupEntries, ...quizQuestionEntries, ...quizResultEntries, ...quizFlowEntries, ...communityEntries, ...coachEntries, ...reviewEntries, ...archiveEntries, ...dailyEntries, ...analysisEntries, ...authLoginEntries, ...notesEntries, ...planEntries, ...liveEntries, ...registerEntries, ...examEntries, ...studentSchoolEntries, ...referralEntries, ...notificationsEntries, ...openEndedEntries]
+export const ALL_ENTRIES: Entry[] = [...navbarEntries, ...publicEntries, ...dashboardPricingEntries, ...profileEntries, ...quizSetupEntries, ...quizQuestionEntries, ...quizResultEntries, ...quizFlowEntries, ...communityEntries, ...coachEntries, ...reviewEntries, ...archiveEntries, ...dailyEntries, ...analysisEntries, ...authLoginEntries, ...notesEntries, ...planEntries, ...liveEntries, ...registerEntries, ...examEntries, ...studentSchoolEntries, ...referralEntries, ...notificationsEntries, ...openEndedEntries, ...teacherRegisterEntries, ...pdfToolsEntries, ...readingEntries]

@@ -5,9 +5,11 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { translateAuthError } from '@/lib/auth-error-messages'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 function RegisterTeacherContent() {
   const router = useRouter()
+  const { t } = useT()
   const searchParams = useSearchParams()
   const supabase = createClient() as any
 
@@ -56,8 +58,8 @@ function RegisterTeacherContent() {
   }
 
   async function handleCreateAccount() {
-    if (!email.trim()) { setError('E-posta zorunlu.'); return }
-    if (pass.length < 6) { setError('Sifre en az 6 karakter olmali.'); return }
+    if (!email.trim()) { setError(t('E-posta zorunludur.')); return }
+    if (pass.length < 6) { setError(t('Şifre en az 6 karakter olmalıdır.')); return }
     setError(''); setLoading(true)
 
     try {
@@ -77,7 +79,7 @@ function RegisterTeacherContent() {
       // identities dizisiyle "sanki başarılı" bir yanıt döner. Bu, "bu
       // e-posta zaten kayıtlı" sinyalidir.
       if (data.user?.identities && data.user.identities.length === 0) {
-        setError('Bu e-posta adresiyle zaten bir hesabın var. Giriş yapmayı dene ya da şifreni sıfırla.')
+        setError(t('Bu e-posta adresiyle zaten bir hesabın var. Giriş yapmayı dene ya da şifreni sıfırla.'))
         return
       }
 
@@ -97,7 +99,7 @@ function RegisterTeacherContent() {
       setStep('info')
     } catch (e: any) {
       console.error('[handleCreateAccount] beklenmeyen hata:', e)
-      setError('Beklenmeyen bir hata oluştu (' + (e?.message || 'bilinmeyen') + '). Lütfen tekrar dene.')
+      setError(t('Beklenmeyen bir hata oluştu ({msg}). Lütfen tekrar dene.', { msg: e?.message || t('bilinmeyen') }))
     } finally {
       setLoading(false)
     }
@@ -115,8 +117,8 @@ function RegisterTeacherContent() {
   }
 
   async function handleApply() {
-    if (!name.trim()) { setError('Ad soyad zorunlu.'); return }
-    if (!school.trim()) { setError('Okul/Kurum zorunlu.'); return }
+    if (!name.trim()) { setError(t('Ad soyad zorunlu.')); return }
+    if (!school.trim()) { setError(t('Okul/Kurum zorunlu.')); return }
     setError(''); setLoading(true)
 
     try {
@@ -130,7 +132,7 @@ function RegisterTeacherContent() {
         const { data: { user } } = await supabase.auth.getUser()
         uid = user?.id || ''
       }
-      if (!uid) { setError('Oturum bulunamadi. Lutfen once hesap olusturun.'); return }
+      if (!uid) { setError(t('Oturum bulunamadı. Lütfen önce hesap oluşturun.')); return }
 
       const docUrls: string[] = []
       for (let i = 0; i < docs.length; i++) {
@@ -151,7 +153,7 @@ function RegisterTeacherContent() {
         headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ fullName: name.trim(), phone: phone.trim() || null, role: 'teacher' }),
       })
-      if (!idRes.ok) { setError('Kimlik bilgileri kaydedilemedi. Lütfen tekrar deneyin.'); return }
+      if (!idRes.ok) { setError(t('Kimlik bilgileri kaydedilemedi. Lütfen tekrar deneyin.')); return }
 
       const { error: insertErr } = await supabase.from('teachers').insert({
         user_id: uid,
@@ -167,7 +169,7 @@ function RegisterTeacherContent() {
       setStep('done')
     } catch (e: any) {
       console.error('[handleApply] beklenmeyen hata:', e)
-      setError('Beklenmeyen bir hata oluştu (' + (e?.message || 'bilinmeyen') + '). Lütfen tekrar dene.')
+      setError(t('Beklenmeyen bir hata oluştu ({msg}). Lütfen tekrar dene.', { msg: e?.message || t('bilinmeyen') }))
     } finally {
       setLoading(false)
     }
@@ -179,11 +181,11 @@ function RegisterTeacherContent() {
 
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }} className="anim-up">
-          <Link href="/login" style={{ fontSize: '13px', color: 'var(--text3)', textDecoration: 'none', display: 'block', marginBottom: '12px' }}>← Girise don</Link>
+          <Link href="/login" style={{ fontSize: '13px', color: 'var(--text3)', textDecoration: 'none', display: 'block', marginBottom: '12px' }}>{t('← Girişe dön')}</Link>
           <div style={{ fontSize: '40px', marginBottom: '8px' }}>🎓</div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)' }}>Ogretmen Basvurusu</h1>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)' }}>{t('Öğretmen Başvurusu')}</h1>
           <p style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '4px' }}>
-            Admin onayindan sonra panele erisebilirsiniz
+            {t('Admin onayından sonra panele erişebilirsiniz')}
           </p>
         </div>
 
@@ -191,12 +193,12 @@ function RegisterTeacherContent() {
 
         {/* Adım göstergesi */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem' }}>
-          {['Hesap', 'Bilgiler', 'Tamamlandi'].map((label, i) => {
+          {['Hesap‖adım', 'Bilgiler', 'Tamamlandı‖adım'].map((label, i) => {
             const stepIdx = step === 'account' ? 0 : step === 'info' ? 1 : 2
             return (
               <div key={i} style={{ flex: 1, textAlign: 'center' }}>
                 <div style={{ height: 4, borderRadius: '999px', background: i <= stepIdx ? '#7c3aed' : 'var(--border)', marginBottom: '4px', transition: 'background 0.3s' }} />
-                <div style={{ fontSize: '10px', color: i <= stepIdx ? '#7c3aed' : 'var(--text4)', fontWeight: i <= stepIdx ? 700 : 400 }}>{label}</div>
+                <div style={{ fontSize: '10px', color: i <= stepIdx ? '#7c3aed' : 'var(--text4)', fontWeight: i <= stepIdx ? 700 : 400 }}>{t(label)}</div>
               </div>
             )
           })}
@@ -205,7 +207,7 @@ function RegisterTeacherContent() {
         {/* Adım 1: Hesap */}
         {step === 'account' && (
           <div className="card anim-up-1">
-            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>1. Hesap Olustur</div>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>{t('1. Hesap Oluştur')}</div>
 
             <button className="btn" onClick={handleOAuth} disabled={oauthLoading}
               style={{ width: '100%', justifyContent: 'center', gap: '10px', fontWeight: 500, marginBottom: '0.5rem' }}>
@@ -217,17 +219,17 @@ function RegisterTeacherContent() {
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                 </svg>
               )}
-              Google ile devam et
+              {t('Google ile devam et')}
             </button>
 
-            <div className="divider">veya e-posta ile</div>
+            <div className="divider">{t('veya e-posta ile')}</div>
 
-            <label className="field-label">E-posta</label>
+            <label className="field-label">{t('E-posta')}</label>
             <input className="input" type="email" placeholder="ornek@mail.com"
               value={email} onChange={e => setEmail(e.target.value)} />
 
-            <label className="field-label">Sifre</label>
-            <input className="input" type="password" placeholder="En az 6 karakter"
+            <label className="field-label">{t('Şifre')}</label>
+            <input className="input" type="password" placeholder={t('En az 6 karakter')}
               value={pass} onChange={e => setPass(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleCreateAccount()} />
 
@@ -235,12 +237,12 @@ function RegisterTeacherContent() {
 
             <button className="btn btn-primary" onClick={handleCreateAccount} disabled={loading}
               style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}>
-              {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Devam Et →'}
+              {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : t('Devam Et →')}
             </button>
 
             <div style={{ marginTop: '0.75rem', textAlign: 'center', fontSize: '12px', color: 'var(--text3)' }}>
-              Hesabiniz var mi?{' '}
-              <Link href="/login/teacher" style={{ color: '#7c3aed', fontWeight: 600 }}>Giris yapin</Link>
+              {t('Hesabınız var mı?')}{' '}
+              <Link href="/login/teacher" style={{ color: '#7c3aed', fontWeight: 600 }}>{t('Giriş yapın')}</Link>
             </div>
           </div>
         )}
@@ -250,13 +252,13 @@ function RegisterTeacherContent() {
           <div className="card anim-up-1" style={{ textAlign: 'center', padding: '2.5rem 2rem' }}>
             <div style={{ fontSize: '48px', marginBottom: '1rem' }}>📬</div>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 800, color: 'var(--primary)', marginBottom: '8px' }}>
-              E-postanı kontrol et
+              {t('E-postanı kontrol et')}
             </h2>
             <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7, marginBottom: '4px' }}>
-              <b>{email}</b> adresine bir onay bağlantısı gönderdik.
+              <b>{email}</b> {t('adresine bir onay bağlantısı gönderdik.')}
             </p>
             <p style={{ fontSize: '13px', color: 'var(--text3)', lineHeight: 1.6, marginBottom: '1rem' }}>
-              Bağlantıya tıkladığında öğretmen bilgilerini gireceğin adıma otomatik geçeceksin.
+              {t('Bağlantıya tıkladığında öğretmen bilgilerini gireceğin adıma otomatik geçeceksin.')}
             </p>
             {/* 19 Eylül 2026 — Deniz'in isteği: yeni kayıtlarda onay ekranına
                 spam/gereksiz kutusu uyarısı (bkz. app/(auth)/register/page.tsx) */}
@@ -267,13 +269,13 @@ function RegisterTeacherContent() {
             }}>
               <span style={{ fontSize: '16px', lineHeight: 1 }}>⚠️</span>
               <span style={{ fontSize: '12.5px', color: 'var(--text2)', lineHeight: 1.55 }}>
-                E-postayı birkaç dakika içinde göremezsen lütfen <b>spam / gereksiz</b> klasörünü kontrol et — onay bağlantısı bazen oraya düşebiliyor.
+                {t('E-postayı birkaç dakika içinde göremezsen lütfen spam / gereksiz klasörünü kontrol et — onay bağlantısı bazen oraya düşebiliyor.')}
               </span>
             </div>
             <button className="btn" onClick={handleResendConfirmation} disabled={resendStatus === 'sending'}
               style={{ width: '100%', justifyContent: 'center' }}>
               {resendStatus === 'sending' ? <span className="spinner" style={{ width: 18, height: 18 }} />
-                : resendStatus === 'sent' ? 'Tekrar gönderildi ✓' : 'E-postayı tekrar gönder'}
+                : resendStatus === 'sent' ? t('Tekrar gönderildi ✓') : t('E-postayı tekrar gönder')}
             </button>
           </div>
         )}
@@ -281,28 +283,28 @@ function RegisterTeacherContent() {
         {/* Adım 2: Öğretmen bilgileri */}
         {step === 'info' && (
           <div className="card anim-up-1">
-            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>2. Ogretmen Bilgileri</div>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>{t('2. Öğretmen Bilgileri')}</div>
 
-            <label className="field-label">Ad Soyad *</label>
-            <input className="input" placeholder="Ahmet Yilmaz"
+            <label className="field-label">{t('Ad Soyad *')}</label>
+            <input className="input" placeholder="Ahmet Yılmaz"
               value={name} onChange={e => setName(e.target.value)} />
 
-            <label className="field-label">Okul / Kurum *</label>
+            <label className="field-label">{t('Okul / Kurum *')}</label>
             <input className="input" placeholder="Ankara Anadolu Lisesi"
               value={school} onChange={e => setSchool(e.target.value)} />
 
-            <label className="field-label">Bransi</label>
-            <input className="input" placeholder="Matematik, Fizik..."
+            <label className="field-label">{t('Branşı')}</label>
+            <input className="input" placeholder={t('Matematik, Fizik...')}
               value={subject} onChange={e => setSubject(e.target.value)} />
 
-            <label className="field-label">Telefon (Opsiyonel)</label>
+            <label className="field-label">{t('Telefon (Opsiyonel)')}</label>
             <input className="input" type="tel" placeholder="05xx xxx xx xx"
               value={phone} onChange={e => setPhone(e.target.value)} />
 
-            <label className="field-label">Belge Yukle (Opsiyonel)</label>
+            <label className="field-label">{t('Belge Yükle (Opsiyonel)')}</label>
             <div style={{ marginBottom: '0.75rem' }}>
               <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '9px 16px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', fontSize: '13px', cursor: 'pointer', color: 'var(--text2)', fontFamily: 'var(--font-sans)' }}>
-                📎 {docs.length > 0 ? `${docs.length} belge secildi` : 'Belge sec (PDF, JPG - birden fazla secebilirsin)'}
+                📎 {docs.length > 0 ? t('{n} belge seçildi', { n: docs.length }) : t('Belge seç (PDF, JPG — birden fazla seçebilirsin)')}
                 <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple style={{ display: 'none' }}
                   onChange={e => setDocs(Array.from(e.target.files || []))} />
               </label>
@@ -313,20 +315,20 @@ function RegisterTeacherContent() {
                       <span>{f.name}</span>
                       <button type="button" onClick={() => setDocs(docs.filter((_, j) => j !== i))}
                         style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: '12px', fontFamily: 'var(--font-sans)' }}>
-                        Kaldir
+                        {t('Kaldır')}
                       </button>
                     </li>
                   ))}
                 </ul>
               )}
-              <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Ogretmenlik belgesi, diploma vb. (admin inceleyecek)</div>
+              <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>{t('Öğretmenlik belgesi, diploma vb. (admin inceleyecek)')}</div>
             </div>
 
             {error && <div style={{ marginTop: '8px', padding: '10px 12px', background: 'var(--red-bg)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)' }}>{error}</div>}
 
             <button className="btn btn-primary" onClick={handleApply} disabled={loading}
               style={{ width: '100%', justifyContent: 'center', marginTop: '0.75rem', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}>
-              {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Basvuruyu Gonder →'}
+              {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : t('Başvuruyu Gönder →')}
             </button>
           </div>
         )}
@@ -336,14 +338,13 @@ function RegisterTeacherContent() {
           <div className="card anim-up-1" style={{ textAlign: 'center', padding: '2.5rem 2rem' }}>
             <div style={{ fontSize: '56px', marginBottom: '1rem' }}>✅</div>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '8px' }}>
-              Basvurunuz Alindi!
+              {t('Başvurunuz Alındı!')}
             </h2>
             <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
-              Ekibimiz basvurunuzu inceleyecek ve e-posta ile bildirim gonderecek.
-              Onay sureci genellikle 1-2 is gunu surmektedir.
+              {t('Ekibimiz başvurunuzu inceleyecek ve e-posta ile bildirim gönderecek. Onay süreci genellikle 1-2 iş günü sürmektedir.')}
             </p>
             <Link href="/" className="btn btn-primary" style={{ justifyContent: 'center', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}>
-              Ana Sayfaya Don
+              {t('Ana Sayfaya Dön')}
             </Link>
           </div>
         )}
