@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { identityDbSsl } from '../lib/identity/ssl'
-import { computeCostUsd } from '../lib/ai-usage'
+import { computeCostUsd } from '../lib/ai-pricing'
 
 test('identity DB TLS is off unless TR_IDENTITY_DB_SSL=true', () => {
   assert.equal(identityDbSsl({}), false)
