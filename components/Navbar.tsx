@@ -5,15 +5,8 @@ import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/user-context'
 import LightbulbIcon from '@/components/LightbulbIcon'
-
-const LANGS = [
-  { code: 'Türkçe', flag: '🇹🇷' },
-  { code: 'English', flag: '🇬🇧' },
-  { code: 'Deutsch', flag: '🇩🇪' },
-  { code: 'Français', flag: '🇫🇷' },
-  { code: 'Español', flag: '🇪🇸' },
-  { code: 'العربية', flag: '🇸🇦' },
-]
+import { useT } from '@/lib/i18n/I18nProvider'
+import { LOCALES, localeFromLanguage } from '@/lib/i18n/core'
 
 // Desktop avatar dropdown menüsü
 const DROPDOWN_ITEMS = [
@@ -58,6 +51,7 @@ const MENU_ITEMS = [
 
 export default function Navbar() {
   const router = useRouter()
+  const { t, locale, setLocale } = useT()
   const pathname = usePathname()
   const [profile, setProfile] = useState<any>(null)
   const [streak, setStreak] = useState(0)
@@ -104,12 +98,9 @@ export default function Navbar() {
     localStorage.setItem('pratium-theme', next ? 'dark' : 'light')
   }
 
-  async function saveLang(lang: string) {
+  async function saveLang(code: string) {
     setShowLang(false)
-    if (!profile) return
-    localStorage.setItem('pratium_lang', lang)
-    setProfile((prev: any) => prev ? { ...prev, language: lang } : prev)
-    await ctxUpdateLanguage(lang)
+    await setLocale(localeFromLanguage(code))
   }
 
   async function handleSignOut() {
@@ -127,7 +118,7 @@ export default function Navbar() {
   if (HIDDEN.includes(pathname)) return null
 
   const testsLeft = profile.plan === 'free' ? 10 - (profile.monthly_test_count || 0) : null
-  const activeLang = LANGS.find(l => l.code === profile.language) || LANGS[0]
+  const activeLang = LOCALES.find(l => l.code === locale) || LOCALES[0]
 
   const isApprovedTeacher = profile?.teacher_approved === true
   const isParent = profile?.is_parent === true || profile?.role === 'parent'
@@ -147,7 +138,7 @@ export default function Navbar() {
     { href: '/quiz',        label: '⚡ Test' },
     { href: '/live',        label: '🎯 Canlı' },
     { href: '/review',      label: '🧠 Tekrar' },
-    { href: '/daily',       label: streak > 0 ? `🔥 ${streak} gün` : '📅 Günlük' },
+    { href: '/daily',       label: streak > 0 ? `🔥 ${t('{n} gün', { n: streak })}` : '📅 Günlük' },
     { href: '/leaderboard', label: '🏆 Sıralama' },
   ]
 
@@ -180,7 +171,7 @@ export default function Navbar() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button onClick={toggleDark}
-            title={isDark ? 'Aydınlık mod' : 'Karanlık mod'}
+            title={isDark ? t('Aydınlık mod') : t('Karanlık mod')}
             style={{ width: 38, height: 38, borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, transition: 'all 0.2s' }}
             onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
             onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}>
@@ -219,9 +210,9 @@ export default function Navbar() {
               <>
                 <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setShowLang(false)} />
                 <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '6px', minWidth: '155px', boxShadow: '0 8px 32px rgba(8,36,101,0.2)' }}>
-                  {LANGS.map(l => (
-                    <button key={l.code} onClick={() => saveLang(l.code)} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', borderRadius: '8px', border: 'none', background: profile.language === l.code ? 'rgba(30,207,184,0.08)' : 'transparent', color: profile.language === l.code ? '#0a9e90' : '#3B566E', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: profile.language === l.code ? 600 : 400 }}>
-                      {l.flag} {l.code}
+                  {LOCALES.map(l => (
+                    <button key={l.code} onClick={() => saveLang(l.language)} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', borderRadius: '8px', border: 'none', background: locale === l.code ? 'rgba(30,207,184,0.08)' : 'transparent', color: locale === l.code ? '#0a9e90' : '#3B566E', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: locale === l.code ? 600 : 400 }}>
+                      {l.flag} {l.label}
                     </button>
                   ))}
                 </div>
@@ -259,19 +250,19 @@ export default function Navbar() {
                     <div style={{ fontWeight: 700, fontSize: '14px', color: '#29483d' }}>{profile.name}</div>
                     <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
                       {profile.plan === 'premium'
-                        ? <span style={{ color: '#0a9e90', fontWeight: 600 }}>★ Altın</span>
+                        ? <span style={{ color: '#0a9e90', fontWeight: 600 }}>★ {t('Altın')}</span>
                         : profile.plan === 'unlimited'
-                        ? <span style={{ color: '#0d9488', fontWeight: 600 }}>⭐ Platin</span>
+                        ? <span style={{ color: '#0d9488', fontWeight: 600 }}>⭐ {t('Platin')}</span>
                         : profile.plan === 'silver'
-                        ? <span style={{ color: '#64748b', fontWeight: 600 }}>🥈 Gümüş</span>
+                        ? <span style={{ color: '#64748b', fontWeight: 600 }}>🥈 {t('Gümüş')}</span>
                         : profile.plan === 'free'
-                        ? 'Ücretsiz'
-                        : 'Plan seçilmedi'}
-                      {streak > 0 && <span style={{ marginLeft: '6px' }}>🔥 {streak} gün</span>}
+                        ? t('Ücretsiz')
+                        : t('Plan seçilmedi')}
+                      {streak > 0 && <span style={{ marginLeft: '6px' }}>🔥 {t('{n} gün',{n:streak})}</span>}
                     </div>
                     {testsLeft !== null && (
                       <div style={{ fontSize: '11px', color: testsLeft <= 2 ? '#dc2626' : '#94a3b8', marginTop: '2px' }}>
-                        Bu ay {testsLeft} test hakkı kaldı
+                        {t('Bu ay {n} test hakkı kaldı',{n:testsLeft})}
                       </div>
                     )}
                   </div>
@@ -317,12 +308,12 @@ export default function Navbar() {
                       background: pathname === item.href ? 'rgba(30,207,184,0.08)' : 'transparent',
                       fontWeight: pathname === item.href ? 600 : 400,
                     }}>
-                      {item.label}
+                      {t(item.label)}
                     </Link>
                   ))}
                   <div style={{ borderTop: '1px solid #f0f4f8', marginTop: '6px', paddingTop: '6px' }}>
                     <button onClick={handleSignOut} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px', borderRadius: '10px', fontSize: '13px', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>
-                      Çıkış yap
+                      {t('Çıkış yap')}
                     </button>
                   </div>
                 </div>
@@ -361,7 +352,7 @@ export default function Navbar() {
                 onMouseEnter={e => { if (pathname !== item.href) { e.currentTarget.style.color = '#df5c3f'; e.currentTarget.style.background = 'rgba(223,92,63,0.06)' } }}
                 onMouseLeave={e => { if (pathname !== item.href) { e.currentTarget.style.color = '#62574e'; e.currentTarget.style.background = 'transparent' } }}
               >
-                {item.label}
+                {t(item.label)}
               </Link>
             ))}
           </div>
@@ -371,7 +362,7 @@ export default function Navbar() {
 
             {/* Dark mode toggle */}
             <button onClick={toggleDark}
-              title={isDark ? 'Aydınlık mod' : 'Karanlık mod'}
+              title={isDark ? t('Aydınlık mod') : t('Karanlık mod')}
               style={{ width: 38, height: 38, borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, transition: 'all 0.2s' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
               onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}>
@@ -413,9 +404,9 @@ export default function Navbar() {
                 <>
                   <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setShowLang(false)} />
                   <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '6px', minWidth: '160px', boxShadow: '0 8px 40px rgba(8,36,101,0.15)' }}>
-                    {LANGS.map(l => (
-                      <button key={l.code} onClick={() => saveLang(l.code)} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', borderRadius: '8px', border: 'none', background: profile.language === l.code ? 'rgba(30,207,184,0.08)' : 'transparent', color: profile.language === l.code ? '#0a9e90' : '#3B566E', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: profile.language === l.code ? 600 : 400 }}>
-                        {l.flag} {l.code}
+                    {LOCALES.map(l => (
+                      <button key={l.code} onClick={() => saveLang(l.language)} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', borderRadius: '8px', border: 'none', background: locale === l.code ? 'rgba(30,207,184,0.08)' : 'transparent', color: locale === l.code ? '#0a9e90' : '#3B566E', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: locale === l.code ? 600 : 400 }}>
+                        {l.flag} {l.label}
                       </button>
                     ))}
                   </div>
@@ -427,7 +418,7 @@ export default function Navbar() {
             <div style={{ position: 'relative' }}>
               {/* Gümüş / Altın / Platin küçük rozet */}
               {planBadge && (
-                <span title={planBadge.title} style={{
+                <span title={t(planBadge.title)} style={{
                   position: 'absolute', top: -6, right: -4,
                   width: 18, height: 18, borderRadius: '50%',
                   background: planBadge.color,
@@ -491,14 +482,14 @@ export default function Navbar() {
                           <div style={{ fontWeight: 700, fontSize: '14px', color: '#082465', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.name}</div>
                           <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                             {planBadge
-                              ? <span style={{ color: planBadge.color === '#fdd31d' ? '#b8860b' : planBadge.color, fontWeight: 600 }}>{planBadge.emoji} {planBadge.title}</span>
-                              : <span>Ücretsiz</span>
+                              ? <span style={{ color: planBadge.color === '#fdd31d' ? '#b8860b' : planBadge.color, fontWeight: 600 }}>{planBadge.emoji} {t(planBadge.title)}</span>
+                              : <span>{t('Ücretsiz')}</span>
                             }
-                            {streak > 0 && <span>🔥 {streak} gün</span>}
+                            {streak > 0 && <span>🔥 {t('{n} gün',{n:streak})}</span>}
                           </div>
                           {testsLeft !== null && (
                             <div style={{ fontSize: '11px', color: testsLeft <= 2 ? '#dc2626' : '#94a3b8', marginTop: '2px' }}>
-                              Bu ay {testsLeft} test hakkı kaldı
+                              {t('Bu ay {n} test hakkı kaldı',{n:testsLeft})}
                             </div>
                           )}
                         </div>
@@ -521,7 +512,7 @@ export default function Navbar() {
                         onMouseEnter={e => { if (pathname !== item.href) e.currentTarget.style.background = '#f8fafc' }}
                         onMouseLeave={e => { if (pathname !== item.href) e.currentTarget.style.background = 'transparent' }}
                       >
-                        {item.label}
+                        {t(item.label)}
                       </Link>
                     ))}
 
@@ -529,7 +520,7 @@ export default function Navbar() {
                       <button onClick={handleSignOut} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px', borderRadius: '10px', fontSize: '13px', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}
                         onMouseEnter={e => (e.currentTarget.style.background = 'rgba(220,38,38,0.06)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                        🚪 Çıkış yap
+                        🚪 {t('Çıkış yap')}
                       </button>
                     </div>
                   </div>
@@ -578,7 +569,7 @@ export default function Navbar() {
           }}>
             <span style={{ fontSize: '19px', lineHeight: 1 }}>{item.icon}</span>
             <span style={{ fontSize: '9px', fontWeight: pathname === item.href ? 700 : 400, color: pathname === item.href ? '#f2b94b' : 'rgba(255,255,255,0.62)', whiteSpace: 'nowrap' }}>
-              {item.label}
+              {t(item.label)}
             </span>
           </Link>
         ))}
