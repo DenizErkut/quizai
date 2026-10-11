@@ -19,5 +19,9 @@ import { planEntries } from './plan'
 import { liveEntries } from './live'
 import { registerEntries } from './register'
 import { examEntries } from './exam'
+import { studentSchoolEntries } from './student-school'
+import { referralEntries } from './referral'
+import { notificationsEntries } from './notifications'
+import { openEndedEntries } from './open-ended'
 
-export const ALL_ENTRIES: Entry[] = [...navbarEntries, ...publicEntries, ...dashboardPricingEntries, ...profileEntries, ...quizSetupEntries, ...quizQuestionEntries, ...quizResultEntries, ...quizFlowEntries, ...communityEntries, ...coachEntries, ...reviewEntries, ...archiveEntries, ...dailyEntries, ...analysisEntries, ...authLoginEntries, ...notesEntries, ...planEntries, ...liveEntries, ...registerEntries, ...examEntries]
+export const ALL_ENTRIES: Entry[] = [...navbarEntries, ...publicEntries, ...dashboardPricingEntries, ...profileEntries, ...quizSetupEntries, ...quizQuestionEntries, ...quizResultEntries, ...quizFlowEntries, ...communityEntries, ...coachEntries, ...reviewEntries, ...archiveEntries, ...dailyEntries, ...analysisEntries, ...authLoginEntries, ...notesEntries, ...planEntries, ...liveEntries, ...registerEntries, ...examEntries, ...studentSchoolEntries, ...referralEntries, ...notificationsEntries, ...openEndedEntries]

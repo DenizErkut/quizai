@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities } from '@/lib/identity/resolve-client'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 
 interface ClassRoom {
   id: string
@@ -44,6 +46,7 @@ function subjectStyle(subject: string) {
 }
 
 export default function ClassesPage() {
+  const { t, locale } = useT()
   const router = useRouter()
   const [classes, setClasses] = useState<ClassRoom[]>([])
   const [loading, setLoading] = useState(true)
@@ -95,7 +98,7 @@ export default function ClassesPage() {
       setClasses(enriched)
     } catch (error) {
       console.error('[classes] sınıf listesi alınamadı:', error)
-      setLoadError(error instanceof Error ? error.message : 'Sınıf bilgileri şu anda alınamıyor.')
+      setLoadError(error instanceof Error ? error.message : t('Sınıf bilgileri şu anda alınamıyor.'))
     } finally {
       setLoading(false)
     }
@@ -115,8 +118,8 @@ export default function ClassesPage() {
       body: JSON.stringify({ code }),
     })
     const result = await response.json().catch(() => ({}))
-    if (!response.ok) setJoinError(result.error || 'Bir hata oluştu, tekrar dene.')
-    else if (result.alreadyJoined) setJoinError('Bu sınıfa zaten kayıtlısın.')
+    if (!response.ok) setJoinError(result.error || t('Bir hata oluştu, tekrar dene.'))
+    else if (result.alreadyJoined) setJoinError(t('Bu sınıfa zaten kayıtlısın.'))
     else {
       setJoinCode('')
       setShowJoin(false)
@@ -142,23 +145,23 @@ export default function ClassesPage() {
         <div style={{ maxWidth: '640px', margin: '0 auto' }}>
           <button onClick={() => setSelectedClass(null)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', fontSize: '14px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'inherit' }}>
-            ← Sınıflarıma dön
+            {t('← Sınıflarıma dön')}
           </button>
 
           <div className="card anim-up" style={{ marginBottom: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
               <div>
                 <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '99px', background: sStyle.bg, color: sStyle.color, border: `1px solid ${sStyle.border}`, fontWeight: 700, marginBottom: '8px', display: 'inline-block' }}>
-                  {selectedClass.subject || 'Genel'}
+                  {selectedClass.subject || t('Genel‖ders')}
                 </span>
                 <h2 className="serif" style={{ fontSize: '24px', marginBottom: '4px' }}>{selectedClass.name}</h2>
                 {selectedClass.description && (
                   <p style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}>{selectedClass.description}</p>
                 )}
                 <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '6px' }}>
-                  👨‍🏫 Öğretmen: <strong>{selectedClass.teacher_name}</strong>
+                  {t('👨‍🏫 Öğretmen: {name}', { name: selectedClass.teacher_name })}
                   <span style={{ margin: '0 8px' }}>·</span>
-                  {students.length} öğrenci
+                  {t('{n} öğrenci', { n: students.length })}
                 </div>
               </div>
               <div style={{ fontSize: '40px' }}>{SUBJECT_EMOJI[selectedClass.subject] || '📚'}</div>
@@ -166,8 +169,8 @@ export default function ClassesPage() {
 
             <div style={{ marginTop: '1rem', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
               <div>
-                <div style={{ fontSize: '13px', fontWeight: 500 }}>Test sonuçlarımı sınıfla paylaş</div>
-                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>Açıksa arkadaşların sonuçlarını görebilir</div>
+                <div style={{ fontSize: '13px', fontWeight: 500 }}>{t('Test sonuçlarımı sınıfla paylaş')}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{t('Açıksa arkadaşların sonuçlarını görebilir')}</div>
               </div>
               <button onClick={() => setShareResult(v => !v)}
                 style={{ width: 44, height: 24, borderRadius: '12px', border: 'none', cursor: 'pointer', background: shareResult ? 'var(--accent)' : '#cbd5e1', transition: 'background 0.2s', position: 'relative', flexShrink: 0 }}>
@@ -178,7 +181,7 @@ export default function ClassesPage() {
 
           <div className="card anim-up-1">
             <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '1rem' }}>
-              Sınıf üyeleri · {students.length} öğrenci
+              {t('Sınıf üyeleri · {n} öğrenci', { n: students.length })}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
               {students.map((s, i) => (
@@ -189,23 +192,23 @@ export default function ClassesPage() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: s.id === myUserId ? 700 : 500, fontSize: '14px' }}>
                       {s.name}
-                      {s.id === myUserId && <span style={{ marginLeft: '6px', fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>(Sen)</span>}
+                      {s.id === myUserId && <span style={{ marginLeft: '6px', fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>{t('(Sen)')}</span>}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '1px' }}>
                       {s.grade}
-                      {s.plan === 'premium' && <span style={{ marginLeft: '6px', color: 'var(--accent)' }}>★ Altın</span>}
-                      {s.plan === 'unlimited' && <span style={{ marginLeft: '6px', color: '#0d9488' }}>⭐ Platin</span>}
-                      {s.plan === 'silver' && <span style={{ marginLeft: '6px', color: '#64748b' }}>🥈 Gümüş</span>}
+                      {s.plan === 'premium' && <span style={{ marginLeft: '6px', color: 'var(--accent)' }}>★ {t('Altın')}</span>}
+                      {s.plan === 'unlimited' && <span style={{ marginLeft: '6px', color: '#0d9488' }}>⭐ {t('Platin')}</span>}
+                      {s.plan === 'silver' && <span style={{ marginLeft: '6px', color: '#64748b' }}>🥈 {t('Gümüş')}</span>}
                     </div>
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text3)', flexShrink: 0 }}>
-                    {new Date(s.joined_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                    {new Date(s.joined_at).toLocaleDateString(intlLocale(locale), { day: 'numeric', month: 'short' })}
                   </div>
                 </div>
               ))}
               {students.length === 0 && (
                 <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text3)', fontSize: '13px' }}>
-                  Henüz öğrenci yok.
+                  {t('Henüz öğrenci yok.')}
                 </div>
               )}
             </div>
@@ -222,29 +225,29 @@ export default function ClassesPage() {
 
         <div className="anim-up" style={{ marginBottom: '1.75rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <div className="badge badge-purple" style={{ marginBottom: '0.5rem' }}>Sınıflarım</div>
-            <h1 className="serif" style={{ fontSize: '28px', marginBottom: '4px' }}>Sınıflarım</h1>
-            <p style={{ color: 'var(--text2)', fontSize: '13px' }}>Dahil olduğun sınıflar ve arkadaşların</p>
+            <div className="badge badge-purple" style={{ marginBottom: '0.5rem' }}>{t('Sınıflarım')}</div>
+            <h1 className="serif" style={{ fontSize: '28px', marginBottom: '4px' }}>{t('Sınıflarım')}</h1>
+            <p style={{ color: 'var(--text2)', fontSize: '13px' }}>{t('Dahil olduğun sınıflar ve arkadaşların')}</p>
           </div>
           <button onClick={() => setShowJoin(v => !v)} className="btn btn-primary" style={{ flexShrink: 0 }}>
-            + Sınıfa katıl
+            {t('+ Sınıfa katıl')}
           </button>
         </div>
 
         {showJoin && (
           <div className="card anim-up" style={{ marginBottom: '1rem', border: '2px solid var(--accent)' }}>
-            <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '0.75rem' }}>🏫 Sınıfa katıl</div>
+            <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '0.75rem' }}>{t('🏫 Sınıfa katıl')}</div>
             <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '1rem', lineHeight: 1.6 }}>
-              Öğretmeninden aldığın davet kodunu gir. Her öğretmen her dersi için ayrı bir sınıf oluşturabilir.
+              {t('Öğretmeninden aldığın davet kodunu gir. Her öğretmen her dersi için ayrı bir sınıf oluşturabilir.')}
             </p>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <input className="input" placeholder="Örn: 8A002D"
+              <input className="input" placeholder={t('Örn: 8A002D')}
                 value={joinCode}
                 onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinError('') }}
                 onKeyDown={e => e.key === 'Enter' && joinClass()}
                 style={{ flex: 1, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }} />
               <button className="btn btn-primary" onClick={joinClass} disabled={joinLoading || !joinCode.trim()}>
-                {joinLoading ? '⏳' : 'Katıl'}
+                {joinLoading ? '⏳' : t('Katıl')}
               </button>
             </div>
             {joinError && <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--red)' }}>{joinError}</div>}
@@ -253,19 +256,19 @@ export default function ClassesPage() {
 
         {loadError ? (
           <div className="card anim-up-1" role="alert" style={{ textAlign: 'center', padding: '2rem 1.5rem' }}>
-            <h3 className="serif" style={{ fontSize: '20px', marginBottom: '0.5rem' }}>Sınıflar yüklenemedi</h3>
+            <h3 className="serif" style={{ fontSize: '20px', marginBottom: '0.5rem' }}>{t('Sınıflar yüklenemedi')}</h3>
             <p style={{ color: 'var(--text2)', fontSize: '14px', lineHeight: 1.7, marginBottom: '1rem' }}>{loadError}</p>
-            <button className="btn btn-primary" onClick={loadClasses}>Tekrar dene</button>
+            <button className="btn btn-primary" onClick={loadClasses}>{t('Tekrar dene')}</button>
           </div>
         ) : classes.length === 0 ? (
           <div className="card anim-up-1" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
             <div style={{ fontSize: '48px', marginBottom: '1rem' }}>🏫</div>
-            <h3 className="serif" style={{ fontSize: '22px', marginBottom: '0.5rem' }}>Henüz bir sınıfa dahil değilsin</h3>
+            <h3 className="serif" style={{ fontSize: '22px', marginBottom: '0.5rem' }}>{t('Henüz bir sınıfa dahil değilsin')}</h3>
             <p style={{ color: 'var(--text2)', fontSize: '14px', lineHeight: 1.7, marginBottom: '1.5rem' }}>
-              Öğretmeninden davet kodu alarak matematik, Türkçe veya istediğin ders için sınıfa katılabilirsin.
+              {t('Öğretmeninden davet kodu alarak matematik, Türkçe veya istediğin ders için sınıfa katılabilirsin.')}
             </p>
             <button className="btn btn-primary" onClick={() => setShowJoin(true)} style={{ justifyContent: 'center' }}>
-              + Sınıfa katıl
+              {t('+ Sınıfa katıl')}
             </button>
           </div>
         ) : (
@@ -289,8 +292,8 @@ export default function ClassesPage() {
                       </div>
                       {cls.description && <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cls.description}</div>}
                       <div style={{ fontSize: '12px', color: 'var(--text3)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                        <span>👨‍🏫 {cls.teacher_name}</span>
-                        <span>👥 {cls.student_count} öğrenci</span>
+                        <span>{t('👨‍🏫 Öğretmen: {name}', { name: cls.teacher_name })}</span>
+                        <span>👥 {t('{n} öğrenci', { n: cls.student_count })}</span>
                       </div>
                     </div>
                     <span style={{ fontSize: '18px', color: 'var(--text3)', alignSelf: 'center' }}>›</span>
@@ -304,7 +307,7 @@ export default function ClassesPage() {
         {classes.length > 0 && (
           <div style={{ marginTop: '1rem', textAlign: 'center' }}>
             <button onClick={() => setShowJoin(v => !v)} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '13px', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
-              + Başka bir sınıfa katıl
+              {t('+ Başka bir sınıfa katıl')}
             </button>
           </div>
         )}

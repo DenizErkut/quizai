@@ -211,3 +211,35 @@ test('exam entries are used by the exam page, shared header or exam metadata', a
   const unused = examEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
   assert.deepEqual(unused, [])
 })
+
+test('student school entries are used by assignments and classes pages', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { studentSchoolEntries } = await import('../lib/i18n/entries/student-school')
+  const source = ['app/assignments/page.tsx', 'app/classes/page.tsx'].map(f => readFileSync(f, 'utf8')).join('\n')
+  const unused = studentSchoolEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})
+
+test('referral entries are used by the referral page', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { referralEntries } = await import('../lib/i18n/entries/referral')
+  const source = readFileSync('app/referral/page.tsx', 'utf8')
+  const unused = referralEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})
+
+test('notifications entries are used by the notifications page', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { notificationsEntries } = await import('../lib/i18n/entries/notifications')
+  const source = readFileSync('app/notifications/page.tsx', 'utf8')
+  const unused = notificationsEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})
+
+test('open-ended entries are used by the open-ended page', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { openEndedEntries } = await import('../lib/i18n/entries/open-ended')
+  const source = readFileSync('app/acik-uclu/page.tsx', 'utf8')
+  const unused = openEndedEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})
