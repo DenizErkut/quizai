@@ -285,6 +285,9 @@ for (const [name, entriesFile, exportName, files] of [
   ['teacher assign', 'teacher-assign', 'teacherAssignEntries', ['app/teacher/assign/page.tsx']],
   ['teacher performance', 'teacher-performance', 'teacherPerformanceEntries', ['app/teacher/performance/page.tsx']],
   ['parent', 'parent', 'parentEntries', ['app/parent/page.tsx', 'app/parent/report/page.tsx']],
+  ['institution', 'institution', 'institutionEntries', ['app/institution/page.tsx']],
+  ['institution parts', 'institution-parts', 'institutionPartsEntries', ['components/institution/InstitutionTeachers.tsx', 'components/institution/InstitutionComparisons.tsx']],
+  ['institution integrations', 'institution-integrations', 'institutionIntegrationsEntries', ['app/institution/integrations/page.tsx']],
   ['teacher live', 'teacher-live', 'teacherLiveEntries', ['app/teacher/live/page.tsx']],
   ['teacher components', 'teacher-components', 'teacherComponentsEntries', ['components/teacher/PeriodicAiQuiz.tsx', 'components/teacher/TeacherKnowledgeTestShortcut.tsx', 'components/teacher/PaperAnswerImport.tsx']],
 ] as const) {
