@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { languageFromLocale } from '@/lib/i18n/core'
 
 // ─── TIPLER ──────────────────────────────────────────────────────────────────
 interface Question {
@@ -44,6 +46,7 @@ function pctColor(p: number) {
 // ─── ANA COMPONENT ───────────────────────────────────────────────────────────
 export default function ExamPage() {
   const router = useRouter()
+  const { t: tr, locale } = useT()
   const supabase = createClient() as any
 
   // Ekranlar
@@ -122,10 +125,10 @@ export default function ExamPage() {
     setScreen('loading')
 
     const msgs = [
-      `${selectedExam} soruları hazırlanıyor...`,
-      'Bölümler oluşturuluyor...',
-      'Sorular derleniyor...',
-      'Son kontroller yapılıyor...',
+      tr('{exam} soruları hazırlanıyor...', { exam: selectedExam }),
+      tr('Bölümler oluşturuluyor...'),
+      tr('Sorular derleniyor...'),
+      tr('Son kontroller yapılıyor...'),
     ]
     let mi = 0
     setLoadingMsg(msgs[0])
@@ -317,7 +320,7 @@ export default function ExamPage() {
             content: `Öğrenci şu soruları yanlış yaptı. Her birini kısaca (2-3 cümle) analiz et ve neden yanlış yaptığını, nasıl öğreneceğini açıkla:\n\n${wrongQs.join('\n---\n')}`
           }],
           topic: 'sınav analizi',
-          language: 'Türkçe'
+          language: languageFromLocale(locale)
         })
       })
       const data = await res.json()
@@ -332,7 +335,7 @@ export default function ExamPage() {
     const spent = accumulatedTimeRef.current + currentPhaseTime
     setTimeSpent(spent)
     setScreen('loading')
-    setLoadingMsg('Sonuçlar hesaplanıyor...')
+    setLoadingMsg(tr('Sonuçlar hesaplanıyor...'))
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -392,12 +395,12 @@ export default function ExamPage() {
       <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--bg)', padding: '1rem' }}>
         <div className="card" style={{ maxWidth: 520, width: '100%', textAlign: 'center', padding: '2rem' }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>☕</div>
-          <h1 className="serif" style={{ fontSize: 28 }}>{completedPhase?.label} tamamlandı</h1>
+          <h1 className="serif" style={{ fontSize: 28 }}>{tr('{label} tamamlandı', { label: completedPhase?.label ?? '' })}</h1>
           <p style={{ color: 'var(--text2)', lineHeight: 1.6, margin: '10px 0 20px' }}>
-            Cevapların kaydedildi. Hazır olduğunda {nextPhase?.label} bölümüne geçebilirsin. Önceki oturuma geri dönülemez.
+            {tr('Cevapların kaydedildi. Hazır olduğunda {label} bölümüne geçebilirsin. Önceki oturuma geri dönülemez.', { label: nextPhase?.label ?? '' })}
           </p>
           <button onClick={startNextPhase} style={{ padding: '13px 24px', borderRadius: 12, border: 0, background: '#6366f1', color: '#fff', fontWeight: 800, cursor: 'pointer' }}>
-            {nextPhase?.label} bölümünü başlat →
+            {tr('{label} bölümünü başlat →', { label: nextPhase?.label ?? '' })}
           </button>
         </div>
       </main>
@@ -420,11 +423,11 @@ export default function ExamPage() {
           return isRestricted && (
             <div style={{ padding: '14px 16px', borderRadius: '14px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
               <div>
-                <div style={{ fontWeight: 600, fontSize: '14px', color: '#6366f1' }}>Demo modu</div>
-                <div style={{ fontSize: '12px', color: 'var(--text2)', marginTop: '2px' }}>Her sınav türünün demosunu (alanda 1 soru) deneyebilirsin. Tam sınav için bir plana geç.</div>
+                <div style={{ fontWeight: 600, fontSize: '14px', color: '#6366f1' }}>{tr('Demo modu')}</div>
+                <div style={{ fontSize: '12px', color: 'var(--text2)', marginTop: '2px' }}>{tr('Her sınav türünün demosunu (alanda 1 soru) deneyebilirsin. Tam sınav için bir plana geç.')}</div>
               </div>
               <button onClick={() => router.push('/pricing')} style={{ padding: '8px 16px', borderRadius: '8px', background: '#6366f1', color: '#fff', border: 'none', fontWeight: 600, fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--font-sans)' }}>
-                Yükselt
+                {tr('Yükselt')}
               </button>
             </div>
           )
@@ -443,15 +446,15 @@ export default function ExamPage() {
               <button key={String(opt.val)}
                 onClick={() => { if (!isFreeLocked) setDemoMode(opt.val) }}
                 disabled={isFreeLocked}
-                title={isFreeLocked ? 'Tam sınav için bir plana geçmen gerekir' : undefined}
+                title={isFreeLocked ? tr('Tam sınav için bir plana geçmen gerekir') : undefined}
                 style={{
                   flex: 1, padding: '12px', borderRadius: '12px', border: `2px solid ${demoMode === opt.val ? '#6366f1' : 'var(--border)'}`,
                   background: demoMode === opt.val ? 'rgba(99,102,241,0.08)' : 'var(--bg2)',
                   cursor: isFreeLocked ? 'not-allowed' : 'pointer', textAlign: 'left', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
                   opacity: isFreeLocked ? 0.5 : 1,
                 }}>
-                <div style={{ fontWeight: 700, fontSize: '13px', color: demoMode === opt.val ? '#6366f1' : 'var(--primary)' }}>{opt.label}{isFreeLocked ? ' 🔒' : ''}</div>
-                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{opt.desc}</div>
+                <div style={{ fontWeight: 700, fontSize: '13px', color: demoMode === opt.val ? '#6366f1' : 'var(--primary)' }}>{tr(opt.label)}{isFreeLocked ? ' 🔒' : ''}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{tr(opt.desc)}</div>
               </button>
             )
             })
@@ -474,7 +477,7 @@ export default function ExamPage() {
                 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                   <div style={{ fontSize: '28px' }}>{meta.emoji}</div>
-                  <span style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '99px', background: meta.bg, color: meta.color, fontWeight: 600, border: `1px solid ${meta.color}33` }}>{meta.badge}</span>
+                  <span style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '99px', background: meta.bg, color: meta.color, fontWeight: 600, border: `1px solid ${meta.color}33` }}>{tr(meta.badge)}</span>
                 </div>
                 <div style={{ fontWeight: 800, fontSize: '20px', color: isSelected ? meta.color : 'var(--primary)', marginBottom: '4px' }}>{key}</div>
                 <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '10px' }}>{fmt?.fullName || key}</div>
@@ -490,7 +493,7 @@ export default function ExamPage() {
                     ))}
                     {fmt.sections.length > 4 && (
                       <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '99px', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text3)' }}>
-                        +{fmt.sections.length - 4} bölüm
+                        {tr('+{n} bölüm', { n: fmt.sections.length - 4 })}
                       </span>
                     )}
                   </div>
@@ -502,11 +505,11 @@ export default function ExamPage() {
 
         {selectedExam === 'AYT' && (
           <div className="card-sm" style={{ marginTop: '1rem' }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>AYT puan alanını seç</div>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>{tr('AYT puan alanını seç')}</div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {([['SAY', 'Sayısal'], ['EA', 'Eşit Ağırlık'], ['SOZ', 'Sözel']] as const).map(([value, label]) => (
                 <button key={value} onClick={() => setAytTrack(value)} style={{ padding: '9px 14px', borderRadius: 10, border: `1.5px solid ${aytTrack === value ? '#f59e0b' : 'var(--border)'}`, background: aytTrack === value ? 'rgba(245,158,11,.1)' : 'var(--bg2)', color: aytTrack === value ? '#b45309' : 'var(--text2)', fontWeight: 700, cursor: 'pointer' }}>
-                  {label}
+                  {tr(label)}
                 </button>
               ))}
             </div>
@@ -515,11 +518,11 @@ export default function ExamPage() {
 
         {selectedExam === 'YDT' && (
           <div className="card-sm" style={{ marginTop: '1rem' }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>YDT dilini seç</div>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>{tr('YDT dilini seç')}</div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {['İngilizce', 'Almanca', 'Fransızca', 'Arapça', 'Rusça'].map(language => (
                 <button key={language} onClick={() => setYdtLanguage(language)} style={{ padding: '9px 12px', borderRadius: 10, border: `1.5px solid ${ydtLanguage === language ? '#8b5cf6' : 'var(--border)'}`, background: ydtLanguage === language ? 'rgba(139,92,246,.1)' : 'var(--bg2)', color: ydtLanguage === language ? '#7c3aed' : 'var(--text2)', fontWeight: 700, cursor: 'pointer' }}>
-                  {language}
+                  {tr(language)}
                 </button>
               ))}
             </div>
@@ -531,14 +534,14 @@ export default function ExamPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--primary)' }}>
-                  {demoMode ? '⚡ Demo' : '📋 Tam'} {selectedExam} sınavı hazır
+                  {demoMode ? tr('⚡ Demo {exam} sınavı hazır', { exam: selectedExam }) : tr('📋 Tam {exam} sınavı hazır', { exam: selectedExam })}
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--text2)', marginTop: '3px' }}>
                   {demoMode
-                    ? `Kısa önizleme · ${Math.round((formats[selectedExam]?.duration || 60) * 0.25)} dakika`
-                    : selectedExam === 'AYT' ? `${aytTrack} · 80 soru · 180 dakika`
-                    : selectedExam === 'YDT' ? `${ydtLanguage} · 80 soru · 120 dakika`
-                    : `${formats[selectedExam]?.sections.reduce((a: number, s: any) => a + s.count, 0)} soru · ${formats[selectedExam]?.duration} dakika`
+                    ? tr('Kısa önizleme · {n} dakika', { n: Math.round((formats[selectedExam]?.duration || 60) * 0.25) })
+                    : selectedExam === 'AYT' ? tr('{track} · 80 soru · 180 dakika', { track: aytTrack })
+                    : selectedExam === 'YDT' ? tr('{lang} · 80 soru · 120 dakika', { lang: tr(ydtLanguage) })
+                    : tr('{q} soru · {d} dakika', { q: formats[selectedExam]?.sections.reduce((a: number, s: any) => a + s.count, 0) ?? 0, d: formats[selectedExam]?.duration ?? 0 })
                   }
                 </div>
               </div>
@@ -547,7 +550,7 @@ export default function ExamPage() {
                 color: '#fff', border: 'none', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
                 fontFamily: 'var(--font-sans)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
               }}>
-                🚀 Sınavı Başlat
+                {tr('🚀 Sınavı Başlat')}
               </button>
             </div>
           </div>
@@ -602,7 +605,7 @@ export default function ExamPage() {
           </div>
           {/* Alt etiket */}
           <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginTop: '6px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-            {timeWarning ? 'Az kaldı!' : 'Kalan Süre'}
+            {timeWarning ? tr('Az kaldı!') : tr('Kalan Süre')}
           </div>
         </div>
 
@@ -637,9 +640,9 @@ export default function ExamPage() {
             {formatTime(timeLeft)}
           </div>
 
-          <button onClick={() => { if (confirm('Sınavı bitirmek istediğinize emin misiniz?')) finishExam() }}
+          <button onClick={() => { if (confirm(tr('Sınavı bitirmek istediğinize emin misiniz?'))) finishExam() }}
             style={{ padding: '6px 12px', borderRadius: '8px', background: 'rgba(220,38,38,0.2)', border: '1px solid rgba(220,38,38,0.4)', color: '#fca5a5', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>
-            Bitir
+            {tr('Bitir')}
           </button>
         </div>
 
@@ -675,7 +678,7 @@ export default function ExamPage() {
               {currentSectionInfo?.label}
             </span>
             <span style={{ fontSize: '12px', color: 'var(--text3)' }}>
-              Soru {currentQ + 1} / {sectionQs.length} · Genel {globalQNum}/{totalQCount}
+              {tr('Soru {n} / {m} · Genel {a}/{b}', { n: currentQ + 1, m: sectionQs.length, a: globalQNum, b: totalQCount })}
             </span>
           </div>
 
@@ -742,26 +745,26 @@ export default function ExamPage() {
               )}
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text2)' }}>Bu bölümde soru yüklenemedi.</div>
+            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text2)' }}>{tr('Bu bölümde soru yüklenemedi.')}</div>
           )}
 
           {/* Navigasyon */}
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button onClick={prevQuestion} disabled={currentQ === 0}
               style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text2)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: '14px', fontWeight: 500 }}>
-              ← Önceki
+              {tr('← Önceki')}
             </button>
             <button onClick={nextQuestion}
               style={{ flex: 2, padding: '12px', borderRadius: '10px', border: 'none', background: sectionMeta?.color || '#6366f1', color: '#fff', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: '14px', fontWeight: 700 }}>
               {currentQ === sectionQs.length - 1 && currentSection === examFormat.sections[examFormat.sections.length - 1]?.id
-                ? '🏁 Sınavı Bitir'
-                : 'Sonraki →'}
+                ? tr('🏁 Sınavı Bitir')
+                : tr('Sonraki →')}
             </button>
           </div>
 
           {/* Soru haritası — mevcut bölüm */}
           <div style={{ marginTop: '1.25rem' }}>
-            <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '8px' }}>Soru haritası — {currentSectionInfo?.label}</div>
+            <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '8px' }}>{tr('Soru haritası — {label}', { label: currentSectionInfo?.label ?? '' })}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
               {sectionQs.map((_, qi) => {
                 const ans = answers[currentSection]?.[qi]
@@ -801,23 +804,23 @@ export default function ExamPage() {
 
           {/* Büyük skor */}
           <div style={{ textAlign: 'center', padding: '2rem 1rem', marginBottom: '1rem', borderRadius: '20px', background: `linear-gradient(135deg, #082465, ${sectionMeta?.color || '#6366f1'})`, color: '#fff' }}>
-            <div style={{ fontSize: '13px', opacity: 0.7, marginBottom: '8px' }}>Pratik puanı (resmî sonuç değildir)</div>
+            <div style={{ fontSize: '13px', opacity: 0.7, marginBottom: '8px' }}>{tr('Pratik puanı (resmî sonuç değildir)')}</div>
             <div style={{ fontSize: '56px', fontWeight: 900, lineHeight: 1 }}>{result?.practiceScore ?? '—'}</div>
             <div style={{ fontSize: '14px', opacity: 0.6, marginTop: '4px' }}>/ {examFormat.maxScore}</div>
             <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'center', gap: '24px', fontSize: '13px' }}>
-              <span>✓ {stats.correct} doğru</span>
-              <span>✗ {stats.wrong} yanlış</span>
-              <span>— {stats.total - stats.answered} boş</span>
+              <span>{tr('✓ {n} doğru', { n: stats.correct })}</span>
+              <span>{tr('✗ {n} yanlış', { n: stats.wrong })}</span>
+              <span>{tr('— {n} boş', { n: stats.total - stats.answered })}</span>
             </div>
             <div style={{ marginTop: '8px', fontSize: '13px', opacity: 0.7 }}>
-              ⏱ {formatTime(timeSpent)} sürede tamamlandı
+              {tr('⏱ {time} sürede tamamlandı', { time: formatTime(timeSpent) })}
             </div>
           </div>
 
           {/* Bölüm bazlı sonuçlar */}
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
-              Bölüm bazlı sonuçlar
+              {tr('Bölüm bazlı sonuçlar')}
             </div>
             {examFormat.sections.map(sec => {
               const sNet = result?.sectionNets?.[sec.id] || getSectionStats(sec.id)
@@ -828,7 +831,7 @@ export default function ExamPage() {
                     <div>
                       <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary)' }}>{sec.label}</span>
                       <span style={{ fontSize: '11px', color: 'var(--text3)', marginLeft: '8px' }}>
-                        {sNet.correct || 0}D · {sNet.wrong || 0}Y · Net {(sNet.net || 0).toFixed(2)}
+                        {tr('{c}D · {w}Y · Net {net}', { c: sNet.correct || 0, w: sNet.wrong || 0, net: (sNet.net || 0).toFixed(2) })}
                       </span>
                     </div>
                     <span style={{ fontSize: '13px', fontWeight: 700, color: pctColor(secPct) }}>%{secPct}</span>
@@ -845,11 +848,11 @@ export default function ExamPage() {
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={() => { setScreen('select'); setSelectedExam(null); setResult(null) }}
               style={{ flex: 1, padding: '13px', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontWeight: 600, fontSize: '14px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-              🔄 Tekrar Dene
+              {tr('🔄 Tekrar Dene')}
             </button>
             <button onClick={() => router.push('/analysis')}
               style={{ flex: 1, padding: '13px', borderRadius: '12px', border: 'none', background: sectionMeta?.color || '#6366f1', color: '#fff', fontWeight: 600, fontSize: '14px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-              📊 Analize Git
+              {tr('📊 Analize Git')}
             </button>
           </div>
 
@@ -859,15 +862,15 @@ export default function ExamPage() {
               <div style={{ background: 'linear-gradient(135deg, #082465, #1e3a8a)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '20px' }}>🤖</span>
                 <div>
-                  <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>AI Yanlış Analizi</div>
-                  <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>Pratium Asistan yanlışlarını değerlendiriyor</div>
+                  <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>{tr('AI Yanlış Analizi')}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>{tr('Pratium Asistan yanlışlarını değerlendiriyor')}</div>
                 </div>
               </div>
               <div style={{ padding: '16px', background: 'var(--bg2)' }}>
                 {aiLoading ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text3)', fontSize: '13px' }}>
                     <div style={{ width: 16, height: 16, border: '2px solid rgba(99,102,241,0.2)', borderTop: '2px solid #6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-                    Yanlışların analiz ediliyor...
+                    {tr('Yanlışların analiz ediliyor...')}
                   </div>
                 ) : (
                   <div style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
