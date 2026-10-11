@@ -11,8 +11,11 @@ import LearningRiskOverview from '@/components/LearningRiskOverview'
 import AgentApprovalQueue from '@/components/teacher/AgentApprovalQueue'
 import TeacherInstitutionMemberships from '@/components/teacher/TeacherInstitutionMemberships'
 import LearningGainPilot from '@/components/teacher/LearningGainPilot'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 
 export default function TeacherDashboard() {
+  const { t: tr, locale } = useT()
   const [teacher, setTeacher] = useState<any>(null)
   const [classrooms, setClassrooms] = useState<any[]>([])
   const [assignments, setAssignments] = useState<any[]>([])
@@ -87,7 +90,7 @@ export default function TeacherDashboard() {
         const classroomIds = Object.entries(classStudentMap).filter(([, ids]) => ids.includes(sid)).map(([cid]) => cid)
         return {
           id: sid,
-          name: studentIdentities[sid]?.full_name ?? 'İsimsiz',
+          name: studentIdentities[sid]?.full_name ?? tr('İsimsiz'),
           grade: profileRes.data?.grade ?? '',
           avatar_url: profileRes.data?.avatar_url ?? null,
           streak: streakRes.data?.current_streak ?? 0,
@@ -127,9 +130,9 @@ export default function TeacherDashboard() {
     if (!iso) return '—'
     const diff = Date.now() - new Date(iso).getTime()
     const days = Math.floor(diff / 86400000)
-    if (days === 0) return 'Bugün'
-    if (days === 1) return 'Dün'
-    return `${days} gün önce`
+    if (days === 0) return tr('Bugün')
+    if (days === 1) return tr('Dün')
+    return tr('{n} gün önce', { n: days })
   }
 
   const filteredStudents = selectedClass === 'all'
@@ -142,12 +145,12 @@ export default function TeacherDashboard() {
       <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: '1.5rem' }}>
         <div style={{ textAlign: 'center', maxWidth: '400px' }}>
           <div style={{ fontSize: '56px', marginBottom: '1rem' }}>⏳</div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)', marginBottom: '8px' }}>Başvurunuz İnceleniyor</h1>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)', marginBottom: '8px' }}>{tr('Başvurunuz İnceleniyor')}</h1>
           <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
-            Öğretmen başvurunuz admin onayı bekliyor. Onaylandığında e-posta ile bildirileceksiniz.
+            {tr('Öğretmen başvurunuz admin onayı bekliyor. Onaylandığında e-posta ile bildirileceksiniz.')}
           </p>
           <button onClick={() => { supabase.auth.signOut(); router.push('/login') }}
-            className="btn" style={{ justifyContent: 'center' }}>Çıkış Yap</button>
+            className="btn" style={{ justifyContent: 'center' }}>{tr('Çıkış Yap')}</button>
         </div>
       </main>
     )
@@ -174,22 +177,22 @@ export default function TeacherDashboard() {
           <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '32px', filter: 'brightness(0) invert(1)' }} />
           <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.2)' }} />
           <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap' }}>
-            🎓 {teacher?.name || 'Öğretmen'}
+            🎓 {teacher?.name || tr('Öğretmen')}
           </span>
         </div>
         <div className="nav-scroll-x" style={{ display: 'flex', gap: '4px', alignItems: 'center', flex: 1, minWidth: 0 }}>
           {[
-            { key: 'dashboard', label: '📊 Dashboard' },
-            { key: 'students', label: '👥 Öğrenciler' },
-            { key: 'invite', label: '🔗 DAVET KODU' },
-            { key: 'assign', label: '📝 Ödev Ata' },
-            { key: 'performance', label: '📈 Analiz' },
-            { key: 'notify', label: '🔔 Bildirim' },
-            { key: 'report', label: '🔧 Hata Bildir' },
-            { key: 'institutions', label: '🏢 Kurumlar' },
-            { key: 'reports', label: '📋 RAPORLAR', href: '/teacher/reports' },
-            { key: 'import', label: '📥 Not İçe Aktar', href: '/teacher/import-grades' },
-            { key: 'live', label: '🎯 Canlı Test', href: '/teacher/live' },
+            { key: 'dashboard', label: tr('📊 Dashboard') },
+            { key: 'students', label: tr('👥 Öğrenciler') },
+            { key: 'invite', label: tr('🔗 DAVET KODU') },
+            { key: 'assign', label: tr('📝 Ödev Ata') },
+            { key: 'performance', label: tr('📈 Analiz') },
+            { key: 'notify', label: tr('🔔 Bildirim') },
+            { key: 'report', label: tr('🔧 Hata Bildir') },
+            { key: 'institutions', label: tr('🏢 Kurumlar') },
+            { key: 'reports', label: tr('📋 RAPORLAR'), href: '/teacher/reports' },
+            { key: 'import', label: tr('📥 Not İçe Aktar'), href: '/teacher/import-grades' },
+            { key: 'live', label: tr('🎯 Canlı Test'), href: '/teacher/live' },
           ].map(t => (
             (t as any).href ? (
               <Link key={t.key} href={(t as any).href}
@@ -210,7 +213,7 @@ export default function TeacherDashboard() {
           <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.2)', margin: '0 4px', flexShrink: 0 }} />
           <button onClick={() => { supabase.auth.signOut(); router.push('/login') }}
             style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-            Çıkış
+            {tr('Çıkış')}
           </button>
         </div>
       </nav>
@@ -226,11 +229,11 @@ export default function TeacherDashboard() {
           <div>
             <LearningInsights />
             <LearningGainPilot classrooms={classrooms} />
-            <LearningRiskOverview endpoint="/api/teacher/learning-risk" title="Sınıf erken uyarıları" />
+            <LearningRiskOverview endpoint="/api/teacher/learning-risk" title={tr('Sınıf erken uyarıları')} />
             <AgentApprovalQueue />
             <div style={{ marginBottom: '1.5rem' }}>
               <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)' }}>
-                Hoş geldin, {teacher?.name?.split(' ')[0]} 👋
+                {tr('Hoş geldin, {name} 👋', { name: teacher?.name?.split(' ')[0] ?? '' })}
               </h1>
               <p style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '4px' }}>{teacher?.school}</p>
             </div>
@@ -238,11 +241,11 @@ export default function TeacherDashboard() {
             {/* Özet kartlar */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '1.5rem' }}>
               {[
-                { icon: '👥', label: 'Toplam Öğrenci', value: totalStudents, color: 'var(--primary)' },
-                { icon: '⚡', label: 'Aktif Öğrenci', value: activeStudents, color: 'var(--accent)' },
-                { icon: '🏫', label: 'Sınıf', value: classrooms.length, color: '#7c3aed' },
-                { icon: '📝', label: 'Aktif Ödev', value: pendingAssignments, color: '#d97706' },
-                { icon: '📊', label: 'Genel Ortalama', value: overallAvg ? `%${overallAvg}` : '—', color: pctColor(overallAvg || null) },
+                { icon: '👥', label: tr('Toplam Öğrenci'), value: totalStudents, color: 'var(--primary)' },
+                { icon: '⚡', label: tr('Aktif Öğrenci'), value: activeStudents, color: 'var(--accent)' },
+                { icon: '🏫', label: tr('Sınıf‖sınıf grubu'), value: classrooms.length, color: '#7c3aed' },
+                { icon: '📝', label: tr('Aktif Ödev'), value: pendingAssignments, color: '#d97706' },
+                { icon: '📊', label: tr('Genel Ortalama'), value: overallAvg ? `%${overallAvg}` : '—', color: pctColor(overallAvg || null) },
               ].map((s, i) => (
                 <div key={i} className="card" style={{ textAlign: 'center', padding: '14px 10px' }}>
                   <div style={{ fontSize: '20px', marginBottom: '4px' }}>{s.icon}</div>
@@ -255,38 +258,38 @@ export default function TeacherDashboard() {
             {/* Sınıflar */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '1.5rem' }}>
               <div className="card">
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>🏫 Sınıflarım</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>{tr('🏫 Sınıflarım')}</div>
                 {classrooms.length === 0 ? (
-                  <div style={{ fontSize: '13px', color: 'var(--text3)' }}>Henüz sınıf yok.</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text3)' }}>{tr('Henüz sınıf yok.')}</div>
                 ) : classrooms.map((c: any) => (
                   <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: '13px' }}>
                     <span style={{ fontWeight: 600 }}>{c.name}</span>
-                    <span style={{ color: 'var(--text3)' }}>{c.classroom_students?.[0]?.count ?? 0} öğrenci</span>
+                    <span style={{ color: 'var(--text3)' }}>{tr('{n} öğrenci', { n: c.classroom_students?.[0]?.count ?? 0 })}</span>
                   </div>
                 ))}
                 <button onClick={() => router.push('/teacher/students')}
                   style={{ marginTop: '10px', fontSize: '12px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 600 }}>
-                  Sınıfları yönet →
+                  {tr('Sınıfları yönet →')}
                 </button>
               </div>
 
               {/* Son ödevler */}
               <div className="card">
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>📝 Son Ödevler</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>{tr('📝 Son Ödevler')}</div>
                 {assignments.slice(0, 5).length === 0 ? (
-                  <div style={{ fontSize: '13px', color: 'var(--text3)' }}>Henüz ödev yok.</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text3)' }}>{tr('Henüz ödev yok.')}</div>
                 ) : assignments.slice(0, 5).map((a: any) => (
                   <div key={a.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                     <div style={{ fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
-                      {a.assignment_completions?.[0]?.count ?? 0} tamamladı
-                      {a.due_date && ` · Son: ${new Date(a.due_date).toLocaleDateString('tr-TR')}`}
+                      {tr('{n} tamamladı', { n: a.assignment_completions?.[0]?.count ?? 0 })}
+                      {a.due_date && ` · ${tr('Son: {date}', { date: new Date(a.due_date).toLocaleDateString(intlLocale(locale)) })}`}
                     </div>
                   </div>
                 ))}
                 <button onClick={() => setActiveTab('assign')}
                   style={{ marginTop: '10px', fontSize: '12px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 600 }}>
-                  Ödev ata →
+                  {tr('Ödev ata →')}
                 </button>
               </div>
             </div>
@@ -294,7 +297,7 @@ export default function TeacherDashboard() {
             {/* En zayıf öğrenciler */}
             {students.filter(s => s.avgPct !== null && s.avgPct < 60).length > 0 && (
               <div className="card" style={{ borderLeft: '3px solid var(--red)' }}>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--red)', marginBottom: '10px' }}>⚠️ Dikkat Gerektiren Öğrenciler (%60 altı)</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--red)', marginBottom: '10px' }}>{tr('⚠️ Dikkat Gerektiren Öğrenciler (%60 altı)')}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {students.filter(s => s.avgPct !== null && s.avgPct < 60).map(s => (
                     <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
@@ -303,7 +306,7 @@ export default function TeacherDashboard() {
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '13px', fontWeight: 600 }}>{s.name}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Son: {timeAgo(s.lastActive)}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{tr('Son: {when}', { when: timeAgo(s.lastActive) })}</div>
                       </div>
                       <div style={{ fontWeight: 800, fontSize: '18px', color: 'var(--red)' }}>%{s.avgPct}</div>
                     </div>
@@ -318,21 +321,21 @@ export default function TeacherDashboard() {
         {activeTab === 'students' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '10px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)' }}>👥 Öğrencilerim</h2>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)' }}>{tr('👥 Öğrencilerim')}</h2>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)}
                   style={{ padding: '7px 12px', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '12px', fontFamily: 'var(--font-sans)', outline: 'none' }}>
-                  <option value="all">Tüm Sınıflar</option>
+                  <option value="all">{tr('Tüm Sınıflar')}</option>
                   {classrooms.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
-                <button onClick={() => router.push('/teacher/students')} className="btn btn-sm">+ Sınıf Yönet</button>
+                <button onClick={() => router.push('/teacher/students')} className="btn btn-sm">{tr('+ Sınıf Yönet')}</button>
               </div>
             </div>
 
             {filteredStudents.length === 0 ? (
               <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
                 <div style={{ fontSize: '40px', marginBottom: '12px' }}>👥</div>
-                <div style={{ fontSize: '14px', color: 'var(--text3)' }}>Bu sınıfta öğrenci yok.</div>
+                <div style={{ fontSize: '14px', color: 'var(--text3)' }}>{tr('Bu sınıfta öğrenci yok.')}</div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -345,9 +348,9 @@ export default function TeacherDashboard() {
                       <div style={{ fontWeight: 600, fontSize: '14px' }}>{s.name}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         {s.grade && <span>📚 {s.grade}</span>}
-                        <span>📝 {s.totalTests} test</span>
-                        <span>✅ {s.assignmentsDone} ödev</span>
-                        {s.streak > 0 && <span>🔥 {s.streak} gün</span>}
+                        <span>{tr('📝 {n} test', { n: s.totalTests })}</span>
+                        <span>{tr('✅ {n} ödev', { n: s.assignmentsDone })}</span>
+                        {s.streak > 0 && <span>{tr('🔥 {n} gün', { n: s.streak })}</span>}
                         <span style={{ color: 'var(--text4)' }}>{timeAgo(s.lastActive)}</span>
                       </div>
                     </div>
@@ -355,7 +358,7 @@ export default function TeacherDashboard() {
                       <div style={{ fontWeight: 800, fontSize: '20px', color: pctColor(s.avgPct) }}>
                         {s.avgPct !== null ? `%${s.avgPct}` : '—'}
                       </div>
-                      <div style={{ fontSize: '10px', color: 'var(--text4)' }}>ortalama</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text4)' }}>{tr('ortalama')}</div>
                     </div>
                   </div>
                 ))}
@@ -367,29 +370,29 @@ export default function TeacherDashboard() {
         {/* ÖDEV ATA */}
         {activeTab === 'assign' && (
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>📝 Ödev Ata</h2>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>{tr('📝 Ödev Ata')}</h2>
             <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-              <p style={{ fontSize: '14px', color: 'var(--text2)', marginBottom: '1rem' }}>Gelişmiş ödev atama sayfasına git</p>
+              <p style={{ fontSize: '14px', color: 'var(--text2)', marginBottom: '1rem' }}>{tr('Gelişmiş ödev atama sayfasına git')}</p>
               <Link href="/teacher/assign" className="btn btn-primary" style={{ justifyContent: 'center' }}>
-                Ödev Atama Sayfası →
+                {tr('Ödev Atama Sayfası →')}
               </Link>
             </div>
 
             {/* Son ödevler listesi */}
             {assignments.length > 0 && (
               <div className="card" style={{ marginTop: '1rem' }}>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>Son Ödevler</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>{tr('Son Ödevler')}</div>
                 {assignments.map((a: any) => (
                   <div key={a.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <div style={{ fontSize: '13px', fontWeight: 600 }}>{a.title}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
-                        {a.topic} · {a.question_count} soru
-                        {a.due_date && ` · Son: ${new Date(a.due_date).toLocaleDateString('tr-TR')}`}
+                        {tr('{topic} · {n} soru', { topic: a.topic, n: a.question_count })}
+                        {a.due_date && ` · ${tr('Son: {date}', { date: new Date(a.due_date).toLocaleDateString(intlLocale(locale)) })}`}
                       </div>
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--text3)', flexShrink: 0, marginLeft: '10px' }}>
-                      {a.assignment_completions?.[0]?.count ?? 0} tamamladı
+                      {tr('{n} tamamladı', { n: a.assignment_completions?.[0]?.count ?? 0 })}
                     </div>
                   </div>
                 ))}
@@ -402,10 +405,10 @@ export default function TeacherDashboard() {
         {activeTab === 'performance' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '10px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)' }}>📈 Öğrenci Analizi</h2>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)' }}>{tr('📈 Öğrenci Analizi')}</h2>
               <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)}
                 style={{ padding: '7px 12px', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '12px', fontFamily: 'var(--font-sans)', outline: 'none' }}>
-                <option value="all">Tüm Sınıflar</option>
+                <option value="all">{tr('Tüm Sınıflar')}</option>
                 {classrooms.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
@@ -413,9 +416,9 @@ export default function TeacherDashboard() {
             {/* Dağılım */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '1.5rem' }}>
               {[
-                { label: 'İyi (%70+)', count: filteredStudents.filter(s => (s.avgPct ?? 0) >= 70).length, color: 'var(--green)', bg: 'var(--green-bg)' },
-                { label: 'Orta (%50-69)', count: filteredStudents.filter(s => (s.avgPct ?? 0) >= 50 && (s.avgPct ?? 0) < 70).length, color: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
-                { label: 'Zayıf (%50 altı)', count: filteredStudents.filter(s => s.avgPct !== null && s.avgPct < 50).length, color: 'var(--red)', bg: 'var(--red-bg)' },
+                { label: tr('İyi (%70+)'), count: filteredStudents.filter(s => (s.avgPct ?? 0) >= 70).length, color: 'var(--green)', bg: 'var(--green-bg)' },
+                { label: tr('Orta (%50-69)'), count: filteredStudents.filter(s => (s.avgPct ?? 0) >= 50 && (s.avgPct ?? 0) < 70).length, color: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
+                { label: tr('Zayıf (%50 altı)'), count: filteredStudents.filter(s => s.avgPct !== null && s.avgPct < 50).length, color: 'var(--red)', bg: 'var(--red-bg)' },
               ].map((g, i) => (
                 <div key={i} style={{ padding: '16px', borderRadius: '12px', background: g.bg, textAlign: 'center' }}>
                   <div style={{ fontWeight: 800, fontSize: '28px', color: g.color }}>{g.count}</div>
@@ -426,15 +429,15 @@ export default function TeacherDashboard() {
 
             {/* Detaylı analiz */}
             <div className="card">
-              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>Öğrenci Bazlı Performans</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>{tr('Öğrenci Bazlı Performans')}</div>
               {filteredStudents.sort((a, b) => (b.avgPct ?? -1) - (a.avgPct ?? -1)).map((s, idx) => (
                 <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                   <div style={{ width: 28, textAlign: 'center', fontSize: '13px', color: 'var(--text4)', fontWeight: 700 }}>{idx + 1}.</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '13px', fontWeight: 600 }}>{s.name}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
-                      {s.totalTests} test · {s.assignmentsDone} ödev
-                      {s.lastTopic && ` · Son: ${s.lastTopic}`}
+                      {tr('{tests} test · {homework} ödev', { tests: s.totalTests, homework: s.assignmentsDone })}
+                      {s.lastTopic && ` · ${tr('Son: {when}', { when: s.lastTopic })}`}
                     </div>
                   </div>
                   {/* Progress bar */}
@@ -449,14 +452,14 @@ export default function TeacherDashboard() {
                 </div>
               ))}
               {filteredStudents.length === 0 && (
-                <div style={{ fontSize: '13px', color: 'var(--text3)', textAlign: 'center', padding: '2rem' }}>Öğrenci bulunamadı.</div>
+                <div style={{ fontSize: '13px', color: 'var(--text3)', textAlign: 'center', padding: '2rem' }}>{tr('Öğrenci bulunamadı.')}</div>
               )}
             </div>
 
             {/* Gelişmiş analiz */}
             <div style={{ marginTop: '1rem', textAlign: 'center' }}>
               <Link href="/teacher/performance" className="btn" style={{ justifyContent: 'center', fontSize: '13px' }}>
-                Gelişmiş Performans Raporu →
+                {tr('Gelişmiş Performans Raporu →')}
               </Link>
             </div>
           </div>
@@ -465,17 +468,17 @@ export default function TeacherDashboard() {
         {/* BİLDİRİM */}
         {activeTab === 'notify' && (
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1.5rem' }}>🔔 Bildirim Gönder</h2>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1.5rem' }}>{tr('🔔 Bildirim Gönder')}</h2>
 
             <div className="card" style={{ marginBottom: '1rem' }}>
               {/* Hızlı şablonlar */}
-              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Hızlı Şablonlar</div>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>{tr('Hızlı Şablonlar')}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '1rem' }}>
                 {[
-                  { label: "📢 Yeni ödev", text: "Yeni bir ödeviniz var! Pratium'a girerek kontrol edin." },
-                  { label: '🔥 Streak hatırlatıcı', text: 'Bugün test çözmeyi unutma! Streakini koru 🔥' },
-                  { label: "📊 Sınav yaklaşıyor", text: "Sınav tarihine az kaldi. Pratiumda pratik yapmaya devam et!" },
-                  { label: '🏆 Tebrik', text: 'Bu haftaki performansın harika! Gurur duyduk.' },
+                  { label: tr('📢 Yeni ödev'), text: "Yeni bir ödeviniz var! Pratium'a girerek kontrol edin." },
+                  { label: tr('🔥 Streak hatırlatıcı'), text: 'Bugün test çözmeyi unutma! Streakini koru 🔥' },
+                  { label: tr('📊 Sınav yaklaşıyor'), text: "Sınav tarihine az kaldi. Pratiumda pratik yapmaya devam et!" },
+                  { label: tr('🏆 Tebrik'), text: 'Bu haftaki performansın harika! Gurur duyduk.' },
                 ].map((t, i) => (
                   <button key={i} onClick={() => setNotifyMsg(t.text)}
                     style={{ padding: '6px 12px', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text2)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 500 }}>
@@ -485,17 +488,17 @@ export default function TeacherDashboard() {
               </div>
 
               {/* Sınıf seç */}
-              <label style={{ fontSize: '12px', color: 'var(--text3)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>Sınıf</label>
+              <label style={{ fontSize: '12px', color: 'var(--text3)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>{tr('Sınıf‖sınıf grubu')}</label>
               <select value={notifyClass} onChange={e => setNotifyClass(e.target.value)}
                 style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', outline: 'none', marginBottom: '12px' }}>
-                <option value="">Tüm sınıflarım</option>
+                <option value="">{tr('Tüm sınıflarım')}</option>
                 {classrooms.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
 
               {/* Mesaj */}
-              <label style={{ fontSize: '12px', color: 'var(--text3)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>Mesaj</label>
+              <label style={{ fontSize: '12px', color: 'var(--text3)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>{tr('Mesaj')}</label>
               <textarea value={notifyMsg} onChange={e => setNotifyMsg(e.target.value)}
-                placeholder="Öğrencilerinize göndermek istediğiniz mesajı yazın..."
+                placeholder={tr('Öğrencilerinize göndermek istediğiniz mesajı yazın...')}
                 rows={4}
                 style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', outline: 'none', resize: 'vertical', lineHeight: 1.6, boxSizing: 'border-box', marginBottom: '12px' }} />
 
@@ -516,29 +519,29 @@ export default function TeacherDashboard() {
                   })
                   const data = await res.json()
                   if (data.error) { setNotifyResult(`❌ ${data.error}`); return }
-                  setNotifyResult(`✅ ${data.recipientCount ?? 0} öğrenciye bildirim gönderildi!`)
+                  setNotifyResult(`✅ ${tr('{n} öğrenciye bildirim gönderildi!', { n: data.recipientCount ?? 0 })}`)
                   setNotifyMsg('')
                   // Geçmişi yenile
                   const { data: hist } = await supabase.from('teacher_notifications').select('*, classrooms(name)').eq('teacher_id', teacher?.id).order('created_at', { ascending: false }).limit(10)
                   setNotifyHistory(hist ?? [])
-                } catch { setNotifyResult('❌ Bir hata oluştu.') }
+                } catch { setNotifyResult(`❌ ${tr('Bir hata oluştu.')}`) }
                 setNotifySending(false)
               }} className="btn btn-primary" style={{ justifyContent: 'center', opacity: (!notifyMsg.trim() || notifySending) ? 0.5 : 1 }}>
-                {notifySending ? '⏳ Gönderiliyor...' : '🔔 Bildirimi Gönder'}
+                {notifySending ? tr('⏳ Gönderiliyor...') : tr('🔔 Bildirimi Gönder')}
               </button>
             </div>
 
             {/* Geçmiş */}
             {notifyHistory.length > 0 && (
               <div className="card">
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>📋 Geçmiş Bildirimler</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>{tr('📋 Geçmiş Bildirimler')}</div>
                 {notifyHistory.map((n: any) => (
                   <div key={n.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                     <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.5 }}>{n.message}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text4)', marginTop: '4px', display: 'flex', gap: '8px' }}>
-                      <span>{n.classrooms?.name || 'Tüm sınıflar'}</span>
+                      <span>{n.classrooms?.name || tr('Tüm sınıflar')}</span>
                       <span>·</span>
-                      <span>{new Date(n.created_at).toLocaleDateString('tr-TR')}</span>
+                      <span>{new Date(n.created_at).toLocaleDateString(intlLocale(locale))}</span>
                     </div>
                   </div>
                 ))}
@@ -550,7 +553,7 @@ export default function TeacherDashboard() {
         {/* HATA BİLDİR (Madde 2) */}
         {activeTab === 'report' && (
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1.5rem' }}>🔧 İçerik Hatası Bildir</h2>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1.5rem' }}>{tr('🔧 İçerik Hatası Bildir')}</h2>
             <ContentIssueReporter reporterRole="teacher" />
           </div>
         )}

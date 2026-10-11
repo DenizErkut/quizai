@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useTeacherEntitlement } from './useTeacherEntitlement'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 type Classroom = { id: string; name: string; invite_code?: string | null; classroom_students?: Array<{ count: number }> | null }
 
@@ -26,6 +27,7 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
+  const { t } = useT()
   const [state, setState] = useState<'idle' | 'ok' | 'failed'>('idle')
   async function copy() {
     setState((await copyText(text)) ? 'ok' : 'failed')
@@ -33,7 +35,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   }
   return (
     <button type="button" className="btn btn-sm" onClick={() => void copy()} aria-label={label}>
-      {state === 'ok' ? '✓ Kopyalandı' : state === 'failed' ? 'Kopyalanamadı' : '📋 Kopyala'}
+      {state === 'ok' ? t('✓ Kopyalandı') : state === 'failed' ? t('Kopyalanamadı') : t('📋 Kopyala')}
     </button>
   )
 }
@@ -41,24 +43,24 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 /** "Davet kodu" tab: every class with its code and student invite link, each with a copy button. */
 export default function TeacherInviteLink({ classrooms }: { classrooms: Classroom[] }) {
   const { entitlement } = useTeacherEntitlement()
+  const { t } = useT()
   const withCode = classrooms.filter(classroom => classroom.invite_code)
   const field = { flex: '1 1 240px', minWidth: 0, padding: '9px 11px', borderRadius: 9, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontFamily: 'monospace', fontSize: 12.5 } as const
 
   return (
     <section aria-labelledby="teacher-invite-title">
-      <h1 id="teacher-invite-title" style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, color: 'var(--primary)', margin: 0 }}>🔗 Davet kodları</h1>
+      <h1 id="teacher-invite-title" style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, color: 'var(--primary)', margin: 0 }}>{t('🔗 Davet kodları')}</h1>
       <p style={{ fontSize: 13, color: 'var(--text3)', margin: '6px 0 14px', lineHeight: 1.6 }}>
-        Her sınıfın davet kodunu ve linkini öğrencilerinle paylaş. Hesabı olanlar linke tıklayınca doğrudan sınıfına katılır; yeni öğrenciler kayıt olduktan sonra katılır.
+        {t('Her sınıfın davet kodunu ve linkini öğrencilerinle paylaş. Hesabı olanlar linke tıklayınca doğrudan sınıfına katılır; yeni öğrenciler kayıt olduktan sonra katılır.')}
       </p>
       {entitlement?.tier === 'limited' && (
         <div className="card" style={{ marginBottom: 14, background: 'var(--amber-bg, #fff4dc)' }}>
-          🎁 Sınıflarındaki <strong>{entitlement.inviteTarget} öğrenci yıllık Altın üyelik</strong> alırsa sen de <strong>1 yıl Altın</strong> olursun.
-          Şu an: <strong>{entitlement.qualifyingStudents}/{entitlement.inviteTarget}</strong>
+          {t('🎁 Sınıflarındaki {target} öğrenci yıllık Altın üyelik alırsa sen de 1 yıl Altın olursun. Şu an: {cur}/{target}', { target: entitlement.inviteTarget, cur: entitlement.qualifyingStudents })}
         </div>
       )}
       {withCode.length === 0 ? (
         <div className="card" style={{ color: 'var(--text3)', fontSize: 13 }}>
-          Henüz sınıfın yok. Önce <strong>Öğrenciler</strong> sekmesinden bir sınıf oluştur; davet kodu otomatik oluşur.
+          {t('Henüz sınıfın yok. Önce Öğrenciler sekmesinden bir sınıf oluştur; davet kodu otomatik oluşur.')}
         </div>
       ) : withCode.map(classroom => {
         const link = `https://pratium.com/join?code=${classroom.invite_code}`
@@ -67,18 +69,18 @@ export default function TeacherInviteLink({ classrooms }: { classrooms: Classroo
           <div key={classroom.id} className="card" style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
               <strong style={{ fontSize: 15 }}>{classroom.name}</strong>
-              {typeof count === 'number' && <span style={{ fontSize: 12, color: 'var(--text3)' }}>{count} öğrenci</span>}
+              {typeof count === 'number' && <span style={{ fontSize: 12, color: 'var(--text3)' }}>{t('{n} öğrenci', { n: count })}</span>}
             </div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', marginBottom: 4 }}>Davet kodu</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', marginBottom: 4 }}>{t('Davet kodu')}</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-              <input readOnly value={classroom.invite_code ?? ''} aria-label={`${classroom.name} davet kodu`} onFocus={event => event.currentTarget.select()} style={{ ...field, flex: '0 1 180px', letterSpacing: '.18em', fontWeight: 700, fontSize: 15 }} />
-              <CopyButton text={classroom.invite_code ?? ''} label={`${classroom.name} davet kodunu kopyala`} />
+              <input readOnly value={classroom.invite_code ?? ''} aria-label={t('{name} davet kodu', { name: classroom.name })} onFocus={event => event.currentTarget.select()} style={{ ...field, flex: '0 1 180px', letterSpacing: '.18em', fontWeight: 700, fontSize: 15 }} />
+              <CopyButton text={classroom.invite_code ?? ''} label={t('{name} davet kodunu kopyala', { name: classroom.name })} />
             </div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', marginBottom: 4 }}>Davet linki</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', marginBottom: 4 }}>{t('Davet linki')}</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <input readOnly value={link} aria-label={`${classroom.name} davet linki`} onFocus={event => event.currentTarget.select()} style={field} />
-              <CopyButton text={link} label={`${classroom.name} davet linkini kopyala`} />
-              <a className="btn btn-sm" href={`https://wa.me/?text=${encodeURIComponent(`${classroom.name} sınıfına katıl: ${link}`)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+              <input readOnly value={link} aria-label={t('{name} davet linki', { name: classroom.name })} onFocus={event => event.currentTarget.select()} style={field} />
+              <CopyButton text={link} label={t('{name} davet linkini kopyala', { name: classroom.name })} />
+              <a className="btn btn-sm" href={`https://wa.me/?text=${encodeURIComponent(t('{name} sınıfına katıl: {link}', { name: classroom.name, link }))}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
             </div>
           </div>
         )

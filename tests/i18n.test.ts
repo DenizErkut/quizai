@@ -267,3 +267,12 @@ test('reading entries are used by the reading page', async () => {
   const unused = readingEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
   assert.deepEqual(unused, [])
 })
+
+test('teacher panel entries are used by the teacher dashboard and its components', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { teacherPanelEntries } = await import('../lib/i18n/entries/teacher-panel')
+  const sources = ['app/teacher/page.tsx', 'components/teacher/LearningInsights.tsx', 'components/teacher/AgentApprovalQueue.tsx', 'components/teacher/TeacherInviteLink.tsx', 'components/teacher/TeacherPlanBanner.tsx']
+    .map(file => readFileSync(file, 'utf8')).join('\n')
+  const unused = teacherPanelEntries.map(e => e[0]).filter(key => !sources.includes(key.replace(/'/g, "\\'")) && !sources.includes(key))
+  assert.deepEqual(unused, [])
+})
