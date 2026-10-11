@@ -13,6 +13,7 @@ import { computeTopicMastery, TopicMastery } from '@/lib/mastery'
 import { analyzeTrend } from '@/lib/predictive-risk'
 import { analyzeStudyDuration, StudyDurationInsight } from '@/lib/study-duration-model'
 import { useT } from '@/lib/i18n/I18nProvider'
+import { gradeLabel } from '@/lib/i18n/grade'
 import { intlLocale } from '@/lib/i18n/core'
 import PanelLanguageSwitch from '@/components/PanelLanguageSwitch'
 
@@ -365,7 +366,7 @@ function ParentContent() {
                 {selected.name}
               </h1>
               <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '2px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                {selected.grade && <span>📚 {selected.grade}</span>}
+                {selected.grade && <span>📚 {gradeLabel(selected.grade, tr)}</span>}
                 <span>{tr('Son aktivite: {when}', { when: timeAgo(selected.lastActive) })}</span>
               </div>
             </div>
@@ -800,7 +801,7 @@ function ParentContent() {
                           {p.name} {isChild && '⭐'}
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
-                          {tr('{n} test · {grade}', { n: p.totalTests, grade: p.grade ?? '' })}
+                          {tr('{n} test · {grade}', { n: p.totalTests, grade: gradeLabel(p.grade, tr) })}
                         </div>
                       </div>
                       <div style={{ fontWeight: 800, fontSize: '20px', color: pctColor(p.avgPct), flexShrink: 0 }}>
@@ -852,7 +853,7 @@ function ParentContent() {
                   <div key={c.child_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: '13px' }}>{c.nickname}</div>
-                      {c.grade && <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{c.grade}</div>}
+                      {c.grade && <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{gradeLabel(c.grade, tr)}</div>}
                     </div>
                     <button onClick={() => removeChild(c.child_id)} style={{ fontSize: '11px', color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
                       {tr('Kaldır')}

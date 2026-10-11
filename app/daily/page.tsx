@@ -55,7 +55,7 @@ export default function DailyPage() {
         setAlreadyDone(payload.challenge.completed === true)
       } else {
         setChallenge(null)
-        setChallengeError(payload.error || t('Günlük 10 soru şu an hazırlanamadı.'))
+        setChallengeError((payload.error ? t(payload.error) : t('Günlük 10 soru şu an hazırlanamadı.')))
       }
     } catch {
       setChallenge(null)

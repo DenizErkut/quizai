@@ -46,11 +46,12 @@ export async function POST(req: NextRequest) {
   // OTONOM olarak belirliyor (bkz. computeAutonomousGoals). Eski client
   // sürümleriyle geriye dönük uyum için body okunmaya devam ediyor ama
   // kullanılmıyor.
-  await req.json().catch(() => ({}))
+  const body = await req.json().catch(() => ({}))
+  const uiLanguage = typeof body?.uiLanguage === 'string' && body.uiLanguage.length < 30 ? body.uiLanguage : undefined
 
   const result = await generateStudyPlan(supabase, user.id, {
     grade: profile?.grade,
-    language: profile?.language,
+    language: uiLanguage || profile?.language,
     displayName,
     previousGoals: previousPlan?.goals_snapshot || undefined,
   })
