@@ -1,4 +1,6 @@
+'use client'
 import Link from 'next/link'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 // Teslimat/İade linki + ödeme sağlayıcı bilgisi tüm herkese açık
 // sayfalarda görünsün diye ortak footer. TEK kaynak — bazı sayfalar
@@ -12,6 +14,7 @@ import Link from 'next/link'
 // eklenmedi (Deniz'in PayTR merchant panelinden indirip eklemesi gerekiyor)
 // — o zamana kadar metin tabanlı bir rozet kullanılıyor.
 export default function SiteFooter() {
+  const { t: tr } = useT()
   const links = [
     { href: '/hakkimizda', label: 'Hakkımızda' },
     { href: '/iletisim', label: 'İletişim' },
@@ -38,14 +41,14 @@ export default function SiteFooter() {
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px 20px' }}>
             {links.map(l => (
               <Link key={l.href} href={l.href} style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', textDecoration: 'none' }}>
-                {l.label}
+                {tr(l.label)}
               </Link>
             ))}
           </div>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>
-            💳 PayTR ile güvenli ödeme — Mastercard, Visa, Troy
+            {tr('💳 PayTR ile güvenli ödeme — Mastercard, Visa, Troy')}
           </p>
           <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)' }}>
             © 2026 Dumerk Elektronik Sanayi ve Ticaret Limited Şirketi

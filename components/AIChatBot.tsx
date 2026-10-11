@@ -13,6 +13,8 @@ import LearningMessage from '@/components/LearningMessage'
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useDraggableMascot } from '@/lib/useDraggableMascot'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { LOCALES } from '@/lib/i18n/core'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -95,13 +97,15 @@ interface Props {
 }
 
 export default function AIChatBot({ isGuest = false }: Props) {
+  const { t: tr, locale } = useT()
   const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: isGuest
-      ? 'Merhaba! 👋 Pratium hakkında merak ettiklerini sorabilirsin. Sana nasıl yardımcı olabilirim?'
-      : 'Merhaba! 👋 Öğrenme hedeflerin veya platform kullanımı hakkında sana yardımcı olmak için buradayım.'
-    }
-  ])
+  // The greeting is rendered separately (translated at render time) so it follows the UI language.
+  const [messages, setMessages] = useState<Message[]>([])
+  const greeting = isGuest
+    ? tr('Merhaba! 👋 Pratium hakkında merak ettiklerini sorabilirsin. Sana nasıl yardımcı olabilirim?')
+    : tr('Merhaba! 👋 Öğrenme hedeflerin veya platform kullanımı hakkında sana yardımcı olmak için buradayım.')
+  const languageName = LOCALES.find(l => l.code === locale)?.label || 'Türkçe'
+  const languageNote = `\n\nKullanıcının arayüz dili: ${languageName}. Kullanıcı başka bir dilde yazmadıkça bu dilde yanıt ver.`
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [unread, setUnread] = useState(0)
@@ -147,7 +151,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
 
-      const systemPrompt = isGuest ? GUEST_SYSTEM_PROMPT : SYSTEM_PROMPT
+      const systemPrompt = (isGuest ? GUEST_SYSTEM_PROMPT : SYSTEM_PROMPT) + languageNote
 
       const res = await fetch('/api/bot', {
         method: 'POST',
@@ -164,22 +168,22 @@ export default function AIChatBot({ isGuest = false }: Props) {
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply }])
       if (!open) setUnread(prev => prev + 1)
     } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Bağlantı hatası, lütfen tekrar dene.' }])
+      setMessages(prev => [...prev, { role: 'assistant', content: tr('Bağlantı hatası, lütfen tekrar dene.') }])
     } finally {
       setLoading(false)
     }
   }
 
   const quickQuestions = isGuest ? [
-    '5. sınıf Türkçe soruları çözebilir miyim?',
-    'LGS\'ye nasıl hazırlanabilirim?',
-    'Ücretsiz ne kadar kullanabilirim?',
-    'Öğretmen olarak nasıl kullanırım?',
+    tr('5. sınıf Türkçe soruları çözebilir miyim?'),
+    tr("LGS'ye nasıl hazırlanabilirim?"),
+    tr('Ücretsiz ne kadar kullanabilirim?'),
+    tr('Öğretmen olarak nasıl kullanırım?'),
   ] : [
-    'Test nasıl oluşturabilirim?',
-    'Sınav simülasyonu nedir?',
-    'Altın\'a nasıl geçebilirim?',
-    'Gelişim planı nedir?',
+    tr('Test nasıl oluşturabilirim?'),
+    tr('Sınav simülasyonu nedir?'),
+    tr("Altın'a nasıl geçebilirim?"),
+    tr('Gelişim planı nedir?'),
   ]
 
   return (
@@ -187,8 +191,8 @@ export default function AIChatBot({ isGuest = false }: Props) {
       {hidden && (
         <button
           onClick={show}
-          aria-label="Pratium Asistanını tekrar göster"
-          title="Asistanı göster"
+          aria-label={tr('Pratium Asistanını tekrar göster')}
+          title={tr('Asistanı göster')}
           className="prati-launcher-restore"
           style={{
             width: 44, height: 44, borderRadius: '50%', padding: 0, overflow: 'hidden',
@@ -226,8 +230,8 @@ export default function AIChatBot({ isGuest = false }: Props) {
                 <img src="/mascot-prati-face-v2.webp" alt="Pratium Asistan" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </div>
               <div>
-                <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>Pratium Asistan</div>
-                <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '11px' }}>Size yardımcı olmak için buradayım ✨</div>
+                <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>{tr('Pratium Asistan')}</div>
+                <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '11px' }}>{tr('Size yardımcı olmak için buradayım ✨')}</div>
               </div>
             </div>
             <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', fontSize: '22px', lineHeight: 1, padding: '4px' }}>×</button>
@@ -238,13 +242,21 @@ export default function AIChatBot({ isGuest = false }: Props) {
             <span style={{ fontSize: '13px' }}>💡</span>
             <span style={{ fontSize: '11px', color: '#0a9e90', fontWeight: 500, lineHeight: 1.4 }}>
               {isGuest
-                ? 'Öğrenme hedefin için en doğru yolu birlikte bulalım!'
-                : 'Öğrenme hedefin, platform kullanımı veya plan soruların için buradayım.'}
+                ? tr('Öğrenme hedefin için en doğru yolu birlikte bulalım!')
+                : tr('Öğrenme hedefin, platform kullanımı veya plan soruların için buradayım.')}
             </span>
           </div>
 
           {/* Mesajlar */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px', minHeight: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #082465, #1ECFB8)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: '8px', alignSelf: 'flex-end', padding: '3px' }}>
+                <img src="/mascot-prati-face-v2.webp" alt="Pratium Asistan" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </div>
+              <div style={{ maxWidth: '78%', padding: '10px 13px', borderRadius: '14px 14px 14px 4px', background: '#f8fafc', color: '#0F172A', fontSize: '13px', lineHeight: 1.6, border: '1px solid #e2e8f0', whiteSpace: 'pre-wrap' }}>
+                <LearningMessage text={greeting} />
+              </div>
+            </div>
             {messages.map((m, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
                 {m.role === 'assistant' && (
@@ -279,7 +291,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
           </div>
 
           {/* Hızlı sorular */}
-          {messages.length <= 1 && (
+          {messages.length === 0 && (
             <div style={{ padding: '0 12px 10px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {quickQuestions.map(q => (
                 <button key={q} onClick={async () => {
@@ -290,7 +302,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
                     const supabase = createClient() as any
                     const { data: { session } } = await supabase.auth.getSession()
                     const tok = session?.access_token
-                    const systemPrompt = isGuest ? GUEST_SYSTEM_PROMPT : SYSTEM_PROMPT
+                    const systemPrompt = (isGuest ? GUEST_SYSTEM_PROMPT : SYSTEM_PROMPT) + languageNote
                     const res = await fetch('/api/bot', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json', ...(tok ? { Authorization: `Bearer ${tok}` } : {}) },
@@ -317,7 +329,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
-              placeholder={isGuest ? 'Platforma dair bir şey sor...' : 'Hedefini veya sorunuzu yaz...'}
+              placeholder={isGuest ? tr('Platforma dair bir şey sor...') : tr('Hedefini veya sorunuzu yaz...')}
               style={{
                 flex: 1, padding: '10px 14px', borderRadius: '20px',
                 border: '1.5px solid #e2e8f0', background: '#f8fafc',
@@ -340,7 +352,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
           {isGuest && (
             <div style={{ padding: '10px 14px', background: 'rgba(253,211,29,0.08)', borderTop: '1px solid rgba(253,211,29,0.2)', borderRadius: '0 0 20px 20px', textAlign: 'center' }}>
               <a href="/register" style={{ fontSize: '12px', fontWeight: 700, color: '#082465', textDecoration: 'none' }}>
-                🚀 Ücretsiz hesap aç ve hemen başla →
+                {tr('🚀 Ücretsiz hesap aç ve hemen başla →')}
               </a>
             </div>
           )}
@@ -367,7 +379,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
         >
           <button
             onClick={e => { e.stopPropagation(); setBubbleDismissed(true) }}
-            aria-label="Kapat"
+            aria-label={tr('Kapat')}
             style={{
               position: 'absolute', top: '-8px', right: '-8px',
               width: 22, height: 22, borderRadius: '50%',
@@ -378,10 +390,10 @@ export default function AIChatBot({ isGuest = false }: Props) {
             }}
           >×</button>
           <div style={{ fontSize: '13px', fontWeight: 700, color: '#082465', marginBottom: '2px' }}>
-            Merhaba! 👋
+            {tr('Merhaba! 👋')}
           </div>
           <div style={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.5 }}>
-            Pratium Asistanıyım — size yardımcı olmak için buradayım.
+            {tr('Pratium Asistanıyım — size yardımcı olmak için buradayım.')}
           </div>
           {/* balon kuyruğu */}
           <div style={{
@@ -431,7 +443,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
             }}
             onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(8,36,101,0.4)' }}
             onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 8px 32px rgba(8,36,101,0.3)' }}
-            aria-label={open ? 'Sohbeti kapat' : 'Pratium Asistanı ile sohbet et'}
+            aria-label={open ? tr('Sohbeti kapat') : tr('Pratium Asistanı ile sohbet et')}
           >
             {open
               ? <span style={{ fontSize: '28px', color: '#fff' }}>×</span>
@@ -446,8 +458,8 @@ export default function AIChatBot({ isGuest = false }: Props) {
           {!open && (
             <button
               onClick={(e) => { e.stopPropagation(); hide(); setBubbleDismissed(true) }}
-              aria-label="Pratium Asistanını geçici olarak gizle"
-              title="Geçici olarak gizle"
+              aria-label={tr('Pratium Asistanını geçici olarak gizle')}
+              title={tr('Geçici olarak gizle')}
               style={{
                 position: 'absolute', top: '-6px', left: '-6px',
                 width: 20, height: 20, borderRadius: '50%',

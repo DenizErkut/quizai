@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 import { LIVE_DATA_REFRESH_EVENT } from '@/components/LiveDataRefresh'
 
 type Recommendation = {
@@ -10,6 +11,7 @@ type Recommendation = {
 }
 
 export default function RecommendationLifecycle() {
+  const { t: tr } = useT()
   const [items, setItems] = useState<Recommendation[]>([])
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -51,24 +53,24 @@ export default function RecommendationLifecycle() {
   const item = items[0]
   return (
     <section style={{ marginBottom: '1rem', padding: '16px', borderRadius: '16px', background: '#edf7f2', border: '1px solid #cce5da' }}>
-      <div style={{ fontSize: 11, fontWeight: 800, color: '#386455', textTransform: 'uppercase' }}>Sıradaki en iyi adım</div>
+      <div style={{ fontSize: 11, fontWeight: 800, color: '#386455', textTransform: 'uppercase' }}>{tr('Sıradaki en iyi adım')}</div>
       <div style={{ fontSize: 15, fontWeight: 800, color: '#29483d', marginTop: 5 }}>{item.topic}</div>
       <div style={{ fontSize: 12, color: '#587067', marginTop: 4 }}>{item.reason}</div>
       {item.status === 'deferred' ? (
         <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: '#8b6b32' }}>Yarına ertelendi</span>
-          <button disabled={busy === item.id} onClick={() => act(item, 'resume')} style={buttonStyle}>Şimdi aç</button>
+          <span style={{ fontSize: 11, color: '#8b6b32' }}>{tr('Yarına ertelendi')}</span>
+          <button disabled={busy === item.id} onClick={() => act(item, 'resume')} style={buttonStyle}>{tr('Şimdi aç')}</button>
         </div>
       ) : item.status === 'accepted' ? (
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <a href={`/quiz?subject=${encodeURIComponent(item.subject)}&topic=${encodeURIComponent(item.topic)}&recommendationId=${item.id}`} style={primaryStyle}>Çalışmaya devam et</a>
-          <button disabled={busy === item.id} onClick={() => act(item, 'complete')} style={buttonStyle}>Tamamladım</button>
+          <a href={`/quiz?subject=${encodeURIComponent(item.subject)}&topic=${encodeURIComponent(item.topic)}&recommendationId=${item.id}`} style={primaryStyle}>{tr('Çalışmaya devam et')}</a>
+          <button disabled={busy === item.id} onClick={() => act(item, 'complete')} style={buttonStyle}>{tr('Tamamladım')}</button>
         </div>
       ) : (
         <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-          <button disabled={busy === item.id} onClick={() => applyAndOpen(item)} style={primaryStyle}>Uygula</button>
-          <button disabled={busy === item.id} onClick={() => act(item, 'defer')} style={buttonStyle}>Yarına ertele</button>
-          <button disabled={busy === item.id} onClick={() => act(item, 'dismiss')} style={buttonStyle}>İlgilenmiyorum</button>
+          <button disabled={busy === item.id} onClick={() => applyAndOpen(item)} style={primaryStyle}>{tr('Uygula')}</button>
+          <button disabled={busy === item.id} onClick={() => act(item, 'defer')} style={buttonStyle}>{tr('Yarına ertele')}</button>
+          <button disabled={busy === item.id} onClick={() => act(item, 'dismiss')} style={buttonStyle}>{tr('İlgilenmiyorum')}</button>
         </div>
       )}
     </section>
