@@ -3,6 +3,8 @@ import PageHeader from '@/components/PageHeader'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 import { resolveName } from '@/lib/identity/resolve-client'
 import { printPage } from '@/lib/print-page'
 
@@ -28,6 +30,7 @@ interface ProgressEntry {
 }
 
 export default function PlanPage() {
+  const { t: tr, locale } = useT()
   const router = useRouter()
   const [plan, setPlan] = useState<StudyPlan | null>(null)
   const [planId, setPlanId] = useState<string | null>(null)
@@ -181,9 +184,9 @@ export default function PlanPage() {
     if (!plan || !profile) return
     try {
       const { printLearningDocument, printableMath } = await import("@/lib/learning-print")
-      const content = "<p>" + printableMath(plan.summary) + "</p>" + plan.weeks.map(week => "<section class='print-question'><h2>Hafta " + week.week + ": " + printableMath(week.goal) + "</h2><p>" + week.daily_minutes + " dk/gün</p><ul>" + (week.topics || []).map(topic => "<li>" + (isCompleted(week.week, topic) ? "✓ " : "○ ") + printableMath(topic) + "</li>").join("") + "</ul><p>" + printableMath(week.focus) + "</p></section>").join("") + "<p>" + printableMath(plan.motivation || "") + "</p>"
-      await printLearningDocument("Pratium Gelişim Planı - " + profile.name, [profile.grade, "Ortalama %" + avgPct, planDate ? new Date(planDate).toLocaleDateString("tr-TR") : ""].filter(Boolean).join(" · "), content)
-    } catch (error) { alert(error instanceof Error ? error.message : "PDF görünümü açılamadı.") }
+      const content = "<p>" + printableMath(plan.summary) + "</p>" + plan.weeks.map(week => "<section class='print-question'><h2>" + tr('Hafta {n}: {goal}', { n: week.week, goal: printableMath(week.goal) }) + "</h2><p>" + week.daily_minutes + " " + tr('dk/gün') + "</p><ul>" + (week.topics || []).map(topic => "<li>" + (isCompleted(week.week, topic) ? "✓ " : "○ ") + printableMath(topic) + "</li>").join("") + "</ul><p>" + printableMath(week.focus) + "</p></section>").join("") + "<p>" + printableMath(plan.motivation || "") + "</p>"
+      await printLearningDocument(tr('Pratium Gelişim Planı - {name}', { name: profile.name }), [profile.grade, tr('Ortalama %{n}', { n: avgPct }), planDate ? new Date(planDate).toLocaleDateString(intlLocale(locale)) : ""].filter(Boolean).join(" · "), content)
+    } catch (error) { alert(error instanceof Error ? error.message : tr('PDF görünümü açılamadı.')) }
   }
 
   const report = calcReport()
@@ -200,17 +203,17 @@ export default function PlanPage() {
       <div style={{ maxWidth: '640px', margin: '0 auto' }}>
 
         <div className="anim-up" style={{ marginBottom: '2rem' }}>
-          <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>Kişisel Plan</div>
-          <h1 className="serif" style={{ fontSize: '28px' }}>Gelişim planın</h1>
+          <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>{tr('Kişisel Plan')}</div>
+          <h1 className="serif" style={{ fontSize: '28px' }}>{tr('Gelişim planın')}</h1>
           <p style={{ color: 'var(--text2)', fontSize: '14px', marginTop: '4px' }}>
-            AI, test geçmişine göre 4 haftalık kişisel plan oluşturur.
+            {tr('AI, test geçmişine göre 4 haftalık kişisel plan oluşturur.')}
           </p>
         </div>
 
         {/* Mevcut durum özeti */}
         <div className="card anim-up-1" style={{ marginBottom: '1rem' }}>
           <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
-            Mevcut durumun
+            {tr('Mevcut durumun')}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginBottom: '1rem' }}>
             {[
@@ -220,14 +223,14 @@ export default function PlanPage() {
             ].map((s, i) => (
               <div key={i} style={{ textAlign: 'center', padding: '12px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
                 <div style={{ fontSize: '22px', fontWeight: 700, color: s.color }}>{s.value}</div>
-                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '3px' }}>{s.label}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '3px' }}>{tr(s.label)}</div>
               </div>
             ))}
           </div>
 
           {stats?.weakTopics?.length > 0 && (
             <div>
-              <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px' }}>Odaklanılacak konular:</div>
+              <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px' }}>{tr('Odaklanılacak konular:')}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {stats.weakTopics.slice(0, 5).map((w: any, i: number) => (
                   <span key={i} style={{ fontSize: '12px', padding: '3px 10px', borderRadius: '99px', background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid rgba(220,38,38,0.15)' }}>
@@ -244,17 +247,17 @@ export default function PlanPage() {
           <div className="card anim-up-1" style={{ marginBottom: '1rem', borderLeft: '3px solid var(--accent)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Aylık İlerleme
+                {tr('Aylık İlerleme')}
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text3)' }}>
-                {planDate ? `${report.daysElapsed}. gün` : ''}
+                {planDate ? tr('{n}. gün', { n: report.daysElapsed }) : ''}
               </div>
             </div>
 
             {/* Genel progress bar */}
             <div style={{ marginBottom: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <span style={{ fontSize: '13px', color: 'var(--text)' }}>{report.completed}/{report.total} konu tamamlandı</span>
+                <span style={{ fontSize: '13px', color: 'var(--text)' }}>{tr('{a}/{b} konu tamamlandı', { a: report.completed, b: report.total })}</span>
                 <span style={{ fontSize: '13px', fontWeight: 700, color: report.pct >= 70 ? 'var(--green)' : report.pct >= 40 ? 'var(--amber)' : 'var(--red)' }}>%{report.pct}</span>
               </div>
               <div style={{ height: '8px', borderRadius: '99px', background: 'var(--border)', overflow: 'hidden' }}>
@@ -267,7 +270,7 @@ export default function PlanPage() {
               {report.byWeek?.map(w => (
                 <div key={w.week} style={{ textAlign: 'center', padding: '8px 4px', borderRadius: '8px', background: w.pct === 100 ? 'var(--green-bg, #dcfce7)' : 'var(--bg2)', border: `1px solid ${w.pct === 100 ? 'rgba(22,163,74,0.2)' : 'var(--border)'}` }}>
                   <div style={{ fontSize: '14px', fontWeight: 700, color: w.pct === 100 ? 'var(--green)' : 'var(--accent)' }}>{w.pct}%</div>
-                  <div style={{ fontSize: '10px', color: 'var(--text3)' }}>Hafta {w.week}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text3)' }}>{tr('Hafta {n}', { n: w.week })}</div>
                   <div style={{ fontSize: '10px', color: 'var(--text3)' }}>{w.done}/{w.total}</div>
                 </div>
               ))}
@@ -276,16 +279,16 @@ export default function PlanPage() {
             <button
               onClick={() => setShowReport(v => !v)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--accent)', padding: '4px 0', fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              {showReport ? '▲ Raporu kapat' : '▼ Ay sonu raporunu gör'}
+              {showReport ? tr('▲ Raporu kapat') : tr('▼ Ay sonu raporunu gör')}
             </button>
 
             {showReport && (
               <div style={{ marginTop: '1rem', padding: '1rem', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '0.75rem' }}>📊 Ay Sonu Raporu</div>
+                <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '0.75rem' }}>{tr('📊 Ay Sonu Raporu')}</div>
                 {report.byWeek?.map(w => (
                   <div key={w.week} style={{ marginBottom: '10px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>Hafta {w.week}: {w.goal}</span>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>{tr('Hafta {n}: {goal}', { n: w.week, goal: w.goal })}</span>
                       <span style={{ fontSize: '12px', color: w.pct === 100 ? 'var(--green)' : w.pct >= 50 ? 'var(--amber)' : 'var(--red)', fontWeight: 600 }}>
                         {w.done}/{w.total} · %{w.pct}
                       </span>
@@ -296,10 +299,10 @@ export default function PlanPage() {
                   </div>
                 ))}
                 <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)', fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}>
-                  {report.pct >= 80 ? '🌟 Harika bir ay geçirdin! Çok disiplinlisin.' :
-                   report.pct >= 50 ? '👍 İyi gidiyorsun, biraz daha odaklan.' :
-                   report.pct > 0 ? '💪 Başlangıç iyi, tutarlılık önemli.' :
-                   '🎯 Konuları tamamladıkça burası dolacak.'}
+                  {report.pct >= 80 ? tr('🌟 Harika bir ay geçirdin! Çok disiplinlisin.') :
+                   report.pct >= 50 ? tr('👍 İyi gidiyorsun, biraz daha odaklan.') :
+                   report.pct > 0 ? tr('💪 Başlangıç iyi, tutarlılık önemli.') :
+                   tr('🎯 Konuları tamamladıkça burası dolacak.')}
                 </div>
               </div>
             )}
@@ -311,19 +314,19 @@ export default function PlanPage() {
           <div className="card anim-up-2" style={{ textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '48px', marginBottom: '1rem' }}>📋</div>
             <h3 className="serif" style={{ fontSize: '20px', marginBottom: '0.75rem' }}>
-              {stats?.sessions?.length < 3 ? 'Daha fazla test çöz' : 'Planını oluştur'}
+              {stats?.sessions?.length < 3 ? tr('Daha fazla test çöz') : tr('Planını oluştur')}
             </h3>
             <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1.5rem', lineHeight: 1.7 }}>
               {stats?.sessions?.length < 3
-                ? 'Kişisel plan için en az 10 test çözmen gerekiyor. Şu an: ' + stats.sessions.length
-                : 'AI, test geçmişini analiz ederek 4 haftalık özel plan hazırlayacak.'}
+                ? tr('Kişisel plan için en az 10 test çözmen gerekiyor. Şu an: {n}', { n: stats.sessions.length })
+                : tr('AI, test geçmişini analiz ederek 4 haftalık özel plan hazırlayacak.')}
             </p>
             <button className="btn btn-primary btn-lg" onClick={generatePlan}
               disabled={generating || stats?.sessions?.length < 3}
               style={{ justifyContent: 'center' }}>
               {generating
-                ? <><span className="spinner" style={{ width: 18, height: 18 }} /> Plan oluşturuluyor...</>
-                : '🤖 4 haftalık plan oluştur'}
+                ? <><span className="spinner" style={{ width: 18, height: 18 }} /> {tr('Plan oluşturuluyor...')}</>
+                : tr('🤖 4 haftalık plan oluştur')}
             </button>
           </div>
         ) : (
@@ -331,7 +334,7 @@ export default function PlanPage() {
             {/* Plan özeti */}
             <div className="card" style={{ marginBottom: '1rem', borderLeft: '3px solid var(--accent)' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
-                Genel değerlendirme
+                {tr('Genel değerlendirme')}
               </div>
               <p style={{ fontSize: '14px', lineHeight: 1.7, color: 'var(--text)' }}>{plan.summary}</p>
             </div>
@@ -343,12 +346,12 @@ export default function PlanPage() {
                 <div key={i} className="card" style={{ marginBottom: '1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
                     <div>
-                      <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>Hafta {week.week}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>{tr('Hafta {n}', { n: week.week })}</div>
                       <div style={{ fontWeight: 600, fontSize: '16px' }}>{week.goal}</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent)' }}>{week.daily_minutes}</div>
-                      <div style={{ fontSize: '10px', color: 'var(--text3)' }}>dk/gün</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text3)' }}>{tr('dk/gün')}</div>
                     </div>
                   </div>
 
@@ -356,7 +359,7 @@ export default function PlanPage() {
                   {weekReport && weekReport.total > 0 && (
                     <div style={{ marginBottom: '10px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
-                        <span style={{ fontSize: '11px', color: 'var(--text3)' }}>{weekReport.done}/{weekReport.total} konu</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text3)' }}>{tr('{a}/{b} konu', { a: weekReport.done, b: weekReport.total })}</span>
                         <span style={{ fontSize: '11px', fontWeight: 600, color: weekReport.pct === 100 ? 'var(--green)' : 'var(--accent)' }}>%{weekReport.pct}</span>
                       </div>
                       <div style={{ height: '4px', borderRadius: '99px', background: 'var(--border)', overflow: 'hidden' }}>
@@ -409,11 +412,11 @@ export default function PlanPage() {
             <div className="print-controls" style={{ display: 'flex', gap: '8px', marginTop: '1rem' }}>
               <button className="btn btn-sm" onClick={generatePlan} disabled={generating}
                 style={{ flex: 1, justifyContent: 'center' }}>
-                {generating ? 'Yenileniyor...' : '↺ Planı yenile'}
+                {generating ? tr('Yenileniyor...') : tr('↺ Planı yenile')}
               </button>
               <button className="btn btn-sm" onClick={exportPDF} disabled={generating}
                 style={{ flex: 1, justifyContent: 'center', color: 'var(--accent)', borderColor: 'rgba(91,76,245,0.3)' }}>
-                📄 Yazdır / PDF kaydet
+                {tr('📄 Yazdır / PDF kaydet')}
               </button>
               <button className="btn btn-sm" onClick={() => printPage({ orientation: 'portrait' })}
                 style={{ justifyContent: 'center', color: 'var(--text2)' }}>

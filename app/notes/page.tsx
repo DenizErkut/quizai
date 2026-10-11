@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 
 interface Exam {
   name: string   // "1. Yazılı", "Sözlü" vb.
@@ -33,6 +35,7 @@ const PRESET_SUBJECTS = [
 ]
 
 export default function NotesPage() {
+  const { t, locale } = useT()
   const router = useRouter()
   const [gradeNotes, setGradeNotes] = useState<GradeNote[]>([])
   const [loading, setLoading] = useState(true)
@@ -163,7 +166,7 @@ export default function NotesPage() {
   }
 
   async function deleteGradeNote(id: string) {
-    if (!confirm('Bu dersi silmek istediğine emin misin?')) return
+    if (!confirm(t('Bu dersi silmek istediğine emin misin?'))) return
     await supabase.from('grade_notes').delete().eq('id', id)
     setGradeNotes(prev => prev.filter(g => g.id !== id))
   }
@@ -187,9 +190,9 @@ export default function NotesPage() {
         body: JSON.stringify({ gradeNotes: notesStr }),
       })
       const data = await res.json()
-      setAiAnalysis(data.analysis || 'Analiz alınamadı.')
+      setAiAnalysis(data.analysis || t('Analiz alınamadı.'))
     } catch {
-      setAiAnalysis('Analiz sırasında hata oluştu.')
+      setAiAnalysis(t('Analiz sırasında hata oluştu.'))
     }
     setAiLoading(false)
   }
@@ -204,10 +207,10 @@ export default function NotesPage() {
 
   function scoreLabel(avg: number | null) {
     if (avg === null) return '—'
-    if (avg >= 85) return 'İyi'
-    if (avg >= 70) return 'Orta'
-    if (avg >= 55) return 'Geliştirilebilir'
-    return 'Zayıf ⚠️'
+    if (avg >= 85) return t('İyi')
+    if (avg >= 70) return t('Orta')
+    if (avg >= 55) return t('Geliştirilebilir')
+    return t('Zayıf ⚠️')
   }
 
   // Sıralama: en zayıf dersler başa
@@ -231,16 +234,16 @@ export default function NotesPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)' }}>
-              📒 Karne Notlarım
+              {t('📒 Karne Notlarım')}
             </h1>
             <p style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '2px' }}>
-              Ders notlarını gir — AI zayıf derslerine odaklansın
+              {t('Ders notlarını gir — AI zayıf derslerine odaklansın')}
             </p>
           </div>
           {!isInstitutionStudent && (
             <button onClick={() => { resetForm(); setEditingId(null); setShowAdd(true) }}
               className="btn btn-primary" style={{ fontSize: '13px' }}>
-              + Ders Ekle
+              {t('+ Ders Ekle')}
             </button>
           )}
         </div>
@@ -249,13 +252,11 @@ export default function NotesPage() {
         <div className="card" style={{ marginBottom: '1.5rem', borderLeft: '3px solid var(--accent)', background: 'var(--accent-bg)' }}>
           {isInstitutionStudent ? (
             <p style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.7, margin: 0 }}>
-              🏫 Bir kuruma bağlısın — ders notların artık <strong>kurumun veya öğretmenin</strong> tarafından
-              giriliyor/içe aktarılıyor. Burada sadece görüntüleyebilirsin.
+              {t('🏫 Bir kuruma bağlısın — ders notların artık kurumun veya öğretmenin tarafından giriliyor/içe aktarılıyor. Burada sadece görüntüleyebilirsin.')}
             </p>
           ) : (
             <p style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.7, margin: 0 }}>
-              💡 Ders notlarını girdikten sonra <strong>AI Analizi</strong> butonu ile zayıf derslerini öğren.
-              Test üretirken veya gelişim planı hazırlarken AI bu notları otomatik dikkate alır.
+              {t('💡 Ders notlarını girdikten sonra AI Analizi butonu ile zayıf derslerini öğren. Test üretirken veya gelişim planı hazırlarken AI bu notları otomatik dikkate alır.')}
             </p>
           )}
         </div>
@@ -265,23 +266,23 @@ export default function NotesPage() {
           importedGrades.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
               <div style={{ fontSize: '40px', marginBottom: '10px' }}>📒</div>
-              <div style={{ fontWeight: 700, color: 'var(--primary)', marginBottom: '6px' }}>Henüz not girilmemiş</div>
-              <p style={{ fontSize: '13px', color: 'var(--text3)' }}>Kurumun veya öğretmenin not girdiğinde burada görünecek.</p>
+              <div style={{ fontWeight: 700, color: 'var(--primary)', marginBottom: '6px' }}>{t('Henüz not girilmemiş')}</div>
+              <p style={{ fontSize: '13px', color: 'var(--text3)' }}>{t('Kurumun veya öğretmenin not girdiğinde burada görünecek.')}</p>
             </div>
           ) : (
             <div className="card">
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
-                  <tr><th style={{ textAlign: 'left', padding: '8px', borderBottom: '2px solid var(--border)' }}>Ders</th>
-                    <th style={{ textAlign: 'left', padding: '8px', borderBottom: '2px solid var(--border)' }}>Not</th>
-                    <th style={{ textAlign: 'left', padding: '8px', borderBottom: '2px solid var(--border)' }}>Tarih</th></tr>
+                  <tr><th style={{ textAlign: 'left', padding: '8px', borderBottom: '2px solid var(--border)' }}>{t('Ders')}</th>
+                    <th style={{ textAlign: 'left', padding: '8px', borderBottom: '2px solid var(--border)' }}>{t('Not')}</th>
+                    <th style={{ textAlign: 'left', padding: '8px', borderBottom: '2px solid var(--border)' }}>{t('Tarih')}</th></tr>
                 </thead>
                 <tbody>
                   {importedGrades.map((g, i) => (
                     <tr key={i}>
                       <td style={{ padding: '8px', borderBottom: '1px solid var(--border)', fontWeight: 600 }}>{g.subject}</td>
                       <td style={{ padding: '8px', borderBottom: '1px solid var(--border)' }}>{g.value_text}</td>
-                      <td style={{ padding: '8px', borderBottom: '1px solid var(--border)', color: 'var(--text3)' }}>{new Date(g.created_at).toLocaleDateString('tr-TR')}</td>
+                      <td style={{ padding: '8px', borderBottom: '1px solid var(--border)', color: 'var(--text3)' }}>{new Date(g.created_at).toLocaleDateString(intlLocale(locale))}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -296,12 +297,12 @@ export default function NotesPage() {
         {showAdd && (
           <div className="card" style={{ marginBottom: '1.5rem', border: '2px solid var(--accent)' }}>
             <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>
-              {editingId ? '✏️ Dersi Düzenle' : '➕ Yeni Ders Ekle'}
+              {editingId ? t('✏️ Dersi Düzenle') : t('➕ Yeni Ders Ekle')}
             </div>
 
             {/* Ders adı + renk */}
             <div style={{ marginBottom: '12px' }}>
-              <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px', fontWeight: 600 }}>Ders Adı</label>
+              <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px', fontWeight: 600 }}>{t('Ders Adı')}</label>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
                 {PRESET_SUBJECTS.map(s => (
                   <button key={s} onClick={() => setForm(p => ({ ...p, subject: s }))}
@@ -315,13 +316,13 @@ export default function NotesPage() {
                 ))}
               </div>
               <input value={form.subject} onChange={e => setForm(p => ({ ...p, subject: e.target.value }))}
-                placeholder="Veya kendi ders adını yaz..."
+                placeholder={t('Veya kendi ders adını yaz...')}
                 style={{ padding: '10px 14px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', outline: 'none', width: '100%', boxSizing: 'border-box' }} />
             </div>
 
             {/* Renk seçici */}
             <div style={{ marginBottom: '14px' }}>
-              <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px', fontWeight: 600 }}>Renk</label>
+              <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px', fontWeight: 600 }}>{t('Renk')}</label>
               <div style={{ display: 'flex', gap: '8px' }}>
                 {SUBJECT_COLORS.map(c => (
                   <button key={c} onClick={() => setForm(p => ({ ...p, subject_color: c }))}
@@ -334,16 +335,16 @@ export default function NotesPage() {
             {(['term1_exams', 'term2_exams'] as const).map(term => (
               <div key={term} style={{ marginBottom: '14px' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', marginBottom: '8px' }}>
-                  {term === 'term1_exams' ? '1. Dönem Sınavları' : '2. Dönem Sınavları'}
+                  {term === 'term1_exams' ? t('1. Dönem Sınavları') : t('2. Dönem Sınavları')}
                 </div>
                 {form[term].map((exam, idx) => (
                   <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '6px', alignItems: 'center' }}>
                     <input value={exam.name} onChange={e => updateExam(term, idx, 'name', e.target.value)}
-                      placeholder="Sınav adı (1. Yazılı, Sözlü...)"
+                      placeholder={t('Sınav adı (1. Yazılı, Sözlü...)')}
                       style={{ flex: 2, padding: '8px 12px', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '12px', fontFamily: 'var(--font-sans)', outline: 'none' }} />
                     <input type="number" min={0} max={100} value={exam.score}
                       onChange={e => updateExam(term, idx, 'score', e.target.value)}
-                      placeholder="Not (0-100)"
+                      placeholder={t('Not (0-100)')}
                       style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '12px', fontFamily: 'var(--font-sans)', outline: 'none' }} />
                     {form[term].length > 1 && (
                       <button onClick={() => removeExam(term, idx)}
@@ -353,16 +354,16 @@ export default function NotesPage() {
                 ))}
                 <button onClick={() => addExam(term)}
                   style={{ fontSize: '12px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 600, padding: '4px 0' }}>
-                  + Sınav Ekle
+                  {t('+ Sınav Ekle')}
                 </button>
               </div>
             ))}
 
             {/* Kişisel not */}
             <div style={{ marginBottom: '14px' }}>
-              <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px', fontWeight: 600 }}>Kişisel not (opsiyonel)</label>
+              <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px', fontWeight: 600 }}>{t('Kişisel not (opsiyonel)')}</label>
               <textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
-                placeholder="Bu dersle ilgili notun var mı? (Örn: Logaritma konusunu hiç anlamadım)"
+                placeholder={t('Bu dersle ilgili notun var mı? (Örn: Logaritma konusunu hiç anlamadım)')}
                 rows={2}
                 style={{ padding: '10px 14px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', outline: 'none', width: '100%', boxSizing: 'border-box', resize: 'vertical', lineHeight: 1.6 }} />
             </div>
@@ -370,10 +371,10 @@ export default function NotesPage() {
             <div style={{ display: 'flex', gap: '8px' }}>
               <button onClick={saveGradeNote} disabled={saving || !form.subject.trim()}
                 className="btn btn-primary" style={{ flex: 1, justifyContent: 'center', opacity: saving ? 0.6 : 1 }}>
-                {saving ? '⏳ Kaydediliyor...' : '💾 Kaydet'}
+                {saving ? t('⏳ Kaydediliyor...') : t('💾 Kaydet')}
               </button>
               <button onClick={() => { setShowAdd(false); setEditingId(null); resetForm() }}
-                className="btn" style={{ justifyContent: 'center' }}>İptal</button>
+                className="btn" style={{ justifyContent: 'center' }}>{t('İptal')}</button>
             </div>
           </div>
         )}
@@ -382,12 +383,12 @@ export default function NotesPage() {
         {sortedNotes.length === 0 && !showAdd ? (
           <div className="card" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>📒</div>
-            <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--primary)', marginBottom: '6px' }}>Henüz ders eklenmedi</div>
+            <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--primary)', marginBottom: '6px' }}>{t('Henüz ders eklenmedi')}</div>
             <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '1.5rem' }}>
-              Ders notlarını ekle, AI zayıf konularına odaklansın.
+              {t('Ders notlarını ekle, AI zayıf konularına odaklansın.')}
             </div>
             <button onClick={() => setShowAdd(true)} className="btn btn-primary" style={{ justifyContent: 'center' }}>
-              + İlk Dersimi Ekle
+              {t('+ İlk Dersimi Ekle')}
             </button>
           </div>
         ) : sortedNotes.length > 0 && (
@@ -397,9 +398,9 @@ export default function NotesPage() {
               {aiAnalysis ? (
                 <div className="card" style={{ marginBottom: '1rem', borderLeft: '3px solid #7c3aed', background: 'rgba(124,58,237,0.04)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#7c3aed' }}>🤖 AI Ders Analizi</div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#7c3aed' }}>{t('🤖 AI Ders Analizi')}</div>
                     <button onClick={generateAiAnalysis} style={{ fontSize: '11px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                      Yenile
+                      {t('Yenile')}
                     </button>
                   </div>
                   <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
@@ -409,7 +410,7 @@ export default function NotesPage() {
               ) : (
                 <button onClick={generateAiAnalysis} disabled={aiLoading}
                   style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1.5px dashed rgba(124,58,237,0.4)', background: 'rgba(124,58,237,0.04)', color: '#7c3aed', fontSize: '14px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', opacity: aiLoading ? 0.6 : 1 }}>
-                  {aiLoading ? '⏳ Analiz hazırlanıyor...' : '🤖 AI ile Zayıf Dersleri Analiz Et'}
+                  {aiLoading ? t('⏳ Analiz hazırlanıyor...') : t('🤖 AI ile Zayıf Dersleri Analiz Et')}
                 </button>
               )}
             </div>
@@ -426,7 +427,7 @@ export default function NotesPage() {
               ].map((s, i) => (
                 <div key={i} className="card" style={{ textAlign: 'center', padding: '12px 8px' }}>
                   <div style={{ fontWeight: 800, fontSize: '22px', color: (s as any).color || 'var(--primary)' }}>{s.value}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{s.label}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{t(s.label)}</div>
                 </div>
               ))}
             </div>
@@ -442,17 +443,17 @@ export default function NotesPage() {
                         <div style={{ width: 10, height: 10, borderRadius: '50%', background: g.subject_color, flexShrink: 0 }} />
                         <div>
                           <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--primary)' }}>{g.subject}</div>
-                          {isWeak && <div style={{ fontSize: '11px', color: 'var(--red)', fontWeight: 600 }}>⚠️ Gelişim gerekiyor</div>}
+                          {isWeak && <div style={{ fontSize: '11px', color: 'var(--red)', fontWeight: 600 }}>{t('⚠️ Gelişim gerekiyor')}</div>}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <button onClick={() => startEdit(g)}
                           style={{ padding: '5px 10px', borderRadius: '7px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text3)', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                          Düzenle
+                          {t('Düzenle')}
                         </button>
                         <button onClick={() => deleteGradeNote(g.id)}
                           style={{ padding: '5px 10px', borderRadius: '7px', border: '1px solid rgba(220,38,38,0.2)', background: 'var(--red-bg)', color: 'var(--red)', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                          Sil
+                          {t('Sil')}
                         </button>
                       </div>
                     </div>
@@ -465,7 +466,7 @@ export default function NotesPage() {
                       ].map((term, ti) => (
                         <div key={ti} style={{ background: 'var(--bg2)', borderRadius: '10px', padding: '10px 12px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)' }}>{term.label}</div>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)' }}>{t(term.label)}</div>
                             <div style={{ fontWeight: 800, fontSize: '18px', color: scoreColor(term.avg) }}>
                               {term.avg !== null ? term.avg.toFixed(1) : '—'}
                             </div>
@@ -497,15 +498,15 @@ export default function NotesPage() {
             {/* Quize yönlendirme */}
             <div className="card" style={{ marginTop: '1.5rem', textAlign: 'center', background: 'linear-gradient(135deg, rgba(8,36,101,0.04), rgba(30,207,184,0.04))', border: '1.5px dashed var(--border)' }}>
               <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary)', marginBottom: '6px' }}>
-                Test çözerken karne notların dikkate alınır 🎯
+                {t('Test çözerken karne notların dikkate alınır 🎯')}
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '12px' }}>
-                Zayıf derslerinden soru üret, hızla gelişim sağla.
+                {t('Zayıf derslerinden soru üret, hızla gelişim sağla.')}
               </div>
               {sortedNotes[0] && (
                 <Link href={`/quiz?topic=${encodeURIComponent(sortedNotes[0].subject)}`}
                   className="btn btn-primary" style={{ justifyContent: 'center', fontSize: '13px' }}>
-                  ⚡ En Zayıf Dersimden Test Çöz ({sortedNotes[0].subject})
+                  {t('⚡ En Zayıf Dersimden Test Çöz ({subject})', { subject: sortedNotes[0].subject })}
                 </Link>
               )}
             </div>

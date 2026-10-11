@@ -13,5 +13,9 @@ import { reviewEntries } from './review'
 import { archiveEntries } from './archive'
 import { dailyEntries } from './daily'
 import { analysisEntries } from './analysis'
+import { authLoginEntries } from './auth-login'
+import { notesEntries } from './notes'
+import { planEntries } from './plan'
+import { liveEntries } from './live'
 
-export const ALL_ENTRIES: Entry[] = [...navbarEntries, ...publicEntries, ...dashboardPricingEntries, ...profileEntries, ...quizSetupEntries, ...quizQuestionEntries, ...quizResultEntries, ...quizFlowEntries, ...communityEntries, ...coachEntries, ...reviewEntries, ...archiveEntries, ...dailyEntries, ...analysisEntries]
+export const ALL_ENTRIES: Entry[] = [...navbarEntries, ...publicEntries, ...dashboardPricingEntries, ...profileEntries, ...quizSetupEntries, ...quizQuestionEntries, ...quizResultEntries, ...quizFlowEntries, ...communityEntries, ...coachEntries, ...reviewEntries, ...archiveEntries, ...dailyEntries, ...analysisEntries, ...authLoginEntries, ...notesEntries, ...planEntries, ...liveEntries]

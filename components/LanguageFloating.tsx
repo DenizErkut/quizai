@@ -20,7 +20,7 @@ export default function LanguageFloating() {
         aria-expanded={open}
         style={{ height: 42, padding: '0 12px', borderRadius: 21, background: 'var(--bg)', border: '1.5px solid var(--border)', boxShadow: 'var(--shadow)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: 'var(--text)', fontFamily: 'inherit' }}
       >
-        <span>{active.flag}</span><span style={{ fontSize: 10, opacity: 0.6 }}>▾</span>
+        <span>🌐</span><span style={{ fontWeight: 700 }}>{active.code.toUpperCase()}</span><span style={{ fontSize: 10, opacity: 0.6 }}>▾</span>
       </button>
       {open && (
         <>
@@ -29,7 +29,7 @@ export default function LanguageFloating() {
             {LOCALES.map(l => (
               <button key={l.code} onClick={() => { setOpen(false); void setLocale(l.code) }}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', borderRadius: 8, border: 'none', background: l.code === locale ? 'rgba(30,207,184,0.12)' : 'transparent', color: 'var(--text)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: l.code === locale ? 600 : 400, textAlign: 'start' }}>
-                {l.flag} {l.label}
+                {l.code.toUpperCase()} · {l.label}
               </button>
             ))}
           </div>
