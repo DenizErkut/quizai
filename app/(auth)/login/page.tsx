@@ -2,6 +2,7 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 const ROLES = [
   {
@@ -47,6 +48,7 @@ const ROLES = [
 ]
 
 function LoginSelectContent() {
+  const { t } = useT()
   const searchParams = useSearchParams()
   const next = searchParams.get('next')
   const withNext = (href: string) => next ? `${href}?next=${encodeURIComponent(next)}` : href
@@ -59,10 +61,10 @@ function LoginSelectContent() {
           <Link href="/" style={{ textDecoration: 'none', display: 'inline-block' }}>
             <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '72px', width: 'auto' }} />
           </Link>
-          <div className="warm-badge" style={{ marginTop: '18px' }}>Tekrar hoş geldin</div>
-          <h1>Nasıl devam etmek istersin?</h1>
+          <div className="warm-badge" style={{ marginTop: '18px' }}>{t('Tekrar hoş geldin')}</div>
+          <h1>{t('Nasıl devam etmek istersin?')}</h1>
           <p style={{ fontSize: '14px', color: 'var(--text3)', marginTop: '8px' }}>
-            Sana uygun çalışma alanını seç.
+            {t('Sana uygun çalışma alanını seç.')}
           </p>
         </div>
 
@@ -77,8 +79,8 @@ function LoginSelectContent() {
                 {role.icon}
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: '15px', color: role.color, marginBottom: '2px' }}>{role.title}</div>
-                <div style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.5 }}>{role.desc}</div>
+                <div style={{ fontWeight: 700, fontSize: '15px', color: role.color, marginBottom: '2px' }}>{t(role.title)}</div>
+                <div style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.5 }}>{t(role.desc)}</div>
               </div>
               <span style={{ color: role.color, fontSize: '18px', opacity: 0.6 }}>›</span>
             </Link>
@@ -87,9 +89,9 @@ function LoginSelectContent() {
 
         {/* Kayıt ol */}
         <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '13px', color: 'var(--text3)' }} className="anim-up-2">
-          Hesabın yok mu?{' '}
+          {t('Hesabın yok mu?')}{' '}
           <Link href={next ? `/register?next=${encodeURIComponent(next)}` : '/register'} style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>
-            Kayıt ol
+            {t('Kayıt ol')}
           </Link>
         </div>
       </div>

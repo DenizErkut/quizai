@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 import { resolveName } from '@/lib/identity/resolve-client'
 import LearningSummary from '@/components/student/LearningSummary'
 import RecommendationLifecycle from '@/components/student/RecommendationLifecycle'
@@ -56,6 +57,7 @@ function currentGreeting() {
 
 export default function HomeChoicePage() {
   const router = useRouter()
+  const { t } = useT()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [greeting] = useState(currentGreeting)
   const [loading, setLoading] = useState(true)
@@ -111,16 +113,16 @@ export default function HomeChoicePage() {
               {initials}
             </div>
             <div>
-              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{greeting} 👋</div>
+              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t(greeting)} 👋</div>
               <div style={{ fontSize: '16px', fontWeight: 700, color: '#fff' }}>{firstName}</div>
             </div>
           </div>
 
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#fff', marginBottom: '4px' }}>
-            Bugün ne yapmak istersin?
+            {t('Bugün ne yapmak istersin?')}
           </div>
           <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.65)' }}>
-            Bir mod seç, hemen başlayalım
+            {t('Bir mod seç, hemen başlayalım')}
           </div>
         </div>
       </div>
@@ -128,7 +130,7 @@ export default function HomeChoicePage() {
       {/* ── SEÇİM KARTLARI ── */}
       <div style={{ maxWidth: '520px', margin: '-1.5rem auto 0', padding: '0 1.25rem', position: 'relative', zIndex: 2 }}>
         <NextBestAction />
-        <details style={{ marginBottom:'1rem' }}><summary style={{ cursor:'pointer',fontSize:12,fontWeight:700,color:'var(--text3)',padding:'8px 2px' }}>Öğrenme durumunun ayrıntıları</summary><div style={{ marginTop:8 }}><LearningSummary /><LearningRiskCard /><AgentInsights /><RecommendationLifecycle /></div></details>
+        <details style={{ marginBottom:'1rem' }}><summary style={{ cursor:'pointer',fontSize:12,fontWeight:700,color:'var(--text3)',padding:'8px 2px' }}>{t('Öğrenme durumunun ayrıntıları')}</summary><div style={{ marginTop:8 }}><LearningSummary /><LearningRiskCard /><AgentInsights /><RecommendationLifecycle /></div></details>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
           {CHOICES.map(c => (
             <Link key={c.href} href={c.href} style={{
@@ -144,10 +146,10 @@ export default function HomeChoicePage() {
             >
               <div style={{ fontSize: '32px', marginBottom: '10px' }}>{c.icon}</div>
               <div style={{ fontSize: '15px', fontWeight: 800, color: '#fff', marginBottom: '4px', lineHeight: 1.25 }}>
-                {c.title}
+                {t(c.title)}
               </div>
               <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
-                {c.desc}
+                {t(c.desc)}
               </div>
             </Link>
           ))}
@@ -156,7 +158,7 @@ export default function HomeChoicePage() {
         {/* Diğer araçlara erişim */}
         <div style={{ textAlign: 'center', marginTop: '1.75rem' }}>
           <Link href="/dashboard" style={{ fontSize: '13px', color: 'var(--text3)', textDecoration: 'none' }}>
-            Tüm araçları gör (Analiz, Arşiv, Sıralama...) →
+            {t('Tüm araçları gör (Analiz, Arşiv, Sıralama...) →')}
           </Link>
         </div>
       </div>
