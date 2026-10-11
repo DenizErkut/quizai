@@ -4,8 +4,10 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities } from '@/lib/identity/resolve-client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 export default function LiveContent() {
+  const { t } = useT()
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient() as any
@@ -64,7 +66,7 @@ export default function LiveContent() {
       .neq('status', 'finished')
       .single()
 
-    if (!lq) { setError('Bu koda ait aktif quiz bulunamadı.'); setJoining(false); return }
+    if (!lq) { setError(t('Bu koda ait aktif quiz bulunamadı.')); setJoining(false); return }
 
     setLiveQuiz(lq)
     liveQuizRef.current = lq
@@ -303,22 +305,22 @@ export default function LiveContent() {
   if (screen === 'join') return (
     <main style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #082465, #6366f1)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
       <div style={{ fontSize: '48px', marginBottom: '12px' }}>🎯</div>
-      <div style={{ fontWeight: 900, fontSize: '28px', color: '#fff', marginBottom: '4px' }}>Canlı Quiz</div>
-      <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', marginBottom: '2rem' }}>Kodu gir, quize katıl!</div>
+      <div style={{ fontWeight: 900, fontSize: '28px', color: '#fff', marginBottom: '4px' }}>{t('Canlı Quiz')}</div>
+      <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', marginBottom: '2rem' }}>{t('Kodu gir, quize katıl!')}</div>
 
       <div style={{ background: '#fff', borderRadius: '20px', padding: '2rem', width: '100%', maxWidth: '360px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <input
           value={code}
           onChange={e => setCode(e.target.value.toUpperCase())}
           onKeyDown={e => e.key === 'Enter' && joinQuiz()}
-          placeholder="KOD GİR"
+          placeholder={t('KOD GİR')}
           maxLength={8}
           style={{ width: '100%', padding: '16px', borderRadius: '12px', border: '2px solid #e2e8f0', fontSize: '28px', fontWeight: 900, letterSpacing: '0.2em', textAlign: 'center', fontFamily: 'monospace', color: '#082465', outline: 'none', boxSizing: 'border-box', marginBottom: '12px' }}
         />
         {error && <div style={{ color: '#dc2626', fontSize: '13px', marginBottom: '10px', textAlign: 'center' }}>{error}</div>}
         <button onClick={joinQuiz} disabled={joining || code.length < 4}
           style={{ width: '100%', padding: '14px', borderRadius: '12px', border: 'none', background: joining ? '#e2e8f0' : '#6366f1', color: joining ? '#94a3b8' : '#fff', fontWeight: 800, fontSize: '16px', cursor: joining ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
-          {joining ? 'Bağlanıyor...' : 'Katıl →'}
+          {joining ? t('Bağlanıyor...') : t('Katıl →')}
         </button>
       </div>
     </main>
@@ -328,9 +330,9 @@ export default function LiveContent() {
   if (screen === 'waiting') return (
     <main style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #082465, #6366f1)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem', textAlign: 'center' }}>
       <div style={{ width: 64, height: 64, border: '5px solid rgba(255,255,255,0.2)', borderTop: '5px solid #fff', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '1.5rem' }} />
-      <div style={{ fontWeight: 800, fontSize: '22px', color: '#fff', marginBottom: '8px' }}>Hazır ol!</div>
+      <div style={{ fontWeight: 800, fontSize: '22px', color: '#fff', marginBottom: '8px' }}>{t('Hazır ol!')}</div>
       <div style={{ fontSize: '15px', color: 'rgba(255,255,255,0.7)', marginBottom: '1rem' }}>{liveQuiz?.topic}</div>
-      <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>Öğretmen quizi başlatana kadar bekle...</div>
+      <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>{t('Öğretmen quizi başlatana kadar bekle...')}</div>
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </main>
   )
@@ -339,7 +341,7 @@ export default function LiveContent() {
   if (screen === 'question' && q) return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: '40px' }}>
       <div style={{ background: '#082465', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>Soru {currentQ + 1}/{liveQuiz.questions.length}</div>
+        <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{t('Soru {a}/{b}', { a: currentQ + 1, b: liveQuiz.questions.length })}</div>
         <div style={{ flex: 1, height: 6, borderRadius: '99px', background: 'rgba(255,255,255,0.15)', overflow: 'hidden' }}>
           <div style={{ height: '100%', borderRadius: '99px', background: timerPct > 30 ? '#1ECFB8' : '#ef4444', width: `${timerPct}%`, transition: 'width 1s linear' }} />
         </div>
@@ -349,7 +351,7 @@ export default function LiveContent() {
       <div style={{ maxWidth: '560px', margin: '0 auto', padding: '1.25rem 1rem' }}>
         {answerError && (
           <div style={{ padding: '10px 12px', background: '#fff4e5', border: '1px solid rgba(217,119,6,0.25)', borderRadius: '10px', fontSize: '13px', color: '#92400e', marginBottom: '1rem', lineHeight: 1.5 }}>
-            ⚠️ Cevabın gönderilemedi (bağlantı sorunu olabilir). Lütfen tekrar seç.
+            {t('⚠️ Cevabın gönderilemedi (bağlantı sorunu olabilir). Lütfen tekrar seç.')}
           </div>
         )}
         <div className="card" style={{ marginBottom: '1rem' }}>
@@ -374,22 +376,22 @@ export default function LiveContent() {
   if (screen === 'answer_sent') return (
     <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: isCorrect ? 'linear-gradient(135deg, #14532d, #16a34a)' : 'linear-gradient(135deg, #7f1d1d, #dc2626)', textAlign: 'center', padding: '2rem 1rem' }}>
       <div style={{ fontSize: '72px', marginBottom: '16px' }}>{isCorrect ? '✓' : '✗'}</div>
-      <div style={{ fontWeight: 900, fontSize: '28px', color: '#fff', marginBottom: '8px' }}>{isCorrect ? 'Doğru!' : 'Yanlış!'}</div>
+      <div style={{ fontWeight: 900, fontSize: '28px', color: '#fff', marginBottom: '8px' }}>{isCorrect ? t('Doğru!') : t('Yanlış!')}</div>
       <div style={{ fontSize: '15px', color: 'rgba(255,255,255,0.8)', marginBottom: '2rem' }}>
-        {isCorrect ? 'Harika! Bir sonraki soruyu bekle.' : 'Bir sonraki soruyu bekle.'}
+        {isCorrect ? t('Harika! Bir sonraki soruyu bekle.') : t('Bir sonraki soruyu bekle.')}
       </div>
       <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: '16px', padding: '16px 32px', backdropFilter: 'blur(10px)' }}>
-        <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '4px' }}>Toplam</div>
+        <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '4px' }}>{t('Toplam')}</div>
         <div style={{ fontSize: '32px', fontWeight: 900, color: '#fff' }}>{score.correct}/{liveQuiz?.questions?.length || score.total}</div>
       </div>
-      <div style={{ marginTop: '2rem', fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>Sonraki soru geliyor...</div>
+      <div style={{ marginTop: '2rem', fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>{t('Sonraki soru geliyor...')}</div>
 
       {/* Öğretmen bitirdiyse otomatik geçilir; takılı kalırsa manuel buton */}
       {score.total >= (liveQuizRef.current?.questions?.length || 999) && (
         <button
           onClick={() => { fetchLeaderboard(liveQuizRef.current?.id); setScreen('results') }}
           style={{ marginTop: '1.5rem', padding: '12px 28px', borderRadius: '12px', border: '2px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.15)', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', backdropFilter: 'blur(10px)' }}>
-          🏆 Sonuçları Gör
+          {t('🏆 Sonuçları Gör')}
         </button>
       )}
     </main>
@@ -400,14 +402,14 @@ export default function LiveContent() {
     <main style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #082465, #6366f1)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem', textAlign: 'center' }}>
       {lastAnswerScore !== null && (
         <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '4px' }}>
-          {lastAnswerScore > 0 ? `Bu soruda +${lastAnswerScore} puan aldın` : 'Bu soruda puan alamadın'}
+          {lastAnswerScore > 0 ? t('Bu soruda +{n} puan aldın', { n: lastAnswerScore }) : t('Bu soruda puan alamadın')}
         </div>
       )}
-      <div style={{ fontWeight: 900, fontSize: '26px', color: '#fff', marginBottom: '1.5rem' }}>🏆 İlk 3</div>
+      <div style={{ fontWeight: 900, fontSize: '26px', color: '#fff', marginBottom: '1.5rem' }}>{t('🏆 İlk 3')}</div>
 
       <div style={{ background: '#fff', borderRadius: '20px', padding: '1.5rem', width: '100%', maxWidth: '380px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', marginBottom: '1.5rem' }}>
         {leaderboard.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '13px', padding: '1rem' }}>Henüz kimse cevap vermedi.</div>
+          <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '13px', padding: '1rem' }}>{t('Henüz kimse cevap vermedi.')}</div>
         ) : leaderboard.map((entry, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderTop: i > 0 ? '1px solid #e2e8f0' : undefined }}>
             <div style={{ fontSize: '26px' }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</div>
@@ -417,7 +419,7 @@ export default function LiveContent() {
         ))}
       </div>
 
-      <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>Öğretmen sonraki soruyu açıyor...</div>
+      <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>{t('Öğretmen sonraki soruyu açıyor...')}</div>
     </main>
   )
 
@@ -425,16 +427,16 @@ export default function LiveContent() {
   if (screen === 'results') return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: '80px' }}>
       <div style={{ background: 'linear-gradient(135deg, #082465, #6366f1)', padding: '2rem 1rem', textAlign: 'center', color: '#fff' }}>
-        <div style={{ fontSize: '14px', opacity: 0.7, marginBottom: '4px' }}>Toplam sonucun</div>
+        <div style={{ fontSize: '14px', opacity: 0.7, marginBottom: '4px' }}>{t('Toplam sonucun')}</div>
         <div style={{ fontSize: '52px', fontWeight: 900 }}>{score.correct}/{liveQuiz?.questions?.length || score.total}</div>
         <div style={{ fontSize: '13px', opacity: 0.7, marginTop: '4px' }}>
-          {liveQuiz?.questions?.length > 0 ? `%${Math.round(score.correct / liveQuiz.questions.length * 100)}` : '%0'} başarı
+          {t('%{n} başarı', { n: liveQuiz?.questions?.length > 0 ? Math.round(score.correct / liveQuiz.questions.length * 100) : 0 })}
         </div>
       </div>
 
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '1.25rem 1rem' }}>
         <div className="card">
-          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>🏆 Sıralama</div>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>{t('🏆 Sıralama')}</div>
           {leaderboard.map((entry, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
               <div style={{ fontWeight: 800, fontSize: '16px', width: 28, textAlign: 'center' }}>
@@ -442,14 +444,14 @@ export default function LiveContent() {
               </div>
               <div style={{ flex: 1, fontWeight: 500, fontSize: '14px', color: 'var(--primary)' }}>{entry.name}</div>
               <div style={{ fontWeight: 800, fontSize: '15px', color: '#6366f1' }}>
-                {entry.points} puan
+                {t('{n} puan', { n: entry.points })}
               </div>
             </div>
           ))}
         </div>
 
         <button onClick={() => router.push('/quiz')} style={{ width: '100%', marginTop: '1rem', padding: '13px', borderRadius: '12px', border: 'none', background: '#6366f1', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-          Ana Sayfaya Dön
+          {t('Ana Sayfaya Dön')}
         </button>
       </div>
     </main>

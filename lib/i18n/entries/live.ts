@@ -1,0 +1,30 @@
+import type { Entry } from './types'
+
+// Student live-quiz screen (/live).
+export const liveEntries: Entry[] = [
+  ['Bu koda ait aktif quiz bulunamadı.', 'No active quiz found for this code.', 'Für diesen Code wurde kein aktives Quiz gefunden.', 'Aucun quiz actif trouvé pour ce code.', 'No se encontró ningún quiz activo para este código.', 'لم يتم العثور على اختبار نشط لهذا الرمز.'],
+  ['Canlı Quiz', 'Live Quiz', 'Live-Quiz', 'Quiz en direct', 'Quiz en vivo', 'اختبار مباشر'],
+  ['Kodu gir, quize katıl!', 'Enter the code and join the quiz!', 'Code eingeben und dem Quiz beitreten!', 'Saisis le code et rejoins le quiz !', '¡Introduce el código y únete al quiz!', 'أدخل الرمز وانضم إلى الاختبار!'],
+  ['KOD GİR', 'ENTER CODE', 'CODE EINGEBEN', 'SAISIR LE CODE', 'INTRODUCE EL CÓDIGO', 'أدخل الرمز'],
+  ['Bağlanıyor...', 'Connecting...', 'Verbindung wird hergestellt ...', 'Connexion...', 'Conectando...', 'جارٍ الاتصال...'],
+  ['Katıl →', 'Join →', 'Beitreten →', 'Rejoindre →', 'Unirse →', 'انضم ←'],
+  ['Hazır ol!', 'Get ready!', 'Mach dich bereit!', 'Prépare-toi !', '¡Prepárate!', 'استعد!'],
+  ['Öğretmen quizi başlatana kadar bekle...', 'Wait until the teacher starts the quiz...', 'Warte, bis die Lehrkraft das Quiz startet ...', 'Attends que l’enseignant lance le quiz...', 'Espera a que el docente inicie el quiz...', 'انتظر حتى يبدأ المعلم الاختبار...'],
+  ['Soru {a}/{b}', 'Question {a}/{b}', 'Frage {a}/{b}', 'Question {a}/{b}', 'Pregunta {a}/{b}', 'السؤال {a}/{b}'],
+  ['⚠️ Cevabın gönderilemedi (bağlantı sorunu olabilir). Lütfen tekrar seç.', '⚠️ Your answer could not be sent (possible connection problem). Please choose again.', '⚠️ Deine Antwort konnte nicht gesendet werden (evtl. Verbindungsproblem). Bitte wähle erneut.', '⚠️ Ta réponse n’a pas pu être envoyée (problème de connexion possible). Choisis à nouveau.', '⚠️ No se pudo enviar tu respuesta (posible problema de conexión). Elige de nuevo.', '⚠️ تعذّر إرسال إجابتك (ربما بسبب مشكلة في الاتصال). يرجى الاختيار مجددًا.'],
+  ['Yanlış!', 'Wrong!', 'Falsch!', 'Faux !', '¡Incorrecto!', 'خطأ!'],
+  ['Harika! Bir sonraki soruyu bekle.', 'Great! Wait for the next question.', 'Super! Warte auf die nächste Frage.', 'Super ! Attends la question suivante.', '¡Genial! Espera la siguiente pregunta.', 'رائع! انتظر السؤال التالي.'],
+  ['Bir sonraki soruyu bekle.', 'Wait for the next question.', 'Warte auf die nächste Frage.', 'Attends la question suivante.', 'Espera la siguiente pregunta.', 'انتظر السؤال التالي.'],
+  ['Toplam', 'Total', 'Gesamt', 'Total', 'Total', 'المجموع'],
+  ['Sonraki soru geliyor...', 'The next question is coming...', 'Die nächste Frage kommt ...', 'La question suivante arrive...', 'Llega la siguiente pregunta...', 'السؤال التالي قادم...'],
+  ['🏆 Sonuçları Gör', '🏆 See results', '🏆 Ergebnisse ansehen', '🏆 Voir les résultats', '🏆 Ver resultados', '🏆 عرض النتائج'],
+  ['Bu soruda +{n} puan aldın', 'You earned +{n} points on this question', 'Du hast bei dieser Frage +{n} Punkte erhalten', 'Tu as gagné +{n} points à cette question', 'Obtuviste +{n} puntos en esta pregunta', 'حصلت على +{n} نقطة في هذا السؤال'],
+  ['Bu soruda puan alamadın', 'You didn’t earn any points on this question', 'Du hast bei dieser Frage keine Punkte erhalten', 'Tu n’as gagné aucun point à cette question', 'No obtuviste puntos en esta pregunta', 'لم تحصل على نقاط في هذا السؤال'],
+  ['🏆 İlk 3', '🏆 Top 3', '🏆 Top 3', '🏆 Top 3', '🏆 Top 3', '🏆 أفضل 3'],
+  ['Henüz kimse cevap vermedi.', 'Nobody has answered yet.', 'Noch niemand hat geantwortet.', 'Personne n’a encore répondu.', 'Nadie ha respondido todavía.', 'لم يُجب أحد بعد.'],
+  ['Öğretmen sonraki soruyu açıyor...', 'The teacher is opening the next question...', 'Die Lehrkraft öffnet die nächste Frage ...', 'L’enseignant ouvre la question suivante...', 'El docente está abriendo la siguiente pregunta...', 'المعلم يفتح السؤال التالي...'],
+  ['Toplam sonucun', 'Your total result', 'Dein Gesamtergebnis', 'Ton résultat total', 'Tu resultado total', 'نتيجتك الإجمالية'],
+  ['%{n} başarı', '{n}% success', '{n} % Erfolg', '{n} % de réussite', '{n}% de éxito', 'نجاح {n}%'],
+  ['{n} puan', '{n} points', '{n} Punkte', '{n} points', '{n} puntos', '{n} نقطة'],
+  ['Ana Sayfaya Dön', 'Back to home', 'Zurück zur Startseite', 'Retour à l’accueil', 'Volver al inicio', 'العودة إلى الصفحة الرئيسية'],
+]

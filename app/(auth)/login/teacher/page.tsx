@@ -3,8 +3,10 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 export default function TeacherLoginPage() {
+  const { t } = useT()
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [pass, setPass] = useState('')
@@ -28,7 +30,7 @@ export default function TeacherLoginPage() {
   }
 
   async function handleReset() {
-    if (!resetEmail.trim()) { setError('E-posta adresinizi girin.'); return }
+    if (!resetEmail.trim()) { setError(t('E-posta adresinizi girin.')); return }
     setError(''); setResetLoading(true)
     const { error: err } = await supabase.auth.resetPasswordForEmail(resetEmail, {
       redirectTo: `${window.location.origin}/auth/reset-password`,
@@ -39,11 +41,11 @@ export default function TeacherLoginPage() {
   }
 
   async function handleLogin() {
-    if (!email.trim() || !pass) { setError('E-posta ve sifre gerekli.'); return }
+    if (!email.trim() || !pass) { setError(t('E-posta ve şifre gerekli.')); return }
     setError(''); setLoading(true)
 
     const { data, error: err } = await supabase.auth.signInWithPassword({ email, password: pass })
-    if (err) { setError('E-posta veya sifre hatali.'); setLoading(false); return }
+    if (err) { setError(t('E-posta veya şifre hatalı.')); setLoading(false); return }
 
     // Öğretmen mi kontrol et
     const { data: teacher } = await supabase
@@ -56,13 +58,13 @@ export default function TeacherLoginPage() {
 
     if (!teacher) {
       await supabase.auth.signOut()
-      setError('Bu hesap ogretmen paneline kayitli degil. Ogretmen basvurusu icin kayit sayfasini kullanin.')
+      setError(t('Bu hesap öğretmen paneline kayıtlı değil. Öğretmen başvurusu için kayıt sayfasını kullanın.'))
       return
     }
 
     if (!teacher.approved) {
       await supabase.auth.signOut()
-      setError('Ogretmen basvurunuz henuz onaylanmamis. Onay emaili bekleniyor.')
+      setError(t('Öğretmen başvurunuz henüz onaylanmamış. Onay emaili bekleniyor.'))
       return
     }
 
@@ -73,35 +75,35 @@ export default function TeacherLoginPage() {
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
       <div style={{ width: '100%', maxWidth: '400px' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }} className="anim-up">
-          <Link href="/login" style={{ fontSize: '13px', color: 'var(--text3)', textDecoration: 'none', display: 'block', marginBottom: '12px' }}>← Geri</Link>
+          <Link href="/login" style={{ fontSize: '13px', color: 'var(--text3)', textDecoration: 'none', display: 'block', marginBottom: '12px' }}>{t('← Geri')}</Link>
           <div style={{ fontSize: '48px', marginBottom: '8px' }}>🎓</div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)' }}>Ogretmen Girisi</h1>
-          <p style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '4px' }}>Onaylanmis ogretmen hesabi gereklidir</p>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)' }}>{t('Öğretmen Girişi')}</h1>
+          <p style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '4px' }}>{t('Onaylanmış öğretmen hesabı gereklidir')}</p>
         </div>
 
         <div className="card anim-up-1">
           {resetMode ? (
             <>
               <h1 className="serif" style={{ fontSize: '22px', marginBottom: '0.25rem' }}>
-                {resetSent ? 'E-posta gönderildi ✓' : 'Şifremi sıfırla'}
+                {resetSent ? t('E-posta gönderildi ✓') : t('Şifremi sıfırla')}
               </h1>
               {resetSent ? (
                 <>
                   <p style={{ color: 'var(--text2)', fontSize: '14px', marginBottom: '1.5rem', lineHeight: 1.7 }}>
-                    <b>{resetEmail}</b> adresine sıfırlama bağlantısı gönderdik. Gelen kutunuzu ve spam klasörünü kontrol edin.
+                    <b>{resetEmail}</b> {t('adresine sıfırlama bağlantısı gönderdik. Gelen kutunuzu ve spam klasörünü kontrol edin.')}
                   </p>
                   <button className="btn btn-primary"
                     onClick={() => { setResetMode(false); setResetSent(false); setResetEmail('') }}
                     style={{ width: '100%', justifyContent: 'center' }}>
-                    Giriş sayfasına dön
+                    {t('Giriş sayfasına dön')}
                   </button>
                 </>
               ) : (
                 <>
                   <p style={{ color: 'var(--text2)', fontSize: '14px', marginBottom: '1.5rem' }}>
-                    Kayıtlı e-posta adresinizi girin, sıfırlama bağlantısı gönderelim.
+                    {t('Kayıtlı e-posta adresinizi girin, sıfırlama bağlantısı gönderelim.')}
                   </p>
-                  <label className="field-label">E-posta</label>
+                  <label className="field-label">{t('E-posta')}</label>
                   <input className="input" type="email" placeholder="ornek@mail.com"
                     value={resetEmail} onChange={e => setResetEmail(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleReset()} autoFocus />
@@ -112,11 +114,11 @@ export default function TeacherLoginPage() {
                   )}
                   <button className="btn btn-primary" onClick={handleReset} disabled={resetLoading}
                     style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}>
-                    {resetLoading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Sıfırlama bağlantısı gönder →'}
+                    {resetLoading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : t('Sıfırlama bağlantısı gönder →')}
                   </button>
                   <button onClick={() => { setResetMode(false); setError('') }}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--text2)', marginTop: '0.75rem', fontFamily: 'var(--font-sans)', display: 'block', width: '100%', textAlign: 'center' }}>
-                    ← Geri dön
+                    {t('← Geri dön')}
                   </button>
                 </>
               )}
@@ -133,15 +135,15 @@ export default function TeacherLoginPage() {
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                   </svg>
                 )}
-                Google ile giris yap
+                {t('Google ile giriş yap')}
               </button>
-              <div className="divider">veya e-posta ile</div>
+              <div className="divider">{t('veya e-posta ile')}</div>
 
-              <label className="field-label">E-posta</label>
+              <label className="field-label">{t('E-posta')}</label>
               <input className="input" type="email" placeholder="ornek@mail.com"
                 value={email} onChange={e => setEmail(e.target.value)} />
 
-              <label className="field-label">Sifre</label>
+              <label className="field-label">{t('Şifre')}</label>
               <input className="input" type="password" placeholder="••••••••"
                 value={pass} onChange={e => setPass(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleLogin()} />
@@ -154,18 +156,18 @@ export default function TeacherLoginPage() {
 
               <button className="btn btn-primary" onClick={handleLogin} disabled={loading}
                 style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}>
-                {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Ogretmen Paneline Gir →'}
+                {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : t('Öğretmen Paneline Gir →')}
               </button>
 
               <button onClick={() => { setResetMode(true); setError('') }}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--accent)', marginTop: '0.75rem', fontFamily: 'var(--font-sans)', display: 'block', width: '100%', textAlign: 'center' }}>
-                Şifremi unuttum
+                {t('Şifremi unuttum')}
               </button>
 
               <div style={{ marginTop: '1rem', padding: '10px 12px', background: 'rgba(124,58,237,0.06)', borderRadius: '10px', fontSize: '12px', color: 'var(--text3)', lineHeight: 1.6 }}>
-                💡 Ogretmen basvurusu yapmak icin{' '}
-                <Link href="/register/teacher" style={{ color: '#7c3aed', fontWeight: 600 }}>buraya tiklayin</Link>.
-                Admin onayinden sonra panele erisebilirsiniz.
+                {t('💡 Öğretmen başvurusu yapmak için')}{' '}
+                <Link href="/register/teacher" style={{ color: '#7c3aed', fontWeight: 600 }}>{t('buraya tıklayın')}</Link>.
+                {t('Admin onayından sonra panele erişebilirsiniz.')}
               </div>
             </>
           )}

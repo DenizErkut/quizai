@@ -3,8 +3,10 @@ import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 function LoginPageContent() {
+  const { t } = useT()
   const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams.get('next')
@@ -22,11 +24,11 @@ function LoginPageContent() {
   const supabase = createClient() as any
 
   async function handleLogin() {
-    if (!email.trim() || !pass) { setError('E-posta ve şifre gerekli.'); return }
+    if (!email.trim() || !pass) { setError(t('E-posta ve şifre gerekli.')); return }
     setError(''); setLoading(true)
     const { error: err } = await supabase.auth.signInWithPassword({ email, password: pass })
     setLoading(false)
-    if (err) { setError('E-posta veya şifre hatalı.'); return }
+    if (err) { setError(t('E-posta veya şifre hatalı.')); return }
     router.push(isSafeNext(next) ? next! : '/home')
   }
 
@@ -44,13 +46,13 @@ function LoginPageContent() {
   }
 
   async function handleReset() {
-    if (!resetEmail.trim()) { setError('E-posta adresinizi girin.'); return }
+    if (!resetEmail.trim()) { setError(t('E-posta adresinizi girin.')); return }
     setError(''); setResetLoading(true)
     const { error: err } = await supabase.auth.resetPasswordForEmail(resetEmail, {
       redirectTo: `${window.location.origin}/auth/reset-password`,
     })
     setResetLoading(false)
-    if (err) { setError('Bir hata oluştu. Lütfen tekrar deneyin.'); return }
+    if (err) { setError(t('Bir hata oluştu. Lütfen tekrar deneyin.')); return }
     setResetSent(true)
   }
 
@@ -58,7 +60,7 @@ function LoginPageContent() {
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
       <div style={{ width: '100%', maxWidth: '400px' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }} className="anim-up">
-          <Link href="/login" style={{ fontSize: '13px', color: 'var(--text3)', textDecoration: 'none', display: 'block', marginBottom: '12px' }}>← Geri</Link>
+          <Link href="/login" style={{ fontSize: '13px', color: 'var(--text3)', textDecoration: 'none', display: 'block', marginBottom: '12px' }}>{t('← Geri')}</Link>
           <Link href="/" style={{ textDecoration: 'none', display: 'inline-block' }}>
             <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '72px', width: 'auto' }} />
           </Link>
@@ -68,25 +70,25 @@ function LoginPageContent() {
           {resetMode ? (
             <>
               <h1 className="serif" style={{ fontSize: '22px', marginBottom: '0.25rem' }}>
-                {resetSent ? 'E-posta gönderildi ✓' : 'Şifremi sıfırla'}
+                {resetSent ? t('E-posta gönderildi ✓') : t('Şifremi sıfırla')}
               </h1>
               {resetSent ? (
                 <>
                   <p style={{ color: 'var(--text2)', fontSize: '14px', marginBottom: '1.5rem', lineHeight: 1.7 }}>
-                    <b>{resetEmail}</b> adresine sıfırlama bağlantısı gönderdik. Gelen kutunuzu ve spam klasörünü kontrol edin.
+                    <b>{resetEmail}</b> {t('adresine sıfırlama bağlantısı gönderdik. Gelen kutunuzu ve spam klasörünü kontrol edin.')}
                   </p>
                   <button className="btn btn-primary"
                     onClick={() => { setResetMode(false); setResetSent(false); setResetEmail('') }}
                     style={{ width: '100%', justifyContent: 'center' }}>
-                    Giriş sayfasına dön
+                    {t('Giriş sayfasına dön')}
                   </button>
                 </>
               ) : (
                 <>
                   <p style={{ color: 'var(--text2)', fontSize: '14px', marginBottom: '1.5rem' }}>
-                    Kayıtlı e-posta adresinizi girin, sıfırlama bağlantısı gönderelim.
+                    {t('Kayıtlı e-posta adresinizi girin, sıfırlama bağlantısı gönderelim.')}
                   </p>
-                  <label className="field-label">E-posta</label>
+                  <label className="field-label">{t('E-posta')}</label>
                   <input className="input" type="email" placeholder="ornek@mail.com"
                     value={resetEmail} onChange={e => setResetEmail(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleReset()} autoFocus />
@@ -97,19 +99,19 @@ function LoginPageContent() {
                   )}
                   <button className="btn btn-primary" onClick={handleReset} disabled={resetLoading}
                     style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem' }}>
-                    {resetLoading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Sıfırlama bağlantısı gönder →'}
+                    {resetLoading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : t('Sıfırlama bağlantısı gönder →')}
                   </button>
                   <button onClick={() => { setResetMode(false); setError('') }}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--text2)', marginTop: '0.75rem', fontFamily: 'var(--font-sans)', display: 'block', width: '100%', textAlign: 'center' }}>
-                    ← Geri dön
+                    {t('← Geri dön')}
                   </button>
                 </>
               )}
             </>
           ) : (
             <>
-              <h1 className="serif" style={{ fontSize: '26px', marginBottom: '0.25rem' }}>Tekrar hoş geldin</h1>
-              <p style={{ color: 'var(--text2)', fontSize: '14px', marginBottom: '1.5rem' }}>Hesabına giriş yap.</p>
+              <h1 className="serif" style={{ fontSize: '26px', marginBottom: '0.25rem' }}>{t('Tekrar hoş geldin')}</h1>
+              <p style={{ color: 'var(--text2)', fontSize: '14px', marginBottom: '1.5rem' }}>{t('Hesabına giriş yap.')}</p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '0.5rem' }}>
                 <button className="btn" onClick={() => handleOAuth('google')} disabled={!!oauthLoading}
@@ -131,17 +133,17 @@ function LoginPageContent() {
                       <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
                     </svg>
                   )}
-                  Apple ile giriş yap
+                  {t('Apple ile giriş yap')}
                 </button>
               </div>
 
-              <div className="divider">veya e-posta ile</div>
+              <div className="divider">{t('veya e-posta ile')}</div>
 
-              <label className="field-label">E-posta</label>
+              <label className="field-label">{t('E-posta')}</label>
               <input className="input" type="email" placeholder="ornek@mail.com"
                 value={email} onChange={e => setEmail(e.target.value)} />
 
-              <label className="field-label">Şifre</label>
+              <label className="field-label">{t('Şifre')}</label>
               <input className="input" type="password" placeholder="••••••••"
                 value={pass} onChange={e => setPass(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleLogin()} />
@@ -154,17 +156,17 @@ function LoginPageContent() {
 
               <button className="btn btn-primary" onClick={handleLogin} disabled={loading}
                 style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem' }}>
-                {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Giriş yap →'}
+                {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : t('Giriş yap →')}
               </button>
 
               <button onClick={() => { setResetMode(true); setError('') }}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--accent)', marginTop: '0.75rem', fontFamily: 'var(--font-sans)', display: 'block', width: '100%', textAlign: 'center' }}>
-                Şifremi unuttum
+                {t('Şifremi unuttum')}
               </button>
 
-              <div className="divider">veya</div>
+              <div className="divider">{t('veya')}</div>
               <Link href={isSafeNext(next) ? `/register?next=${encodeURIComponent(next!)}` : '/register'} className="btn" style={{ width: '100%', justifyContent: 'center' }}>
-                Hesap oluştur
+                {t('Hesap oluştur')}
               </Link>
             </>
           )}

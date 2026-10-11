@@ -163,3 +163,35 @@ test('analysis entries are used by the analysis page', async () => {
   const unused = analysisEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
   assert.deepEqual(unused, [])
 })
+
+test('auth login entries are used by the role login pages', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { authLoginEntries } = await import('../lib/i18n/entries/auth-login')
+  const source = ['student', 'parent', 'teacher', 'institution'].map(r => readFileSync(`app/(auth)/login/${r}/page.tsx`, 'utf8')).join('\n')
+  const unused = authLoginEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})
+
+test('notes entries are used by the notes page', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { notesEntries } = await import('../lib/i18n/entries/notes')
+  const source = readFileSync('app/notes/page.tsx', 'utf8')
+  const unused = notesEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})
+
+test('plan entries are used by the plan page or already defined', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { planEntries } = await import('../lib/i18n/entries/plan')
+  const source = readFileSync('app/plan/page.tsx', 'utf8')
+  const unused = planEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})
+
+test('live entries are used by the live quiz screen', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { liveEntries } = await import('../lib/i18n/entries/live')
+  const source = readFileSync('app/live/LiveContent.tsx', 'utf8')
+  const unused = liveEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})

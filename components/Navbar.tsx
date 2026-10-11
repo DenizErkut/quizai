@@ -203,7 +203,8 @@ export default function Navbar() {
           <div style={{ position: 'relative' }}>
             <button onClick={() => { setShowLang(v => !v); setShowMenu(false) }}
               style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '7px 9px', borderRadius: '8px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: '13px', fontFamily: 'inherit' }}>
-              <span>{activeLang.flag}</span>
+              <span style={{ fontSize: '14px', lineHeight: 1 }}>🌐</span>
+              <span style={{ fontWeight: 700 }}>{activeLang.code.toUpperCase()}</span>
               <span style={{ fontSize: '9px', opacity: 0.6 }}>▾</span>
             </button>
             {showLang && (
@@ -212,7 +213,7 @@ export default function Navbar() {
                 <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '6px', minWidth: '155px', boxShadow: '0 8px 32px rgba(8,36,101,0.2)' }}>
                   {LOCALES.map(l => (
                     <button key={l.code} onClick={() => saveLang(l.language)} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', borderRadius: '8px', border: 'none', background: locale === l.code ? 'rgba(30,207,184,0.08)' : 'transparent', color: locale === l.code ? '#0a9e90' : '#3B566E', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: locale === l.code ? 600 : 400 }}>
-                      {l.flag} {l.label}
+                      {l.code.toUpperCase()} · {l.label}
                     </button>
                   ))}
                 </div>
@@ -396,8 +397,10 @@ export default function Navbar() {
             {/* Dil seçici */}
             <div style={{ position: 'relative' }}>
               <button onClick={() => { setShowLang(v => !v); setShowMenu(false) }}
-                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '7px 10px', borderRadius: '8px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.8)', fontSize: '13px', fontFamily: 'inherit' }}>
-                <span>{activeLang.flag}</span>
+                aria-label="Language"
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '7px 10px', height: 36, borderRadius: '8px', cursor: 'pointer', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--primary)', fontSize: '13px', fontWeight: 700, fontFamily: 'inherit' }}>
+                <span style={{ fontSize: '15px', lineHeight: 1 }}>🌐</span>
+                <span>{activeLang.code.toUpperCase()}</span>
                 <span style={{ fontSize: '10px', opacity: 0.6 }}>▾</span>
               </button>
               {showLang && (
@@ -406,7 +409,7 @@ export default function Navbar() {
                   <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '6px', minWidth: '160px', boxShadow: '0 8px 40px rgba(8,36,101,0.15)' }}>
                     {LOCALES.map(l => (
                       <button key={l.code} onClick={() => saveLang(l.language)} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', borderRadius: '8px', border: 'none', background: locale === l.code ? 'rgba(30,207,184,0.08)' : 'transparent', color: locale === l.code ? '#0a9e90' : '#3B566E', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: locale === l.code ? 600 : 400 }}>
-                        {l.flag} {l.label}
+                        {l.code.toUpperCase()} · {l.label}
                       </button>
                     ))}
                   </div>
