@@ -47,3 +47,32 @@ test('literal t() keys in translated pages exist in the dictionaries', async () 
   }
   assert.deepEqual(missing, [])
 })
+
+test('duplicate source texts never carry conflicting translations', async () => {
+  const { ALL_ENTRIES } = await import('../lib/i18n/entries')
+  const seen = new Map<string, string>()
+  const conflicts: string[] = []
+  for (const entry of ALL_ENTRIES) {
+    const signature = entry.slice(1).join('\u0000')
+    const previous = seen.get(entry[0])
+    if (previous !== undefined && previous !== signature) conflicts.push(entry[0])
+    seen.set(entry[0], signature)
+  }
+  assert.deepEqual(conflicts, [])
+})
+
+test('every dashboard/pricing entry is referenced by its page', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { dashboardPricingEntries } = await import('../lib/i18n/entries/dashboard-pricing')
+  const source = ['app/dashboard/page.tsx', 'app/pricing/page.tsx', 'components/Navbar.tsx'].map(f => readFileSync(f, 'utf8')).join('\n')
+  const unused = dashboardPricingEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key.replace(/'/g, "\\'").replace(/^\{n\}/, '')) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})
+
+test('profile entries are used by the profile page', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { profileEntries } = await import('../lib/i18n/entries/profile')
+  const source = readFileSync('app/profile/page.tsx', 'utf8')
+  const unused = profileEntries.map(e => e[0]).filter(key => !/^(İlkokul|Ortaokul|Lise|Üniversite) \d\. Sınıf$/.test(key) && !source.includes(key.replace(/'/g, "\\'")))
+  assert.deepEqual(unused, [])
+})

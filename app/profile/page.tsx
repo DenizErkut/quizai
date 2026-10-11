@@ -3,6 +3,8 @@ import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import DepartmentSelect, { resolveDepartmentValue } from '@/components/DepartmentSelect'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { languageFromLocale } from '@/lib/i18n/core'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -25,6 +27,7 @@ const GRADES = [
 
 function ProfileSetupContent() {
   const router = useRouter()
+  const { t, locale } = useT()
   const searchParams = useSearchParams()
   const next = searchParams.get('next')
   const isSafeNext = (n: string | null) => !!n && n.startsWith('/') && !n.startsWith('//') && !n.startsWith('/login')
@@ -66,22 +69,22 @@ function ProfileSetupContent() {
   }, [])
 
   async function handleSave() {
-    if (!name.trim()) { setError('Ad zorunludur.'); return }
-    if (!surname.trim()) { setError('Soyad zorunludur.'); return }
-    if (!age || parseInt(age) < 5 || parseInt(age) > 35) { setError('Geçerli bir yaş girin (5-35).'); return }
-    if (!grade) { setError('Sınıf / eğitim seviyesi zorunludur.'); return }
+    if (!name.trim()) { setError(t('Ad zorunludur.')); return }
+    if (!surname.trim()) { setError(t('Soyad zorunludur.')); return }
+    if (!age || parseInt(age) < 5 || parseInt(age) > 35) { setError(t('Geçerli bir yaş girin (5-35).')); return }
+    if (!grade) { setError(t('Sınıf / eğitim seviyesi zorunludur.')); return }
     const isUniversity = grade.toLowerCase().startsWith('universite')
     const resolvedDepartment = resolveDepartmentValue(department, departmentOther)
-    if (isUniversity && !resolvedDepartment) { setError('Bölüm seçimi zorunludur.'); return }
+    if (isUniversity && !resolvedDepartment) { setError(t('Bölüm seçimi zorunludur.')); return }
     // Okul adı ve sınıf numarası SADECE kurum kodu üzerinden bağlanan
     // öğrenciler için zorunlu — okul adı kurum kaydından otomatik gelir.
     if (institutionName) {
-      if (!classNumber.trim()) { setError('Sınıf numarası zorunludur.'); return }
+      if (!classNumber.trim()) { setError(t('Sınıf numarası zorunludur.')); return }
     }
 
     setError(''); setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setError('Oturum bulunamadı, lütfen tekrar giriş yapın.'); setLoading(false); router.push(isSafeNext(next) ? `/login?next=${encodeURIComponent(next!)}` : '/login'); return }
+    if (!user) { setError(t('Oturum bulunamadı, lütfen tekrar giriş yapın.')); setLoading(false); router.push(isSafeNext(next) ? `/login?next=${encodeURIComponent(next!)}` : '/login'); return }
 
     // Ad-soyad, yaş ve telefon kimlik verisidir → TR-PG'ye yazılır (Supabase'e değil).
     // NOT: Daha önce 'age' burada bilerek gönderilmiyordu ("profiles'ta kolon
@@ -101,7 +104,7 @@ function ProfileSetupContent() {
       }),
     })
     if (!idRes.ok) {
-      setError('Kimlik bilgileri kaydedilemedi. Lütfen tekrar deneyin.')
+      setError(t('Kimlik bilgileri kaydedilemedi. Lütfen tekrar deneyin.'))
       setLoading(false)
       return
     }
@@ -115,13 +118,13 @@ function ProfileSetupContent() {
       department: resolvedDepartment || null,
       school: institutionName || null,
       class_number: institutionName ? classNumber.trim() : null,
-      language: 'Türkçe',
+      language: languageFromLocale(locale),
       instagram: instagram || null,
       tiktok: tiktok || null,
     })
     if (upsertError) {
       console.error('profiles upsert hatasi:', upsertError)
-      setError('Profil kaydedilemedi: ' + upsertError.message)
+      setError(t('Profil kaydedilemedi: ') + upsertError.message)
       setLoading(false)
       return
     }
@@ -148,11 +151,11 @@ function ProfileSetupContent() {
   }
 
   async function requestDeletion() {
-    if (!window.confirm('Kaydınızın silinmesi için admin incelemesine talep göndermek istediğinize emin misiniz?')) return
+    if (!window.confirm(t('Kaydınızın silinmesi için admin incelemesine talep göndermek istediğinize emin misiniz?'))) return
     const { data: { session } } = await supabase.auth.getSession()
     const response = await fetch('/api/profile/data-request', { method: 'POST', headers: { Authorization: `Bearer ${session?.access_token}` } })
     setDeletionRequested(response.ok || response.status === 409)
-    if (!response.ok && response.status !== 409) setError('Silme talebi oluşturulamadı. Lütfen tekrar deneyin.')
+    if (!response.ok && response.status !== 409) setError(t('Silme talebi oluşturulamadı. Lütfen tekrar deneyin.'))
   }
 
   return (
@@ -172,40 +175,40 @@ function ProfileSetupContent() {
           </div>
 
           <h1 className="serif" style={{ fontSize: '20px', marginBottom: '4px' }}>
-            {step === 1 ? 'Merhaba! 👋' : 'Eğitim bilgilerin'}
+            {step === 1 ? t('Merhaba! 👋') : t('Eğitim bilgilerin')}
           </h1>
           <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1.25rem' }}>
             {step === 1
-              ? 'Sana nasıl hitap edelim?'
-              : 'Sorular sınıfına göre kişiselleştirilecek.'}
+              ? t('Sana nasıl hitap edelim?')
+              : t('Sorular sınıfına göre kişiselleştirilecek.')}
           </p>
 
           {step === 1 && (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label className="field-label">Ad <span style={{ color: 'var(--red)' }}>*</span></label>
+                  <label className="field-label">{t('Ad')} <span style={{ color: 'var(--red)' }}>*</span></label>
                   <input className="input" placeholder="Deniz" value={name} onChange={e => setName(e.target.value)} autoFocus />
                 </div>
                 <div>
-                  <label className="field-label">Soyad <span style={{ color: 'var(--red)' }}>*</span></label>
+                  <label className="field-label">{t('Soyad')} <span style={{ color: 'var(--red)' }}>*</span></label>
                   <input className="input" placeholder="Yılmaz" value={surname} onChange={e => setSurname(e.target.value)} />
                 </div>
               </div>
               <div style={{ marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
                 <button onClick={requestDeletion} className="btn" style={{ color: 'var(--red)', borderColor: 'rgba(220,38,38,0.35)' }} disabled={deletionRequested}>
-                  {deletionRequested ? '✓ Silme talebi oluşturuldu' : 'Kaydımı sil'}
+                  {deletionRequested ? t('✓ Silme talebi oluşturuldu') : t('Kaydımı sil')}
                 </button>
-                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px' }}>Bu işlem hemen silme yapmaz; talebiniz admin doğrulamasına gönderilir.</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px' }}>{t('Bu işlem hemen silme yapmaz; talebiniz admin doğrulamasına gönderilir.')}</div>
               </div>
 
               {error && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{error}</div>}
 
               <button className="btn btn-primary" onClick={() => {
-                if (!name.trim() || !surname.trim()) { setError('Ad ve soyad zorunludur.'); return }
+                if (!name.trim() || !surname.trim()) { setError(t('Ad ve soyad zorunludur.')); return }
                 setError(''); setStep(2)
               }} style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem' }}>
-                Devam et →
+                {t('Devam et →')}
               </button>
             </>
           )}
@@ -214,14 +217,14 @@ function ProfileSetupContent() {
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label className="field-label">Yaş <span style={{ color: 'var(--red)' }}>*</span></label>
+                  <label className="field-label">{t('Yaş')} <span style={{ color: 'var(--red)' }}>*</span></label>
                   <input className="input" type="number" placeholder="16" min={5} max={35} value={age} onChange={e => setAge(e.target.value)} autoFocus />
                 </div>
                 <div>
-                  <label className="field-label">Sınıf <span style={{ color: 'var(--red)' }}>*</span></label>
+                  <label className="field-label">{t('Sınıf')} <span style={{ color: 'var(--red)' }}>*</span></label>
                   <select className="input" value={grade} onChange={e => setGrade(e.target.value)}>
-                    <option value="">Seç</option>
-                    {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+                    <option value="">{t('Seç')}</option>
+                    {GRADES.map(g => <option key={g.value} value={g.value}>{t(g.label)}</option>)}
                   </select>
                 </div>
               </div>
@@ -239,11 +242,11 @@ function ProfileSetupContent() {
 
               {/* Kurum kodu — okul adı BURADAN otomatik gelir, elle yazılmaz */}
               <div style={{ marginTop: '10px', padding: '12px 14px', borderRadius: '12px', background: 'rgba(217,119,6,0.04)', border: '1.5px solid rgba(217,119,6,0.15)' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: '#d97706', marginBottom: '6px' }}>🏛️ Kurum Kodu (Opsiyonel)</div>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#d97706', marginBottom: '6px' }}>{t('🏛️ Kurum Kodu (Opsiyonel)')}</div>
                 <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px', lineHeight: 1.5 }}>
-                  Okulunuz Pratium ile anlaşmalıysa size verilen kodu girin — okul bilginiz otomatik eklenir.
+                  {t('Okulunuz Pratium ile anlaşmalıysa size verilen kodu girin — okul bilginiz otomatik eklenir.')}
                 </div>
-                <input className="input" placeholder="8 haneli kurum kodu"
+                <input className="input" placeholder={t('8 haneli kurum kodu')}
                   value={institutionCode}
                   onChange={async e => {
                     const val = e.target.value.toUpperCase()
@@ -256,7 +259,7 @@ function ProfileSetupContent() {
                 />
                 {institutionName && (
                   <div style={{ fontSize: '12px', color: 'var(--green)', fontWeight: 600, marginTop: '4px' }}>
-                    ✓ {institutionName} kurumuna bağlanıyor
+                    {t('✓ {name} kurumuna bağlanıyor', { name: institutionName })}
                   </div>
                 )}
               </div>
@@ -267,13 +270,13 @@ function ProfileSetupContent() {
               {institutionName && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
                   <div>
-                    <label className="field-label">Okul Adı</label>
+                    <label className="field-label">{t('Okul Adı')}</label>
                     <input className="input" value={institutionName} readOnly disabled
                       style={{ background: 'var(--bg2)', color: 'var(--text2)', cursor: 'not-allowed' }} />
                   </div>
                   <div>
-                    <label className="field-label">Sınıf Numarası <span style={{ color: 'var(--red)' }}>*</span></label>
-                    <input className="input" placeholder="Örn: 14" value={classNumber} onChange={e => setClassNumber(e.target.value)} />
+                    <label className="field-label">{t('Sınıf Numarası')} <span style={{ color: 'var(--red)' }}>*</span></label>
+                    <input className="input" placeholder={t('Örn: 14')} value={classNumber} onChange={e => setClassNumber(e.target.value)} />
                   </div>
                 </div>
               )}
@@ -282,14 +285,14 @@ function ProfileSetupContent() {
               <button onClick={() => setShowOptional(v => !v)}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--text2)', marginTop: '10px', padding: '4px 0', fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontSize: '11px' }}>{showOptional ? '▲' : '▼'}</span>
-                Veli e-postası, telefon ve sosyal medya (opsiyonel)
+                {t('Veli e-postası, telefon ve sosyal medya (opsiyonel)')}
               </button>
 
               {showOptional && (
                 <div style={{ marginTop: '8px', padding: '12px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
-                  <label className="field-label">Veli E-postası</label>
+                  <label className="field-label">{t('Veli E-postası')}</label>
                   <input className="input" type="email" placeholder="veli@mail.com" value={parentEmail} onChange={e => setParentEmail(e.target.value)} />
-                  <label className="field-label">Telefon</label>
+                  <label className="field-label">{t('Telefon')}</label>
                   <input className="input" type="tel" placeholder="+90 555 000 00 00" value={phone} onChange={e => setPhone(e.target.value)} />
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '4px' }}>
                     <div>
@@ -307,17 +310,17 @@ function ProfileSetupContent() {
               {error && <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--red)' }}>{error}</div>}
 
               <div style={{ display: 'flex', gap: '8px', marginTop: '1.25rem' }}>
-                <button className="btn" onClick={() => setStep(1)} style={{ justifyContent: 'center' }}>← Geri</button>
+                <button className="btn" onClick={() => setStep(1)} style={{ justifyContent: 'center' }}>{t('← Geri')}</button>
                 <button className="btn btn-primary" onClick={handleSave} disabled={loading}
                   style={{ flex: 1, justifyContent: 'center' }}>
-                  {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Başla ⚡'}
+                  {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : t('Başla ⚡')}
                 </button>
               </div>
               <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
                 <button onClick={requestDeletion} className="btn" style={{ color: 'var(--red)', borderColor: 'rgba(220,38,38,0.35)', width: '100%', justifyContent: 'center' }} disabled={deletionRequested}>
-                  {deletionRequested ? '✓ Silme talebi oluşturuldu' : 'Kaydımı sil'}
+                  {deletionRequested ? t('✓ Silme talebi oluşturuldu') : t('Kaydımı sil')}
                 </button>
-                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px' }}>Talep admin doğrulamasına gönderilir; hemen silme yapılmaz.</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px' }}>{t('Talep admin doğrulamasına gönderilir; hemen silme yapılmaz.')}</div>
               </div>
             </>
           )}

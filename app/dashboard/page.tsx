@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { resolveName } from '@/lib/identity/resolve-client'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale, type Locale } from '@/lib/i18n/core'
 import RecommendationLifecycle from '@/components/student/RecommendationLifecycle'
 import LearningSummary from '@/components/student/LearningSummary'
 
@@ -11,8 +13,8 @@ interface Session { id: string; topic: string; grade: string; score: number; pct
 interface Profile { name: string; grade: string; language: string; plan: string }
 interface DashStats { total_count: number; total_correct: number; total_questions: number; avg_pct: number; best_pct: number; weak_count: number }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', timeZone: 'Europe/Istanbul' })
+function formatDate(iso: string, locale: Locale = 'tr') {
+  return new Date(iso).toLocaleDateString(intlLocale(locale), { day: 'numeric', month: 'short', timeZone: 'Europe/Istanbul' })
 }
 
 function pctColor(p: number) { return p >= 80 ? '#16a34a' : p >= 50 ? '#d97706' : '#dc2626' }
@@ -38,6 +40,7 @@ const menuItems = [
 
 export default function DashboardPage() {
   const router = useRouter()
+  const { t, locale } = useT()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
   const [stats, setStats] = useState<DashStats>({ total_count: 0, total_correct: 0, total_questions: 0, avg_pct: 0, best_pct: 0, weak_count: 0 })
@@ -134,7 +137,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>
-                  {greeting} 👋
+                  {t(greeting)} 👋
                 </div>
                 <div style={{ fontSize: '16px', fontWeight: 700, color: '#fff' }}>
                   {firstName}
@@ -147,17 +150,17 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', gap: '8px' }}>
               {profile?.plan === 'premium' && (
                 <div style={{ padding: '4px 10px', borderRadius: '99px', background: 'rgba(253,211,29,0.2)', border: '1px solid rgba(253,211,29,0.4)', fontSize: '11px', fontWeight: 700, color: '#fdd31d' }}>
-                  ★ Altın
+                  ★ {t('Altın')}
                 </div>
               )}
               {profile?.plan === 'unlimited' && (
                 <div style={{ padding: '4px 10px', borderRadius: '99px', background: 'rgba(30,207,184,0.2)', border: '1px solid rgba(30,207,184,0.4)', fontSize: '11px', fontWeight: 700, color: '#1ecfb8' }}>
-                  ⭐ Platin
+                  ⭐ {t('Platin')}
                 </div>
               )}
               {profile?.plan === 'silver' && (
                 <div style={{ padding: '4px 10px', borderRadius: '99px', background: 'rgba(148,163,184,0.2)', border: '1px solid rgba(148,163,184,0.4)', fontSize: '11px', fontWeight: 700, color: '#94a3b8' }}>
-                  🥈 Gümüş
+                  🥈 {t('Gümüş')}
                 </div>
               )}
               <Link href="/quiz" style={{
@@ -167,7 +170,7 @@ export default function DashboardPage() {
                 display: 'flex', alignItems: 'center', gap: '4px',
                 boxShadow: '0 4px 12px rgba(253,211,29,0.4)',
               }}>
-                ⚡ Test
+                {t('⚡ Test')}
               </Link>
             </div>
           </div>
@@ -187,7 +190,7 @@ export default function DashboardPage() {
                 border: '1px solid rgba(255,255,255,0.15)',
               }}>
                 <div style={{ fontSize: '18px', fontWeight: 800, color: '#fff', lineHeight: 1 }}>{s.value}</div>
-                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', marginTop: '3px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</div>
+                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', marginTop: '3px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t(s.label)}</div>
               </div>
             ))}
           </div>
@@ -210,8 +213,8 @@ export default function DashboardPage() {
             <a href="/review" style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(124,58,237,0.06))', border: '1.5px solid rgba(139,92,246,0.25)', textDecoration: 'none', marginBottom: '1rem', cursor: 'pointer' }}>
               <div style={{ width: 46, height: 46, borderRadius: '12px', background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>🧠</div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: '14px', color: '#7c3aed' }}>Tekrar zamanı!</div>
-                <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>{dueCards} kart seni bekliyor · SM-2</div>
+                <div style={{ fontWeight: 700, fontSize: '14px', color: '#7c3aed' }}>{t('Tekrar zamanı!')}</div>
+                <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>{t('{n} kart seni bekliyor · SM-2', { n: dueCards })}</div>
               </div>
               <span style={{ fontSize: '18px', color: '#8b5cf6' }}>→</span>
             </a>
@@ -239,7 +242,7 @@ export default function DashboardPage() {
                     {item.icon}
                   </div>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', textAlign: 'center', lineHeight: 1.3 }}>
-                    {item.label}{item.href === '/transfer-checks' && dueTransfer > 0 ? ` (${dueTransfer})` : ''}
+                    {t(item.label)}{item.href === '/transfer-checks' && dueTransfer > 0 ? ` (${dueTransfer})` : ''}
                   </span>
                 </div>
               </Link>
@@ -250,8 +253,8 @@ export default function DashboardPage() {
           {sessions.length > 0 && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)' }}>Son Testler</div>
-                <Link href="/archive" style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 600 }}>Tümü →</Link>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)' }}>{t('Son Testler')}</div>
+                <Link href="/archive" style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 600 }}>{t('Tümü →')}</Link>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {sessions.map((s, i) => (
@@ -275,7 +278,7 @@ export default function DashboardPage() {
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.topic}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{formatDate(s.created_at)}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{formatDate(s.created_at, locale)}</div>
                       </div>
                       <span style={{ color: 'var(--text4)', fontSize: '14px' }}>›</span>
                     </div>
@@ -288,17 +291,17 @@ export default function DashboardPage() {
           {sessions.length === 0 && (
             <div style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
               <div style={{ fontSize: '48px', marginBottom: '12px' }}>📝</div>
-              <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--primary)', marginBottom: '6px' }}>Henüz test çözmedin</div>
-              <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '1.25rem' }}>İlk testini çöz, analizini gör!</div>
+              <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--primary)', marginBottom: '6px' }}>{t('Henüz test çözmedin')}</div>
+              <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '1.25rem' }}>{t('İlk testini çöz, analizini gör!')}</div>
               <Link href="/quiz" className="btn btn-primary" style={{ display: 'inline-flex', justifyContent: 'center' }}>
-                ⚡ İlk Testimi Çöz
+                {t('⚡ İlk Testimi Çöz')}
               </Link>
             </div>
           )}
 
           <div style={{ marginTop: '1.25rem', padding: '12px 14px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(8,36,101,0.04), rgba(30,207,184,0.04))', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text3)' }}>Toplam {stats.total_correct}/{stats.total_questions} doğru</span>
-            <Link href="/quiz" className="btn btn-primary btn-sm">Yeni Test ⚡</Link>
+            <span style={{ fontSize: '12px', color: 'var(--text3)' }}>{t('Toplam {a}/{b} doğru', { a: stats.total_correct, b: stats.total_questions })}</span>
+            <Link href="/quiz" className="btn btn-primary btn-sm">{t('Yeni Test ⚡')}</Link>
           </div>
         </div>
       </div>
