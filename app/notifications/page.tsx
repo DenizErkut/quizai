@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale, type Locale } from '@/lib/i18n/core'
 import { useUser } from '@/lib/user-context'
 
 interface Notification {
@@ -21,7 +23,7 @@ const TYPE_META: Record<string, { icon: string; color: string; bg: string; label
   streak:          { icon: '🔥', color: '#f97316', bg: 'rgba(249,115,22,0.08)',   label: 'Seri' },
   teacher_message: { icon: '🎓', color: '#082465', bg: 'rgba(8,36,101,0.06)',     label: 'Öğretmen' },
   system:          { icon: '📢', color: '#1ECFB8', bg: 'rgba(30,207,184,0.08)',   label: 'Sistem' },
-  achievement:     { icon: '🏆', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)',   label: 'Başarı' },
+  achievement:     { icon: '🏆', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)',   label: 'Başarı‖bildirim' },
   weekly_summary:  { icon: '📊', color: '#10b981', bg: 'rgba(16,185,129,0.08)',   label: 'Haftalık' },
   quiz_result:     { icon: '✅', color: '#3b82f6', bg: 'rgba(59,130,246,0.08)',   label: 'Test' },
   reminder:        { icon: '⏰', color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)',   label: 'Hatırlatma' },
@@ -33,19 +35,20 @@ function getMeta(type: string) {
   return TYPE_META[type] || { icon: '🔔', color: 'var(--primary)', bg: 'var(--bg2)', label: 'Diğer' }
 }
 
-function timeAgo(dateStr: string) {
+function timeAgo(dateStr: string, t: (text: string, params?: Record<string, string | number>) => string, locale: Locale) {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'Az önce'
-  if (mins < 60) return `${mins} dk önce`
+  if (mins < 1) return t('Az önce')
+  if (mins < 60) return t('{n} dk önce', { n: mins })
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours} saat önce`
+  if (hours < 24) return t('{n} saat önce', { n: hours })
   const days = Math.floor(hours / 24)
-  if (days < 7) return `${days} gün önce`
-  return new Date(dateStr).toLocaleDateString('tr-TR')
+  if (days < 7) return t('{n} gün önce', { n: days })
+  return new Date(dateStr).toLocaleDateString(intlLocale(locale))
 }
 
 export default function NotificationsPage() {
+  const { t, locale } = useT()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [prefs, setPrefs] = useState<Record<string, boolean>>({ assignment:true, streak:true, achievement:true, weekly_summary:true, teacher_message:true, coach_nudge:true })
   const togglePref = async (key: string) => { const next=!prefs[key]; setPrefs(p=>({...p,[key]:next})); const token=(await createClient().auth.getSession()).data.session?.access_token; if(token) await fetch('/api/notifications/preferences',{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({[key]:next})}) }
@@ -111,7 +114,7 @@ export default function NotificationsPage() {
   }
 
   async function clearAll() {
-    if (!confirm('Tüm bildirimler silinsin mi?')) return
+    if (!confirm(t('Tüm bildirimler silinsin mi?'))) return
     const { data: { user } } = await supabase.auth.getUser()
     await supabase.from('notifications').delete().eq('user_id', user.id)
     setNotifications([])
@@ -168,23 +171,23 @@ export default function NotificationsPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '10px' }}>
           <div>
             <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--primary)', marginBottom: '2px' }}>
-              🔔 Bildirim Merkezi
+              {t('🔔 Bildirim Merkezi')}
             </h1>
             <p style={{ fontSize: '13px', color: 'var(--text3)' }}>
-              {notifications.length} bildirim{unread > 0 ? ` · ${unread} okunmamış` : ''}
+              {t('{n} bildirim', { n: notifications.length })}{unread > 0 ? t(' · {n} okunmamış', { n: unread }) : ''}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             {unread > 0 && (
               <button onClick={markAllRead} className="btn btn-sm"
                 style={{ fontSize: '12px', padding: '6px 12px' }}>
-                ✓ Tümü Okundu
+                {t('✓ Tümü Okundu')}
               </button>
             )}
             {notifications.length > 0 && (
               <button onClick={clearAll} className="btn btn-sm"
                 style={{ fontSize: '12px', padding: '6px 12px', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }}>
-                🗑️ Temizle
+                {t('🗑️ Temizle')}
               </button>
             )}
           </div>
@@ -195,32 +198,32 @@ export default function NotificationsPage() {
           <div style={{ marginBottom: '1rem', padding: '14px 16px', borderRadius: '14px', background: 'rgba(99,102,241,0.06)', border: '1.5px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '24px' }}>📲</span>
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)' }}>Anlık Bildirimler</div>
-              <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>Ödev, seri ve başarı bildirimlerini anında al.</div>
+              <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)' }}>{t('Anlık Bildirimler')}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>{t('Ödev, seri ve başarı bildirimlerini anında al.')}</div>
             </div>
             <button onClick={enablePush} disabled={pushLoading} className="btn btn-primary"
               style={{ padding: '7px 14px', fontSize: '13px' }}>
-              {pushLoading ? '⏳...' : '✓ Etkinleştir'}
+              {pushLoading ? '⏳...' : t('✓ Etkinleştir')}
             </button>
           </div>
         )}
 
         {pushEnabled && (
           <div style={{ marginBottom: '1rem', padding: '10px 14px', borderRadius: '10px', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', fontSize: '13px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>✅</span> Anlık bildirimler açık — seni güncel tutacağız!
+            <span>✅</span> {t('Anlık bildirimler açık — seni güncel tutacağız!')}
           </div>
         )}
 
         {/* Tür Filtresi */}
         {types.length > 2 && (
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '1rem' }}>
-            {types.map(t => {
-              const meta = t === 'all' ? { icon: '🔔', label: 'Tümü', color: 'var(--primary)', bg: 'var(--bg2)' } : getMeta(t)
-              const count = t === 'all' ? notifications.length : notifications.filter(n => n.type === t).length
+            {types.map(ty => {
+              const meta = ty === 'all' ? { icon: '🔔', label: 'Tümü', color: 'var(--primary)', bg: 'var(--bg2)' } : getMeta(ty)
+              const count = ty === 'all' ? notifications.length : notifications.filter(n => n.type === ty).length
               return (
-                <button key={t} onClick={() => setFilter(t)}
-                  style={{ padding: '5px 12px', borderRadius: '99px', border: `1.5px solid ${filter === t ? meta.color : 'var(--border)'}`, background: filter === t ? meta.bg : 'var(--bg)', color: filter === t ? meta.color : 'var(--text3)', fontSize: '12px', fontWeight: filter === t ? 700 : 400, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                  {meta.icon} {meta.label} <span style={{ opacity: 0.6 }}>({count})</span>
+                <button key={ty} onClick={() => setFilter(ty)}
+                  style={{ padding: '5px 12px', borderRadius: '99px', border: `1.5px solid ${filter === ty ? meta.color : 'var(--border)'}`, background: filter === ty ? meta.bg : 'var(--bg)', color: filter === ty ? meta.color : 'var(--text3)', fontSize: '12px', fontWeight: filter === ty ? 700 : 400, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                  {meta.icon} {t(meta.label)} <span style={{ opacity: 0.6 }}>({count})</span>
                 </button>
               )
             })}
@@ -232,10 +235,10 @@ export default function NotificationsPage() {
           <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
             <div style={{ fontSize: '56px', marginBottom: '12px' }}>🔕</div>
             <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--primary)', marginBottom: '6px' }}>
-              {filter === 'all' ? 'Henüz bildirim yok' : 'Bu türde bildirim yok'}
+              {filter === 'all' ? t('Henüz bildirim yok') : t('Bu türde bildirim yok')}
             </div>
             <div style={{ fontSize: '13px', color: 'var(--text3)' }}>
-              Test çözdükçe, ödev aldıkça bildirimler burada görünecek.
+              {t('Test çözdükçe, ödev aldıkça bildirimler burada görünecek.')}
             </div>
           </div>
         ) : (
@@ -264,7 +267,7 @@ export default function NotificationsPage() {
                         {n.title}
                       </div>
                       <span style={{ fontSize: '11px', color: 'var(--text4)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                        {timeAgo(n.created_at)}
+                        {timeAgo(n.created_at, t, locale)}
                       </span>
                     </div>
                     <div style={{ fontSize: '13px', color: 'var(--text2)', marginTop: '3px', lineHeight: 1.5 }}>
@@ -272,16 +275,16 @@ export default function NotificationsPage() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
                       <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: meta.bg, color: meta.color, fontWeight: 600 }}>
-                        {meta.icon} {meta.label}
+                        {meta.icon} {t(meta.label)}
                       </span>
                       {n.action_url && (
                         <span style={{ fontSize: '12px', color: meta.color, fontWeight: 600 }}>
-                          Görüntüle →
+                          {t('Görüntüle →')}
                         </span>
                       )}
                       <button onClick={e => { e.stopPropagation(); deleteNotif(n.id) }}
                         style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text4)', fontSize: '16px', lineHeight: 1, padding: '2px 4px' }}
-                        title="Sil">
+                        title={t('Sil')}>
                         ✕
                       </button>
                     </div>
@@ -294,7 +297,7 @@ export default function NotificationsPage() {
 
         {/* Bildirim Ayarları */}
         <div className="card" style={{ marginTop: '1.5rem', background: 'var(--bg2)' }}>
-          <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '12px' }}>⚙️ Bildirim Tercihleri</div>
+          <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '12px' }}>{t('⚙️ Bildirim Tercihleri')}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {[
               { label: '📝 Yeni ödev bildirimleri', key: 'assignment' },
@@ -305,15 +308,15 @@ export default function NotificationsPage() {
               { label: '✦ Pratium Koç mesajları', key: 'coach_nudge' },
             ].map(pref => (
               <div key={pref.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{pref.label}</span>
-                <button onClick={()=>togglePref(pref.key)} aria-label={prefs[pref.key]?'Kapat':'Aç'} style={{ width: 40, height: 22, borderRadius: '99px', background: prefs[pref.key]?'rgba(16,185,129,0.2)':'var(--border)', border: '1.5px solid #10b981', display: 'flex', alignItems: 'center', padding: '2px', cursor: 'pointer' }}>
+                <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{t(pref.label)}</span>
+                <button onClick={()=>togglePref(pref.key)} aria-label={prefs[pref.key] ? t('Kapat‖tercih') : t('Aç‖tercih')} style={{ width: 40, height: 22, borderRadius: '99px', background: prefs[pref.key]?'rgba(16,185,129,0.2)':'var(--border)', border: '1.5px solid #10b981', display: 'flex', alignItems: 'center', padding: '2px', cursor: 'pointer' }}>
                   <div style={{ width: 16, height: 16, borderRadius: '50%', background: prefs[pref.key]?'#10b981':'var(--text4)', marginLeft: prefs[pref.key]?'auto':0, transition: 'margin 0.2s' }} />
                 </button>
               </div>
             ))}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text4)', marginTop: '10px' }}>
-            Tercihler hesabına anında kaydedilir.
+            {t('Tercihler hesabına anında kaydedilir.')}
           </div>
         </div>
 

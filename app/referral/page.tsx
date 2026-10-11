@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 import { resolveIdentities } from '@/lib/identity/resolve-client'
 
 interface ReferralUser {
@@ -23,6 +25,7 @@ interface Profile {
 }
 
 export default function ReferralPage() {
+  const { t, locale } = useT()
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [referrals, setReferrals] = useState<ReferralUser[]>([])
@@ -50,7 +53,7 @@ export default function ReferralPage() {
       const refIdentities = await resolveIdentities(supabase, (refs || []).map((r: any) => r.referred_id))
       setReferrals((refs || []).map((r: any) => ({
         id: r.referred_id,
-        name: refIdentities[r.referred_id]?.full_name || 'Kullanıcı',
+        name: refIdentities[r.referred_id]?.full_name || t('Kullanıcı'),
         grade: r.profiles?.grade || '',
         created_at: r.created_at,
         qualified_at: r.qualified_at,
@@ -70,13 +73,13 @@ export default function ReferralPage() {
 
   function shareWhatsApp() {
     const link = `${window.location.origin}/register?ref=${profile?.referral_code}`
-    const text = `Pratium'yi denedin mi? Sınıfına ve konuna özel AI destekli testler! Davet linkimle ücretsiz kayıt ol: ${link}`
+    const text = t("Pratium'yi denedin mi? Sınıfına ve konuna özel AI destekli testler! Davet linkimle ücretsiz kayıt ol: {link}", { link })
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
   }
 
   function shareTwitter() {
     const link = `${window.location.origin}/register?ref=${profile?.referral_code}`
-    const text = `AI destekli soru bankası @Pratium ile öğrenmek çok kolay! Davet linkimle kayıt ol:`
+    const text = t('AI destekli soru bankası @Pratium ile öğrenmek çok kolay! Davet linkimle kayıt ol:')
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`, '_blank')
   }
 
@@ -100,13 +103,12 @@ export default function ReferralPage() {
 
         {/* Header */}
         <div className="anim-up" style={{ marginBottom: '2rem' }}>
-          <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>Davet Programı</div>
+          <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>{t('Davet Programı')}</div>
           <h1 className="serif" style={{ fontSize: '28px', marginBottom: '0.5rem' }}>
-            Arkadaşlarını davet et
+            {t('Arkadaşlarını davet et')}
           </h1>
           <p style={{ color: 'var(--text2)', fontSize: '14px', lineHeight: 1.6 }}>
-            Her 10 ücretli davette, eşiği tamamlayan arkadaşının satın aldığı süre kadar Altın kazanırsın: aylık üyelikte 1 ay, yıllık üyelikte 1 yıl.
-            Ücretsiz kayıtlar ödül hesabına dahil edilmez.
+            {t('Her 10 ücretli davette, eşiği tamamlayan arkadaşının satın aldığı süre kadar Altın kazanırsın: aylık üyelikte 1 ay, yıllık üyelikte 1 yıl. Ücretsiz kayıtlar ödül hesabına dahil edilmez.')}
           </p>
         </div>
 
@@ -120,21 +122,21 @@ export default function ReferralPage() {
                 <span style={{ fontSize: '18px', color: 'var(--text2)' }}>/10</span>
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '4px' }}>
-                {10 - currentProgress} ücretli üyelik daha → ödül
+                {t('{n} ücretli üyelik daha → ödül', { n: 10 - currentProgress })}
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
               {completedCycles > 0 && (
                 <div className="badge badge-green" style={{ marginBottom: '8px', display: 'block' }}>
-                  {completedCycles} yıl kazanıldı! 🎉
+                  {t('{n} yıl kazanıldı! 🎉', { n: completedCycles })}
                 </div>
               )}
               <div style={{ fontSize: '13px', color: 'var(--text2)' }}>
-                {qualifiedReferrals} ücretli üyelik tamamlandı · {totalReferrals - qualifiedReferrals} bekliyor
+                {t('{a} ücretli üyelik tamamlandı · {b} bekliyor', { a: qualifiedReferrals, b: totalReferrals - qualifiedReferrals })}
               </div>
               {profile?.plan === 'premium' && profile.plan_expires_at && (
                 <div style={{ fontSize: '11px', color: 'var(--green)', marginTop: '4px' }}>
-                  Altın: {new Date(profile.plan_expires_at).toLocaleDateString('tr-TR')} kadar
+                  {t('Altın: {date} kadar', { date: new Date(profile.plan_expires_at).toLocaleDateString(intlLocale(locale)) })}
                 </div>
               )}
             </div>
@@ -146,8 +148,8 @@ export default function ReferralPage() {
               <div className="progress-fill" style={{ width: `${progressPct}%` }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '11px', color: 'var(--text3)' }}>
-              <span>{currentProgress} ücretli üyelik</span>
-              <span>{nextMilestone} ücretli üyelikte ödül · süre satın alınan plana bağlı</span>
+              <span>{t('{n} ücretli üyelik', { n: currentProgress })}</span>
+              <span>{t('{n} ücretli üyelikte ödül · süre satın alınan plana bağlı', { n: nextMilestone })}</span>
             </div>
           </div>
 
@@ -163,10 +165,10 @@ export default function ReferralPage() {
                   {qualifiedReferrals >= milestone ? '✅' : '🎯'}
                 </div>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: qualifiedReferrals >= milestone ? 'var(--green)' : 'var(--text3)' }}>
-                  {milestone} ücretli
+                  {t('{n} ücretli', { n: milestone })}
                 </div>
                 <div style={{ fontSize: '10px', color: 'var(--text3)' }}>
-                  ödül
+                  {t('ödül')}
                 </div>
               </div>
             ))}
@@ -176,13 +178,13 @@ export default function ReferralPage() {
         {/* Davet linki */}
         <div className="card anim-up-2" style={{ marginBottom: '1rem' }}>
           <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
-            Davet linkin
+            {t('Davet linkin')}
           </div>
 
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
             <input className="input" readOnly value={referralLink} style={{ fontSize: '12px', flex: 1 }} />
             <button className="btn btn-sm" onClick={copyLink} style={{ flexShrink: 0, minWidth: '90px' }}>
-              {copied ? '✓ Kopyalandı' : 'Kopyala'}
+              {copied ? t('✓ Kopyalandı') : t('Kopyala')}
             </button>
           </div>
 
@@ -208,7 +210,7 @@ export default function ReferralPage() {
         {/* Nasıl çalışır */}
         <div className="card anim-up-3" style={{ marginBottom: '1rem' }}>
           <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
-            Nasıl çalışır?
+            {t('Nasıl çalışır?')}
           </div>
           {[
             { icon: '🔗', title: 'Linki paylaş', desc: 'Davet linkini kopyala, WhatsApp, Instagram veya doğrudan arkadaşına gönder.' },
@@ -218,8 +220,8 @@ export default function ReferralPage() {
             <div key={i} style={{ display: 'flex', gap: '12px', padding: '12px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
               <div style={{ fontSize: '24px', flexShrink: 0 }}>{step.icon}</div>
               <div>
-                <div style={{ fontWeight: 500, marginBottom: '3px' }}>{step.title}</div>
-                <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}>{step.desc}</div>
+                <div style={{ fontWeight: 500, marginBottom: '3px' }}>{t(step.title)}</div>
+                <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}>{t(step.desc)}</div>
               </div>
             </div>
           ))}
@@ -229,7 +231,7 @@ export default function ReferralPage() {
         {referrals.length > 0 && (
           <div className="card anim-up-4">
             <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
-              Davet ettiğin kişiler ({referrals.length})
+              {t('Davet ettiğin kişiler ({n})', { n: referrals.length })}
             </div>
             {referrals.map((r, i) => (
               <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
@@ -244,10 +246,10 @@ export default function ReferralPage() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '11px', color: r.qualified_at ? 'var(--green)' : 'var(--text3)' }}>
-                    {r.rewarded_months ? `${r.rewarded_months} ay Altın ödülü kazanıldı` : r.qualified_at ? 'Ücretli üyelik tamamlandı' : 'Ücretli üyelik bekleniyor'}
+                    {r.rewarded_months ? t('{n} ay Altın ödülü kazanıldı', { n: r.rewarded_months }) : r.qualified_at ? t('Ücretli üyelik tamamlandı') : t('Ücretli üyelik bekleniyor')}
                   </div>
                   <div style={{ fontSize: '10px', color: 'var(--text3)' }}>
-                    {new Date(r.created_at).toLocaleDateString('tr-TR')}
+                    {new Date(r.created_at).toLocaleDateString(intlLocale(locale))}
                   </div>
                 </div>
               </div>
@@ -258,12 +260,12 @@ export default function ReferralPage() {
         {referrals.length === 0 && (
           <div className="card anim-up-4" style={{ textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '40px', marginBottom: '0.75rem' }}>👋</div>
-            <div style={{ fontWeight: 500, marginBottom: '6px' }}>Henüz kimseyi davet etmedin</div>
+            <div style={{ fontWeight: 500, marginBottom: '6px' }}>{t('Henüz kimseyi davet etmedin')}</div>
             <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '1.25rem' }}>
-              Davet linkini paylaşmaya başla!
+              {t('Davet linkini paylaşmaya başla!')}
             </div>
             <button className="btn btn-primary btn-sm" onClick={copyLink}>
-              Linki kopyala
+              {t('Linki kopyala')}
             </button>
           </div>
         )}

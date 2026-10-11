@@ -3,8 +3,11 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 
 export default function StudentAssignmentsPage() {
+  const { t, locale } = useT()
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active')
   const [assignments, setAssignments] = useState<any[]>([])
   const [completions, setCompletions] = useState<any[]>([])
@@ -71,25 +74,25 @@ export default function StudentAssignmentsPage() {
       <div style={{ maxWidth: '680px', margin: '0 auto' }}>
 
         <div style={{ marginBottom: '1.5rem' }}>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)' }}>📝 Ödevlerim</h1>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)' }}>{t('📝 Ödevlerim')}</h1>
           <p style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '4px' }}>
-            {myClasses.length > 0 ? myClasses.map((c: any) => c?.name).filter(Boolean).join(', ') : 'Henüz bir sınıfa katılmadın'}
+            {myClasses.length > 0 ? myClasses.map((c: any) => c?.name).filter(Boolean).join(', ') : t('Henüz bir sınıfa katılmadın')}
           </p>
         </div>
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem' }}>
           {[
-            { key: 'active', label: `📋 Aktif Ödevler (${assignments.length})` },
-            { key: 'completed', label: `✅ Tamamlananlar (${completions.length})` },
-          ].map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key as any)}
+            { key: 'active', label: t('📋 Aktif Ödevler ({n})', { n: assignments.length }) },
+            { key: 'completed', label: t('✅ Tamamlananlar ({n})', { n: completions.length }) },
+          ].map(tab => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
               style={{ padding: '8px 16px', borderRadius: '999px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
-                background: activeTab === t.key ? 'rgba(8,36,101,0.08)' : 'var(--bg2)',
-                borderColor: activeTab === t.key ? 'rgba(8,36,101,0.3)' : 'var(--border)',
-                color: activeTab === t.key ? 'var(--primary)' : 'var(--text3)',
+                background: activeTab === tab.key ? 'rgba(8,36,101,0.08)' : 'var(--bg2)',
+                borderColor: activeTab === tab.key ? 'rgba(8,36,101,0.3)' : 'var(--border)',
+                color: activeTab === tab.key ? 'var(--primary)' : 'var(--text3)',
               }}>
-              {t.label}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -99,13 +102,13 @@ export default function StudentAssignmentsPage() {
           assignments.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
               <div style={{ fontSize: '40px', marginBottom: '12px' }}>🎉</div>
-              <div style={{ fontWeight: 600, marginBottom: '6px', color: 'var(--primary)' }}>Aktif ödevin yok!</div>
+              <div style={{ fontWeight: 600, marginBottom: '6px', color: 'var(--primary)' }}>{t('Aktif ödevin yok!')}</div>
               <div style={{ fontSize: '13px', color: 'var(--text3)' }}>
-                {myClasses.length === 0 ? 'Önce bir sınıfa katıl.' : 'Öğretmenin yeni ödev eklediğinde burada görünecek.'}
+                {myClasses.length === 0 ? t('Önce bir sınıfa katıl.') : t('Öğretmenin yeni ödev eklediğinde burada görünecek.')}
               </div>
               {myClasses.length === 0 && (
                 <Link href="/join" className="btn btn-primary" style={{ justifyContent: 'center', marginTop: '1rem', display: 'inline-flex' }}>
-                  Sınıfa Katıl →
+                  {t('Sınıfa Katıl →')}
                 </Link>
               )}
             </div>
@@ -119,12 +122,12 @@ export default function StudentAssignmentsPage() {
                       <div style={{ fontSize: '12px', color: 'var(--text3)', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         <span>📚 {a.topic}</span>
                         <span>🏫 {a.classrooms?.name}</span>
-                        <span>❓ {a.question_count} soru</span>
-                        <span>⚡ {a.difficulty}</span>
-                        <span>{({'multiple_choice':'🔤 Çoktan Seçmeli','fill_blank':'✏️ Boşluk Doldurma','true_false':'✓✗ D/Y','multi_true_false':'📋✓✗ Çoklu D/Y','table_fill':'🗂️ Tablo Doldurma','matching':'🔗 Eşleştirme','ordering':'📋 Sıralama','short_answer':'💬 Kısa Cevap','mixed':'🎲 Karma'} as any)[a.question_type] || '🔤 Çoktan Seçmeli'}</span>
+                        <span>{t('❓ {n} soru', { n: a.question_count })}</span>
+                        <span>⚡ {({ kolay: t('Kolay'), normal: t('Normal'), zor: t('Zor'), 'cok zor': t('Çok Zor') } as Record<string, string>)[a.difficulty] || a.difficulty}</span>
+                        <span>{t(({'multiple_choice':'🔤 Çoktan Seçmeli','fill_blank':'✏️ Boşluk Doldurma','true_false':'✓✗ D/Y','multi_true_false':'📋✓✗ Çoklu D/Y','table_fill':'🗂️ Tablo Doldurma','matching':'🔗 Eşleştirme','ordering':'📋 Sıralama','short_answer':'💬 Kısa Cevap','mixed':'🎲 Karma'} as any)[a.question_type] || '🔤 Çoktan Seçmeli')}</span>
                         {a.due_date && (
                           <span style={{ color: isOverdue(a.due_date) ? 'var(--red)' : 'var(--text3)', fontWeight: isOverdue(a.due_date) ? 700 : 400 }}>
-                            🕐 {new Date(a.due_date).toLocaleDateString('tr-TR')}{isOverdue(a.due_date) ? ' ⚠️ Süresi doldu' : '\'e kadar'}
+                            {isOverdue(a.due_date) ? `🕐 ${new Date(a.due_date).toLocaleDateString(intlLocale(locale))} ${t('⚠️ Süresi doldu')}` : t('🕐 {date} tarihine kadar', { date: new Date(a.due_date).toLocaleDateString(intlLocale(locale)) })}
                           </span>
                         )}
                       </div>
@@ -134,7 +137,7 @@ export default function StudentAssignmentsPage() {
                     href={`/quiz?assignment=${a.id}&topic=${encodeURIComponent(a.topic)}&count=${a.question_count}&difficulty=${a.difficulty}&type=${a.question_type || 'multiple_choice'}`}
                     className="btn btn-primary"
                     style={{ width: '100%', justifyContent: 'center', display: 'flex' }}>
-                    ⚡ Ödevi Çöz
+                    {t('⚡ Ödevi Çöz')}
                   </Link>
                 </div>
               ))}
@@ -147,21 +150,21 @@ export default function StudentAssignmentsPage() {
           completions.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
               <div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div>
-              <div style={{ fontSize: '14px', color: 'var(--text3)' }}>Henüz tamamlanan ödevin yok.</div>
+              <div style={{ fontSize: '14px', color: 'var(--text3)' }}>{t('Henüz tamamlanan ödevin yok.')}</div>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {completions.map((c: any) => (
                 <div key={c.id} className="card" style={{ borderLeft: '4px solid var(--green)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary)' }}>{c.assignments?.title || 'Ödev'}</div>
+                    <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary)' }}>{c.assignments?.title || t('Ödev')}</div>
                     <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '3px' }}>
-                      {c.assignments?.topic} · {new Date(c.completed_at).toLocaleDateString('tr-TR')}
+                      {c.assignments?.topic} · {new Date(c.completed_at).toLocaleDateString(intlLocale(locale))}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '12px' }}>
                     <div style={{ fontWeight: 800, fontSize: '20px', color: c.pct >= 70 ? 'var(--green)' : 'var(--red)' }}>%{c.pct}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{c.score} doğru</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{t('{n} doğru', { n: c.score })}</div>
                   </div>
                 </div>
               ))}
