@@ -10,6 +10,8 @@ import PWAInstallBanner from '@/components/PWAInstallBanner'
 import ConsentGate from '@/components/ConsentGate'
 import CookieConsent from '@/components/CookieConsent'
 import LiveDataRefresh from '@/components/LiveDataRefresh'
+import LanguageFloating from '@/components/LanguageFloating'
+import { I18nProvider } from '@/lib/i18n/I18nProvider'
 
 export const metadata: Metadata = {
   title: 'Pratium — Öğren. Test Et. Geliş.',
@@ -96,7 +98,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   }
 
   return (
-    <html lang="tr">
+    <html lang="tr" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -128,8 +130,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           })();
         `}} />
         <UserProvider>
+          <I18nProvider>
           <Navbar />
           <ThemeToggleFloating />
+          <LanguageFloating />
           {children}
           {/* Madde 7: sözleşme/rıza versiyonu değiştiğinde yeniden-onay modalı */}
           <ConsentGate />
@@ -138,6 +142,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               içinde; artık her sayfada görünüyor (önceden sadece dashboard'a
               gömülüydü). */}
           <CoachMascot />
+          </I18nProvider>
         </UserProvider>
         <AIChatBot />
       </body>
