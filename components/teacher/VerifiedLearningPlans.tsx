@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 import VerifiedLearningMetrics from '@/components/VerifiedLearningMetrics'
 import type { verifiedLearningMetrics } from '@/lib/verified-learning-metrics'
 import InterventionReviewQueue from './InterventionReviewQueue'
@@ -11,6 +12,7 @@ type Cycle = { id: string; status: string; metrics?: ReturnType<typeof verifiedL
 type NextObjective = { status: string; candidate: { id: string; objectiveCode: string; title: string } | null; reason: string }
 
 export default function VerifiedLearningPlans({ classroomId, studentId }: { classroomId: string; studentId: string }) {
+  const { t: tr } = useT()
   const [options, setOptions] = useState<Option[]>([])
   const [cycles, setCycles] = useState<Cycle[]>([])
   const [objectiveId, setObjectiveId] = useState('')
@@ -22,13 +24,13 @@ export default function VerifiedLearningPlans({ classroomId, studentId }: { clas
     if (!classroomId || !studentId) return
     try {
       const { data: { session } } = await createClient().auth.getSession()
-      if (!session) throw new Error('Oturum gerekli.')
+      if (!session) throw new Error(tr('Oturum gerekli.'))
       const response = await fetch(`/api/teacher/verified-learning?${new URLSearchParams({ classroomId, studentId })}`, { headers: { Authorization: `Bearer ${session.access_token}` } })
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'Pilot durumu alınamadı.')
+      if (!response.ok) throw new Error(data.error || tr('Pilot durumu alınamadı.'))
       setOptions(data.options || []); setCycles(data.cycles || []); setNextObjective(data.nextObjective || null); setMessage('')
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Pilot durumu alınamadı.') }
-  }, [classroomId, studentId])
+    } catch (error) { setMessage(error instanceof Error ? error.message : tr('Pilot durumu alınamadı.')) }
+  }, [classroomId, studentId, tr])
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void load() }, 0)
@@ -40,40 +42,40 @@ export default function VerifiedLearningPlans({ classroomId, studentId }: { clas
     setBusy(true)
     try {
       const { data: { session } } = await createClient().auth.getSession()
-      if (!session) throw new Error('Oturum gerekli.')
+      if (!session) throw new Error(tr('Oturum gerekli.'))
       const response = await fetch('/api/teacher/verified-learning', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ classroomId, studentId, objectiveId }),
       })
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'Pilot başlatılamadı.')
+      if (!response.ok) throw new Error(data.error || tr('Pilot başlatılamadı.'))
       await load()
-      setMessage('Ölçüm döngüsü öğrenciye atandı. Öğrenci panelindeki “Doğrulanmış Öğrenme Pilotu” bağlantısından başlayabilir.')
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Pilot başlatılamadı.') }
+      setMessage(tr('Ölçüm döngüsü öğrenciye atandı. Öğrenci panelindeki “Doğrulanmış Öğrenme Pilotu” bağlantısından başlayabilir.'))
+    } catch (error) { setMessage(error instanceof Error ? error.message : tr('Pilot başlatılamadı.')) }
     finally { setBusy(false) }
   }
 
   if (!studentId) return null
   return <section style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 14, fontSize: 13 }}>
-    <strong>Ölçüm döngüsü ata</strong>
-    <p style={{ color: 'var(--text3)' }}>Üç ölçüm aşaması için 15, ayrı rehberli çalışma için en az 1 farklı soru gerekir. Ölçüm setlerinin zorluk dağılımı aynı olmalı.</p>
+    <strong>{tr('Ölçüm döngüsü ata')}</strong>
+    <p style={{ color: 'var(--text3)' }}>{tr('Üç ölçüm aşaması için 15, ayrı rehberli çalışma için en az 1 farklı soru gerekir. Ölçüm setlerinin zorluk dağılımı aynı olmalı.')}</p>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-      <select aria-label="Pilot kazanımı" value={objectiveId} onChange={event => setObjectiveId(event.target.value)} style={{ padding: 9, borderRadius: 8, maxWidth: '100%' }}>
-        <option value="">Kazanım seçin</option>
-        {options.map(item => <option key={item.id} value={item.id}>{item.objective_code} · {item.availableItems}/16 {item.seenItems ? 'yeni ' : ''}doğrulanmış soru{item.seenItems ? ` (öğrenci ${item.seenItems} soruyu gördü)` : ''} {item.ready ? '✓ hazır' : '· eksik'}</option>)}
+      <select aria-label={tr('Pilot kazanımı')} value={objectiveId} onChange={event => setObjectiveId(event.target.value)} style={{ padding: 9, borderRadius: 8, maxWidth: '100%' }}>
+        <option value="">{tr('Kazanım seçin')}</option>
+        {options.map(item => <option key={item.id} value={item.id}>{item.seenItems ? tr('{code} · {n}/16 yeni doğrulanmış soru', { code: item.objective_code, n: item.availableItems }) : tr('{code} · {n}/16 doğrulanmış soru', { code: item.objective_code, n: item.availableItems })}{item.seenItems ? ` ${tr('(öğrenci {n} soruyu gördü)', { n: item.seenItems })}` : ''} {item.ready ? tr('✓ hazır') : tr('· eksik')}</option>)}
       </select>
-      <button className="btn btn-primary" disabled={busy || !options.find(item => item.id === objectiveId)?.ready} onClick={() => void create()}>Öğrenciye ata</button>
+      <button className="btn btn-primary" disabled={busy || !options.find(item => item.id === objectiveId)?.ready} onClick={() => void create()}>{tr('Öğrenciye ata')}</button>
     </div>
     {nextObjective && <div style={{ marginTop: 10, padding: 10, border: '1px solid var(--border)', borderRadius: 8 }}>
-      <strong>Doğrulanmış döngüden sonraki aday</strong>
-      <p style={{ margin: '5px 0', color: 'var(--text3)' }}>{nextObjective.candidate ? `${nextObjective.candidate.objectiveCode} · ${nextObjective.candidate.title}` : 'Güvenilir aday bulunamadı.'}</p>
+      <strong>{tr('Doğrulanmış döngüden sonraki aday')}</strong>
+      <p style={{ margin: '5px 0', color: 'var(--text3)' }}>{nextObjective.candidate ? `${nextObjective.candidate.objectiveCode} · ${nextObjective.candidate.title}` : tr('Güvenilir aday bulunamadı.')}</p>
       <p style={{ margin: '5px 0', fontSize: 12 }}>{nextObjective.reason}</p>
-      {nextObjective.candidate && <button type="button" onClick={() => setObjectiveId(nextObjective.candidate!.id)} disabled={!options.some(item => item.id === nextObjective.candidate!.id && item.ready)}>Adayı seç</button>}
+      {nextObjective.candidate && <button type="button" onClick={() => setObjectiveId(nextObjective.candidate!.id)} disabled={!options.some(item => item.id === nextObjective.candidate!.id && item.ready)}>{tr('Adayı seç')}</button>}
     </div>}
-    {!options.some(item => item.ready) && <p style={{ color: 'var(--text3)' }}>Bu sınıfta henüz dengeli 15 soruluk hazır kazanım yok. Yönetici panelinde kazanım ve soru kalitesi incelemesi tamamlandıkça burada açılacak.</p>}
+    {!options.some(item => item.ready) && <p style={{ color: 'var(--text3)' }}>{tr('Bu sınıfta henüz dengeli 15 soruluk hazır kazanım yok. Yönetici panelinde kazanım ve soru kalitesi incelemesi tamamlandıkça burada açılacak.')}</p>}
     {message && <p role="status">{message}</p>}
     {cycles.length > 0 && <div style={{ marginTop: 12 }}>{cycles.map(cycle => <div key={cycle.id} style={{ padding: '7px 0', borderTop: '1px solid var(--border)' }}>
-      {cycle.objective?.objective_code || 'Kazanım'} · {cycle.status === 'active' ? 'Sürüyor' : 'Aşamalar tamamlandı'} · {cycle.attempts.map(attempt => `${attempt.stage}: ${attempt.status === 'completed' ? `%${attempt.score_pct}` : attempt.status}`).join(' · ') || 'Ön test bekliyor'}
+      {cycle.objective?.objective_code || tr('Kazanım')} · {cycle.status === 'active' ? tr('Sürüyor') : tr('Aşamalar tamamlandı')} · {cycle.attempts.map(attempt => `${attempt.stage}: ${attempt.status === 'completed' ? `%${attempt.score_pct}` : attempt.status}`).join(' · ') || tr('Ön test bekliyor')}
       {cycle.metrics && <VerifiedLearningMetrics metrics={cycle.metrics} />}
     </div>)}</div>}
     <InterventionReviewQueue key={`${classroomId}:${studentId}`} classroomId={classroomId} studentId={studentId}/>
