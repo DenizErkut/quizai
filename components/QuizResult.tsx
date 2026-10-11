@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import ChatAssistant from '@/components/ChatAssistant'
 import type { Question } from '@/lib/quiz-constants'
 import { answerScore } from '@/lib/partial-scoring'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 interface YouTubeLink {
   url: string; title: string; channel: string; thumbnail: string
@@ -65,7 +66,11 @@ const SOCIAL_LINKS = [
   },
 ]
 
-function correctAnswerText(q: Question): string {
+type Translate = (text: string) => string
+const plain: Translate = text => text
+
+// `tr` translates for display; the bug-report payload keeps the Turkish default for the admin reviewers.
+function correctAnswerText(q: Question, tr: Translate = plain): string {
   if (q.type === 'ordering' && q.items?.length) {
     return (q.correctOrder || q.items.map((_, i) => i))
       .map(i => q.items?.[i])
@@ -76,28 +81,29 @@ function correctAnswerText(q: Question): string {
     return q.pairs.map(pair => `${pair.left} → ${pair.right}`).join(' · ')
   }
   if (q.type === 'multi_true_false' && q.statements?.length) {
-    return q.statements.map(s => `${s.text}: ${s.correct ? 'Doğru' : 'Yanlış'}`).join(' · ')
+    return q.statements.map(s => `${s.text}: ${s.correct ? tr('Doğru') : tr('Yanlış')}`).join(' · ')
   }
   if (q.type === 'table_fill' && q.tableAnswers?.length) return q.tableAnswers.join(' · ')
   if (q.type === 'fill_blank' && q.blank) return q.blank
   const option = q.opts?.[q.ans]
   if (option != null) return String(option)
-  if (q.type === 'true_false') return q.ans === 0 ? 'Doğru' : 'Yanlış'
-  return 'Cevap bilgisi bulunamadı'
+  if (q.type === 'true_false') return q.ans === 0 ? tr('Doğru') : tr('Yanlış')
+  return tr('Cevap bilgisi bulunamadı')
 }
 
-function userAnswerText(q: Question, userAns: number | undefined): string {
-  if (userAns == null) return 'Cevap verilmedi'
+function userAnswerText(q: Question, userAns: number | undefined, tr: Translate = plain): string {
+  if (userAns == null) return tr('Cevap verilmedi')
   const option = q.opts?.[userAns]
   if (option != null) return String(option)
-  if (q.type === 'true_false') return userAns === 0 ? 'Doğru' : 'Yanlış'
+  if (q.type === 'true_false') return userAns === 0 ? tr('Doğru') : tr('Yanlış')
   if (['ordering', 'matching', 'multi_true_false', 'table_fill', 'fill_blank', 'short_answer'].includes(q.type || '')) {
-    return 'Verilen yanıt'
+    return tr('Verilen yanıt')
   }
   return String(userAns)
 }
 
 export default function QuizResult({ questions, answers, topic, difficulty, language, onNewTest, onRetryWrong, youtubeLinks = {} }: Props) {
+  const { t } = useT()
   const [reportedIdx, setReportedIdx] = useState<Set<number>>(new Set())
   const [reportingIdx, setReportingIdx] = useState<number | null>(null)
   const supabase = createClient() as any
@@ -107,10 +113,10 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
   const diff = DIFFICULTIES[difficulty] || DIFFICULTIES.normal
   const wrongQuestions = questions.filter((_, i) => !answers[i]?.correct)
 
-  const msg = finalPct === 100 ? 'Mükemmel! Tüm sorular doğru.' :
+  const msg = t(finalPct === 100 ? 'Mükemmel! Tüm sorular doğru.' :
     finalPct >= 80 ? 'Çok iyi! Konuya hakimsin.' :
     finalPct >= 60 ? 'Fena değil, pratik yaparsan harika olur.' :
-    'Tekrar çalışmak isteyebilirsin.'
+    'Tekrar çalışmak isteyebilirsin.')
 
   const [sharing, setSharing] = useState(false)
   const [sm2Added, setSm2Added] = useState(false)
@@ -151,7 +157,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
       ctx.fillText('pratium', 80, 100)
       ctx.fillStyle = 'rgba(255,255,255,0.4)'
       ctx.font = '24px Arial'
-      ctx.fillText('Ogren. Test Et. Gelis.', 80, 138)
+      ctx.fillText(t('Öğren. Test Et. Geliş.'), 80, 138)
 
       // Dekoratif daire
       ctx.beginPath()
@@ -173,7 +179,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
       // Skor alt yazı
       ctx.fillStyle = 'rgba(255,255,255,0.7)'
       ctx.font = '36px Arial'
-      ctx.fillText(`${finalScore} / ${questions.length} soru dogru`, 540, 630)
+      ctx.fillText(t('{a} / {b} soru doğru', { a: finalScore, b: questions.length }), 540, 630)
 
       // Konu
       ctx.fillStyle = '#ffffff'
@@ -182,7 +188,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
       ctx.fillText(topicText, 540, 730)
 
       // Mesaj
-      const msg = finalPct === 100 ? 'Mukemmel!' : finalPct >= 80 ? 'Harika!' : finalPct >= 60 ? 'Iyi is!' : 'Devam et!'
+      const msg = t(finalPct === 100 ? 'Mükemmel!' : finalPct >= 80 ? 'Harika!' : finalPct >= 60 ? 'İyi iş!' : 'Devam et!')
       ctx.fillStyle = scoreColor
       ctx.font = 'bold 56px Arial'
       ctx.fillText(msg, 540, 820)
@@ -198,7 +204,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
       // Davet metni
       ctx.fillStyle = 'rgba(255,255,255,0.6)'
       ctx.font = '30px Arial'
-      ctx.fillText('Sen de dene → pratium.com', 540, 960)
+      ctx.fillText(t('Sen de dene → pratium.com'), 540, 960)
 
       ctx.textAlign = 'left'
 
@@ -212,7 +218,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
 
   async function shareResult() {
     setSharing(true)
-    const text = `Pratium'da "${topic}" konusunda %${finalPct} başarı elde ettim! 🎯 Sen de dene: https://pratium.com`
+    const text = t('Pratium\'da "{topic}" konusunda %{pct} başarı elde ettim! 🎯 Sen de dene: https://pratium.com', { topic, pct: finalPct })
 
     try {
       const blob = await generateShareCard()
@@ -220,7 +226,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
       // Web Share API ile görsel paylaş (mobil destekler)
       if (blob && navigator.share && navigator.canShare?.({ files: [new File([blob], 'pratium-skor.png', { type: 'image/png' })] })) {
         await navigator.share({
-          title: 'Pratium Test Sonucu',
+          title: t('Pratium Test Sonucu'),
           text,
           files: [new File([blob], 'pratium-skor.png', { type: 'image/png' })],
         })
@@ -233,14 +239,14 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
         a.click()
         URL.revokeObjectURL(url)
         await navigator.clipboard.writeText(text).catch(() => {})
-        alert('Kart indirildi! Metni panoya kopyaladık, görselle birlikte paylaşabilirsin.')
+        alert(t('Kart indirildi! Metni panoya kopyaladık, görselle birlikte paylaşabilirsin.'))
       } else {
         // Canvas başarısız → sadece metin
         if (navigator.share) {
-          await navigator.share({ title: 'Pratium Test Sonucu', text, url: 'https://pratium.com' })
+          await navigator.share({ title: t('Pratium Test Sonucu'), text, url: 'https://pratium.com' })
         } else {
           await navigator.clipboard.writeText(text)
-          alert('Sonuç panoya kopyalandı!')
+          alert(t('Sonuç panoya kopyalandı!'))
         }
       }
     } catch {
@@ -251,13 +257,13 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
 
   // WhatsApp paylaş
   function shareWhatsApp() {
-    const text = encodeURIComponent(`Pratium'da "${topic}" konusunda %${finalPct} başarı elde ettim! 🎯 Sen de dene: https://pratium.com`)
+    const text = encodeURIComponent(t('Pratium\'da "{topic}" konusunda %{pct} başarı elde ettim! 🎯 Sen de dene: https://pratium.com', { topic, pct: finalPct }))
     window.open(`https://wa.me/?text=${text}`, '_blank')
   }
 
   // Twitter/X paylaş
   function shareTwitter() {
-    const text = encodeURIComponent(`Pratium'da "${topic}" konusunda %${finalPct} aldım! 🎯 #Pratium #Eğitim`)
+    const text = encodeURIComponent(t('Pratium\'da "{topic}" konusunda %{pct} aldım! 🎯 #Pratium #Eğitim', { topic, pct: finalPct }))
     window.open(`https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent('https://pratium.com')}`, '_blank')
   }
 
@@ -295,8 +301,8 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
   async function exportPDF() {
     try {
       const { printLearningDocument, questionPrintHtml } = await import("@/lib/learning-print");
-      await printLearningDocument("Pratium - " + topic, "Zorluk: " + diff.label + " · Dil: " + language + " · " + questions.length + " soru", questionPrintHtml(questions));
-    } catch (error) { alert(error instanceof Error ? error.message : "PDF görünümü açılamadı."); }
+      await printLearningDocument("Pratium - " + topic, t('Zorluk: {d} · Dil: {l} · {n} soru', { d: t(diff.label), l: language, n: questions.length }), questionPrintHtml(questions));
+    } catch (error) { alert(error instanceof Error ? error.message : t('PDF görünümü açılamadı.')); }
   }
 
   return (
@@ -304,9 +310,9 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
       {/* Skor kartı */}
       <div className="card anim-up" style={{ marginBottom: '1rem' }}>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem', flexWrap: 'wrap' }}>
-          <div className="badge badge-purple">Test tamamlandı</div>
+          <div className="badge badge-purple">{t('Test tamamlandı')}</div>
           <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '99px', background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600 }}>
-            {diff.label}
+            {t(diff.label)}
           </span>
         </div>
         <div style={{ textAlign: 'center', padding: '1rem 0' }}>
@@ -319,11 +325,11 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
         {/* Ana butonlar — max 480px, ortalı */}
         <div style={{ maxWidth: '480px', margin: '1.5rem auto 0' }}>
           <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-            <button className="btn btn-primary" onClick={onNewTest} style={{ flex: 1, justifyContent: 'center', padding: '12px' }}>⚡ Yeni test</button>
+            <button className="btn btn-primary" onClick={onNewTest} style={{ flex: 1, justifyContent: 'center', padding: '12px' }}>{t('⚡ Yeni test')}</button>
             {wrongQuestions.length > 0 && onRetryWrong && (
               <button className="btn" onClick={() => onRetryWrong(wrongQuestions)}
                 style={{ flex: 1, justifyContent: 'center', padding: '12px', color: 'var(--red)', borderColor: 'rgba(220,38,38,0.3)', background: 'var(--red-bg)' }}>
-                🔁 Yanlışları tekrar çöz ({wrongQuestions.length})
+                {t('🔁 Yanlışları tekrar çöz ({n})', { n: wrongQuestions.length })}
               </button>
             )}
           </div>
@@ -331,29 +337,29 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
             <div style={{ marginBottom: '10px', padding: '10px 14px', borderRadius: '12px', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '20px' }}>🧠</span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: '#7c3aed' }}>{wrongQuestions.length} soru tekrar listene eklendi</div>
-                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>SM-2 algoritması en iyi zamanı hesaplar</div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#7c3aed' }}>{t('{n} soru tekrar listene eklendi', { n: wrongQuestions.length })}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{t('SM-2 algoritması en iyi zamanı hesaplar')}</div>
               </div>
               <a href="/review" style={{ padding: '7px 12px', borderRadius: '8px', background: '#8b5cf6', color: '#fff', fontSize: '12px', fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-                Tekrar Et →
+                {t('Tekrar Et →')}
               </a>
             </div>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px' }}>
             <button className="btn" onClick={shareResult} disabled={sharing}
               style={{ justifyContent: 'center', fontSize: '13px', padding: '10px', color: 'var(--accent)', borderColor: 'rgba(0,149,200,0.3)' }}>
-              {sharing ? '⏳...' : '🖼️ Paylaş'}
+              {sharing ? '⏳...' : t('🖼️ Paylaş')}
             </button>
             <button className="btn" onClick={shareWhatsApp}
               style={{ justifyContent: 'center', fontSize: '13px', padding: '10px', color: '#25D366', borderColor: 'rgba(37,211,102,0.3)', background: 'rgba(37,211,102,0.06)' }}>
               💬 WhatsApp
             </button>
             <Link href="/dashboard" className="btn" style={{ justifyContent: 'center', fontSize: '13px', padding: '10px' }}>
-              🏠 Dashboard
+              {t('🏠 Dashboard')}
             </Link>
             <button className="btn" onClick={exportPDF}
               style={{ justifyContent: 'center', fontSize: '13px', padding: '10px', color: 'var(--text2)' }}>
-              📄 Yazdır / PDF kaydet
+              {t('📄 Yazdır / PDF kaydet')}
             </button>
           </div>
         </div>
@@ -362,7 +368,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
       {/* Sosyal medya */}
       <div className="card anim-up-1" style={{ marginBottom: '1rem' }}>
         <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px', fontWeight: 500 }}>
-          Pratium'u takip et — günlük ipuçları ve haberler için
+          {t("Pratium'u takip et — günlük ipuçları ve haberler için")}
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {SOCIAL_LINKS.map(s => (
@@ -379,7 +385,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
       {questions.some((_, i) => !answers[i]?.correct) && (
         <div className="card anim-up-2" style={{ marginBottom: '1rem' }}>
           <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--red)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            ✗ Yanlış cevaplar · Kaynak önerileri
+            {t('✗ Yanlış cevaplar · Kaynak önerileri')}
           </div>
           {questions.map((q, i) => {
             if (answers[i]?.correct) return null
@@ -387,11 +393,11 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
             const yt = ytLink ? (typeof ytLink === 'string' ? { url: ytLink, title: topic, channel: '', thumbnail: '' } : ytLink) : null
             return (
               <div key={i} style={{ padding: '12px 14px', borderRadius: '10px', background: 'var(--red-bg)', border: '1px solid rgba(220,38,38,0.15)', marginBottom: '10px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>Soru {i + 1}: <MathText text={q.q} /></div>
+                <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>{t('Soru {n}:', { n: i + 1 })} <MathText text={q.q} /></div>
                 <div style={{ fontSize: '12px', marginBottom: '4px' }}>
-                  <span style={{ color: 'var(--red)' }}>✗ Cevabın: <MathText text={userAnswerText(q, answers[i]?.userAns)} /></span>
+                  <span style={{ color: 'var(--red)' }}>{t('✗ Cevabın:')} <MathText text={userAnswerText(q, answers[i]?.userAns, t)} /></span>
                   {'  ·  '}
-                  <span style={{ color: 'var(--green)' }}>✓ Doğru: <MathText text={correctAnswerText(q)} /></span>
+                  <span style={{ color: 'var(--green)' }}>{t('✓ Doğru:')} <MathText text={correctAnswerText(q, t)} /></span>
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--text2)', lineHeight: 1.6, marginBottom: '8px' }}>💡 <MathText text={q.exp} /></div>
                 {yt && (
@@ -399,7 +405,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
                     style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '8px', background: '#ff0000', textDecoration: 'none', color: '#fff', marginBottom: '8px' }}>
                     {yt.thumbnail && <img src={yt.thumbnail} alt="" style={{ width: 44, height: 33, objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} />}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '12px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>▶ {yt.title || `${topic} — Konu Anlatımı`}</div>
+                      <div style={{ fontSize: '12px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>▶ {yt.title || t('{topic} — Konu Anlatımı', { topic })}</div>
                       {yt.channel && <div style={{ fontSize: '11px', opacity: 0.85, marginTop: '2px' }}>{yt.channel}</div>}
                     </div>
                   </a>
@@ -413,7 +419,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
       {/* Tüm cevaplar + hata bildir */}
       <div className="card anim-up-3">
         <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Cevap özeti
+          {t('Cevap özeti')}
         </div>
         {questions.map((q, i) => {
           const earned = answerScore(answers[i] || {})
@@ -427,15 +433,15 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '3px' }}><MathText text={q.q} /></div>
                 {isPartial && <div style={{ fontSize: '12px', color: '#d97706', fontWeight: 700, marginBottom: '3px' }}>
-                  Kısmi puan: %{Math.round(earned * 100)}
+                  {t('Kısmi puan: %{n}', { n: Math.round(earned * 100) })}
                 </div>}
                 <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px' }}>
-                  Doğru: <MathText text={correctAnswerText(q)} />
+                  {t('Doğru:')} <MathText text={correctAnswerText(q, t)} />
                 </div>
                 {/* HATA BİLDİR butonu */}
                 {reportedIdx.has(i) ? (
                   <div style={{ fontSize: '11px', color: 'var(--green)', fontWeight: 500 }}>
-                    ✓ Bildirim gönderildi, teşekkürler!
+                    {t('✓ Bildirim gönderildi, teşekkürler!')}
                   </div>
                 ) : (
                   <button
@@ -451,7 +457,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--red-bg)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                   >
-                    {reportingIdx === i ? '⏳ Gönderiliyor...' : '⚠ Hata bildir'}
+                    {reportingIdx === i ? t('⏳ Gönderiliyor...') : t('⚠ Hata bildir')}
                   </button>
                 )}
               </div>

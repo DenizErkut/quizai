@@ -1,5 +1,6 @@
 'use client'
 import { Fragment, useState } from 'react'
+import { useT } from '@/lib/i18n/I18nProvider'
 import MathText from '@/components/MathText'
 import { plainMathText } from '@/lib/math-text'
 import { DIFFICULTIES, type Question } from '@/lib/quiz-constants'
@@ -108,6 +109,7 @@ export default function QuizQuestion({
   setOrderAnswer, setMatchAnswer, setMultiTFAnswer, setTableFillAnswer,
   onFinish, shuffledPairs, shuffledIndexMap,
 }: QuizQuestionProps) {
+  const { t } = useT()
   const q = questions[current]
   const [hintState, setHintState] = useState({ questionIndex: -1, open: false })
   const hintOpen = hintState.questionIndex === current && hintState.open
@@ -148,8 +150,8 @@ export default function QuizQuestion({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
           <img src='/pratium-logo-new.svg' alt='Pratium' style={{ height: '32px' }} />
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '99px', background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600 }}>{diff.label}</span>
-            <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{answers.filter(a => a.correct).length}/{answers.length || current} doğru</span>
+            <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '99px', background: diff.bg, color: diff.color, border: `1px solid ${diff.border}`, fontWeight: 600 }}>{t(diff.label)}</span>
+            <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{t('{a}/{b} doğru', { a: answers.filter(x => x.correct).length, b: answers.length || current })}</span>
           </div>
         </div>
 
@@ -160,9 +162,9 @@ export default function QuizQuestion({
 
         <div className="card anim-up">
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text3)', fontWeight: 500 }}>Soru {current + 1} / {questions.length}</span>
+            <span style={{ fontSize: '12px', color: 'var(--text3)', fontWeight: 500 }}>{t('Soru {n} / {m}', { n: current + 1, m: questions.length })}</span>
             <div style={{ display: 'flex', gap: '8px' }}>
-              {trustedVisual && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid rgba(91,76,245,0.2)' }}>📊 Görsel</span>}
+              {trustedVisual && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid rgba(91,76,245,0.2)' }}>{t('📊 Görsel')}</span>}
               <span style={{ fontSize: '11px', color: 'var(--text3)' }}>🌐 {currentLang}</span>
             </div>
           </div>
@@ -172,14 +174,14 @@ export default function QuizQuestion({
               {/* SVG in an image context cannot execute scripts or inject
                   markup into the surrounding application document. */}
               <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(q.svg)}`}
-                alt="Soruya ait şekil veya grafik" style={{ width: '100%', maxHeight: '480px', objectFit: 'contain' }} />
+                alt={t('Soruya ait şekil veya grafik')} style={{ width: '100%', maxHeight: '480px', objectFit: 'contain' }} />
             </div>
           )}
 
           {q.type && q.type !== 'multiple_choice' && (
             <div style={{ marginBottom: '8px' }}>
               <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '99px', background: 'rgba(8,36,101,0.08)', color: 'var(--primary)', fontWeight: 700, border: '1px solid rgba(8,36,101,0.15)' }}>
-                {({'fill_blank':'✏️ Boşluk Doldurma','true_false':'✓✗ Doğru / Yanlış','matching':'🔗 Eşleştirme','ordering':'📋 Sıralama','short_answer':'💬 Kısa Cevap','multi_true_false':'📋✓✗ Çoklu D/Y — Maarif','table_fill':'🗂️ Tablo Doldurma — Maarif'} as Record<string,string>)[q.type]}
+                {t(({'fill_blank':'✏️ Boşluk Doldurma','true_false':'✓✗ Doğru / Yanlış','matching':'🔗 Eşleştirme','ordering':'📋 Sıralama','short_answer':'💬 Kısa Cevap','multi_true_false':'📋✓✗ Çoklu D/Y — Maarif','table_fill':'🗂️ Tablo Doldurma — Maarif'} as Record<string,string>)[q.type] ?? '')}
               </span>
             </div>
           )}
@@ -191,7 +193,7 @@ export default function QuizQuestion({
           {q.passage && (
             <details open={isFirstPassageOccurrence} style={{ marginBottom: '1.25rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', padding: '10px 14px' }}>
               <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 700, color: 'var(--primary)', userSelect: 'none' }}>
-                📖 Kaynak Metin{!isFirstPassageOccurrence && passageOrigin !== undefined && ` (Soru ${passageOrigin + 1}'de gösterildi — tekrar okumak için aç)`}
+                {t('📖 Kaynak Metin')}{!isFirstPassageOccurrence && passageOrigin !== undefined && t(" (Soru {n}'de gösterildi — tekrar okumak için aç)", { n: passageOrigin + 1 })}
               </summary>
               <div style={{ marginTop: '10px', maxHeight: '240px', overflowY: 'auto', fontSize: '13px', lineHeight: 1.6, color: 'var(--text2)', whiteSpace: 'pre-wrap' }}>
                 <MathText text={q.passage} />
@@ -221,7 +223,7 @@ export default function QuizQuestion({
           {q.adaptiveHint && chosen === null && (
             <div style={{ marginBottom: 12 }}>
               <button type="button" onClick={() => setHintState({ questionIndex: current, open: !hintOpen })} style={{ border: '1px solid var(--border)', borderRadius: 9, padding: '7px 10px', background: 'var(--bg2)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                {hintOpen ? 'İpucunu kapat' : '💡 İpucu göster'}
+                {hintOpen ? t('İpucunu kapat') : t('💡 İpucu göster')}
               </button>
               {hintOpen && <div style={{ marginTop: 7, padding: '9px 11px', borderRadius: 9, background: '#fff9e9', color: '#725a52', fontSize: 12 }}><MathText text={q.adaptiveHint} /></div>}
             </div>
@@ -249,7 +251,7 @@ export default function QuizQuestion({
           {/* ── 2. DOĞRU / YANLIŞ ── */}
           {q.type === 'true_false' && (
             <div style={{ display: 'flex', gap: '12px' }}>
-              {[{label: '✓ Doğru', val: 0}, {label: '✗ Yanlış', val: 1}].map(opt => {
+              {[{label: t('✓ Doğru'), val: 0}, {label: t('✗ Yanlış'), val: 1}].map(opt => {
                 const isChosen = chosen === opt.val
                 const isCorrect = opt.val === q.ans
                 const showResult = chosen !== null
@@ -272,16 +274,16 @@ export default function QuizQuestion({
             <div>
               <input value={fillInput} onChange={e => setFillInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && chosen === null && onFillSubmit()}
-                disabled={chosen !== null} placeholder="Cevabınızı yazın..."
+                disabled={chosen !== null} placeholder={t('Cevabınızı yazın...')}
                 style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: `1.5px solid ${chosen !== null ? (answers[answers.length-1]?.correct ? 'rgba(22,163,74,0.5)' : 'rgba(220,38,38,0.4)') : 'var(--border)'}`, background: chosen !== null ? (answers[answers.length-1]?.correct ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.06)') : 'var(--bg2)', fontSize: '14px', fontFamily: 'var(--font-sans)', color: 'var(--text)', outline: 'none', boxSizing: 'border-box' as const }} />
               {chosen === null && (
                 <button className="btn btn-primary" onClick={onFillSubmit} disabled={!fillInput.trim() || checkingAnswer} style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
-                  Cevapla ✓
+                  {t('Cevapla ✓')}
                 </button>
               )}
               {chosen !== null && (
                 <div style={{ marginTop: '10px', fontSize: '13px', fontWeight: 600, color: answers[answers.length-1]?.correct ? '#15803d' : '#dc2626' }}>
-                  {answers[answers.length-1]?.correct ? '✓ Doğru!' : <>Doğru cevap: <MathText text={q.blank || q.opts?.[q.ans] || ''} /></>}
+                  {answers[answers.length-1]?.correct ? t('✓ Doğru!') : <>{t('Doğru cevap:')} <MathText text={q.blank || q.opts?.[q.ans] || ''} /></>}
                 </div>
               )}
             </div>
@@ -291,16 +293,16 @@ export default function QuizQuestion({
           {q.type === 'short_answer' && (
             <div>
               <textarea value={shortInput} onChange={e => setShortInput(e.target.value)} disabled={chosen !== null}
-                placeholder="Cevabınızı yazın..." rows={3}
+                placeholder={t('Cevabınızı yazın...')} rows={3}
                 style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', fontSize: '14px', fontFamily: 'var(--font-sans)', color: 'var(--text)', outline: 'none', resize: 'vertical' as const, boxSizing: 'border-box' as const }} />
               {chosen === null && (
                 <button className="btn btn-primary" onClick={onFillSubmit} disabled={!shortInput.trim() || checkingAnswer} style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
-                  Gönder ✓
+                  {t('Gönder ✓')}
                 </button>
               )}
               {chosen !== null && (
                 <div style={{ marginTop: '12px', padding: '12px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '13px' }}>
-                  <strong style={{ color: 'var(--primary)' }}>Örnek cevap:</strong> <MathText text={q.opts?.[q.ans] || q.blank} />
+                  <strong style={{ color: 'var(--primary)' }}>{t('Örnek cevap:')}</strong> <MathText text={q.opts?.[q.ans] || q.blank} />
                 </div>
               )}
             </div>
@@ -310,8 +312,8 @@ export default function QuizQuestion({
           {q.type === 'matching' && (
             <div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase' }}>Kavram</div>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase' }}>Tanım</div>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase' }}>{t('Kavram')}</div>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase' }}>{t('Tanım')}</div>
                 {(q.pairs || []).map((pair: any, i: number) => {
                   const userShuffledIdx = matchAnswer[i]
                   const isAnswered = chosen !== null && userShuffledIdx !== undefined
@@ -325,7 +327,7 @@ export default function QuizQuestion({
                         onChange={e => setMatchAnswer(prev => ({ ...prev, [i]: Number(e.target.value) }))}
                         disabled={chosen !== null}
                         style={{ padding: '10px 12px', borderRadius: '8px', border: `1.5px solid ${isAnswered ? (isCorrect ? 'rgba(22,163,74,0.5)' : 'rgba(220,38,38,0.4)') : 'var(--border)'}`, background: isAnswered ? (isCorrect ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.06)') : 'var(--bg2)', fontSize: '13px', fontFamily: 'var(--font-sans)', color: 'var(--text)' }}>
-                        <option value="">Seç...</option>
+                        <option value="">{t('Seç...')}</option>
                         {shuffledPairs.map((right: string, j: number) => (
                           <option key={j} value={j}>{plainMathText(right)}</option>
                         ))}
@@ -339,12 +341,12 @@ export default function QuizQuestion({
                   onClick={() => { const allMatched = q.pairs?.every((_: any, i: number) => matchAnswer[i] !== undefined); if (!allMatched) return; const correct = q.pairs?.every((_: any, i: number) => shuffledIndexMap[matchAnswer[i]] === i) ?? false; onSelectAnswer(correct ? 0 : -1) }}
                   disabled={Object.keys(matchAnswer).length < (q.pairs || []).length}
                   style={{ width: '100%', justifyContent: 'center' }}>
-                  Eşleştir 🔗
+                  {t('Eşleştir 🔗')}
                 </button>
               )}
               {chosen !== null && (
                 <div style={{ marginTop: '10px', padding: '12px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '13px' }}>
-                  <strong style={{ color: 'var(--primary)', display: 'block', marginBottom: '6px' }}>Doğru eşleşmeler:</strong>
+                  <strong style={{ color: 'var(--primary)', display: 'block', marginBottom: '6px' }}>{t('Doğru eşleşmeler:')}</strong>
                   {(q.pairs || []).map((p: any, i: number) => (
                     <div key={i} style={{ marginTop: '3px', color: 'var(--text2)' }}>• <MathText text={p.left} /> → <MathText text={p.right} /></div>
                   ))}
@@ -356,7 +358,7 @@ export default function QuizQuestion({
           {/* ── 6. SIRALAMA ── */}
           {q.type === 'ordering' && (
             <div>
-              <p style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '10px' }}>Öğeleri doğru sıraya diz:</p>
+              <p style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '10px' }}>{t('Öğeleri doğru sıraya diz:')}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {orderAnswer.map((item, i) => {
                   const isCorrect = chosen !== null && (q.correctOrder || []).indexOf(q.items?.indexOf(item) ?? i) === i
@@ -378,7 +380,7 @@ export default function QuizQuestion({
                 <button className="btn btn-primary"
                   onClick={() => { const correct = orderAnswer.every((v, i) => (q.items?.indexOf(v) ?? i) === (q.correctOrder?.[i] ?? i)); onSelectAnswer(correct ? 0 : -1) }}
                   style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
-                  Sıralamayı Onayla 📋
+                  {t('Sıralamayı Onayla 📋')}
                 </button>
               )}
             </div>
@@ -399,10 +401,10 @@ export default function QuizQuestion({
                           <button key={String(val)} onClick={() => { if (chosen !== null) return; setMultiTFAnswer(prev => ({ ...prev, [i]: val })) }}
                             disabled={chosen !== null}
                             style={{ padding: '5px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, fontFamily: 'var(--font-sans)', cursor: chosen !== null ? 'default' : 'pointer', border: `1.5px solid ${multiTFAnswer[i] === val ? (val ? 'rgba(22,163,74,0.5)' : 'rgba(220,38,38,0.4)') : 'var(--border)'}`, background: multiTFAnswer[i] === val ? (val ? 'rgba(22,163,74,0.1)' : 'rgba(220,38,38,0.08)') : 'var(--bg3)', color: multiTFAnswer[i] === val ? (val ? '#15803d' : '#dc2626') : 'var(--text2)' }}>
-                            {val ? '✓ Doğru' : '✗ Yanlış'}
+                            {val ? t('✓ Doğru') : t('✗ Yanlış')}
                           </button>
                         ))}
-                        {isAnswered && <span style={{ fontSize: '12px', fontWeight: 600, color: isCorrect ? '#15803d' : '#dc2626' }}>{isCorrect ? '✓' : `✗ (${s.correct ? 'Doğru' : 'Yanlış'})`}</span>}
+                        {isAnswered && <span style={{ fontSize: '12px', fontWeight: 600, color: isCorrect ? '#15803d' : '#dc2626' }}>{isCorrect ? '✓' : `✗ (${s.correct ? t('Doğru') : t('Yanlış')})`}</span>}
                       </div>
                     </div>
                   )
@@ -413,7 +415,7 @@ export default function QuizQuestion({
                   onClick={() => { const correct = (q.statements || []).every((s: any, i: number) => multiTFAnswer[i] === s.correct); onSelectAnswer(correct ? 0 : -1) }}
                   disabled={(q.statements || []).some((_: any, i: number) => multiTFAnswer[i] === undefined || multiTFAnswer[i] === null)}
                   style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
-                  Onayla ✓
+                  {t('Onayla ✓')}
                 </button>
               )}
             </div>
@@ -436,7 +438,7 @@ export default function QuizQuestion({
             }
             return (
               <div>
-                <p style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '10px' }}>Boş hücreleri doldur:</p>
+                <p style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '10px' }}>{t('Boş hücreleri doldur:')}</p>
                 <div style={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid var(--border)' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                     <thead>
@@ -475,9 +477,9 @@ export default function QuizQuestion({
                 {chosen === null && (
                   <button className="btn btn-primary"
                     onClick={() => { const allCorrect = tableAnswers.every((ans: string, i: number) => tableCellCorrect(tableFillAnswer[i] || '', ans)); onSelectAnswer(allCorrect ? 0 : -1) }}
-                    disabled={tableFillAnswer.some(t => !t?.trim())}
+                    disabled={tableFillAnswer.some(cell => !cell?.trim())}
                     style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
-                    Tabloyu Gönder 🗂️
+                    {t('Tabloyu Gönder 🗂️')}
                   </button>
                 )}
               </div>
@@ -489,12 +491,12 @@ export default function QuizQuestion({
             <div style={{ marginTop: '1.5rem' }}>
               <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', borderLeft: `4px solid ${chosen === q.ans ? '#16a34a' : '#dc2626'}`, fontSize: '14px', color: 'var(--text2)', lineHeight: 1.6, marginBottom: '1rem' }}>
                 <strong style={{ color: chosen === q.ans ? '#16a34a' : '#dc2626', display: 'block', marginBottom: '4px' }}>
-                  {chosen === q.ans ? '✓ Doğru!' : '✗ Yanlış'}
+                  {chosen === q.ans ? t('✓ Doğru!') : t('✗ Yanlış')}
                 </strong>
                 <MathText text={q.exp} />
               </div>
               <button className="btn btn-primary" onClick={onNext} disabled={checkingAnswer} style={{ width: '100%', justifyContent: 'center' }}>
-                {current + 1 < questions.length ? 'Sonraki Soru →' : 'Sonuçları Gör 🎯'}
+                {current + 1 < questions.length ? t('Sonraki Soru →') : t('Sonuçları Gör 🎯')}
               </button>
             </div>
           )}

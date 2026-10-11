@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { resolveName } from '@/lib/identity/resolve-client'
+import { useT } from '@/lib/i18n/I18nProvider'
 import FileUploader, { type UploadedFile } from '@/components/FileUploader'
 import QuizResult from '@/components/QuizResult'
 import QuizSetup from '@/components/quiz/QuizSetup'
@@ -126,6 +127,7 @@ async function fetchQuizTopup(params: {
 
 function QuizPageContent() {
   const router = useRouter()
+  const { t } = useT()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showPrioritySetup, setShowPrioritySetup] = useState(false)
@@ -538,6 +540,10 @@ function QuizPageContent() {
 
   // ── HATA MESAJLARI ──
   function getErrorInfo(errorCode: string, status?: number, reason?: string, serverMessage?: string): {code: string; title: string; desc: string; retry: boolean} {
+    const info = getErrorInfoRaw(errorCode, status, reason, serverMessage)
+    return { ...info, title: t(info.title), desc: t(info.desc) }
+  }
+  function getErrorInfoRaw(errorCode: string, status?: number, reason?: string, serverMessage?: string): {code: string; title: string; desc: string; retry: boolean} {
     if (status === 429 || errorCode === 'daily_limit_reached') return { code: 'daily_limit', title: "⏰ Günlük limit doldu", desc: "Bugünkü test hakkını kullandın. Yarın yenilenir ya da Altın'a geçerek sınırsız test çöz.", retry: false }
     if (errorCode === 'limit_reached') return { code: 'monthly_limit', title: "📚 Aylık limit doldu", desc: "Bu ay için test hakkın bitti. Sınırsız test için Altın'a geç.", retry: false }
     if (errorCode === 'out_of_curriculum') return { code: 'curriculum', title: "📖 Müfredat dışı konu", desc: "Bu konu MEB müfredatında yer almıyor. Başka bir konu dene ya da Altın ile tüm konulara eriş.", retry: false }
@@ -570,18 +576,18 @@ function QuizPageContent() {
 
   async function startQuiz() {
     const topic = customTopic.trim() || selectedTopic || (hasFiles ? uploadedFiles.map(f => f.name.replace(/\.[^.]+$/, '')).join(', ') : '')
-    if (!topic) { setTopicErr('Bir konu seç veya yaz.'); return }
+    if (!topic) { setTopicErr(t('Bir konu seç veya yaz.')); return }
     setTopicErr('')
     const lang = getActiveLang(profile?.language)
     setCurrentLang(lang)
     setScreen('loading')
 
     const msgs = [
-      hasFiles ? `${uploadedFiles.length} dosya analiz ediliyor...` : 'Profilin analiz ediliyor...',
-      'Müfredat kontrol ediliyor...',
-      'Senin seviyene uygun sorular hazırlanıyor...',
-      includeVisuals ? 'Görsel içerikler hazırlanıyor...' : 'Şıklar karıştırılıyor...',
-      'Son kontroller...',
+      hasFiles ? t('{n} dosya analiz ediliyor...', { n: uploadedFiles.length }) : t('Profilin analiz ediliyor...'),
+      t('Müfredat kontrol ediliyor...'),
+      t('Senin seviyene uygun sorular hazırlanıyor...'),
+      includeVisuals ? t('Görsel içerikler hazırlanıyor...') : t('Şıklar karıştırılıyor...'),
+      t('Son kontroller...'),
     ]
     let mi = 0
     const iv = setInterval(() => { mi = (mi + 1) % msgs.length; setLoadMsg(msgs[mi]) }, 1000)
@@ -750,7 +756,7 @@ function QuizPageContent() {
           }
           setInterventionInfo({
             exp: q.exp || questions[current - 1]?.exp || '',
-            typeLabel: typeLabels[q.type] || q.type,
+            typeLabel: typeLabels[q.type] ? t(typeLabels[q.type]) : q.type,
           })
           setShowIntervention(true)
         }
@@ -1030,14 +1036,14 @@ function QuizPageContent() {
         } else {
           setChunkBoundary(null)
           setFetchingNextChunk(false)
-          setQuizError({ code: 'adaptive_next_failed', title: 'Yedek sorular kalite kontrolünden geçemedi', desc: `Bu adım için gereken ${minimumSecondChunk} doğrulanmış soru hazırlanamadı. Birkaç saniye sonra yeniden deneyebilirsin.`, retry: true })
+          setQuizError({ code: 'adaptive_next_failed', title: t('Yedek sorular kalite kontrolünden geçemedi'), desc: t('Bu adım için gereken {n} doğrulanmış soru hazırlanamadı. Birkaç saniye sonra yeniden deneyebilirsin.', { n: minimumSecondChunk }), retry: true })
           setScreen('error')
           return
         }
       } catch {
         setFetchingNextChunk(false)
         setChunkBoundary(null)
-        setQuizError({ code: 'adaptive_next_failed', title: 'Yeni sorular kalite kontrolünden geçemedi', desc: 'Yedek soru hazırlanırken doğrulama tamamlanamadı. Birkaç saniye sonra yeniden deneyebilirsin.', retry: true })
+        setQuizError({ code: 'adaptive_next_failed', title: t('Yeni sorular kalite kontrolünden geçemedi'), desc: t('Yedek soru hazırlanırken doğrulama tamamlanamadı. Birkaç saniye sonra yeniden deneyebilirsin.'), retry: true })
         setScreen('error')
         return
       }
@@ -1162,14 +1168,14 @@ function QuizPageContent() {
             {reason === 'qcount' ? '🎯' : reason === 'daily' ? '⏰' : '🔒'}
           </div>
           <h3 className="serif" style={{ fontSize: '22px', marginBottom: '0.5rem' }}>
-            {reason === 'qcount' ? 'Daha fazla soru için Altın' :
-             reason === 'daily' ? 'Günlük test limitin doldu' :
-             'Bu konu müfredat dışı'}
+            {reason === 'qcount' ? t('Daha fazla soru için Altın') :
+             reason === 'daily' ? t('Günlük test limitin doldu') :
+             t('Bu konu müfredat dışı')}
           </h3>
           <p style={{ color: 'var(--text2)', fontSize: '13px', lineHeight: 1.7 }}>
-            {reason === 'qcount' ? 'Gümüş planda en fazla 10 soru oluşturabilirsin. Altın veya Platin üyelikle 20 soruya kadar test oluştur.' :
-             reason === 'daily' ? `Bugün ${dailyLimit} test hakkını kullandın. Yarın yenilenir ya da Altın/Platin'e geç.` :
-             'Bu konu Türkiye Millî Eğitim müfredatında bulunmuyor. Altın veya Platin planda müfredat dışı konularda da test oluşturabilirsin.'}
+            {reason === 'qcount' ? t('Gümüş planda en fazla 10 soru oluşturabilirsin. Altın veya Platin üyelikle 20 soruya kadar test oluştur.') :
+             reason === 'daily' ? t("Bugün {n} test hakkını kullandın. Yarın yenilenir ya da Altın/Platin'e geç.", { n: dailyLimit }) :
+             t('Bu konu Türkiye Millî Eğitim müfredatında bulunmuyor. Altın veya Platin planda müfredat dışı konularda da test oluşturabilirsin.')}
           </p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1180,12 +1186,12 @@ function QuizPageContent() {
           ].map(p => (
             <div key={p.plan} style={{ padding: '14px 16px', borderRadius: '12px', border: `2px solid ${p.highlight ? p.color : 'var(--border)'}`, background: p.highlight ? 'var(--accent-bg)' : 'var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
               <div>
-                <div style={{ fontWeight: 700, color: p.color, fontSize: '14px' }}>{p.plan} {p.highlight && '⭐'}</div>
-                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{p.features.join(' · ')}</div>
+                <div style={{ fontWeight: 700, color: p.color, fontSize: '14px' }}>{t(p.plan)} {p.highlight && '⭐'}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{p.features.map(f => t(f)).join(' · ')}</div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: '14px', color: p.color }}>{p.price}</div>
-                <a href="/pricing" style={{ fontSize: '11px', color: p.color, textDecoration: 'none', fontWeight: 600 }}>Satın al →</a>
+                <div style={{ fontWeight: 700, fontSize: '14px', color: p.color }}>{t(p.price)}</div>
+                <a href="/pricing" style={{ fontSize: '11px', color: p.color, textDecoration: 'none', fontWeight: 600 }}>{t('Satın al →')}</a>
               </div>
             </div>
           ))}
@@ -1199,24 +1205,24 @@ function QuizPageContent() {
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', paddingBottom: '5rem', background: 'var(--bg)' }}>
       <div style={{ maxWidth: '460px', textAlign: 'center' }} className="anim-up">
         <div style={{ fontSize: '56px', marginBottom: '1.25rem' }}>📚</div>
-        <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>Bu ayki test hakkın doldu</h2>
+        <h2 className="serif" style={{ fontSize: '28px', marginBottom: '0.75rem' }}>{t('Bu ayki test hakkın doldu')}</h2>
         <p style={{ color: 'var(--text2)', fontSize: '15px', marginBottom: '2rem', lineHeight: 1.7 }}>
-          {profile?.plan === 'silver' ? <>Gümüş planda ayda <strong>30 test</strong> hakkın var.</> : <>Ücretsiz planda ayda <strong>10 test</strong> hakkın var.</>}<br />
-          Sınırsız test için Altın'a geç veya <strong>10 arkadaşını davet ederek</strong> 1 yıl ücretsiz Altın kazan.
+          {profile?.plan === 'silver' ? t('Gümüş planda ayda 30 test hakkın var.') : t('Ücretsiz planda ayda 10 test hakkın var.')}<br />
+          {t("Sınırsız test için Altın'a geç veya 10 arkadaşını davet ederek 1 yıl ücretsiz Altın kazan.")}
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '320px', margin: '0 auto' }}>
           <Link href="/pricing" className="btn btn-primary btn-lg" style={{ justifyContent: 'center' }}>
-            💎 Altın'a geç
+            {t("💎 Altın'a geç")}
           </Link>
           <Link href="/pricing#referral" className="btn btn-lg" style={{ justifyContent: 'center' }}>
-            🎁 Arkadaşını davet et (ücretsiz)
+            {t('🎁 Arkadaşını davet et (ücretsiz)')}
           </Link>
           <button className="btn btn-ghost btn-sm" onClick={() => setScreen('topic')}>
-            ← Geri dön
+            {t('← Geri dön')}
           </button>
         </div>
         <p style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '1.5rem' }}>
-          Ay başında (her ayın 1'i) test hakkın otomatik sıfırlanır.
+          {t("Ay başında (her ayın 1'i) test hakkın otomatik sıfırlanır.")}
         </p>
       </div>
     </main>
@@ -1323,20 +1329,20 @@ function QuizPageContent() {
                 startQuiz()
               }}
               style={{ justifyContent: 'center' }}>
-              🔄 Tekrar dene
+              {t('🔄 Tekrar dene')}
             </button>
           )}
 
           {/* Plana göre CTA */}
           {(quizError.code === 'daily_limit' || quizError.code === 'monthly_limit') && (
             <a href="/pricing" className="btn btn-primary btn-lg" style={{ justifyContent: 'center', textDecoration: 'none' }}>
-              💎 Altın'a geç
+              {t("💎 Altın'a geç")}
             </a>
           )}
 
           {quizError.code === 'curriculum' && (
             <a href="/pricing" className="btn btn-lg" style={{ justifyContent: 'center', textDecoration: 'none' }}>
-              🔓 Tüm konular için Altın
+              {t('🔓 Tüm konular için Altın')}
             </a>
           )}
 
@@ -1345,7 +1351,7 @@ function QuizPageContent() {
             className="btn btn-ghost"
             onClick={() => { setQuizError(null); setRetryCount(0); setScreen('topic') }}
             style={{ justifyContent: 'center' }}>
-            ← Farklı konu seç
+            {t('← Farklı konu seç')}
           </button>
 
           {/* Hata bildir */}
@@ -1357,7 +1363,7 @@ function QuizPageContent() {
                 window.open(`mailto:destek@pratium.com.tr?subject=Hata Bildirimi&body=${msg}`)
               }}
               style={{ justifyContent: 'center', color: 'var(--text3)', fontSize: '12px' }}>
-              📧 Hatayı bildir
+              {t('📧 Hatayı bildir')}
             </button>
           )}
         </div>
@@ -1365,7 +1371,7 @@ function QuizPageContent() {
         {/* Tekrar deneme geçmişi */}
         {retryCount >= 1 && quizError.retry && (
           <div style={{ marginTop: '1rem', padding: '10px 14px', borderRadius: '10px', background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.2)', fontSize: '12px', color: '#92400e' }}>
-            ⚠️ Bir kez daha denendi ama başarısız oldu. Lütfen daha sonra tekrar dene veya hatayı bildir.
+            {t('⚠️ Bir kez daha denendi ama başarısız oldu. Lütfen daha sonra tekrar dene veya hatayı bildir.')}
           </div>
         )}
       </div>
@@ -1380,22 +1386,22 @@ function QuizPageContent() {
         <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--gradient)', margin: '0 auto 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--shadow-accent)' }}>
           <div className="spinner" style={{ width: 28, height: 28, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} />
         </div>
-        <div style={{ fontWeight: 600, fontSize: '16px', marginBottom: '0.4rem' }}>Sorular hazırlanıyor...</div>
+        <div style={{ fontWeight: 600, fontSize: '16px', marginBottom: '0.4rem' }}>{t('Sorular hazırlanıyor...')}</div>
         {loadMsg.startsWith('__PDF_ERROR__:') ? (
           <div style={{ marginTop: '1rem', background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '12px', padding: '16px', textAlign: 'left', maxWidth: '320px' }}>
-            <div style={{ fontWeight: 700, color: 'var(--red)', marginBottom: '8px', fontSize: '13px' }}>⚠️ PDF Yüklenemedi</div>
+            <div style={{ fontWeight: 700, color: 'var(--red)', marginBottom: '8px', fontSize: '13px' }}>{t('⚠️ PDF Yüklenemedi')}</div>
             <div style={{ color: 'var(--text2)', fontSize: '12px', lineHeight: 1.6, marginBottom: '10px' }}>
               {loadMsg.replace('__PDF_ERROR__:', '')}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.7, marginBottom: '12px' }}>
-              <strong style={{ color: 'var(--text2)' }}>Çözüm önerileri:</strong><br/>
-              • PDF'i Word dosyasına çevir, tekrar yükle<br/>
-              • Büyük PDF'i 50 sayfalık parçalara böl<br/>
-              • Metni kopyalayıp konu kutusuna yapıştır
+              <strong style={{ color: 'var(--text2)' }}>{t('Çözüm önerileri:')}</strong><br/>
+              {t("• PDF'i Word dosyasına çevir, tekrar yükle")}<br/>
+              {t("• Büyük PDF'i 50 sayfalık parçalara böl")}<br/>
+              {t('• Metni kopyalayıp konu kutusuna yapıştır')}
             </div>
             <a href="https://bigconvert.11zon.com/" target="_blank" rel="noopener noreferrer"
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 16px', borderRadius: '8px', background: '#082465', color: '#fff', fontSize: '12px', fontWeight: 700, textDecoration: 'none' }}>
-              🔄 Ücretsiz PDF Dönüştür / Küçült →
+              {t('🔄 Ücretsiz PDF Dönüştür / Küçült →')}
             </a>
           </div>
         ) : (
@@ -1415,7 +1421,7 @@ function QuizPageContent() {
         <main style={{ maxWidth: '520px', margin: '0 auto', padding: '2rem 1rem', textAlign: 'center' }}>
           <div style={{ padding: '48px 24px', borderRadius: '16px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
             <div style={{ fontSize: '32px', marginBottom: '12px' }}>⚡</div>
-            <div style={{ fontSize: '14px', color: 'var(--text2)' }}>Yeni soru kalite kontrolünden geçiyor; yedek sorular hazırlanıyor...</div>
+            <div style={{ fontSize: '14px', color: 'var(--text2)' }}>{t('Yeni soru kalite kontrolünden geçiyor; yedek sorular hazırlanıyor...')}</div>
           </div>
         </main>
       )
@@ -1430,11 +1436,10 @@ function QuizPageContent() {
         <main style={{ maxWidth: '560px', margin: '0 auto', padding: '2rem 1rem' }}>
           <div style={{ padding: '28px 24px', borderRadius: '16px', background: 'var(--bg2)', border: '1.5px solid var(--accent)' }}>
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', marginBottom: '10px' }}>
-              💡 Bir dakika, bunu birlikte gözden geçirelim
+              {t('💡 Bir dakika, bunu birlikte gözden geçirelim')}
             </div>
             <p style={{ fontSize: '13.5px', color: 'var(--text2)', lineHeight: 1.6, margin: '0 0 16px' }}>
-              Son iki soruda <strong>{interventionInfo.typeLabel}</strong> tipinde benzer bir noktada zorlandın.
-              Devam etmeden önce şunu bir daha okuyalım:
+              {t('Son iki soruda {type} tipinde benzer bir noktada zorlandın. Devam etmeden önce şunu bir daha okuyalım:', { type: interventionInfo.typeLabel })}
             </p>
             {interventionInfo.exp && (
               <div style={{ padding: '14px 16px', borderRadius: '10px', background: 'var(--bg)', border: '1px solid var(--border)', fontSize: '13.5px', color: 'var(--text)', lineHeight: 1.6, marginBottom: '18px' }}>
@@ -1442,7 +1447,7 @@ function QuizPageContent() {
               </div>
             )}
             <button className="btn btn-primary" onClick={next} style={{ width: '100%', justifyContent: 'center' }}>
-              Anladım, devam et →
+              {t('Anladım, devam et →')}
             </button>
           </div>
         </main>
