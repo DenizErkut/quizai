@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Tr from '@/components/Tr'
 import SiteFooter from '@/components/SiteFooter'
 
 export const metadata = {
@@ -46,40 +47,37 @@ export default function ForStudentsPage() {
           <Link href="/" style={{ textDecoration: 'none', display: 'inline-block', marginBottom: '1.5rem' }}>
             <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '52px' }} />
           </Link>
-          <div className="badge badge-accent" style={{ marginBottom: '0.75rem' }}>Öğrenciler İçin</div>
-          <h1 className="serif" style={{ fontSize: '30px', marginBottom: '0.75rem' }}>Kendi seviyene göre çalış, kendi hızında öğren</h1>
-          <p style={{ color: 'var(--text2)', fontSize: '15px', lineHeight: 1.7 }}>
-            İlkokuldan liseye, hatta üniversiteye kadar — Pratium, sana özel sorular üretir, seni takip eder ve
-            neyi bilmediğini değil, neyi öğrenmen gerektiğini gösterir.
-          </p>
+          <div className="badge badge-accent" style={{ marginBottom: '0.75rem' }}><Tr text="Öğrenciler İçin" /></div>
+          <h1 className="serif" style={{ fontSize: '30px', marginBottom: '0.75rem' }}><Tr text="Kendi seviyene göre çalış, kendi hızında öğren" /></h1>
+          <p style={{ color: 'var(--text2)', fontSize: '15px', lineHeight: 1.7 }}><Tr text="İlkokuldan liseye, hatta üniversiteye kadar — Pratium, sana özel sorular üretir, seni takip eder ve neyi bilmediğini değil, neyi öğrenmen gerektiğini gösterir." /></p>
         </div>
 
         {features.map((f, i) => (
           <div key={i} className="card" style={{ marginBottom: '1rem' }}>
-            <div className={`badge badge-${f.badge}`} style={{ marginBottom: '0.6rem' }}>{f.title}</div>
-            <p style={{ fontSize: '14px', lineHeight: 1.8, color: 'var(--text)' }}>{f.content}</p>
+            <div className={`badge badge-${f.badge}`} style={{ marginBottom: '0.6rem' }}><Tr text={f.title} /></div>
+            <p style={{ fontSize: '14px', lineHeight: 1.8, color: 'var(--text)' }}><Tr text={f.content} /></p>
           </div>
         ))}
 
-        <h2 className="serif" style={{ fontSize: '20px', marginTop: '2rem', marginBottom: '1rem' }}>Diğer Çalışma Modları</h2>
+        <h2 className="serif" style={{ fontSize: '20px', marginTop: '2rem', marginBottom: '1rem' }}><Tr text="Diğer Çalışma Modları" /></h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '2rem' }}>
           {otherModes.map((m, i) => (
             <div key={i} className="card-sm">
-              <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>{m.title}</h3>
-              <p style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}>{m.desc}</p>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}><Tr text={m.title} /></h3>
+              <p style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}><Tr text={m.desc} /></p>
             </div>
           ))}
         </div>
 
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <a href="https://pratium.com/register" className="btn btn-primary">Ücretsiz Başla →</a>
+          <a href="https://pratium.com/register" className="btn btn-primary"><Tr text="Ücretsiz Başla →" /></a>
         </div>
 
         <div style={{ textAlign: 'center', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link href="/for-parents" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}>Veliler için →</Link>
-            <Link href="/for-teachers" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}>Öğretmenler için →</Link>
-            <Link href="/methodology" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}>Metodolojimiz →</Link>
+            <Link href="/for-parents" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}><Tr text="Veliler için →" /></Link>
+            <Link href="/for-teachers" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}><Tr text="Öğretmenler için →" /></Link>
+            <Link href="/methodology" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}><Tr text="Metodolojimiz →" /></Link>
           </div>
         </div>
       </div>

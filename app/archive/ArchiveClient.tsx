@@ -325,7 +325,7 @@ export default function ArchiveClient({ sessions }: { sessions: Session[] }) {
 
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {s.topic}
+                          {t(s.topic)}
                         </div>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '11px', color: 'var(--text3)' }}>
                           {s.grade && <span>📚 {s.grade}</span>}

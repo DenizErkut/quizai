@@ -277,7 +277,7 @@ export default function DashboardPage() {
                         <span style={{ fontSize: '9px', color: pctColor(s.pct), opacity: 0.7 }}>{s.score}/{s.question_count}</span>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.topic}</div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t(s.topic)}</div>
                         <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{formatDate(s.created_at, locale)}</div>
                       </div>
                       <span style={{ color: 'var(--text4)', fontSize: '14px' }}>›</span>

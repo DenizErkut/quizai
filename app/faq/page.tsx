@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Tr from '@/components/Tr'
 import SiteFooter from '@/components/SiteFooter'
 
 export const metadata = {
@@ -64,24 +65,24 @@ export default function FaqPage() {
           <Link href="/" style={{ textDecoration: 'none', display: 'inline-block', marginBottom: '1.5rem' }}>
             <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '52px' }} />
           </Link>
-          <div className="badge badge-yellow" style={{ marginBottom: '0.75rem' }}>Sık Sorulan Sorular</div>
-          <h1 className="serif" style={{ fontSize: '30px', marginBottom: '0.75rem' }}>Merak ettikleriniz</h1>
+          <div className="badge badge-yellow" style={{ marginBottom: '0.75rem' }}><Tr text="Sık Sorulan Sorular" /></div>
+          <h1 className="serif" style={{ fontSize: '30px', marginBottom: '0.75rem' }}><Tr text="Merak ettikleriniz" /></h1>
         </div>
 
         {faqs.map((f, i) => (
           <details key={i} className="card" style={{ marginBottom: '0.75rem', cursor: 'pointer' }}>
             <summary style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)', listStyle: 'none' }}>
-              {f.q}
+              <Tr text={f.q} />
             </summary>
             <p style={{ fontSize: '14px', lineHeight: 1.8, color: 'var(--text2)', marginTop: '0.75rem' }}>
-              {f.a}
+              <Tr text={f.a} />
             </p>
           </details>
         ))}
 
         <div style={{ textAlign: 'center', marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
-          <p style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '10px' }}>Sorunuz burada yok mu?</p>
-          <a href="mailto:info@pratium.com.tr" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}>Bize ulaşın →</a>
+          <p style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '10px' }}><Tr text="Sorunuz burada yok mu?" /></p>
+          <a href="mailto:info@pratium.com.tr" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}><Tr text="Bize ulaşın →" /></a>
         </div>
       </div>
       <SiteFooter />

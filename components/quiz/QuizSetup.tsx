@@ -142,7 +142,7 @@ export default function QuizSetup({
                       color: selectedTopic === fav ? '#082465' : 'var(--text2)',
                       display: 'flex', alignItems: 'center', gap: '5px',
                     }}>
-                    ⭐ {fav}
+                    ⭐ {t(fav)}
                   </button>
                 ))}
               </div>
@@ -166,7 +166,7 @@ export default function QuizSetup({
                     color: openSubject === subj ? 'var(--accent)' : 'var(--text2)',
                     display: 'flex', alignItems: 'center', gap: '5px',
                   }}>
-                  {subj}
+                  {t(subj)}
                   <span style={{ fontSize: '10px', opacity: 0.6 }}>{openSubject === subj ? '▲' : '▼'}</span>
                 </button>
               ))}
@@ -196,7 +196,7 @@ export default function QuizSetup({
                               background: selectedTopic === unit ? '#0d9488' : 'rgba(13,148,136,0.08)',
                               color: selectedTopic === unit ? '#fff' : '#0d9488', whiteSpace: 'nowrap',
                             }}>
-                            {unit}
+                            {t(unit)}
                           </button>
                           <button onClick={() => onToggleFavorite(unit)}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', opacity: favorites.includes(unit) ? 1 : 0.35, padding: '2px' }}>
@@ -224,7 +224,7 @@ export default function QuizSetup({
                             background: selectedTopic === topic ? 'var(--accent)' : 'var(--bg)',
                             color: selectedTopic === topic ? '#fff' : 'var(--text)', whiteSpace: 'nowrap',
                           }}>
-                          {topic}
+                          {t(topic)}
                         </button>
                         <button onClick={() => onToggleFavorite(topic)}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', opacity: favorites.includes(topic) ? 1 : 0.35, padding: '2px', transition: 'opacity 0.15s' }}>
@@ -239,7 +239,7 @@ export default function QuizSetup({
 
             {selectedTopic && (
               <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 600 }}>{t('✓ Seçilen: {topic}', { topic: selectedTopic })}</span>
+                <span style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 600 }}>{t('✓ Seçilen: {topic}', { topic: t(selectedTopic) })}</span>
                 <button onClick={() => onToggleFavorite(selectedTopic)} title={favorites.includes(selectedTopic) ? t('Favorilerden çıkar') : t('Favorilere ekle')}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', opacity: favorites.includes(selectedTopic) ? 1 : 0.4, padding: 0 }}>⭐</button>
                 <button onClick={() => onFetchSummary(selectedTopic)}
@@ -255,7 +255,7 @@ export default function QuizSetup({
               <div style={{ marginTop: '12px', borderRadius: '14px', border: '1.5px solid rgba(99,102,241,0.25)', background: 'rgba(99,102,241,0.04)', padding: '14px 16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <div style={{ fontWeight: 700, fontSize: '13px', color: '#6366f1', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                    📖 {t('{topic} — Hızlı Özet', { topic: selectedTopic || customTopic.trim() })}
+                    📖 {t('{topic} — Hızlı Özet', { topic: t(selectedTopic || customTopic.trim()) })}
                     {topicSummary?.curriculumGrounded && (
                       <span title={t('Bu özet MEB müfredatındaki gerçek kazanımlara dayanıyor')} style={{ fontSize: '10px', fontWeight: 700, color: '#0d9488', background: 'rgba(13,148,136,0.1)', border: '1px solid rgba(13,148,136,0.3)', borderRadius: '99px', padding: '2px 8px' }}>
                         {t('✓ MEB müfredatına dayalı')}
@@ -315,7 +315,7 @@ export default function QuizSetup({
           >
             <option value="">{t('Ders seç (önerilir)')}</option>
             {[...new Set([...Object.keys(gradeSubjects), ...dynamicSubjects])].map(subject => (
-              <option key={subject} value={subject}>{subject}</option>
+              <option key={subject} value={subject}>{t(subject)}</option>
             ))}
           </select>
           <textarea className="input" rows={2}
