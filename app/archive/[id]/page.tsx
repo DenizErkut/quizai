@@ -4,8 +4,11 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 
 export default function SessionDetailPage() {
+  const { t, locale } = useT()
   const params = useParams()
   const id = params?.id as string
   const [session, setSession] = useState<any>(null)
@@ -65,8 +68,8 @@ export default function SessionDetailPage() {
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: '48px', marginBottom: '1rem' }}>😕</div>
-        <div style={{ fontWeight: 600, marginBottom: '8px' }}>Test bulunamadı</div>
-        <Link href="/archive" className="btn btn-primary" style={{ justifyContent: 'center' }}>← Arşive dön</Link>
+        <div style={{ fontWeight: 600, marginBottom: '8px' }}>{t('Test bulunamadı')}</div>
+        <Link href="/archive" className="btn btn-primary" style={{ justifyContent: 'center' }}>{t('← Arşive dön')}</Link>
       </div>
     </main>
   )
@@ -95,7 +98,7 @@ export default function SessionDetailPage() {
       <div style={{ maxWidth: '640px', margin: '0 auto', padding: '1.5rem' }}>
 
         <Link href="/archive" style={{ fontSize: '13px', color: 'var(--text3)', textDecoration: 'none', display: 'inline-block', marginBottom: '1.5rem' }}>
-          ← Arşive dön
+          {t('← Arşive dön')}
         </Link>
 
         <div style={{ marginBottom: '2rem' }}>
@@ -104,9 +107,9 @@ export default function SessionDetailPage() {
           </h1>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ fontSize: '13px', color: 'var(--text3)' }}>
-              {new Date(session.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+              {new Date(session.created_at).toLocaleDateString(intlLocale(locale), { day: 'numeric', month: 'long', year: 'numeric' })}
             </span>
-            <span style={{ fontSize: '13px', color: 'var(--text3)' }}>{session.question_count} soru</span>
+            <span style={{ fontSize: '13px', color: 'var(--text3)' }}>{t('{n} soru', { n: session.question_count })}</span>
             <span style={{
               fontSize: '13px', fontWeight: 700, padding: '2px 10px', borderRadius: '99px',
               background: session.pct >= 70 ? 'var(--green-bg)' : 'var(--red-bg)',
@@ -122,7 +125,7 @@ export default function SessionDetailPage() {
         {questions.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div>
-            <div style={{ color: 'var(--text3)' }}>Soru verisi bulunamadı.</div>
+            <div style={{ color: 'var(--text3)' }}>{t('Soru verisi bulunamadı.')}</div>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -146,7 +149,7 @@ export default function SessionDetailPage() {
                   {q.passage && (
                     <details style={{ marginBottom: '10px', marginLeft: '26px', borderRadius: '9px', border: '1px solid var(--border)', background: 'var(--bg)', padding: '8px 12px' }}>
                       <summary style={{ cursor: 'pointer', fontSize: '11px', fontWeight: 700, color: 'var(--primary)', userSelect: 'none' }}>
-                        📖 Kaynak Metin
+                        {t('📖 Kaynak Metin')}
                       </summary>
                       <div style={{ marginTop: '8px', maxHeight: '200px', overflowY: 'auto', fontSize: '12px', lineHeight: 1.6, color: 'var(--text3)', whiteSpace: 'pre-wrap' }}>
                         <MathText text={q.passage} />
@@ -191,7 +194,7 @@ export default function SessionDetailPage() {
           <Link
             href={`/quiz?topic=${encodeURIComponent(session.topic)}&grade=${session.grade}&count=${session.question_count}&difficulty=${session.difficulty || 'normal'}&lang=${session.language || 'Türkçe'}`}
             className="btn btn-primary" style={{ justifyContent: 'center' }}>
-            🔄 Bu Konudan Tekrar Çöz
+            {t('🔄 Bu Konudan Tekrar Çöz')}
           </Link>
 
           {/* Sadece yanlışları tekrar çöz */}
@@ -199,7 +202,7 @@ export default function SessionDetailPage() {
             <button
               onClick={retryWrong}
               className="btn" style={{ justifyContent: 'center', borderColor: 'var(--red)', color: 'var(--red)' }}>
-              ❌ Sadece Yanlışlarımı Tekrar Çöz ({wrongQuestions.length} soru)
+              {t('❌ Sadece Yanlışlarımı Tekrar Çöz ({n} soru)', { n: wrongQuestions.length })}
             </button>
           )}
 
@@ -208,7 +211,7 @@ export default function SessionDetailPage() {
               ⚡ Yeni Test
             </Link>
             <Link href="/archive" className="btn" style={{ flex: 1, justifyContent: 'center' }}>
-              ← Arşive dön
+              {t('← Arşive dön')}
             </Link>
           </div>
         </div>

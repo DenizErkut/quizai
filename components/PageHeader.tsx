@@ -2,6 +2,7 @@
 // Okulyo stilinde ortak sayfa başlığı — tüm iç sayfalarda kullanılır
 'use client'
 import Link from 'next/link'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 interface PageHeaderProps {
   title: string
@@ -20,6 +21,7 @@ export default function PageHeader({
   title, subtitle, icon, backHref, backLabel,
   color, badge, badgeColor, action, stats,
 }: PageHeaderProps) {
+  const { t } = useT()
   const gradFrom = '#29483d'
   const gradTo   = color || '#4c7d6b'
 
@@ -43,7 +45,7 @@ export default function PageHeader({
             marginBottom: '10px', textDecoration: 'none',
             transition: 'color 0.15s',
           }}>
-            ← {backLabel || 'Geri'}
+            ← {t(backLabel || 'Geri')}
           </Link>
         )}
 
@@ -54,7 +56,7 @@ export default function PageHeader({
               <h1 style={{
                 fontFamily: 'var(--font-display)',
                 fontSize: 'clamp(22px, 3vw, 30px)', fontWeight: 800, color: '#fff', lineHeight: 1.2,
-              }}>{title}</h1>
+              }}>{t(title)}</h1>
               {badge && (
                 <span style={{
                   fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px',
@@ -62,12 +64,12 @@ export default function PageHeader({
                   color: badgeColor ? '#fff' : '#ffd77f',
                   border: '1px solid rgba(242,185,75,0.4)',
                 }}>
-                  {badge}
+                  {t(badge)}
                 </span>
               )}
             </div>
             {subtitle && (
-              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginTop: '2px' }}>{subtitle}</p>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginTop: '2px' }}>{t(subtitle)}</p>
             )}
           </div>
           {action && <div>{action}</div>}
@@ -84,7 +86,7 @@ export default function PageHeader({
                 border: '1px solid rgba(255,255,255,0.15)',
               }}>
                 <span style={{ fontSize: '14px', fontWeight: 800, color: '#fff' }}>{s.value}</span>
-                <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', marginLeft: '5px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</span>
+                <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', marginLeft: '5px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t(s.label)}</span>
               </div>
             ))}
           </div>

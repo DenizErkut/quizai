@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { useT } from '@/lib/i18n/I18nProvider'
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, RadarChart, Radar,
   PolarGrid, PolarAngleAxis, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -37,6 +38,7 @@ function pctColor(pct: number) {
 
 export default function AnalysisPage() {
   const router = useRouter()
+  const { t } = useT()
   const [sessions, setSessions] = useState<Session[]>([])
   const [weakTopics, setWeakTopics] = useState<WeakTopic[]>([])
   const [aiPlan, setAiPlan] = useState('')
@@ -124,7 +126,7 @@ export default function AnalysisPage() {
           'fill_blank': 'Boşluk Doldurma',
           'short_answer': 'Kısa Cevap',
           'matching': 'Eşleştirme',
-          'ordering': 'Sıralama',
+          'ordering': 'Sıralama‖soru tipi',
           'multi_true_false': 'Çoklu D/Y',
           'table_fill': 'Tablo',
         } as any)[t] || t
@@ -161,12 +163,12 @@ export default function AnalysisPage() {
       // yanlışlıkla {plan} okunuyordu; istek başarılı olsa bile aiPlan hep
       // boş kalıp "Plan Oluştur" butonu sessizce hiçbir şey göstermiyordu.
       if (!res.ok) {
-        setAiPlanError(data.error || 'Plan oluşturulamadı, lütfen tekrar dene.')
+        setAiPlanError(data.error || t('Plan oluşturulamadı, lütfen tekrar dene.'))
       } else {
         setAiPlan(data.analysis || '')
       }
     } catch {
-      setAiPlanError('Bağlantı hatası, lütfen tekrar dene.')
+      setAiPlanError(t('Bağlantı hatası, lütfen tekrar dene.'))
     }
     setLoadingAi(false)
   }
@@ -181,9 +183,9 @@ export default function AnalysisPage() {
     <main style={{ minHeight: '100vh', padding: '2rem' }}>
       <div style={{ maxWidth: '480px', margin: '4rem auto', textAlign: 'center' }}>
         <div style={{ fontSize: '64px', marginBottom: '1rem' }}>📊</div>
-        <h2 style={{ color: 'var(--primary)', marginBottom: '0.5rem' }}>Henüz analiz verisi yok</h2>
-        <p style={{ color: 'var(--text3)', marginBottom: '1.5rem' }}>Birkaç test çözdükten sonra detaylı analizin burada belirecek.</p>
-        <Link href="/quiz" className="btn btn-primary" style={{ justifyContent: 'center' }}>⚡ İlk Testi Başlat</Link>
+        <h2 style={{ color: 'var(--primary)', marginBottom: '0.5rem' }}>{t('Henüz analiz verisi yok')}</h2>
+        <p style={{ color: 'var(--text3)', marginBottom: '1.5rem' }}>{t('Birkaç test çözdükten sonra detaylı analizin burada belirecek.')}</p>
+        <Link href="/quiz" className="btn btn-primary" style={{ justifyContent: 'center' }}>{t('⚡ İlk Testi Başlat')}</Link>
       </div>
     </main>
   )
@@ -194,8 +196,8 @@ export default function AnalysisPage() {
 
         {/* Başlık */}
         <div style={{ marginBottom: '1.5rem' }}>
-          <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--primary)', marginBottom: '4px' }}>📊 Performans Analizi</h1>
-          <p style={{ color: 'var(--text3)', fontSize: '13px' }}>{stats?.count} test · {stats?.totalQ} soru çözüldü</p>
+          <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--primary)', marginBottom: '4px' }}>{t('📊 Performans Analizi')}</h1>
+          <p style={{ color: 'var(--text3)', fontSize: '13px' }}>{t('{n} test · {m} soru çözüldü', { n: stats?.count ?? 0, m: stats?.totalQ ?? 0 })}</p>
         </div>
 
         {/* Özet stat kartları */}
@@ -209,7 +211,7 @@ export default function AnalysisPage() {
             <div key={i} className="card" style={{ textAlign: 'center', padding: '14px 10px' }}>
               <div style={{ fontSize: '22px', marginBottom: '4px' }}>{s.icon}</div>
               <div style={{ fontWeight: 800, fontSize: '20px', color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{s.label}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{t(s.label)}</div>
             </div>
           ))}
         </div>
@@ -221,10 +223,10 @@ export default function AnalysisPage() {
             { key: 'subjects', label: '📚 Dersler' },
             { key: 'trend', label: '📈 Trend' },
             { key: 'weakpoints', label: '⚠️ Zayıf Noktalar' },
-          ].map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key as any)}
-              style={{ padding: '7px 14px', borderRadius: '99px', border: `1.5px solid ${activeTab === t.key ? 'var(--accent)' : 'var(--border)'}`, background: activeTab === t.key ? 'var(--accent)' : 'var(--bg)', color: activeTab === t.key ? '#fff' : 'var(--text2)', fontSize: '13px', fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-              {t.label}
+          ].map(tb => (
+            <button key={tb.key} onClick={() => setActiveTab(tb.key as any)}
+              style={{ padding: '7px 14px', borderRadius: '99px', border: `1.5px solid ${activeTab === tb.key ? 'var(--accent)' : 'var(--border)'}`, background: activeTab === tb.key ? 'var(--accent)' : 'var(--bg)', color: activeTab === tb.key ? '#fff' : 'var(--text2)', fontSize: '13px', fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+              {t(tb.label)}
             </button>
           ))}
         </div>
@@ -236,26 +238,26 @@ export default function AnalysisPage() {
 
               {/* Radar Chart */}
               <div className="card">
-                <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>🕸️ Ders Radar</div>
+                <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>{t('🕸️ Ders Radar')}</div>
                 <ResponsiveContainer width="100%" height={220}>
                   <RadarChart data={radarData}>
                     <PolarGrid stroke="var(--border)" />
                     <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11, fill: 'var(--text3)' }} />
-                    <Radar name="Puan" dataKey="puan" stroke="#6366f1" fill="#6366f1" fillOpacity={0.25} />
-                    <Tooltip formatter={(v: any) => [`%${v}`, 'Başarı']} />
+                    <Radar name={t('Puan')} dataKey="puan" stroke="#6366f1" fill="#6366f1" fillOpacity={0.25} />
+                    <Tooltip formatter={(v: any) => [`%${v}`, t('Başarı')]} />
                   </RadarChart>
                 </ResponsiveContainer>
               </div>
 
               {/* Ders Dağılımı Pie */}
               <div className="card">
-                <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>🍩 Test Dağılımı</div>
+                <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>{t('🍩 Test Dağılımı')}</div>
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
                     <Pie data={subjectData} dataKey="count" nameKey="subject" cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3}>
                       {subjectData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                     </Pie>
-                    <Tooltip formatter={(v: any, name: any) => [v + ' test', name]} />
+                    <Tooltip formatter={(v: any, name: any) => [t('{n} test', { n: v }), name]} />
                     <Legend iconSize={10} wrapperStyle={{ fontSize: '11px' }} />
                   </PieChart>
                 </ResponsiveContainer>
@@ -265,13 +267,13 @@ export default function AnalysisPage() {
             {/* Soru Tipi Bar */}
             {typeData.length > 0 && (
               <div className="card">
-                <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>🎯 Soru Tipi Başarısı</div>
+                <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>{t('🎯 Soru Tipi Başarısı')}</div>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={typeData} layout="vertical" margin={{ left: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={v => `%${v}`} />
-                    <YAxis type="category" dataKey="type" tick={{ fontSize: 11, fill: 'var(--text2)' }} width={130} />
-                    <Tooltip formatter={(v: any) => [`%${v}`, 'Başarı']} />
+                    <YAxis type="category" dataKey="type" tickFormatter={(v: any) => t(String(v))} tick={{ fontSize: 11, fill: 'var(--text2)' }} width={130} />
+                    <Tooltip formatter={(v: any) => [`%${v}`, t('Başarı')]} />
                     <Bar dataKey="pct" radius={[0, 6, 6, 0]}>
                       {typeData.map((d, i) => <Cell key={i} fill={pctColor(d.pct)} />)}
                     </Bar>
@@ -286,14 +288,14 @@ export default function AnalysisPage() {
         {activeTab === 'subjects' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div className="card">
-              <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>📚 Ders Bazlı Başarı</div>
+              <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>{t('📚 Ders Bazlı Başarı')}</div>
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={subjectData} margin={{ bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="subject" tick={{ fontSize: 11, fill: 'var(--text2)' }} angle={-25} textAnchor="end" interval={0} />
                   <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={v => `%${v}`} />
-                  <Tooltip formatter={(v: any) => [`%${v}`, 'Ortalama']} />
-                  <Bar dataKey="avg" radius={[6, 6, 0, 0]} name="Ortalama">
+                  <Tooltip formatter={(v: any) => [`%${v}`, t('Ortalama')]} />
+                  <Bar dataKey="avg" radius={[6, 6, 0, 0]} name={t('Ortalama')}>
                     {subjectData.map((d, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Bar>
                 </BarChart>
@@ -302,20 +304,20 @@ export default function AnalysisPage() {
 
             {/* Ders detay tablosu */}
             <div className="card">
-              <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>📋 Ders Detayları</div>
+              <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>{t('📋 Ders Detayları')}</div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                      {['Konu', 'Test', 'Ort. Başarı', 'Yanlış', 'Durum'].map(h => (
-                        <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text3)', fontWeight: 600 }}>{h}</th>
+                      {['Konu', 'Test', 'Ort. Başarı', 'Yanlış‖istatistik', 'Durum'].map(h => (
+                        <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text3)', fontWeight: 600 }}>{t(h)}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {subjectData.map((s, i) => (
                       <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ padding: '10px 12px', fontWeight: 600 }}>{s.subject}</td>
+                        <td style={{ padding: '10px 12px', fontWeight: 600 }}>{t(s.subject)}</td>
                         <td style={{ padding: '10px 12px', color: 'var(--text3)' }}>{s.count}</td>
                         <td style={{ padding: '10px 12px' }}>
                           <span style={{ color: pctColor(s.avg), fontWeight: 700 }}>%{s.avg}</span>
@@ -326,7 +328,7 @@ export default function AnalysisPage() {
                         <td style={{ padding: '10px 12px', color: '#ef4444' }}>{s.wrong}</td>
                         <td style={{ padding: '10px 12px' }}>
                           <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: s.avg >= 80 ? 'rgba(16,185,129,0.1)' : s.avg >= 55 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)', color: pctColor(s.avg), fontWeight: 600 }}>
-                            {s.avg >= 80 ? '✓ İyi' : s.avg >= 55 ? '~ Orta' : '✗ Zayıf'}
+                            {s.avg >= 80 ? t('✓ İyi') : s.avg >= 55 ? t('~ Orta') : t('✗ Zayıf')}
                           </span>
                         </td>
                       </tr>
@@ -342,7 +344,7 @@ export default function AnalysisPage() {
         {activeTab === 'trend' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div className="card">
-              <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>📈 Haftalık Gelişim</div>
+              <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>{t('📈 Haftalık Gelişim')}</div>
               <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={trendData}>
                   <defs>
@@ -354,7 +356,7 @@ export default function AnalysisPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="week" tick={{ fontSize: 12 }} />
                   <YAxis domain={[0, 100]} tickFormatter={v => `%${v}`} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v: any) => [`%${v}`, 'Ortalama']} />
+                  <Tooltip formatter={(v: any) => [`%${v}`, t('Ortalama')]} />
                   <Area type="monotone" dataKey="avg" stroke="#6366f1" strokeWidth={2.5} fill="url(#colorAvg)" dot={{ fill: '#6366f1', r: 4 }} activeDot={{ r: 6 }} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -362,13 +364,13 @@ export default function AnalysisPage() {
 
             {/* Son 10 test */}
             <div className="card">
-              <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>🕐 Son Testler</div>
+              <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>{t('🕐 Son Testler')}</div>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={sessions.slice(0, 10).reverse().map((s, i) => ({ name: `#${i + 1}`, pct: s.pct, topic: s.topic }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                   <YAxis domain={[0, 100]} tickFormatter={v => `%${v}`} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v: any, _: any, p: any) => [`%${v} — ${p.payload.topic}`, 'Başarı']} />
+                  <Tooltip formatter={(v: any, _: any, p: any) => [`%${v} — ${p.payload.topic}`, t('Başarı')]} />
                   <Bar dataKey="pct" radius={[4, 4, 0, 0]}>
                     {sessions.slice(0, 10).map((s, i) => <Cell key={i} fill={pctColor(s.pct)} />)}
                   </Bar>
@@ -385,13 +387,13 @@ export default function AnalysisPage() {
             {/* Zayıf konu bar chart */}
             {weakTopics.length > 0 && (
               <div className="card">
-                <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>⚠️ En Zayıf Konular</div>
+                <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>{t('⚠️ En Zayıf Konular')}</div>
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={weakTopics.slice(0, 8).map(w => ({ topic: w.topic.length > 18 ? w.topic.slice(0, 18) + '…' : w.topic, oran: Math.round(w.wrong_count / w.total_count * 100), yanlış: w.wrong_count, toplam: w.total_count }))} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis type="number" domain={[0, 100]} tickFormatter={v => `%${v}`} tick={{ fontSize: 11 }} />
                     <YAxis type="category" dataKey="topic" width={140} tick={{ fontSize: 11, fill: 'var(--text2)' }} />
-                    <Tooltip formatter={(v: any, _: any, p: any) => [`%${v} hata oranı (${p.payload.yanlış}/${p.payload.toplam})`, 'Yanlış']} />
+                    <Tooltip formatter={(v: any, _: any, p: any) => [t('%{v} hata oranı ({a}/{b})', { v, a: p.payload.yanlış, b: p.payload.toplam }), t('Yanlış‖istatistik')]} />
                     <Bar dataKey="oran" radius={[0, 6, 6, 0]} fill="#ef4444" />
                   </BarChart>
                 </ResponsiveContainer>
@@ -400,7 +402,7 @@ export default function AnalysisPage() {
 
             {/* Zayıf konular listesi + YouTube */}
             <div className="card">
-              <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>📚 Çalışma Önerileri</div>
+              <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', color: 'var(--primary)' }}>{t('📚 Çalışma Önerileri')}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {weakTopics.slice(0, 8).map((w, i) => {
                   const errorRate = Math.round(w.wrong_count / w.total_count * 100)
@@ -412,12 +414,12 @@ export default function AnalysisPage() {
                         <div style={{ height: '5px', background: 'var(--border)', borderRadius: '3px' }}>
                           <div style={{ height: '5px', background: '#ef4444', borderRadius: '3px', width: `${errorRate}%` }} />
                         </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '3px' }}>{w.wrong_count}/{w.total_count} yanlış · %{errorRate} hata</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '3px' }}>{t('{a}/{b} yanlış · %{p} hata', { a: w.wrong_count, b: w.total_count, p: errorRate })}</div>
                       </div>
                       <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                         <Link href={`/quiz?topic=${encodeURIComponent(w.topic)}`}
                           style={{ padding: '5px 10px', borderRadius: '8px', background: 'var(--accent)', color: '#fff', fontSize: '11px', fontWeight: 600, textDecoration: 'none' }}>
-                          Çöz
+                          {t('Çöz')}
                         </Link>
                         <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(w.topic + ' konu anlatımı')}`}
                           target="_blank" rel="noopener"
@@ -436,13 +438,13 @@ export default function AnalysisPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                 <span style={{ fontSize: '24px' }}>🤖</span>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)' }}>AI Çalışma Planı</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text3)' }}>Kişiselleştirilmiş öneriler</div>
+                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)' }}>{t('AI Çalışma Planı')}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{t('Kişiselleştirilmiş öneriler')}</div>
                 </div>
                 {!aiPlan && (
                   <button onClick={generateAiAnalysis} disabled={loadingAi}
                     className="btn btn-primary" style={{ marginLeft: 'auto', padding: '8px 14px', fontSize: '13px' }}>
-                    {loadingAi ? '⏳ Hazırlanıyor...' : '✨ Plan Oluştur'}
+                    {loadingAi ? t('⏳ Hazırlanıyor...') : t('✨ Plan Oluştur')}
                   </button>
                 )}
               </div>
@@ -452,7 +454,7 @@ export default function AnalysisPage() {
                 <div style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-line' }}>{aiPlan}</div>
               ) : (
                 <div style={{ fontSize: '13px', color: 'var(--text3)', fontStyle: 'italic' }}>
-                  Zayıf konularını analiz edip sana özel bir çalışma planı oluşturalım.
+                  {t('Zayıf konularını analiz edip sana özel bir çalışma planı oluşturalım.')}
                 </div>
               )}
             </div>
