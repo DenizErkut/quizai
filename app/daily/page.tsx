@@ -191,7 +191,7 @@ export default function DailyPage() {
                 <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>
                   {new Date().toLocaleDateString(intlLocale(locale), { weekday: 'long', day: 'numeric', month: 'long' })}
                 </div>
-                <div style={{ fontWeight: 600, fontSize: '18px' }}>{challenge.topic}</div>
+                <div style={{ fontWeight: 600, fontSize: '18px' }}>{t(challenge.topic)}</div>
                 <div style={{ fontSize: '13px', color: 'var(--text2)', marginTop: '2px' }}>{t('10 karma soru · Kişiselleştirilmiş')}</div>
               </div>
               <div style={{ fontSize: '32px' }}>📝</div>

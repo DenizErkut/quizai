@@ -115,7 +115,7 @@ export default function ReviewPage() {
         {/* Kart */}
         <div className="card" style={{ marginBottom: '1rem', minHeight: '200px' }}>
           <div style={{ fontSize: '11px', fontWeight: 600, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
-            🧠 {card.topic}
+            🧠 {t(card.topic)}
           </div>
           <div style={{ fontSize: '16px', fontWeight: 500, color: 'var(--primary)', lineHeight: 1.65, marginBottom: '1.25rem' }}>
             <MathText text={card.question} />
