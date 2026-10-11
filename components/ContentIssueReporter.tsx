@@ -22,6 +22,7 @@
 //      görünürlüğü, öğretmen/öğrenci güvenini inşa etmesi için.
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 interface MyReport {
   id: string
@@ -34,6 +35,7 @@ interface MyReport {
 }
 
 export default function ContentIssueReporter({ reporterRole }: { reporterRole: 'teacher' | 'student' }) {
+  const { t: tr } = useT()
   const supabase = createClient() as any
   const [topic, setTopic] = useState('')
   const [description, setDescription] = useState('')
@@ -59,7 +61,7 @@ export default function ContentIssueReporter({ reporterRole }: { reporterRole: '
   }
 
   async function submit() {
-    if (!description.trim()) { setMsg('❌ Açıklama gerekli.'); return }
+    if (!description.trim()) { setMsg(tr('❌ Açıklama gerekli.')); return }
     setSubmitting(true)
     setMsg('')
     try {
@@ -75,40 +77,38 @@ export default function ContentIssueReporter({ reporterRole }: { reporterRole: '
         reporter_role: reporterRole,
       })
       if (error) throw error
-      setMsg('✅ Bildirdiğin için teşekkürler — admin en kısa sürede inceleyecek.')
+      setMsg(tr('✅ Bildirdiğin için teşekkürler — admin en kısa sürede inceleyecek.'))
       setTopic('')
       setDescription('')
       loadMyReports()
     } catch (e: any) {
-      setMsg(`❌ ${e.message || 'Bildirim gönderilemedi.'}`)
+      setMsg(`❌ ${e.message || tr('Bildirim gönderilemedi.')}`)
     } finally {
       setSubmitting(false)
     }
   }
 
-  const statusLabel = (s: string) => s === 'pending' ? '⏳ Bekliyor' : s === 'confirmed' ? '✓ Onaylandı (düzeltiliyor/düzeltildi)' : s === 'rejected' ? '✗ İncelendi (sorun bulunmadı)' : s
+  const statusLabel = (s: string) => s === 'pending' ? tr('⏳ Bekliyor') : s === 'confirmed' ? tr('✓ Onaylandı (düzeltiliyor/düzeltildi)') : s === 'rejected' ? tr('✗ İncelendi (sorun bulunmadı)') : s
 
   return (
     <div>
       <div className="card" style={{ marginBottom: '1.25rem' }}>
         <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '10px' }}>
-          🔧 İçerik/Soru Hatası Bildir
+          {tr('🔧 İçerik/Soru Hatası Bildir')}
         </div>
         <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '12px' }}>
-          Bir soruda, kaynakta ya da konu anlatımında sorun mu fark ettin? Ekran görüntüsü/WhatsApp yerine
-          artık doğrudan buradan bildirebilirsin — admin panelindeki "Hata Bildirimleri" listesine düşer,
-          durumunu aşağıdan takip edebilirsin.
+          {tr('Bir soruda, kaynakta ya da konu anlatımında sorun mu fark ettin? Ekran görüntüsü/WhatsApp yerine artık doğrudan buradan bildirebilirsin — admin panelindeki "Hata Bildirimleri" listesine düşer, durumunu aşağıdan takip edebilirsin.')}
         </div>
         <input
           value={topic}
           onChange={e => setTopic(e.target.value)}
-          placeholder="Konu / Ders (opsiyonel, ör. 6. Sınıf Fen Bilimleri - Güneş Sistemi)"
+          placeholder={tr('Konu / Ders (opsiyonel, ör. 6. Sınıf Fen Bilimleri - Güneş Sistemi)')}
           style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box', marginBottom: '8px' }}
         />
         <textarea
           value={description}
           onChange={e => setDescription(e.target.value)}
-          placeholder="Sorunu anlat — ne bekliyordun, ne gördün?"
+          placeholder={tr('Sorunu anlat — ne bekliyordun, ne gördün?')}
           rows={3}
           style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box', resize: 'vertical', marginBottom: '8px' }}
         />
@@ -119,32 +119,32 @@ export default function ContentIssueReporter({ reporterRole }: { reporterRole: '
           disabled={submitting}
           onClick={submit}
           style={{ padding: '9px 18px', borderRadius: '10px', border: 'none', background: submitting ? 'var(--bg2)' : '#6366f1', color: submitting ? 'var(--text3)' : '#fff', fontWeight: 700, fontSize: '13px', cursor: submitting ? 'default' : 'pointer', fontFamily: 'var(--font-sans)' }}>
-          {submitting ? 'Gönderiliyor...' : '📤 Bildir'}
+          {submitting ? tr('Gönderiliyor...') : tr('📤 Bildir')}
         </button>
       </div>
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-          <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)' }}>📋 Bildirdiklerim</div>
-          <button className="btn btn-sm" onClick={loadMyReports}>↺ Yenile</button>
+          <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)' }}>{tr('📋 Bildirdiklerim')}</div>
+          <button className="btn btn-sm" onClick={loadMyReports}>{tr('↺ Yenile')}</button>
         </div>
         {loadingReports ? (
-          <div style={{ textAlign: 'center', color: 'var(--text3)', padding: '1.5rem', fontSize: '13px' }}>Yükleniyor...</div>
+          <div style={{ textAlign: 'center', color: 'var(--text3)', padding: '1.5rem', fontSize: '13px' }}>{tr('Yükleniyor...')}</div>
         ) : myReports.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--text3)', padding: '1.5rem', fontSize: '13px' }}>Henüz bir bildirimin yok.</div>
+          <div style={{ textAlign: 'center', color: 'var(--text3)', padding: '1.5rem', fontSize: '13px' }}>{tr('Henüz bir bildirimin yok.')}</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {myReports.map(r => (
               <div key={r.id} style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600 }}>{r.topic || 'Genel'}</span>
+                  <span style={{ fontSize: '12px', fontWeight: 600 }}>{r.topic || tr('Genel')}</span>
                   <span style={{ fontSize: '11px', color: r.status === 'pending' ? 'var(--red)' : r.status === 'confirmed' ? 'var(--amber)' : 'var(--green)', fontWeight: 600, whiteSpace: 'nowrap' }}>
                     {statusLabel(r.status)}
                   </span>
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: r.root_cause ? '4px' : 0 }}>{r.question_text}</div>
                 {r.root_cause && (
-                  <div style={{ fontSize: '11px', color: 'var(--text3)', fontStyle: 'italic', marginTop: '4px' }}>Kök neden: {r.root_cause}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text3)', fontStyle: 'italic', marginTop: '4px' }}>{tr('Kök neden: {cause}', { cause: r.root_cause })}</div>
                 )}
               </div>
             ))}
