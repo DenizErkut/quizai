@@ -14,6 +14,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 import { loadPendingRegistration, clearPendingRegistration, PendingRole } from '@/lib/pending-registration'
 import DepartmentSelect, { resolveDepartmentValue } from '@/components/DepartmentSelect'
 
@@ -40,6 +41,7 @@ type Phase = 'loading' | 'error' | 'teacher-apply' | 'teacher-done' | 'fallback-
 
 export default function CompleteProfilePage() {
   const router = useRouter()
+  const { t: tr } = useT()
   const supabase = createClient() as any
 
   const [phase, setPhase] = useState<Phase>('loading')
@@ -90,7 +92,7 @@ export default function CompleteProfilePage() {
         if (cancelled) return
 
         if (!user) {
-          setErrorMsg('Onay bağlantısı geçersiz veya süresi dolmuş olabilir. Lütfen tekrar kayıt olmayı deneyin ya da giriş yapmayı dene — hesabın zaten onaylanmış olabilir.')
+          setErrorMsg(tr('Onay bağlantısı geçersiz veya süresi dolmuş olabilir. Lütfen tekrar kayıt olmayı deneyin ya da giriş yapmayı dene — hesabın zaten onaylanmış olabilir.'))
           setPhase('error')
           return
         }
@@ -113,7 +115,7 @@ export default function CompleteProfilePage() {
         // kullanıcı en azından tekrar deneme/giriş seçenekleri görsün.
         if (cancelled) return
         console.error('[complete-profile run] beklenmeyen hata:', e)
-        setErrorMsg('Beklenmeyen bir hata oluştu (' + (e?.message || 'bilinmeyen') + '). Lütfen tekrar dene.')
+        setErrorMsg(tr('Beklenmeyen bir hata oluştu ({msg}). Lütfen tekrar dene.', { msg: e?.message || tr('bilinmeyen') }))
         setPhase('error')
       }
     }
@@ -127,7 +129,7 @@ export default function CompleteProfilePage() {
     const { data: { session } } = await supabase.auth.getSession()
     const accessToken = session?.access_token
     if (!accessToken) {
-      setErrorMsg('Oturum kurulamadı. Lütfen tekrar giriş yapmayı dene.')
+      setErrorMsg(tr('Oturum kurulamadı. Lütfen tekrar giriş yapmayı dene.'))
       setPhase('error')
       return
     }
@@ -147,7 +149,7 @@ export default function CompleteProfilePage() {
       }),
     })
     if (!idRes.ok) {
-      setErrorMsg('Kimlik kaydı oluşturulamadı. Lütfen tekrar dene.')
+      setErrorMsg(tr('Kimlik kaydı oluşturulamadı. Lütfen tekrar dene.'))
       setPhase('error')
       return
     }
@@ -175,7 +177,7 @@ export default function CompleteProfilePage() {
         seller_id: pending.sellerId || null,
       })
       if (upsertError) {
-        setErrorMsg('Profil oluşturulamadı: ' + upsertError.message)
+        setErrorMsg(tr('Profil oluşturulamadı: {msg}', { msg: upsertError.message }))
         setPhase('error')
         return
       }
@@ -217,7 +219,7 @@ export default function CompleteProfilePage() {
   }
 
   async function handleTeacherApply() {
-    if (!school.trim()) { setTeacherError('Okul/Kurum zorunlu.'); return }
+    if (!school.trim()) { setTeacherError(tr('Okul/Kurum zorunlu.')); return }
     setTeacherError(''); setLoading(true)
 
     try {
@@ -253,36 +255,36 @@ export default function CompleteProfilePage() {
       setPhase('teacher-done')
     } catch (e: any) {
       console.error('[complete-profile handleTeacherApply] beklenmeyen hata:', e)
-      setTeacherError('Beklenmeyen bir hata oluştu (' + (e?.message || 'bilinmeyen') + '). Lütfen tekrar dene.')
+      setTeacherError(tr('Beklenmeyen bir hata oluştu ({msg}). Lütfen tekrar dene.', { msg: e?.message || tr('bilinmeyen') }))
     } finally {
       setLoading(false)
     }
   }
 
   async function handleFallbackSubmit() {
-    if (!fbName.trim()) { setFbError('Ad soyad zorunludur.'); return }
-    if (!fbKvkkAydinlatma) { setFbError('KVKK Aydınlatma Metnini onaylamalısın.'); return }
-    if (!fbKvkkAcikRiza) { setFbError('Açık rıza vermelisin.'); return }
+    if (!fbName.trim()) { setFbError(tr('Ad soyad zorunludur.')); return }
+    if (!fbKvkkAydinlatma) { setFbError(tr('KVKK Aydınlatma Metnini onaylamalısın.')); return }
+    if (!fbKvkkAcikRiza) { setFbError(tr('Açık rıza vermelisin.')); return }
     if (fbRole === 'student') {
-      if (!fbAge || parseInt(fbAge) < 5 || parseInt(fbAge) > 35) { setFbError('Geçerli bir yaş girin (5-35).'); return }
-      if (!fbGrade) { setFbError('Sınıf zorunludur.'); return }
+      if (!fbAge || parseInt(fbAge) < 5 || parseInt(fbAge) > 35) { setFbError(tr('Geçerli bir yaş girin (5-35).')); return }
+      if (!fbGrade) { setFbError(tr('Sınıf zorunludur.')); return }
       const fbIsUniversity = fbGrade.toLowerCase().startsWith('universite')
       const fbResolvedDepartment = resolveDepartmentValue(fbDepartment, fbDepartmentOther)
-      if (fbIsUniversity && !fbResolvedDepartment) { setFbError('Bölüm seçimi zorunludur.'); return }
+      if (fbIsUniversity && !fbResolvedDepartment) { setFbError(tr('Bölüm seçimi zorunludur.')); return }
       // Okul adı/sınıf numarası SADECE kurum kodu doğrulandığında zorunlu —
       // internetten bireysel kayıtta hiç istenmiyor (bkz. register/page.tsx
       // ve profile/page.tsx'teki aynı mantık).
-      if (fbInstitutionName && !fbClassNumber.trim()) { setFbError('Sınıf numarası zorunludur.'); return }
-      if (parseInt(fbAge) < 18 && !fbVeliOnayi) { setFbError('18 yaş altı için veli onayı gereklidir.'); return }
+      if (fbInstitutionName && !fbClassNumber.trim()) { setFbError(tr('Sınıf numarası zorunludur.')); return }
+      if (parseInt(fbAge) < 18 && !fbVeliOnayi) { setFbError(tr('18 yaş altı için veli onayı gereklidir.')); return }
     }
-    if (fbRole === 'teacher' && !fbSchool.trim()) { setFbError('Okul/Kurum zorunludur.'); return }
+    if (fbRole === 'teacher' && !fbSchool.trim()) { setFbError(tr('Okul/Kurum zorunludur.')); return }
 
     setFbError(''); setLoading(true)
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const accessToken = session?.access_token
-      if (!accessToken) { setFbError('Oturum bulunamadı.'); return }
+      if (!accessToken) { setFbError(tr('Oturum bulunamadı.')); return }
 
       const idRes = await fetch('/api/auth/create-identity', {
         method: 'POST',
@@ -296,7 +298,7 @@ export default function CompleteProfilePage() {
           kvkkAydinlatma: fbKvkkAydinlatma, kvkkAcikRiza: fbKvkkAcikRiza, veliOnayi: fbVeliOnayi,
         }),
       })
-      if (!idRes.ok) { setFbError('Kimlik kaydı oluşturulamadı.'); return }
+      if (!idRes.ok) { setFbError(tr('Kimlik kaydı oluşturulamadı.')); return }
       if (fbRole === 'student' && fbPhone.trim()) {
         await fetch('/api/profile/update-identity', {
           method: 'POST',
@@ -325,7 +327,7 @@ export default function CompleteProfilePage() {
       }
     } catch (e: any) {
       console.error('[handleFallbackSubmit] beklenmeyen hata:', e)
-      setFbError('Beklenmeyen bir hata oluştu (' + (e?.message || 'bilinmeyen') + '). Lütfen tekrar dene.')
+      setFbError(tr('Beklenmeyen bir hata oluştu ({msg}). Lütfen tekrar dene.', { msg: e?.message || tr('bilinmeyen') }))
     } finally {
       setLoading(false)
     }
@@ -344,7 +346,7 @@ export default function CompleteProfilePage() {
     return (
       <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
         <div className="spinner" style={{ width: 32, height: 32 }} />
-        <p style={{ fontSize: '14px', color: 'var(--text3)' }}>Hesabın onaylanıyor...</p>
+        <p style={{ fontSize: '14px', color: 'var(--text3)' }}>{tr('Hesabın onaylanıyor...')}</p>
       </main>
     )
   }
@@ -354,11 +356,11 @@ export default function CompleteProfilePage() {
       <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
         <div className="card" style={{ maxWidth: 440, textAlign: 'center', padding: '2.5rem 2rem' }}>
           <div style={{ fontSize: '48px', marginBottom: '1rem' }}>⚠️</div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 800, color: 'var(--primary)', marginBottom: '10px' }}>Bir sorun oluştu</h2>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 800, color: 'var(--primary)', marginBottom: '10px' }}>{tr('Bir sorun oluştu')}</h2>
           <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7, marginBottom: '1.5rem' }}>{errorMsg}</p>
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-            <a href="/login" className="btn btn-primary">Giriş yap</a>
-            <a href="/register" className="btn">Tekrar kayıt ol</a>
+            <a href="/login" className="btn btn-primary">{tr('Giriş yap')}</a>
+            <a href="/register" className="btn">{tr('Tekrar kayıt ol')}</a>
           </div>
         </div>
       </main>
@@ -380,15 +382,14 @@ export default function CompleteProfilePage() {
           <div className="card anim-up-1" style={{ textAlign: 'center', padding: '2.5rem 2rem' }}>
             <div style={{ fontSize: '56px', marginBottom: '1rem' }}>✅</div>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '8px' }}>
-              Başvurunuz Alındı!
+              {tr('Başvurunuz Alındı!')}
             </h2>
             <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
-              Ekibimiz başvurunuzu inceleyecek ve e-posta ile bildirim gönderecek.
-              Onay süreci genellikle 1-2 iş günü sürmektedir.
+              {tr('Ekibimiz başvurunuzu inceleyecek ve e-posta ile bildirim gönderecek. Onay süreci genellikle 1-2 iş günü sürmektedir.')}
             </p>
             <button onClick={() => router.push('/teacher')} className="btn btn-primary"
               style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}>
-              Devam Et
+              {tr('Devam Et')}
             </button>
           </div>
         </div>
@@ -402,19 +403,19 @@ export default function CompleteProfilePage() {
         <div style={{ width: '100%', maxWidth: '440px' }}>
           <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
             <div style={{ fontSize: '40px', marginBottom: '8px' }}>🎓</div>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>Hesabın onaylandı — son adım</h1>
-            <p style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '4px' }}>Admin onayından sonra panele erişebilirsin</p>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>{tr('Hesabın onaylandı — son adım')}</h1>
+            <p style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '4px' }}>{tr('Admin onayından sonra panele erişebilirsin')}</p>
           </div>
           <div className="card">
-            <label className="field-label">Okul / Kurum *</label>
+            <label className="field-label">{tr('Okul / Kurum *')}</label>
             <input className="input" placeholder="Ankara Anadolu Lisesi" value={school} onChange={e => setSchool(e.target.value)} />
-            <label className="field-label">Branş</label>
-            <input className="input" placeholder="Matematik, Fizik..." value={subject} onChange={e => setSubject(e.target.value)} />
-            <label className="field-label">Telefon (Opsiyonel)</label>
+            <label className="field-label">{tr('Branş')}</label>
+            <input className="input" placeholder={tr('Matematik, Fizik...')} value={subject} onChange={e => setSubject(e.target.value)} />
+            <label className="field-label">{tr('Telefon (Opsiyonel)')}</label>
             <input className="input" type="tel" placeholder="05xx xxx xx xx" value={phone} onChange={e => setPhone(e.target.value)} />
-            <label className="field-label">Belge Yükle (Opsiyonel)</label>
+            <label className="field-label">{tr('Belge Yükle (Opsiyonel)')}</label>
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '9px 16px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', fontSize: '13px', cursor: 'pointer', color: 'var(--text2)', marginBottom: '4px' }}>
-              📎 {docs.length > 0 ? `${docs.length} belge seçildi` : 'Belge seç (PDF, JPG — birden fazla seçebilirsin)'}
+              📎 {docs.length > 0 ? tr('{n} belge seçildi', { n: docs.length }) : tr('Belge seç (PDF, JPG — birden fazla seçebilirsin)')}
               <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple style={{ display: 'none' }}
                 onChange={e => setDocs(Array.from(e.target.files || []))} />
             </label>
@@ -425,20 +426,20 @@ export default function CompleteProfilePage() {
                     <span>{f.name}</span>
                     <button type="button" onClick={() => setDocs(docs.filter((_, j) => j !== i))}
                       style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: '12px', fontFamily: 'var(--font-sans)' }}>
-                      Kaldır
+                      {tr('Kaldır')}
                     </button>
                   </li>
                 ))}
               </ul>
             )}
-            <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '1rem' }}>Öğretmenlik belgesi, diploma vb.</div>
+            <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '1rem' }}>{tr('Öğretmenlik belgesi, diploma vb.')}</div>
             {teacherError && <div style={{ padding: '10px 12px', background: 'var(--red-bg)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)', marginBottom: '10px' }}>{teacherError}</div>}
             <button className="btn btn-primary" onClick={handleTeacherApply} disabled={loading}
               style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}>
-              {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Başvuruyu Gönder →'}
+              {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : tr('Başvuruyu Gönder →')}
             </button>
             <button onClick={() => router.push('/teacher')} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--text3)', marginTop: '8px' }}>
-              Daha sonra tamamla →
+              {tr('Daha sonra tamamla →')}
             </button>
           </div>
         </div>
@@ -451,27 +452,27 @@ export default function CompleteProfilePage() {
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
       <div style={{ width: '100%', maxWidth: '440px' }}>
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>Hesabın onaylandı!</h1>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>{tr('Hesabın onaylandı!')}</h1>
           <p style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '4px' }}>
-            Kayıt bilgilerini bu cihazda bulamadık (farklı bir cihaz/tarayıcıdan onaylamış olabilirsin) — profilini tamamlamak için birkaç bilgi daha alalım.
+            {tr('Kayıt bilgilerini bu cihazda bulamadık (farklı bir cihaz/tarayıcıdan onaylamış olabilirsin) — profilini tamamlamak için birkaç bilgi daha alalım.')}
           </p>
         </div>
         <div className="card">
-          <label className="field-label">Ad Soyad *</label>
+          <label className="field-label">{tr('Ad Soyad *')}</label>
           <input className="input" value={fbName} onChange={e => setFbName(e.target.value)} placeholder="Ahmet Yılmaz" />
 
           {fbRole === 'student' && (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label className="field-label">Yaş *</label>
+                  <label className="field-label">{tr('Yaş *')}</label>
                   <input className="input" type="number" value={fbAge} onChange={e => setFbAge(e.target.value)} placeholder="16" />
                 </div>
                 <div>
-                  <label className="field-label">Sınıf *</label>
+                  <label className="field-label">{tr('Sınıf *')}</label>
                   <select className="input" value={fbGrade} onChange={e => setFbGrade(e.target.value)} style={{ cursor: 'pointer' }}>
-                    <option value="">Seç...</option>
-                    {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+                    <option value="">{tr('Seç...')}</option>
+                    {GRADES.map(g => <option key={g.value} value={g.value}>{tr(g.label)}</option>)}
                   </select>
                 </div>
               </div>
@@ -489,8 +490,8 @@ export default function CompleteProfilePage() {
 
               {/* Kurum kodu — okul adı BURADAN otomatik gelir, elle yazılmaz */}
               <div style={{ marginTop: '10px', padding: '12px 14px', borderRadius: '12px', background: 'rgba(217,119,6,0.04)', border: '1.5px solid rgba(217,119,6,0.15)' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: '#d97706', marginBottom: '6px' }}>🏛️ Kurum Kodu (Opsiyonel)</div>
-                <input className="input" placeholder="8 haneli kurum kodu"
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#d97706', marginBottom: '6px' }}>{tr('🏛️ Kurum Kodu (Opsiyonel)')}</div>
+                <input className="input" placeholder={tr('8 haneli kurum kodu')}
                   value={fbInstitutionCode}
                   onChange={async e => {
                     const val = e.target.value.toUpperCase()
@@ -500,7 +501,7 @@ export default function CompleteProfilePage() {
                 />
                 {fbInstitutionName && (
                   <div style={{ fontSize: '12px', color: 'var(--green)', fontWeight: 600, marginTop: '4px' }}>
-                    ✓ {fbInstitutionName} kurumuna bağlanıyor
+                    ✓ {tr('{name} kurumuna bağlanıyor', { name: fbInstitutionName })}
                   </div>
                 )}
               </div>
@@ -510,24 +511,24 @@ export default function CompleteProfilePage() {
               {fbInstitutionName && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
                   <div>
-                    <label className="field-label">Okul Adı</label>
+                    <label className="field-label">{tr('Okul Adı')}</label>
                     <input className="input" value={fbInstitutionName} readOnly disabled
                       style={{ background: 'var(--bg2)', color: 'var(--text2)', cursor: 'not-allowed' }} />
                   </div>
                   <div>
-                    <label className="field-label">Sınıf Numarası *</label>
-                    <input className="input" value={fbClassNumber} onChange={e => setFbClassNumber(e.target.value)} placeholder="Örn: 14" />
+                    <label className="field-label">{tr('Sınıf Numarası *')}</label>
+                    <input className="input" value={fbClassNumber} onChange={e => setFbClassNumber(e.target.value)} placeholder={tr('Örn: 14')} />
                   </div>
                 </div>
               )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
                 <div>
-                  <label className="field-label">Veli E-postası (Opsiyonel)</label>
+                  <label className="field-label">{tr('Veli E-postası (Opsiyonel)')}</label>
                   <input className="input" type="email" value={fbParentEmail} onChange={e => setFbParentEmail(e.target.value)} placeholder="veli@mail.com" />
                 </div>
                 <div>
-                  <label className="field-label">Telefon (Opsiyonel)</label>
+                  <label className="field-label">{tr('Telefon (Opsiyonel)')}</label>
                   <input className="input" type="tel" value={fbPhone} onChange={e => setFbPhone(e.target.value)} placeholder="05xx xxx xx xx" />
                 </div>
               </div>
@@ -557,7 +558,7 @@ export default function CompleteProfilePage() {
 
           {fbRole === 'teacher' && (
             <>
-              <label className="field-label">Okul / Kurum *</label>
+              <label className="field-label">{tr('Okul / Kurum *')}</label>
               <input className="input" value={fbSchool} onChange={e => setFbSchool(e.target.value)} placeholder="Ankara Anadolu Lisesi" />
             </>
           )}
@@ -566,7 +567,7 @@ export default function CompleteProfilePage() {
 
           <button className="btn btn-primary" onClick={handleFallbackSubmit} disabled={loading}
             style={{ width: '100%', justifyContent: 'center', marginTop: '4px' }}>
-            {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Kaydı Tamamla →'}
+            {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : tr('Kaydı Tamamla →')}
           </button>
         </div>
       </div>

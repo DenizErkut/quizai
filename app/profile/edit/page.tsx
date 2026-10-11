@@ -7,6 +7,8 @@ import { resolveOwnIdentity } from '@/lib/identity/resolve-client'
 import DepartmentSelect, { resolveDepartmentValue } from '@/components/DepartmentSelect'
 import { UNIVERSITY_DEPARTMENTS, OTHER_DEPARTMENT_VALUE } from '@/lib/university-departments'
 import ContentIssueReporter from '@/components/ContentIssueReporter'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -38,6 +40,7 @@ const LANGS = [
 
 export default function ProfileEditPage() {
   const router = useRouter()
+  const { t: tr, locale } = useT()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -70,11 +73,11 @@ export default function ProfileEditPage() {
   const supabase = createClient() as any
 
   async function requestDeletion() {
-    if (!window.confirm('Kaydınızın silinmesi için admin incelemesine talep göndermek istediğinize emin misiniz?')) return
+    if (!window.confirm(tr('Kaydınızın silinmesi için admin incelemesine talep göndermek istediğinize emin misiniz?'))) return
     const { data: { session } } = await supabase.auth.getSession()
     const response = await fetch('/api/profile/data-request', { method: 'POST', headers: { Authorization: `Bearer ${session?.access_token}` } })
     setDeletionRequested(response.ok || response.status === 409)
-    if (!response.ok && response.status !== 409) setError('Silme talebi oluşturulamadı. Lütfen tekrar deneyin.')
+    if (!response.ok && response.status !== 409) setError(tr('Silme talebi oluşturulamadı. Lütfen tekrar deneyin.'))
   }
 
   useEffect(() => {
@@ -142,7 +145,7 @@ export default function ProfileEditPage() {
 
   async function uploadAvatar(file: File) {
     if (!file || file.size > 2 * 1024 * 1024) {
-      alert('Dosya 2MB den kucuk olmali.')
+      alert(tr('Dosya 2MB den küçük olmalı.'))
       return
     }
     setAvatarUploading(true)
@@ -153,7 +156,7 @@ export default function ProfileEditPage() {
     const path = `${user.id}/avatar.${ext}`
 
     const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
-    if (error) { alert('Yükleme hatası: ' + error.message); setAvatarUploading(false); return }
+    if (error) { alert(tr('Yükleme hatası: {msg}', { msg: error.message })); setAvatarUploading(false); return }
 
     const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
     const url = publicUrl + '?t=' + Date.now() // cache bust
@@ -164,10 +167,10 @@ export default function ProfileEditPage() {
   }
 
   async function handleSave() {
-    if (!name.trim() || !grade) { setError('Ad ve sınıf zorunlu.'); return }
+    if (!name.trim() || !grade) { setError(tr('Ad ve sınıf zorunlu.')); return }
     const isUniversity = grade.toLowerCase().startsWith('universite')
     const resolvedDepartment = resolveDepartmentValue(department, departmentOther)
-    if (isUniversity && !resolvedDepartment) { setError('Bölüm seçimi zorunlu.'); return }
+    if (isUniversity && !resolvedDepartment) { setError(tr('Bölüm seçimi zorunlu.')); return }
     setError(''); setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
@@ -182,7 +185,7 @@ export default function ProfileEditPage() {
         age: age.trim() ? parseInt(age, 10) : null,
       }),
     })
-    if (!idRes.ok) { setError('İsim/yaş kaydedilemedi. Lütfen tekrar deneyin.'); setSaving(false); return }
+    if (!idRes.ok) { setError(tr('İsim/yaş kaydedilemedi. Lütfen tekrar deneyin.')); setSaving(false); return }
 
     await supabase.from('profiles').upsert({
       id: user.id,
@@ -221,20 +224,20 @@ export default function ProfileEditPage() {
             <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '36px' }} />
           </Link>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <Link href="/quiz" className="btn btn-ghost btn-sm">← Testler</Link>
-            <Link href="/dashboard" className="btn btn-ghost btn-sm">Dashboard</Link>
+            <Link href="/quiz" className="btn btn-ghost btn-sm">{tr('← Testler')}</Link>
+            <Link href="/dashboard" className="btn btn-ghost btn-sm">{tr('Dashboard')}</Link>
           </div>
         </nav>
 
         <div className="anim-up" style={{ marginBottom: '1.5rem' }}>
-          <div className="badge badge-purple" style={{ marginBottom: '0.5rem' }}>Profil</div>
-          <h1 className="serif" style={{ fontSize: '28px' }}>Profil ayarları</h1>
+          <div className="badge badge-purple" style={{ marginBottom: '0.5rem' }}>{tr('Profil')}</div>
+          <h1 className="serif" style={{ fontSize: '28px' }}>{tr('Profil ayarları')}</h1>
         </div>
 
         {/* Kisisel bilgiler */}
         <div className="card anim-up-1" style={{ marginBottom: '1rem' }}>
           <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '1rem' }}>
-            Kişisel bilgiler
+            {tr('Kişisel bilgiler')}
           </div>
 
           {/* Avatar */}
@@ -255,11 +258,11 @@ export default function ProfileEditPage() {
               )}
             </div>
             <div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary)', marginBottom: '4px' }}>Profil Fotoğrafı</div>
-              <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>JPG, PNG · Maks. 2MB</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary)', marginBottom: '4px' }}>{tr('Profil Fotoğrafı')}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>{tr('JPG, PNG · Maks. 2MB')}</div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '8px', background: 'var(--bg2)', border: '1.5px solid var(--border)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', color: 'var(--text2)' }}>
-                  📷 {avatarUrl ? 'Değiştir' : 'Yükle'}
+                  📷 {avatarUrl ? tr('Değiştir') : tr('Yükle')}
                   <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
                     onChange={e => { const f = e.target.files?.[0]; if (f) uploadAvatar(f) }} />
                 </label>
@@ -271,40 +274,40 @@ export default function ProfileEditPage() {
                     await supabase.from('profiles').update({ avatar_url: null }).eq('id', user.id)
                     setAvatarUrl('')
                   }} style={{ fontSize: '12px', color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 500 }}>
-                    Kaldır
+                    {tr('Kaldır')}
                   </button>
                 )}
               </div>
             </div>
           </div>
 
-          <label className="field-label">Ad soyad</label>
-          <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Adın Soyadın" />
+          <label className="field-label">{tr('Ad soyad')}</label>
+          <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder={tr('Adın Soyadın')} />
 
-          <label className="field-label">E-posta</label>
+          <label className="field-label">{tr('E-posta')}</label>
           <input className="input" value={email} disabled style={{ opacity: 0.5, cursor: 'not-allowed' }} />
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
-              <label className="field-label">Yaş</label>
+              <label className="field-label">{tr('Yaş')}</label>
               <input className="input" type="number" min={5} max={30} placeholder="12"
                 value={age} onChange={e => setAge(e.target.value)} />
             </div>
             <div>
-              <label className="field-label">Cinsiyet</label>
+              <label className="field-label">{tr('Cinsiyet')}</label>
               <select className="input" value={gender} onChange={e => setGender(e.target.value)}>
-                <option value="">Seç</option>
-                <option value="erkek">Erkek</option>
-                <option value="kiz">Kız</option>
-                <option value="belirtmek istemiyorum">Belirtmek istemiyorum</option>
+                <option value="">{tr('Seç')}</option>
+                <option value="erkek">{tr('Erkek')}</option>
+                <option value="kiz">{tr('Kız')}</option>
+                <option value="belirtmek istemiyorum">{tr('Belirtmek istemiyorum')}</option>
               </select>
             </div>
           </div>
 
-          <label className="field-label">Sınıf / eğitim seviyesi</label>
+          <label className="field-label">{tr('Sınıf / eğitim seviyesi')}</label>
           <select className="input" value={grade} onChange={e => setGrade(e.target.value)}>
-            <option value="">Seç</option>
-            {GRADES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+            <option value="">{tr('Seç')}</option>
+            {GRADES.map(g => <option key={g.value} value={g.value}>{tr(g.label)}</option>)}
           </select>
 
           {grade.toLowerCase().startsWith('universite') && (
@@ -318,7 +321,7 @@ export default function ProfileEditPage() {
             </div>
           )}
 
-          <label className="field-label">Okul (isteğe bağlı)</label>
+          <label className="field-label">{tr('Okul (isteğe bağlı)')}</label>
           <input className="input" placeholder="İzmir Fen Lisesi"
             value={school} onChange={e => setSchool(e.target.value)} />
         </div>
@@ -326,10 +329,10 @@ export default function ProfileEditPage() {
         {/* Dil secimi */}
         <div className="card anim-up-2" style={{ marginBottom: '1rem' }}>
           <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '1rem' }}>
-            Test dili
+            {tr('Test dili')}
           </div>
           <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '1rem' }}>
-            Sorular ve açıklamalar seçtiğin dilde gelecek.
+            {tr('Sorular ve açıklamalar seçtiğin dilde gelecek.')}
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
             {LANGS.map(l => (
@@ -361,22 +364,22 @@ export default function ProfileEditPage() {
         {/* Plan bilgisi */}
         <div className="card anim-up-3" style={{ marginBottom: '1rem' }}>
           <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '1rem' }}>
-            Üyelik
+            {tr('Üyelik')}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontWeight: 500 }}>
-                {plan === 'premium' ? '★ Altın üye' : plan === 'unlimited' ? '👑 Platin üye' : plan === 'silver' ? '🥈 Gümüş üye' : plan === 'free' ? 'Ücretsiz plan' : 'Plan seçilmedi'}
+                {plan === 'premium' ? tr('★ Altın üye') : plan === 'unlimited' ? tr('👑 Platin üye') : plan === 'silver' ? tr('🥈 Gümüş üye') : plan === 'free' ? tr('Ücretsiz plan') : tr('Plan seçilmedi')}
               </div>
               <div style={{ fontSize: '13px', color: 'var(--text2)', marginTop: '2px' }}>
-                {(plan === 'premium' || plan === 'unlimited') ? 'Sınırsız test · Tüm özellikler aktif'
-                  : plan === 'silver' ? 'Ayda 30 test · Sınırsız için yükselt'
-                  : plan === 'free' ? 'Ayda 10 test · Sınırsız için yükselt'
-                  : 'Devam etmek için bir plan seç'}
+                {(plan === 'premium' || plan === 'unlimited') ? tr('Sınırsız test · Tüm özellikler aktif')
+                  : plan === 'silver' ? tr('Ayda 30 test · Sınırsız için yükselt')
+                  : plan === 'free' ? tr('Ayda 10 test · Sınırsız için yükselt')
+                  : tr('Devam etmek için bir plan seç')}
               </div>
             </div>
             <Link href="/pricing" className={`btn btn-sm ${(plan === 'premium' || plan === 'unlimited') ? '' : 'btn-primary'}`}>
-              {(plan === 'premium' || plan === 'unlimited') ? 'Planı gör' : 'Yükselt →'}
+              {(plan === 'premium' || plan === 'unlimited') ? tr('Planı gör') : tr('Yükselt →')}
             </Link>
           </div>
         </div>
@@ -385,10 +388,10 @@ export default function ProfileEditPage() {
         {parentCode && (
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>
-              👨‍👩‍👧 Veli Bağlantısı
+              {tr('👨‍👩‍👧 Veli Bağlantısı')}
             </div>
             <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px', lineHeight: 1.6 }}>
-              Velinize bu kodu verin — Veli Panelinden performansınızı takip edebilirler.
+              {tr('Velinize bu kodu verin — Veli Panelinden performansınızı takip edebilirler.')}
             </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', background: 'var(--bg2)', border: '1.5px solid var(--border)', fontSize: '16px', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--primary)', fontFamily: 'monospace' }}>
@@ -396,7 +399,7 @@ export default function ProfileEditPage() {
               </div>
               <button onClick={() => navigator.clipboard.writeText(parentCode)}
                 style={{ padding: '10px 14px', borderRadius: '10px', background: '#082465', color: '#fff', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                Kopyala
+                {tr('Kopyala')}
               </button>
             </div>
           </div>
@@ -406,7 +409,7 @@ export default function ProfileEditPage() {
         {/* Kurum Kodu */}
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>
-            🏛️ Kurum Bağlantısı
+            {tr('🏛️ Kurum Bağlantısı')}
           </div>
           {instName ? (
             <div>
@@ -414,31 +417,31 @@ export default function ProfileEditPage() {
                 <div style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', background: 'var(--bg2)', border: '1.5px solid var(--border)' }}>
                   <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)' }}>{instName}</div>
                   <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
-                    Kod: <strong style={{ fontFamily: 'monospace', color: 'var(--accent)' }}>{instCode}</strong>
-                    {instJoined && ` · Katılım: ${new Date(instJoined).toLocaleDateString('tr-TR')}`}
+                    {tr('Kod:')} <strong style={{ fontFamily: 'monospace', color: 'var(--accent)' }}>{instCode}</strong>
+                    {instJoined && ` · ${tr('Katılım: {date}', { date: new Date(instJoined).toLocaleDateString(intlLocale(locale)) })}`}
                   </div>
                 </div>
                 <button onClick={async () => {
-                  if (!confirm('Kurumdan ayrılmak istediğinize emin misiniz?')) return
+                  if (!confirm(tr('Kurumdan ayrılmak istediğinize emin misiniz?'))) return
                   const { data: { user: u } } = await supabase.auth.getUser()
                   const { data: inst } = await supabase.from('institutions').select('id').eq('code', instCode).maybeSingle()
                   if (inst) await supabase.from('institution_users').delete().eq('user_id', u.id).eq('institution_id', inst.id)
                   setInstName(''); setInstCode(''); setInstJoined('')
                 }} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(220,38,38,0.2)', background: 'var(--red-bg)', color: 'var(--red)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>
-                  Ayrıl
+                  {tr('Ayrıl')}
                 </button>
               </div>
-              <p style={{ fontSize: '12px', color: 'var(--green)', margin: 0 }}>✅ Bu kuruma kayıtlısınız.</p>
+              <p style={{ fontSize: '12px', color: 'var(--green)', margin: 0 }}>{tr('✅ Bu kuruma kayıtlısınız.')}</p>
             </div>
           ) : (
             <div>
               <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px', lineHeight: 1.6 }}>
-                Okulunuz veya kurumunuz Pratium ile anlaşmalıysa size verilen kodu girin.
+                {tr('Okulunuz veya kurumunuz Pratium ile anlaşmalıysa size verilen kodu girin.')}
               </p>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input
                   className="input"
-                  placeholder="8 haneli kurum kodu"
+                  placeholder={tr('8 haneli kurum kodu')}
                   value={instCode}
                   style={{ flex: 1, fontFamily: 'monospace', letterSpacing: '0.08em', textTransform: 'uppercase' }}
                   onChange={async e => {
@@ -447,15 +450,15 @@ export default function ProfileEditPage() {
                     setInstMsg('')
                     if (val.length === 8) {
                       const { data: inst } = await supabase.from('institutions').select('name').eq('code', val).eq('active', true).maybeSingle()
-                      if (inst) setInstMsg(`🏛️ ${inst.name} — Katılmak için butona bas`)
-                      else setInstMsg('Kurum bulunamadı.')
+                      if (inst) setInstMsg(tr('🏛️ {name} — Katılmak için butona bas', { name: inst.name }))
+                      else setInstMsg(tr('Kurum bulunamadı.'))
                     }
                   }}
                 />
                 <button disabled={instSaving || instCode.length !== 8} onClick={async () => {
                   setInstSaving(true); setInstMsg('')
                   const { data: { user: u } } = await supabase.auth.getUser()
-                  if (!u) { setInstMsg('Oturum bulunamadı.'); setInstSaving(false); return }
+                  if (!u) { setInstMsg(tr('Oturum bulunamadı.')); setInstSaving(false); return }
                   const { data: { session } } = await supabase.auth.getSession()
                   const res = await fetch('/api/institution/join', {
                     method: 'POST',
@@ -464,16 +467,16 @@ export default function ProfileEditPage() {
                   })
                   const json = await res.json()
                   if (!res.ok) {
-                    setInstMsg(`Hata: ${json.error}`)
+                    setInstMsg(tr('Hata: {msg}', { msg: json.error }))
                     setInstSaving(false)
                     return
                   }
                   setInstName(json.institution_name)
                   setInstJoined(new Date().toISOString())
-                  setInstMsg('✅ Kuruma başarıyla kaydoldunuz!')
+                  setInstMsg(tr('✅ Kuruma başarıyla kaydoldunuz!'))
                   setInstSaving(false)
                 }} style={{ padding: '10px 16px', borderRadius: '10px', background: '#082465', color: '#fff', border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', opacity: instSaving || instCode.length !== 8 ? 0.5 : 1 }}>
-                  {instSaving ? '...' : 'Katıl'}
+                  {instSaving ? '...' : tr('Katıl')}
                 </button>
               </div>
 
@@ -485,10 +488,10 @@ export default function ProfileEditPage() {
         {referralCode && (
           <div className="card anim-up-4" style={{ marginBottom: '1.5rem' }}>
             <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.75rem' }}>
-              Davet linkin
+              {tr('Davet linkin')}
             </div>
             <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '0.75rem' }}>
-              10 kişiyi davet et → 1 yıl ücretsiz premium kazan.
+              {tr('10 kişiyi davet et → 1 yıl ücretsiz premium kazan.')}
             </p>
             <div style={{ display: 'flex', gap: '8px' }}>
               <input
@@ -498,7 +501,7 @@ export default function ProfileEditPage() {
                 style={{ fontSize: '12px' }}
               />
               <button className="btn btn-sm" onClick={copyReferral} style={{ flexShrink: 0 }}>
-                {copied ? '✓ Kopyalandı' : 'Kopyala'}
+                {copied ? tr('✓ Kopyalandı') : tr('Kopyala')}
               </button>
             </div>
           </div>
@@ -512,27 +515,27 @@ export default function ProfileEditPage() {
         )}
         {success && (
           <div style={{ padding: '10px 14px', background: 'var(--green-bg)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: '10px', fontSize: '13px', color: 'var(--green)', marginBottom: '1rem' }}>
-            ✓ Profil kaydedildi!
+            {tr('✓ Profil kaydedildi!')}
           </div>
         )}
 
         <button className="btn btn-primary btn-lg" onClick={handleSave} disabled={saving}
           style={{ width: '100%', justifyContent: 'center' }}>
-          {saving ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Kaydet'}
+          {saving ? <span className="spinner" style={{ width: 18, height: 18 }} /> : tr('Kaydet')}
         </button>
 
         <div style={{ marginTop: '1rem', padding: '1rem', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '12px' }}>
           <button onClick={requestDeletion} className="btn" style={{ width: '100%', justifyContent: 'center', color: 'var(--red)', borderColor: 'rgba(220,38,38,0.35)' }} disabled={deletionRequested}>
-            {deletionRequested ? '✓ Silme talebi oluşturuldu' : 'Kaydımı sil'}
+            {deletionRequested ? tr('✓ Silme talebi oluşturuldu') : tr('Kaydımı sil')}
           </button>
-          <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px', textAlign: 'center' }}>Talep admin doğrulamasına gönderilir; hemen silme yapılmaz.</div>
+          <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px', textAlign: 'center' }}>{tr('Talep admin doğrulamasına gönderilir; hemen silme yapılmaz.')}</div>
         </div>
 
         {/* Madde 2: İçerik hatası bildirme + "Bildirdiklerim" — katlanabilir,
             profil sayfasını kalabalıklaştırmasın diye varsayılan kapalı. */}
         <div style={{ marginTop: '1.5rem' }}>
           <button className="btn" onClick={() => setShowIssueReporter(v => !v)} style={{ width: '100%', justifyContent: 'center' }}>
-            🔧 Bildirdiğim İçerik Hataları {showIssueReporter ? '▲' : '▼'}
+            {tr('🔧 Bildirdiğim İçerik Hataları')} {showIssueReporter ? '▲' : '▼'}
           </button>
           {showIssueReporter && (
             <div style={{ marginTop: '1rem' }}>
