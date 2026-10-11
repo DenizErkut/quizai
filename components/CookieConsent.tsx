@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 type Choice = { necessary: true; analytics: boolean; personalization: boolean; decidedAt: string; version: string }
 const VERSION = '2026-09-01'
 
 export default function CookieConsent() {
+  const { t: tr } = useT()
   const [userId, setUserId] = useState('')
   const [visible, setVisible] = useState(false)
   const [preferencesOpen, setPreferencesOpen] = useState(false)
@@ -47,19 +49,19 @@ export default function CookieConsent() {
     {visible && <section className="cookie-consent" role="dialog" aria-modal="true" aria-labelledby="cookie-title">
       <div className="cookie-copy">
         <div className="cookie-mascot"><img src="/mascot-prati-face-v2.webp" alt="" /></div>
-        <div><h2 id="cookie-title">Çerez tercihlerin senin kontrolünde</h2><p>Pratium’un güvenli biçimde çalışması için zorunlu çerezleri kullanıyoruz. Analiz ve kişiselleştirme çerezleri yalnızca izin verirsen etkinleştirilir. Ayrıntılar için <Link href="/cookie-policy">Çerez Politikası</Link>’nı inceleyebilirsin.</p></div>
+        <div><h2 id="cookie-title">{tr('Çerez tercihlerin senin kontrolünde')}</h2><p>{tr('Pratium’un güvenli biçimde çalışması için zorunlu çerezleri kullanıyoruz. Analiz ve kişiselleştirme çerezleri yalnızca izin verirsen etkinleştirilir. Ayrıntılar için')} <Link href="/cookie-policy">{tr('Çerez Politikası')}</Link> {tr('sayfasını inceleyebilirsin.')}</p></div>
       </div>
       {preferencesOpen && <div className="cookie-preferences">
-        <label><span><b>Zorunlu çerezler</b><small>Oturum, güvenlik ve tercih kaydı için gereklidir.</small></span><input type="checkbox" checked disabled aria-label="Zorunlu çerezler her zaman açık" /></label>
-        <label><span><b>Analiz çerezleri</b><small>Platformun nasıl kullanıldığını toplu biçimde anlamamıza yardımcı olur.</small></span><input type="checkbox" checked={analytics} onChange={e=>setAnalytics(e.target.checked)} /></label>
-        <label><span><b>Kişiselleştirme çerezleri</b><small>Dil, görünüm ve öğrenme deneyimi tercihlerini hatırlar.</small></span><input type="checkbox" checked={personalization} onChange={e=>setPersonalization(e.target.checked)} /></label>
+        <label><span><b>{tr('Zorunlu çerezler')}</b><small>{tr('Oturum, güvenlik ve tercih kaydı için gereklidir.')}</small></span><input type="checkbox" checked disabled aria-label={tr('Zorunlu çerezler her zaman açık')} /></label>
+        <label><span><b>{tr('Analiz çerezleri')}</b><small>{tr('Platformun nasıl kullanıldığını toplu biçimde anlamamıza yardımcı olur.')}</small></span><input type="checkbox" checked={analytics} onChange={e=>setAnalytics(e.target.checked)} /></label>
+        <label><span><b>{tr('Kişiselleştirme çerezleri')}</b><small>{tr('Dil, görünüm ve öğrenme deneyimi tercihlerini hatırlar.')}</small></span><input type="checkbox" checked={personalization} onChange={e=>setPersonalization(e.target.checked)} /></label>
       </div>}
       <div className="cookie-actions">
-        <button onClick={()=>save(true,true)}>Tümünü kabul et</button>
-        <button onClick={()=>save(false,false)}>Tümünü reddet</button>
-        {preferencesOpen ? <button onClick={()=>save(analytics,personalization)}>Tercihleri kaydet</button> : <button onClick={()=>setPreferencesOpen(true)}>Tercihler</button>}
+        <button onClick={()=>save(true,true)}>{tr('Tümünü kabul et')}</button>
+        <button onClick={()=>save(false,false)}>{tr('Tümünü reddet')}</button>
+        {preferencesOpen ? <button onClick={()=>save(analytics,personalization)}>{tr('Tercihleri kaydet')}</button> : <button onClick={()=>setPreferencesOpen(true)}>{tr('Tercihler')}</button>}
       </div>
     </section>}
-    {!visible && <button className="cookie-reopen" onClick={()=>setVisible(true)} aria-label="Çerez tercihlerini aç">🍪 Çerez tercihleri</button>}
+    {!visible && <button className="cookie-reopen" onClick={()=>setVisible(true)} aria-label={tr('Çerez tercihlerini aç')}>{tr('🍪 Çerez tercihleri')}</button>}
   </>
 }

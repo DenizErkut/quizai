@@ -14,10 +14,12 @@
 // Navbar göründüğünde seçtiği tema aynen korunur.
 import { useEffect, useState } from 'react'
 import { useUser } from '@/lib/user-context'
+import { useT } from '@/lib/i18n/I18nProvider'
 import LightbulbIcon from '@/components/LightbulbIcon'
 
 export default function ThemeToggleFloating() {
   const { profile } = useUser()
+  const { t: tr } = useT()
   const [isDark, setIsDark] = useState(false)
   const [mounted, setMounted] = useState(false)
 
@@ -40,8 +42,8 @@ export default function ThemeToggleFloating() {
   return (
     <button
       onClick={toggleDark}
-      aria-label={isDark ? 'Aydınlık moda geç' : 'Karanlık moda geç'}
-      title={isDark ? 'Aydınlık mod' : 'Karanlık mod'}
+      aria-label={isDark ? tr('Aydınlık moda geç') : tr('Karanlık moda geç')}
+      title={isDark ? tr('Aydınlık mod') : tr('Karanlık mod')}
       style={{
         position: 'fixed', top: '16px', right: '16px', zIndex: 9997,
         width: 42, height: 42, borderRadius: '50%',

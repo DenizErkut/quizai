@@ -5,6 +5,7 @@
 // (register, complete-profile, profile OAuth sihirbazı, profile/edit)
 // tekrar tekrar aynı listeyi yazmamak için tek, paylaşılan bileşen.
 import { UNIVERSITY_DEPARTMENTS, OTHER_DEPARTMENT_VALUE } from '@/lib/university-departments'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 interface DepartmentSelectProps {
   value: string
@@ -15,13 +16,14 @@ interface DepartmentSelectProps {
 }
 
 export default function DepartmentSelect({ value, onChange, otherValue, onOtherChange, required = true }: DepartmentSelectProps) {
+  const { t: tr } = useT()
   return (
     <div>
       <label className="field-label">
-        Bölüm {required && <span style={{ color: 'var(--red)' }}>*</span>}
+        {tr('Bölüm')} {required && <span style={{ color: 'var(--red)' }}>*</span>}
       </label>
       <select className="input" value={value} onChange={e => onChange(e.target.value)}>
-        <option value="">Seç...</option>
+        <option value="">{tr('Seç...')}</option>
         {UNIVERSITY_DEPARTMENTS.map(g => (
           <optgroup key={g.group} label={g.group}>
             {g.options.map(o => <option key={o} value={o}>{o}</option>)}
@@ -32,7 +34,7 @@ export default function DepartmentSelect({ value, onChange, otherValue, onOtherC
         <input
           className="input"
           style={{ marginTop: '8px' }}
-          placeholder="Bölümünü yaz"
+          placeholder={tr('Bölümünü yaz')}
           value={otherValue}
           onChange={e => onOtherChange(e.target.value)}
         />
