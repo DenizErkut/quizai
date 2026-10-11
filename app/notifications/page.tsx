@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/i18n/I18nProvider'
+import { localizeNotificationTitle, localizeNotificationBody } from '@/lib/i18n/notification-text'
 import { intlLocale, type Locale } from '@/lib/i18n/core'
 import { useUser } from '@/lib/user-context'
 
@@ -264,14 +265,14 @@ export default function NotificationsPage() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
                       <div style={{ fontWeight: n.read ? 500 : 700, fontSize: '14px', color: 'var(--text)' }}>
-                        {n.title}
+                        {localizeNotificationTitle(n.title, t)}
                       </div>
                       <span style={{ fontSize: '11px', color: 'var(--text4)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                         {timeAgo(n.created_at, t, locale)}
                       </span>
                     </div>
                     <div style={{ fontSize: '13px', color: 'var(--text2)', marginTop: '3px', lineHeight: 1.5 }}>
-                      {n.body}
+                      {localizeNotificationBody(n.body, t)}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
                       <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: meta.bg, color: meta.color, fontWeight: 600 }}>

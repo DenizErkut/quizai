@@ -193,7 +193,7 @@ export default function StudentReportPage() {
             {stats.topTopics.map((t: any, i: number) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
                 <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: 'var(--text3)', flexShrink: 0 }}>{i + 1}</div>
-                <div style={{ flex: 1, fontSize: '13px', fontWeight: 500 }}>{t.topic}</div>
+                <div style={{ flex: 1, fontSize: '13px', fontWeight: 500 }}>{tr(t.topic)}</div>
                 <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{tr('{n} test',{n:t.count})}</div>
                 <span style={{ fontSize: '12px', fontWeight: 700, color: pctColor(t.avgPct) }}>%{t.avgPct}</span>
               </div>
@@ -207,7 +207,7 @@ export default function StudentReportPage() {
             <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>{tr('⚠️ Zayıf Konular')}</div>
             {weakTopics.map((w: any, i: number) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
-                <div style={{ flex: 1, fontSize: '13px' }}>{w.topic}</div>
+                <div style={{ flex: 1, fontSize: '13px' }}>{tr(w.topic)}</div>
                 <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{tr('{n} yanlış',{n:w.wrong_count})}</div>
                 <Link href={`/quiz?topic=${encodeURIComponent(w.topic)}&source=weak_topic`}
                   style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', textDecoration: 'none', fontWeight: 600 }}>

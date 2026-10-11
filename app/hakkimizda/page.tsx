@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import Tr from '@/components/Tr'
 import SiteFooter from '@/components/SiteFooter'
 
 export default function AboutPage() {
@@ -11,9 +12,9 @@ export default function AboutPage() {
           <Link href="/" style={{ textDecoration: 'none', display: 'inline-block', marginBottom: '1.5rem' }}>
             <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '52px' }} />
           </Link>
-          <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>Kurumsal</div>
-          <h1 className="serif" style={{ fontSize: '28px', marginBottom: '0.5rem' }}>Hakkımızda</h1>
-          <p style={{ color: 'var(--text2)', fontSize: '13px' }}>Son güncelleme: Temmuz 2026</p>
+          <div className="badge badge-purple" style={{ marginBottom: '0.75rem' }}><Tr text="Kurumsal" /></div>
+          <h1 className="serif" style={{ fontSize: '28px', marginBottom: '0.5rem' }}><Tr text="Hakkımızda" /></h1>
+          <p style={{ color: 'var(--text2)', fontSize: '13px' }}><Tr text="Son güncelleme: Temmuz 2026" /></p>
         </div>
 
         {[
@@ -47,16 +48,16 @@ export default function AboutPage() {
           },
         ].map((section, i) => (
           <div key={i} className="card" style={{ marginBottom: '1rem' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--accent)', marginBottom: '0.75rem' }}>{section.title}</h2>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--accent)', marginBottom: '0.75rem' }}><Tr text={section.title} /></h2>
             {section.content && (
               <p style={{ fontSize: '14px', lineHeight: 1.8, color: 'var(--text)', marginBottom: section.list ? '0.75rem' : 0 }}>
-                {section.content}
+                <Tr text={section.content} />
               </p>
             )}
             {section.list && (
               <ul style={{ paddingLeft: '1.25rem', margin: 0 }}>
                 {section.list.map((item, j) => (
-                  <li key={j} style={{ fontSize: '14px', lineHeight: 1.8, color: 'var(--text)', marginBottom: '4px' }}>{item}</li>
+                  <li key={j} style={{ fontSize: '14px', lineHeight: 1.8, color: 'var(--text)', marginBottom: '4px' }}><Tr text={item} /></li>
                 ))}
               </ul>
             )}
@@ -64,10 +65,10 @@ export default function AboutPage() {
         ))}
 
         <div style={{ textAlign: 'center', marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
-          <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '8px' }}>© 2026 Dumerk Elektronik Sanayi ve Ticaret Limited Şirketi. Tüm hakları saklıdır.</p>
+          <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '8px' }}><Tr text="© 2026 Dumerk Elektronik Sanayi ve Ticaret Limited Şirketi. Tüm hakları saklıdır." /></p>
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
-            <Link href="/privacy" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}>Gizlilik Politikası</Link>
-            <Link href="/" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}>← Ana sayfaya dön</Link>
+            <Link href="/privacy" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}><Tr text="Gizlilik Politikası" /></Link>
+            <Link href="/" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}><Tr text="← Ana sayfaya dön" /></Link>
           </div>
         </div>
       </div>

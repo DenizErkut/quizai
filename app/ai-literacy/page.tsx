@@ -8,6 +8,8 @@
 // flaw_explanation/correct_reasoning geri bildirimi göster.
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Tr from '@/components/Tr'
+import { useT } from '@/lib/i18n/I18nProvider'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { SUBJECT_MAP } from '@/lib/subject-map'
@@ -37,6 +39,7 @@ interface Feedback {
 }
 
 export default function AILiteracyPage() {
+  const { t: tr } = useT()
   const router = useRouter()
   const supabase = createClient() as any
   const [loadingProfile, setLoadingProfile] = useState(true)
@@ -79,10 +82,10 @@ export default function AILiteracyPage() {
         body: JSON.stringify({ subject, topic }),
       })
       const data = await res.json()
-      if (!res.ok) { setError(data.error || 'Üretilemedi.'); setGenerating(false); return }
+      if (!res.ok) { setError(data.error || tr('Üretilemedi.')); setGenerating(false); return }
       setChallenge(data)
     } catch {
-      setError('Bağlantı hatası, lütfen tekrar dene.')
+      setError(tr('Bağlantı hatası, lütfen tekrar dene.'))
     }
     setGenerating(false)
   }
@@ -98,10 +101,10 @@ export default function AILiteracyPage() {
         body: JSON.stringify({ id: challenge.id, choice, reasoning }),
       })
       const data = await res.json()
-      if (!res.ok) { setError(data.error || 'Gönderilemedi.'); setSubmitting(false); return }
+      if (!res.ok) { setError(data.error || tr('Gönderilemedi.')); setSubmitting(false); return }
       setFeedback(data)
     } catch {
-      setError('Bağlantı hatası, lütfen tekrar dene.')
+      setError(tr('Bağlantı hatası, lütfen tekrar dene.'))
     }
     setSubmitting(false)
   }
@@ -114,8 +117,8 @@ export default function AILiteracyPage() {
         <Link href="/dashboard" className="btn-ghost btn" style={{ padding: '6px 10px' }}>←</Link>
         <span style={{ fontSize: '22px' }}>🔍</span>
         <div>
-          <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--primary)' }}>AI Okuryazarlığı</div>
-          <div style={{ fontSize: '12px', color: 'var(--text3)' }}>İki AI cevabından hangisi doğru? Neden?</div>
+          <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--primary)' }}><Tr text="AI Okuryazarlığı" /></div>
+          <div style={{ fontSize: '12px', color: 'var(--text3)' }}><Tr text="İki AI cevabından hangisi doğru? Neden?" /></div>
         </div>
       </div>
 
@@ -124,22 +127,20 @@ export default function AILiteracyPage() {
           <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}><div className="spinner" /></div>
         ) : !challenge ? (
           <div className="card">
-            <p style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6, marginBottom: '16px' }}>
-              Sana bir soru ve bu soruya "AI tarafından üretilmiş" iki farklı cevap göstereceğiz. Biri doğru, biri gerçekçi ama hatalı — hangisi hangisi, sana söylenmeyecek. Amaç doğru cevabı ezberlemek değil, bir AI cevabını her zaman sorgulamadan kabul etmemeyi alıştırmak.
-            </p>
-            <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)' }}>Ders</label>
+            <p style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6, marginBottom: '16px' }}>{tr('Sana bir soru ve bu soruya "AI tarafından üretilmiş" iki farklı cevap göstereceğiz. Biri doğru, biri gerçekçi ama hatalı — hangisi hangisi, sana söylenmeyecek. Amaç doğru cevabı ezberlemek değil, bir AI cevabını her zaman sorgulamadan kabul etmemeyi alıştırmak.')}</p>
+            <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)' }}><Tr text="Ders" /></label>
             <select value={subject} onChange={e => { setSubject(e.target.value); setTopic((subjects[e.target.value] || [])[0] || '') }}
               style={{ width: '100%', padding: '10px', marginTop: '4px', marginBottom: '12px', borderRadius: '10px', border: '1px solid var(--border)' }}>
-              {Object.keys(subjects).map(s => <option key={s} value={s}>{s}</option>)}
+              {Object.keys(subjects).map(s => <option key={s} value={s}>{tr(s)}</option>)}
             </select>
-            <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)' }}>Konu</label>
+            <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)' }}><Tr text="Konu" /></label>
             <select value={topic} onChange={e => setTopic(e.target.value)}
               style={{ width: '100%', padding: '10px', marginTop: '4px', marginBottom: '16px', borderRadius: '10px', border: '1px solid var(--border)' }}>
-              {topics.map(t => <option key={t} value={t}>{t}</option>)}
+              {topics.map(t => <option key={t} value={t}>{tr(t)}</option>)}
             </select>
             {error && <p style={{ color: 'var(--red)', fontSize: '13px', marginBottom: '12px' }}>{error}</p>}
             <button className="btn btn-primary" style={{ width: '100%' }} onClick={generate} disabled={generating}>
-              {generating ? 'Hazırlanıyor…' : 'Başla'}
+              {generating ? tr('Hazırlanıyor…') : tr('Başla')}
             </button>
           </div>
         ) : (
@@ -165,7 +166,7 @@ export default function AILiteracyPage() {
                       : (isPicked ? 'rgba(99,102,241,0.06)' : 'transparent'),
                   }}>
                   <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', marginBottom: '4px' }}>
-                    Cevap {letter} {feedback && isCorrectAnswer ? '✅' : ''}{feedback && isWrongPick ? '❌' : ''}
+                    {tr('Cevap {letter}', { letter })} {feedback && isCorrectAnswer ? '✅' : ''}{feedback && isWrongPick ? '❌' : ''}
                   </div>
                   <div style={{ fontSize: '13.5px', lineHeight: 1.6 }}>{text}</div>
                 </button>
@@ -174,15 +175,13 @@ export default function AILiteracyPage() {
 
             {!feedback && (
               <>
-                <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', marginTop: '8px', display: 'block' }}>
-                  Neden bu cevabı seçtin? (kısaca yaz)
-                </label>
+                <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', marginTop: '8px', display: 'block' }}><Tr text="Neden bu cevabı seçtin? (kısaca yaz)" /></label>
                 <textarea value={reasoning} onChange={e => setReasoning(e.target.value)} rows={3}
-                  placeholder="Örn: Diğer cevaptaki hesaplama bence yanlış çünkü..."
+                  placeholder={tr('Örn: Diğer cevaptaki hesaplama bence yanlış çünkü...')}
                   style={{ width: '100%', padding: '10px', marginTop: '4px', marginBottom: '12px', borderRadius: '10px', border: '1px solid var(--border)', fontFamily: 'inherit', fontSize: '13px' }} />
                 {error && <p style={{ color: 'var(--red)', fontSize: '13px', marginBottom: '12px' }}>{error}</p>}
                 <button className="btn btn-primary" style={{ width: '100%' }} onClick={submit} disabled={!choice || submitting}>
-                  {submitting ? 'Gönderiliyor…' : 'Cevabı Gönder'}
+                  {submitting ? tr('Gönderiliyor…') : tr('Cevabı Gönder')}
                 </button>
               </>
             )}
@@ -190,11 +189,11 @@ export default function AILiteracyPage() {
             {feedback && (
               <div style={{ marginTop: '14px', padding: '14px', borderRadius: '12px', background: feedback.isCorrect ? 'rgba(22,163,74,0.08)' : 'rgba(217,119,6,0.08)' }}>
                 <div style={{ fontWeight: 700, marginBottom: '8px', fontSize: '13.5px' }}>
-                  {feedback.isCorrect ? '✅ Doğru seçtin!' : '🤔 Bu sefer AI\'nın hatalı cevabına kandın.'}
+                  {feedback.isCorrect ? tr('✅ Doğru seçtin!') : tr("🤔 Bu sefer AI'nın hatalı cevabına kandın.")}
                 </div>
-                <div style={{ fontSize: '13px', lineHeight: 1.6, marginBottom: '8px' }}><strong>Doğru cevap neden doğru:</strong> {feedback.correctReasoning}</div>
-                <div style={{ fontSize: '13px', lineHeight: 1.6, marginBottom: '14px' }}><strong>Hatalı cevaptaki sorun:</strong> {feedback.flawExplanation}</div>
-                <button className="btn btn-primary" style={{ width: '100%' }} onClick={generate}>Yeni Mücadele</button>
+                <div style={{ fontSize: '13px', lineHeight: 1.6, marginBottom: '8px' }}><strong><Tr text="Doğru cevap neden doğru:" /></strong> {feedback.correctReasoning}</div>
+                <div style={{ fontSize: '13px', lineHeight: 1.6, marginBottom: '14px' }}><strong><Tr text="Hatalı cevaptaki sorun:" /></strong> {feedback.flawExplanation}</div>
+                <button className="btn btn-primary" style={{ width: '100%' }} onClick={generate}><Tr text="Yeni Mücadele" /></button>
               </div>
             )}
           </div>

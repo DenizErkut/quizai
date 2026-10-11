@@ -218,7 +218,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
 
   async function shareResult() {
     setSharing(true)
-    const text = t('Pratium\'da "{topic}" konusunda %{pct} başarı elde ettim! 🎯 Sen de dene: https://pratium.com', { topic, pct: finalPct })
+    const text = t('Pratium\'da "{topic}" konusunda %{pct} başarı elde ettim! 🎯 Sen de dene: https://pratium.com', { topic: t(topic), pct: finalPct })
 
     try {
       const blob = await generateShareCard()
@@ -257,13 +257,13 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
 
   // WhatsApp paylaş
   function shareWhatsApp() {
-    const text = encodeURIComponent(t('Pratium\'da "{topic}" konusunda %{pct} başarı elde ettim! 🎯 Sen de dene: https://pratium.com', { topic, pct: finalPct }))
+    const text = encodeURIComponent(t('Pratium\'da "{topic}" konusunda %{pct} başarı elde ettim! 🎯 Sen de dene: https://pratium.com', { topic: t(topic), pct: finalPct }))
     window.open(`https://wa.me/?text=${text}`, '_blank')
   }
 
   // Twitter/X paylaş
   function shareTwitter() {
-    const text = encodeURIComponent(t('Pratium\'da "{topic}" konusunda %{pct} aldım! 🎯 #Pratium #Eğitim', { topic, pct: finalPct }))
+    const text = encodeURIComponent(t('Pratium\'da "{topic}" konusunda %{pct} aldım! 🎯 #Pratium #Eğitim', { topic: t(topic), pct: finalPct }))
     window.open(`https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent('https://pratium.com')}`, '_blank')
   }
 
@@ -405,7 +405,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
                     style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '8px', background: '#ff0000', textDecoration: 'none', color: '#fff', marginBottom: '8px' }}>
                     {yt.thumbnail && <img src={yt.thumbnail} alt="" style={{ width: 44, height: 33, objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} />}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '12px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>▶ {yt.title || t('{topic} — Konu Anlatımı', { topic })}</div>
+                      <div style={{ fontSize: '12px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>▶ {yt.title || t('{topic} — Konu Anlatımı', { topic: t(topic) })}</div>
                       {yt.channel && <div style={{ fontSize: '11px', opacity: 0.85, marginTop: '2px' }}>{yt.channel}</div>}
                     </div>
                   </a>
