@@ -377,7 +377,7 @@ export default function InstitutionPage() {
                     </div>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '14px' }}>
                       <button onClick={() => {
-                        navigator.clipboard.writeText(tr('E-posta: {email}\nŞifre: {password}', { email: asCreated.email, password: asCreated.password }))
+                        navigator.clipboard.writeText(tr('E-posta: {email}', { email: asCreated.email }) + '\n' + tr('Şifre: {password}', { password: asCreated.password }))
                         setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000)
                       }}
                         style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
