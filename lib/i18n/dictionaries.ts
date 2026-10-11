@@ -1,11 +1,18 @@
 import type { Dictionary, Locale } from './core'
-import { en } from './messages/en'
-import { de } from './messages/de'
-import { fr } from './messages/fr'
-import { es } from './messages/es'
-import { ar } from './messages/ar'
+import { ALL_ENTRIES } from './entries'
 
-export const DICTIONARIES: Record<Exclude<Locale, 'tr'>, Dictionary> = { en, de, fr, es, ar }
+type TargetLocale = Exclude<Locale, 'tr'>
+const COLUMN: Record<TargetLocale, number> = { en: 1, de: 2, fr: 3, es: 4, ar: 5 }
+
+function build(locale: TargetLocale): Dictionary {
+  const dictionary: Dictionary = {}
+  for (const entry of ALL_ENTRIES) dictionary[entry[0]] = entry[COLUMN[locale]]
+  return dictionary
+}
+
+export const DICTIONARIES: Record<TargetLocale, Dictionary> = {
+  en: build('en'), de: build('de'), fr: build('fr'), es: build('es'), ar: build('ar'),
+}
 
 export function dictionaryFor(locale: Locale): Dictionary | undefined {
   return locale === 'tr' ? undefined : DICTIONARIES[locale]
