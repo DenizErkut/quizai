@@ -27,5 +27,10 @@ import { teacherRegisterEntries } from './teacher-register'
 import { pdfToolsEntries } from './pdf-tools'
 import { readingEntries } from './reading'
 import { teacherPanelEntries } from './teacher-panel'
+import { teacherStudentsEntries } from './teacher-students'
+import { teacherNotifyEntries } from './teacher-notify'
+import { teacherReportEntries } from './teacher-report'
+import { teacherAiTrainingEntries } from './teacher-ai-training'
+import { teacherAssignEntries } from './teacher-assign'
 
-export const ALL_ENTRIES: Entry[] = [...navbarEntries, ...publicEntries, ...dashboardPricingEntries, ...profileEntries, ...quizSetupEntries, ...quizQuestionEntries, ...quizResultEntries, ...quizFlowEntries, ...communityEntries, ...coachEntries, ...reviewEntries, ...archiveEntries, ...dailyEntries, ...analysisEntries, ...authLoginEntries, ...notesEntries, ...planEntries, ...liveEntries, ...registerEntries, ...examEntries, ...studentSchoolEntries, ...referralEntries, ...notificationsEntries, ...openEndedEntries, ...teacherRegisterEntries, ...pdfToolsEntries, ...readingEntries, ...teacherPanelEntries]
+export const ALL_ENTRIES: Entry[] = [...navbarEntries, ...publicEntries, ...dashboardPricingEntries, ...profileEntries, ...quizSetupEntries, ...quizQuestionEntries, ...quizResultEntries, ...quizFlowEntries, ...communityEntries, ...coachEntries, ...reviewEntries, ...archiveEntries, ...dailyEntries, ...analysisEntries, ...authLoginEntries, ...notesEntries, ...planEntries, ...liveEntries, ...registerEntries, ...examEntries, ...studentSchoolEntries, ...referralEntries, ...notificationsEntries, ...openEndedEntries, ...teacherRegisterEntries, ...pdfToolsEntries, ...readingEntries, ...teacherPanelEntries, ...teacherStudentsEntries, ...teacherNotifyEntries, ...teacherReportEntries, ...teacherAiTrainingEntries, ...teacherAssignEntries]

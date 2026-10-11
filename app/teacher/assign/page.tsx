@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import PaperAnswerImport from '@/components/teacher/PaperAnswerImport'
 import { useTeacherEntitlement, LOCKED_MESSAGE } from '@/components/teacher/useTeacherEntitlement'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 
 // '6' -> 'ortaokul 6. sınıf' (the test generator expects the school-level form).
 function gradeLabel(grade: string | null | undefined): string {
@@ -21,6 +23,7 @@ const DIFFICULTIES = [
 ]
 
 export default function TeacherAssignPage() {
+  const { t: tr, locale } = useT()
   const [teacher, setTeacher] = useState<any>(null)
   const [classrooms, setClassrooms] = useState<any[]>([])
   const [assignments, setAssignments] = useState<any[]>([])
@@ -158,7 +161,7 @@ export default function TeacherAssignPage() {
   }
 
   async function deleteAssignment(id: string) {
-    if (!confirm('Bu ödevi silmek istediğine emin misin?')) return
+    if (!confirm(tr('Bu ödevi silmek istediğine emin misin?'))) return
     await supabase.from('assignments').delete().eq('id', id)
     setAssignments(prev => prev.filter(a => a.id !== id))
   }
@@ -178,7 +181,7 @@ export default function TeacherAssignPage() {
   }
 
   async function generateOeWithAI() {
-    if (!oeForm.subject.trim() || !oeForm.topic.trim()) { setOeError('Ders ve konu zorunlu.'); return }
+    if (!oeForm.subject.trim() || !oeForm.topic.trim()) { setOeError(tr('Ders ve konu zorunlu.')); return }
     setOeError(''); setOeGenerating(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -188,7 +191,7 @@ export default function TeacherAssignPage() {
         body: JSON.stringify({ mode: 'ai', preview: true, count: oeCount, ...oeForm }),
       })
       const data = await res.json().catch(() => null)
-      if (!res.ok) { setOeError(data?.error || 'Soru üretilemedi.'); return }
+      if (!res.ok) { setOeError(data?.error || tr('Soru üretilemedi.')); return }
       // preview modunda dogrudan assignment kaydedilmedi, sadece uretilen
       // icerik donuyor - once ogretmen onaylasin
       if (Array.isArray(data.items) && data.items.length > 1) {
@@ -200,18 +203,18 @@ export default function TeacherAssignPage() {
       setOeGenerated(true)
     } catch (e) {
       console.error('[generateOeWithAI]', e)
-      setOeError('Beklenmeyen bir hata oluştu.')
+      setOeError(tr('Beklenmeyen bir hata oluştu.'))
     } finally {
       setOeGenerating(false)
     }
   }
 
   async function saveOeAssignment() {
-    if (!oeForm.classroom_id || !oeForm.title.trim()) { setOeError('Sınıf ve başlık zorunlu.'); return }
-    if (oeItems && oeItems.length > 1 && oeItems.some(item => !item.scenario.trim() || !item.question.trim())) { setOeError('Her sorunun senaryosu ve sorusu dolu olmalı.'); return }
-    if (!(oeItems && oeItems.length > 1) && (!oeScenario.trim() || !oeQuestion.trim())) { setOeError('Senaryo ve soru zorunlu.'); return }
+    if (!oeForm.classroom_id || !oeForm.title.trim()) { setOeError(tr('Sınıf ve başlık zorunlu.')); return }
+    if (oeItems && oeItems.length > 1 && oeItems.some(item => !item.scenario.trim() || !item.question.trim())) { setOeError(tr('Her sorunun senaryosu ve sorusu dolu olmalı.')); return }
+    if (!(oeItems && oeItems.length > 1) && (!oeScenario.trim() || !oeQuestion.trim())) { setOeError(tr('Senaryo ve soru zorunlu.')); return }
     const validRubric = oeRubric.filter(r => r.criterion.trim() && r.maxPoints > 0)
-    if (!(oeItems && oeItems.length > 1) && validRubric.length === 0) { setOeError('En az bir puanlama kriteri girmelisiniz.'); return }
+    if (!(oeItems && oeItems.length > 1) && validRubric.length === 0) { setOeError(tr('En az bir puanlama kriteri girmelisiniz.')); return }
 
     setOeError(''); setOeSaving(true)
     try {
@@ -227,20 +230,20 @@ export default function TeacherAssignPage() {
         }),
       })
       const data = await res.json().catch(() => null)
-      if (!res.ok) { setOeError(data?.error || 'Ödev kaydedilemedi.'); return }
+      if (!res.ok) { setOeError(data?.error || tr('Ödev kaydedilemedi.')); return }
       setOpenEndedAssignments(prev => [...(data.assignments ?? [data.assignment]), ...prev])
       setShowForm(false)
       resetOeForm()
     } catch (e) {
       console.error('[saveOeAssignment]', e)
-      setOeError('Beklenmeyen bir hata oluştu.')
+      setOeError(tr('Beklenmeyen bir hata oluştu.'))
     } finally {
       setOeSaving(false)
     }
   }
 
   async function deleteOeAssignment(id: string) {
-    if (!confirm('Bu açık uçlu ödevi silmek istediğine emin misin?')) return
+    if (!confirm(tr('Bu açık uçlu ödevi silmek istediğine emin misin?'))) return
     await supabase.from('open_ended_assignments').delete().eq('id', id)
     setOpenEndedAssignments(prev => prev.filter(a => a.id !== id))
   }
@@ -258,7 +261,7 @@ export default function TeacherAssignPage() {
   const baseTitle = (title: string) => String(title || '').replace(/ — Soru \d+\/\d+$/, '')
 
   async function deleteOeGroup(group: any[]) {
-    if (!confirm(group.length > 1 ? `Bu ${group.length} soruluk açık uçlu ödevi silmek istediğine emin misin?` : 'Bu açık uçlu ödevi silmek istediğine emin misin?')) return
+    if (!confirm(group.length > 1 ? tr('Bu {n} soruluk açık uçlu ödevi silmek istediğine emin misin?', { n: group.length }) : tr('Bu açık uçlu ödevi silmek istediğine emin misin?'))) return
     const ids = group.map(a => a.id)
     await supabase.from('open_ended_assignments').delete().in('id', ids)
     setOpenEndedAssignments(prev => prev.filter(a => !ids.includes(a.id)))
@@ -277,7 +280,7 @@ export default function TeacherAssignPage() {
       const html = openEndedStudentSheetHtml(items, { code, title, grade: gradeLabel(first.grade), subject: first.subject, topic: first.topic })
         + (withKey ? openEndedTeacherKeyHtml(items, { code }) : '')
       await printLearningDocument(title, `${first.classrooms?.name || ''} · ${group.length} soru`, html, { studentLine: false })
-    } catch (e: any) { setPrintMessage(e?.message || 'Yazdırma görünümü açılamadı.') }
+    } catch (e: any) { setPrintMessage(e?.message || tr('Yazdırma görünümü açılamadı.')) }
     finally { setPrintBusy('') }
   }
 
@@ -285,7 +288,7 @@ export default function TeacherAssignPage() {
   // so a printable class copy is generated once here with the same quality pipeline.
   async function printQuizAssignment(a: any, withKey: boolean) {
     if (planLimited) { setPrintMessage(LOCKED_MESSAGE); return }
-    setPrintBusy(`quiz-${a.id}`); setPrintMessage('Basılı test hazırlanıyor… (30-90 saniye sürebilir)')
+    setPrintBusy(`quiz-${a.id}`); setPrintMessage(tr('Basılı test hazırlanıyor… (30-90 saniye sürebilir)'))
     try {
       const classroom = classrooms.find(c => c.id === a.classroom_id)
       const topicText = String(a.topic || '')
@@ -303,13 +306,13 @@ export default function TeacherAssignPage() {
       })
       const data = await res.json().catch(() => null)
       if (!res.ok || !Array.isArray(data?.questions) || !data.questions.length) {
-        setPrintMessage(data?.message || (data?.error === 'insufficient_questions' ? 'Kalite kontrolünden yeterli soru geçmedi, birkaç saniye sonra tekrar deneyin.' : (data?.error || 'Test hazırlanamadı.')))
+        setPrintMessage(data?.message || (data?.error === 'insufficient_questions' ? tr('Kalite kontrolünden yeterli soru geçmedi, birkaç saniye sonra tekrar deneyin.') : (data?.error || tr('Test hazırlanamadı.'))))
         return
       }
       const { printLearningDocument, questionPrintHtml, answerKeyHtml } = await import('@/lib/learning-print')
       await printLearningDocument(a.title, `${classroom?.name || ''} · ${data.questions.length} soru · Ad Soyad: ..............................`, questionPrintHtml(data.questions) + (withKey ? answerKeyHtml(data.questions) : ''))
       setPrintMessage('')
-    } catch (e: any) { setPrintMessage(e?.message || 'Test hazırlanamadı.') }
+    } catch (e: any) { setPrintMessage(e?.message || tr('Test hazırlanamadı.')) }
     finally { setPrintBusy('') }
   }
 
@@ -317,7 +320,7 @@ export default function TeacherAssignPage() {
 
   if (loading) return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
-      <div style={{ color: 'var(--text3)', fontSize: '14px' }}>Yükleniyor...</div>
+      <div style={{ color: 'var(--text3)', fontSize: '14px' }}>{tr('Yükleniyor...')}</div>
     </main>
   )
 
@@ -326,24 +329,24 @@ export default function TeacherAssignPage() {
       <div style={{ maxWidth: '720px', margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Link href="/teacher" style={{ color: 'var(--text3)', fontSize: '13px', textDecoration: 'none' }}>← Panel</Link>
-            <h1 style={{ fontSize: '20px', fontWeight: 700 }}>Ödev Ata</h1>
+            <Link href="/teacher" style={{ color: 'var(--text3)', fontSize: '13px', textDecoration: 'none' }}>{tr('← Panel')}</Link>
+            <h1 style={{ fontSize: '20px', fontWeight: 700 }}>{tr('Ödev Ata')}</h1>
           </div>
           <button className="btn btn-primary" onClick={() => setShowForm(v => !v)} style={{ justifyContent: 'center' }}>
-            + Yeni ödev
+            {tr('+ Yeni ödev')}
           </button>
         </div>
 
         {/* Yeni ödev formu */}
         {showForm && (
           <div className="card anim-up" style={{ marginBottom: '1.5rem' }}>
-            <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '10px' }}>Yeni Ödev</div>
+            <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '10px' }}>{tr('Yeni Ödev')}</div>
 
             {/* Ödev türü */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
               {[
-                { value: 'quiz', label: '📝 Test / Quiz' },
-                { value: 'open_ended', label: '💬 Açık Uçlu Soru' },
+                { value: 'quiz', label: tr('📝 Test / Quiz') },
+                { value: 'open_ended', label: tr('💬 Açık Uçlu Soru') },
               ].map(opt => (
                 <button key={opt.value} onClick={() => { setAssignmentType(opt.value as any); resetOeForm() }}
                   style={{ flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid', fontFamily: 'var(--font-sans)',
@@ -366,81 +369,81 @@ export default function TeacherAssignPage() {
                     <button onClick={() => setOeMethod('ai')}
                       style={{ padding: '20px 14px', borderRadius: '14px', border: '1.5px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', textAlign: 'center', fontFamily: 'var(--font-sans)' }}>
                       <div style={{ fontSize: '30px', marginBottom: '8px' }}>🤖</div>
-                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '4px' }}>Yapay Zeka Hazırlasın</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text3)', lineHeight: 1.5 }}>Ders ve konu gir, senaryo + soru + rubrik saniyeler içinde üretilsin</div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '4px' }}>{tr('Yapay Zeka Hazırlasın')}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text3)', lineHeight: 1.5 }}>{tr('Ders ve konu gir, senaryo + soru + rubrik saniyeler içinde üretilsin')}</div>
                     </button>
                     <button onClick={() => setOeMethod('manual')}
                       style={{ padding: '20px 14px', borderRadius: '14px', border: '1.5px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', textAlign: 'center', fontFamily: 'var(--font-sans)' }}>
                       <div style={{ fontSize: '30px', marginBottom: '8px' }}>✍️</div>
-                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '4px' }}>Kendim Oluşturayım</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text3)', lineHeight: 1.5 }}>Senaryoyu, soruyu ve puanlama kriterlerini kendin yaz</div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '4px' }}>{tr('Kendim Oluşturayım')}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text3)', lineHeight: 1.5 }}>{tr('Senaryoyu, soruyu ve puanlama kriterlerini kendin yaz')}</div>
                     </button>
                   </div>
                 ) : (
                   <>
                     <button onClick={() => { setOeMethod(null); setOeGenerated(false) }}
                       style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: 'var(--text3)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', padding: 0 }}>
-                      ← Yöntemi değiştir
+                      {tr('← Yöntemi değiştir')}
                     </button>
 
                     {/* Ortak alanlar */}
                     <select value={oeForm.classroom_id} onChange={e => setOeForm(p => ({ ...p, classroom_id: e.target.value }))} style={inputStyle}>
                       {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
-                    <input placeholder="Ödev başlığı (örn: Su Döngüsü - Açık Uçlu)" value={oeForm.title}
+                    <input placeholder={tr('Ödev başlığı (örn: Su Döngüsü - Açık Uçlu)')} value={oeForm.title}
                       onChange={e => setOeForm(p => ({ ...p, title: e.target.value }))} style={inputStyle} />
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                       <select value={oeForm.grade} onChange={e => setOeForm(p => ({ ...p, grade: e.target.value }))} style={inputStyle}>
-                        <option value="">Sınıf seviyesi</option>
-                        {['5','6','7','8','9','10','11','12'].map(g => <option key={g} value={g}>{g}. Sınıf</option>)}
+                        <option value="">{tr('Sınıf seviyesi')}</option>
+                        {['5','6','7','8','9','10','11','12'].map(g => <option key={g} value={g}>{tr('{g}. Sınıf', { g })}</option>)}
                       </select>
-                      <input placeholder="Ders (örn: Fen Bilimleri)" value={oeForm.subject}
+                      <input placeholder={tr('Ders (örn: Fen Bilimleri)')} value={oeForm.subject}
                         onChange={e => setOeForm(p => ({ ...p, subject: e.target.value }))} style={inputStyle} />
                     </div>
                     <div>
-                      <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>Son tarih (isteğe bağlı)</label>
+                      <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>{tr('Son tarih (isteğe bağlı)')}</label>
                       <input type="datetime-local" value={oeForm.due_date}
                         onChange={e => setOeForm(p => ({ ...p, due_date: e.target.value }))} style={inputStyle} />
                     </div>
 
                     {oeMethod === 'ai' && !oeGenerated && (
                       <>
-                        <input placeholder="Konu (örn: Su döngüsü ve buharlaşma)" value={oeForm.topic}
+                        <input placeholder={tr('Konu (örn: Su döngüsü ve buharlaşma)')} value={oeForm.topic}
                           onChange={e => setOeForm(p => ({ ...p, topic: e.target.value }))} style={inputStyle} />
                         <div>
-                          <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>Soru sayısı (aynı konuda farklı açık uçlu sorular)</label>
+                          <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>{tr('Soru sayısı (aynı konuda farklı açık uçlu sorular)')}</label>
                           <select value={oeCount} onChange={e => setOeCount(Number(e.target.value))} style={inputStyle}>
-                            {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n} soru</option>)}
+                            {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{tr('{n} soru', { n })}</option>)}
                           </select>
                         </div>
                         <button className="btn btn-primary" onClick={generateOeWithAI} disabled={oeGenerating}
                           style={{ justifyContent: 'center', opacity: oeGenerating ? 0.6 : 1 }}>
-                          {oeGenerating ? '✨ Üretiliyor...' : '🤖 Yapay Zeka ile Oluştur'}
+                          {oeGenerating ? tr('✨ Üretiliyor...') : tr('🤖 Yapay Zeka ile Oluştur')}
                         </button>
                       </>
                     )}
 
                     {oeMethod === 'ai' && oeGenerated && oeItems && oeItems.length > 1 && (
                       <>
-                        <div style={{ fontSize: '11px', color: 'var(--green)', fontWeight: 600 }}>✓ {oeItems.length} farklı soru üretildi — göndermeden önce düzenleyebilir veya silebilirsin</div>
+                        <div style={{ fontSize: '11px', color: 'var(--green)', fontWeight: 600 }}>{tr('✓ {n} farklı soru üretildi — göndermeden önce düzenleyebilir veya silebilirsin', { n: oeItems.length })}</div>
                         {oeItems.map((item, index) => (
                           <div key={index} style={{ border: '1px solid var(--border)', borderRadius: '12px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <strong style={{ fontSize: '12px' }}>Soru {index + 1}</strong>
+                              <strong style={{ fontSize: '12px' }}>{tr('Soru {n}', { n: index + 1 })}</strong>
                               <button onClick={() => setOeItems(prev => prev && prev.length > 2 ? prev.filter((_, j) => j !== index) : prev)} disabled={oeItems.length <= 2}
-                                style={{ fontSize: '11px', color: 'var(--red)', background: 'none', border: 'none', cursor: oeItems.length <= 2 ? 'default' : 'pointer', opacity: oeItems.length <= 2 ? 0.4 : 1 }}>Sil</button>
+                                style={{ fontSize: '11px', color: 'var(--red)', background: 'none', border: 'none', cursor: oeItems.length <= 2 ? 'default' : 'pointer', opacity: oeItems.length <= 2 ? 0.4 : 1 }}>{tr('Sil')}</button>
                             </div>
                             <textarea value={item.scenario} rows={3} onChange={e => setOeItems(prev => prev && prev.map((x, j) => j === index ? { ...x, scenario: e.target.value } : x))}
-                              style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--font-sans)' }} aria-label={`Soru ${index + 1} senaryo`} />
+                              style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--font-sans)' }} aria-label={tr('Soru {n} senaryo', { n: index + 1 })} />
                             <textarea value={item.question} rows={2} onChange={e => setOeItems(prev => prev && prev.map((x, j) => j === index ? { ...x, question: e.target.value } : x))}
-                              style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--font-sans)' }} aria-label={`Soru ${index + 1} soru metni`} />
-                            <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Puanlama: {item.rubric.map(r => `${r.criterion} (${r.maxPoints})`).join(' · ')}</div>
+                              style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--font-sans)' }} aria-label={tr('Soru {n} soru metni', { n: index + 1 })} />
+                            <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{tr('Puanlama: {list}', { list: item.rubric.map(r => `${r.criterion} (${r.maxPoints})`).join(' · ') })}</div>
                           </div>
                         ))}
                         <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                          <button className="btn" onClick={generateOeWithAI} disabled={oeGenerating} style={{ justifyContent: 'center' }}>{oeGenerating ? '⏳' : '🔄 Yeniden Üret'}</button>
+                          <button className="btn" onClick={generateOeWithAI} disabled={oeGenerating} style={{ justifyContent: 'center' }}>{oeGenerating ? '⏳' : tr('🔄 Yeniden Üret')}</button>
                           <button className="btn btn-primary" onClick={saveOeAssignment} disabled={oeSaving || !oeForm.title.trim()}
-                            style={{ flex: 1, justifyContent: 'center', opacity: oeSaving ? 0.6 : 1 }}>{oeSaving ? 'Kaydediliyor...' : `✓ Onayla ve ${oeItems.length} Ödevi Oluştur`}</button>
+                            style={{ flex: 1, justifyContent: 'center', opacity: oeSaving ? 0.6 : 1 }}>{oeSaving ? tr('Kaydediliyor...') : tr('✓ Onayla ve {n} Ödevi Oluştur', { n: oeItems.length })}</button>
                         </div>
                       </>
                     )}
@@ -449,40 +452,40 @@ export default function TeacherAssignPage() {
                       <>
                         {oeMethod === 'ai' && oeGenerated && (
                           <div style={{ fontSize: '11px', color: 'var(--green)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                            <span>✓ Üretildi — göndermeden önce dilediğin gibi düzenleyebilirsin</span>
+                            <span>{tr('✓ Üretildi — göndermeden önce dilediğin gibi düzenleyebilirsin')}</span>
                             {oeUsedMeb ? (
                               <span style={{ padding: '2px 8px', borderRadius: '99px', background: 'rgba(13,148,136,0.1)', color: '#0d9488', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                                📚 Gerçek MEB kaynağına dayanıyor
+                                {tr('📚 Gerçek MEB kaynağına dayanıyor')}
                               </span>
                             ) : (
                               <span style={{ padding: '2px 8px', borderRadius: '99px', background: 'var(--bg2)', color: 'var(--text3)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                                ℹ️ Bu konuda yüklü MEB kaynağı bulunamadı — genel bilgiden üretildi
+                                {tr('ℹ️ Bu konuda yüklü MEB kaynağı bulunamadı — genel bilgiden üretildi')}
                               </span>
                             )}
                           </div>
                         )}
                         <div>
-                          <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>Senaryo / Durum</label>
+                          <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>{tr('Senaryo / Durum')}</label>
                           <textarea value={oeScenario} onChange={e => setOeScenario(e.target.value)} rows={3}
-                            placeholder="Öğrencinin okuyacağı kısa senaryo/durum metni..."
+                            placeholder={tr('Öğrencinin okuyacağı kısa senaryo/durum metni...')}
                             style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--font-sans)' }} />
                         </div>
                         <div>
-                          <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>Soru</label>
+                          <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>{tr('Soru‖açık uçlu')}</label>
                           <textarea value={oeQuestion} onChange={e => setOeQuestion(e.target.value)} rows={2}
-                            placeholder="Senaryoya dayanan açık uçlu soru..."
+                            placeholder={tr('Senaryoya dayanan açık uçlu soru...')}
                             style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--font-sans)' }} />
                         </div>
                         <div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                            <label style={{ fontSize: '11px', color: 'var(--text3)', fontWeight: 600 }}>Puanlama Kriterleri (Rubrik)</label>
+                            <label style={{ fontSize: '11px', color: 'var(--text3)', fontWeight: 600 }}>{tr('Puanlama Kriterleri (Rubrik)')}</label>
                             <span style={{ fontSize: '11px', fontWeight: 700, color: rubricTotal === 100 ? 'var(--green)' : 'var(--red)' }}>
-                              Toplam: {rubricTotal} / 100
+                              {tr('Toplam: {n} / 100', { n: rubricTotal })}
                             </span>
                           </div>
                           {oeRubric.map((r, i) => (
                             <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 70px 32px', gap: '6px', marginBottom: '6px' }}>
-                              <input placeholder={`Kriter ${i + 1} (örn: Bilimsel doğruluk)`} value={r.criterion}
+                              <input placeholder={tr('Kriter {n} (örn: Bilimsel doğruluk)', { n: i + 1 })} value={r.criterion}
                                 onChange={e => setOeRubric(prev => prev.map((x, j) => j === i ? { ...x, criterion: e.target.value } : x))}
                                 style={{ ...inputStyle, padding: '8px 10px', fontSize: '12px' }} />
                               <input type="number" min={0} max={100} value={r.maxPoints}
@@ -494,7 +497,7 @@ export default function TeacherAssignPage() {
                           ))}
                           <button onClick={() => setOeRubric(prev => [...prev, { criterion: '', maxPoints: 0, description: '' }])}
                             style={{ fontSize: '11px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', padding: '2px 0' }}>
-                            + Kriter ekle
+                            {tr('+ Kriter ekle')}
                           </button>
                         </div>
 
@@ -502,33 +505,33 @@ export default function TeacherAssignPage() {
                           {oeMethod === 'ai' && (
                             <button className="btn" onClick={generateOeWithAI} disabled={oeGenerating}
                               style={{ justifyContent: 'center' }}>
-                              {oeGenerating ? '⏳' : '🔄 Yeniden Üret'}
+                              {oeGenerating ? '⏳' : tr('🔄 Yeniden Üret')}
                             </button>
                           )}
                           <button className="btn btn-primary" onClick={saveOeAssignment}
                             disabled={oeSaving || !oeForm.title.trim() || !oeScenario.trim() || !oeQuestion.trim()}
                             style={{ flex: 1, justifyContent: 'center', opacity: oeSaving ? 0.6 : 1 }}>
-                            {oeSaving ? 'Kaydediliyor...' : '✓ Onayla ve Ödevi Oluştur'}
+                            {oeSaving ? tr('Kaydediliyor...') : tr('✓ Onayla ve Ödevi Oluştur')}
                           </button>
                         </div>
                       </>
                     )}
                   </>
                 )}
-                <button className="btn" onClick={() => { setShowForm(false); resetOeForm() }} style={{ justifyContent: 'center' }}>İptal</button>
+                <button className="btn" onClick={() => { setShowForm(false); resetOeForm() }} style={{ justifyContent: 'center' }}>{tr('İptal')}</button>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <select value={form.classroom_id} onChange={e => setForm(p => ({ ...p, classroom_id: e.target.value }))} style={inputStyle}>
                 {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
-              <input placeholder="Ödev başlığı (örn: Hücre Bölünmesi Testi)" value={form.title}
+              <input placeholder={tr('Ödev başlığı (örn: Hücre Bölünmesi Testi)')} value={form.title}
                 onChange={e => setForm(p => ({ ...p, title: e.target.value }))} style={inputStyle} />
-              <input placeholder="Konu (AI buna göre soru üretir)" value={form.topic}
+              <input placeholder={tr('Konu (AI buna göre soru üretir)')} value={form.topic}
                 onChange={e => setForm(p => ({ ...p, topic: e.target.value }))} style={inputStyle} />
               <div style={{ marginTop: '6px' }}>
                 <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>
-                  Veya dosyadan soru üret (PDF, DOCX, JPG, PNG)
+                  {tr('Veya dosyadan soru üret (PDF, DOCX, JPG, PNG)')}
                 </label>
                 <input type="file" accept=".pdf,.docx,.jpg,.jpeg,.png,.txt"
                   onChange={async e => {
@@ -546,64 +549,64 @@ export default function TeacherAssignPage() {
                   }}
                   style={{ fontSize: '12px', color: 'var(--text)', width: '100%' }} />
                 {fileLoading && (
-                  <p style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>⏳ Dosya okunuyor...</p>
+                  <p style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>{tr('⏳ Dosya okunuyor...')}</p>
                 )}
                 {assignFile && !fileLoading && !fileError && (
                   <p style={{ fontSize: '11px', color: 'var(--green)', marginTop: '4px' }}>✓ {assignFile.name}</p>
                 )}
                 {fileError && (
                   <div style={{ marginTop: '8px', background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '10px', padding: '12px' }}>
-                    <div style={{ fontWeight: 700, color: 'var(--red)', fontSize: '12px', marginBottom: '6px' }}>⚠️ PDF Yüklenemedi</div>
+                    <div style={{ fontWeight: 700, color: 'var(--red)', fontSize: '12px', marginBottom: '6px' }}>{tr('⚠️ PDF Yüklenemedi')}</div>
                     <div style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.6, marginBottom: '8px' }}>
-                      Çözüm önerileri:<br/>
-                      • PDF'i Word'e çevir → tekrar yükle<br/>
-                      • Büyük PDF'i 50 sayfalık parçalara böl<br/>
-                      • Metni kopyalayıp Konu alanına yapıştır
+                      {tr('Çözüm önerileri:')}<br/>
+                      {tr("• PDF'i Word'e çevir → tekrar yükle")}<br/>
+                      {tr("• Büyük PDF'i 50 sayfalık parçalara böl")}<br/>
+                      {tr('• Metni kopyalayıp Konu alanına yapıştır')}
                     </div>
                     <a href="https://bigconvert.11zon.com/" target="_blank" rel="noopener noreferrer"
                       style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 12px', borderRadius: '7px', background: '#082465', color: '#fff', fontSize: '11px', fontWeight: 700, textDecoration: 'none' }}>
-                      🔄 Ücretsiz PDF Dönüştür / Küçült →
+                      {tr('🔄 Ücretsiz PDF Dönüştür / Küçült →')}
                     </a>
                   </div>
                 )}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <select value={form.grade} onChange={e => setForm(p => ({ ...p, grade: e.target.value }))} style={inputStyle}>
-                  <option value="">Sınıf seviyesi</option>
-                  {['5','6','7','8','9','10','11','12'].map(g => <option key={g} value={g}>{g}. Sınıf</option>)}
+                  <option value="">{tr('Sınıf seviyesi')}</option>
+                  {['5','6','7','8','9','10','11','12'].map(g => <option key={g} value={g}>{tr('{g}. Sınıf', { g })}</option>)}
                 </select>
                 <select value={form.difficulty} onChange={e => setForm(p => ({ ...p, difficulty: e.target.value }))} style={inputStyle}>
-                  {DIFFICULTIES.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                  {DIFFICULTIES.map(d => <option key={d.value} value={d.value}>{tr(d.label)}</option>)}
                 </select>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>Soru sayısı: {form.question_count}</label>
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>{tr('Soru sayısı: {n}', { n: form.question_count })}</label>
                   <input type="range" min={5} max={30} step={5} value={form.question_count}
                     onChange={e => setForm(p => ({ ...p, question_count: Number(e.target.value) }))}
                     style={{ width: '100%', accentColor: 'var(--accent)' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>Son tarih (isteğe bağlı)</label>
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>{tr('Son tarih (isteğe bağlı)')}</label>
                   <input type="datetime-local" value={form.due_date}
                     onChange={e => setForm(p => ({ ...p, due_date: e.target.value }))} style={inputStyle} />
                 </div>
               </div>
               {/* Soru tipi */}
               <div style={{ marginTop: '6px' }}>
-                <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Soru tipi</label>
-                <div style={{ fontSize: '10px', color: '#5b4cf5', marginBottom: '6px', fontWeight: 600 }}>MM = Maarif Modeli soru tipi</div>
+                <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>{tr('Soru tipi')}</label>
+                <div style={{ fontSize: '10px', color: '#5b4cf5', marginBottom: '6px', fontWeight: 600 }}>{tr('MM = Maarif Modeli soru tipi')}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
                   {[
-                    { value: 'multiple_choice', label: '🔤 Çoktan Seçmeli', maarif: false },
-                    { value: 'fill_blank', label: '✏️ Boşluk Doldurma', maarif: false },
-                    { value: 'true_false', label: '✓✗ D/Y', maarif: false },
-                    { value: 'multi_true_false', label: '📋✓✗ Çoklu D/Y', maarif: true },
-                    { value: 'table_fill', label: '🗂️ Tablo Doldurma', maarif: true },
-                    { value: 'matching', label: '🔗 Eşleştirme', maarif: false },
-                    { value: 'ordering', label: '📋 Sıralama', maarif: false },
-                    { value: 'short_answer', label: '💬 Kısa Cevap', maarif: false },
-                    { value: 'mixed', label: '🎲 Karma Sorular', maarif: false },
+                    { value: 'multiple_choice', label: tr('🔤 Çoktan Seçmeli'), maarif: false },
+                    { value: 'fill_blank', label: tr('✏️ Boşluk Doldurma'), maarif: false },
+                    { value: 'true_false', label: tr('✓✗ D/Y'), maarif: false },
+                    { value: 'multi_true_false', label: tr('📋✓✗ Çoklu D/Y'), maarif: true },
+                    { value: 'table_fill', label: tr('🗂️ Tablo Doldurma'), maarif: true },
+                    { value: 'matching', label: tr('🔗 Eşleştirme'), maarif: false },
+                    { value: 'ordering', label: tr('📋 Sıralama'), maarif: false },
+                    { value: 'short_answer', label: tr('💬 Kısa Cevap'), maarif: false },
+                    { value: 'mixed', label: tr('🎲 Karma Sorular'), maarif: false },
                   ].map(t => (
                     <button key={t.value} onClick={() => setForm(p => ({ ...p, question_type: t.value }))}
                       style={{ padding: '6px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', fontFamily: 'var(--font-sans)', textAlign: 'center', position: 'relative',
@@ -621,12 +624,12 @@ export default function TeacherAssignPage() {
               {/* Dosya kaynağı seçimi */}
               {assignFile && (
                 <div style={{ marginTop: '6px' }}>
-                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>Dosyadan soru üretme yöntemi</label>
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>{tr('Dosyadan soru üretme yöntemi')}</label>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     {[
-                      { value: 'from_file', label: '📄 Dosyadaki Soruları Kullan' },
-                      { value: 'similar', label: '🔀 Benzer Sorular Üret' },
-                      { value: 'generate', label: '✨ Konuya Göre Üret' },
+                      { value: 'from_file', label: tr('📄 Dosyadaki Soruları Kullan') },
+                      { value: 'similar', label: tr('🔀 Benzer Sorular Üret') },
+                      { value: 'generate', label: tr('✨ Konuya Göre Üret') },
                     ].map(s => (
                       <button key={s.value} onClick={() => setForm(p => ({ ...p, source_type: s.value }))}
                         style={{ flex: 1, padding: '7px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', fontFamily: 'var(--font-sans)', textAlign: 'center',
@@ -645,9 +648,9 @@ export default function TeacherAssignPage() {
                 <button className="btn btn-primary" onClick={createAssignment}
                   disabled={saving || !form.title.trim() || !form.topic.trim()}
                   style={{ flex: 1, justifyContent: 'center', opacity: saving ? 0.6 : 1 }}>
-                  {saving ? 'Kaydediliyor...' : 'Ödevi Oluştur'}
+                  {saving ? tr('Kaydediliyor...') : tr('Ödevi Oluştur')}
                 </button>
-                <button className="btn" onClick={() => setShowForm(false)} style={{ justifyContent: 'center' }}>İptal</button>
+                <button className="btn" onClick={() => setShowForm(false)} style={{ justifyContent: 'center' }}>{tr('İptal')}</button>
               </div>
             </div>
             )}
@@ -658,8 +661,8 @@ export default function TeacherAssignPage() {
         {assignments.length === 0 && openEndedAssignments.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>📝</div>
-            <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Henüz ödev yok</div>
-            <div style={{ fontSize: '13px', color: 'var(--text3)' }}>İlk ödevi oluştur ve öğrencilerine ata.</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>{tr('Henüz ödev yok')}</div>
+            <div style={{ fontSize: '13px', color: 'var(--text3)' }}>{tr('İlk ödevi oluştur ve öğrencilerine ata.')}</div>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -673,26 +676,26 @@ export default function TeacherAssignPage() {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '5px' }}>{group.length > 1 ? baseTitle(a.title) : a.title}</div>
                     <div style={{ fontSize: '12px', color: 'var(--text3)', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                      <span>💬 Açık Uçlu{group.length > 1 ? ` · ${group.length} soru` : ''}</span>
+                      <span>{tr('💬 Açık Uçlu')}{group.length > 1 ? ` · ${tr('{n} soru', { n: group.length })}` : ''}</span>
                       {a.subject && <span>📚 {a.subject}</span>}
                       <span>🏫 {a.classrooms?.name}</span>
-                      <span>{a.created_via === 'ai' ? '🤖 AI ile' : '✍️ Manuel'}</span>
+                      <span>{a.created_via === 'ai' ? tr('🤖 AI ile') : tr('✍️ Manuel')}</span>
                       {a.due_date && (
                         <span style={{ color: new Date(a.due_date) < new Date() ? 'var(--red)' : 'var(--text3)' }}>
-                          🕐 {new Date(a.due_date).toLocaleDateString('tr-TR')}
+                          🕐 {new Date(a.due_date).toLocaleDateString(intlLocale(locale))}
                         </span>
                       )}
                     </div>
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
-                      <button className="btn btn-sm" disabled={busy} onClick={() => void printOpenEndedGroup(group, false)}>🖨️ Öğrenci formu (PDF)</button>
-                      <button className="btn btn-sm" disabled={busy} onClick={() => void printOpenEndedGroup(group, true)}>👩‍🏫 Puanlama anahtarıyla</button>
-                      <button className="btn btn-sm" onClick={() => planLimited ? setPrintMessage(LOCKED_MESSAGE) : setImportGroup(importGroup === (a.batch_id || a.id) ? '' : (a.batch_id || a.id))}>📥 Kâğıt cevapları aktar</button>
+                      <button className="btn btn-sm" disabled={busy} onClick={() => void printOpenEndedGroup(group, false)}>{tr('🖨️ Öğrenci formu (PDF)')}</button>
+                      <button className="btn btn-sm" disabled={busy} onClick={() => void printOpenEndedGroup(group, true)}>{tr('👩‍🏫 Puanlama anahtarıyla')}</button>
+                      <button className="btn btn-sm" onClick={() => planLimited ? setPrintMessage(LOCKED_MESSAGE) : setImportGroup(importGroup === (a.batch_id || a.id) ? '' : (a.batch_id || a.id))}>{tr('📥 Kâğıt cevapları aktar')}</button>
                     </div>
                     {importGroup === (a.batch_id || a.id) && <PaperAnswerImport group={group} onClose={() => setImportGroup('')} />}
                   </div>
                   <button onClick={() => deleteOeGroup(group)}
                     style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '7px', border: '1px solid rgba(220,38,38,0.25)', background: 'transparent', color: 'var(--red)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                    Sil
+                    {tr('Sil')}
                   </button>
                 </div>
               </div>
@@ -709,23 +712,23 @@ export default function TeacherAssignPage() {
                       <div style={{ fontSize: '12px', color: 'var(--text3)', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                         <span>📚 {a.topic}</span>
                         <span>🏫 {a.classrooms?.name}</span>
-                        <span>❓ {a.question_count} soru</span>
-                        <span>✅ {completions} tamamladı</span>
-                        <span>{({'multiple_choice':'🔤 Çoktan Seçmeli','fill_blank':'✏️ Boşluk Doldurma','true_false':'✓✗ D/Y','multi_true_false':'📋✓✗ Çoklu D/Y','table_fill':'🗂️ Tablo','matching':'🔗 Eşleştirme','ordering':'📋 Sıralama','short_answer':'💬 Kısa Cevap','mixed':'🎲 Karma'} as any)[a.question_type] || '🔤 Çoktan Seçmeli'}</span>
+                        <span>{tr('❓ {n} soru', { n: a.question_count })}</span>
+                        <span>{tr('✅ {n} tamamladı', { n: completions })}</span>
+                        <span>{tr(({'multiple_choice':'🔤 Çoktan Seçmeli','fill_blank':'✏️ Boşluk Doldurma','true_false':'✓✗ D/Y','multi_true_false':'📋✓✗ Çoklu D/Y','table_fill':'🗂️ Tablo','matching':'🔗 Eşleştirme','ordering':'📋 Sıralama','short_answer':'💬 Kısa Cevap','mixed':'🎲 Karma'} as any)[a.question_type] || '🔤 Çoktan Seçmeli')}</span>
                         {a.due_date && (
                           <span style={{ color: isOverdue ? 'var(--red)' : 'var(--text3)' }}>
-                            🕐 {new Date(a.due_date).toLocaleDateString('tr-TR')}{isOverdue ? ' (süresi doldu)' : ''}
+                            🕐 {new Date(a.due_date).toLocaleDateString(intlLocale(locale))}{isOverdue ? ` ${tr('(süresi doldu)')}` : ''}
                           </span>
                         )}
                       </div>
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
-                        <button className="btn btn-sm" disabled={printBusy === `quiz-${a.id}`} onClick={() => void printQuizAssignment(a, false)}>🖨️ Basılı test (PDF)</button>
-                        <button className="btn btn-sm" disabled={printBusy === `quiz-${a.id}`} onClick={() => void printQuizAssignment(a, true)}>👩‍🏫 Cevap anahtarıyla</button>
+                        <button className="btn btn-sm" disabled={printBusy === `quiz-${a.id}`} onClick={() => void printQuizAssignment(a, false)}>{tr('🖨️ Basılı test (PDF)')}</button>
+                        <button className="btn btn-sm" disabled={printBusy === `quiz-${a.id}`} onClick={() => void printQuizAssignment(a, true)}>{tr('👩‍🏫 Cevap anahtarıyla')}</button>
                       </div>
                     </div>
                     <button onClick={() => deleteAssignment(a.id)}
                       style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '7px', border: '1px solid rgba(220,38,38,0.25)', background: 'transparent', color: 'var(--red)', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0, marginLeft: '10px' }}>
-                      Sil
+                      {tr('Sil')}
                     </button>
                   </div>
                 </div>

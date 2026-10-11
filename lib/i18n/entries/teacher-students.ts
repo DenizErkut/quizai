@@ -1,0 +1,31 @@
+import type { Entry } from './types'
+
+// Teacher student/class management (/teacher/students). Names, schools and server errors stay as provided.
+export const teacherStudentsEntries: Entry[] = [
+  ['Hata: {msg}', 'Error: {msg}', 'Fehler: {msg}', 'Erreur : {msg}', 'Error: {msg}', 'خطأ: {msg}'],
+  ['Bilinmeyen hata', 'Unknown error', 'Unbekannter Fehler', 'Erreur inconnue', 'Error desconocido', 'خطأ غير معروف'],
+  ['Bu sınıfı silmek istediğine emin misin?', 'Are you sure you want to delete this class?', 'Bist du sicher, dass du diese Klasse löschen möchtest?', 'Es-tu sûr de vouloir supprimer cette classe ?', '¿Seguro que quieres eliminar esta clase?', 'هل أنت متأكد من حذف هذا الصف؟'],
+  ['← Panel', '← Dashboard', '← Dashboard', '← Tableau de bord', '← Panel', '← اللوحة'],
+  ['Öğrenci Yönetimi', 'Student management', 'Schülerverwaltung', 'Gestion des élèves', 'Gestión de estudiantes', 'إدارة الطلاب'],
+  ['+ Yeni sınıf', '+ New class', '+ Neue Klasse', '+ Nouvelle classe', '+ Nueva clase', '+ صف جديد'],
+  ['Yeni Sınıf Oluştur', 'Create a new class', 'Neue Klasse erstellen', 'Créer une nouvelle classe', 'Crear una nueva clase', 'إنشاء صف جديد'],
+  ['Sınıf adı (örn: 6-D Matematik)', 'Class name (e.g. 6-D Mathematics)', 'Klassenname (z. B. 6-D Mathematik)', 'Nom de la classe (ex. 6-D Mathématiques)', 'Nombre de la clase (p. ej. 6-D Matemáticas)', 'اسم الصف (مثال: 6-D رياضيات)'],
+  ['Sınıf seviyesi seç', 'Choose a grade level', 'Klassenstufe wählen', 'Choisis un niveau', 'Elige un nivel', 'اختر المستوى الدراسي'],
+  ['{g}. Sınıf', 'Grade {g}', 'Klasse {g}', 'Classe de {g}e', '{g}.º curso', 'الصف {g}'],
+  ['Ders (isteğe bağlı)', 'Subject (optional)', 'Fach (optional)', 'Matière (facultatif)', 'Asignatura (opcional)', 'المادة (اختياري)'],
+  ['Oluşturuluyor...', 'Creating...', 'Wird erstellt...', 'Création...', 'Creando...', 'جارٍ الإنشاء...'],
+  ['Oluştur', 'Create', 'Erstellen', 'Créer', 'Crear', 'إنشاء'],
+  ['İptal', 'Cancel', 'Abbrechen', 'Annuler', 'Cancelar', 'إلغاء'],
+  ['Davet kodu:', 'Invite code:', 'Einladungscode:', 'Code d’invitation :', 'Código de invitación:', 'رمز الدعوة:'],
+  ['Sınıfı sil', 'Delete class', 'Klasse löschen', 'Supprimer la classe', 'Eliminar clase', 'حذف الصف'],
+  ['Öğrenciler {code} kodunu kullanarak katılabilir.', 'Students can join using the code {code}.', 'Schüler können mit dem Code {code} beitreten.', 'Les élèves peuvent rejoindre avec le code {code}.', 'Los estudiantes pueden unirse con el código {code}.', 'يمكن للطلاب الانضمام باستخدام الرمز {code}.'],
+  ['{n} test bu ay', '{n} quizzes this month', '{n} Tests diesen Monat', '{n} tests ce mois-ci', '{n} tests este mes', '{n} اختبارًا هذا الشهر'],
+  ['Çıkar', 'Remove', 'Entfernen', 'Retirer', 'Quitar', 'إزالة'],
+  ['💡 Önerilen öğrenciler', '💡 Suggested students', '💡 Vorgeschlagene Schüler', '💡 Élèves suggérés', '💡 Estudiantes sugeridos', '💡 طلاب مقترحون'],
+  ['{school} okulundan öğrenciler', 'Students from {school}', 'Schüler von {school}', 'Élèves de l’école {school}', 'Estudiantes del centro {school}', 'طلاب من مدرسة {school}'],
+  ['{grade}. sınıf seviyesinden öğrenciler', 'Grade {grade} students', 'Schüler der Klasse {grade}', 'Élèves de niveau {grade}', 'Estudiantes de nivel {grade}', 'طلاب الصف {grade}'],
+  ['+ Ekle', '+ Add', '+ Hinzufügen', '+ Ajouter', '+ Añadir', '+ إضافة'],
+  ['Henüz sınıfın yok', 'You have no classes yet', 'Du hast noch keine Klasse', 'Tu n’as pas encore de classe', 'Aún no tienes clases', 'ليس لديك صفوف بعد'],
+  ['İlk sınıfını oluştur ve öğrencilerini ekle.', 'Create your first class and add your students.', 'Erstelle deine erste Klasse und füge deine Schüler hinzu.', 'Crée ta première classe et ajoute tes élèves.', 'Crea tu primera clase y añade a tus estudiantes.', 'أنشئ صفك الأول وأضف طلابك.'],
+  ['+ Sınıf Oluştur', '+ Create class', '+ Klasse erstellen', '+ Créer une classe', '+ Crear clase', '+ إنشاء صف'],
+]

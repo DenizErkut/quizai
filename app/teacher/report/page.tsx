@@ -3,11 +3,13 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 function pctColor(p: number) { return p >= 80 ? 'var(--green)' : p >= 50 ? '#f59e0b' : 'var(--red)' }
 function pctBg(p: number) { return p >= 80 ? 'var(--green-bg)' : p >= 50 ? 'rgba(245,158,11,0.1)' : 'var(--red-bg)' }
 
 export default function TeacherReportPage() {
+  const { t: tr } = useT()
   const [classrooms, setClassrooms] = useState<any[]>([])
   const [selectedClass, setSelectedClass] = useState<string | null>(null)
   const [students, setStudents] = useState<any[]>([])
@@ -56,8 +58,8 @@ export default function TeacherReportPage() {
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
 
         <div style={{ marginBottom: '1.5rem' }}>
-          <Link href="/teacher" style={{ fontSize: '13px', color: 'var(--text3)', textDecoration: 'none' }}>← Öğretmen Paneli</Link>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)', marginTop: '8px' }}>📊 Sınıf Raporu</h1>
+          <Link href="/teacher" style={{ fontSize: '13px', color: 'var(--text3)', textDecoration: 'none' }}>{tr('← Öğretmen Paneli')}</Link>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)', marginTop: '8px' }}>{tr('📊 Sınıf Raporu')}</h1>
         </div>
 
         {/* Sınıf seçici */}
@@ -75,26 +77,26 @@ export default function TeacherReportPage() {
         {selectedStudent ? (
           /* Öğrenci detayı */
           <div>
-            <button onClick={() => setSelectedStudent(null)} style={{ fontSize: '13px', color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: '16px', padding: 0 }}>← Sınıf listesine dön</button>
+            <button onClick={() => setSelectedStudent(null)} style={{ fontSize: '13px', color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: '16px', padding: 0 }}>{tr('← Sınıf listesine dön')}</button>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
               <div>
                 <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>{selectedStudent.name}</h2>
-                <div style={{ fontSize: '13px', color: 'var(--text3)' }}>{selectedStudent.grade} · 🔥 {selectedStudent.streak} gün seri</div>
+                <div style={{ fontSize: '13px', color: 'var(--text3)' }}>{tr('{grade} · 🔥 {n} gün seri', { grade: selectedStudent.grade, n: selectedStudent.streak })}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '32px', fontWeight: 800, color: pctColor(selectedStudent.avgPct) }}>%{selectedStudent.avgPct}</div>
-                <div style={{ fontSize: '11px', color: 'var(--text3)' }}>genel ortalama</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{tr('genel ortalama')}</div>
               </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '1rem' }}>
               {[
-                { label: 'Toplam Test', value: selectedStudent.totalTests },
-                { label: 'Toplam Soru', value: selectedStudent.totalQuestions },
-                { label: 'Doğru', value: selectedStudent.totalCorrect, color: 'var(--green)' },
-                { label: 'Mükemmel', value: selectedStudent.perfect, color: 'var(--green)' },
-                { label: 'Zayıf Test', value: selectedStudent.failing, color: 'var(--red)' },
-                { label: 'Bu Hafta', value: selectedStudent.weeklyTests, color: 'var(--accent)' },
+                { label: tr('Toplam Test'), value: selectedStudent.totalTests },
+                { label: tr('Toplam Soru'), value: selectedStudent.totalQuestions },
+                { label: tr('Doğru‖rapor'), value: selectedStudent.totalCorrect, color: 'var(--green)' },
+                { label: tr('Mükemmel'), value: selectedStudent.perfect, color: 'var(--green)' },
+                { label: tr('Zayıf Test'), value: selectedStudent.failing, color: 'var(--red)' },
+                { label: tr('Bu Hafta'), value: selectedStudent.weeklyTests, color: 'var(--accent)' },
               ].map((s, i) => (
                 <div key={i} style={{ textAlign: 'center', padding: '12px', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--bg)' }}>
                   <div style={{ fontSize: '22px', fontWeight: 800, color: s.color || 'var(--primary)' }}>{s.value}</div>
@@ -106,7 +108,7 @@ export default function TeacherReportPage() {
             {/* Trend */}
             {selectedStudent.trend?.length > 0 && (
               <div className="card" style={{ marginBottom: '1rem' }}>
-                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', marginBottom: '10px' }}>Test Trendi</div>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', marginBottom: '10px' }}>{tr('Test Trendi')}</div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: '5px', height: '60px' }}>
                   {selectedStudent.trend.map((t: any, i: number) => (
                     <div key={i} title={`${t.topic}: %${t.pct}`} style={{ flex: 1 }}>
@@ -120,7 +122,7 @@ export default function TeacherReportPage() {
             {/* Konular */}
             {selectedStudent.topTopics?.length > 0 && (
               <div className="card">
-                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', marginBottom: '10px' }}>Çalışılan Konular</div>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', marginBottom: '10px' }}>{tr('Çalışılan Konular')}</div>
                 {selectedStudent.topTopics.map((t: any, i: number) => (
                   <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', padding: '6px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
                     <div style={{ flex: 1, fontSize: '13px' }}>{t.topic}</div>
@@ -137,10 +139,10 @@ export default function TeacherReportPage() {
             {/* Sınıf istatistikleri */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '1.25rem' }}>
               {[
-                { label: 'Öğrenci', value: students.length },
-                { label: 'Sınıf Ort.', value: `%${classAvg}`, color: pctColor(classAvg) },
-                { label: 'Mükemmel', value: perfectStudents, color: 'var(--green)' },
-                { label: 'Risk Altında', value: atRisk, color: atRisk > 0 ? 'var(--red)' : 'var(--text3)' },
+                { label: tr('Öğrenci‖rapor'), value: students.length },
+                { label: tr('Sınıf Ort.'), value: `%${classAvg}`, color: pctColor(classAvg) },
+                { label: tr('Mükemmel'), value: perfectStudents, color: 'var(--green)' },
+                { label: tr('Risk Altında'), value: atRisk, color: atRisk > 0 ? 'var(--red)' : 'var(--text3)' },
               ].map((s, i) => (
                 <div key={i} style={{ textAlign: 'center', padding: '14px 8px', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--bg)' }}>
                   <div style={{ fontSize: '24px', fontWeight: 800, color: s.color || 'var(--primary)' }}>{s.value}</div>
@@ -153,10 +155,10 @@ export default function TeacherReportPage() {
             {studentsLoading ? <div style={{ textAlign: 'center', padding: '2rem' }}><div className="spinner" /></div> : (
               <div className="card">
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
-                  Öğrenciler (başarıya göre)
+                  {tr('Öğrenciler (başarıya göre)')}
                 </div>
                 {students.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text3)', fontSize: '14px' }}>Bu sınıfta öğrenci yok</div>
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text3)', fontSize: '14px' }}>{tr('Bu sınıfta öğrenci yok')}</div>
                 ) : students.map((s, i) => (
                   <div key={s.student_id} onClick={() => setSelectedStudent(s)}
                     style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined, cursor: 'pointer' }}
@@ -167,12 +169,12 @@ export default function TeacherReportPage() {
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: '14px' }}>{s.name}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{s.grade} · {s.totalTests} test · 🔥 {s.streak} gün</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{tr('{grade} · {tests} test · 🔥 {n} gün', { grade: s.grade, tests: s.totalTests, n: s.streak })}</div>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <div style={{ textAlign: 'right', fontSize: '11px', color: 'var(--text3)' }}>
-                        <div>{s.totalCorrect}/{s.totalQuestions} doğru</div>
-                        <div>Bu hafta: {s.weeklyTests}</div>
+                        <div>{tr('{a}/{b} doğru', { a: s.totalCorrect, b: s.totalQuestions })}</div>
+                        <div>{tr('Bu hafta: {n}', { n: s.weeklyTests })}</div>
                       </div>
                       <div style={{ padding: '5px 10px', borderRadius: '8px', background: pctBg(s.avgPct), fontWeight: 800, fontSize: '14px', color: pctColor(s.avgPct), minWidth: '52px', textAlign: 'center' }}>
                         %{s.avgPct}
