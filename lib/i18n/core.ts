@@ -47,7 +47,9 @@ export function localeDir(locale: Locale): 'ltr' | 'rtl' {
  * `‖context` to the key to tell them apart. The context is dropped from the fallback text.
  */
 const normalizedCache = new WeakMap<Dictionary, Map<string, string>>()
-const normalizeKey = (value: string) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('tr-TR')
+const TR_FOLD: Record<string, string> = { ı: 'i', ğ: 'g', ü: 'u', ş: 's', ö: 'o', ç: 'c' }
+const normalizeKey = (value: string) =>
+  value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('tr-TR').replace(/[ığüşöç]/g, ch => TR_FOLD[ch])
 
 // Veri tabanından gelen konu adları yazım/büyük-küçük harf farkı taşıyabilir ("Güneş Sistemi Ve Tutulmalar");
 // tam eşleşme yoksa normalize edilmiş eşleşmeyi ve "Ad (1)" gibi sayı ekini dener.
