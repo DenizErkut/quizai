@@ -12,6 +12,8 @@ import { computeWeeklyGrowth } from '@/lib/weekly-growth'
 import { computeTopicMastery, TopicMastery } from '@/lib/mastery'
 import { analyzeTrend } from '@/lib/predictive-risk'
 import { analyzeStudyDuration, StudyDurationInsight } from '@/lib/study-duration-model'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 
 // lib/parent-risk-alert.ts'teki AYNI eşik (35) — o dosyayı buraya import
 // ETMİYORUZ bilerek: server-only bir zincire bağlanıyor (identity/client.ts
@@ -68,6 +70,8 @@ interface ChildData {
 }
 
 function ParentContent() {
+  const { t: tr, locale } = useT()
+  const dateLocale = intlLocale(locale)
   const [children, setChildren] = useState<ChildData[]>([])
   const [selectedChild, setSelectedChild] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -155,8 +159,8 @@ function ParentContent() {
 
       return {
         child_id: cid,
-        nickname: nicknameMap[cid] || childIdentities[cid]?.full_name || 'Çocuğum',
-        name: childIdentities[cid]?.full_name ?? 'İsimsiz',
+        nickname: nicknameMap[cid] || childIdentities[cid]?.full_name || tr('Çocuğum'),
+        name: childIdentities[cid]?.full_name ?? tr('İsimsiz'),
         grade: profileRes.data?.grade ?? '',
         streak: streakRes.data?.current_streak ?? 0,
         totalTests: sessions.length,
@@ -197,7 +201,7 @@ function ParentContent() {
       const lbWithStats = await Promise.all(lbData.map(async (p: any) => {
         const { data: s } = await supabase.from('quiz_sessions').select('pct').eq('user_id', p.id).eq('completed', true)
         const avg = s?.length ? Math.round(s.reduce((a: number, x: any) => a + x.pct, 0) / s.length) : 0
-        return { ...p, name: lbIdentities[p.id]?.full_name ?? 'İsimsiz', avgPct: avg, totalTests: s?.length ?? 0 }
+        return { ...p, name: lbIdentities[p.id]?.full_name ?? tr('İsimsiz'), avgPct: avg, totalTests: s?.length ?? 0 }
       }))
       const sorted = lbWithStats.filter(p => p.totalTests > 0).sort((a, b) => b.avgPct - a.avgPct)
       setLeaderboard(sorted.slice(0, 20))
@@ -225,16 +229,16 @@ function ParentContent() {
     const { data: { session } } = await supabase.auth.getSession()
     const response = await fetch('/api/parent/link-child', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ code: addCode.trim() }) })
     const result = await response.json()
-    if (!response.ok) { setAddError(result.error || 'Çocuk eklenemedi.'); return }
-    setAddSuccess('Çocuğunuz başarıyla eklendi!')
+    if (!response.ok) { setAddError(result.error || tr('Çocuk eklenemedi.')); return }
+    setAddSuccess(tr('Çocuğunuz başarıyla eklendi!'))
     setAddCode('')
     await load()
-    } catch { setAddError('Bağlantı hatası. Lütfen yeniden deneyin.') }
+    } catch { setAddError(tr('Bağlantı hatası. Lütfen yeniden deneyin.')) }
     finally { setAdding(false) }
   }
 
   async function removeChild(childId: string) {
-    if (!confirm('Bu çocuğu listeden kaldırmak istediğinize emin misiniz?')) return
+    if (!confirm(tr('Bu çocuğu listeden kaldırmak istediğinize emin misiniz?'))) return
     const { data: { session } } = await supabase.auth.getSession()
     const response = await fetch('/api/parent/unlink-child', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
@@ -242,12 +246,14 @@ function ParentContent() {
     })
     if (!response.ok) {
       const payload = await response.json().catch(() => null)
-      setAddError(payload?.error || 'Bağlantı kaldırılamadı.')
+      setAddError(payload?.error || tr('Bağlantı kaldırılamadı.'))
       return
     }
     setChildren(prev => prev.filter(c => c.child_id !== childId))
     setSelectedChild(children.filter(c => c.child_id !== childId)[0]?.child_id ?? null)
   }
+
+  const levelLabel = (v: string) => v === 'yüksek' ? tr('yüksek‖seviye') : v === 'orta' ? tr('orta‖seviye') : tr('düşük‖seviye')
 
   function pctColor(pct: number | null) {
     if (pct === null) return 'var(--text4)'
@@ -257,12 +263,12 @@ function ParentContent() {
   }
 
   function timeAgo(iso: string | null) {
-    if (!iso) return 'Henüz aktif değil'
+    if (!iso) return tr('Henüz aktif değil')
     const diff = Date.now() - new Date(iso).getTime()
     const days = Math.floor(diff / 86400000)
-    if (days === 0) return 'Bugün'
-    if (days === 1) return 'Dün'
-    return `${days} gün önce`
+    if (days === 0) return tr('Bugün')
+    if (days === 1) return tr('Dün')
+    return tr('{n} gün önce', { n: days })
   }
 
   const selected = children.find(c => c.child_id === selectedChild)
@@ -280,18 +286,18 @@ function ParentContent() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
           <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '32px', filter: 'brightness(0) invert(1)' }} />
           <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.2)' }} />
-          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap' }}>👨‍👩‍👧 Veli Paneli</span>
+          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap' }}>{tr('👨‍👩‍👧 Veli Paneli')}</span>
         </div>
         <div className="nav-scroll-x" style={{ display: 'flex', gap: '4px', alignItems: 'center', flex: 1, minWidth: 0 }}>
           {[
-            { key: 'dashboard', label: '📊 Durum' },
-            { key: 'trend', label: '📈 Trend' },
-            { key: 'weekly-growth', label: '📊 Haftalık Gelişim' },
-            { key: 'mastery', label: '🧠 Ustalık & Uyarılar' },
-            { key: 'archive', label: '📦 Arşiv' },
-            { key: 'leaderboard', label: '🏆 Sıralama' },
-            { key: 'reports', label: '📋 RAPORLAR' },
-            { key: 'add', label: '➕ Çocuk Ekle' },
+            { key: 'dashboard', label: tr('📊 Durum') },
+            { key: 'trend', label: tr('📈 Trend') },
+            { key: 'weekly-growth', label: tr('📊 Haftalık Gelişim') },
+            { key: 'mastery', label: tr('🧠 Ustalık & Uyarılar') },
+            { key: 'archive', label: tr('📦 Arşiv') },
+            { key: 'leaderboard', label: tr('🏆 Sıralama') },
+            { key: 'reports', label: tr('📋 RAPORLAR') },
+            { key: 'add', label: tr('➕ Çocuk Ekle') },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key as any)}
               style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0,
@@ -303,7 +309,7 @@ function ParentContent() {
           ))}
           <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.2)', margin: '0 4px', flexShrink: 0 }} />
           {/* Bildirim zili — /notifications zaten vardı, navbar'dan hiç bağlanmıyordu */}
-          <button onClick={() => router.push('/notifications')} title="Bildirimler"
+          <button onClick={() => router.push('/notifications')} title={tr('Bildirimler')}
             style={{ position: 'relative', padding: '6px 10px', borderRadius: '8px', border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.7)', fontSize: '15px', cursor: 'pointer', flexShrink: 0 }}>
             🔔
             {unreadNotifications > 0 && (
@@ -314,7 +320,7 @@ function ParentContent() {
           </button>
           <button onClick={() => { supabase.auth.signOut(); router.push('/login') }}
             style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-            Çıkış
+            {tr('Çıkış')}
           </button>
         </div>
       </nav>
@@ -341,10 +347,10 @@ function ParentContent() {
         {children.length === 0 && activeTab !== 'add' && (
           <div className="card" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>👶</div>
-            <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--primary)', marginBottom: '8px' }}>Henüz çocuk eklenmedi</div>
-            <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '1.5rem' }}>Çocuğunuzdan Pratium profilindeki veli kodunu alın.</div>
+            <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--primary)', marginBottom: '8px' }}>{tr('Henüz çocuk eklenmedi')}</div>
+            <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '1.5rem' }}>{tr('Çocuğunuzdan Pratium profilindeki veli kodunu alın.')}</div>
             <button onClick={() => setActiveTab('add')} className="btn btn-primary" style={{ justifyContent: 'center' }}>
-              + Çocuk Ekle
+              {tr('+ Çocuk Ekle')}
             </button>
           </div>
         )}
@@ -358,7 +364,7 @@ function ParentContent() {
               </h1>
               <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '2px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                 {selected.grade && <span>📚 {selected.grade}</span>}
-                <span>Son aktivite: {timeAgo(selected.lastActive)}</span>
+                <span>{tr('Son aktivite: {when}', { when: timeAgo(selected.lastActive) })}</span>
               </div>
             </div>
 
@@ -370,17 +376,17 @@ function ParentContent() {
               const growthDelta = wg?.deltaPoints ?? null
               const growthHasData = wg?.thisWeekAvg != null && wg?.lastWeekAvg != null
               const growthColor = !growthHasData ? 'var(--text4)' : growthDelta! > 0 ? 'var(--green)' : growthDelta! < 0 ? 'var(--red)' : 'var(--text)'
-              const growthValue = !growthHasData ? '—' : `${growthDelta! > 0 ? '+' : ''}${growthDelta} puan`
+              const growthValue = !growthHasData ? '—' : `${growthDelta! > 0 ? '+' : ''}${tr('{n} puan', { n: growthDelta })}`
 
               return (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginBottom: '1.5rem' }}>
                   {[
-                    { icon: '🔥', label: 'Günlük Seri', value: `${selected.streak} gün`, color: selected.streak >= 7 ? 'var(--green)' : 'var(--text)' },
-                    { icon: '📊', label: 'Genel Ortalama', value: selected.avgPct !== null ? `%${selected.avgPct}` : '—', color: pctColor(selected.avgPct) },
-                    { icon: '📅', label: 'Bu Hafta', value: `${selected.weeklyTests} test`, color: 'var(--text)' },
-                    { icon: '✅', label: 'Ödev', value: `${selected.assignmentsDone} tamamlandı`, color: 'var(--text)' },
-                    { icon: '🏆', label: 'Genel Sıra', value: selected.leaderRank ? `#${selected.leaderRank}` : '—', color: selected.leaderRank && selected.leaderRank <= 10 ? 'var(--green)' : 'var(--text)' },
-                    { icon: '📈', label: 'Gelişim Oranı', value: growthValue, color: growthColor, onClick: () => setActiveTab('weekly-growth') },
+                    { icon: '🔥', label: tr('Günlük Seri'), value: tr('{n} gün', { n: selected.streak }), color: selected.streak >= 7 ? 'var(--green)' : 'var(--text)' },
+                    { icon: '📊', label: tr('Genel Ortalama'), value: selected.avgPct !== null ? `%${selected.avgPct}` : '—', color: pctColor(selected.avgPct) },
+                    { icon: '📅', label: tr('Bu Hafta'), value: tr('{n} test', { n: selected.weeklyTests }), color: 'var(--text)' },
+                    { icon: '✅', label: tr('Ödev‖veli'), value: tr('{n} tamamlandı', { n: selected.assignmentsDone }), color: 'var(--text)' },
+                    { icon: '🏆', label: tr('Genel Sıra'), value: selected.leaderRank ? `#${selected.leaderRank}` : '—', color: selected.leaderRank && selected.leaderRank <= 10 ? 'var(--green)' : 'var(--text)' },
+                    { icon: '📈', label: tr('Gelişim Oranı'), value: growthValue, color: growthColor, onClick: () => setActiveTab('weekly-growth') },
                   ].map((s, i) => (
                     <div key={i} className="card" onClick={s.onClick} style={{ textAlign: 'center', padding: '14px 10px', cursor: s.onClick ? 'pointer' : 'default' }}>
                       <div style={{ fontSize: '20px', marginBottom: '4px' }}>{s.icon}</div>
@@ -396,55 +402,55 @@ function ParentContent() {
             <div className="card" style={{ marginBottom: '1.5rem', background: 'linear-gradient(135deg, rgba(30,207,184,0.08), rgba(99,102,241,0.06))' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '8px' }}>
                 <div>
-                  <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Veli öğrenme özeti</div>
-                  <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--primary)', marginTop: '4px' }}>Bugün nasıl destek olabilirsiniz?</div>
+                  <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{tr('Veli öğrenme özeti')}</div>
+                  <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--primary)', marginTop: '4px' }}>{tr('Bugün nasıl destek olabilirsiniz?')}</div>
                 </div>
                 <span style={{ fontSize: '22px' }}>💡</span>
               </div>
               {selected.weakTopics.length > 0 ? (
                 <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}>
-                  Öncelik: <strong>{selected.weakTopics[0]}</strong>. Kısa ve sakin bir tekrar oturumu öneriyoruz; baskı yerine birlikte hedef belirleyin.
+                  {tr('Öncelik: {topic}. Kısa ve sakin bir tekrar oturumu öneriyoruz; baskı yerine birlikte hedef belirleyin.', { topic: selected.weakTopics[0] })}
                 </div>
               ) : selected.weeklyTests > 0 ? (
-                <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}>Bu hafta {selected.weeklyTests} test tamamlandı. Düzenli çalışma alışkanlığını küçük molalarla destekleyin.</div>
+                <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}>{tr('Bu hafta {n} test tamamlandı. Düzenli çalışma alışkanlığını küçük molalarla destekleyin.', { n: selected.weeklyTests })}</div>
               ) : (
-                <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}>Henüz bu hafta veri oluşmadı. Birlikte kısa bir çalışma hedefi belirleyebilirsiniz.</div>
+                <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6 }}>{tr('Henüz bu hafta veri oluşmadı. Birlikte kısa bir çalışma hedefi belirleyebilirsiniz.')}</div>
               )}
             </div>
 
             {/* Son çalışılan konular + Zayıf konular */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '1.5rem' }}>
               <div className="card">
-                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>Son Çalışılan</div>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>{tr('Son Çalışılan')}</div>
                 {selected.recentTopics.length > 0 ? selected.recentTopics.map((t, i) => (
                   <div key={i} style={{ fontSize: '13px', padding: '6px 0', borderBottom: i < selected.recentTopics.length - 1 ? '1px solid var(--border)' : 'none' }}>📚 {t}</div>
-                )) : <div style={{ fontSize: '13px', color: 'var(--text4)' }}>Henüz test çözülmedi</div>}
+                )) : <div style={{ fontSize: '13px', color: 'var(--text4)' }}>{tr('Henüz test çözülmedi')}</div>}
               </div>
               <div className="card">
-                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>Gelişim Alanları</div>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>{tr('Gelişim Alanları')}</div>
                 {selected.weakTopics.length > 0 ? selected.weakTopics.map((t, i) => (
                   <div key={i} style={{ fontSize: '13px', padding: '6px 0', borderBottom: i < selected.weakTopics.length - 1 ? '1px solid var(--border)' : 'none', color: 'var(--red)' }}>⚠️ {t}</div>
-                )) : <div style={{ fontSize: '13px', color: 'var(--green)' }}>✓ Zayıf konu yok</div>}
+                )) : <div style={{ fontSize: '13px', color: 'var(--green)' }}>{tr('✓ Zayıf konu yok')}</div>}
               </div>
             </div>
 
             {/* Son testler */}
             {selected.sessions.length > 0 && (
               <div className="card">
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>📝 Son Çözülen Testler</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>{tr('📝 Son Çözülen Testler')}</div>
                 {selected.sessions.slice(0, 5).map((s: any) => (
                   <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                     <div>
                       <div style={{ fontSize: '13px', fontWeight: 500 }}>{s.topic}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
-                        {s.score}/{s.question_count} doğru · {new Date(s.created_at).toLocaleDateString('tr-TR')}
+                        {tr('{score}/{total} doğru · {date}', { score: s.score, total: s.question_count, date: new Date(s.created_at).toLocaleDateString(dateLocale) })}
                       </div>
                     </div>
                     <div style={{ fontWeight: 800, fontSize: '18px', color: pctColor(s.pct) }}>%{s.pct}</div>
                   </div>
                 ))}
                 <button onClick={() => setActiveTab('archive')} style={{ marginTop: '8px', fontSize: '12px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 600 }}>
-                  Tüm arşivi gör →
+                  {tr('Tüm arşivi gör →')}
                 </button>
               </div>
             )}
@@ -455,7 +461,7 @@ function ParentContent() {
             {/* Çocuğu kaldır */}
             <div style={{ marginTop: '1rem', textAlign: 'right' }}>
               <button onClick={() => removeChild(selected.child_id)} style={{ fontSize: '12px', color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                Listeden kaldır
+                {tr('Listeden kaldır')}
               </button>
             </div>
           </div>
@@ -501,8 +507,8 @@ function ParentContent() {
               <div className="card" style={{ background: 'linear-gradient(135deg, rgba(8,36,101,0.04), rgba(30,207,184,0.04))', border: '1px solid rgba(99,102,241,0.2)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)' }}>📧 Haftalık Özet E-postası</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>Her Pazar 08:00'de otomatik gönderilir. Şimdi de isteyebilirsin.</div>
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)' }}>{tr('📧 Haftalık Özet E-postası')}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>{tr("Her Pazar 08:00'de otomatik gönderilir. Şimdi de isteyebilirsin.")}</div>
                   </div>
                   <button onClick={async () => {
                     setSendingEmail(true)
@@ -517,7 +523,7 @@ function ParentContent() {
                     setSendingEmail(false)
                   }} disabled={sendingEmail || emailSent}
                     className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '13px' }}>
-                    {emailSent ? '✅ Gönderildi!' : sendingEmail ? '⏳ Gönderiliyor...' : '📨 Özet Gönder'}
+                    {emailSent ? tr('✅ Gönderildi!') : sendingEmail ? tr('⏳ Gönderiliyor...') : tr('📨 Özet Gönder')}
                   </button>
                 </div>
               </div>
@@ -525,7 +531,7 @@ function ParentContent() {
               {/* Haftalık Trend */}
               {trendData.length > 0 && (
                 <div className="card">
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '12px' }}>📈 Haftalık Başarı Trendi</div>
+                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '12px' }}>{tr('📈 Haftalık Başarı Trendi')}</div>
                   <ResponsiveContainer width="100%" height={220}>
                     <AreaChart data={trendData}>
                       <defs>
@@ -537,7 +543,7 @@ function ParentContent() {
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                       <XAxis dataKey="week" tick={{ fontSize: 12 }} />
                       <YAxis domain={[0,100]} tickFormatter={v => `%${v}`} tick={{ fontSize: 11 }} />
-                      <Tooltip formatter={(v: any) => [`%${v}`, 'Haftalık Ort.']} />
+                      <Tooltip formatter={(v: any) => [`%${v}`, tr('Haftalık Ort.')]} />
                       <Area type="monotone" dataKey="avg" stroke="#6366f1" strokeWidth={2.5} fill="url(#parentTrend)" dot={{ fill: '#6366f1', r: 4 }} />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -547,13 +553,13 @@ function ParentContent() {
               {/* Konu bazlı başarı */}
               {topicData.length > 0 && (
                 <div className="card">
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '12px' }}>📚 Konu Başarısı</div>
+                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '12px' }}>{tr('📚 Konu Başarısı')}</div>
                   <ResponsiveContainer width="100%" height={Math.max(180, topicData.length * 30)}>
                     <BarChart data={topicData} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                       <XAxis type="number" domain={[0,100]} tickFormatter={v => `%${v}`} tick={{ fontSize: 11 }} />
                       <YAxis type="category" dataKey="topic" width={120} tick={{ fontSize: 11, fill: 'var(--text2)' }} />
-                      <Tooltip formatter={(v: any) => [`%${v}`, 'Başarı']} />
+                      <Tooltip formatter={(v: any) => [`%${v}`, tr('Başarı')]} />
                       <Bar dataKey="avg" radius={[0,6,6,0]}>
                         {topicData.map((d, i) => <Cell key={i} fill={pctColor(d.avg)} />)}
                       </Bar>
@@ -565,7 +571,7 @@ function ParentContent() {
               {/* Zayıf konular */}
               {selected.weakTopics?.length > 0 && (
                 <div className="card" style={{ border: '1.5px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.03)' }}>
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: '#dc2626', marginBottom: '10px' }}>⚠️ Çalışılması Gereken Konular</div>
+                  <div style={{ fontWeight: 700, fontSize: '14px', color: '#dc2626', marginBottom: '10px' }}>{tr('⚠️ Çalışılması Gereken Konular')}</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     {selected.weakTopics.map((topic: string, i: number) => (
                       <span key={i} style={{ padding: '5px 12px', borderRadius: '99px', background: 'rgba(239,68,68,0.1)', color: '#dc2626', fontSize: '12px', fontWeight: 600 }}>
@@ -588,45 +594,43 @@ function ParentContent() {
           const deltaColor = delta == null ? 'var(--text3)' : delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--red)' : 'var(--text3)'
           const deltaArrow = delta == null ? '' : delta > 0 ? '▲' : delta < 0 ? '▼' : '—'
           const compareChartData = [
-            { subject: 'Geçen Hafta', avgPct: g.lastWeekAvg ?? 0, testCount: g.lastWeekCount },
-            { subject: 'Bu Hafta', avgPct: g.thisWeekAvg ?? 0, testCount: g.thisWeekCount },
+            { subject: tr('Geçen Hafta'), avgPct: g.lastWeekAvg ?? 0, testCount: g.lastWeekCount },
+            { subject: tr('Bu Hafta'), avgPct: g.thisWeekAvg ?? 0, testCount: g.thisWeekCount },
           ]
 
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div className="card" style={{ textAlign: 'center', padding: '2rem 1.5rem' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
-                  Haftalık Gelişim Oranı
+                  {tr('Haftalık Gelişim Oranı')}
                 </div>
                 {hasComparison ? (
                   <>
                     <div style={{ fontSize: '40px', fontWeight: 800, color: deltaColor, lineHeight: 1 }}>
                       {deltaArrow} {delta! > 0 ? '+' : ''}{delta}
-                      <span style={{ fontSize: '20px' }}> puan</span>
+                      <span style={{ fontSize: '20px' }}> {tr('puan')}</span>
                     </div>
                     <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '8px' }}>
-                      Geçen hafta %{g.lastWeekAvg} → Bu hafta %{g.thisWeekAvg}
+                      {tr('Geçen hafta %{last} → Bu hafta %{this}', { last: g.lastWeekAvg, this: g.thisWeekAvg })}
                     </div>
                   </>
                 ) : (
                   <div style={{ fontSize: '14px', color: 'var(--text3)', padding: '1rem 0' }}>
-                    Karşılaştırma için hem bu hafta hem geçen hafta en az bir test çözülmüş olması gerekiyor.
+                    {tr('Karşılaştırma için hem bu hafta hem geçen hafta en az bir test çözülmüş olması gerekiyor.')}
                   </div>
                 )}
               </div>
 
               {hasComparison && (
                 <div className="card">
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>Geçen Hafta vs Bu Hafta</div>
+                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>{tr('Geçen Hafta vs Bu Hafta')}</div>
                   <SubjectPerformanceChart data={compareChartData} height={180} />
                 </div>
               )}
 
               <div className="card" style={{ background: 'var(--bg2)' }}>
                 <div style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.7 }}>
-                  ℹ️ Hafta, Pazartesi gününden başlar. "Bu hafta" bu Pazartesi'den bugüne, "geçen hafta"
-                  ise önceki Pazartesi-Pazar aralığındaki testlerin ortalamasını gösterir. Bu karşılaştırma,
-                  her pazar günü gönderilen haftalık özet e-postasına da otomatik olarak ekleniyor.
+                  {tr('ℹ️ Hafta, Pazartesi gününden başlar. "Bu hafta" bu Pazartesi\'den bugüne, "geçen hafta" ise önceki Pazartesi-Pazar aralığındaki testlerin ortalamasını gösterir. Bu karşılaştırma, her pazar günü gönderilen haftalık özet e-postasına da otomatik olarak ekleniyor.')}
                 </div>
               </div>
             </div>
@@ -639,22 +643,22 @@ function ParentContent() {
           const riskColor = { yüksek: 'var(--red)', orta: '#f59e0b', düşük: 'var(--green)' } as Record<string, string>
           const atRisk = selected.topicRisks.filter(t => t.riskKind !== null)
           const sd = selected.studyDuration
-          const progressLabel = (score: number) => score >= 70 ? 'İyi ilerliyor' : score >= 45 ? 'Pekiştirilmeli' : 'Desteğe ihtiyaç var'
+          const progressLabel = (score: number) => score >= 70 ? tr('İyi ilerliyor') : score >= 45 ? tr('Pekiştirilmeli') : tr('Desteğe ihtiyaç var')
           const homeSupport = (risk: TopicRisk) => risk.forgettingRisk === 'yüksek'
-            ? 'Bugün 10 dakikalık sakin bir tekrar planlayın; cevabı söylemek yerine ne hatırladığını sorun.'
-            : 'Bu hafta kısa bir çalışma hedefi belirleyin ve tamamladığında çabasını takdir edin.'
+            ? tr('Bugün 10 dakikalık sakin bir tekrar planlayın; cevabı söylemek yerine ne hatırladığını sorun.')
+            : tr('Bu hafta kısa bir çalışma hedefi belirleyin ve tamamladığında çabasını takdir edin.')
 
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
               {/* Erken Uyarılar */}
               <div className="card">
-                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>🚨 Erken Uyarılar</div>
+                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>{tr('🚨 Erken Uyarılar')}</div>
                 <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '12px' }}>
-                  Bu liste, riskli konu oluştuğu anda gönderilen e-posta uyarılarıyla AYNI kaynaktan besleniyor — e-postayı kaçırsanız bile burada görebilirsiniz.
+                  {tr('Bu liste, riskli konu oluştuğu anda gönderilen e-posta uyarılarıyla AYNI kaynaktan besleniyor — e-postayı kaçırsanız bile burada görebilirsiniz.')}
                 </div>
                 {atRisk.length === 0 ? (
-                  <div style={{ fontSize: '13px', color: 'var(--green)' }}>✓ Şu an aktif bir erken uyarı yok</div>
+                  <div style={{ fontSize: '13px', color: 'var(--green)' }}>{tr('✓ Şu an aktif bir erken uyarı yok')}</div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {atRisk.map((t, i) => (
@@ -664,10 +668,10 @@ function ParentContent() {
                           <div style={{ fontWeight: 700, fontSize: '13px', color: t.riskKind === 'reaktif' ? '#dc2626' : '#b45309' }}>{t.topic}</div>
                           <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>
                             {t.riskKind === 'reaktif'
-                              ? `Son çalışmalar bu konuda desteğe ihtiyaç olduğunu gösteriyor (ilerleme göstergesi %${t.masteryScore}).`
-                              : `Genel durum henüz kritik değil; ancak son çalışmalar aşağı yönlü ilerliyor (ilerleme göstergesi %${t.masteryScore}).`}
+                              ? tr('Son çalışmalar bu konuda desteğe ihtiyaç olduğunu gösteriyor (ilerleme göstergesi %{score}).', { score: t.masteryScore })
+                              : tr('Genel durum henüz kritik değil; ancak son çalışmalar aşağı yönlü ilerliyor (ilerleme göstergesi %{score}).', { score: t.masteryScore })}
                           </div>
-                          <div style={{ fontSize:'12px', color:'var(--text2)', marginTop:'5px' }}><strong>Evde destek:</strong> {homeSupport(t)}</div>
+                          <div style={{ fontSize:'12px', color:'var(--text2)', marginTop:'5px' }}><strong>{tr('Evde destek:')}</strong> {homeSupport(t)}</div>
                         </div>
                       </div>
                     ))}
@@ -677,12 +681,12 @@ function ParentContent() {
 
               {/* Konu Ustalık Haritası */}
               <div className="card">
-                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>🧠 Konu Gelişim Haritası</div>
+                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>{tr('🧠 Konu Gelişim Haritası')}</div>
                 <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '12px' }}>
-                  Çocuğunuzun zorlandığı konular, son çalışmalar ve tekrar ihtiyacı birlikte değerlendirilir.
+                  {tr('Çocuğunuzun zorlandığı konular, son çalışmalar ve tekrar ihtiyacı birlikte değerlendirilir.')}
                 </div>
                 {selected.topicRisks.length === 0 ? (
-                  <div style={{ fontSize: '13px', color: 'var(--green)' }}>✓ Henüz zorlanılan bir konu yok</div>
+                  <div style={{ fontSize: '13px', color: 'var(--green)' }}>{tr('✓ Henüz zorlanılan bir konu yok')}</div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
                     {selected.topicRisks.map((t, i) => (
@@ -691,12 +695,12 @@ function ParentContent() {
                         <div style={{ fontWeight: 800, fontSize: '22px', color: masteryColor(t.masteryScore) }}>%{t.masteryScore}</div>
                         <div style={{ fontSize:'11px', fontWeight:700, color:masteryColor(t.masteryScore), marginTop:2 }}>{progressLabel(t.masteryScore)}</div>
                         <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
-                          <span>Veri güveni: {t.confidence}</span>
+                          <span>{tr('Veri güveni: {level}', { level: levelLabel(t.confidence) })}</span>
                           <span>·</span>
-                          <span style={{ color: riskColor[t.forgettingRisk] }}>Tekrar ihtiyacı: {t.forgettingRisk}</span>
+                          <span style={{ color: riskColor[t.forgettingRisk] }}>{tr('Tekrar ihtiyacı: {level}', { level: levelLabel(t.forgettingRisk) })}</span>
                         </div>
                         <div style={{ fontSize: '10px', color: 'var(--text4)', marginTop: '4px' }}>
-                          {t.wrongCount}/{t.totalCount} yanlış · {timeAgo(selected.weakTopicsRaw[i]?.last_seen_at ?? null)}
+                          {tr('{wrong}/{total} yanlış · {when}', { wrong: t.wrongCount, total: t.totalCount, when: timeAgo(selected.weakTopicsRaw[i]?.last_seen_at ?? null) })}
                         </div>
                       </div>
                     ))}
@@ -706,24 +710,23 @@ function ParentContent() {
 
               {/* Verimli Çalışma Süresi */}
               <div className="card">
-                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>⏱️ Verimli Çalışma Süresi</div>
+                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '4px' }}>{tr('⏱️ Verimli Çalışma Süresi')}</div>
                 {!sd || !sd.hasEnoughData ? (
                   <div style={{ fontSize: '13px', color: 'var(--text3)', lineHeight: 1.6 }}>
-                    Henüz yeterli veri yok ({sd?.sessionsAnalyzed ?? 0} test analiz edildi). {selected.name} yeni testler çözdükçe,
-                    kaçıncı sorudan sonra dikkatinin dağılmaya başladığı burada görünecek.
+                    {tr('Henüz yeterli veri yok ({n} test analiz edildi). {name} yeni testler çözdükçe, kaçıncı sorudan sonra dikkatinin dağılmaya başladığı burada görünecek.', { n: sd?.sessionsAnalyzed ?? 0, name: selected.name })}
                   </div>
                 ) : (
                   <div>
                     <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '10px' }}>
-                      Son {sd.sessionsAnalyzed} test incelendi · ortalama soru başına <strong>{sd.avgTimePerQuestionSec} sn</strong>
+                      {tr('Son {n} test incelendi · ortalama soru başına {sec} sn', { n: sd.sessionsAnalyzed, sec: sd.avgTimePerQuestionSec })}
                     </div>
                     {sd.fatigueDetected ? (
                       <div style={{ padding: '10px 12px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: '10px', fontSize: '12.5px', color: '#78350f' }}>
-                        📉 Testler genelde <strong>{sd.fatiguePointEstimate}. sorudan</strong> sonra doğruluk düşüyor.
-                        {sd.recommendedSessionLength && <> Önerilen: tek seferde <strong>{sd.recommendedSessionLength} soruluk</strong> testler.</>}
+                        {tr('📉 Testler genelde {n}. sorudan sonra doğruluk düşüyor.', { n: sd.fatiguePointEstimate })}
+                        {sd.recommendedSessionLength && <> {tr('Önerilen: tek seferde {n} soruluk testler.', { n: sd.recommendedSessionLength })}</>}
                       </div>
                     ) : (
-                      <div style={{ fontSize: '13px', color: 'var(--green)' }}>✓ Belirgin bir yorgunluk paterni tespit edilmedi</div>
+                      <div style={{ fontSize: '13px', color: 'var(--green)' }}>{tr('✓ Belirgin bir yorgunluk paterni tespit edilmedi')}</div>
                     )}
                   </div>
                 )}
@@ -735,12 +738,12 @@ function ParentContent() {
         {activeTab === 'archive' && selected && (
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>
-              📦 {selected.name} — Test Arşivi
+              {tr('📦 {name} — Test Arşivi', { name: selected.name })}
             </h2>
             {selected.sessions.length === 0 ? (
               <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
                 <div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div>
-                <div style={{ fontSize: '14px', color: 'var(--text3)' }}>Henüz test çözülmemiş.</div>
+                <div style={{ fontSize: '14px', color: 'var(--text3)' }}>{tr('Henüz test çözülmemiş.')}</div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -753,7 +756,7 @@ function ParentContent() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.topic}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
-                        {new Date(s.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        {new Date(s.created_at).toLocaleDateString(dateLocale, { day: 'numeric', month: 'long', year: 'numeric' })}
                       </div>
                     </div>
                   </div>
@@ -766,20 +769,20 @@ function ParentContent() {
         {/* LEADERBOARD */}
         {activeTab === 'leaderboard' && (
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>🏆 Genel Sıralama</h2>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>{tr('🏆 Genel Sıralama')}</h2>
 
             {/* Çocuğun sırası */}
             {selected && selected.leaderRank && (
               <div className="card" style={{ marginBottom: '1rem', borderLeft: '3px solid var(--accent)', background: 'var(--accent-bg)' }}>
                 <div style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: 700 }}>
-                  {selected.name} — #{selected.leaderRank} sırada ({selected.leaderTotal} öğrenci arasında)
+                  {tr('{name} — #{rank} sırada ({total} öğrenci arasında)', { name: selected.name, rank: selected.leaderRank, total: selected.leaderTotal ?? 0 })}
                 </div>
               </div>
             )}
 
             {leaderboard.length === 0 ? (
               <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-                <div style={{ fontSize: '13px', color: 'var(--text3)' }}>Sıralama yükleniyor...</div>
+                <div style={{ fontSize: '13px', color: 'var(--text3)' }}>{tr('Sıralama yükleniyor...')}</div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -795,7 +798,7 @@ function ParentContent() {
                           {p.name} {isChild && '⭐'}
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
-                          {p.totalTests} test · {p.grade}
+                          {tr('{n} test · {grade}', { n: p.totalTests, grade: p.grade ?? '' })}
                         </div>
                       </div>
                       <div style={{ fontWeight: 800, fontSize: '20px', color: pctColor(p.avgPct), flexShrink: 0 }}>
@@ -812,7 +815,7 @@ function ParentContent() {
         {/* RAPORLAR */}
         {activeTab === 'reports' && (
           <div>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.25rem' }}>📋 Çocuklarımın Raporları</h1>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.25rem' }}>{tr('📋 Çocuklarımın Raporları')}</h1>
             <ReportsHub scope="parent" gradesEndpoint="/api/parent/reports" sectionalEndpoint="/api/parent/reports" hubEndpoint="/api/parent/reports-hub" />
           </div>
         )}
@@ -820,20 +823,19 @@ function ParentContent() {
         {/* ÇOCUK EKLE */}
         {activeTab === 'add' && (
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>➕ Çocuk Ekle</h2>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>{tr('➕ Çocuk Ekle')}</h2>
             <div className="card">
               <p style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '14px', lineHeight: 1.6 }}>
-                Çocuğunuzdan Pratium profilindeki <strong>Veli Kodunu</strong> alın ve buraya girin.
-                (Profil Düzenle → Veli Bağlantısı bölümünden bulabilirler)
+                {tr('Çocuğunuzdan Pratium profilindeki Veli Kodunu alın ve buraya girin. (Profil Düzenle → Veli Bağlantısı bölümünden bulabilirler)')}
               </p>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input value={addCode} onChange={e => setAddCode(e.target.value)}
-                  placeholder="8 haneli veli kodu"
+                  placeholder={tr('8 haneli veli kodu')}
                   onKeyDown={e => e.key === 'Enter' && addChild()}
                   style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', outline: 'none' }} />
                 <button onClick={addChild} disabled={adding || !addCode.trim()}
                   style={{ padding: '10px 18px', borderRadius: '10px', background: '#082465', color: '#fff', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)', opacity: adding ? 0.6 : 1 }}>
-                  {adding ? '...' : 'Ekle'}
+                  {adding ? '...' : tr('Ekle')}
                 </button>
               </div>
               {addError && <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--red)' }}>⚠️ {addError}</div>}
@@ -843,7 +845,7 @@ function ParentContent() {
             {/* Mevcut çocuklar */}
             {children.length > 0 && (
               <div className="card" style={{ marginTop: '1rem' }}>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>Bağlı Çocuklar</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>{tr('Bağlı Çocuklar')}</div>
                 {children.map(c => (
                   <div key={c.child_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                     <div>
@@ -851,7 +853,7 @@ function ParentContent() {
                       {c.grade && <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{c.grade}</div>}
                     </div>
                     <button onClick={() => removeChild(c.child_id)} style={{ fontSize: '11px', color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                      Kaldır
+                      {tr('Kaldır')}
                     </button>
                   </div>
                 ))}
