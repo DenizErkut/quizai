@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities } from '@/lib/identity/resolve-client'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 import {
   BarChart, Bar, RadarChart, Radar, PolarGrid, PolarAngleAxis,
   PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -12,6 +14,8 @@ import {
 } from 'recharts'
 
 export default function TeacherPerformancePage() {
+  const { t: tr, locale } = useT()
+  const dateLocale = intlLocale(locale)
   const [teacher, setTeacher] = useState<any>(null)
   const [classrooms, setClassrooms] = useState<any[]>([])
   const [selectedClass, setSelectedClass] = useState<string | null>(null)
@@ -126,7 +130,7 @@ export default function TeacherPerformancePage() {
         ? Math.round(userCompletions.reduce((acc: number, c: any) => acc + c.pct, 0) / userCompletions.length) : null
       return {
         student_id: s.student_id,
-        name: identities[s.student_id]?.full_name || 'İsimsiz',
+        name: identities[s.student_id]?.full_name || tr('İsimsiz'),
         grade: profile.grade,
         totalTests: userSessions.length,
         avgPct,
@@ -145,7 +149,7 @@ export default function TeacherPerformancePage() {
         ? Math.round(asgComps.reduce((acc: number, c: any) => acc + c.pct, 0) / asgComps.length) : null
       const studentResults = asgComps.map((c: any) => ({
         ...c,
-        name: identities[c.student_id]?.full_name || 'İsimsiz',
+        name: identities[c.student_id]?.full_name || tr('İsimsiz'),
       }))
       return { ...a, completedCount: asgComps.length, totalStudents: students.length, avgScore, studentResults }
     })
@@ -163,11 +167,11 @@ export default function TeacherPerformancePage() {
       const classroom = classrooms.find(c => c.id === selectedClass)
       const measured = studentStats.filter(s => s.avgPct !== null)
       const average = measured.length ? Math.round(measured.reduce((total, s) => total + (s.avgPct || 0), 0) / measured.length) : null
-      const summary = "<h2>Genel Özet</h2><p>Toplam öğrenci: " + studentStats.length + " · Aktif öğrenci: " + studentStats.filter(s => s.totalTests > 0).length + " · Sınıf ortalaması: " + (average === null ? "—" : "%" + average) + " · Toplam ödev: " + assignments.length + "</p>"
+      const summary = "<h2>" + tr('Genel Özet') + "</h2><p>" + tr('Toplam öğrenci: {total} · Aktif öğrenci: {active} · Sınıf ortalaması: {avg} · Toplam ödev: {hw}', { total: studentStats.length, active: studentStats.filter(s => s.totalTests > 0).length, avg: average === null ? "—" : "%" + average, hw: assignments.length }) + "</p>"
       const rows = [...studentStats].sort((a,b) => (b.avgPct ?? -1) - (a.avgPct ?? -1)).map(s => "<tr><td>" + printableMath(s.name) + "</td><td>" + s.totalTests + "</td><td>" + (s.avgPct === null ? "—" : "%" + s.avgPct) + "</td><td>" + s.assignmentsDone + "</td><td>" + (s.assignmentAvg === null ? "—" : "%" + s.assignmentAvg) + "</td></tr>").join("")
-      const homework = assignments.map(a => "<section class='print-question'><h2>" + printableMath(a.title || a.topic || "") + "</h2><p>" + a.completedCount + "/" + a.totalStudents + " tamamladı</p><p>Konu: " + printableMath(a.topic || "") + " · Zorluk: " + printableMath(a.difficulty || "") + " · " + a.question_count + " soru · Ortalama: " + (a.avgScore === null ? "—" : "%" + a.avgScore) + "</p></section>").join("")
-      await printLearningDocument("Pratium Sınıf Performans Raporu", (classroom?.name || "Sınıf") + " · " + new Date().toLocaleDateString("tr-TR"), summary + "<h2>Öğrenci Detayları</h2><table><thead><tr><th>Ad</th><th>Test</th><th>Ortalama</th><th>Ödev</th><th>Ödev Ort.</th></tr></thead><tbody>" + rows + "</tbody></table><h2>Ödev Özeti</h2>" + homework)
-    } catch (error) { alert(error instanceof Error ? error.message : "PDF görünümü açılamadı.") }
+      const homework = assignments.map(a => "<section class='print-question'><h2>" + printableMath(a.title || a.topic || "") + "</h2><p>" + tr('{done}/{total} tamamladı', { done: a.completedCount, total: a.totalStudents }) + "</p><p>" + tr('Konu: {topic} · Zorluk: {difficulty} · {n} soru · Ortalama: {avg}', { topic: printableMath(a.topic || ""), difficulty: printableMath(a.difficulty || ""), n: a.question_count, avg: a.avgScore === null ? "—" : "%" + a.avgScore }) + "</p></section>").join("")
+      await printLearningDocument(tr('Pratium Sınıf Performans Raporu'), (classroom?.name || tr('Sınıf‖sınıf grubu')) + " · " + new Date().toLocaleDateString(dateLocale), summary + "<h2>" + tr('Öğrenci Detayları') + "</h2><table><thead><tr><th>" + tr('Ad') + "</th><th>" + tr('Test‖tablo') + "</th><th>" + tr('Ortalama') + "</th><th>" + tr('Ödev‖tablo') + "</th><th>" + tr('Ödev Ort.') + "</th></tr></thead><tbody>" + rows + "</tbody></table><h2>" + tr('Ödev Özeti') + "</h2>" + homework)
+    } catch (error) { alert(error instanceof Error ? error.message : tr('PDF görünümü açılamadı.')) }
     finally { setPdfLoading(false) }
   }
 
@@ -205,7 +209,7 @@ export default function TeacherPerformancePage() {
         setAiAnalysis(prev => ({ ...prev, [key]: json.analysis }))
       }
     } catch (e) {
-      alert('AI analiz hatası')
+      alert(tr('AI analiz hatası'))
     } finally {
       setAiLoading(null)
     }
@@ -245,12 +249,12 @@ export default function TeacherPerformancePage() {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Link href="/teacher" style={{ color: 'var(--text3)', fontSize: '13px', textDecoration: 'none' }}>← Panel</Link>
-            <h1 style={{ fontSize: '20px', fontWeight: 700 }}>📊 Performans</h1>
+            <Link href="/teacher" style={{ color: 'var(--text3)', fontSize: '13px', textDecoration: 'none' }}>{tr('← Panel')}</Link>
+            <h1 style={{ fontSize: '20px', fontWeight: 700 }}>{tr('📊 Performans')}</h1>
           </div>
           <button onClick={exportPDF} disabled={pdfLoading || statsLoading || studentStats.length === 0}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '10px', background: pdfLoading ? 'var(--bg2)' : '#082465', color: pdfLoading ? 'var(--text3)' : '#fff', border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', opacity: (pdfLoading || studentStats.length === 0) ? 0.6 : 1, transition: 'all 0.15s' }}>
-            {pdfLoading ? '⏳ Hazırlanıyor...' : '📄 Yazdır / PDF kaydet'}
+            {pdfLoading ? tr('⏳ Hazırlanıyor...') : tr('📄 Yazdır / PDF kaydet')}
           </button>
         </div>
 
@@ -271,9 +275,9 @@ export default function TeacherPerformancePage() {
         {/* View sekmeleri */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem' }}>
           {[
-            { key: 'overview', label: '👥 Öğrenci Genel Bakış' },
-            { key: 'assignments', label: `📝 Ödev Sonuçları (${assignments.length})` },
-            { key: 'ranking', label: '🏆 Sınıf Sıralaması' },
+            { key: 'overview', label: tr('👥 Öğrenci Genel Bakış') },
+            { key: 'assignments', label: tr('📝 Ödev Sonuçları ({n})', { n: assignments.length }) },
+            { key: 'ranking', label: tr('🏆 Sınıf Sıralaması') },
           ].map(t => (
             <button key={t.key} onClick={() => { setView(t.key as any); setSelectedStudent(null) }}
               style={{ padding: '8px 16px', borderRadius: '999px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
@@ -293,7 +297,7 @@ export default function TeacherPerformancePage() {
           studentStats.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
               <div style={{ fontSize: '40px', marginBottom: '12px' }}>👥</div>
-              <div style={{ fontSize: '14px', color: 'var(--text3)' }}>Bu sınıfta henüz öğrenci yok.</div>
+              <div style={{ fontSize: '14px', color: 'var(--text3)' }}>{tr('Bu sınıfta henüz öğrenci yok.')}</div>
             </div>
           ) : (
             <>
@@ -301,8 +305,8 @@ export default function TeacherPerformancePage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', flexWrap: 'wrap', gap: '10px' }}>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   {[
-                    { key: 'list', label: '👥 Öğrenci Listesi' },
-                    { key: 'charts', label: '📊 Sınıf Grafikleri' },
+                    { key: 'list', label: tr('👥 Öğrenci Listesi') },
+                    { key: 'charts', label: tr('📊 Sınıf Grafikleri') },
                   ].map(t => (
                     <button key={t.key} onClick={() => setChartView(t.key as any)}
                       style={{ padding: '6px 14px', borderRadius: '99px', border: `1.5px solid ${chartView === t.key ? 'var(--accent)' : 'var(--border)'}`, background: chartView === t.key ? 'var(--accent)' : 'var(--bg)', color: chartView === t.key ? '#fff' : 'var(--text2)', fontSize: '13px', fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
@@ -313,10 +317,10 @@ export default function TeacherPerformancePage() {
                 {/* Sınıf özet statsları */}
                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                   {[
-                    { label: 'Öğrenci', value: studentStats.length, icon: '👥' },
-                    { label: 'Sınıf Ort.', value: `%${Math.round(studentStats.reduce((a,s) => a + (s.avgPct||0), 0) / (studentStats.length||1))}`, icon: '📈' },
-                    { label: 'Risk', value: studentStats.filter(s => (s.avgPct||0) < 50).length, icon: '⚠️', color: '#ef4444' },
-                    { label: 'Başarılı', value: studentStats.filter(s => (s.avgPct||0) >= 75).length, icon: '🏆', color: '#16a34a' },
+                    { label: tr('Öğrenci‖rapor'), value: studentStats.length, icon: '👥' },
+                    { label: tr('Sınıf Ort.'), value: `%${Math.round(studentStats.reduce((a,s) => a + (s.avgPct||0), 0) / (studentStats.length||1))}`, icon: '📈' },
+                    { label: tr('Risk'), value: studentStats.filter(s => (s.avgPct||0) < 50).length, icon: '⚠️', color: '#ef4444' },
+                    { label: tr('Başarılı'), value: studentStats.filter(s => (s.avgPct||0) >= 75).length, icon: '🏆', color: '#16a34a' },
                   ].map((st, i) => (
                     <div key={i} style={{ textAlign: 'center', padding: '6px 12px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
                       <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{st.icon} {st.label}</div>
@@ -333,9 +337,9 @@ export default function TeacherPerformancePage() {
 
                 // Başarı dağılımı (Pie)
                 const distribution = [
-                  { name: '🏆 Başarılı (75+)', value: studentStats.filter(s => (s.avgPct||0) >= 75).length, color: '#10b981' },
-                  { name: '~ Orta (50-74)', value: studentStats.filter(s => (s.avgPct||0) >= 50 && (s.avgPct||0) < 75).length, color: '#f59e0b' },
-                  { name: '⚠️ Risk (<50)', value: studentStats.filter(s => (s.avgPct||0) < 50).length, color: '#ef4444' },
+                  { name: tr('🏆 Başarılı (75+)'), value: studentStats.filter(s => (s.avgPct||0) >= 75).length, color: '#10b981' },
+                  { name: tr('~ Orta (50-74)'), value: studentStats.filter(s => (s.avgPct||0) >= 50 && (s.avgPct||0) < 75).length, color: '#f59e0b' },
+                  { name: tr('⚠️ Risk (<50)'), value: studentStats.filter(s => (s.avgPct||0) < 50).length, color: '#ef4444' },
                 ].filter(d => d.value > 0)
 
                 // Öğrenci bazlı bar
@@ -363,13 +367,13 @@ export default function TeacherPerformancePage() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '14px' }}>
                       {/* Başarı Dağılımı Pie */}
                       <div className="card">
-                        <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '12px' }}>🍩 Başarı Dağılımı</div>
+                        <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '12px' }}>{tr('🍩 Başarı Dağılımı')}</div>
                         <ResponsiveContainer width="100%" height={220}>
                           <PieChart>
                             <Pie data={distribution} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3}>
                               {distribution.map((d, i) => <Cell key={i} fill={d.color} />)}
                             </Pie>
-                            <Tooltip formatter={(v: any, n: any) => [v + ' öğrenci', n]} />
+                            <Tooltip formatter={(v: any, n: any) => [tr('{n} öğrenci', { n: v }), n]} />
                             <Legend iconSize={10} wrapperStyle={{ fontSize: '12px' }} />
                           </PieChart>
                         </ResponsiveContainer>
@@ -378,13 +382,13 @@ export default function TeacherPerformancePage() {
                       {/* En Zayıf Konular */}
                       {topicBars.length > 0 && (
                         <div className="card">
-                          <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '12px' }}>⚠️ Sınıf Zayıf Konular</div>
+                          <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '12px' }}>{tr('⚠️ Sınıf Zayıf Konular')}</div>
                           <ResponsiveContainer width="100%" height={220}>
                             <BarChart data={topicBars} layout="vertical">
                               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                               <XAxis type="number" domain={[0,100]} tickFormatter={v => `%${v}`} tick={{ fontSize: 10 }} />
                               <YAxis type="category" dataKey="topic" width={130} tick={{ fontSize: 10, fill: 'var(--text2)' }} />
-                              <Tooltip formatter={(v: any) => [`%${v}`, 'Sınıf Ort.']} />
+                              <Tooltip formatter={(v: any) => [`%${v}`, tr('Sınıf Ort.')]} />
                               <Bar dataKey="avg" radius={[0,6,6,0]}>
                                 {topicBars.map((d, i) => <Cell key={i} fill={pctColor(d.avg)} />)}
                               </Bar>
@@ -396,13 +400,13 @@ export default function TeacherPerformancePage() {
 
                     {/* Öğrenci Sıralaması Bar */}
                     <div className="card">
-                      <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '12px' }}>👥 Öğrenci Performans Sıralaması</div>
+                      <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '12px' }}>{tr('👥 Öğrenci Performans Sıralaması')}</div>
                       <ResponsiveContainer width="100%" height={Math.max(200, studentBars.length * 32)}>
                         <BarChart data={studentBars} layout="vertical">
                           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                           <XAxis type="number" domain={[0,100]} tickFormatter={v => `%${v}`} tick={{ fontSize: 11 }} />
                           <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: 'var(--text2)' }} />
-                          <Tooltip formatter={(v: any, _: any, p: any) => [`%${v} (${p.payload.test} test)`, 'Ortalama']} />
+                          <Tooltip formatter={(v: any, _: any, p: any) => [tr('%{pct} ({n} test)', { pct: v, n: p.payload.test }), tr('Ortalama')]} />
                           <Bar dataKey="pct" radius={[0,6,6,0]}>
                             {studentBars.map((d, i) => <Cell key={i} fill={pctColor(d.pct)} />)}
                           </Bar>
@@ -413,7 +417,7 @@ export default function TeacherPerformancePage() {
                     {/* Risk altındaki öğrenciler */}
                     {studentStats.filter(s => (s.avgPct||0) < 50).length > 0 && (
                       <div className="card" style={{ border: '1.5px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.03)' }}>
-                        <div style={{ fontWeight: 700, fontSize: '14px', color: '#dc2626', marginBottom: '12px' }}>🚨 Risk Altındaki Öğrenciler (Ort. &lt;%50)</div>
+                        <div style={{ fontWeight: 700, fontSize: '14px', color: '#dc2626', marginBottom: '12px' }}>{tr('🚨 Risk Altındaki Öğrenciler (Ort. <%50)')}</div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           {studentStats.filter(s => (s.avgPct||0) < 50).map((s: any) => (
                             <div key={s.student_id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', cursor: 'pointer' }}
@@ -423,12 +427,12 @@ export default function TeacherPerformancePage() {
                               </div>
                               <div style={{ flex: 1 }}>
                                 <div style={{ fontWeight: 600, fontSize: '13px' }}>{s.name}</div>
-                                <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{s.totalTests} test · Son: {s.lastTopic || 'Yok'}</div>
+                                <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{tr('{n} test · Son: {topic}', { n: s.totalTests, topic: s.lastTopic || tr('Yok') })}</div>
                               </div>
                               <div style={{ fontWeight: 800, fontSize: '18px', color: '#dc2626' }}>%{s.avgPct||0}</div>
                               <button onClick={e => { e.stopPropagation(); /* ödev ata */ }}
                                 style={{ padding: '5px 12px', borderRadius: '8px', background: '#dc2626', color: '#fff', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                                📝 Ödev At
+                                {tr('📝 Ödev At')}
                               </button>
                             </div>
                           ))}
@@ -455,11 +459,11 @@ export default function TeacherPerformancePage() {
                       <div>
                         <div style={{ fontWeight: 700, fontSize: '14px' }}>{s.name}</div>
                         <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>
-                          {s.grade && `${s.grade} · `}{s.totalTests} test{s.lastTopic && ` · Son: ${s.lastTopic}`}
+                          {s.grade && `${s.grade} · `}{tr('{n} test', { n: s.totalTests })}{s.lastTopic && ` · ${tr('Son: {when}', { when: s.lastTopic })}`}
                         </div>
                         {teacherNotes[s.student_id] && (
                           <div style={{ fontSize: '11px', color: 'var(--accent)', marginTop: '3px' }}>
-                            📝 Not: {teacherNotes[s.student_id].slice(0, 60)}{teacherNotes[s.student_id].length > 60 ? '…' : ''}
+                            {tr('📝 Not: {note}', { note: teacherNotes[s.student_id].slice(0, 60) + (teacherNotes[s.student_id].length > 60 ? '…' : '') })}
                           </div>
                         )}
                       </div>
@@ -468,13 +472,13 @@ export default function TeacherPerformancePage() {
                       {s.avgPct !== null && (
                         <div style={{ textAlign: 'center' }}>
                           <div style={{ fontWeight: 800, fontSize: '20px', color: pctColor(s.avgPct) }}>%{s.avgPct}</div>
-                          <div style={{ fontSize: '10px', color: 'var(--text3)' }}>Genel ort.</div>
+                          <div style={{ fontSize: '10px', color: 'var(--text3)' }}>{tr('Genel ort.')}</div>
                         </div>
                       )}
                       {s.assignmentsDone > 0 && (
                         <div style={{ textAlign: 'center' }}>
                           <div style={{ fontWeight: 800, fontSize: '20px', color: pctColor(s.assignmentAvg) }}>%{s.assignmentAvg}</div>
-                          <div style={{ fontSize: '10px', color: 'var(--text3)' }}>{s.assignmentsDone} ödev</div>
+                          <div style={{ fontSize: '10px', color: 'var(--text3)' }}>{tr('{n} ödev', { n: s.assignmentsDone })}</div>
                         </div>
                       )}
                       <span style={{ color: 'var(--text4)', fontSize: '18px' }}>→</span>
@@ -493,8 +497,8 @@ export default function TeacherPerformancePage() {
           assignments.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
               <div style={{ fontSize: '40px', marginBottom: '12px' }}>📝</div>
-              <div style={{ fontSize: '14px', color: 'var(--text3)' }}>Bu sınıfa henüz ödev atanmadı.</div>
-              <Link href="/teacher/assign" className="btn btn-primary" style={{ justifyContent: 'center', marginTop: '1rem', display: 'inline-flex' }}>Ödev Ata →</Link>
+              <div style={{ fontSize: '14px', color: 'var(--text3)' }}>{tr('Bu sınıfa henüz ödev atanmadı.')}</div>
+              <Link href="/teacher/assign" className="btn btn-primary" style={{ justifyContent: 'center', marginTop: '1rem', display: 'inline-flex' }}>{tr('Ödev Ata →')}</Link>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -505,19 +509,19 @@ export default function TeacherPerformancePage() {
                     <div>
                       <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--primary)' }}>{a.title}</div>
                       <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '4px' }}>
-                        📚 {a.topic} · ❓ {a.question_count} soru · ⚡ {a.difficulty}
-                        {a.due_date && ` · 🕐 ${new Date(a.due_date).toLocaleDateString('tr-TR')}`}
+                        {tr('📚 {topic} · ❓ {n} soru · ⚡ {difficulty}', { topic: a.topic, n: a.question_count, difficulty: a.difficulty })}
+                        {a.due_date && ` · 🕐 ${new Date(a.due_date).toLocaleDateString(dateLocale)}`}
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                       <div style={{ textAlign: 'center' }}>
                         <div style={{ fontWeight: 800, fontSize: '18px', color: 'var(--primary)' }}>{a.completedCount}/{a.totalStudents}</div>
-                        <div style={{ fontSize: '10px', color: 'var(--text3)' }}>Tamamladı</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text3)' }}>{tr('Tamamladı')}</div>
                       </div>
                       {a.avgScore !== null && (
                         <div style={{ textAlign: 'center' }}>
                           <div style={{ fontWeight: 800, fontSize: '18px', color: pctColor(a.avgScore) }}>%{a.avgScore}</div>
-                          <div style={{ fontSize: '10px', color: 'var(--text3)' }}>Sınıf ort.</div>
+                          <div style={{ fontSize: '10px', color: 'var(--text3)' }}>{tr('Sınıf Ort.')}</div>
                         </div>
                       )}
                     </div>
@@ -527,7 +531,7 @@ export default function TeacherPerformancePage() {
                   {a.studentResults.length > 0 && (
                     <div style={{ borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
                       <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text3)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Öğrenci Sonuçları
+                        {tr('Öğrenci Sonuçları')}
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {a.studentResults.sort((x: any, y: any) => y.pct - x.pct).map((r: any) => {
@@ -546,7 +550,7 @@ export default function TeacherPerformancePage() {
                                   <div>
                                     <div style={{ fontSize: '13px', fontWeight: 600 }}>{r.name}</div>
                                     <div style={{ fontSize: '11px', color: 'var(--text3)' }}>
-                                      {wrongAnswers.length > 0 ? `${wrongAnswers.length} yanlış` : 'Tüm sorular doğru ✓'}
+                                      {wrongAnswers.length > 0 ? tr('{n} yanlış', { n: wrongAnswers.length }) : tr('Tüm sorular doğru ✓')}
                                     </div>
                                   </div>
                                 </div>
@@ -564,17 +568,17 @@ export default function TeacherPerformancePage() {
                                   {wrongAnswers.length > 0 && (
                                     <div style={{ marginBottom: '14px' }}>
                                       <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--red)', marginBottom: '8px' }}>
-                                        ❌ Yanlış Cevaplar
+                                        {tr('❌ Yanlış Cevaplar')}
                                       </div>
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                         {wrongAnswers.map((ans: any, idx: number) => (
                                           <div key={idx} style={{ padding: '10px 12px', borderRadius: '8px', background: 'rgba(220,38,38,0.04)', border: '1px solid rgba(220,38,38,0.15)' }}>
                                             <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px', lineHeight: 1.5 }}>
-                                              {idx + 1}. <MathText text={ans.question ?? 'Soru metni yok'} />
+                                              {idx + 1}. <MathText text={ans.question ?? tr('Soru metni yok')} />
                                             </div>
                                             <div style={{ display: 'flex', gap: '12px', fontSize: '12px', flexWrap: 'wrap' }}>
-                                              <span style={{ color: 'var(--red)' }}>✗ Öğrenci: <MathText text={ans.student_answer ?? '—'} /></span>
-                                              <span style={{ color: 'var(--green)' }}>✓ Doğru: <MathText text={ans.correct_answer ?? '—'} /></span>
+                                              <span style={{ color: 'var(--red)' }}>{tr('✗ Öğrenci:')} <MathText text={ans.student_answer ?? '—'} /></span>
+                                              <span style={{ color: 'var(--green)' }}>{tr('✓ Doğru:')} <MathText text={ans.correct_answer ?? '—'} /></span>
                                             </div>
                                             {ans.explanation && (
                                               <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text3)', fontStyle: 'italic' }}>
@@ -592,10 +596,10 @@ export default function TeacherPerformancePage() {
                                     {aiAnalysis[analyzeKey] ? (
                                       <div>
                                         <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                                          <span>🤖 AI Öğretmen Analizi</span>
+                                          <span>{tr('🤖 AI Öğretmen Analizi')}</span>
                                           <button onClick={() => generateAiAnalysis(r.student_id, a.id)}
                                             style={{ fontSize: '11px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                                            Yenile
+                                            {tr('Yenile')}
                                           </button>
                                         </div>
                                         <div style={{ fontSize: '12px', color: 'var(--text2)', lineHeight: 1.8, whiteSpace: 'pre-wrap', background: 'rgba(8,36,101,0.03)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(8,36,101,0.08)' }}>
@@ -608,9 +612,9 @@ export default function TeacherPerformancePage() {
                                         disabled={aiLoading === analyzeKey}
                                         style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '10px', border: '1.5px solid rgba(8,36,101,0.2)', background: 'rgba(8,36,101,0.04)', color: 'var(--primary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', opacity: aiLoading === analyzeKey ? 0.6 : 1 }}>
                                         {aiLoading === analyzeKey ? (
-                                          <>⏳ Analiz hazırlanıyor...</>
+                                          <>{tr('⏳ Analiz hazırlanıyor...')}</>
                                         ) : (
-                                          <>🤖 AI Öğretmen Analizi Üret</>
+                                          <>{tr('🤖 AI Öğretmen Analizi Üret')}</>
                                         )}
                                       </button>
                                     )}
@@ -619,14 +623,14 @@ export default function TeacherPerformancePage() {
                                   {/* Öğretmen notu */}
                                   <div>
                                     <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', marginBottom: '6px' }}>
-                                      📝 Öğretmen Notu
+                                      {tr('📝 Öğretmen Notu')}
                                     </div>
                                     {editingNote === `${r.student_id}_${a.id}` ? (
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                         <textarea
                                           value={noteText}
                                           onChange={e => setNoteText(e.target.value)}
-                                          placeholder="Bu öğrenci hakkında notunuzu yazın..."
+                                          placeholder={tr('Bu öğrenci hakkında notunuzu yazın...')}
                                           rows={3}
                                           autoFocus
                                           style={{ padding: '10px 12px', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', resize: 'vertical', outline: 'none' }}
@@ -634,22 +638,22 @@ export default function TeacherPerformancePage() {
                                         <div style={{ display: 'flex', gap: '8px' }}>
                                           <button onClick={() => saveNote(r.student_id)} disabled={savingNote}
                                             style={{ padding: '7px 14px', borderRadius: '8px', background: '#082465', color: '#fff', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', opacity: savingNote ? 0.6 : 1 }}>
-                                            {savingNote ? 'Kaydediliyor...' : 'Kaydet'}
+                                            {savingNote ? tr('Kaydediliyor...') : tr('Kaydet')}
                                           </button>
                                           <button onClick={() => setEditingNote(null)}
                                             style={{ padding: '7px 14px', borderRadius: '8px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', color: 'var(--text)' }}>
-                                            İptal
+                                            {tr('İptal')}
                                           </button>
                                         </div>
                                       </div>
                                     ) : (
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                                         <div style={{ fontSize: '13px', color: teacherNotes[r.student_id] ? 'var(--text2)' : 'var(--text4)', fontStyle: teacherNotes[r.student_id] ? 'normal' : 'italic', flex: 1, lineHeight: 1.6 }}>
-                                          {teacherNotes[r.student_id] || 'Not eklenmemiş.'}
+                                          {teacherNotes[r.student_id] || tr('Not eklenmemiş.')}
                                         </div>
                                         <button onClick={() => { setEditingNote(`${r.student_id}_${a.id}`); setNoteText(teacherNotes[r.student_id] || '') }}
                                           style={{ padding: '5px 10px', borderRadius: '7px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text3)', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>
-                                          {teacherNotes[r.student_id] ? 'Düzenle' : '+ Not Ekle'}
+                                          {teacherNotes[r.student_id] ? tr('Düzenle') : tr('+ Not Ekle')}
                                         </button>
                                       </div>
                                     )}
@@ -668,7 +672,7 @@ export default function TeacherPerformancePage() {
                         if (!notDone.length) return null
                         return (
                           <div style={{ marginTop: '10px', padding: '8px 12px', borderRadius: '8px', background: 'rgba(253,211,29,0.08)', border: '1px solid rgba(253,211,29,0.2)', fontSize: '12px', color: 'var(--text3)' }}>
-                            ⏳ Tamamlamadı: {notDone.map((s: any) => s.name).join(', ')}
+                            {tr('⏳ Tamamlamadı: {names}', { names: notDone.map((s: any) => s.name).join(', ') })}
                           </div>
                         )
                       })()}
@@ -677,7 +681,7 @@ export default function TeacherPerformancePage() {
 
                   {a.completedCount === 0 && (
                     <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px', fontSize: '13px', color: 'var(--text4)' }}>
-                      ⏳ Henüz kimse tamamlamadı.
+                      {tr('⏳ Henüz kimse tamamlamadı.')}
                     </div>
                   )}
                 </div>
@@ -693,16 +697,16 @@ export default function TeacherPerformancePage() {
             {studentStats.length === 0 ? (
               <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
                 <div style={{ fontSize: '40px', marginBottom: '12px' }}>🏆</div>
-                <div style={{ fontSize: '14px', color: 'var(--text3)' }}>Bu sınıfta henüz öğrenci yok.</div>
+                <div style={{ fontSize: '14px', color: 'var(--text3)' }}>{tr('Bu sınıfta henüz öğrenci yok.')}</div>
               </div>
             ) : (
               <div>
                 {/* Sekme: Genel / Ödev bazlı */}
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem' }}>
                   {[
-                    { key: 'general', label: '📊 Genel Ortalama' },
-                    { key: 'assignments', label: '📝 Ödev Başarısı' },
-                    { key: 'streak', label: '🔥 Streak' },
+                    { key: 'general', label: tr('📊 Genel Ortalama') },
+                    { key: 'assignments', label: tr('📝 Ödev Başarısı') },
+                    { key: 'streak', label: tr('🔥 Streak') },
                   ].map(t => (
                     <button key={t.key}
                       onClick={() => setRankTab(t.key as any)}
@@ -735,7 +739,7 @@ export default function TeacherPerformancePage() {
                         ? (s.avgPct !== null ? `%${s.avgPct}` : '—')
                         : rankTab === 'assignments'
                         ? (s.assignmentAvg !== null ? `%${s.assignmentAvg}` : '—')
-                        : `${s.totalTests} test`
+                        : tr('{n} test', { n: s.totalTests })
                       const valueColor = rankTab !== 'streak'
                         ? ((s.avgPct ?? 0) >= 70 ? 'var(--green)' : (s.avgPct ?? 0) >= 50 ? 'var(--amber, #f59e0b)' : 'var(--red)')
                         : 'var(--primary)'
@@ -758,7 +762,7 @@ export default function TeacherPerformancePage() {
                           <div style={{ flex: 1 }}>
                             <div style={{ fontWeight: 600, fontSize: '14px' }}>{s.name}</div>
                             <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
-                              {s.totalTests} test · {s.assignmentsDone} ödev
+                              {tr('{tests} test · {homework} ödev', { tests: s.totalTests, homework: s.assignmentsDone })}
                             </div>
                           </div>
                           {/* Değer */}
@@ -773,7 +777,7 @@ export default function TeacherPerformancePage() {
                 {/* Tamamlamamış öğrenciler */}
                 {rankTab !== 'streak' && studentStats.filter(s => rankTab === 'general' ? s.avgPct === null : s.assignmentsDone === 0).length > 0 && (
                   <div style={{ marginTop: '12px', padding: '10px 14px', borderRadius: '10px', background: 'rgba(148,163,184,0.08)', border: '1px solid var(--border)', fontSize: '12px', color: 'var(--text3)' }}>
-                    📭 Henüz test çözmeyen: {studentStats.filter(s => rankTab === 'general' ? s.avgPct === null : s.assignmentsDone === 0).map(s => s.name).join(', ')}
+                    {tr('📭 Henüz test çözmeyen: {names}', { names: studentStats.filter(s => rankTab === 'general' ? s.avgPct === null : s.assignmentsDone === 0).map(s => s.name).join(', ') })}
                   </div>
                 )}
               </div>
@@ -784,7 +788,7 @@ export default function TeacherPerformancePage() {
         {view === 'student' && studentDetail && (
           <div>
             <button onClick={() => setView('overview')} className="btn" style={{ marginBottom: '1rem', fontSize: '13px' }}>
-              ← Listeye dön
+              {tr('← Listeye dön')}
             </button>
 
             <div className="card" style={{ marginBottom: '1rem' }}>
@@ -803,9 +807,9 @@ export default function TeacherPerformancePage() {
               {/* İstatistikler */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '1rem' }}>
                 {[
-                  { label: 'Toplam Test', value: studentDetail.totalTests },
-                  { label: 'Genel Ort.', value: studentDetail.avgPct !== null ? `%${studentDetail.avgPct}` : '—' },
-                  { label: 'Tamamlanan Ödev', value: studentDetail.assignmentsDone },
+                  { label: tr('Toplam Test'), value: studentDetail.totalTests },
+                  { label: tr('Genel Ort.'), value: studentDetail.avgPct !== null ? `%${studentDetail.avgPct}` : '—' },
+                  { label: tr('Tamamlanan Ödev'), value: studentDetail.assignmentsDone },
                 ].map((stat, i) => (
                   <div key={i} style={{ textAlign: 'center', padding: '12px', background: 'var(--bg2)', borderRadius: '10px' }}>
                     <div style={{ fontWeight: 800, fontSize: '22px', color: 'var(--primary)' }}>{stat.value}</div>
@@ -816,13 +820,13 @@ export default function TeacherPerformancePage() {
 
               {/* Öğretmen notu */}
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', marginBottom: '6px' }}>📝 Öğretmen Notu</div>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', marginBottom: '6px' }}>{tr('📝 Öğretmen Notu')}</div>
                 {editingNote === studentDetail.student_id ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <textarea
                       value={noteText}
                       onChange={e => setNoteText(e.target.value)}
-                      placeholder="Bu öğrenci hakkında notunuzu yazın..."
+                      placeholder={tr('Bu öğrenci hakkında notunuzu yazın...')}
                       rows={3}
                       autoFocus
                       style={{ padding: '10px 12px', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', resize: 'vertical', outline: 'none' }}
@@ -830,22 +834,22 @@ export default function TeacherPerformancePage() {
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button onClick={() => saveNote(studentDetail.student_id)} disabled={savingNote}
                         style={{ padding: '7px 14px', borderRadius: '8px', background: '#082465', color: '#fff', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                        {savingNote ? 'Kaydediliyor...' : 'Kaydet'}
+                        {savingNote ? tr('Kaydediliyor...') : tr('Kaydet')}
                       </button>
                       <button onClick={() => setEditingNote(null)}
                         style={{ padding: '7px 14px', borderRadius: '8px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', color: 'var(--text)' }}>
-                        İptal
+                        {tr('İptal')}
                       </button>
                     </div>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                     <div style={{ fontSize: '13px', color: teacherNotes[studentDetail.student_id] ? 'var(--text2)' : 'var(--text4)', fontStyle: teacherNotes[studentDetail.student_id] ? 'normal' : 'italic', flex: 1 }}>
-                      {teacherNotes[studentDetail.student_id] || 'Not eklenmemiş.'}
+                      {teacherNotes[studentDetail.student_id] || tr('Not eklenmemiş.')}
                     </div>
                     <button onClick={() => { setEditingNote(studentDetail.student_id); setNoteText(teacherNotes[studentDetail.student_id] || '') }}
                       style={{ padding: '5px 10px', borderRadius: '7px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text3)', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>
-                      {teacherNotes[studentDetail.student_id] ? 'Düzenle' : '+ Not Ekle'}
+                      {teacherNotes[studentDetail.student_id] ? tr('Düzenle') : tr('+ Not Ekle')}
                     </button>
                   </div>
                 )}
@@ -856,7 +860,7 @@ export default function TeacherPerformancePage() {
             {studentDetail.completions.length > 0 && (
               <div className="card" style={{ marginBottom: '1rem' }}>
                 <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  📝 Ödev Sonuçları
+                  {tr('📝 Ödev Sonuçları')}
                 </div>
                 {studentDetail.completions.map((c: any) => {
                   const asgn = assignments.find((a: any) => a.id === c.assignment_id)
@@ -868,10 +872,10 @@ export default function TeacherPerformancePage() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', cursor: 'pointer' }}
                         onClick={() => setExpandedAssignment(isExpanded ? null : c.assignment_id)}>
                         <div>
-                          <div style={{ fontSize: '13px', fontWeight: 600 }}>{asgn?.title || 'Ödev'}</div>
+                          <div style={{ fontSize: '13px', fontWeight: 600 }}>{asgn?.title || tr('Ödev')}</div>
                           <div style={{ fontSize: '12px', color: 'var(--text3)' }}>
-                            {asgn?.topic} · {new Date(c.completed_at).toLocaleDateString('tr-TR')}
-                            {wrongAnswers.length > 0 && <span style={{ color: 'var(--red)', marginLeft: '6px' }}>· {wrongAnswers.length} yanlış</span>}
+                            {asgn?.topic} · {new Date(c.completed_at).toLocaleDateString(dateLocale)}
+                            {wrongAnswers.length > 0 && <span style={{ color: 'var(--red)', marginLeft: '6px' }}>{tr('· {n} yanlış', { n: wrongAnswers.length })}</span>}
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -884,11 +888,11 @@ export default function TeacherPerformancePage() {
                         <div style={{ paddingBottom: '14px' }}>
                           {wrongAnswers.length > 0 && (
                             <div style={{ marginBottom: '12px' }}>
-                              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--red)', marginBottom: '8px' }}>❌ Yanlış Cevaplar</div>
+                              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--red)', marginBottom: '8px' }}>{tr('❌ Yanlış Cevaplar')}</div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                 {wrongAnswers.map((ans: any, idx: number) => (
                                   <div key={idx} style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(220,38,38,0.04)', border: '1px solid rgba(220,38,38,0.15)', fontSize: '12px' }}>
-                                    <div style={{ fontWeight: 500, marginBottom: '4px' }}>{idx + 1}. <MathText text={ans.question ?? 'Soru metni yok'} /></div>
+                                    <div style={{ fontWeight: 500, marginBottom: '4px' }}>{idx + 1}. <MathText text={ans.question ?? tr('Soru metni yok')} /></div>
                                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                                       <span style={{ color: 'var(--red)' }}>✗ <MathText text={ans.student_answer ?? '—'} /></span>
                                       <span style={{ color: 'var(--green)' }}>✓ <MathText text={ans.correct_answer ?? '—'} /></span>
@@ -902,7 +906,7 @@ export default function TeacherPerformancePage() {
                           {/* AI Analiz */}
                           {aiAnalysis[analyzeKey] ? (
                             <div style={{ background: 'rgba(8,36,101,0.03)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(8,36,101,0.08)' }}>
-                              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', marginBottom: '6px' }}>🤖 AI Analizi</div>
+                              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', marginBottom: '6px' }}>{tr('🤖 AI Analizi')}</div>
                               <div style={{ fontSize: '12px', color: 'var(--text2)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{aiAnalysis[analyzeKey]}</div>
                             </div>
                           ) : (
@@ -910,7 +914,7 @@ export default function TeacherPerformancePage() {
                               onClick={() => generateAiAnalysis(studentDetail.student_id, c.assignment_id)}
                               disabled={aiLoading === analyzeKey}
                               style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', borderRadius: '8px', border: '1.5px solid rgba(8,36,101,0.2)', background: 'rgba(8,36,101,0.04)', color: 'var(--primary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                              {aiLoading === analyzeKey ? '⏳ Analiz hazırlanıyor...' : '🤖 AI Analizi Üret'}
+                              {aiLoading === analyzeKey ? tr('⏳ Analiz hazırlanıyor...') : tr('🤖 AI Analizi Üret')}
                             </button>
                           )}
                         </div>
@@ -925,13 +929,13 @@ export default function TeacherPerformancePage() {
             {studentDetail.sessions.length > 0 && (
               <div className="card">
                 <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Son Testler
+                  {tr('Son Testler')}
                 </div>
                 {studentDetail.sessions.slice(0, 10).map((s: any, i: number) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: i < 9 ? '1px solid var(--border)' : 'none' }}>
                     <div>
                       <div style={{ fontSize: '13px', fontWeight: 500 }}>{s.topic}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{new Date(s.created_at).toLocaleDateString('tr-TR')}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{new Date(s.created_at).toLocaleDateString(dateLocale)}</div>
                     </div>
                     <div style={{ fontWeight: 700, fontSize: '15px', color: pctColor(s.pct) }}>%{s.pct}</div>
                   </div>

@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 // The bar is always there; when the periodic AI test is due (every 10 days) the button blinks.
 export default function TeacherKnowledgeTestShortcut() {
   const pathname = usePathname()
+  const { t } = useT()
   const [due, setDue] = useState(false)
   const [level, setLevel] = useState<number | null>(null)
 
@@ -31,10 +33,10 @@ export default function TeacherKnowledgeTestShortcut() {
     <div style={{ background: '#173f52', padding: '10px 20px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
       <style>{`@keyframes pratium-blink{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(255,214,102,.9)}50%{opacity:.55;box-shadow:0 0 0 10px rgba(255,214,102,0)}}.pratium-blink{animation:pratium-blink 1.1s ease-in-out infinite}@media (prefers-reduced-motion: reduce){.pratium-blink{animation:none;outline:3px solid #ffd666}}`}</style>
       <span style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>
-        {due ? `Yeni AI bilgi testin hazır${level ? ` (Seviye ${level})` : ''}!` : 'Öğretmen bilgi testine hazır mısınız?'}
+        {due ? (level ? t('Yeni AI bilgi testin hazır (Seviye {level})!', { level }) : t('Yeni AI bilgi testin hazır!')) : t('Öğretmen bilgi testine hazır mısınız?')}
       </span>
       <Link href="/teacher/ai-training" className={due ? 'pratium-blink' : undefined} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minHeight: '40px', padding: '8px 18px', borderRadius: '10px', background: due ? '#ffd666' : '#fff', color: '#173f52', fontSize: '14px', fontWeight: 800, textDecoration: 'none', ...(due ? {} : { boxShadow: '0 3px 10px rgba(0,0,0,0.15)' }) }}>
-        🎓 Öğretmen Bilgi Testi →
+        {t('🎓 Öğretmen Bilgi Testi →')}
       </Link>
     </div>
   )

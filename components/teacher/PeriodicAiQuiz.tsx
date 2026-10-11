@@ -1,6 +1,8 @@
 'use client'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
+import { intlLocale } from '@/lib/i18n/core'
 
 type Question = { id: string; topicLabel: string; q: string; options: string[] }
 type Status = {
@@ -13,6 +15,8 @@ type Result = { score: number; passed: boolean; level: number; nextLevel: number
 
 /** Periodic (every 10 days) AI-literacy test whose questions get harder with each pass. */
 export default function PeriodicAiQuiz() {
+  const { t, locale } = useT()
+  const dateLocale = intlLocale(locale)
   const supabase = useMemo(() => createClient(), [])
   const [token, setToken] = useState('')
   const [status, setStatus] = useState<Status | null>(null)
@@ -38,7 +42,7 @@ export default function PeriodicAiQuiz() {
   async function call(body: Record<string, unknown>) {
     const response = await fetch('/api/teacher/ai-quiz', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body) })
     const data = await response.json().catch(() => ({}))
-    if (!response.ok) throw new Error(data.error || 'İşlem tamamlanamadı.')
+    if (!response.ok) throw new Error(data.error || t('İşlem tamamlanamadı.'))
     return data
   }
   async function start() {
@@ -46,7 +50,7 @@ export default function PeriodicAiQuiz() {
     try {
       const data = await call({ action: 'start' })
       setRound(data); setAnswers(new Array(data.questions.length).fill(-1))
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Test başlatılamadı.') } finally { setBusy(false) }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : t('Test başlatılamadı.')) } finally { setBusy(false) }
   }
   async function submit() {
     if (!round) return
@@ -55,7 +59,7 @@ export default function PeriodicAiQuiz() {
       setResult(await call({ action: 'submit', roundId: round.roundId, answers }))
       setRound(null)
       await load()
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Sonuç kaydedilemedi.') } finally { setBusy(false) }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : t('Sonuç kaydedilemedi.')) } finally { setBusy(false) }
   }
 
   if (!status) return null
@@ -64,12 +68,12 @@ export default function PeriodicAiQuiz() {
     <section className="card" aria-labelledby="periodic-ai-quiz-title" style={{ display: 'grid', gap: 12, border: status.due ? '2px solid var(--accent)' : undefined }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <div>
-          <h2 id="periodic-ai-quiz-title" style={{ margin: 0, color: 'var(--primary)', fontSize: 18 }}>🧠 Düzenli AI bilgi testi</h2>
-          <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 3 }}>Her {status.intervalDays} günde bir · 4 soru · her başarıdan sonra sorular zorlaşır</div>
+          <h2 id="periodic-ai-quiz-title" style={{ margin: 0, color: 'var(--primary)', fontSize: 18 }}>{t('🧠 Düzenli AI bilgi testi')}</h2>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 3 }}>{t('Her {n} günde bir · 4 soru · her başarıdan sonra sorular zorlaşır', { n: status.intervalDays })}</div>
         </div>
         <div style={{ textAlign: 'center', fontSize: 12 }}>
-          <strong style={{ fontSize: 18 }}>Seviye {status.level}/{status.maxLevel}</strong>
-          <div style={{ color: 'var(--text2)' }}>{status.roundsTaken} test tamamlandı</div>
+          <strong style={{ fontSize: 18 }}>{t('Seviye {level}/{max}', { level: status.level, max: status.maxLevel })}</strong>
+          <div style={{ color: 'var(--text2)' }}>{t('{n} test tamamlandı', { n: status.roundsTaken })}</div>
         </div>
       </div>
       {error && <div role="alert" style={{ color: 'var(--red)', fontSize: 13 }}>{error}</div>}
@@ -77,14 +81,14 @@ export default function PeriodicAiQuiz() {
       {result && (
         <div role="status" style={{ display: 'grid', gap: 8 }}>
           <strong style={{ color: result.passed ? 'var(--green)' : 'var(--text)' }}>
-            {result.passed ? '✓ Başardın' : 'Bu sefer olmadı'} — {result.score}/4{result.leveledUp ? ` · Yeni seviye: ${result.nextLevel}/${status.maxLevel} (sorular zorlaşıyor)` : result.passed ? ' · En üst seviyedesin' : ' · Aynı seviyede devam'}
+            {result.passed ? t('✓ Başardın') : t('Bu sefer olmadı')} — {result.score}/4{result.leveledUp ? ` · ${t('Yeni seviye: {next}/{max} (sorular zorlaşıyor)', { next: result.nextLevel, max: status.maxLevel })}` : result.passed ? ` · ${t('En üst seviyedesin')}` : ` · ${t('Aynı seviyede devam')}`}
           </strong>
           {result.results.map((item, index) => (
             <div key={item.id} style={{ fontSize: 13, padding: '8px 10px', borderRadius: 9, background: item.isCorrect ? 'var(--green-bg, #e4f1ec)' : 'var(--red-bg, #fdecea)' }}>
-              <b>Soru {index + 1}: {item.isCorrect ? 'Doğru' : `Yanlış (doğru şık ${letters[item.correct]})`}</b> — {item.explanation}
+              <b>{item.isCorrect ? t('Soru {n}: Doğru', { n: index + 1 }) : t('Soru {n}: Yanlış (doğru şık {letter})', { n: index + 1, letter: letters[item.correct] })}</b> — {item.explanation}
             </div>
           ))}
-          <div style={{ fontSize: 12, color: 'var(--text2)' }}>Sonraki test: {new Date(result.nextDueAt).toLocaleDateString('tr-TR')}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)' }}>{t('Sonraki test: {date}', { date: new Date(result.nextDueAt).toLocaleDateString(dateLocale) })}</div>
         </div>
       )}
 
@@ -102,17 +106,17 @@ export default function PeriodicAiQuiz() {
               ))}
             </fieldset>
           ))}
-          <button className="btn btn-primary" disabled={busy || answers.some(value => value < 0)} onClick={() => void submit()}>{busy ? 'Kaydediliyor…' : 'Testi bitir'}</button>
+          <button className="btn btn-primary" disabled={busy || answers.some(value => value < 0)} onClick={() => void submit()}>{busy ? t('Kaydediliyor…') : t('Testi bitir')}</button>
         </div>
       )}
 
       {!round && !result && (status.due
-        ? <button className="btn btn-primary" disabled={busy} onClick={() => void start()}>{busy ? 'Hazırlanıyor…' : status.roundsTaken ? 'Yeni testi başlat' : 'İlk testi başlat'}</button>
-        : <div style={{ fontSize: 13, color: 'var(--text2)' }}>Sonraki test: <b>{status.nextDueAt ? new Date(status.nextDueAt).toLocaleDateString('tr-TR') : 'yakında'}</b></div>)}
+        ? <button className="btn btn-primary" disabled={busy} onClick={() => void start()}>{busy ? t('Hazırlanıyor…') : status.roundsTaken ? t('Yeni testi başlat') : t('İlk testi başlat')}</button>
+        : <div style={{ fontSize: 13, color: 'var(--text2)' }}>{t('Sonraki test: {date}', { date: status.nextDueAt ? new Date(status.nextDueAt).toLocaleDateString(dateLocale) : t('yakında') })}</div>)}
 
       {status.history.length > 0 && !round && (
         <div style={{ fontSize: 12, color: 'var(--text2)' }}>
-          Son testler: {status.history.map(item => `#${item.roundNo} S${item.level} ${item.score}/4${item.passed ? '✓' : ''}`).join(' · ')}
+          {t('Son testler: {list}', { list: status.history.map(item => `#${item.roundNo} S${item.level} ${item.score}/4${item.passed ? '✓' : ''}`).join(' · ') })}
         </div>
       )}
     </section>

@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
 import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities } from '@/lib/identity/resolve-client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 export default function TeacherLivePage() {
+  const { t: tr } = useT()
   const router = useRouter()
   const supabase = createClient() as any
 
@@ -116,7 +118,7 @@ export default function TeacherLivePage() {
     // süresi ve doğruluk üzerinden" değerlendirme.
     const scoreMap: Record<string, { name: string; avatar: string | null; correct: number; total: number; points: number }> = {}
     for (const a of realAnswers) {
-      if (!scoreMap[a.user_id]) scoreMap[a.user_id] = { name: a.profiles?.name || 'Öğrenci', avatar: a.profiles?.avatar_url || null, correct: 0, total: 0, points: 0 }
+      if (!scoreMap[a.user_id]) scoreMap[a.user_id] = { name: a.profiles?.name || tr('Öğrenci‖canlı'), avatar: a.profiles?.avatar_url || null, correct: 0, total: 0, points: 0 }
       scoreMap[a.user_id].total++
       if (a.is_correct) scoreMap[a.user_id].correct++
       scoreMap[a.user_id].points += a.score || 0
@@ -159,8 +161,8 @@ export default function TeacherLivePage() {
       // durumu sonsuza kadar true kalır (ekran donmuş gibi görünür).
       if (!res.ok) {
         let msg = res.status === 504
-          ? 'Soru üretimi zaman aşımına uğradı. Soru sayısını azaltıp tekrar dene.'
-          : 'Quiz oluşturulamadı. Lütfen tekrar dene.'
+          ? tr('Soru üretimi zaman aşımına uğradı. Soru sayısını azaltıp tekrar dene.')
+          : tr('Quiz oluşturulamadı. Lütfen tekrar dene.')
         try {
           const errBody = await res.json()
           if (errBody?.error) msg = errBody.error
@@ -183,7 +185,7 @@ export default function TeacherLivePage() {
       setLiveQuiz((p: any) => ({ ...p, questions: lq?.questions || [] }))
     } catch (e: any) {
       console.error('[createLiveQuiz] beklenmeyen hata:', e)
-      setCreateError('Beklenmeyen bir hata oluştu. Lütfen tekrar dene.')
+      setCreateError(tr('Beklenmeyen bir hata oluştu. Lütfen tekrar dene.'))
     } finally {
       setCreating(false)
     }
@@ -193,7 +195,7 @@ export default function TeacherLivePage() {
     setActionError('')
     lastActionRef.current = startQuiz
     const ok = await patchLiveQuiz({ live_quiz_id: liveQuiz.id, action: 'start' })
-    if (!ok) { setActionError('Quiz başlatılamadı — bağlantı sorunu olabilir. Tekrar dene.'); return }
+    if (!ok) { setActionError(tr('Quiz başlatılamadı — bağlantı sorunu olabilir. Tekrar dene.')); return }
     setCurrentQ(0)
     setScreen('active')
     startTimer()
@@ -220,7 +222,7 @@ export default function TeacherLivePage() {
     lastActionRef.current = revealLeaderboard
     if (timerRef.current) clearInterval(timerRef.current)
     const ok = await patchLiveQuiz({ live_quiz_id: liveQuiz.id, action: 'reveal' })
-    if (!ok) { setActionError('Sıralama gönderilemedi — bağlantı sorunu olabilir. Tekrar dene.'); return }
+    if (!ok) { setActionError(tr('Sıralama gönderilemedi — bağlantı sorunu olabilir. Tekrar dene.')); return }
     setScreen('reveal')
   }
 
@@ -237,7 +239,7 @@ export default function TeacherLivePage() {
       // ÖNEMLİ: DB güncellenmediyse öğretmenin ekranını da İLERLETME — aksi
       // halde öğretmen "sonraki soruyu gönderdim" sanır ama öğrenci eski
       // soruda kalır (Deniz'in bildirdiği hata tam olarak bu).
-      setActionError('Sonraki soru gönderilemedi — öğrencilere ulaşmadı. Tekrar dene.')
+      setActionError(tr('Sonraki soru gönderilemedi — öğrencilere ulaşmadı. Tekrar dene.'))
       return
     }
     setCurrentQ(nextQ)
@@ -250,7 +252,7 @@ export default function TeacherLivePage() {
     lastActionRef.current = finishQuiz
     if (timerRef.current) clearInterval(timerRef.current)
     const ok = await patchLiveQuiz({ live_quiz_id: liveQuiz.id, action: 'finish' })
-    if (!ok) { setActionError('Quiz bitirilemedi — bağlantı sorunu olabilir. Tekrar dene.'); return }
+    if (!ok) { setActionError(tr('Quiz bitirilemedi — bağlantı sorunu olabilir. Tekrar dene.')); return }
     setScreen('results')
   }
 
@@ -261,50 +263,50 @@ export default function TeacherLivePage() {
   // ── SETUP ──────────────────────────────────────────────────────────────────
   if (screen === 'setup') return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: '80px' }}>
-      <PageHeader title="Canlı Quiz" subtitle="Sınıfa anlık quiz gönder" icon="🎯" color="#6366f1" backHref="/teacher" backLabel="Öğretmen paneli" />
+      <PageHeader title={tr('Canlı Quiz')} subtitle={tr('Sınıfa anlık quiz gönder')} icon="🎯" color="#6366f1" backHref="/teacher" backLabel={tr('Öğretmen paneli')} />
       <div style={{ maxWidth: '560px', margin: '0 auto', padding: '0 1rem' }}>
         <div className="card">
-          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Quiz ayarları</div>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>{tr('Quiz ayarları')}</div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div>
-              <label style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px', display: 'block' }}>Sınıf</label>
+              <label style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px', display: 'block' }}>{tr('Sınıf‖sınıf grubu')}</label>
               <select value={form.classroom_id} onChange={e => setForm(p => ({ ...p, classroom_id: e.target.value }))}
                 style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '14px', fontFamily: 'var(--font-sans)' }}>
-                {classrooms.map(c => <option key={c.id} value={c.id}>{c.name} ({c.classroom_students?.[0]?.count || 0} öğrenci)</option>)}
+                {classrooms.map(c => <option key={c.id} value={c.id}>{tr('{name} ({n} öğrenci)', { name: c.name, n: c.classroom_students?.[0]?.count || 0 })}</option>)}
               </select>
             </div>
 
             <div>
-              <label style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px', display: 'block' }}>Konu</label>
-              <input value={form.topic} onChange={e => setForm(p => ({ ...p, topic: e.target.value }))} placeholder="Örn: Osmanlı tarihi, Fotosentez..."
+              <label style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px', display: 'block' }}>{tr('Konu')}</label>
+              <input value={form.topic} onChange={e => setForm(p => ({ ...p, topic: e.target.value }))} placeholder={tr('Örn: Osmanlı tarihi, Fotosentez...')}
                 style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '14px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' }} />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
               <div>
-                <label style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px', display: 'block' }}>Soru sayısı</label>
+                <label style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px', display: 'block' }}>{tr('Soru sayısı')}</label>
                 <select value={form.question_count} onChange={e => setForm(p => ({ ...p, question_count: Number(e.target.value) }))}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '14px', fontFamily: 'var(--font-sans)' }}>
-                  {[3, 5, 8, 10, 15].map(n => <option key={n} value={n}>{n} soru</option>)}
+                  {[3, 5, 8, 10, 15].map(n => <option key={n} value={n}>{tr('{n} soru', { n })}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px', display: 'block' }}>Soru başına süre</label>
+                <label style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px', display: 'block' }}>{tr('Soru başına süre')}</label>
                 <select value={form.time_per_question} onChange={e => setForm(p => ({ ...p, time_per_question: Number(e.target.value) }))}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '14px', fontFamily: 'var(--font-sans)' }}>
-                  {[15, 20, 30, 45, 60].map(n => <option key={n} value={n}>{n} saniye</option>)}
+                  {[15, 20, 30, 45, 60].map(n => <option key={n} value={n}>{tr('{n} saniye', { n })}</option>)}
                 </select>
               </div>
             </div>
 
             <div>
-              <label style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px', display: 'block' }}>Zorluk</label>
+              <label style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px', display: 'block' }}>{tr('Zorluk')}</label>
               <div style={{ display: 'flex', gap: '8px' }}>
                 {['kolay', 'normal', 'zor'].map(d => (
                   <button key={d} onClick={() => setForm(p => ({ ...p, difficulty: d }))}
                     style={{ flex: 1, padding: '8px', borderRadius: '8px', border: `1.5px solid ${form.difficulty === d ? '#6366f1' : 'var(--border)'}`, background: form.difficulty === d ? 'rgba(99,102,241,0.1)' : 'var(--bg2)', color: form.difficulty === d ? '#6366f1' : 'var(--text2)', fontSize: '13px', fontWeight: form.difficulty === d ? 700 : 400, cursor: 'pointer', fontFamily: 'var(--font-sans)', textTransform: 'capitalize' }}>
-                    {d}
+                    {tr(d === 'kolay' ? 'Kolay' : d === 'zor' ? 'Zor' : 'Normal')}
                   </button>
                 ))}
               </div>
@@ -318,7 +320,7 @@ export default function TeacherLivePage() {
 
             <button onClick={createLiveQuiz} disabled={creating || !form.topic.trim() || !form.classroom_id}
               style={{ padding: '13px', borderRadius: '12px', border: 'none', background: creating ? 'var(--bg2)' : '#6366f1', color: creating ? 'var(--text3)' : '#fff', fontWeight: 700, fontSize: '15px', cursor: creating ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)' }}>
-              {creating ? '⏳ Sorular hazırlanıyor...' : '🚀 Quiz Oluştur ve Gönder'}
+              {creating ? tr('⏳ Sorular hazırlanıyor...') : tr('🚀 Quiz Oluştur ve Gönder')}
             </button>
           </div>
         </div>
@@ -329,28 +331,28 @@ export default function TeacherLivePage() {
   // ── WAITING (Katılım bekleniyor) ───────────────────────────────────────────
   if (screen === 'waiting') return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: '80px' }}>
-      <PageHeader title="Katılım Bekleniyor" subtitle="Öğrenciler bağlanıyor..." icon="⏳" color="#6366f1" backHref="/teacher/live" backLabel="İptal" />
+      <PageHeader title={tr('Katılım Bekleniyor')} subtitle={tr('Öğrenciler bağlanıyor...')} icon="⏳" color="#6366f1" backHref="/teacher/live" backLabel={tr('İptal')} />
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '0 1rem', textAlign: 'center' }}>
 
         {/* Katılım kodu */}
         <div className="card" style={{ marginBottom: '1rem' }}>
-          <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '8px' }}>Katılım kodu</div>
+          <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '8px' }}>{tr('Katılım kodu')}</div>
           <div style={{ fontSize: '56px', fontWeight: 900, letterSpacing: '0.15em', color: '#6366f1', fontFamily: 'monospace' }}>{joinCode}</div>
-          <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '8px' }}>Öğrenciler pratium.com/live adresine gidip bu kodu girecek</div>
+          <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '8px' }}>{tr('Öğrenciler pratium.com/live adresine gidip bu kodu girecek')}</div>
         </div>
 
         {/* Katılan öğrenciler */}
         <div className="card" style={{ marginBottom: '1.5rem' }}>
           <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', marginBottom: '12px' }}>
-            Katılanlar ({participants.length})
+            {tr('Katılanlar ({n})', { n: participants.length })}
           </div>
           {participants.length === 0 ? (
-            <div style={{ fontSize: '13px', color: 'var(--text3)', padding: '1rem' }}>Henüz kimse katılmadı...</div>
+            <div style={{ fontSize: '13px', color: 'var(--text3)', padding: '1rem' }}>{tr('Henüz kimse katılmadı...')}</div>
           ) : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
               {participants.map((p: any) => (
                 <div key={p.user_id} style={{ padding: '5px 12px', borderRadius: '99px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', fontSize: '13px', color: '#6366f1', fontWeight: 500 }}>
-                  {p.profiles?.name || 'Öğrenci'}
+                  {p.profiles?.name || tr('Öğrenci‖canlı')}
                 </div>
               ))}
             </div>
@@ -360,13 +362,13 @@ export default function TeacherLivePage() {
         {/* Katılımcı sayısı */}
         <div style={{ marginBottom: '1rem', padding: '10px', borderRadius: '10px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', fontSize: '13px', color: '#6366f1', textAlign: 'center' }}>
           {participants.length === 0
-            ? '⏳ Öğrenciler bağlanıyor...'
-            : `✅ ${participants.length} öğrenci hazır`}
+            ? tr('⏳ Öğrenciler bağlanıyor...')
+            : tr('✅ {n} öğrenci hazır', { n: participants.length })}
         </div>
 
         {actionError && (
           <div style={{ marginBottom: '1rem', padding: '10px 12px', background: '#fff4e5', border: '1px solid rgba(217,119,6,0.25)', borderRadius: '10px', fontSize: '13px', color: '#92400e', textAlign: 'left' }}>
-            ⚠️ {actionError} <button onClick={() => lastActionRef.current?.()} style={{ marginLeft: 6, textDecoration: 'underline', color: '#92400e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '13px', padding: 0 }}>Tekrar dene</button>
+            ⚠️ {actionError} <button onClick={() => lastActionRef.current?.()} style={{ marginLeft: 6, textDecoration: 'underline', color: '#92400e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '13px', padding: 0 }}>{tr('Tekrar dene')}</button>
           </div>
         )}
 
@@ -376,10 +378,10 @@ export default function TeacherLivePage() {
             color: '#fff', fontWeight: 800, fontSize: '18px', cursor: 'pointer',
             fontFamily: 'var(--font-sans)', boxShadow: '0 8px 24px rgba(99,102,241,0.4)',
             transition: 'all 0.2s', letterSpacing: '0.02em' }}>
-          ▶ Sınavı Başlat — {liveQuiz?.questions?.length || 0} Soru
+          {tr('▶ Sınavı Başlat — {n} Soru', { n: liveQuiz?.questions?.length || 0 })}
         </button>
         <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text3)', marginTop: '8px' }}>
-          {participants.length > 0 ? `✅ ${participants.length} öğrenci hazır` : 'Öğrenci olmasa da başlatabilirsin'}
+          {participants.length > 0 ? tr('✅ {n} öğrenci hazır', { n: participants.length }) : tr('Öğrenci olmasa da başlatabilirsin')}
         </p>
       </div>
     </main>
@@ -395,18 +397,18 @@ export default function TeacherLivePage() {
       <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: '80px' }}>
         {/* Üst bar */}
         <div style={{ position: 'sticky', top: 0, zIndex: 100, background: '#082465', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ fontWeight: 800, fontSize: '14px', color: '#fff' }}>Soru {currentQ + 1}/{liveQuiz.questions.length}</div>
+          <div style={{ fontWeight: 800, fontSize: '14px', color: '#fff' }}>{tr('Soru {i}/{n}', { i: currentQ + 1, n: liveQuiz.questions.length })}</div>
           <div style={{ flex: 1, height: 6, borderRadius: '99px', background: 'rgba(255,255,255,0.15)', overflow: 'hidden' }}>
             <div style={{ height: '100%', borderRadius: '99px', background: timerPct > 30 ? '#1ECFB8' : '#ef4444', width: `${timerPct}%`, transition: 'width 1s linear' }} />
           </div>
           <div style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '18px', color: timeLeft <= 5 ? '#fca5a5' : '#fff', minWidth: 28 }}>{timeLeft}</div>
-          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>{answeredThisQ}/{totalParticipants} cevapladı</div>
+          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>{tr('{a}/{b} cevapladı', { a: answeredThisQ, b: totalParticipants })}</div>
         </div>
 
         <div style={{ maxWidth: '640px', margin: '0 auto', padding: '1.25rem 1rem' }}>
           {actionError && (
             <div style={{ marginBottom: '1rem', padding: '10px 12px', background: '#fff4e5', border: '1px solid rgba(217,119,6,0.25)', borderRadius: '10px', fontSize: '13px', color: '#92400e' }}>
-              ⚠️ {actionError} <button onClick={() => lastActionRef.current?.()} style={{ marginLeft: 6, textDecoration: 'underline', color: '#92400e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '13px', padding: 0 }}>Tekrar dene</button>
+              ⚠️ {actionError} <button onClick={() => lastActionRef.current?.()} style={{ marginLeft: 6, textDecoration: 'underline', color: '#92400e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '13px', padding: 0 }}>{tr('Tekrar dene')}</button>
             </div>
           )}
           {/* Soru */}
@@ -427,7 +429,7 @@ export default function TeacherLivePage() {
                       </span>
                       <span style={{ fontSize: '13px', fontWeight: 700, color: isCorrect ? '#16a34a' : '#6366f1' }}>{pct}%</span>
                     </div>
-                    <div style={{ position: 'relative', zIndex: 1, fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>{optAnswers.length} kişi</div>
+                    <div style={{ position: 'relative', zIndex: 1, fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>{tr('{n} kişi', { n: optAnswers.length })}</div>
                   </div>
                 )
               })}
@@ -436,14 +438,14 @@ export default function TeacherLivePage() {
 
           {/* Anlık cevap sayacı */}
           <div className="card" style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
-            <div><div style={{ fontSize: '24px', fontWeight: 800, color: '#16a34a' }}>{correctCount}</div><div style={{ fontSize: '11px', color: 'var(--text3)' }}>Doğru</div></div>
-            <div><div style={{ fontSize: '24px', fontWeight: 800, color: '#dc2626' }}>{answeredThisQ - correctCount}</div><div style={{ fontSize: '11px', color: 'var(--text3)' }}>Yanlış</div></div>
-            <div><div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text2)' }}>{Math.max(0, totalParticipants - answeredThisQ)}</div><div style={{ fontSize: '11px', color: 'var(--text3)' }}>Bekliyor</div></div>
+            <div><div style={{ fontSize: '24px', fontWeight: 800, color: '#16a34a' }}>{correctCount}</div><div style={{ fontSize: '11px', color: 'var(--text3)' }}>{tr('Doğru')}</div></div>
+            <div><div style={{ fontSize: '24px', fontWeight: 800, color: '#dc2626' }}>{answeredThisQ - correctCount}</div><div style={{ fontSize: '11px', color: 'var(--text3)' }}>{tr('Yanlış')}</div></div>
+            <div><div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text2)' }}>{Math.max(0, totalParticipants - answeredThisQ)}</div><div style={{ fontSize: '11px', color: 'var(--text3)' }}>{tr('Bekliyor')}</div></div>
           </div>
 
           <button onClick={revealLeaderboard}
             style={{ width: '100%', padding: '13px', borderRadius: '12px', border: 'none', background: '#f59e0b', color: '#fff', fontWeight: 700, fontSize: '15px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-            🏆 Sıralamayı Göster
+            {tr('🏆 Sıralamayı Göster')}
           </button>
         </div>
       </main>
@@ -456,23 +458,23 @@ export default function TeacherLivePage() {
     const isLastQuestion = currentQ >= (liveQuiz.questions.length - 1)
     return (
       <main style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #082465, #6366f1)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
-        <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '4px' }}>Soru {currentQ + 1}/{liveQuiz.questions.length} sonrası</div>
-        <div style={{ fontWeight: 900, fontSize: '26px', color: '#fff', marginBottom: '1.5rem' }}>🏆 İlk 3</div>
+        <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '4px' }}>{tr('Soru {i}/{n} sonrası', { i: currentQ + 1, n: liveQuiz.questions.length })}</div>
+        <div style={{ fontWeight: 900, fontSize: '26px', color: '#fff', marginBottom: '1.5rem' }}>{tr('🏆 İlk 3')}</div>
 
         {actionError && (
           <div style={{ marginBottom: '1rem', padding: '10px 12px', background: '#fff4e5', border: '1px solid rgba(217,119,6,0.25)', borderRadius: '10px', fontSize: '13px', color: '#92400e', maxWidth: 420, width: '100%' }}>
-            ⚠️ {actionError} <button onClick={() => lastActionRef.current?.()} style={{ marginLeft: 6, textDecoration: 'underline', color: '#92400e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '13px', padding: 0 }}>Tekrar dene</button>
+            ⚠️ {actionError} <button onClick={() => lastActionRef.current?.()} style={{ marginLeft: 6, textDecoration: 'underline', color: '#92400e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '13px', padding: 0 }}>{tr('Tekrar dene')}</button>
           </div>
         )}
 
         <div style={{ background: '#fff', borderRadius: '20px', padding: '1.5rem', width: '100%', maxWidth: '420px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', marginBottom: '1.5rem' }}>
           {top3.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', padding: '1rem' }}>Henüz kimse cevap vermedi.</div>
+            <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', padding: '1rem' }}>{tr('Henüz kimse cevap vermedi.')}</div>
           ) : top3.map((entry, i) => (
             <div key={entry.uid} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
               <div style={{ fontSize: '26px' }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</div>
               <div style={{ flex: 1, fontWeight: 700, fontSize: '15px', color: 'var(--primary)' }}>{entry.name}</div>
-              <div style={{ fontWeight: 800, fontSize: '16px', color: '#6366f1' }}>{entry.points} puan</div>
+              <div style={{ fontWeight: 800, fontSize: '16px', color: '#6366f1' }}>{tr('{n} puan', { n: entry.points })}</div>
             </div>
           ))}
         </div>
@@ -481,7 +483,7 @@ export default function TeacherLivePage() {
           style={{ width: '100%', maxWidth: '420px', padding: '16px', borderRadius: '14px', border: 'none',
             background: isLastQuestion ? '#dc2626' : 'linear-gradient(135deg, #1ECFB8, #0ea5a0)',
             color: '#fff', fontWeight: 800, fontSize: '16px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-          {isLastQuestion ? '🏁 Quizi Bitir' : 'Sonraki Soru →'}
+          {isLastQuestion ? tr('🏁 Quizi Bitir') : tr('Sonraki Soru →')}
         </button>
       </main>
     )
@@ -490,22 +492,22 @@ export default function TeacherLivePage() {
   // ── RESULTS (Sonuçlar) ─────────────────────────────────────────────────────
   if (screen === 'results') return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: '80px' }}>
-      <PageHeader title="Quiz Sonuçları" subtitle={form.topic} icon="🏆" color="#f59e0b" backHref="/teacher" backLabel="Öğretmen paneli" />
+      <PageHeader title={tr('Quiz Sonuçları')} subtitle={form.topic} icon="🏆" color="#f59e0b" backHref="/teacher" backLabel={tr('Öğretmen paneli')} />
       <div style={{ maxWidth: '560px', margin: '0 auto', padding: '0 1rem' }}>
 
         {/* Sınıf özeti */}
         <div className="card" style={{ marginBottom: '1rem', textAlign: 'center', background: 'linear-gradient(135deg, #082465, #6366f1)', color: '#fff' }}>
-          <div style={{ fontSize: '13px', opacity: 0.7, marginBottom: '4px' }}>Katılımcı</div>
+          <div style={{ fontSize: '13px', opacity: 0.7, marginBottom: '4px' }}>{tr('Katılımcı')}</div>
           <div style={{ fontSize: '40px', fontWeight: 900 }}>{leaderboard.length}</div>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginTop: '12px', fontSize: '13px', opacity: 0.8 }}>
-            <span>📝 {liveQuiz?.questions?.length || 0} soru</span>
-            <span>⏱ {form.time_per_question}sn/soru</span>
+            <span>{tr('📝 {n} soru', { n: liveQuiz?.questions?.length || 0 })}</span>
+            <span>{tr('⏱ {n}sn/soru', { n: form.time_per_question })}</span>
           </div>
         </div>
 
         {/* Liderboard */}
         <div className="card">
-          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Sıralama</div>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>{tr('Sıralama')}</div>
           {leaderboard.map((entry, i) => (
             <div key={entry.uid} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
               <div style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 800, background: i === 0 ? '#fdd31d' : i === 1 ? '#e2e8f0' : i === 2 ? '#f59e0b' : 'var(--bg2)', color: i < 3 ? '#082465' : 'var(--text2)', flexShrink: 0 }}>
@@ -513,22 +515,22 @@ export default function TeacherLivePage() {
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary)' }}>{entry.name}</div>
-                <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{entry.correct} doğru / {entry.total} soru · %{entry.pct}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{tr('{correct} doğru / {total} soru · %{pct}', { correct: entry.correct, total: entry.total, pct: entry.pct })}</div>
               </div>
               <div style={{ fontWeight: 800, fontSize: '16px', color: '#6366f1' }}>
-                {entry.points} puan
+                {tr('{n} puan', { n: entry.points })}
               </div>
             </div>
           ))}
-          {leaderboard.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', padding: '1rem' }}>Henüz kimse katılmadı.</div>}
+          {leaderboard.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', padding: '1rem' }}>{tr('Henüz kimse katılmadı.')}</div>}
         </div>
 
         <div style={{ display: 'flex', gap: '8px', marginTop: '1rem', flexWrap: 'wrap' }}>
           <button onClick={() => { setScreen('setup'); setLiveQuiz(null) }} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontWeight: 600, fontSize: '14px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-            🔄 Yeni Quiz
+            {tr('🔄 Yeni Quiz')}
           </button>
           <button onClick={() => router.push('/teacher')} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: '#6366f1', color: '#fff', fontWeight: 600, fontSize: '14px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-            📊 Panele Dön
+            {tr('📊 Panele Dön')}
           </button>
         </div>
       </div>

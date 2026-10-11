@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 type Assignment = { id: string; classroom_id: string; title: string; question: string; rubric: Array<{ criterion: string; maxPoints: number }> }
 type Student = { id: string; schoolNo: string | null; fullName: string; classroomId?: string }
@@ -20,6 +21,7 @@ async function compress(file: File): Promise<{ mediaType: 'image/jpeg'; data: st
 }
 
 export default function PaperAnswerImport({ group, onClose }: { group: Assignment[]; onClose: () => void }) {
+  const { t } = useT()
   const supabase = createClient() as any
   const [students, setStudents] = useState<Student[]>([])
   const [studentId, setStudentId] = useState('')
@@ -60,12 +62,12 @@ export default function PaperAnswerImport({ group, onClose }: { group: Assignmen
   }
 
   async function removeImport(target: Student) {
-    if (!confirm(`${target.fullName} için aktarılan kâğıt cevapları ve puanları silinsin mi? Sonra kâğıdı yeniden yükleyebilirsiniz.`)) return
+    if (!confirm(t('{name} için aktarılan kâğıt cevapları ve puanları silinsin mi? Sonra kâğıdı yeniden yükleyebilirsiniz.', { name: target.fullName }))) return
     setBusy(true)
     try {
       const { ok, data } = await call({ action: 'delete', student_id: target.id })
-      if (!ok) { setMessage(data?.error || 'Silinemedi.'); return }
-      setMessage(`${target.fullName} için aktarım silindi; kâğıdı yeniden yükleyebilirsiniz.`)
+      if (!ok) { setMessage(data?.error || t('Silinemedi.')); return }
+      setMessage(t('{name} için aktarım silindi; kâğıdı yeniden yükleyebilirsiniz.', { name: target.fullName }))
       setStudentId(target.id)
       await refreshStatus()
     } finally { setBusy(false) }
@@ -73,32 +75,32 @@ export default function PaperAnswerImport({ group, onClose }: { group: Assignmen
 
   async function transcribe() {
     if (!studentId || !files.length) return
-    setBusy(true); setMessage('Kâğıt okunuyor… (20-60 saniye sürebilir)')
+    setBusy(true); setMessage(t('Kâğıt okunuyor… (20-60 saniye sürebilir)'))
     try {
       const images = await Promise.all(files.slice(0, 6).map(compress))
       const { ok, data } = await call({ action: 'transcribe', images })
-      if (!ok) { setMessage(data?.error || 'Kâğıt okunamadı.'); return }
+      if (!ok) { setMessage(data?.error || t('Kâğıt okunamadı.')); return }
       setAnswers(data.answers); setInfo({ codeMatches: data.codeMatches, sheetCode: data.sheetCode, expectedCode: data.expectedCode, studentNameOnPaper: data.studentNameOnPaper })
       setMessage('')
-    } catch { setMessage('Görseller işlenemedi. JPEG/PNG fotoğraf seçin.') }
+    } catch { setMessage(t('Görseller işlenemedi. JPEG/PNG fotoğraf seçin.')) }
     finally { setBusy(false) }
   }
 
   async function save(replace = false) {
     if (!answers) return
-    setBusy(true); setMessage('Cevaplar puanlanıyor…')
+    setBusy(true); setMessage(t('Cevaplar puanlanıyor…'))
     try {
       const { ok, status, data } = await call({ action: 'save', replace, answers: answers.map(item => ({ assignmentId: item.assignmentId, text: item.text })) })
       if (status === 409 && !replace) {
-        if (confirm(`${data?.error}\n\nÜzerine yazılsın mı?`)) { setBusy(false); return save(true) }
-        setMessage('Kaydedilmedi.'); return
+        if (confirm(`${data?.error}\n\n${t('Üzerine yazılsın mı?')}`)) { setBusy(false); return save(true) }
+        setMessage(t('Kaydedilmedi.')); return
       }
-      if (!ok) { setMessage(data?.error || 'Kaydedilemedi.'); return }
+      if (!ok) { setMessage(data?.error || t('Kaydedilemedi.')); return }
       setResults(data.results)
       void refreshStatus()
       setScores(Object.fromEntries(data.results.map((result: Result) => [result.assignmentId, result.criteriaResults.map(c => c.earnedPoints)])))
       setMessage('')
-    } catch { setMessage('Beklenmeyen bir hata oluştu.') }
+    } catch { setMessage(t('Beklenmeyen bir hata oluştu.')) }
     finally { setBusy(false) }
   }
 
@@ -106,9 +108,9 @@ export default function PaperAnswerImport({ group, onClose }: { group: Assignmen
     setBusy(true)
     try {
       const { ok, data } = await call({ action: 'adjust', assignment_ids: [result.assignmentId], scores: scores[result.assignmentId] })
-      if (!ok) { setMessage(data?.error || 'Puan kaydedilemedi.'); return }
+      if (!ok) { setMessage(data?.error || t('Puan kaydedilemedi.')); return }
       setResults(prev => prev && prev.map(item => item.assignmentId === result.assignmentId ? { ...item, criteriaResults: data.criteriaResults, totalEarned: data.totalEarned } : item))
-      setMessage('Puanlar güncellendi.')
+      setMessage(t('Puanlar güncellendi.'))
     } finally { setBusy(false) }
   }
 
@@ -117,12 +119,12 @@ export default function PaperAnswerImport({ group, onClose }: { group: Assignmen
   return (
     <div className="card" style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <strong style={{ fontSize: 13 }}>📥 Kâğıt cevapları içe aktar — öğrenci bazında</strong>
-        <button className="btn btn-sm" onClick={onClose}>Kapat</button>
+        <strong style={{ fontSize: 13 }}>{t('📥 Kâğıt cevapları içe aktar — öğrenci bazında')}</strong>
+        <button className="btn btn-sm" onClick={onClose}>{t('Kapat')}</button>
       </div>
       {!answers && <>
-        <select value={studentId} onChange={event => setStudentId(event.target.value)} aria-label="Öğrenci seç">
-          <option value="">Öğrenci seç…</option>
+        <select value={studentId} onChange={event => setStudentId(event.target.value)} aria-label={t('Öğrenci seç')}>
+          <option value="">{t('Öğrenci seç…')}</option>
           {students.filter(item => !importedIds.has(item.id)).map(item => <option key={item.id} value={item.id}>{item.schoolNo ? `${item.schoolNo} — ` : ''}{item.fullName}</option>)}
         </select>
         {imported.length > 0 && <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -131,38 +133,38 @@ export default function PaperAnswerImport({ group, onClose }: { group: Assignmen
             if (!person) return null
             return (
               <div key={entry.studentId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 12, padding: '6px 0', borderTop: '1px solid var(--border)' }}>
-                <span><strong>{person.schoolNo ? `${person.schoolNo} — ` : ''}{person.fullName}</strong> · <span style={{ color: 'var(--green)' }}>✓ Aktarıldı (import ok)</span> · {entry.earned} / {entry.possible}{entry.source === 'online' ? ' · çevrim içi çözdü' : ''}</span>
-                {entry.source === 'paper' && <button className="btn btn-sm" disabled={busy} onClick={() => void removeImport(person)}>🗑️ Sil ve yeniden yükle</button>}
+                <span><strong>{person.schoolNo ? `${person.schoolNo} — ` : ''}{person.fullName}</strong> · <span style={{ color: 'var(--green)' }}>{t('✓ Aktarıldı')}</span> · {entry.earned} / {entry.possible}{entry.source === 'online' ? ` · ${t('çevrim içi çözdü')}` : ''}</span>
+                {entry.source === 'paper' && <button className="btn btn-sm" disabled={busy} onClick={() => void removeImport(person)}>{t('🗑️ Sil ve yeniden yükle')}</button>}
               </div>
             )
           })}
         </div>}
-        <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={event => setFiles(Array.from(event.target.files || []))} aria-label="Cevap kâğıdı fotoğrafları" />
-        <div style={{ fontSize: 11, color: 'var(--text3)' }}>Bu öğrencinin doldurduğu kâğıdın tüm sayfalarını (en fazla 6 fotoğraf) yükleyin. Fotoğraflar yalnızca okunmak için işlenir, saklanmaz.</div>
-        <button className="btn btn-primary" disabled={busy || !studentId || !files.length} onClick={() => void transcribe()}>{busy ? '⏳ Okunuyor…' : 'Kâğıdı oku'}</button>
+        <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={event => setFiles(Array.from(event.target.files || []))} aria-label={t('Cevap kâğıdı fotoğrafları')} />
+        <div style={{ fontSize: 11, color: 'var(--text3)' }}>{t('Bu öğrencinin doldurduğu kâğıdın tüm sayfalarını (en fazla 6 fotoğraf) yükleyin. Fotoğraflar yalnızca okunmak için işlenir, saklanmaz.')}</div>
+        <button className="btn btn-primary" disabled={busy || !studentId || !files.length} onClick={() => void transcribe()}>{busy ? t('⏳ Okunuyor…') : t('Kâğıdı oku')}</button>
       </>}
       {answers && !results && <>
-        <div style={{ fontSize: 12 }}>Öğrenci: <strong>{student?.fullName}</strong>{info?.studentNameOnPaper ? ` · kâğıtta yazan ad: ${info.studentNameOnPaper}` : ''}</div>
-        {info?.codeMatches === false && <div role="alert" style={{ padding: 8, background: 'var(--red-bg)', color: 'var(--red)', borderRadius: 8, fontSize: 12 }}>⚠️ Kâğıttaki ödev kodu ({info.sheetCode}) bu ödevin kodundan ({info.expectedCode}) farklı. Doğru ödevi seçtiğinizden emin olun.</div>}
-        <div style={{ fontSize: 12, color: 'var(--text3)' }}>Okunan cevapları kontrol edin; hatalı okunanları düzeltin. Puanlama bundan sonra yapılır.</div>
+        <div style={{ fontSize: 12 }}>{t('Öğrenci: {name}', { name: student?.fullName ?? '' })}{info?.studentNameOnPaper ? ` · ${t('kâğıtta yazan ad: {name}', { name: info.studentNameOnPaper })}` : ''}</div>
+        {info?.codeMatches === false && <div role="alert" style={{ padding: 8, background: 'var(--red-bg)', color: 'var(--red)', borderRadius: 8, fontSize: 12 }}>{t('⚠️ Kâğıttaki ödev kodu ({found}) bu ödevin kodundan ({expected}) farklı. Doğru ödevi seçtiğinizden emin olun.', { found: info.sheetCode ?? '', expected: info.expectedCode })}</div>}
+        <div style={{ fontSize: 12, color: 'var(--text3)' }}>{t('Okunan cevapları kontrol edin; hatalı okunanları düzeltin. Puanlama bundan sonra yapılır.')}</div>
         {answers.map((item, index) => (
           <div key={item.assignmentId}>
-            <div style={{ fontSize: 12, fontWeight: 600 }}>Soru {index + 1}: {group[index]?.question.slice(0, 140)}</div>
-            <textarea value={item.text} rows={4} onChange={event => setAnswers(prev => prev && prev.map(x => x.index === index ? { ...x, text: event.target.value } : x))} style={{ width: '100%' }} aria-label={`Soru ${index + 1} cevabı`} />
-            {(!item.legible || item.note) && <div style={{ fontSize: 11, color: 'var(--amber, #b45309)' }}>⚠️ {item.note || 'Bazı kısımlar zor okundu; kontrol edin.'}</div>}
-            {!item.text.trim() && <div style={{ fontSize: 11, color: 'var(--text3)' }}>Cevap bulunamadı — 0 puan verilir.</div>}
+            <div style={{ fontSize: 12, fontWeight: 600 }}>{t('Soru {n}', { n: index + 1 })}: {group[index]?.question.slice(0, 140)}</div>
+            <textarea value={item.text} rows={4} onChange={event => setAnswers(prev => prev && prev.map(x => x.index === index ? { ...x, text: event.target.value } : x))} style={{ width: '100%' }} aria-label={t('Soru {n} cevabı', { n: index + 1 })} />
+            {(!item.legible || item.note) && <div style={{ fontSize: 11, color: 'var(--amber, #b45309)' }}>⚠️ {item.note || t('Bazı kısımlar zor okundu; kontrol edin.')}</div>}
+            {!item.text.trim() && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{t('Cevap bulunamadı — 0 puan verilir.')}</div>}
           </div>
         ))}
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn" disabled={busy} onClick={() => { setAnswers(null); setInfo(null) }}>← Yeniden yükle</button>
-          <button className="btn btn-primary" disabled={busy} onClick={() => void save()} style={{ flex: 1 }}>{busy ? '⏳ Puanlanıyor…' : '✓ Onayla ve puanla'}</button>
+          <button className="btn" disabled={busy} onClick={() => { setAnswers(null); setInfo(null) }}>{t('← Yeniden yükle')}</button>
+          <button className="btn btn-primary" disabled={busy} onClick={() => void save()} style={{ flex: 1 }}>{busy ? t('⏳ Puanlanıyor…') : t('✓ Onayla ve puanla')}</button>
         </div>
       </>}
       {results && <>
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--green)' }}>✓ {student?.fullName}: toplam {results.reduce((sum, item) => sum + item.totalEarned, 0)} / {results.reduce((sum, item) => sum + item.totalPossible, 0)} puan kaydedildi</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--green)' }}>{t('✓ {name}: toplam {earned} / {possible} puan kaydedildi', { name: student?.fullName ?? '', earned: results.reduce((sum, item) => sum + item.totalEarned, 0), possible: results.reduce((sum, item) => sum + item.totalPossible, 0) })}</div>
         {results.map(result => (
           <div key={result.assignmentId} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-            <div style={{ fontSize: 12, fontWeight: 600 }}>Soru {result.index + 1}: {result.totalEarned} / {result.totalPossible}{result.answered ? '' : ' (cevap yok)'}</div>
+            <div style={{ fontSize: 12, fontWeight: 600 }}>{t('Soru {n}: {earned} / {possible}', { n: result.index + 1, earned: result.totalEarned, possible: result.totalPossible })}{result.answered ? '' : ` ${t('(cevap yok)')}`}</div>
             {result.criteriaResults.map((criterion, index) => (
               <label key={index} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 11, margin: '3px 0' }}>
                 <input type="number" min={0} max={criterion.maxPoints} value={scores[result.assignmentId]?.[index] ?? criterion.earnedPoints} style={{ width: 76, minWidth: 76, padding: '8px 10px', textAlign: 'center' }}
@@ -170,10 +172,10 @@ export default function PaperAnswerImport({ group, onClose }: { group: Assignmen
                 / {criterion.maxPoints} — {criterion.criterion}{criterion.feedback ? ` · ${criterion.feedback}` : ''}
               </label>
             ))}
-            <button className="btn btn-sm" disabled={busy} onClick={() => void adjust(result)}>Puanları kaydet</button>
+            <button className="btn btn-sm" disabled={busy} onClick={() => void adjust(result)}>{t('Puanları kaydet')}</button>
           </div>
         ))}
-        <button className="btn" onClick={() => { setAnswers(null); setResults(null); setFiles([]); setStudentId(''); setMessage('') }}>Başka öğrenci aktar</button>
+        <button className="btn" onClick={() => { setAnswers(null); setResults(null); setFiles([]); setStudentId(''); setMessage('') }}>{t('Başka öğrenci aktar')}</button>
       </>}
       {message && <div role="status" style={{ fontSize: 12, color: 'var(--text2)' }}>{message}</div>}
     </div>
