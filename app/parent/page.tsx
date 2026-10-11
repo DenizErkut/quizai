@@ -14,6 +14,7 @@ import { analyzeTrend } from '@/lib/predictive-risk'
 import { analyzeStudyDuration, StudyDurationInsight } from '@/lib/study-duration-model'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
+import PanelLanguageSwitch from '@/components/PanelLanguageSwitch'
 
 // lib/parent-risk-alert.ts'teki AYNI eşik (35) — o dosyayı buraya import
 // ETMİYORUZ bilerek: server-only bir zincire bağlanıyor (identity/client.ts
@@ -318,6 +319,7 @@ function ParentContent() {
               </span>
             )}
           </button>
+          <PanelLanguageSwitch />
           <button onClick={() => { supabase.auth.signOut(); router.push('/login') }}
             style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap', flexShrink: 0 }}>
             {tr('Çıkış')}

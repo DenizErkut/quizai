@@ -2,15 +2,26 @@
 // Language picker for visitors without a session (the Navbar, which has its own picker, only renders
 // for signed-in users). Sits left of the floating theme toggle.
 import { useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { useUser } from '@/lib/user-context'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { LOCALES } from '@/lib/i18n/core'
 
+// Pages where the main Navbar is hidden for signed-in users (see Navbar). The panel dashboards themselves
+// embed PanelLanguageSwitch in their own navbar; their sub-pages have no navbar, so the floating picker covers them.
+const PANEL_DASHBOARDS = ['/teacher', '/parent', '/institution']
+const NAVBAR_HIDDEN = ['/login', '/register', '/profile', '/']
+
 export default function LanguageFloating() {
   const { profile, loading } = useUser()
   const { locale, setLocale } = useT()
+  const pathname = usePathname() || ''
   const [open, setOpen] = useState(false)
-  if (profile || loading) return null
+  const inPanel = PANEL_DASHBOARDS.some(base => pathname === base || pathname.startsWith(base + '/'))
+  const panelDashboard = PANEL_DASHBOARDS.includes(pathname)
+  const navbarHidden = inPanel || NAVBAR_HIDDEN.includes(pathname)
+  if (loading || panelDashboard) return null
+  if (profile && !navbarHidden) return null
   const active = LOCALES.find(l => l.code === locale) || LOCALES[0]
   return (
     <div style={{ position: 'fixed', top: '16px', right: '66px', zIndex: 9997 }}>

@@ -299,3 +299,10 @@ for (const [name, entriesFile, exportName, files] of [
     assert.deepEqual(unused, [])
   })
 }
+
+test('teacher, parent and institution dashboards embed the language switch', async () => {
+  const { readFileSync } = await import('node:fs')
+  for (const file of ['app/teacher/page.tsx', 'app/parent/page.tsx', 'app/institution/page.tsx']) {
+    assert.ok(readFileSync(file, 'utf8').includes('<PanelLanguageSwitch />'), file)
+  }
+})

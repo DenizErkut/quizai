@@ -10,6 +10,7 @@ import InstitutionComparisons from '@/components/institution/InstitutionComparis
 import InstitutionTeachers from '@/components/institution/InstitutionTeachers'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
+import PanelLanguageSwitch from '@/components/PanelLanguageSwitch'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Cell
@@ -247,6 +248,7 @@ export default function InstitutionPage() {
             style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', fontSize: '12px', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
             {tr('🔌 Entegrasyonlar')}
           </Link>
+          <PanelLanguageSwitch />
           <button onClick={() => { supabase.auth.signOut(); router.push('/login') }}
             style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', marginLeft: '4px', whiteSpace: 'nowrap', flexShrink: 0 }}>
             {tr('Çıkış')}
