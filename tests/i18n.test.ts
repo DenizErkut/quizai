@@ -289,6 +289,7 @@ for (const [name, entriesFile, exportName, files] of [
   ['institution parts', 'institution-parts', 'institutionPartsEntries', ['components/institution/InstitutionTeachers.tsx', 'components/institution/InstitutionComparisons.tsx']],
   ['institution integrations', 'institution-integrations', 'institutionIntegrationsEntries', ['app/institution/integrations/page.tsx']],
   ['reports hub', 'reports-hub', 'reportsHubEntries', ['components/ReportsHub.tsx']],
+  ['teacher pilot', 'teacher-pilot', 'teacherPilotEntries', ['components/teacher/LearningGainPilot.tsx', 'components/teacher/LearningEvidenceChain.tsx', 'components/teacher/VerifiedLearningPlans.tsx', 'components/teacher/InterventionReviewQueue.tsx', 'components/teacher/TeacherInstitutionMemberships.tsx']],
   ['reports shared', 'reports-shared', 'reportsSharedEntries', ['components/StudentReportTable.tsx', 'components/SectionalReportTable.tsx', 'components/SubjectPerformanceChart.tsx', 'components/ChildConsentStatus.tsx', 'components/VerifiedLearningMetrics.tsx', 'components/LearningRiskOverview.tsx']],
   ['grade import', 'grade-import', 'gradeImportEntries', ['components/GradeImportWizard.tsx']],
   ['teacher live', 'teacher-live', 'teacherLiveEntries', ['app/teacher/live/page.tsx']],
