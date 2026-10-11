@@ -3,6 +3,7 @@ import LearningMessage from '@/components/LearningMessage'
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useVoiceTutor } from '@/lib/use-voice-tutor'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 interface Question {
   q: string; opts: string[]; ans: number; exp: string
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export default function ChatAssistant({ topic, language, questions, answers }: Props) {
+  const { t: tr } = useT()
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -46,8 +48,8 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
   useEffect(() => {
     if (open && messages.length === 0) {
       const greeting = wrongQuestions.length > 0
-        ? `Merhaba! "${topic}" testini %${pct} ile tamamladın. ${wrongQuestions.length} soruda takıldığın bir nokta olmuş — birlikte gözden geçirelim mi? Hangi soruyla başlayalım, yoksa ilk yanlışından mı başlayayım?`
-        : `Merhaba! "${topic}" testini %${pct} ile mükemmel tamamladın 🎉 Konuyla ilgili daha derin soru sormak ister misin?`
+        ? tr('Merhaba! "{topic}" testini %{pct} ile tamamladın. {n} soruda takıldığın bir nokta olmuş — birlikte gözden geçirelim mi? Hangi soruyla başlayalım, yoksa ilk yanlışından mı başlayayım?', { topic, pct, n: wrongQuestions.length })
+        : tr('Merhaba! "{topic}" testini %{pct} ile mükemmel tamamladın 🎉 Konuyla ilgili daha derin soru sormak ister misin?', { topic, pct })
       setMessages([{ role: 'assistant', content: greeting }])
     }
   }, [open])
@@ -75,11 +77,11 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
         }),
       })
       const data = await res.json()
-      const reply = typeof data.reply === 'string' ? data.reply : 'Yanıt alınamadı, tekrar dene.'
+      const reply = typeof data.reply === 'string' ? data.reply : tr('Yanıt alınamadı, tekrar dene.')
       setMessages(prev => [...prev, { role: 'assistant', content: reply }])
       voice.speak(reply)
     } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Bir hata oluştu, tekrar dene.' }])
+      setMessages(prev => [...prev, { role: 'assistant', content: tr('Bir hata oluştu, tekrar dene.') }])
     } finally {
       setLoading(false)
     }
@@ -100,11 +102,11 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
       })
         .then(r => r.json())
         .then(d => {
-          const reply = typeof d.reply === 'string' ? d.reply : 'Yanıt alınamadı, tekrar dene.'
+          const reply = typeof d.reply === 'string' ? d.reply : tr('Yanıt alınamadı, tekrar dene.')
           setMessages(prev => [...prev, { role: 'assistant', content: reply }])
           voice.speak(reply)
         })
-        .catch(() => setMessages(prev => [...prev, { role: 'assistant', content: 'Bir hata olustu.' }]))
+        .catch(() => setMessages(prev => [...prev, { role: 'assistant', content: tr('Bir hata oluştu, tekrar dene.') }]))
         .finally(() => setLoading(false))
     }, 0)
   }
@@ -125,7 +127,7 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
           onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,149,200,0.15)')}
           onMouseLeave={e => (e.currentTarget.style.background = 'rgba(0,149,200,0.08)')}
         >
-          🤖 AI Asistanla Konuş
+          {tr('🤖 AI Asistanla Konuş')}
         </button>
       )}
 
@@ -141,7 +143,7 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '20px' }}>🤖</span>
               <div>
-                <div style={{ fontSize: '13px', fontWeight: 600 }}>Pratium AI Asistan</div>
+                <div style={{ fontSize: '13px', fontWeight: 600 }}>{tr('Pratium AI Asistan')}</div>
                 <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{topic}</div>
               </div>
             </div>
@@ -157,21 +159,21 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
           <div style={{ padding: '9px 14px', borderBottom: '1px solid var(--border)', background: voice.enabled ? 'rgba(30,207,184,0.08)' : 'var(--bg)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
               <div>
-                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)' }}>🎙️ Canlı Sesli Tutor <span style={{ color: '#0a9e90', fontSize: '10px' }}>ÖLÇÜMLÜ</span></div>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)' }}>{tr('🎙️ Canlı Sesli Tutor')} <span style={{ color: '#0a9e90', fontSize: '10px' }}>{tr('ÖLÇÜMLÜ')}</span></div>
                 <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '2px' }}>
-                  {voice.enabled ? `Bas-konuş · ${voice.turnCount} tur · ${Math.floor(voice.secondsLeft / 60)}:${String(voice.secondsLeft % 60).padStart(2, '0')} kaldı${voice.lastRecognitionMs ? ` · son algılama ${Math.round(voice.lastRecognitionMs / 100) / 10} sn` : ''}` : `“${topic}” testi ve yanlışlarınla konuş`}
+                  {voice.enabled ? `${tr('Bas-konuş · {n} tur · {time} kaldı', { n: voice.turnCount, time: `${Math.floor(voice.secondsLeft / 60)}:${String(voice.secondsLeft % 60).padStart(2, '0')}` })}${voice.lastRecognitionMs ? ` · ${tr('son algılama {sec} sn', { sec: Math.round(voice.lastRecognitionMs / 100) / 10 })}` : ''}` : tr('“{topic}” testi ve yanlışlarınla konuş', { topic })}
                 </div>
               </div>
               <button type="button" onClick={voice.enabled ? voice.disable : voice.requestConsent} style={{ border: '1px solid rgba(0,149,200,0.3)', borderRadius: '16px', padding: '6px 10px', background: voice.enabled ? 'var(--accent)' : 'rgba(0,149,200,0.08)', color: voice.enabled ? '#fff' : 'var(--accent)', cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}>
-                {voice.enabled ? 'Sesliyi kapat' : 'Sesliyi dene'}
+                {voice.enabled ? tr('Sesliyi kapat') : tr('Sesliyi dene')}
               </button>
             </div>
             {voice.consentPending && (
               <div style={{ marginTop: '8px', padding: '9px', borderRadius: '10px', background: '#fff8df', border: '1px solid #f6df8b', fontSize: '10.5px', color: '#6b5420', lineHeight: 1.45 }}>
-                Konuşman yazıya çevrilmek üzere tarayıcının konuşma servisine gönderilebilir. Pratium ham ses kaydetmez; Tutor’a yalnızca oluşan metin ve mevcut test bağlamı gönderilir.
+                {tr('Konuşman yazıya çevrilmek üzere tarayıcının konuşma servisine gönderilebilir. Pratium ham ses kaydetmez; Tutor’a yalnızca oluşan metin ve mevcut test bağlamı gönderilir.')}
                 <div style={{ display: 'flex', gap: '6px', marginTop: '7px' }}>
-                  <button type="button" onClick={voice.acceptConsent} style={{ border: 0, borderRadius: '12px', padding: '5px 9px', background: '#087c70', color: '#fff', cursor: 'pointer', fontSize: '10px', fontWeight: 700 }}>Kabul et ve aç</button>
-                  <button type="button" onClick={voice.cancelConsent} style={{ border: '1px solid #d9c778', borderRadius: '12px', padding: '5px 9px', background: '#fff', color: '#6b5420', cursor: 'pointer', fontSize: '10px' }}>Vazgeç</button>
+                  <button type="button" onClick={voice.acceptConsent} style={{ border: 0, borderRadius: '12px', padding: '5px 9px', background: '#087c70', color: '#fff', cursor: 'pointer', fontSize: '10px', fontWeight: 700 }}>{tr('Kabul et ve aç')}</button>
+                  <button type="button" onClick={voice.cancelConsent} style={{ border: '1px solid #d9c778', borderRadius: '12px', padding: '5px 9px', background: '#fff', color: '#6b5420', cursor: 'pointer', fontSize: '10px' }}>{tr('Vazgeç')}</button>
                 </div>
               </div>
             )}
@@ -181,14 +183,14 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
           {/* Quick actions */}
           {wrongQuestions.length > 0 && messages.length <= 1 && (
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
-              <button onClick={() => quickAsk('Yanlış sorularımı birlikte gözden geçirelim, ilk sorudan başla')}
-                style={quickBtnStyle}>🔍 Yanlışlarımı birlikte inceleyelim</button>
-              <button onClick={() => quickAsk('Sadece doğru cevapları söyle, uzatma')}
-                style={quickBtnStyle}>⚡ Sadece cevabı söyle</button>
-              <button onClick={() => quickAsk(`"${topic}" konusunu sıfırdan anlat`)}
-                style={quickBtnStyle}>📚 Konuyu anlat</button>
-              <button onClick={() => quickAsk('Bana bu konudan 3 yeni soru sor')}
-                style={quickBtnStyle}>⚡ Yeni sorular üret</button>
+              <button onClick={() => quickAsk(tr('Yanlış sorularımı birlikte gözden geçirelim, ilk sorudan başla'))}
+                style={quickBtnStyle}>{tr('🔍 Yanlışlarımı birlikte inceleyelim')}</button>
+              <button onClick={() => quickAsk(tr('Sadece doğru cevapları söyle, uzatma'))}
+                style={quickBtnStyle}>{tr('⚡ Sadece cevabı söyle')}</button>
+              <button onClick={() => quickAsk(tr('"{topic}" konusunu sıfırdan anlat', { topic }))}
+                style={quickBtnStyle}>{tr('📚 Konuyu anlat')}</button>
+              <button onClick={() => quickAsk(tr('Bana bu konudan 3 yeni soru sor'))}
+                style={quickBtnStyle}>{tr('⚡ Yeni sorular üret')}</button>
             </div>
           )}
 
@@ -226,7 +228,7 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
           {/* Input */}
           <div style={{ display: 'flex', gap: '8px', padding: '12px 14px', borderTop: '1px solid var(--border)' }}>
             {voice.enabled && (
-              <button type="button" onClick={voice.listening ? voice.stop : voice.start} disabled={loading} aria-label={voice.listening ? 'Dinlemeyi durdur' : 'Konuşmaya başla'} title={voice.listening ? 'Dinleniyor — durdurmak için tıkla' : 'Bas ve konuş'} style={{ width: 40, height: 40, flexShrink: 0, borderRadius: '10px', border: voice.listening ? '2px solid #ff8a80' : '1.5px solid rgba(0,149,200,0.3)', background: voice.listening ? '#fff0ef' : 'rgba(0,149,200,0.08)', color: voice.listening ? '#c62828' : 'var(--accent)', cursor: loading ? 'default' : 'pointer', fontSize: '17px', animation: voice.listening ? 'voicePulse 1.2s ease-in-out infinite' : 'none' }}>
+              <button type="button" onClick={voice.listening ? voice.stop : voice.start} disabled={loading} aria-label={voice.listening ? tr('Dinlemeyi durdur') : tr('Konuşmaya başla')} title={voice.listening ? tr('Dinleniyor — durdurmak için tıkla') : tr('Bas ve konuş')} style={{ width: 40, height: 40, flexShrink: 0, borderRadius: '10px', border: voice.listening ? '2px solid #ff8a80' : '1.5px solid rgba(0,149,200,0.3)', background: voice.listening ? '#fff0ef' : 'rgba(0,149,200,0.08)', color: voice.listening ? '#c62828' : 'var(--accent)', cursor: loading ? 'default' : 'pointer', fontSize: '17px', animation: voice.listening ? 'voicePulse 1.2s ease-in-out infinite' : 'none' }}>
                 {voice.listening ? '■' : '🎙️'}
               </button>
             )}
@@ -234,7 +236,7 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
-              placeholder="Bir şey sor..."
+              placeholder={tr('Bir şey sor...')}
               style={{
                 flex: 1, padding: '10px 13px', borderRadius: '10px', border: '1.5px solid var(--border)',
                 background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px',

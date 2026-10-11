@@ -12,11 +12,13 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 type Phase = 'loading' | 'form' | 'pending' | 'approved' | 'done' | 'error'
 
 export default function ApplyTeacherPage() {
   const router = useRouter()
+  const { t: tr } = useT()
   const supabase = createClient() as any
 
   const [phase, setPhase] = useState<Phase>('loading')
@@ -50,7 +52,7 @@ export default function ApplyTeacherPage() {
     }
     run().catch((e) => {
       console.error('[apply-teacher] beklenmeyen hata:', e)
-      setErrorMsg('Bir sorun oluştu. Lütfen tekrar dene.')
+      setErrorMsg(tr('Bir sorun oluştu. Lütfen tekrar dene.'))
       setPhase('error')
     })
     return () => { cancelled = true }
@@ -58,7 +60,7 @@ export default function ApplyTeacherPage() {
   }, [])
 
   async function handleSubmit() {
-    if (!school.trim()) { setFormError('Okul/Kurum zorunlu.'); return }
+    if (!school.trim()) { setFormError(tr('Okul/Kurum zorunlu.')); return }
     setFormError(''); setLoading(true)
     try {
       const docUrls: string[] = []
@@ -88,7 +90,7 @@ export default function ApplyTeacherPage() {
         document_urls: docUrls.length > 0 ? docUrls : null,
         approved: false,
       })
-      if (insertErr) { setFormError('Başvuru gönderilemedi: ' + insertErr.message); return }
+      if (insertErr) { setFormError(tr('Başvuru gönderilemedi: {msg}', { msg: insertErr.message })); return }
 
       if (phone.trim()) {
         const { data: { session } } = await supabase.auth.getSession()
@@ -102,7 +104,7 @@ export default function ApplyTeacherPage() {
       setPhase('done')
     } catch (e: any) {
       console.error('[apply-teacher handleSubmit] beklenmeyen hata:', e)
-      setFormError('Beklenmeyen bir hata oluştu. Lütfen tekrar dene.')
+      setFormError(tr('Beklenmeyen bir hata oluştu. Lütfen tekrar dene.'))
     } finally {
       setLoading(false)
     }
@@ -134,14 +136,14 @@ export default function ApplyTeacherPage() {
           <div className="card" style={{ textAlign: 'center', padding: '2.5rem 2rem' }}>
             <div style={{ fontSize: '56px', marginBottom: '1rem' }}>🎓</div>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '8px' }}>
-              Zaten onaylı bir öğretmen hesabınız var!
+              {tr('Zaten onaylı bir öğretmen hesabınız var!')}
             </h2>
             <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
-              Bu hesapla öğretmen paneline erişebilirsin — öğrenci özelliklerin de aynen kalmaya devam ediyor.
+              {tr('Bu hesapla öğretmen paneline erişebilirsin — öğrenci özelliklerin de aynen kalmaya devam ediyor.')}
             </p>
             <button onClick={() => router.push('/teacher')} className="btn btn-primary"
               style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}>
-              Öğretmen Paneline Git
+              {tr('Öğretmen Paneline Git')}
             </button>
           </div>
         </div>
@@ -156,10 +158,10 @@ export default function ApplyTeacherPage() {
           <div className="card" style={{ textAlign: 'center', padding: '2.5rem 2rem' }}>
             <div style={{ fontSize: '56px', marginBottom: '1rem' }}>⏳</div>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '8px' }}>
-              Başvurunuz inceleniyor
+              {tr('Başvurunuz inceleniyor')}
             </h2>
             <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7 }}>
-              Ekibimiz başvurunuzu inceliyor, onaylandığında e-posta ve bildirimle haberdar olacaksınız. Genellikle 1-2 iş günü sürer.
+              {tr('Ekibimiz başvurunuzu inceliyor, onaylandığında e-posta ve bildirimle haberdar olacaksınız. Genellikle 1-2 iş günü sürer.')}
             </p>
           </div>
         </div>
@@ -174,15 +176,14 @@ export default function ApplyTeacherPage() {
           <div className="card" style={{ textAlign: 'center', padding: '2.5rem 2rem' }}>
             <div style={{ fontSize: '56px', marginBottom: '1rem' }}>✅</div>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)', marginBottom: '8px' }}>
-              Başvurunuz Alındı!
+              {tr('Başvurunuz Alındı!')}
             </h2>
             <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
-              Ekibimiz başvurunuzu inceleyecek ve e-posta ile bildirim gönderecek. Onay süreci genellikle 1-2 iş günü sürmektedir.
-              Öğrenci hesabın bu süreçte olduğu gibi kullanılmaya devam edebilir.
+              {tr('Ekibimiz başvurunuzu inceleyecek ve e-posta ile bildirim gönderecek. Onay süreci genellikle 1-2 iş günü sürmektedir. Öğrenci hesabın bu süreçte olduğu gibi kullanılmaya devam edebilir.')}
             </p>
             <button onClick={() => router.push('/home')} className="btn btn-primary"
               style={{ width: '100%', justifyContent: 'center' }}>
-              Ana Sayfaya Dön
+              {tr('Ana Sayfaya Dön')}
             </button>
           </div>
         </div>
@@ -196,21 +197,21 @@ export default function ApplyTeacherPage() {
       <div style={{ width: '100%', maxWidth: '440px' }}>
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
           <div style={{ fontSize: '40px', marginBottom: '8px' }}>🎓</div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>Öğretmenlik Başvurusu</h1>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>{tr('Öğretmenlik Başvurusu')}</h1>
           <p style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '4px' }}>
-            Mevcut hesabınla başvurabilirsin — öğrenci özelliklerin etkilenmez, admin onayından sonra öğretmen paneline de erişirsin.
+            {tr('Mevcut hesabınla başvurabilirsin — öğrenci özelliklerin etkilenmez, admin onayından sonra öğretmen paneline de erişirsin.')}
           </p>
         </div>
         <div className="card">
-          <label className="field-label">Okul / Kurum *</label>
+          <label className="field-label">{tr('Okul / Kurum *')}</label>
           <input className="input" placeholder="Ankara Anadolu Lisesi" value={school} onChange={e => setSchool(e.target.value)} />
-          <label className="field-label">Branş</label>
+          <label className="field-label">{tr('Branş')}</label>
           <input className="input" placeholder="Matematik, Fizik..." value={subject} onChange={e => setSubject(e.target.value)} />
-          <label className="field-label">Telefon (Opsiyonel)</label>
+          <label className="field-label">{tr('Telefon (Opsiyonel)')}</label>
           <input className="input" type="tel" placeholder="05xx xxx xx xx" value={phone} onChange={e => setPhone(e.target.value)} />
-          <label className="field-label">Belge Yükle (Opsiyonel)</label>
+          <label className="field-label">{tr('Belge Yükle (Opsiyonel)')}</label>
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '9px 16px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', fontSize: '13px', cursor: 'pointer', color: 'var(--text2)', marginBottom: '4px' }}>
-            📎 {docs.length > 0 ? `${docs.length} belge seçildi` : 'Belge seç (PDF, JPG — birden fazla seçebilirsin)'}
+            📎 {docs.length > 0 ? tr('{n} belge seçildi', { n: docs.length }) : tr('Belge seç (PDF, JPG — birden fazla seçebilirsin)')}
             <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple style={{ display: 'none' }}
               onChange={e => setDocs(Array.from(e.target.files || []))} />
           </label>
@@ -221,17 +222,17 @@ export default function ApplyTeacherPage() {
                   <span>{f.name}</span>
                   <button type="button" onClick={() => setDocs(docs.filter((_, j) => j !== i))}
                     style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: '12px', fontFamily: 'var(--font-sans)' }}>
-                    Kaldır
+                    {tr('Kaldır')}
                   </button>
                 </li>
               ))}
             </ul>
           )}
-          <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '1rem' }}>Öğretmenlik belgesi, diploma vb. — onay sürecini hızlandırır.</div>
+          <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '1rem' }}>{tr('Öğretmenlik belgesi, diploma vb. — onay sürecini hızlandırır.')}</div>
           {formError && <div style={{ padding: '10px 12px', background: 'var(--red-bg)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)', marginBottom: '10px' }}>{formError}</div>}
           <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}
             style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}>
-            {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Başvuruyu Gönder →'}
+            {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : tr('Başvuruyu Gönder →')}
           </button>
         </div>
       </div>

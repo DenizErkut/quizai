@@ -4,8 +4,10 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities, resolveName } from '@/lib/identity/resolve-client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 function JoinContent() {
+  const { t: tr } = useT()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [code, setCode] = useState(searchParams.get('code')?.toUpperCase() || '')
@@ -54,7 +56,7 @@ function JoinContent() {
 
   async function handleJoin(inputCode?: string) {
     const joinCode = (inputCode || code).trim().toUpperCase()
-    if (!joinCode || joinCode.length < 4) { setError('Geçerli bir kod gir.'); return }
+    if (!joinCode || joinCode.length < 4) { setError(tr('Geçerli bir kod gir.')); return }
     setLoading(true); setError('')
 
     const { data: { session } } = await supabase.auth.getSession()
@@ -67,7 +69,7 @@ function JoinContent() {
     })
     const result = await response.json().catch(() => ({}))
     if (!response.ok || !result.classroom) {
-      setError(result.error || 'Sınıfa katılım tamamlanamadı.')
+      setError(result.error || tr('Sınıfa katılım tamamlanamadı.'))
       setLoading(false)
       return
     }
@@ -90,7 +92,7 @@ function JoinContent() {
   }
 
   async function leaveClass(classroomId: string) {
-    if (!confirm('Sınıftan çıkmak istediğine emin misin?')) return
+    if (!confirm(tr('Sınıftan çıkmak istediğine emin misin?'))) return
     const { data: { user } } = await supabase.auth.getUser()
     await supabase.from('classroom_students')
       .delete().eq('classroom_id', classroomId).eq('student_id', user.id)
@@ -118,39 +120,39 @@ function JoinContent() {
           <div className="card anim-up" style={{ marginBottom: '1.5rem' }}>
             <div style={{ fontSize: '36px', textAlign: 'center', marginBottom: '1rem' }}>🏫</div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, marginBottom: '6px', textAlign: 'center', color: 'var(--primary)' }}>
-              Sınıfa Katıl
+              {tr('Sınıfa Katıl')}
             </h1>
             <p style={{ color: 'var(--text3)', fontSize: '13px', marginBottom: '1.75rem', textAlign: 'center' }}>
-              Öğretmeninin verdiği davet kodunu girerek sınıfına katıl.
+              {tr('Öğretmeninin verdiği davet kodunu girerek sınıfına katıl.')}
             </p>
-            <label className="field-label">Davet Kodu</label>
+            <label className="field-label">{tr('Davet Kodu')}</label>
             <input value={code} onChange={e => setCode(e.target.value.toUpperCase())}
               onKeyDown={e => e.key === 'Enter' && handleJoin()}
-              placeholder="örn: A1B2C3" maxLength={8} autoFocus
+              placeholder={tr('örn: A1B2C3')} maxLength={8} autoFocus
               style={{ padding: '14px 18px', borderRadius: '12px', border: '2px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '22px', fontFamily: 'monospace', fontWeight: 700, letterSpacing: '0.2em', outline: 'none', width: '100%', boxSizing: 'border-box', textAlign: 'center', textTransform: 'uppercase', transition: 'border-color 0.18s' }}
               onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
               onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
             {error && <div style={{ marginTop: '10px', padding: '10px 14px', background: 'var(--red-bg)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '10px', fontSize: '13px', color: 'var(--red)' }}>{error}</div>}
             <button className="btn btn-primary" onClick={() => handleJoin()} disabled={loading || code.length < 4}
               style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', opacity: code.length < 4 ? 0.5 : 1 }}>
-              {loading ? <div className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)' }} /> : 'Sınıfa Katıl →'}
+              {loading ? <div className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)' }} /> : tr('Sınıfa Katıl →')}
             </button>
           </div>
         ) : (
           <div className="card anim-up" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
             <div style={{ fontSize: '52px', marginBottom: '1rem' }}>{alreadyJoined ? '✅' : '🎉'}</div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, marginBottom: '8px', color: 'var(--primary)' }}>
-              {alreadyJoined ? 'Zaten bu sınıftasın!' : 'Sınıfa katıldın!'}
+              {alreadyJoined ? tr('Zaten bu sınıftasın!') : tr('Sınıfa katıldın!')}
             </h1>
             <p style={{ color: 'var(--text3)', fontSize: '14px', marginBottom: '1.5rem' }}>
               <strong style={{ color: 'var(--primary)' }}>{success.name}</strong>
-              {success.teachers?.name && ` · ${success.teachers.name} öğretmeni`}
+              {success.teachers?.name && ` · ${tr('{name} öğretmeni', { name: success.teachers.name })}`}
             </p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
               <button className="btn" onClick={() => { setSuccess(null); setCode(''); setAlreadyJoined(false) }}>
-                Başka sınıfa katıl
+                {tr('Başka sınıfa katıl')}
               </button>
-              <Link href="/quiz" className="btn btn-primary" style={{ justifyContent: 'center' }}>Teste başla ⚡</Link>
+              <Link href="/quiz" className="btn btn-primary" style={{ justifyContent: 'center' }}>{tr('Teste başla ⚡')}</Link>
             </div>
           </div>
         )}
@@ -159,7 +161,7 @@ function JoinContent() {
         {myClasses.length > 0 && (
           <div className="card">
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              📚 Sınıflarım ({myClasses.length})
+              {tr('📚 Sınıflarım ({n})', { n: myClasses.length })}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {myClasses.map((cls: any) => (
@@ -168,12 +170,12 @@ function JoinContent() {
                     <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)' }}>{cls.name}</div>
                     <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>
                       {cls.teachers?.name && `${cls.teachers.name} · `}
-                      {cls.subject || 'Sınıf'}
+                      {cls.subject || tr('Sınıf')}
                     </div>
                   </div>
                   <button onClick={() => leaveClass(cls.id)}
                     style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '8px', border: '1px solid rgba(220,38,38,0.3)', background: 'var(--red-bg)', color: 'var(--red)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 500 }}>
-                    Çık
+                    {tr('Çık')}
                   </button>
                 </div>
               ))}
@@ -183,7 +185,7 @@ function JoinContent() {
 
         {myClasses.length === 0 && !success && (
           <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-            <Link href="/quiz" style={{ fontSize: '13px', color: 'var(--text3)' }}>← Ana sayfaya dön</Link>
+            <Link href="/quiz" style={{ fontSize: '13px', color: 'var(--text3)' }}>{tr('← Ana sayfaya dön')}</Link>
           </div>
         )}
       </div>

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/i18n/I18nProvider'
 
 export interface UploadedFile {
   id: string
@@ -39,6 +40,7 @@ function formatSize(bytes: number) {
 }
 
 export default function FileUploader({ onFilesChange, maxFiles = 5, maxMB = 20, pendingFile, onPendingFileConsumed }: Props) {
+  const { t: tr } = useT()
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -100,11 +102,11 @@ export default function FileUploader({ onFilesChange, maxFiles = 5, maxMB = 20, 
         const text = await res.text()
         let data: any
         try { data = JSON.parse(text) } catch {
-          throw new Error('Sunucu hatası. Tekrar deneyin.')
+          throw new Error(tr('Sunucu hatası. Tekrar deneyin.'))
         }
 
         if (!res.ok) {
-          const msg = data?.message || data?.error || 'Yükleme hatası.'
+          const msg = data?.message || data?.error || tr('Yükleme hatası.')
           throw new Error(msg)
         }
 
@@ -146,7 +148,7 @@ export default function FileUploader({ onFilesChange, maxFiles = 5, maxMB = 20, 
           id, name: file.name, size: file.size, type: file.type,
           ext: file.name.split('.').pop() || '', content: '', fileType: '',
           progress: 0, status: 'error',
-          error: `${formatSize(file.size)} — maksimum ${maxMB}MB`,
+          error: tr('{size} — maksimum {max}MB', { size: formatSize(file.size), max: maxMB }),
         }])
         continue
       }
@@ -184,14 +186,14 @@ export default function FileUploader({ onFilesChange, maxFiles = 5, maxMB = 20, 
         >
           <div style={{ fontSize: '22px', marginBottom: '5px' }}>📎</div>
           <div style={{ fontSize: '13px', fontWeight: 500 }}>
-            Dosya sürükle veya tıkla
+            {tr('Dosya sürükle veya tıkla')}
             {files.length > 0 && ` (${files.filter(f => f.status !== 'error').length}/${maxFiles})`}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '3px' }}>
             PDF · TXT · DOCX · JPG · PNG · MP3 · M4A · WAV
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
-            Maks. {maxMB}MB/dosya · {maxFiles} dosyaya kadar
+            {tr('Maks. {max}MB/dosya · {n} dosyaya kadar', { max: maxMB, n: maxFiles })}
           </div>
           <input
             ref={inputRef} type="file" multiple style={{ display: 'none' }}
@@ -222,11 +224,11 @@ export default function FileUploader({ onFilesChange, maxFiles = 5, maxMB = 20, 
                     {f.name}
                   </div>
                   <div style={{ fontSize: '11px', marginTop: '2px', color: f.status === 'error' ? 'var(--red)' : f.status === 'done' ? 'var(--green)' : 'var(--accent)' }}>
-                    {f.status === 'error' && (f.error || 'Hata')}
+                    {f.status === 'error' && (f.error || tr('Hata'))}
                     {f.status === 'done' && (
-                      <span>✓ {f.content.split(' ').length} kelime · {formatSize(f.size)}{f.note && <span style={{ marginLeft:'6px', color:'var(--accent)', fontSize:'10px' }}>{f.note}</span>}</span>
+                      <span>{tr('✓ {words} kelime · {size}', { words: f.content.split(' ').length, size: formatSize(f.size) })}{f.note && <span style={{ marginLeft:'6px', color:'var(--accent)', fontSize:'10px' }}>{f.note}</span>}</span>
                     )}
-                    {f.status === 'uploading' && `${formatSize(f.size)} yükleniyor...`}
+                    {f.status === 'uploading' && tr('{size} yükleniyor...', { size: formatSize(f.size) })}
                   </div>
 
                   {/* Progress bar */}
@@ -234,7 +236,7 @@ export default function FileUploader({ onFilesChange, maxFiles = 5, maxMB = 20, 
                     <div style={{ marginTop: '6px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--accent)', marginBottom: '3px' }}>
                         <span>
-                          {f.progress < 80 ? 'Yükleniyor...' : f.progress < 100 ? 'Analiz ediliyor...' : 'Tamamlandı'}
+                          {f.progress < 80 ? tr('Yükleniyor...') : f.progress < 100 ? tr('Analiz ediliyor...') : tr('Tamamlandı')}
                         </span>
                         <span style={{ fontWeight: 600 }}>{f.progress}%</span>
                       </div>
