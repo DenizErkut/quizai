@@ -1,5 +1,6 @@
 import TeacherMembershipNotice from '@/components/teacher/TeacherMembershipNotice'
 import Link from 'next/link'
+import Tr from '@/components/Tr'
 import SiteFooter from '@/components/SiteFooter'
 
 export const metadata = {
@@ -44,41 +45,34 @@ export default function ForTeachersPage() {
           <Link href="/" style={{ textDecoration: 'none', display: 'inline-block', marginBottom: '1.5rem' }}>
             <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '52px' }} />
           </Link>
-          <div className="badge badge-blue" style={{ marginBottom: '0.75rem' }}>Öğretmenler İçin</div>
-          <h1 className="serif" style={{ fontSize: '30px', marginBottom: '0.75rem' }}>Hangi öğrenciye önce zaman ayırmanız gerektiğini bilin</h1>
-          <p style={{ color: 'var(--text2)', fontSize: '15px', lineHeight: 1.7 }}>
-            Pratium, sınıfınızın genel durumunu ve bireysel risk noktalarını görünür kılarak, öğretme zamanınızı
-            en çok ihtiyacı olan yere yönlendirmenize yardımcı olur.
-          </p>
+          <div className="badge badge-blue" style={{ marginBottom: '0.75rem' }}><Tr text="Öğretmenler İçin" /></div>
+          <h1 className="serif" style={{ fontSize: '30px', marginBottom: '0.75rem' }}><Tr text="Hangi öğrenciye önce zaman ayırmanız gerektiğini bilin" /></h1>
+          <p style={{ color: 'var(--text2)', fontSize: '15px', lineHeight: 1.7 }}><Tr text="Pratium, sınıfınızın genel durumunu ve bireysel risk noktalarını görünür kılarak, öğretme zamanınızı en çok ihtiyacı olan yere yönlendirmenize yardımcı olur." /></p>
         </div>
 
         {features.map((f, i) => (
           <div key={i} className="card" style={{ marginBottom: '1rem' }}>
-            <div className={`badge badge-${f.badge}`} style={{ marginBottom: '0.6rem' }}>{f.title}</div>
-            <p style={{ fontSize: '14px', lineHeight: 1.8, color: 'var(--text)' }}>{f.content}</p>
+            <div className={`badge badge-${f.badge}`} style={{ marginBottom: '0.6rem' }}><Tr text={f.title} /></div>
+            <p style={{ fontSize: '14px', lineHeight: 1.8, color: 'var(--text)' }}><Tr text={f.content} /></p>
           </div>
         ))}
 
         <TeacherMembershipNotice />
 
         <div className="card" style={{ marginBottom: '2rem', background: 'var(--bg2)' }}>
-          <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)', marginBottom: '0.6rem' }}>Kurumunuz İçin</h2>
-          <p style={{ fontSize: '14px', lineHeight: 1.8, color: 'var(--text2)' }}>
-            Okulunuz veya dershaneniz Pratium ile kurumsal olarak çalışıyorsa, kurum yöneticiniz sizi
-            sınıflarınızla birlikte sisteme ekleyebilir. Bireysel öğretmen başvurusu için kayıt sırasında
-            "Öğretmen" rolünü seçmeniz yeterli — başvurunuz kurum yöneticisi tarafından onaylanır.
-          </p>
+          <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)', marginBottom: '0.6rem' }}><Tr text="Kurumunuz İçin" /></h2>
+          <p style={{ fontSize: '14px', lineHeight: 1.8, color: 'var(--text2)' }}><Tr text={'Okulunuz veya dershaneniz Pratium ile kurumsal olarak çalışıyorsa, kurum yöneticiniz sizi sınıflarınızla birlikte sisteme ekleyebilir. Bireysel öğretmen başvurusu için kayıt sırasında "Öğretmen" rolünü seçmeniz yeterli — başvurunuz kurum yöneticisi tarafından onaylanır.'} /></p>
         </div>
 
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <a href="https://pratium.com/register" className="btn btn-primary">Öğretmen Olarak Başvur →</a>
+          <a href="https://pratium.com/register" className="btn btn-primary"><Tr text="Öğretmen Olarak Başvur →" /></a>
         </div>
 
         <div style={{ textAlign: 'center', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link href="/for-students" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}>Öğrenciler için →</Link>
-            <Link href="/for-parents" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}>Veliler için →</Link>
-            <Link href="/ozel-kocluk" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}>Özel Koçluk →</Link>
+            <Link href="/for-students" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}><Tr text="Öğrenciler için →" /></Link>
+            <Link href="/for-parents" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}><Tr text="Veliler için →" /></Link>
+            <Link href="/ozel-kocluk" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}><Tr text="Özel Koçluk →" /></Link>
           </div>
         </div>
       </div>
