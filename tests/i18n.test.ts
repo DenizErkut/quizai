@@ -76,3 +76,42 @@ test('profile entries are used by the profile page', async () => {
   const unused = profileEntries.map(e => e[0]).filter(key => !/^(İlkokul|Ortaokul|Lise|Üniversite) \d\. Sınıf$/.test(key) && !source.includes(key.replace(/'/g, "\\'")))
   assert.deepEqual(unused, [])
 })
+
+test('context suffix disambiguates identical source words and is dropped in Turkish', () => {
+  assert.equal(translate(undefined, 'Sıralama‖soru tipi'), 'Sıralama')
+  assert.equal(translate({ 'Sıralama‖soru tipi': 'Ordering' }, 'Sıralama‖soru tipi'), 'Ordering')
+})
+
+test('quiz setup entries are used by the setup component', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { quizSetupEntries } = await import('../lib/i18n/entries/quiz-setup')
+  const source = readFileSync('components/quiz/QuizSetup.tsx', 'utf8')
+  const unused = quizSetupEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})
+
+test('quiz question entries are used by the question component', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { quizQuestionEntries } = await import('../lib/i18n/entries/quiz-question')
+  const source = readFileSync('components/quiz/QuizQuestion.tsx', 'utf8')
+  const constants = readFileSync('lib/quiz-constants.ts', 'utf8')
+  const unused = quizQuestionEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key) && !constants.includes(`label: '${key}'`))
+  assert.deepEqual(unused, [])
+})
+
+test('quiz result entries are used by the result component', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { quizResultEntries } = await import('../lib/i18n/entries/quiz-result')
+  const source = readFileSync('components/QuizResult.tsx', 'utf8')
+  const constants = readFileSync('lib/quiz-constants.ts', 'utf8')
+  const unused = quizResultEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key) && !constants.includes(key))
+  assert.deepEqual(unused, [])
+})
+
+test('quiz flow entries are used by the quiz page', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { quizFlowEntries } = await import('../lib/i18n/entries/quiz-flow')
+  const source = readFileSync('app/quiz/page.tsx', 'utf8')
+  const unused = quizFlowEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})

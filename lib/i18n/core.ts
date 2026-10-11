@@ -41,9 +41,13 @@ export function localeDir(locale: Locale): 'ltr' | 'rtl' {
   return LOCALES.find(l => l.code === locale)?.dir ?? 'ltr'
 }
 
-/** Looks `text` up in `dictionary` (falls back to `text`) and fills `{name}` placeholders from `params`. */
+/**
+ * Looks `text` up in `dictionary` (falls back to `text`) and fills `{name}` placeholders from `params`.
+ * The same Turkish word can need different translations ("Sıralama": leaderboard vs ordering); append
+ * `‖context` to the key to tell them apart. The context is dropped from the fallback text.
+ */
 export function translate(dictionary: Dictionary | undefined, text: string, params?: Record<string, string | number>): string {
-  const template = dictionary?.[text] ?? text
+  const template = dictionary?.[text] ?? text.replace(/‖.*$/, '')
   if (!params) return template
   return template.replace(/\{(\w+)\}/g, (match, key: string) => (key in params ? String(params[key]) : match))
 }
