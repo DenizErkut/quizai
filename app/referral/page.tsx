@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { gradeLabel } from '@/lib/i18n/grade'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
 import { resolveIdentities } from '@/lib/identity/resolve-client'
@@ -241,7 +242,7 @@ export default function ReferralPage() {
                   </div>
                   <div>
                     <div style={{ fontSize: '13px', fontWeight: 500 }}>{r.name}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{r.grade}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{gradeLabel(r.grade, t)}</div>
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>

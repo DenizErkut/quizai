@@ -444,7 +444,7 @@ function ParentContent() {
                 {selected.sessions.slice(0, 5).map((s: any) => (
                   <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                     <div>
-                      <div style={{ fontSize: '13px', fontWeight: 500 }}>{s.topic}</div>
+                      <div style={{ fontSize: '13px', fontWeight: 500 }}>{tr(s.topic)}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
                         {tr('{score}/{total} doğru · {date}', { score: s.score, total: s.question_count, date: new Date(s.created_at).toLocaleDateString(dateLocale) })}
                       </div>
@@ -694,7 +694,7 @@ function ParentContent() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
                     {selected.topicRisks.map((t, i) => (
                       <div key={i} style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border)' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.topic}</div>
+                        <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tr(t.topic)}</div>
                         <div style={{ fontWeight: 800, fontSize: '22px', color: masteryColor(t.masteryScore) }}>%{t.masteryScore}</div>
                         <div style={{ fontSize:'11px', fontWeight:700, color:masteryColor(t.masteryScore), marginTop:2 }}>{progressLabel(t.masteryScore)}</div>
                         <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
@@ -757,7 +757,7 @@ function ParentContent() {
                       <span style={{ fontSize: '10px', color: pctColor(s.pct), opacity: 0.7, marginTop: '2px' }}>{s.score}/{s.question_count}</span>
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.topic}</div>
+                      <div style={{ fontWeight: 600, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tr(s.topic)}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
                         {new Date(s.created_at).toLocaleDateString(dateLocale, { day: 'numeric', month: 'long', year: 'numeric' })}
                       </div>

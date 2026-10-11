@@ -54,7 +54,7 @@ export default function RecommendationLifecycle() {
   return (
     <section style={{ marginBottom: '1rem', padding: '16px', borderRadius: '16px', background: '#edf7f2', border: '1px solid #cce5da' }}>
       <div style={{ fontSize: 11, fontWeight: 800, color: '#386455', textTransform: 'uppercase' }}>{tr('Sıradaki en iyi adım')}</div>
-      <div style={{ fontSize: 15, fontWeight: 800, color: '#29483d', marginTop: 5 }}>{item.topic}</div>
+      <div style={{ fontSize: 15, fontWeight: 800, color: '#29483d', marginTop: 5 }}>{tr(item.topic)}</div>
       <div style={{ fontSize: 12, color: '#587067', marginTop: 4 }}>{item.reason}</div>
       {item.status === 'deferred' ? (
         <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>

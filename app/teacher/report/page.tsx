@@ -125,7 +125,7 @@ export default function TeacherReportPage() {
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', marginBottom: '10px' }}>{tr('Çalışılan Konular')}</div>
                 {selectedStudent.topTopics.map((t: any, i: number) => (
                   <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', padding: '6px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
-                    <div style={{ flex: 1, fontSize: '13px' }}>{t.topic}</div>
+                    <div style={{ flex: 1, fontSize: '13px' }}>{tr(t.topic)}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{t.count}x</div>
                     <span style={{ fontWeight: 700, fontSize: '13px', color: pctColor(t.avgPct) }}>%{t.avgPct}</span>
                   </div>

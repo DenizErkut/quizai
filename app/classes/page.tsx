@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities } from '@/lib/identity/resolve-client'
+import { gradeLabel } from '@/lib/i18n/grade'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
 
@@ -195,7 +196,7 @@ export default function ClassesPage() {
                       {s.id === myUserId && <span style={{ marginLeft: '6px', fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>{t('(Sen)')}</span>}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '1px' }}>
-                      {s.grade}
+                      {gradeLabel(s.grade, t)}
                       {s.plan === 'premium' && <span style={{ marginLeft: '6px', color: 'var(--accent)' }}>★ {t('Altın')}</span>}
                       {s.plan === 'unlimited' && <span style={{ marginLeft: '6px', color: '#0d9488' }}>⭐ {t('Platin')}</span>}
                       {s.plan === 'silver' && <span style={{ marginLeft: '6px', color: '#64748b' }}>🥈 {t('Gümüş')}</span>}

@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities } from '@/lib/identity/resolve-client'
+import { gradeLabel } from '@/lib/i18n/grade'
 import { useT } from '@/lib/i18n/I18nProvider'
 
 function TeacherStudentsContent() {
@@ -299,7 +300,7 @@ function TeacherStudentsContent() {
                         <div>
                           <div style={{ fontSize: '13px', fontWeight: 500 }}>{s.profiles?.name || tr('İsimsiz')}</div>
                           <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
-                            {s.profiles?.grade && `${s.profiles.grade} · `}
+                            {s.profiles?.grade && `${gradeLabel(s.profiles.grade, tr)} · `}
                             {tr('{n} test bu ay', { n: s.profiles?.monthly_test_count || 0 })}
                           </div>
                         </div>
@@ -333,7 +334,7 @@ function TeacherStudentsContent() {
                         <div>
                           <div style={{ fontSize: '13px', fontWeight: 500 }}>{s.name}</div>
                           <div style={{ fontSize: '11px', color: 'var(--text3)' }}>
-                            {s.grade}{s.school ? ` · ${s.school}` : ''}
+                            {gradeLabel(s.grade, tr)}{s.school ? ` · ${s.school}` : ''}
                           </div>
                         </div>
                       </div>

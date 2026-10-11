@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import StudentReportTable from '@/components/StudentReportTable'
 import SectionalReportTable from '@/components/SectionalReportTable'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { gradeLabel } from '@/lib/i18n/grade'
 import SubjectPerformanceChart from '@/components/SubjectPerformanceChart'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
@@ -312,7 +313,7 @@ function WeakTopicsPanel({ data, scope, classroomId }: { data: any; scope: strin
     .slice()
     .sort((a: any, b: any) => b.errorRate - a.errorRate)
     .slice(0, 8)
-    .map((t: any) => ({ subject: t.topic, avgPct: 100 - t.errorRate, testCount: t.totalCount }))
+    .map((t: any) => ({ subject: tr(t.topic), avgPct: 100 - t.errorRate, testCount: t.totalCount }))
 
   return (
     <div>
@@ -331,8 +332,8 @@ function WeakTopicsPanel({ data, scope, classroomId }: { data: any; scope: strin
           <tbody>
             {data.topics.map((t: any, i: number) => (
               <tr key={i}>
-                <td style={{ ...td, fontWeight: 600 }}>{t.topic}</td>
-                <td style={td}>{t.subject}</td>
+                <td style={{ ...td, fontWeight: 600 }}>{tr(t.topic)}</td>
+                <td style={td}>{tr(t.subject)}</td>
                 <td style={td}>{t.wrongCount}/{t.totalCount}</td>
                 <td style={{ ...td, color: t.errorRate >= 50 ? 'var(--red)' : 'var(--text2)', fontWeight: 700 }}>%{t.errorRate}</td>
                 <td style={td}>{t.studentCount}</td>
@@ -369,7 +370,7 @@ function AssignmentsPanel({ data }: { data: any }) {
           {data.assignments.map((a: any) => (
             <tr key={a.id}>
               <td style={{ ...td, fontWeight: 600 }}>{a.title}</td>
-              <td style={td}>{a.topic}</td>
+              <td style={td}>{tr(a.topic)}</td>
               <td style={td}>{a.dueDate ? new Date(a.dueDate).toLocaleDateString(dl) : '—'}</td>
               <td style={td}>{a.completedCount}</td>
               <td style={td}>{a.avgPct != null ? `%${a.avgPct}` : '—'}</td>
@@ -403,7 +404,7 @@ function LiveQuizPanel({ data }: { data: any }) {
       <tbody>
         {data.quizzes.map((q: any) => (
           <tr key={q.id}>
-            <td style={{ ...td, fontWeight: 600 }}>{q.topic}</td>
+            <td style={{ ...td, fontWeight: 600 }}>{tr(q.topic)}</td>
             <td style={td}>{new Date(q.date).toLocaleDateString(dl)}</td>
             <td style={td}>{q.status}</td>
             <td style={td}>{q.participantCount}</td>
@@ -503,8 +504,8 @@ function OpenEndedArchivePanel({ data }: { data: any }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--primary)' }}>{e.studentName}</div>
                   <div style={{ fontSize: '11px', color: 'var(--text3)', display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
-                    {e.subject && <span>📚 {e.subject}</span>}
-                    {e.topic && <span>· {e.topic}</span>}
+                    {e.subject && <span>📚 {tr(e.subject)}</span>}
+                    {e.topic && <span>· {tr(e.topic)}</span>}
                     <span>· {new Date(e.gradedAt).toLocaleDateString(dl)}</span>
                   </div>
                 </div>
@@ -572,7 +573,7 @@ function ComparisonPanel({ data }: { data: any }) {
             <tbody>
               {s.subjects.map((r: any, i: number) => (
                 <tr key={i}>
-                  <td style={td}>{r.subject}</td>
+                  <td style={td}>{tr(r.subject)}</td>
                   <td style={td}>{r.selfReported ?? '—'}</td>
                   <td style={td}>{r.institutionRecord ?? '—'}</td>
                   <td style={{ ...td, color: r.diff != null && Math.abs(r.diff) >= 10 ? 'var(--red)' : 'var(--text2)', fontWeight: 700 }}>{r.diff ?? '—'}</td>
@@ -591,7 +592,7 @@ function ClassroomComparePanel({ data }: { data: any }) {
   if (!data.groups?.length) return empty
   const chartData = data.groups
     .filter((g: any) => g.avgPct != null)
-    .map((g: any) => ({ subject: g.name, avgPct: g.avgPct, testCount: g.testCount }))
+    .map((g: any) => ({ subject: gradeLabel(g.name, tr), avgPct: g.avgPct, testCount: g.testCount }))
   return (
     <div>
       {chartData.length > 0 && (
@@ -607,7 +608,7 @@ function ClassroomComparePanel({ data }: { data: any }) {
         <tbody>
           {data.groups.map((g: any) => (
             <tr key={g.name}>
-              <td style={{ ...td, fontWeight: 600 }}>{g.name}</td>
+              <td style={{ ...td, fontWeight: 600 }}>{gradeLabel(g.name, tr)}</td>
               <td style={td}>{g.studentCount}</td>
               <td style={td}>{g.testCount}</td>
               <td style={td}>{g.avgPct != null ? `%${g.avgPct}` : '—'}</td>

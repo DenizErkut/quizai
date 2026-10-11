@@ -3,6 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { gradeLabel } from '@/lib/i18n/grade'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { resolveIdentities } from '@/lib/identity/resolve-client'
 
@@ -107,7 +108,7 @@ export default function ParentLoginPage() {
                 </div>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--primary)' }}>{c.nickname}</div>
-                  {c.grade && <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>{c.grade}</div>}
+                  {c.grade && <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>{gradeLabel(c.grade, t)}</div>}
                 </div>
                 <span style={{ marginLeft: 'auto', color: 'var(--accent)', fontSize: '20px' }}>›</span>
               </button>
