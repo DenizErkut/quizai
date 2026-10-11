@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { resolveIdentities } from '@/lib/identity/resolve-client'
+import { gradeLabel } from '@/lib/i18n/grade'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
 import {
@@ -799,7 +800,7 @@ export default function TeacherPerformancePage() {
                   </div>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '18px' }}>{studentDetail.name}</div>
-                    <div style={{ fontSize: '13px', color: 'var(--text3)' }}>{studentDetail.grade}</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text3)' }}>{gradeLabel(studentDetail.grade, tr)}</div>
                   </div>
                 </div>
               </div>
@@ -874,7 +875,7 @@ export default function TeacherPerformancePage() {
                         <div>
                           <div style={{ fontSize: '13px', fontWeight: 600 }}>{asgn?.title || tr('Ödev')}</div>
                           <div style={{ fontSize: '12px', color: 'var(--text3)' }}>
-                            {asgn?.topic} · {new Date(c.completed_at).toLocaleDateString(dateLocale)}
+                            {asgn?.topic ? tr(asgn.topic) : ''} · {new Date(c.completed_at).toLocaleDateString(dateLocale)}
                             {wrongAnswers.length > 0 && <span style={{ color: 'var(--red)', marginLeft: '6px' }}>{tr('· {n} yanlış', { n: wrongAnswers.length })}</span>}
                           </div>
                         </div>
@@ -934,7 +935,7 @@ export default function TeacherPerformancePage() {
                 {studentDetail.sessions.slice(0, 10).map((s: any, i: number) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: i < 9 ? '1px solid var(--border)' : 'none' }}>
                     <div>
-                      <div style={{ fontSize: '13px', fontWeight: 500 }}>{s.topic}</div>
+                      <div style={{ fontSize: '13px', fontWeight: 500 }}>{tr(s.topic)}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{new Date(s.created_at).toLocaleDateString(dateLocale)}</div>
                     </div>
                     <div style={{ fontWeight: 700, fontSize: '15px', color: pctColor(s.pct) }}>%{s.pct}</div>

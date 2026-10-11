@@ -35,7 +35,7 @@ export default function LearningSummary() {
     {focus && <div style={{ marginTop: 7, fontSize: 13, color: '#29483d' }}><strong>{tr('En çok destek isteyen konu:')}</strong> {focus.topic}</div>}
     <div style={{ display:'grid',gap:10,marginTop:12 }}>
       {data.mastery.slice(0,3).map(item => <div key={`${item.subject}-${item.topic}`} style={{ borderTop:'1px solid #eaded1',paddingTop:8 }}>
-        <div style={{ display:'flex',justifyContent:'space-between',gap:8,fontSize:11 }}><span><strong>{item.topic}</strong> · {trend[item.trend]||tr('Dengeli')}</span><strong style={{ color:item.mastery_score<45?'#b84d3b':'#386455' }}>{level(item.mastery_score)}</strong></div>
+        <div style={{ display:'flex',justifyContent:'space-between',gap:8,fontSize:11 }}><span><strong>{tr(item.topic)}</strong> · {trend[item.trend]||tr('Dengeli')}</span><strong style={{ color:item.mastery_score<45?'#b84d3b':'#386455' }}>{level(item.mastery_score)}</strong></div>
         <div aria-label={tr('{topic} konu gelişimi yüzde {pct}', { topic: item.topic, pct: Math.round(item.mastery_score) })} style={{ height:7,borderRadius:99,background:'#eee5da',marginTop:6,overflow:'hidden' }}><div style={{ width:`${Math.max(0,Math.min(100,item.mastery_score))}%`,height:'100%',background:item.mastery_score>=70?'#3f8b70':item.mastery_score>=45?'#d5a23c':'#d96a55' }}/></div>
         <div style={{ fontSize:10,color:'#7c6d60',marginTop:4 }}>{tr('Konu gelişimi %{a} · bilgiyi koruma %{b}', { a: Math.round(item.mastery_score), b: Math.round(item.retention_score) })}</div>
       </div>)}

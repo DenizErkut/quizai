@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import FileUploader, { type UploadedFile } from '@/components/FileUploader'
 import { type QuestionType, type Profile } from '@/lib/quiz-constants'
 import { getSubjectsForGrade } from '@/lib/subject-map-grade'
+import { gradeLabel } from '@/lib/i18n/grade'
 import { useT } from '@/lib/i18n/I18nProvider'
 
 interface QuizSetupProps {
@@ -79,7 +80,7 @@ export default function QuizSetup({
             <div>
               <div style={{ fontWeight: 500 }}>{t('Merhaba, {name}', { name: profile.name.split(' ')[0] })}</div>
               <div style={{ fontSize: '12px', color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span>{profile.grade}</span>
+                <span>{gradeLabel(profile.grade, t)}</span>
                 <span>·</span>
                 <span>{currentLang}</span>
                 {testsLeft !== null && (

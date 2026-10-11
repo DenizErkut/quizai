@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { printPage } from '@/lib/print-page'
+import { gradeLabel } from '@/lib/i18n/grade'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
 
@@ -117,7 +118,7 @@ export default function StudentReportTable({ fetchEndpoint }: { fetchEndpoint: s
                 <td style={td}>{s.schoolNo ?? '—'}</td>
                 <td style={{ ...td, fontWeight: 600 }}>{s.fullName}</td>
                 {hasClassroomCol && <td style={td}>{s.classroomName ?? '—'}</td>}
-                {!hasClassroomCol && <td style={td}>{s.grade ?? '—'}</td>}
+                {!hasClassroomCol && <td style={td}>{s.grade ? gradeLabel(s.grade, tr) : '—'}</td>}
                 {data.subjectColumns.map(subj => <td key={subj} style={td}>{s.grades[subj] ?? '—'}</td>)}
                 <td style={{ ...td, fontWeight: 700, color: s.pratium.avgPct != null && s.pratium.avgPct < 50 ? 'var(--red)' : 'var(--green)' }}>
                   {s.pratium.avgPct != null ? `%${s.pratium.avgPct}` : '—'}

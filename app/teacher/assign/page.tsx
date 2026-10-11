@@ -677,7 +677,7 @@ export default function TeacherAssignPage() {
                     <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '5px' }}>{group.length > 1 ? baseTitle(a.title) : a.title}</div>
                     <div style={{ fontSize: '12px', color: 'var(--text3)', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                       <span>{tr('💬 Açık Uçlu')}{group.length > 1 ? ` · ${tr('{n} soru', { n: group.length })}` : ''}</span>
-                      {a.subject && <span>📚 {a.subject}</span>}
+                      {a.subject && <span>📚 {tr(a.subject)}</span>}
                       <span>🏫 {a.classrooms?.name}</span>
                       <span>{a.created_via === 'ai' ? tr('🤖 AI ile') : tr('✍️ Manuel')}</span>
                       {a.due_date && (

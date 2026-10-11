@@ -123,7 +123,7 @@ function DetailReport({ childId, onBack }: { childId: string; onBack: () => void
           <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>{tr('Çalışılan Konular')}</div>
           {stats.topTopics.map((t: any, i: number) => (
             <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', padding: '6px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
-              <div style={{ flex: 1, fontSize: '13px' }}>{t.topic}</div>
+              <div style={{ flex: 1, fontSize: '13px' }}>{tr(t.topic)}</div>
               <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{t.count}x</div>
               <span style={{ fontWeight: 700, fontSize: '13px', color: pctColor(t.avgPct) }}>%{t.avgPct}</span>
             </div>
@@ -137,7 +137,7 @@ function DetailReport({ childId, onBack }: { childId: string; onBack: () => void
           <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>{tr('⚠️ Çalışması Gereken Konular')}</div>
           {weakTopics.map((w: any, i: number) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
-              <div style={{ flex: 1, fontSize: '13px' }}>{w.topic}</div>
+              <div style={{ flex: 1, fontSize: '13px' }}>{tr(w.topic)}</div>
               <div style={{ fontSize: '11px', color: 'var(--red)' }}>{tr('{n} yanlış', { n: w.wrong_count })}</div>
             </div>
           ))}

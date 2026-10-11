@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { resolveName } from '@/lib/identity/resolve-client'
+import { gradeLabel } from '@/lib/i18n/grade'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale, type Locale } from '@/lib/i18n/core'
 import RecommendationLifecycle from '@/components/student/RecommendationLifecycle'
@@ -143,7 +144,7 @@ export default function DashboardPage() {
                   {firstName}
                 </div>
                 <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>
-                  {profile?.grade}
+                  {gradeLabel(profile?.grade, t)}
                 </div>
               </div>
             </div>

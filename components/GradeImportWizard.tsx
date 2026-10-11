@@ -311,8 +311,11 @@ export default function GradeImportWizard({
           <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '1rem', marginTop: '-6px' }}>
             {tr('Şablonu indirip kendi öğrenci/not verilerinizle doldurun, ardından aşağıdan yükleyin.')}
           </div>
-          <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile}
-            style={{ fontSize: '13px' }} className="input" />
+          <label className="input" style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <span className="btn" style={{ padding: '4px 12px', fontSize: '12px' }}>{tr('Dosya seç')}</span>
+            <span style={{ color: 'var(--text3)' }}>{fileName || tr('Dosya seçilmedi')}</span>
+            <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} style={{ display: 'none' }} />
+          </label>
         </div>
       )}
 

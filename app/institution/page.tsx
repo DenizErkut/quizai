@@ -8,6 +8,7 @@ import ReportsHub from '@/components/ReportsHub'
 import LearningRiskOverview from '@/components/LearningRiskOverview'
 import InstitutionComparisons from '@/components/institution/InstitutionComparisons'
 import InstitutionTeachers from '@/components/institution/InstitutionTeachers'
+import { gradeLabel } from '@/lib/i18n/grade'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
 import PanelLanguageSwitch from '@/components/PanelLanguageSwitch'
@@ -333,7 +334,7 @@ export default function InstitutionPage() {
                     {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
                   </div>
                   <div style={{ flex: 1, fontSize: '13px', fontWeight: 500, color: 'var(--primary)' }}>{s.name}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{s.grade}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{gradeLabel(s.grade, tr)}</div>
                   <div style={{ fontWeight: 800, fontSize: '15px', color: pctColor(s.avgPct) }}>%{s.avgPct}</div>
                 </div>
               ))}
@@ -482,7 +483,7 @@ export default function InstitutionPage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary)' }}>{s.name}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        {s.grade && <span>📚 {s.grade}</span>}
+                        {s.grade && <span>📚 {gradeLabel(s.grade, tr)}</span>}
                         <span>{tr('📝 {n} test', { n: s.totalTests })}</span>
                         {s.streak > 0 && <span>{tr('🔥 {n} gün', { n: s.streak })}</span>}
                         {s.weeklyTests > 0 && <span style={{ color: '#16a34a' }}>{tr('+{n} bu hafta', { n: s.weeklyTests })}</span>}
@@ -494,7 +495,7 @@ export default function InstitutionPage() {
                         <div style={{ marginTop: '4px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                           {s.weakTopics.map((t: any) => (
                             <span key={t.topic} style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(220,38,38,0.08)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.15)' }}>
-                              ⚠️ {t.topic.slice(0, 12)} %{t.avg}
+                              ⚠️ {tr(t.topic).slice(0, 12)} %{t.avg}
                             </span>
                           ))}
                         </div>
@@ -526,7 +527,7 @@ export default function InstitutionPage() {
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={analytics.gradeBreakdown} barSize={32}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="grade" tick={{ fontSize: 11, fill: 'var(--text3)' }} />
+                    <XAxis dataKey="grade" tickFormatter={(v: any) => gradeLabel(String(v), tr)} tick={{ fontSize: 11, fill: "var(--text3)" }} />
                     <YAxis tick={{ fontSize: 11, fill: 'var(--text3)' }} domain={[0, 100]} unit="%" />
                     <Tooltip formatter={(v: any) => [`%${v}`, tr('Ortalama')]} contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
                     <Bar dataKey="avgPct" name={tr('Ortalama')} radius={[6, 6, 0, 0]}>
@@ -539,7 +540,7 @@ export default function InstitutionPage() {
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
                   {analytics.gradeBreakdown.map((g: any) => (
                     <div key={g.grade} style={{ padding: '6px 10px', borderRadius: '8px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '12px' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{g.grade}</span>
+                      <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{gradeLabel(g.grade, tr)}</span>
                       <span style={{ color: 'var(--text3)', marginLeft: '6px' }}>{tr('{n} öğrenci · {tests} test', { n: g.count, tests: g.tests })}</span>
                     </div>
                   ))}
@@ -580,7 +581,7 @@ export default function InstitutionPage() {
                 {analytics.weakTopics?.map((t: any, i: number) => (
                   <div key={i} style={{ marginBottom: '10px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 500 }}>{t.topic}</span>
+                      <span style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 500 }}>{tr(t.topic)}</span>
                       <span style={{ fontSize: '12px', fontWeight: 700, color: '#dc2626' }}>%{t.avg}</span>
                     </div>
                     <div style={{ height: 6, borderRadius: 99, background: 'var(--bg2)', overflow: 'hidden' }}>
@@ -597,7 +598,7 @@ export default function InstitutionPage() {
                 {analytics.strongTopics?.map((t: any, i: number) => (
                   <div key={i} style={{ marginBottom: '10px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 500 }}>{t.topic}</span>
+                      <span style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 500 }}>{tr(t.topic)}</span>
                       <span style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a' }}>%{t.avg}</span>
                     </div>
                     <div style={{ height: 6, borderRadius: 99, background: 'var(--bg2)', overflow: 'hidden' }}>
@@ -642,7 +643,7 @@ export default function InstitutionPage() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary)' }}>{s.name}</div>
                         <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                          {s.grade && <span>📚 {s.grade}</span>}
+                          {s.grade && <span>📚 {gradeLabel(s.grade, tr)}</span>}
                           {s.reason === 'inactive'
                             ? <span style={{ color: '#d97706' }}>⏰ {daysSince !== null ? tr('{n} gündür aktif değil', { n: daysSince }) : tr('Hiç aktif olmadı')}</span>
                             : <span style={{ color: '#dc2626' }}>📉 {tr('Ortalama %{n}', { n: s.avgPct })}</span>

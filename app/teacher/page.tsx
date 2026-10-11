@@ -11,6 +11,7 @@ import LearningRiskOverview from '@/components/LearningRiskOverview'
 import AgentApprovalQueue from '@/components/teacher/AgentApprovalQueue'
 import TeacherInstitutionMemberships from '@/components/teacher/TeacherInstitutionMemberships'
 import LearningGainPilot from '@/components/teacher/LearningGainPilot'
+import { gradeLabel } from '@/lib/i18n/grade'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
 import PanelLanguageSwitch from '@/components/PanelLanguageSwitch'
@@ -350,7 +351,7 @@ export default function TeacherDashboard() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: '14px' }}>{s.name}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        {s.grade && <span>📚 {s.grade}</span>}
+                        {s.grade && <span>📚 {gradeLabel(s.grade, tr)}</span>}
                         <span>{tr('📝 {n} test', { n: s.totalTests })}</span>
                         <span>{tr('✅ {n} ödev', { n: s.assignmentsDone })}</span>
                         {s.streak > 0 && <span>{tr('🔥 {n} gün', { n: s.streak })}</span>}

@@ -7,4 +7,8 @@ export const planTopicEntries: Entry[] = [
   ['Ondalık Sayılar', 'Decimal Numbers', 'Dezimalzahlen', 'Nombres décimaux', 'Números decimales', 'الأعداد العشرية'],
   ['Denklemler', 'Equations', 'Gleichungen', 'Équations', 'Ecuaciones', 'المعادلات'],
   ['Geometri', 'Geometry', 'Geometrie', 'Géométrie', 'Geometría', 'الهندسة'],
+  ['Dosya seç', 'Choose file', 'Datei auswählen', 'Choisir un fichier', 'Elegir archivo', 'اختيار ملف'],
+  ['Dosya seçilmedi', 'No file chosen', 'Keine Datei ausgewählt', 'Aucun fichier choisi', 'Ningún archivo seleccionado', 'لم يتم اختيار ملف'],
+  ['Son 30 gün', 'Last 30 days', 'Letzte 30 Tage', '30 derniers jours', 'Últimos 30 días', 'آخر 30 يومًا'],
+  ['Önceki 30 gün', 'Previous 30 days', 'Vorherige 30 Tage', '30 jours précédents', '30 días anteriores', 'الـ 30 يومًا السابقة'],
 ]

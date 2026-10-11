@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, Fragment } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { gradeLabel } from '@/lib/i18n/grade'
 import SubjectPerformanceChart from '@/components/SubjectPerformanceChart'
 import { printPage } from '@/lib/print-page'
 import { useT } from '@/lib/i18n/I18nProvider'
@@ -83,7 +84,7 @@ export default function SectionalReportTable({ fetchEndpoint }: { fetchEndpoint:
         .filter((v): v is number => v != null)
       if (!values.length) return null
       return {
-        subject: subj,
+        subject: tr(subj),
         avgPct: Math.round(values.reduce((a, b) => a + b, 0) / values.length),
         testCount: values.length,
       }
@@ -133,7 +134,7 @@ export default function SectionalReportTable({ fetchEndpoint }: { fetchEndpoint:
               <th rowSpan={2} style={thBase}>{tr('İsim')}</th>
               <th rowSpan={2} style={thBase}>{hasClassroomCol ? tr('Sınıf‖sınıf grubu') : tr('Seviye')}</th>
               {data.subjects.map(subj => (
-                <th key={subj} colSpan={2} style={{ ...thBase, textAlign: 'center', borderLeft: '2px solid var(--border2)' }}>{subj}</th>
+                <th key={subj} colSpan={2} style={{ ...thBase, textAlign: 'center', borderLeft: '2px solid var(--border2)' }}>{tr(subj)}</th>
               ))}
             </tr>
             <tr style={{ background: 'var(--bg2)' }}>
@@ -150,7 +151,7 @@ export default function SectionalReportTable({ fetchEndpoint }: { fetchEndpoint:
               <tr key={s.id}>
                 <td style={td}>{s.schoolNo ?? '—'}</td>
                 <td style={{ ...td, fontWeight: 600 }}>{s.fullName}</td>
-                <td style={td}>{hasClassroomCol ? (s.classroomName ?? '—') : (s.grade ?? '—')}</td>
+                <td style={td}>{hasClassroomCol ? (s.classroomName ?? '—') : (s.grade ? gradeLabel(s.grade, tr) : '—')}</td>
                 {data.subjects.map(subj => {
                   const cell = s.sections[subj]
                   return (
