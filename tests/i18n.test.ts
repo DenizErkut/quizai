@@ -195,3 +195,19 @@ test('live entries are used by the live quiz screen', async () => {
   const unused = liveEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
   assert.deepEqual(unused, [])
 })
+
+test('register entries are used by the registration page', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { registerEntries } = await import('../lib/i18n/entries/register')
+  const source = readFileSync('app/(auth)/register/page.tsx', 'utf8')
+  const unused = registerEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})
+
+test('exam entries are used by the exam page, shared header or exam metadata', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { examEntries } = await import('../lib/i18n/entries/exam')
+  const source = readFileSync('app/exam/page.tsx', 'utf8')
+  const unused = examEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
+  assert.deepEqual(unused, [])
+})
