@@ -4,6 +4,7 @@ import MathText from "@/components/MathText"
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { noteMatchesObjectiveReview } from '@/lib/objective-review-note'
 import LearningEvidenceReadiness from './LearningEvidenceReadiness'
+import GradeSubjectFilter, { type GradeSubjectOption, type GradeSubjectValue } from './GradeSubjectFilter'
 
 type Item = {
   key: string; source: 'bank' | 'sessions'; recordId: string; index: number | null
@@ -24,6 +25,8 @@ export default function ObjectiveMappingReview() {
   const [source, setSource] = useState<'bank' | 'sessions'>('bank')
   const [reviewState, setReviewState] = useState<'pending' | 'approved' | 'rejected'>('pending')
   const [page, setPage] = useState(1)
+  const [filter, setFilter] = useState<GradeSubjectValue>({ grade: '', subject: '' })
+  const [filterOptions, setFilterOptions] = useState<GradeSubjectOption[]>([])
   const [items, setItems] = useState<Item[]>([])
   const [total, setTotal] = useState(0)
   const [selected, setSelected] = useState<Item | null>(null)
@@ -39,6 +42,7 @@ export default function ObjectiveMappingReview() {
   const [qualityProgress, setQualityProgress] = useState('')
   const [message, setMessage] = useState('')
   const candidateRequest = useRef(0)
+  const filterQuery = `${filter.grade ? `&grade=${encodeURIComponent(filter.grade)}` : ''}${filter.subject ? `&subject=${encodeURIComponent(filter.subject)}` : ''}`
   const selectedObjective = candidates.find(candidate => candidate.id === objectiveId)
   const noteMismatch = Boolean(selected && objectiveId && reason.trim().length >= 3 && !noteMatchesObjectiveReview(reason, selected.question.q || '', selected.question.exp || '', selectedObjective?.title || ''))
   const searchMismatch = Boolean(selected && ((/^F(?:B)?\./i.test(search.trim()) && /matematik/i.test(selected.subject)) || (/^MAT\./i.test(search.trim()) && /fen bilimleri/i.test(selected.subject))))
@@ -46,18 +50,25 @@ export default function ObjectiveMappingReview() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/admin/objective-mapping-review?source=${source}&page=${page}&reviewState=${reviewState}`)
+      const response = await fetch(`/api/admin/objective-mapping-review?source=${source}&page=${page}&reviewState=${reviewState}${filterQuery}`)
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Sorular yüklenemedi.')
       setItems(data.items || [])
       setTotal(data.total || 0)
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Sorular yüklenemedi.') }
     finally { setLoading(false) }
-  }, [source, page, reviewState])
+  }, [source, page, reviewState, filterQuery])
+
+  useEffect(() => {
+    fetch('/api/admin/objective-mapping-review?mode=filters')
+      .then(response => response.ok ? response.json() : null)
+      .then(data => { if (data?.grades) setFilterOptions(data.grades) })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
-    fetch(`/api/admin/objective-mapping-review?source=${source}&page=${page}&reviewState=${reviewState}`, { signal: controller.signal })
+    fetch(`/api/admin/objective-mapping-review?source=${source}&page=${page}&reviewState=${reviewState}${filterQuery}`, { signal: controller.signal })
       .then(async response => {
         const data = await response.json()
         if (!response.ok) throw new Error(data.error || 'Sorular yüklenemedi.')
@@ -66,7 +77,7 @@ export default function ObjectiveMappingReview() {
       })
       .catch(error => { if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : 'Sorular yüklenemedi.') })
     return () => controller.abort()
-  }, [source, page, reviewState])
+  }, [source, page, reviewState, filterQuery])
 
   const loadCandidates = useCallback(async (item: Item, term = '') => {
     const request = ++candidateRequest.current
@@ -170,6 +181,8 @@ export default function ObjectiveMappingReview() {
       )}
       <span style={{ alignSelf: 'center', color: 'var(--text2)' }}>{total} soru</span>
     </div>
+    <GradeSubjectFilter options={filterOptions} value={filter} disabled={loading}
+      onChange={next => { candidateRequest.current++; setFilter(next); setPage(1); setSelected(null); setMessage('') }} />
     {source === 'sessions' && reviewState === 'approved' && <div style={{ marginBottom: 18 }}>
       <button className="btn btn-primary" disabled={qualityRunning || loading || !items.length} onClick={() => void scanApprovedPage()}>
         {qualityRunning ? qualityProgress : 'Bu sayfadaki onaylananları yeniden tara ve kalite kontrolü yap'}

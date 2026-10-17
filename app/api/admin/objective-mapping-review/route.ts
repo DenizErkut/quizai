@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { noteMatchesObjectiveReview } from '@/lib/objective-review-note'
+import { questionBankKey } from '@/lib/question-bank'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -48,6 +49,19 @@ function updateQuestion(q: Question, objective: { id: string; objective_code: st
 }
 
 export async function GET(req: NextRequest) {
+  if (req.nextUrl.searchParams.get('mode') === 'filters') {
+    // Sınıf/ders seçenekleri aktif müfredattan gelir; sınıf numarası 1-12.
+    const { data, error } = await db.from('curriculum').select('grade,subject').eq('is_active', true)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    const byGrade = new Map<string, Set<string>>()
+    for (const row of data || []) {
+      const number = gradeNumber(text(row.grade))
+      if (!number) continue
+      if (!byGrade.has(number)) byGrade.set(number, new Set())
+      byGrade.get(number)!.add(text(row.subject))
+    }
+    return NextResponse.json({ grades: [...byGrade.keys()].sort((a, b) => Number(a) - Number(b)).map(grade => ({ grade, subjects: [...byGrade.get(grade)!].sort((a, b) => a.localeCompare(b, 'tr')) })) })
+  }
   if (!(await adminId())) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
   if (req.nextUrl.searchParams.get('mode') === 'candidates') {
     const subject = text(req.nextUrl.searchParams.get('subject'))
@@ -84,8 +98,8 @@ export async function GET(req: NextRequest) {
     let query = db.from('question_bank').select('id,question,subject_key,topic_key,grade_key,updated_at', { count: 'exact' })
     if (mappingStatuses) query = query.in('question->>objectiveMappingStatus', mappingStatuses)
     else query = query.or('question->>objectiveMappingStatus.is.null,question->>objectiveMappingStatus.not.in.(human_approved,human_rejected,ai_approved,ai_rejected)')
-    if (subject) query = query.eq('subject_key', subject)
-    if (grade) query = query.eq('grade_key', grade)
+    if (subject) query = query.eq('subject_key', questionBankKey(subject))
+    if (grade) query = gradeNumber(grade) ? query.ilike('grade_key', `% ${gradeNumber(grade)} s%`) : query.eq('grade_key', grade)
     const { data, error, count } = await query.order('updated_at', { ascending: false }).range(start, start + 19)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ items: (data || []).map(row => ({ key: row.id, source: 'bank', recordId: row.id, index: null, question: row.question, subject: row.subject_key, grade: row.grade_key, topic: row.topic_key })), total: count || 0 })
@@ -95,7 +109,7 @@ export async function GET(req: NextRequest) {
   const sessions: Array<{ id: string; questions: Question[]; topic: string; grade: string }> = []
   for (let offset = 0; ; offset += 200) {
     let query = db.from('quiz_sessions').select('id,questions,topic,grade,created_at').eq('completed', true)
-    if (grade) query = query.ilike('grade', `%${gradeNumber(grade)}%`)
+    if (grade) query = query.or(`grade.ilike.* ${gradeNumber(grade)}.*,grade.ilike.* ${gradeNumber(grade)} *`)
     const { data, error } = await query.order('created_at', { ascending: false }).range(offset, offset + 199)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     sessions.push(...(data || []))
@@ -106,7 +120,7 @@ export async function GET(req: NextRequest) {
     subject: text(question.subject), grade: row.grade, topic: row.topic,
   }))).filter(item => {
     const currentStatus = text(item.question.objectiveMappingStatus)
-    return (!subject || item.subject === subject) && (mappingStatuses ? mappingStatuses.includes(currentStatus) : !['human_approved', 'human_rejected', 'ai_approved', 'ai_rejected'].includes(currentStatus))
+    return (!subject || questionBankKey(item.subject) === questionBankKey(subject)) && (mappingStatuses ? mappingStatuses.includes(currentStatus) : !['human_approved', 'human_rejected', 'ai_approved', 'ai_rejected'].includes(currentStatus))
   })
   return NextResponse.json({ items: matchingItems.slice(start, start + 20), total: matchingItems.length, pageUnit: 'soru' })
 }
