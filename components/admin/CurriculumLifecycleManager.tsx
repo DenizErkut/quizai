@@ -1,11 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import GradeSubjectFilter, { type GradeSubjectValue } from './GradeSubjectFilter'
 
 interface Version { id: string; code: string; title: string; status: 'draft' | 'active' | 'retired'; academic_year_start: number; academic_year_end: number }
 interface Objective { id: string; objective_code: string; title: string; subject: string; grade: string; topic: string; lifecycle_status: string; is_active: boolean; curriculum_version_id: string }
 interface Target { topic_node_id: string; topic: string; grade: string; level: string; unit: string; subject: string }
 interface PreparedRevision { objective_id: string; curriculum_version_id: string; revision_status: 'draft' }
+
+const PAGE_SIZE = 50
+const gradeNumber = (value: string) => value.match(/\d+/)?.[0] || ''
 
 function canonical(value: string) {
   return value.toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ').trim()
@@ -23,6 +27,9 @@ export default function CurriculumLifecycleManager() {
   const [reasons, setReasons] = useState<Record<string, string>>({})
   const [revisionVersion, setRevisionVersion] = useState<Record<string, string>>({})
   const [revisionTarget, setRevisionTarget] = useState<Record<string, string>>({})
+  const [filter, setFilter] = useState<GradeSubjectValue>({ grade: '', subject: '' })
+  const [search, setSearch] = useState('')
+  const [visible, setVisible] = useState(PAGE_SIZE)
 
   async function load() {
     setBusy(true)
@@ -97,6 +104,24 @@ export default function CurriculumLifecycleManager() {
   }
 
   const drafts = versions.filter(version => version.status === 'draft')
+  const filterOptions = useMemo(() => {
+    const byGrade = new Map<string, Set<string>>()
+    for (const objective of objectives) {
+      const grade = gradeNumber(objective.grade)
+      if (!grade) continue
+      if (!byGrade.has(grade)) byGrade.set(grade, new Set())
+      byGrade.get(grade)!.add(objective.subject)
+    }
+    return [...byGrade.keys()].sort((a, b) => Number(a) - Number(b)).map(grade => ({ grade, subjects: [...byGrade.get(grade)!].sort((a, b) => a.localeCompare(b, 'tr')) }))
+  }, [objectives])
+  const filteredObjectives = useMemo(() => {
+    const term = canonical(search)
+    return objectives.filter(objective =>
+      (!filter.grade || gradeNumber(objective.grade) === filter.grade) &&
+      (!filter.subject || canonical(objective.subject) === canonical(filter.subject)) &&
+      (!term || canonical(`${objective.objective_code} ${objective.title} ${objective.topic}`).includes(term)))
+  }, [objectives, filter, search])
+  const shownObjectives = filteredObjectives.slice(0, visible)
   return <div className="card" style={{ marginTop: '16px' }}>
     <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)' }}>🗓️ Müfredat Sürümleri ve Kazanım Yaşam Döngüsü</div>
     <div style={{ fontSize: '12px', color: 'var(--text3)', margin: '4px 0 12px' }}>Yeni sürümler taslakta hazırlanır. Eski testlerin kazanım geçmişi değişmeden korunur.</div>
@@ -125,7 +150,11 @@ export default function CurriculumLifecycleManager() {
     </div>
     {objectives.length > 0 && <div style={{ marginTop: 16, display: 'grid', gap: 8 }}>
       <strong style={{ fontSize: 13 }}>Kazanımlar</strong>
-      {objectives.map(objective => <div key={objective.id} style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}>
+      <GradeSubjectFilter options={filterOptions} value={filter} count={`${filteredObjectives.length} / ${objectives.length} kazanım`}
+        onChange={next => { setFilter(next); setVisible(PAGE_SIZE) }} />
+      <input className="input" value={search} onChange={event => { setSearch(event.target.value); setVisible(PAGE_SIZE) }} placeholder="Kod, başlık veya konuda ara" aria-label="Kazanım ara" />
+      {!filteredObjectives.length && <p style={{ fontSize: 12, color: 'var(--text3)' }}>Bu filtreyle eşleşen kazanım yok.</p>}
+      {shownObjectives.map(objective => <div key={objective.id} style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}>
         <div><strong>{objective.objective_code}</strong> · {objective.title} · {objective.lifecycle_status}</div>
         <div style={{ color: 'var(--text3)', marginTop: 3 }}>{objective.subject} → {objective.topic} · {objective.grade}</div>
         <input value={reasons[objective.id] || ''} onChange={event => setReasons(current => ({ ...current, [objective.id]: event.target.value }))} placeholder="Zorunlu: değişiklik gerekçesi (en az 3 karakter)" style={{ marginTop: 7, width: '100%' }} />
@@ -146,6 +175,9 @@ export default function CurriculumLifecycleManager() {
           </>}
         </div>
       </div>)}
+      {filteredObjectives.length > visible && <button type="button" className="btn btn-sm" onClick={() => setVisible(count => count + PAGE_SIZE)}>
+        Daha fazla göster ({Math.min(PAGE_SIZE, filteredObjectives.length - visible)} / kalan {filteredObjectives.length - visible})
+      </button>}
     </div>}
   </div>
 }
