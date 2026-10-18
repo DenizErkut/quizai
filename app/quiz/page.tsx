@@ -168,7 +168,8 @@ function QuizPageContent() {
   useEffect(() => {
     async function loadCurriculum() {
       try {
-        const res = await fetch('/api/admin/curriculum')
+        const { data: { session } } = await supabase.auth.getSession()
+        const res = await fetch('/api/admin/curriculum', session?.access_token ? { headers: { Authorization: `Bearer ${session.access_token}` } } : undefined)
         const data = await res.json()
         const userGrade = profile?.grade || '' // örn: "ortaokul 6. sınıf"
         // Kullanıcının tam sınıf numarasını çıkar
@@ -546,6 +547,7 @@ function QuizPageContent() {
   function getErrorInfoRaw(errorCode: string, status?: number, reason?: string, serverMessage?: string): {code: string; title: string; desc: string; retry: boolean} {
     if (status === 429 || errorCode === 'daily_limit_reached') return { code: 'daily_limit', title: "⏰ Günlük limit doldu", desc: "Bugünkü test hakkını kullandın. Yarın yenilenir ya da Altın'a geçerek sınırsız test çöz.", retry: false }
     if (errorCode === 'limit_reached') return { code: 'monthly_limit', title: "📚 Aylık limit doldu", desc: "Bu ay için test hakkın bitti. Sınırsız test için Altın'a geç.", retry: false }
+    if (errorCode === 'location_required') return { code: 'location', title: "📍 Konum bilgisi gerekli", desc: "Test oluşturmak için profil ayarlarından ülke, eyalet ve şehir bilgini gir.", retry: false }
     if (errorCode === 'out_of_curriculum') return { code: 'curriculum', title: "📖 Müfredat dışı konu", desc: "Bu konu MEB müfredatında yer almıyor. Başka bir konu dene ya da Altın ile tüm konulara eriş.", retry: false }
     if (errorCode === 'pdf_too_long') return { code: 'pdf', title: "📄 PDF çok uzun", desc: "PDF dosyan 100 sayfadan fazla. Daha kısa bir bölüm yükle ya da metni kopyalayıp yapıştır.", retry: false }
     if (errorCode === 'pdf_image_only') return { code: 'pdf', title: "🖼️ PDF okunemiyor", desc: "Bu PDF taranmış görsel içeriyor, metin çıkarılamıyor. Word veya metin dosyası yükle.", retry: false }

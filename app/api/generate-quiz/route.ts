@@ -38,6 +38,7 @@ import { startingDifficultyFromMastery } from '@/lib/adaptive-difficulty'
 import { resolveDiagnosticQuestionStrategy } from '@/lib/diagnostic-question-strategy'
 import { parsePrioritySubjects, seedScoreForSubject } from '@/lib/onboarding-priorities'
 import { turkishLanguagePrompt } from '@/lib/turkish-question-rules'
+import { applicableScopes, hasLocation } from '@/lib/location/curriculum-scope'
 import { applyCanonicalObjectiveMappings, learningObjectivePrompt, loadCanonicalObjectiveCandidates } from '@/lib/learning-objective-mapping'
 import { runMistralShadowComparison, MistralAdapter, isProviderConfigured } from '@/lib/ai-gateway'
 import { balanceAnswerPositions, getQuestionBankSet, hasRealVisualAsset, promoteQuestionsToBank, questionBankKey } from '@/lib/question-bank'
@@ -1468,10 +1469,15 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('plan, monthly_test_count, daily_test_count, daily_test_date, grade, language, department, priority_subjects, is_admin')
+      .select('plan, monthly_test_count, daily_test_count, daily_test_date, grade, language, department, priority_subjects, is_admin, role, country, state, city')
       .eq('id', user.id)
       .single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+    // Konum zorunlu: müfredat/kazanım seçimi öğrencinin ülkesine (ve varsa eyalet/şehrine) göre yapılır.
+    const locationRequired = profile.role === 'student' && profile.is_admin !== true
+    if (locationRequired && !hasLocation(profile)) {
+      return NextResponse.json({ error: 'location_required', message: 'Test oluşturmak için profilinizden ülke, eyalet ve şehir bilgisini girin.' }, { status: 422 })
+    }
 
     const body = await req.json()
     const isDailyChallengeRequest = body?.dailyChallenge === true
@@ -1782,12 +1788,19 @@ export async function POST(req: NextRequest) {
       ? await loadBookletContext(subject, grade, topic).catch(() => '')
       : ''
     const isUniversityLevel = level === 'universite'
-    const objectiveCandidates = await loadCanonicalObjectiveCandidates(supabase, {
+    const allObjectiveCandidates = await loadCanonicalObjectiveCandidates(supabase, {
       subject, grade, topic,
     }).catch(error => {
       console.warn('[generate-quiz] canonical objective candidates unavailable:', error?.message || 'unknown')
       return []
     })
+    // Yalnız kullanıcının konumuna uygulanan (ülke geneli ya da eyalet/şehir kapsamlı) aktif müfredat sürümlerinin kazanımları.
+    let objectiveCandidates = allObjectiveCandidates
+    if (allObjectiveCandidates.length && hasLocation(profile)) {
+      const { data: activeVersions } = await supabase.from('curriculum_versions').select('id,country,state,city').eq('status', 'active')
+      const allowed = new Set(applicableScopes(activeVersions || [], profile).map((version: { id: string }) => version.id))
+      objectiveCandidates = allObjectiveCandidates.filter(candidate => allowed.has(candidate.curriculumVersionId))
+    }
     if (!isUniversityLevel && !fileContent && objectiveCandidates.length === 0) {
       return NextResponse.json({ error: 'quality_policy_failed', reason: 'canonical_objectives_unavailable', message: 'Bu sınıf, ders ve konu için doğrulanmış aktif kazanım bulunamadığından test oluşturulamadı.' }, { status: 503 })
     }
