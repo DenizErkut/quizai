@@ -21,3 +21,11 @@ test('anlam kazanımı metin verilmesini ister', () => {
 test('diğer derslerde boş döner', () => {
   assert.equal(turkishLanguagePrompt('Fen Bilimleri', cand('Yazım')), '')
 })
+
+import { turkishOpenEndedPrompt } from '../lib/turkish-question-rules'
+test('açık uçlu: anlam konusunda metin, yazım konusunda hatalı metin ister', () => {
+  assert.match(turkishOpenEndedPrompt('Türkçe', 'Cümlede Anlam'), /3-6 cümlelik/)
+  assert.match(turkishOpenEndedPrompt('Türkçe', 'Noktalama İşaretleri'), /hataları bulup düzeltmesini/)
+  assert.match(turkishOpenEndedPrompt('Türkçe', 'Noktalama İşaretleri'), /ASLA/)
+  assert.equal(turkishOpenEndedPrompt('Fen Bilimleri', 'Noktalama'), '')
+})

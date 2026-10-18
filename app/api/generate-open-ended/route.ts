@@ -4,6 +4,7 @@
 // formatına uygun soru üretimi. (Kaynak: MEB Ölçme, Değerlendirme ve Sınav
 // Hizmetleri Genel Müdürlüğü — Türkiye Yüzyılı Maarif Modeli Modül 5 kılavuzu)
 
+import { turkishOpenEndedPrompt } from '@/lib/turkish-question-rules'
 import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -135,7 +136,7 @@ YAŞA UYGUN CEVAP STANDARDI — ZORUNLU:
 
 Seviye: ${level} (${grade})
 Ders: ${subject}
-Konu: ${topic}
+Konu: ${topic}${turkishOpenEndedPrompt(subject, topic)}
 
 Yukarıdaki konuya uygun, ${grade} seviyesine uygun zorlukta, gerçek bir MEB ortak sınav sorusu gibi bir senaryo+soru+rubrik hazırla.
 
