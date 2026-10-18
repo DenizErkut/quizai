@@ -9,6 +9,7 @@
 //   kaydedilir — 'created_via' alanında bu iki oluşturma yöntemi
 //   frontend tarafından ayrıca işaretlenip gönderilir.
 import { NextRequest, NextResponse } from 'next/server'
+import { turkishOpenEndedPrompt } from '@/lib/turkish-question-rules'
 import { gateTeacherFeature, recordTeacherUsage } from '@/lib/teacher-access'
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -79,7 +80,7 @@ YAŞA UYGUN CEVAP STANDARDI — ZORUNLU:
 
 Seviye: ${level} (${grade})
 Ders: ${subject}
-Konu: ${topic}
+Konu: ${topic}${turkishOpenEndedPrompt(subject, topic)}
 ${mebSection}
 Bir ÖĞRETMEN, bu soruyu SINIFINA ÖDEV olarak atayacak — birden fazla öğrenci aynı soruyu cevaplayacak. Yukarıdaki konuya uygun, ${grade} seviyesine uygun zorlukta, gerçek bir MEB ortak sınav sorusu gibi bir senaryo+soru+rubrik hazırla.
 

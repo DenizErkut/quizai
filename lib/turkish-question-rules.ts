@@ -21,7 +21,7 @@ const GRAMMAR = /(dil bilgisi|sozcuk turleri|fiil|isim|sifat|zamir|zarf|edat|bag
 export type TurkishSkill = 'spelling' | 'meaning' | 'grammar'
 
 /** Kazanım başlıklarına ve konuya göre ölçülen beceri türlerini döndürür. */
-export function turkishSkills(candidates: CanonicalObjectiveCandidate[], topic?: string | null): TurkishSkill[] {
+export function turkishSkills(candidates: CanonicalObjectiveCandidate[] = [], topic?: string | null): TurkishSkill[] {
   const text = fold([topic || '', ...candidates.map(c => c.title)].join(' | '))
   const found: TurkishSkill[] = []
   if (SPELLING.test(text)) found.push('spelling')
@@ -43,4 +43,21 @@ export function turkishLanguagePrompt(subject: string | null | undefined, candid
   if (skills.includes('grammar')) rules.push(
     'Dil bilgisi kazanımlarında kuralı tanım olarak değil, verilen cümle veya metin üzerinde tespit/çözümleme (hangi sözcük/ek/yapı) olarak ölç.')
   return `\n\nTÜRKÇE DERSİ SORU TÜRÜ KURALI (ZORUNLU):\n- ${rules.join('\n- ')}`
+}
+
+/** Açık uçlu (AUS) soru üretimi için Türkçe dersi kuralı; senaryo+soru+rubrik biçimine eklenir. */
+export function turkishOpenEndedPrompt(subject: string | null | undefined, topic?: string | null): string {
+  if (!isTurkishLanguageSubject(subject)) return ''
+  const skills = turkishSkills([], topic)
+  const rules = [
+    '"Senaryo" alanı konunun önemini anlatan bir durum DEĞİL, öğrencinin üzerinde çalışacağı GERÇEK dil malzemesi olmalıdır; soru bu malzemeyi işlemeyi istemelidir. "Bu konu neden önemlidir, ne işe yarar" türünde soru ASLA sorma.',
+  ]
+  if (skills.includes('meaning')) rules.push(
+    'Anlam konularında senaryo olarak 3-6 cümlelik özgün kısa bir METİN/PARAGRAF (veya anlamı tartışılacak cümleler) yaz; soru bu metnin içeriğine, sözcüğün/cümlenin metindeki anlamına veya çıkarıma dayansın. Rubrik, metne dayalı doğru yorumu ölçsün.')
+  if (skills.includes('spelling')) rules.push(
+    'Yazım ve noktalama konularında senaryo olarak içinde yazım/noktalama hataları bulunan kısa bir metin ya da cümleler ver; soru hataları bulup düzeltmesini ve her düzeltmenin dayandığı kuralı kısaca söylemesini istesin. Rubrik, hataların doğru bulunmasını ve düzeltilmesini puanlasın.')
+  if (skills.includes('grammar')) rules.push(
+    'Dil bilgisi konularında verilen metin/cümleler üzerinde çözümleme (ek, sözcük türü, cümle öğesi vb. belirleme ve gerekçelendirme) iste.')
+  if (rules.length === 1) rules.push('Konuya uygun, öğrencinin bir metin veya cümle üzerinde becerisini UYGULAYACAĞI bir görev kur.')
+  return `\n\nTÜRKÇE DERSİ AÇIK UÇLU SORU KURALI (ZORUNLU):\n- ${rules.join('\n- ')}\n`
 }
