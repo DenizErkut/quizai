@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { extractGradeNumber } from '@/lib/subject-map-grade'
 import { fetchAllRows } from '@/lib/paginate'
+import { applicableScopes, hasLocation } from '@/lib/location/curriculum-scope'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,14 +32,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Geçerli sınıf bilgisi gerekli.' }, { status: 400 })
   }
 
-  const { data: version, error: versionError } = await adminDb
+  // Konum zorunlu: yalnız kullanıcının ülkesine (ve varsa eyalet/şehrine) uygulanan aktif müfredat gösterilir.
+  const { data: profile } = await adminDb.from('profiles').select('role,is_admin,country,state,city').eq('id', user.id).maybeSingle()
+  const mustHaveLocation = profile?.role === 'student' && profile.is_admin !== true
+  if (mustHaveLocation && !hasLocation(profile)) {
+    return NextResponse.json({ error: 'location_required', message: 'Konu listesi için profilinizden ülke, eyalet ve şehir bilgisini girin.' }, { status: 422 })
+  }
+  const { data: versions, error: versionError } = await adminDb
     .from('curriculum_versions')
-    .select('id,code')
-    .eq('authority', 'MEB')
+    .select('id,code,country,state,city')
     .eq('status', 'active')
-    .maybeSingle()
+  const candidates = hasLocation(profile) ? applicableScopes(versions || [], profile!) : (versions || []).filter(row => row.country === 'TR' && !row.state && !row.city)
+  const version = candidates[0]
   if (versionError || !version) {
-    return NextResponse.json({ error: 'Aktif MEB müfredatı bulunamadı.' }, { status: 503 })
+    return NextResponse.json({ error: 'Konumunuz için aktif müfredat bulunamadı.' }, { status: 503 })
   }
 
   let data: Array<{ subject: string | null; grade: string | null; unit: string | null; topic: string | null; objective_code: string | null }>

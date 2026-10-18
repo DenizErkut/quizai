@@ -5,6 +5,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { fetchAllRows } from '@/lib/paginate'
 import { deriveTopics, type CatalogObjective } from '@/lib/curriculum-coverage'
+import { hasLocation, scopeApplies, type ScopeLike } from '@/lib/location/curriculum-scope'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,9 +32,20 @@ async function loadCatalogObjectives(): Promise<CatalogObjective[]> {
 }
 
 // GET — tüm müfredatı listele
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Oturum belirteci gönderen yönetici olmayan kullanıcı yalnızca kendi konumuna uygulanan müfredatı görür (konum zorunlu).
+  let viewer: ScopeLike | null = null
+  const bearer = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+  if (bearer) {
+    const { data: { user } } = await adminDb.auth.getUser(bearer)
+    if (user) {
+      const { data: profile } = await adminDb.from('profiles').select('is_admin,country,state,city').eq('id', user.id).maybeSingle()
+      if (profile && !profile.is_admin) viewer = profile
+    }
+  }
   let objectives: CatalogObjective[]
-  const { data } = await adminDb.from('curriculum').select('*').order('level').order('grade').order('sort_order')
+  const { data: allRows } = await adminDb.from('curriculum').select('*').order('level').order('grade').order('sort_order')
+  const data = viewer ? (hasLocation(viewer) ? (allRows || []).filter(row => scopeApplies(row, viewer!)) : []) : allRows
   try { objectives = await loadCatalogObjectives() }
   catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Katalog okunamadı.' }, { status: 500 }) }
   const curriculum = (data || []).map(item => {
