@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { fetchAllRows } from '@/lib/paginate'
 
 const adminDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
@@ -15,25 +16,70 @@ async function getAdminUser() {
   return profile?.is_admin ? user : null
 }
 
-export async function GET() {
+const PAGE_SIZE = 50
+type CatalogMeta = { id: string; grade: string; subject: string; is_active: boolean; lifecycle_status: string }
+const gradeNumber = (value: string) => value.match(/\d+/)?.[0] || ''
+const escapeLike = (value: string) => value.replace(/[\\%_,()*]/g, ' ').trim()
+
+export async function GET(req: NextRequest) {
   const user = await getAdminUser()
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  const [objectivesResult, versionsResult, targetsResult, revisionsResult] = await Promise.all([
-    adminDb.from('learning_objective_catalog')
-      .select('id,objective_code,title,subject,grade,topic,lifecycle_status,is_active,curriculum_version_id,current_revision_id,replaced_by_objective_id,updated_at')
-      .order('subject').order('grade').order('objective_code').limit(500),
-    adminDb.from('curriculum_versions').select('id,code,title,status,academic_year_start,academic_year_end,effective_from,effective_to')
-      .order('academic_year_start', { ascending: false }),
-    adminDb.from('learning_objective_publish_targets')
-      .select('topic_node_id,topic,grade,level,unit,subject').order('subject').order('grade').order('unit').order('topic'),
-    adminDb.from('learning_objective_revisions')
-      .select('objective_id,curriculum_version_id,revision_status').eq('revision_status', 'draft'),
-  ])
-  const error = objectivesResult.error || versionsResult.error || targetsResult.error || revisionsResult.error
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const params = req.nextUrl.searchParams
+  const grade = gradeNumber(params.get('grade') || '')
+  const subject = (params.get('subject') || '').trim()
+  const search = escapeLike((params.get('q') || '').slice(0, 100))
+  const page = Math.max(1, Number(params.get('page') || 1))
+  const from = (page - 1) * PAGE_SIZE
+
+  // Katalog 3.800+ kazanım içerir; liste sunucu tarafında filtrelenip sayfalanır (PostgREST 1000 satır sınırı).
+  let objectivesQuery = adminDb.from('learning_objective_catalog')
+    .select('id,objective_code,title,subject,grade,topic,lifecycle_status,is_active,curriculum_version_id,current_revision_id,replaced_by_objective_id,updated_at', { count: 'exact' })
+  if (grade) objectivesQuery = objectivesQuery.ilike('grade', `${grade}. s*`)
+  if (subject) objectivesQuery = objectivesQuery.eq('subject', subject)
+  if (search) objectivesQuery = objectivesQuery.or(`objective_code.ilike.*${search}*,title.ilike.*${search}*,topic.ilike.*${search}*`)
+
+  let objectivesResult, versionsResult, catalogMeta, targets, drafts
+  try {
+    [objectivesResult, versionsResult, catalogMeta, targets, drafts] = await Promise.all([
+      objectivesQuery.order('subject').order('grade').order('objective_code').range(from, from + PAGE_SIZE - 1),
+      adminDb.from('curriculum_versions').select('id,code,title,status,academic_year_start,academic_year_end,effective_from,effective_to')
+        .order('academic_year_start', { ascending: false }),
+      fetchAllRows<CatalogMeta>((a, b) =>
+        adminDb.from('learning_objective_catalog').select('id,grade,subject,is_active,lifecycle_status').order('id').range(a, b)),
+      fetchAllRows<Record<string, unknown>>((a, b) => adminDb.from('learning_objective_publish_targets')
+        .select('topic_node_id,topic,grade,level,unit,subject').order('topic_node_id').range(a, b)),
+      fetchAllRows<{ objective_id: string; curriculum_version_id: string }>((a, b) => adminDb.from('learning_objective_revisions')
+        .select('objective_id,curriculum_version_id,revision_status').eq('revision_status', 'draft').order('objective_id').range(a, b)),
+    ])
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Katalog okunamadı.' }, { status: 500 })
+  }
+  const failure = objectivesResult.error || versionsResult.error
+  if (failure) return NextResponse.json({ error: failure.message }, { status: 500 })
+
+  const byGrade = new Map<string, Set<string>>()
+  const activeIds: string[] = []
+  for (const row of catalogMeta) {
+    const number = gradeNumber(row.grade)
+    if (number) { if (!byGrade.has(number)) byGrade.set(number, new Set()); byGrade.get(number)!.add(row.subject) }
+    if (row.is_active && row.lifecycle_status === 'active') activeIds.push(row.id)
+  }
+  const filters = [...byGrade.keys()].sort((x, y) => Number(x) - Number(y))
+    .map(g => ({ grade: g, subjects: [...byGrade.get(g)!].sort((x, y) => x.localeCompare(y, 'tr')) }))
+  const preparedByVersion = new Map<string, Set<string>>()
+  for (const row of drafts) {
+    if (!preparedByVersion.has(row.curriculum_version_id)) preparedByVersion.set(row.curriculum_version_id, new Set())
+    preparedByVersion.get(row.curriculum_version_id)!.add(row.objective_id)
+  }
+  const missingByVersion: Record<string, number> = {}
+  for (const version of (versionsResult.data || []) as Array<{ id: string }>) {
+    const prepared = preparedByVersion.get(version.id) || new Set<string>()
+    missingByVersion[version.id] = activeIds.filter(id => !prepared.has(id)).length
+  }
   return NextResponse.json({
-    objectives: objectivesResult.data || [], versions: versionsResult.data || [], targets: targetsResult.data || [],
-    preparedRevisions: revisionsResult.data || [],
+    objectives: objectivesResult.data || [], total: objectivesResult.count || 0, page, pageSize: PAGE_SIZE,
+    versions: versionsResult.data || [], targets, filters, missingByVersion,
+    catalogTotal: catalogMeta.length,
   })
 }
 
