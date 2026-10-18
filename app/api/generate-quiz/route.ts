@@ -37,6 +37,7 @@ import { resolveAdaptiveLearningPolicy } from '@/lib/adaptive-learning'
 import { startingDifficultyFromMastery } from '@/lib/adaptive-difficulty'
 import { resolveDiagnosticQuestionStrategy } from '@/lib/diagnostic-question-strategy'
 import { parsePrioritySubjects, seedScoreForSubject } from '@/lib/onboarding-priorities'
+import { turkishLanguagePrompt } from '@/lib/turkish-question-rules'
 import { applyCanonicalObjectiveMappings, learningObjectivePrompt, loadCanonicalObjectiveCandidates } from '@/lib/learning-objective-mapping'
 import { runMistralShadowComparison, MistralAdapter, isProviderConfigured } from '@/lib/ai-gateway'
 import { balanceAnswerPositions, getQuestionBankSet, hasRealVisualAsset, promoteQuestionsToBank, questionBankKey } from '@/lib/question-bank'
@@ -1790,7 +1791,7 @@ export async function POST(req: NextRequest) {
     if (!isUniversityLevel && !fileContent && objectiveCandidates.length === 0) {
       return NextResponse.json({ error: 'quality_policy_failed', reason: 'canonical_objectives_unavailable', message: 'Bu sınıf, ders ve konu için doğrulanmış aktif kazanım bulunamadığından test oluşturulamadı.' }, { status: 503 })
     }
-    const objectiveInstruction = learningObjectivePrompt(objectiveCandidates)
+    const objectiveInstruction = learningObjectivePrompt(objectiveCandidates) + turkishLanguagePrompt(subject, objectiveCandidates, topic)
 
     // Question Bank v1: only a complete, server-approved set bypasses AI.
     // Uploaded/source passages, university content, daily challenges and
