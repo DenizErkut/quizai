@@ -170,11 +170,21 @@ function TeacherStudentsContent() {
 
   async function removeStudent(studentId: string) {
     if (!selectedClass) return
-    await supabase.from('classroom_students').delete()
-      .eq('classroom_id', selectedClass).eq('student_id', studentId)
+    const removed = students.find(s => s.student_id === studentId)
+    if (!confirm(tr('{name} öğrencisini bu sınıftan çıkarmak istediğine emin misin? Hesabı ve test geçmişi silinmez.', { name: removed?.profiles?.name || tr('İsimsiz') }))) return
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/teacher/classroom-students', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ studentId, classroomId: selectedClass }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      alert(tr('Hata: {msg}', { msg: data?.error ? tr(data.error) : tr('Bilinmeyen hata') }))
+      return
+    }
     setStudents(prev => prev.filter(s => s.student_id !== studentId))
     // Geri önerilere ekle
-    const removed = students.find(s => s.student_id === studentId)
     if (removed?.profiles) {
       setSuggestedStudents(prev => [...prev, { id: studentId, ...removed.profiles }])
     }
