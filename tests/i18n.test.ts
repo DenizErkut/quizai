@@ -278,7 +278,7 @@ test('teacher panel entries are used by the teacher dashboard and its components
 })
 
 for (const [name, entriesFile, exportName, files] of [
-  ['teacher students', 'teacher-students', 'teacherStudentsEntries', ['app/teacher/students/page.tsx']],
+  ['teacher students', 'teacher-students', 'teacherStudentsEntries', ['app/teacher/students/page.tsx', 'app/teacher/page.tsx', 'app/api/teacher/classroom-students/route.ts']],
   ['teacher notify', 'teacher-notify', 'teacherNotifyEntries', ['app/teacher/notify/page.tsx', 'app/teacher/reports/page.tsx', 'app/teacher/import-grades/page.tsx']],
   ['teacher report', 'teacher-report', 'teacherReportEntries', ['app/teacher/report/page.tsx']],
   ['teacher ai training', 'teacher-ai-training', 'teacherAiTrainingEntries', ['app/teacher/ai-training/page.tsx']],

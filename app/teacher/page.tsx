@@ -121,6 +121,27 @@ export default function TeacherDashboard() {
     setLoading(false)
   }
 
+  async function removeStudentFromClasses(student: { id: string; name: string }) {
+    const scope = selectedClass === 'all' ? undefined : selectedClass
+    const className = classrooms.find((c: any) => c.id === scope)?.name
+    const message = scope
+      ? tr('{name} öğrencisini "{cls}" sınıfından çıkarmak istediğine emin misin? Hesabı ve test geçmişi silinmez.', { name: student.name, cls: className || '' })
+      : tr('{name} öğrencisini tüm sınıflarından çıkarmak istediğine emin misin? Hesabı ve test geçmişi silinmez.', { name: student.name })
+    if (!confirm(message)) return
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/teacher/classroom-students', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ studentId: student.id, classroomId: scope }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      alert(tr('Hata: {msg}', { msg: data?.error ? tr(data.error) : tr('Bilinmeyen hata') }))
+      return
+    }
+    await load()
+  }
+
   function pctColor(pct: number | null) {
     if (pct === null) return 'var(--text4)'
     if (pct >= 70) return 'var(--green)'
@@ -364,6 +385,10 @@ export default function TeacherDashboard() {
                       </div>
                       <div style={{ fontSize: '10px', color: 'var(--text4)' }}>{tr('ortalama')}</div>
                     </div>
+                    <button onClick={() => removeStudentFromClasses(s)} title={tr('Öğrenciyi sınıftan çıkar')}
+                      style={{ fontSize: '11px', padding: '5px 10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text3)', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>
+                      {tr('Çıkar')}
+                    </button>
                   </div>
                 ))}
               </div>
