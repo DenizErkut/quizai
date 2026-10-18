@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import mathematicsGrade5 from '@/data/curriculum/meb-2024-mathematics-grade-5.json'
+import LocationSelect from '@/components/LocationSelect'
+import { scopeLabel, type LocationValue } from '@/lib/location/validate'
 
 interface Batch {
   id: string
@@ -13,11 +15,13 @@ interface Batch {
   invalid_count: number
   created_at: string
   curriculum_version_id: string
+  country?: string | null; state?: string | null; city?: string | null
 }
 
 interface CurriculumVersion {
   id: string; code: string; title: string; status: 'draft' | 'active' | 'retired'
   academic_year_start: number; academic_year_end: number
+  country?: string | null; state?: string | null; city?: string | null
 }
 
 interface ImportItem {
@@ -76,6 +80,7 @@ export default function LearningObjectiveImport({
   const [updatingItem, setUpdatingItem] = useState<string | null>(null)
   const [curriculumVersions, setCurriculumVersions] = useState<CurriculumVersion[]>([])
   const [curriculumVersionId, setCurriculumVersionId] = useState('')
+  const [scope, setScope] = useState<LocationValue>({ country: 'TR', state: '', city: '' })
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void loadBatches() }, 0)
@@ -152,7 +157,7 @@ export default function LearningObjectiveImport({
       if (!Array.isArray(rows)) throw new Error('İçerik bir JSON dizisi olmalıdır.')
       const response = await fetch('/api/admin/learning-objective-import', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sourceType, sourceReference, curriculumVersionId, rows }),
+        body: JSON.stringify({ sourceType, sourceReference, curriculumVersionId, rows, country: scope.country, state: scope.state, city: scope.city }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Kazanımlar doğrulanamadı.')
@@ -192,26 +197,34 @@ export default function LearningObjectiveImport({
         <select value={sourceType} onChange={event => setSourceType(event.target.value)} aria-label="Kaynak türü">
           <option value="meb">MEB</option><option value="manual">Manuel</option><option value="import">Kontrollü import</option>
         </select>
-        <select value={curriculumVersionId} onChange={event => setCurriculumVersionId(event.target.value)} aria-label="Müfredat sürümü">
+        <select value={curriculumVersionId} onChange={event => {
+          setCurriculumVersionId(event.target.value)
+          const picked = curriculumVersions.find(version => version.id === event.target.value)
+          if (picked) setScope({ country: picked.country || 'TR', state: picked.state || '', city: picked.city || '' })
+        }} aria-label="Müfredat sürümü">
           <option value="">— Müfredat sürümü —</option>
           {curriculumVersions.map(version => <option key={version.id} value={version.id}>
-            {version.title} · {version.status === 'active' ? 'aktif' : 'taslak'}
+            {version.title} · {version.status === 'active' ? 'aktif' : 'taslak'}{scopeLabel(version) ? ` · ${scopeLabel(version)}` : ''}
           </option>)}
         </select>
         <input value={sourceReference} onChange={event => setSourceReference(event.target.value)}
           placeholder="Kaynak belge, URL veya sayfa referansı" aria-label="Kaynak referansı" />
       </div>
+      <div style={{ marginBottom: '8px' }}>
+        <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '6px' }}>Müfredatın geçerli olduğu konum (eyalet/şehir boşsa ülke geneli)</div>
+        <LocationSelect value={scope} onChange={setScope} optionalPlaces />
+      </div>
       <textarea value={payload} onChange={event => setPayload(event.target.value)} aria-label="Kazanım JSON verisi"
         rows={12} spellCheck={false} style={{ width: '100%', fontFamily: 'monospace', fontSize: '12px', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--primary)', resize: 'vertical' }} />
       <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-        <button className="btn btn-sm" disabled={busy || !curriculumVersionId || sourceReference.trim().length < 3} onClick={stageImport}>Doğrula ve Hazırla</button>
+        <button className="btn btn-sm" disabled={busy || !curriculumVersionId || !scope.country || sourceReference.trim().length < 3} onClick={stageImport}>Doğrula ve Hazırla</button>
         <button className="btn btn-sm" disabled={busy} onClick={() => loadBatches()}>Import Geçmişini Yükle</button>
       </div>
       {message && <div style={{ marginTop: '10px', fontSize: '12px', color: message.startsWith('✅') ? '#16a34a' : '#dc2626' }}>{message}</div>}
       {batches.length > 0 && <div style={{ marginTop: '12px', display: 'grid', gap: '6px' }}>
         {batches.map(batch => <button key={batch.id} onClick={() => loadBatch(batch.id)}
           style={{ padding: '8px', border: selectedBatchId === batch.id ? '2px solid #6366f1' : '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', textAlign: 'left', background: 'var(--bg2)', color: 'var(--primary)', cursor: 'pointer' }}>
-          <strong>{batch.source_reference}</strong> · {curriculumVersions.find(version => version.id === batch.curriculum_version_id)?.code || 'sürüm belirtilmemiş'} · {batch.status} · {batch.valid_count}/{batch.total_count} geçerli{batch.invalid_count > 0 ? ` · ${batch.invalid_count} hatalı` : ''}
+          <strong>{batch.source_reference}</strong> · {curriculumVersions.find(version => version.id === batch.curriculum_version_id)?.code || 'sürüm belirtilmemiş'} · {scopeLabel(batch) ? `${scopeLabel(batch)} · ` : ''}{batch.status} · {batch.valid_count}/{batch.total_count} geçerli{batch.invalid_count > 0 ? ` · ${batch.invalid_count} hatalı` : ''}
         </button>)}
       </div>}
       {selectedBatchId && <div style={{ marginTop: '16px', display: 'grid', gap: '10px' }}>

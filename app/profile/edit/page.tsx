@@ -7,6 +7,8 @@ import { resolveOwnIdentity } from '@/lib/identity/resolve-client'
 import DepartmentSelect, { resolveDepartmentValue } from '@/components/DepartmentSelect'
 import { UNIVERSITY_DEPARTMENTS, OTHER_DEPARTMENT_VALUE } from '@/lib/university-departments'
 import ContentIssueReporter from '@/components/ContentIssueReporter'
+import { LocationFields } from '@/components/LocationSelect'
+import { validateLocationDetails, EMPTY_LOCATION_DETAILS, type LocationDetails } from '@/lib/location/validate'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
 
@@ -55,6 +57,8 @@ export default function ProfileEditPage() {
   const [department, setDepartment] = useState('')
   const [departmentOther, setDepartmentOther] = useState('')
   const [school, setSchool] = useState('')
+  const [loc, setLoc] = useState<LocationDetails>(EMPTY_LOCATION_DETAILS)
+  const [locLoaded, setLocLoaded] = useState(false)
   const [lang, setLang] = useState('Türkçe')
   const [plan, setPlan] = useState('free')
   const [referralCode, setReferralCode] = useState('')
@@ -114,6 +118,12 @@ export default function ProfileEditPage() {
           }
         }
         setSchool(data.school || '')
+        // Konum: ülke/eyalet/şehir profiles'tan, posta kodu/açık adres TR-PG kimliğinden gelir.
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          const locRes = await fetch('/api/profile/location', { headers: { Authorization: `Bearer ${session?.access_token}` } })
+          if (locRes.ok) { setLoc({ ...EMPTY_LOCATION_DETAILS, ...(await locRes.json()) }); setLocLoaded(true) }
+        } catch { /* konum yüklenemezse form boş açılır */ }
         setLang(data.language || 'Türkçe')
         setPlan(data.plan || 'free')
         setReferralCode(data.referral_code || '')
@@ -171,6 +181,8 @@ export default function ProfileEditPage() {
     const isUniversity = grade.toLowerCase().startsWith('universite')
     const resolvedDepartment = resolveDepartmentValue(department, departmentOther)
     if (isUniversity && !resolvedDepartment) { setError(tr('Bölüm seçimi zorunlu.')); return }
+    const locCheck = validateLocationDetails(loc)
+    if (locCheck.ok === false) { setError(tr(locCheck.field === 'postal' ? 'Geçerli bir posta kodu girin.' : 'Ülke, eyalet/il ve şehir/ilçe zorunludur.')); return }
     setError(''); setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
@@ -195,6 +207,14 @@ export default function ProfileEditPage() {
       school: school || null,
       language: lang,
     })
+
+    const { data: { session: locSession } } = await supabase.auth.getSession()
+    const locRes = await fetch('/api/profile/location', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${locSession?.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(loc),
+    })
+    if (!locRes.ok) { setError(tr('Konum kaydedilemedi. Lütfen tekrar deneyin.')); setSaving(false); return }
 
     setSaving(false)
     setSuccess(true)
@@ -324,6 +344,14 @@ export default function ProfileEditPage() {
           <label className="field-label">{tr('Okul (isteğe bağlı)')}</label>
           <input className="input" placeholder="İzmir Fen Lisesi"
             value={school} onChange={e => setSchool(e.target.value)} />
+        </div>
+
+        {/* Konum: ülke, eyalet/il, şehir/ilçe zorunlu; posta kodu ve açık adres opsiyonel */}
+        <div className="card anim-up-2" style={{ marginBottom: '1rem' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '1rem' }}>
+            {tr('Konum bilgileri')}
+          </div>
+          <LocationFields value={loc} onChange={setLoc} disabled={!locLoaded && loading} />
         </div>
 
         {/* Dil secimi */}

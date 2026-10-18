@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { validateCurriculumScope } from '@/lib/location/validate'
+import { isKnownCountry } from '@/lib/location/data'
 
 const adminDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
@@ -32,6 +34,10 @@ export async function POST(req: NextRequest) {
   if (!body?.code || !body?.title || !Number.isInteger(yearStart) || !body?.effectiveFrom || !body?.effectiveTo) {
     return NextResponse.json({ error: 'Kod, başlık, öğretim yılı ve geçerlilik tarihleri gerekli.' }, { status: 400 })
   }
+  const scope = validateCurriculumScope({ country: body?.country ?? 'TR', state: body?.state, city: body?.city })
+  if (scope.ok === false || !isKnownCountry(scope.value.country)) {
+    return NextResponse.json({ error: 'Geçerli bir ülke seçin; şehir seçildiyse eyalet de seçilmelidir.' }, { status: 400 })
+  }
   const { data, error } = await adminDb.rpc('create_curriculum_version_v1', {
     p_code: String(body.code), p_title: String(body.title), p_authority: String(body.authority || 'MEB'),
     p_year_start: yearStart, p_effective_from: String(body.effectiveFrom), p_effective_to: String(body.effectiveTo),
@@ -39,6 +45,9 @@ export async function POST(req: NextRequest) {
     p_actor_id: user.id,
   })
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  const located = await adminDb.from('curriculum_versions')
+    .update({ country: scope.value.country, state: scope.value.state || null, city: scope.value.city || null }).eq('id', data)
+  if (located.error) return NextResponse.json({ error: `Sürüm oluşturuldu fakat konum kaydedilemedi: ${located.error.message}` }, { status: 500 })
   return NextResponse.json({ success: true, versionId: data })
 }
 

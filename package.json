@@ -20,6 +20,7 @@
     "@resvg/resvg-js": "2.6.2",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.0",
+    "country-state-city": "3.2.1",
     "docx": "^9.7.1",
     "jspdf": "^4.2.1",
     "jszip": "^3.10.1",
