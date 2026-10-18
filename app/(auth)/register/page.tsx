@@ -8,6 +8,8 @@ import { translateAuthError } from '@/lib/auth-error-messages'
 import DepartmentSelect, { resolveDepartmentValue } from '@/components/DepartmentSelect'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { languageFromLocale } from '@/lib/i18n/core'
+import { LocationFields } from '@/components/LocationSelect'
+import { validateLocationDetails, EMPTY_LOCATION_DETAILS, type LocationDetails } from '@/lib/location/validate'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -95,6 +97,7 @@ function RegisterContent() {
   const [sellerId, setSellerId] = useState('') // ?satici=KOD ile geldiyse çözümlenen satıcı ID'si
   const [parentEmail, setParentEmail] = useState('')
   const [studentPhone, setStudentPhone] = useState('')
+  const [loc, setLoc] = useState<LocationDetails>(EMPTY_LOCATION_DETAILS)
   const [kvkkAydinlatma, setKvkkAydinlatma] = useState(false)
   const [kvkkAcikRiza, setKvkkAcikRiza] = useState(false)
   const [veliOnayi, setVeliOnayi] = useState(false)
@@ -173,6 +176,8 @@ function RegisterContent() {
     if (selectedRole === 'student') {
       if (!age || parseInt(age) < 5 || parseInt(age) > 35) { setError(t('Geçerli bir yaş girin (5-35).')); return }
       if (!grade) { setError(t('Sınıf / eğitim seviyesi zorunludur.')); return }
+      const locCheck = validateLocationDetails(loc)
+      if (locCheck.ok === false) { setError(t(locCheck.field === 'postal' ? 'Geçerli bir posta kodu girin.' : 'Ülke, eyalet/il ve şehir/ilçe zorunludur.')); return }
       // Üniversite öğrencisi için bölüm zorunlu ("Diğer" seçildiyse serbest metin dolu olmalı)
       const isUniversity = grade.toLowerCase().startsWith('universite')
       const resolvedDepartment = resolveDepartmentValue(department, departmentOther)
@@ -259,6 +264,7 @@ function RegisterContent() {
           department: selectedRole === 'student' ? (resolveDepartmentValue(department, departmentOther) || undefined) : undefined,
           institutionCode: institutionCode.trim(),
           parentEmail: parentEmail.trim(), phone: studentPhone.trim(),
+          ...(selectedRole === 'student' ? { country: loc.country, state: loc.state, city: loc.city, postalCode: loc.postalCode, addressLine: loc.addressLine } : {}),
           sellerId: sellerId || undefined,
           kvkkAydinlatma, kvkkAcikRiza, veliOnayi,
           ref, next,
@@ -325,6 +331,14 @@ function RegisterContent() {
           setError(t('Profil oluşturulamadı: ') + upsertError.message)
           return
         }
+
+        // Konum (ülke/eyalet/şehir profiles'a, posta kodu/açık adres TR-PG'ye) — sunucuda doğrulanır
+        const locationRes = await fetch('/api/profile/location', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(loc),
+        }).catch(() => null)
+        if (!locationRes?.ok) console.error('[register] konum kaydedilemedi; profil düzenlemeden tamamlanabilir')
 
         // Kurum kodu
         if (institutionCode.trim()) {
@@ -688,6 +702,12 @@ function RegisterContent() {
                   />
                 </div>
               )}
+
+              {/* Konum: ülke, eyalet/il, şehir/ilçe zorunlu; posta kodu ve açık adres opsiyonel */}
+              <div style={{ marginTop: '10px', marginBottom: '0.75rem' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', marginBottom: '8px' }}>{t('Konum bilgileri')}</div>
+                <LocationFields value={loc} onChange={setLoc} />
+              </div>
 
               {/* Kurum kodu — okul adı BURADAN otomatik gelir, elle yazılmaz */}
               <div style={{ marginTop: '10px', marginBottom: '0.75rem', padding: '12px 14px', borderRadius: '12px', background: 'rgba(217,119,6,0.04)', border: '1.5px solid rgba(217,119,6,0.15)' }}>

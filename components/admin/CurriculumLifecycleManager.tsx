@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import GradeSubjectFilter, { type GradeSubjectOption, type GradeSubjectValue } from './GradeSubjectFilter'
+import LocationSelect from '@/components/LocationSelect'
+import { curriculumScopeSuffix, scopeLabel, type LocationValue } from '@/lib/location/validate'
 
-interface Version { id: string; code: string; title: string; status: 'draft' | 'active' | 'retired'; academic_year_start: number; academic_year_end: number }
+interface Version { id: string; code: string; title: string; status: 'draft' | 'active' | 'retired'; academic_year_start: number; academic_year_end: number; country?: string | null; state?: string | null; city?: string | null }
 interface Objective { id: string; objective_code: string; title: string; subject: string; grade: string; topic: string; lifecycle_status: string; is_active: boolean; curriculum_version_id: string }
 interface Target { topic_node_id: string; topic: string; grade: string; level: string; unit: string; subject: string }
 
@@ -24,6 +26,8 @@ export default function CurriculumLifecycleManager() {
   const [busy, setBusy] = useState(false)
   const [newYear, setNewYear] = useState(new Date().getFullYear() + 1)
   const [newTitle, setNewTitle] = useState('')
+  const [newAuthority, setNewAuthority] = useState('MEB')
+  const [newScope, setNewScope] = useState<LocationValue>({ country: 'TR', state: '', city: '' })
   const [reasons, setReasons] = useState<Record<string, string>>({})
   const [revisionVersion, setRevisionVersion] = useState<Record<string, string>>({})
   const [revisionTarget, setRevisionTarget] = useState<Record<string, string>>({})
@@ -63,7 +67,9 @@ export default function CurriculumLifecycleManager() {
     try {
       const end = newYear + 1
       const response = await fetch('/api/admin/curriculum-versions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-        code: `MEB-${newYear}-${end}`, title: newTitle || `${newYear}–${end} MEB Müfredatı`, authority: 'MEB', yearStart: newYear,
+        code: `${newAuthority.trim().toUpperCase() || 'MEB'}-${newYear}-${end}${curriculumScopeSuffix(newScope)}`,
+        title: newTitle || `${newYear}–${end} ${newAuthority.trim() || 'MEB'} Müfredatı${scopeLabel(newScope) ? ` (${scopeLabel(newScope)})` : ''}`,
+        authority: newAuthority.trim() || 'MEB', yearStart: newYear, country: newScope.country, state: newScope.state, city: newScope.city,
         effectiveFrom: `${newYear}-09-01`, effectiveTo: `${end}-08-31`, sourceReference: 'Admin kontrollü müfredat sürümü',
       }) })
       const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Sürüm oluşturulamadı.')
@@ -120,15 +126,20 @@ export default function CurriculumLifecycleManager() {
     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
       <input type="number" value={newYear} onChange={event => setNewYear(Number(event.target.value))} aria-label="Başlangıç yılı" style={{ width: 110 }} />
       <input value={newTitle} onChange={event => setNewTitle(event.target.value)} placeholder="Sürüm başlığı (isteğe bağlı)" />
-      <button className="btn btn-sm" disabled={busy} onClick={createVersion}>Yeni taslak sürüm</button>
+      <input value={newAuthority} onChange={event => setNewAuthority(event.target.value)} aria-label="Otorite" placeholder="Otorite (örn. MEB)" style={{ width: 130 }} />
+      <button className="btn btn-sm" disabled={busy || !newScope.country} onClick={createVersion}>Yeni taslak sürüm</button>
       <button className="btn btn-sm" disabled={busy} onClick={() => void load(1, false)}>Yenile</button>
+    </div>
+    <div style={{ marginTop: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Yeni sürümün geçerli olduğu konum (eyalet/şehir boşsa ülke geneli)</div>
+      <LocationSelect value={newScope} onChange={setNewScope} optionalPlaces />
     </div>
     {message && <div style={{ marginTop: 10, fontSize: 12, color: message.startsWith('✅') ? '#16a34a' : '#dc2626' }}>{message}</div>}
     <div style={{ marginTop: 12, display: 'grid', gap: 6 }}>
       {versions.map(version => {
         const missingCount = missingByVersion[version.id] ?? 0
         return <div key={version.id} style={{ padding: 8, border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}>
-          <strong>{version.title}</strong> · {version.status === 'active' ? 'aktif' : version.status === 'draft' ? 'taslak' : 'arşiv'}
+          <strong>{version.title}</strong> · {version.status === 'active' ? 'aktif' : version.status === 'draft' ? 'taslak' : 'arşiv'}{scopeLabel(version) ? ` · ${scopeLabel(version)}` : ''}
           {version.status === 'draft' && <>
             <button className="btn btn-sm" disabled={busy || missingCount > 0} onClick={() => activate(version)} style={{ marginLeft: 8 }}>Hazırsa etkinleştir</button>
             <span style={{ marginLeft: 8, color: missingCount > 0 ? '#dc2626' : '#16a34a' }}>

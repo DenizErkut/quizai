@@ -17,6 +17,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { loadPendingRegistration, clearPendingRegistration, PendingRole } from '@/lib/pending-registration'
 import DepartmentSelect, { resolveDepartmentValue } from '@/components/DepartmentSelect'
+import { LocationFields } from '@/components/LocationSelect'
+import { validateLocationDetails, EMPTY_LOCATION_DETAILS, type LocationDetails } from '@/lib/location/validate'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -71,6 +73,7 @@ export default function CompleteProfilePage() {
   const [fbInstitutionName, setFbInstitutionName] = useState('') // öğrenci: kurum kaydından otomatik
   const [fbParentEmail, setFbParentEmail] = useState('')
   const [fbPhone, setFbPhone] = useState('')
+  const [fbLoc, setFbLoc] = useState<LocationDetails>(EMPTY_LOCATION_DETAILS)
   const [fbKvkkAydinlatma, setFbKvkkAydinlatma] = useState(false)
   const [fbKvkkAcikRiza, setFbKvkkAcikRiza] = useState(false)
   const [fbVeliOnayi, setFbVeliOnayi] = useState(false)
@@ -182,6 +185,16 @@ export default function CompleteProfilePage() {
         return
       }
 
+      // Konum (bu sürümden önce kaydedilmiş bekleyen kayıtlarda yoktur; profil düzenlemeden tamamlanır)
+      if (pending.country) {
+        const locationRes = await fetch('/api/profile/location', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ country: pending.country, state: pending.state, city: pending.city, postalCode: pending.postalCode, addressLine: pending.addressLine }),
+        }).catch(() => null)
+        if (!locationRes?.ok) console.error('[complete-profile] konum kaydedilemedi; profil düzenlemeden tamamlanabilir')
+      }
+
       if (pending.institutionCode) {
         const { data: inst } = await supabase.from('institutions')
           .select('id').eq('code', pending.institutionCode.toUpperCase()).eq('active', true).maybeSingle()
@@ -268,6 +281,8 @@ export default function CompleteProfilePage() {
     if (fbRole === 'student') {
       if (!fbAge || parseInt(fbAge) < 5 || parseInt(fbAge) > 35) { setFbError(tr('Geçerli bir yaş girin (5-35).')); return }
       if (!fbGrade) { setFbError(tr('Sınıf zorunludur.')); return }
+      const fbLocCheck = validateLocationDetails(fbLoc)
+      if (fbLocCheck.ok === false) { setFbError(tr(fbLocCheck.field === 'postal' ? 'Geçerli bir posta kodu girin.' : 'Ülke, eyalet/il ve şehir/ilçe zorunludur.')); return }
       const fbIsUniversity = fbGrade.toLowerCase().startsWith('universite')
       const fbResolvedDepartment = resolveDepartmentValue(fbDepartment, fbDepartmentOther)
       if (fbIsUniversity && !fbResolvedDepartment) { setFbError(tr('Bölüm seçimi zorunludur.')); return }
@@ -317,6 +332,12 @@ export default function CompleteProfilePage() {
           class_number: fbInstitutionName ? fbClassNumber.trim() : null,
           language: 'Türkçe', role: 'student',
         })
+        const locationRes = await fetch('/api/profile/location', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(fbLoc),
+        }).catch(() => null)
+        if (!locationRes?.ok) console.error('[complete-profile] konum kaydedilemedi; profil düzenlemeden tamamlanabilir')
         router.push('/home')
       } else if (fbRole === 'parent') {
         await supabase.from('profiles').upsert({ id: userId, language: 'Türkçe', role: 'parent' })
@@ -487,6 +508,12 @@ export default function CompleteProfilePage() {
                   />
                 </div>
               )}
+
+              {/* Konum: ülke, eyalet/il, şehir/ilçe zorunlu; posta kodu ve açık adres opsiyonel */}
+              <div style={{ marginTop: '10px', marginBottom: '0.75rem' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', marginBottom: '8px' }}>{tr('Konum bilgileri')}</div>
+                <LocationFields value={fbLoc} onChange={setFbLoc} />
+              </div>
 
               {/* Kurum kodu — okul adı BURADAN otomatik gelir, elle yazılmaz */}
               <div style={{ marginTop: '10px', padding: '12px 14px', borderRadius: '12px', background: 'rgba(217,119,6,0.04)', border: '1.5px solid rgba(217,119,6,0.15)' }}>

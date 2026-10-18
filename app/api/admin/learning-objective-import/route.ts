@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { validateCurriculumScope } from '@/lib/location/validate'
+import { isKnownCountry } from '@/lib/location/data'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -45,10 +47,10 @@ export async function GET(req: NextRequest) {
 
   const [batchesResult, versionsResult] = await Promise.all([
     adminDb.from('learning_objective_import_batches')
-      .select('id,source_type,source_reference,status,total_count,valid_count,invalid_count,curriculum_version_id,created_at')
+      .select('id,source_type,source_reference,status,total_count,valid_count,invalid_count,curriculum_version_id,country,state,city,created_at')
       .order('created_at', { ascending: false }).limit(20),
     adminDb.from('curriculum_versions')
-      .select('id,code,title,status,academic_year_start,academic_year_end')
+      .select('id,code,title,status,academic_year_start,academic_year_end,country,state,city')
       .in('status', ['draft', 'active']).order('academic_year_start', { ascending: false }),
   ])
   const error = batchesResult.error || versionsResult.error
@@ -94,6 +96,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Bir parti 1–500 kazanım içermelidir.' }, { status: 400 })
   }
 
+  const scope = validateCurriculumScope({ country: body?.country ?? 'TR', state: body?.state, city: body?.city })
+  if (scope.ok === false || !isKnownCountry(scope.value.country)) {
+    return NextResponse.json({ error: 'Geçerli bir ülke seçin; şehir seçildiyse eyalet de seçilmelidir.' }, { status: 400 })
+  }
+  const version = await adminDb.from('curriculum_versions').select('country').eq('id', curriculumVersionId).maybeSingle()
+  if (version.error || !version.data) return NextResponse.json({ error: 'Müfredat sürümü bulunamadı.' }, { status: 400 })
+  if (version.data.country !== scope.value.country) {
+    return NextResponse.json({ error: `Parti ülkesi (${scope.value.country}) müfredat sürümünün ülkesiyle (${version.data.country}) uyuşmuyor.` }, { status: 400 })
+  }
   const { data, error } = await adminDb.rpc('stage_learning_objective_import_v2', {
     p_source_type: sourceType,
     p_source_reference: sourceReference,
@@ -102,5 +113,10 @@ export async function POST(req: NextRequest) {
     p_rows: rows,
   })
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (data?.batch_id) {
+    const located = await adminDb.from('learning_objective_import_batches')
+      .update({ country: scope.value.country, state: scope.value.state || null, city: scope.value.city || null }).eq('id', data.batch_id)
+    if (located.error) return NextResponse.json({ error: `Parti hazırlandı fakat konum kaydedilemedi: ${located.error.message}` }, { status: 500 })
+  }
   return NextResponse.json({ success: true, result: data })
 }

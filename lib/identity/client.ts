@@ -24,6 +24,9 @@ export interface Identity {
   parent_verified: boolean
   institution_name: string | null
   phone: string | null
+  // Konum ayrıntıları (docs/TR-PG-konum-alanlari.sql uygulanmadan sütunlar olmayabilir)
+  postal_code?: string | null
+  address_line?: string | null
   created_at: string
   updated_at: string
 }
