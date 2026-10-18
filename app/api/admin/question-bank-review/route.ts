@@ -1,3 +1,5 @@
+import { hasVerifiedObjectiveMapping } from '@/lib/objective-mapping-verification'
+import { canApproveWithoutObjective } from '@/lib/question-bank-approval'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
@@ -42,6 +44,14 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({})) as { id?: string; decision?: string }
   if (!body.id || !['approved', 'rejected'].includes(body.decision || '')) {
     return NextResponse.json({ error: 'id ve decision (approved/rejected) zorunlu.' }, { status: 400 })
+  }
+  if (body.decision === 'approved') {
+    // Kazanımı doğrulanmamış soru "onaylı" stoğa giremez; önce Kazanım Eşleştirme'de doğrulanmalı.
+    const { data: current } = await db.from('question_bank').select('question').eq('id', body.id).maybeSingle()
+    if (!current) return NextResponse.json({ error: 'Soru bulunamadı.' }, { status: 404 })
+    if (!canApproveWithoutObjective(current.question) && !hasVerifiedObjectiveMapping(current.question)) {
+      return NextResponse.json({ error: 'Bu sorunun kazanım eşleşmesi doğrulanmamış. Önce Kazanım Eşleştirme ekranında kazanımı doğrulayın.' }, { status: 409 })
+    }
   }
   const { data, error } = await db.from('question_bank').update({
     review_status: body.decision,
