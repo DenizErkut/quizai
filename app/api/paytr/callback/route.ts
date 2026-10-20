@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     const { data: sub } = await supabaseAdmin
       .from('subscriptions')
-      .select('id, user_id, plan, status')
+      .select('id, user_id, plan, status, price_paid')
       .eq('stripe_subscription_id', merchantOid)
       .eq('provider', 'paytr')
       .maybeSingle()
@@ -64,6 +64,15 @@ export async function POST(req: NextRequest) {
     }
 
     if (status !== 'success') {
+      await supabaseAdmin.from('subscriptions').update({ status: 'failed' }).eq('id', sub.id)
+      return new NextResponse('OK')
+    }
+
+    // Eksik ödeme koruması: PayTR'ın imzalı tutarı beklenen tutardan (kuruş) düşükse planı AÇMA.
+    // (Taksit farkı nedeniyle daha yüksek tutar normaldir; yalnızca düşük tutar reddedilir.)
+    const expectedKurus = Math.round(Number(sub.price_paid) * 100)
+    if (Number.isFinite(expectedKurus) && expectedKurus > 0 && Number(totalAmount) < expectedKurus - 1) {
+      console.error('[paytr callback] ödenen tutar beklenenden düşük, plan açılmadı:', { merchantOid, totalAmount, expectedKurus })
       await supabaseAdmin.from('subscriptions').update({ status: 'failed' }).eq('id', sub.id)
       return new NextResponse('OK')
     }

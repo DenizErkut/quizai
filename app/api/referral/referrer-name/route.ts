@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentityBySupabaseId } from '@/lib/identity/client'
+import { allowByIp } from '@/lib/ip-throttle'
 
 export const runtime = 'nodejs'
 
@@ -15,6 +16,7 @@ const supabaseAdmin = createClient(
 )
 
 export async function GET(req: NextRequest) {
+  if (!allowByIp(req, 'referrer-name', 30)) return NextResponse.json({ firstName: null }, { status: 429 })
   const code = new URL(req.url).searchParams.get('code')
   if (!code) return NextResponse.json({ firstName: null })
 

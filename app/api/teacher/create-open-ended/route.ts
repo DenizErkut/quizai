@@ -17,6 +17,7 @@ import { generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-route
 import { pickMeasuredQuizEngine } from '@/lib/ai-gateway/measured-quiz-router'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { verifyQuestionWithOpenAI } from '@/lib/openai'
+import { internalOrigin } from '@/lib/internal-origin'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -207,7 +208,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Ders ve konu zorunlu.' }, { status: 400 })
       }
       try {
-        const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin, user.id, token, questionCount)
+        const result = await generateWithAI(subject, topic, grade || '', internalOrigin(req.nextUrl.origin), user.id, token, questionCount)
         await recordTeacherUsage(user.id, 'ai_generation')
         return NextResponse.json(result)
       } catch (e: any) {
@@ -273,7 +274,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Yapay zeka için ders ve konu zorunlu.' }, { status: 400 })
       }
       try {
-        const result = await generateWithAI(subject, topic, grade || '', req.nextUrl.origin, user.id, token)
+        const result = await generateWithAI(subject, topic, grade || '', internalOrigin(req.nextUrl.origin), user.id, token)
         scenario = result.scenario; question = result.question; rubric = result.rubric
         await recordTeacherUsage(user.id, 'ai_generation')
       } catch (e: any) {

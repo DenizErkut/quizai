@@ -50,6 +50,7 @@ import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuesti
 import { phantomVisualIssue, salvageLeakedSvg } from '@/lib/phantom-visual'
 import { isSameGradeSource } from '@/lib/meb-source-scope'
 import { visualProfileForSubject, visualQuotaFor, VERBAL_VISUAL_RATIO } from '@/lib/visual-quota-policy'
+import { internalOrigin } from '@/lib/internal-origin'
 
 const anthropic = new Anthropic()
 const supabase = createClient(
@@ -1749,7 +1750,7 @@ export async function POST(req: NextRequest) {
     const level = getLevel(grade)
     if (level !== 'universite') {
       try {
-        const mebRes = await fetch(`${req.nextUrl.origin}/api/meb-search`, {
+        const mebRes = await fetch(`${internalOrigin(req.nextUrl.origin)}/api/meb-search`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ topic, grade, subject, unit: topic, level, limit: 2 }),
@@ -2495,7 +2496,7 @@ export async function POST(req: NextRequest) {
       }, { status: 503 })
     }
 
-    const verifyQuestionCandidates = async (candidateQuestions: any[]) => fetch(`${req.nextUrl.origin}/api/verify-questions`, {
+    const verifyQuestionCandidates = async (candidateQuestions: any[]) => fetch(`${internalOrigin(req.nextUrl.origin)}/api/verify-questions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
