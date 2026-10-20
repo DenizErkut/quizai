@@ -4,6 +4,7 @@
 // döndüren güvenli, herkese açık bir çözümleyici.
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { allowByIp } from '@/lib/ip-throttle'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,6 +12,7 @@ const supabaseAdmin = createClient(
 )
 
 export async function GET(req: NextRequest) {
+  if (!allowByIp(req, 'resolve-seller-code', 30)) return NextResponse.json({ seller_id: null }, { status: 429 })
   const code = (req.nextUrl.searchParams.get('code') || '').toUpperCase().trim()
   if (!code) return NextResponse.json({ seller_id: null })
 

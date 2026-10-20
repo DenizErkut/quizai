@@ -53,7 +53,7 @@ async function getAdminUser() {
   }
   const { data: p } = await adminDb.from('profiles').select('is_admin').eq('id', user.id).single()
   if (!p?.is_admin) {
-    console.warn(`[admin/exam-upload] Forbidden: ${user.email} oturumu geçerli ama is_admin=false.`)
+    console.warn(`[admin/exam-upload] Forbidden: ${user.id} oturumu geçerli ama is_admin=false.`)
     return null
   }
   return user
