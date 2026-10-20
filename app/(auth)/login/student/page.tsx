@@ -4,13 +4,14 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/i18n/I18nProvider'
+import { safeNextPath } from '@/lib/safe-next'
 
 function LoginPageContent() {
   const { t } = useT()
   const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams.get('next')
-  const isSafeNext = (n: string | null) => !!n && n.startsWith('/') && !n.startsWith('//')
+  const isSafeNext = (n: string | null) => safeNextPath(n, { allowLogin: true }) !== null
   const [email, setEmail] = useState('')
   const [pass, setPass] = useState('')
   const [error, setError] = useState('')

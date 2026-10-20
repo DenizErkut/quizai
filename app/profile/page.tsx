@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import DepartmentSelect, { resolveDepartmentValue } from '@/components/DepartmentSelect'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { languageFromLocale } from '@/lib/i18n/core'
+import { safeNextPath } from '@/lib/safe-next'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -30,7 +31,7 @@ function ProfileSetupContent() {
   const { t, locale } = useT()
   const searchParams = useSearchParams()
   const next = searchParams.get('next')
-  const isSafeNext = (n: string | null) => !!n && n.startsWith('/') && !n.startsWith('//') && !n.startsWith('/login')
+  const isSafeNext = (n: string | null) => safeNextPath(n) !== null
   const [name, setName] = useState('')
   const [surname, setSurname] = useState('')
   const [age, setAge] = useState('')

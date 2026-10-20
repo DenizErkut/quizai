@@ -19,6 +19,7 @@ import { loadPendingRegistration, clearPendingRegistration, PendingRole } from '
 import DepartmentSelect, { resolveDepartmentValue } from '@/components/DepartmentSelect'
 import { LocationFields } from '@/components/LocationSelect'
 import { validateLocationDetails, EMPTY_LOCATION_DETAILS, type LocationDetails } from '@/lib/location/validate'
+import { safeNextPath } from '@/lib/safe-next'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -164,8 +165,7 @@ export default function CompleteProfilePage() {
       }).catch(() => {})
     }
 
-    const safeNext = pending.next && pending.next.startsWith('/') && !pending.next.startsWith('//') && !pending.next.startsWith('/login')
-      ? pending.next : '/home'
+    const safeNext = safeNextPath(pending.next) ?? '/home'
     setNextUrl(safeNext)
 
     if (pending.role === 'student') {

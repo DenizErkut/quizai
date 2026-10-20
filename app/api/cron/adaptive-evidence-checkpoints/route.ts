@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { isCronAuthorized } from '@/lib/cron-auth'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
@@ -48,7 +49,7 @@ async function measure(evaluation: any, checkpoint: 'day1' | 'day7') {
 }
 
 export async function GET(req: NextRequest) {
-  if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   const { data: evaluations, error } = await db.from('adaptive_learning_evaluations').select('id,student_id,observation_started_at,day1_measured_at,day7_measured_at,baseline_misconception_ids').eq('sample_version', 'adaptive-learning-v3-pilot').is('day7_measured_at', null).order('observation_started_at').limit(250)
   if (error) return NextResponse.json({ error: 'Pilot ölçümleri alınamadı.' }, { status: 500 })
   const summary = { day1: 0, day7: 0, skipped: 0, failed: 0 }

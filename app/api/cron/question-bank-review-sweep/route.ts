@@ -13,6 +13,7 @@
 // kararıyla approved/rejected olabilir.
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { isCronAuthorized } from '@/lib/cron-auth'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,8 +21,7 @@ const supabaseAdmin = createClient(
 )
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(req)) {
     return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   }
 

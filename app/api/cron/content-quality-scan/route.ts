@@ -27,6 +27,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { scanQuestionsForQualityIssues, QualityIssue } from '@/lib/content-quality-scan'
 import { isNonContent, isKazanimListesi } from '@/lib/content-filters'
+import { isCronAuthorized } from '@/lib/cron-auth'
 
 export const maxDuration = 120
 export const runtime = 'nodejs'
@@ -47,8 +48,7 @@ const MAX_EXAM_CHUNKS_POOL = 300
 const MAX_EXAM_CHUNKS_SAMPLE = 40
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(req)) {
     return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   }
 

@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 import { computeParentWeeklySummary, buildParentSummaryEmailHtml, sendResendEmail } from '@/lib/parent-summary'
+import { isCronAuthorized } from '@/lib/cron-auth'
 
 export const maxDuration = 120
 export const runtime = 'nodejs'
@@ -24,8 +25,7 @@ const supabaseAdmin = createClient(
 )
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(req)) {
     return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   }
 

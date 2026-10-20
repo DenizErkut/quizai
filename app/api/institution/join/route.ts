@@ -8,26 +8,27 @@ const supabaseAdmin = createClient(
 )
 
 export async function POST(req: NextRequest) {
-  const { institution_code, user_id } = await req.json()
-  if (!institution_code || !user_id) {
+  // Kimlik doğrulama ZORUNLU: kullanıcı yalnızca KENDİSİNİ kuruma ekleyebilir (user_id istemciden güvenilmez).
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  }
+  const supabaseUser = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { headers: { Authorization: authHeader } } }
+  )
+  const { data: { user: authUser } } = await supabaseUser.auth.getUser()
+  if (!authUser) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+
+  const { institution_code, user_id: requestedUserId } = await req.json().catch(() => ({}))
+  if (!institution_code || typeof institution_code !== 'string') {
     return NextResponse.json({ error: 'Eksik parametre.' }, { status: 400 })
   }
-
-  // Auth kontrolü — token varsa kullan, yoksa user_id ile devam et (register akışı)
-  const authHeader = req.headers.get('authorization')
-  if (authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.slice(7)
-    const supabaseUser = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { global: { headers: { Authorization: `Bearer ${token}` } } }
-    )
-    const { data: { user } } = await supabaseUser.auth.getUser()
-    // user_id ile token'daki uid eşleşmeli
-    if (!user || user.id !== user_id) {
-      return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
-    }
+  if (requestedUserId && requestedUserId !== authUser.id) {
+    return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   }
+  const user_id = authUser.id
 
   // Kurumu bul
   const { data: inst } = await supabaseAdmin

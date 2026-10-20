@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { isCronAuthorized } from '@/lib/cron-auth'
 
 export const runtime = 'nodejs'
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 export async function GET(req: NextRequest) {
-  if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   const since = new Date(Date.now() - 7 * 86_400_000).toISOString()
   const { data: rows, error } = await db.from('agent_decision_audit').select('agent_name,decision_summary').gte('created_at', since).limit(1000)
   if (error) return NextResponse.json({ error: 'Ajan kalite verisi alınamadı.' }, { status: 500 })
