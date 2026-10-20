@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { studentInTeacherClassrooms, teacherOwnsClassroom } from '@/lib/teacher-scope'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
@@ -27,12 +28,9 @@ export async function POST(req: NextRequest) {
   const { action, student_id, classroom_id, subject, topic } = body ?? {}
   if (!student_id || !topic || !['acknowledge', 'assign', 'notify', 'resolve'].includes(action)) return NextResponse.json({ error: 'Geçersiz risk aksiyonu.' }, { status: 400 })
 
-  if (classroom_id) {
-    const { data: classroom } = await db.from('classrooms').select('id').eq('id', classroom_id).eq('teacher_id', teacher.id).maybeSingle()
-    if (!classroom) return NextResponse.json({ error: 'Sınıf erişimi yok.' }, { status: 403 })
-    const { data: member } = await db.from('classroom_students').select('student_id').eq('classroom_id', classroom_id).eq('student_id', student_id).maybeSingle()
-    if (!member) return NextResponse.json({ error: 'Öğrenci bu sınıfta değil.' }, { status: 403 })
-  }
+  // classroom_id verilmese de öğrenci öğretmenin kendi sınıflarından birinde olmalı (başka öğrenciye bildirim/aksiyon yazılamaz).
+  if (classroom_id && !(await teacherOwnsClassroom(db, teacher.id, classroom_id))) return NextResponse.json({ error: 'Sınıf erişimi yok.' }, { status: 403 })
+  if (!(await studentInTeacherClassrooms(db, teacher.id, student_id, classroom_id || null))) return NextResponse.json({ error: 'Öğrenci bu sınıfta değil.' }, { status: 403 })
 
   const completed = action === 'resolve'
   const { data: record, error } = await db.from('learning_risk_actions').insert({ teacher_id: teacher.id, student_id, classroom_id: classroom_id || null, subject: subject || 'Genel', topic, action, status: completed ? 'completed' : 'open', completed_at: completed ? new Date().toISOString() : null }).select().single()

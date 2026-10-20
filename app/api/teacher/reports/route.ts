@@ -44,6 +44,9 @@ export async function GET(req: NextRequest) {
 
   const classroomMap = new Map(classrooms.map((c: any) => [c.id, c.name]))
   const requestedClassroomId = req.nextUrl.searchParams.get('classroomId')
+  if (requestedClassroomId && !classrooms.some((c: any) => c.id === requestedClassroomId)) {
+    return NextResponse.json({ error: 'Sınıf erişimi yok.' }, { status: 403 })
+  }
   const classroomIds = requestedClassroomId ? [requestedClassroomId] : classrooms.map((c: any) => c.id)
 
   const { data: members } = await supabaseAdmin
