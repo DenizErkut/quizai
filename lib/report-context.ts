@@ -75,6 +75,9 @@ export async function buildTeacherContext(userId: string, classroomId?: string |
 
   if (!classrooms?.length) return { teacherId: teacher.id, roster: [], classrooms: [] }
 
+  // İstemciden gelen classroomId öğretmenin kendi sınıflarından biri olmalı (başka kurumun sınıfı reddedilir).
+  if (classroomId && !classrooms.some((c: any) => c.id === classroomId)) return null
+
   const classroomMap = new Map(classrooms.map((c: any) => [c.id, c.name]))
   const classroomIds = classroomId ? [classroomId] : classrooms.map((c: any) => c.id)
 

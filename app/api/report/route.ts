@@ -7,6 +7,7 @@ import { cookies } from 'next/headers'
 import { getIdentityBySupabaseId, getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 import { inferSubject } from '@/lib/student-report-topics'
 import { computeWeeklyGrowth } from '@/lib/weekly-growth'
+import { teacherOwnsClassroom } from '@/lib/teacher-scope'
 
 const adminClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -176,14 +177,16 @@ export async function GET(req: NextRequest) {
 
   // ── ÖĞRETMEN RAPORU ──
   if (type === 'teacher') {
-    const { data: teacher } = await adminClient.from('teachers').select('id').eq('user_id', user.id).maybeSingle()
-    if (!teacher) return NextResponse.json({ error: 'Not a teacher' }, { status: 403 })
+    const { data: teacher } = await adminClient.from('teachers').select('id, approved').eq('user_id', user.id).maybeSingle()
+    if (!teacher?.approved) return NextResponse.json({ error: 'Not a teacher' }, { status: 403 })
 
     const classId = targetId || searchParams.get('classId')
     if (!classId) {
       const { data: cls } = await adminClient.from('classrooms').select('id, name').eq('teacher_id', teacher.id)
       return NextResponse.json({ type: 'teacher', classrooms: cls ?? [] })
     }
+    // Yalnızca öğretmenin KENDİ sınıfı: başka kurumun/öğretmenin sınıf kimliği ile veri çekilemez.
+    if (!(await teacherOwnsClassroom(adminClient, teacher.id, classId))) return NextResponse.json({ error: 'Sınıf erişimi yok.' }, { status: 403 })
 
     const { data: members } = await adminClient.from('classroom_students').select('student_id').eq('classroom_id', classId)
     if (!members?.length) return NextResponse.json({ type: 'teacher', students: [] })

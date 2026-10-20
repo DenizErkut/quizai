@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { gateTeacherFeature, recordTeacherUsage } from '@/lib/teacher-access'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { liveAnswerDecision } from '@/lib/live-quiz-rules'
 import { generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
 import { pickMeasuredQuizEngine } from '@/lib/ai-gateway/measured-quiz-router'
 
@@ -13,6 +14,17 @@ export const maxDuration = 120
 export const runtime = 'nodejs'
 
 // Öğretmen: canlı quiz oluştur ve sınıfa gönder
+async function isClassroomMember(userId: string, classroomId: string | null): Promise<boolean> {
+  if (!classroomId) return false
+  const { data } = await supabase.from('classroom_students').select('student_id').eq('classroom_id', classroomId).eq('student_id', userId).maybeSingle()
+  return Boolean(data)
+}
+
+async function existingAnswer(liveQuizId: string, userId: string, questionIndex: number): Promise<{ is_correct: boolean; score: number } | null> {
+  const { data } = await supabase.from('live_quiz_answers').select('is_correct,score').eq('live_quiz_id', liveQuizId).eq('user_id', userId).eq('question_index', questionIndex).maybeSingle()
+  return data ? { is_correct: Boolean(data.is_correct), score: Number(data.score) || 0 } : null
+}
+
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
@@ -136,8 +148,8 @@ export async function PATCH(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser(token)
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
-  const { data: teacher } = await supabase.from('teachers').select('id').eq('user_id', user.id).single()
-  if (!teacher) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
+  const { data: teacher } = await supabase.from('teachers').select('id,approved').eq('user_id', user.id).single()
+  if (!teacher?.approved) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 })
 
   const { live_quiz_id, action, current_question } = await req.json()
   // action: 'start' | 'reveal' | 'next' | 'finish'
@@ -173,10 +185,21 @@ export async function PUT(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
   const { live_quiz_id, question_index, chosen_answer } = await req.json()
+  if (typeof live_quiz_id !== 'string' || !Number.isInteger(question_index) || !Number.isInteger(chosen_answer)) {
+    return NextResponse.json({ error: 'Geçersiz cevap.' }, { status: 400 })
+  }
 
   // live_quiz'i çek — doğru cevabı kontrol et
-  const { data: lq } = await supabase.from('live_quizzes').select('questions,question_started_at,time_per_question').eq('id', live_quiz_id).single()
+  const { data: lq } = await supabase.from('live_quizzes').select('questions,question_started_at,time_per_question,classroom_id,status,current_question').eq('id', live_quiz_id).single()
   if (!lq) return NextResponse.json({ error: 'Quiz bulunamadı.' }, { status: 404 })
+
+  // Yalnızca sınıfın öğrencisi, yalnızca aktif quizde, yalnızca ŞU AN açık olan soruya, bir kez cevap verebilir.
+  const isMember = await isClassroomMember(user.id, lq.classroom_id)
+  // Aynı soruya tekrar gönderim (ör. ağ yeniden denemesi) yeni puan YAZMAZ; kayıtlı sonucu aynen döndürür.
+  const previous = isMember ? await existingAnswer(live_quiz_id, user.id, question_index) : null
+  if (previous) return NextResponse.json({ ...previous, correct_ans: lq.questions[question_index]?.ans, repeated: true })
+  const decision = liveAnswerDecision({ status: lq.status, currentQuestion: lq.current_question, questionIndex: question_index, isMember, alreadyAnswered: false })
+  if (decision) return NextResponse.json({ error: decision.error }, { status: decision.status })
 
   const question = lq.questions[question_index]
   const is_correct = question?.ans === chosen_answer
@@ -203,7 +226,7 @@ export async function PUT(req: NextRequest) {
     }
   }
 
-  // Upsert: aynı soru için tekrar cevap gönderilirse güncelle
+  // Soru başına tek cevap (yeniden gönderip doğru cevabı öğrenme yolu kapalı)
   await supabase.from('live_quiz_answers').upsert({
     live_quiz_id,
     user_id: user.id,
@@ -230,6 +253,11 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const live_quiz_id = searchParams.get('live_quiz_id')
   if (!live_quiz_id) return NextResponse.json({ error: 'live_quiz_id gerekli.' }, { status: 400 })
+
+  // Yalnızca bitmemiş bir quize ve yalnızca kendi sınıfının quizine katılma işareti yazılabilir.
+  const { data: target } = await supabase.from('live_quizzes').select('classroom_id,status').eq('id', live_quiz_id).maybeSingle()
+  if (!target || target.status === 'finished') return NextResponse.json({ error: 'Quiz bulunamadı.' }, { status: 404 })
+  if (!(await isClassroomMember(user.id, target.classroom_id))) return NextResponse.json({ error: 'Bu quiz sınıfınıza ait değil.' }, { status: 403 })
 
   // question_index: -1 = "katıldı" marker'ı — sadece bir kez yaz
   await supabase.from('live_quiz_answers').upsert({
