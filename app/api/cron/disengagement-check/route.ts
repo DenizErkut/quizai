@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/server-create-client'
 import { checkDisengagement } from '@/lib/disengagement-risk'
 import { sendResendEmail } from '@/lib/parent-summary'
 import { getIdentityBySupabaseId, getIdentitiesBySupabaseIds } from '@/lib/identity/client'
+import { isCronAuthorized } from '@/lib/cron-auth'
 
 export const maxDuration = 120
 export const runtime = 'nodejs'
@@ -45,8 +46,7 @@ function buildDisengagementEmailHtml(childName: string, daysSinceLastActivity: n
 }
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(req)) {
     return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   }
 

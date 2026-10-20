@@ -6,6 +6,7 @@ import { buildCoachContext, type CoachContext } from '@/lib/coach-context'
 import { generateCoachReply, type CoachTurn } from '@/lib/coach-generation'
 import { isPaidCoachPlan } from '@/lib/coach-access'
 import { requireAgentCapability, writeAgentDecisionAudit } from '@/lib/agent-security-policy'
+import { isCronAuthorized } from '@/lib/cron-auth'
 
 export const maxDuration = 120
 export const runtime = 'nodejs'
@@ -97,7 +98,7 @@ async function processJob(job: Job, workerId: string) {
 }
 
 export async function GET(req: NextRequest) {
-  if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   const workerId = randomUUID()
   // Keep discovery bounded; the durable DB cursor advances in small batches.
   let candidatesQueued = 0

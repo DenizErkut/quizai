@@ -4,6 +4,7 @@ export const maxDuration = 30
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { logAnthropicUsage } from '@/lib/ai-usage'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 const anthropic = new Anthropic()
 
@@ -25,28 +26,32 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser(token)
     if (!user) return NextResponse.json({ reply: 'Oturum geçersiz.' }, { status: 401 })
     botUserId = user.id
-    // Rate limiting — 50 istek/gün (giriş yapmış kullanıcılar)
-    try {
-      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-      if (!serviceRoleKey) throw new Error('service role key missing')
-      const rlDb = createClient(supabaseUrl, serviceRoleKey)
-      const today = new Date().toISOString().split('T')[0]
-      const { data: rl } = await rlDb.from('api_rate_limits').select('id, count').eq('user_id', botUserId).eq('endpoint', 'bot').eq('window_date', today).maybeSingle()
-      if (rl) {
-        if (rl.count >= 50) return NextResponse.json({ reply: 'Günlük bot limiti aşıldı.' }, { status: 429 })
-        await rlDb.from('api_rate_limits').update({ count: rl.count + 1 }).eq('id', rl.id)
-      } else { await rlDb.from('api_rate_limits').insert({ user_id: botUserId, endpoint: 'bot', count: 1, window_date: today }) }
-    } catch { /* devam et */ }
+    // Rate limiting — 50 istek/gün (atomik RPC; doğrulanamazsa kapalı)
+    const limit = await checkRateLimit(botUserId, { endpoint: 'bot', limit: 50 })
+    if (!limit.allowed) {
+      return NextResponse.json({ reply: limit.unavailable ? 'İstek sınırı doğrulanamadı. Lütfen biraz sonra tekrar dene.' : 'Günlük bot limiti aşıldı.' }, { status: limit.unavailable ? 503 : 429 })
+    }
   }
 
   try {
-    const { messages, system } = await req.json()
+    const body = await req.json()
+    // Girdi sınırları: son 20 mesaj, mesaj başına 2000 karakter, yalnızca user/assistant rolleri.
+    const rawMessages: unknown[] = Array.isArray(body?.messages) ? body.messages.slice(-20) : []
+    const messages = rawMessages
+      .filter((m): m is { role: 'user' | 'assistant'; content: string } => {
+        const item = m as { role?: unknown; content?: unknown } | null
+        return Boolean(item) && (item!.role === 'user' || item!.role === 'assistant') && typeof item!.content === 'string' && item!.content.length > 0
+      })
+      .map(m => ({ role: m.role, content: m.content.slice(0, 2000) }))
+    while (messages.length && messages[0].role === 'assistant') messages.shift()
+    if (!messages.length) return NextResponse.json({ reply: 'Geçersiz istek.' }, { status: 400 })
+    const system = typeof body?.system === 'string' ? body.system.slice(0, 12000) : undefined
 
     const response = await anthropic.messages.create({
       model: CLAUDE_SONNET, ...SONNET_PARAMS,
       max_tokens: sonnetTokens(512),
       system,
-      messages: messages.map((m: any) => ({ role: m.role, content: m.content })),
+      messages,
     })
 
     await logAnthropicUsage('bot', CLAUDE_SONNET, response, { userId: botUserId })

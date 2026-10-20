@@ -10,6 +10,7 @@ import { useT } from '@/lib/i18n/I18nProvider'
 import { languageFromLocale } from '@/lib/i18n/core'
 import { LocationFields } from '@/components/LocationSelect'
 import { validateLocationDetails, EMPTY_LOCATION_DETAILS, type LocationDetails } from '@/lib/location/validate'
+import { safeNextPath } from '@/lib/safe-next'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -68,7 +69,7 @@ function RegisterContent() {
   const kurumParam = searchParams.get('kurum') || ''
   const saticiParam = searchParams.get('satici') || ''
   const next = searchParams.get('next') || ''
-  const isSafeNext = (n: string) => n.startsWith('/') && !n.startsWith('//') && !n.startsWith('/login')
+  const isSafeNext = (n: string) => safeNextPath(n) !== null
   const supabase = createClient() as any
 
   // Adım yönetimi

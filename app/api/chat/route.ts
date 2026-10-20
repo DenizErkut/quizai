@@ -8,6 +8,7 @@ import { getTopicMastery } from '@/lib/mastery'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { inspectTutorInput, inspectTutorOutput } from '@/lib/tutor-safety'
 import { requireAgentCapability, requireOwnStudentScope, writeAgentDecisionAudit } from '@/lib/agent-security-policy'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 const client = new Anthropic()
 type TutorQuestion = { q: string; opts: string[]; ans: number; exp?: string; userAns?: number }
@@ -25,16 +26,13 @@ export async function POST(req: NextRequest) {
   requireOwnStudentScope(agent, user.id, user.id)
   const adminDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
-  // Rate limiting — 30 istek/gün
-  try {
-    const rlDb = adminDb
-    const today = new Date().toISOString().split('T')[0]
-    const { data: rl } = await rlDb.from('api_rate_limits').select('id, count').eq('user_id', user.id).eq('endpoint', 'chat').eq('window_date', today).maybeSingle()
-    if (rl) {
-      if (rl.count >= 30) return NextResponse.json({ error: 'Günlük chat limiti aşıldı.', limit: 30 }, { status: 429 })
-      await rlDb.from('api_rate_limits').update({ count: rl.count + 1 }).eq('id', rl.id)
-    } else { await rlDb.from('api_rate_limits').insert({ user_id: user.id, endpoint: 'chat', count: 1, window_date: today }) }
-  } catch { /* devam et */ }
+  // Rate limiting — 30 istek/gün (atomik RPC; doğrulanamazsa kapalı)
+  const limit = await checkRateLimit(user.id, { endpoint: 'chat', limit: 30 })
+  if (!limit.allowed) {
+    return NextResponse.json(limit.unavailable
+      ? { error: 'İstek sınırı doğrulanamadı. Lütfen biraz sonra tekrar dene.' }
+      : { error: 'Günlük chat limiti aşıldı.', limit: 30 }, { status: limit.unavailable ? 503 : 429 })
+  }
 
   try {
     const { messages, topic, language, questions = [], answers = [] } = await req.json()
