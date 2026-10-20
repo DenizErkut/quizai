@@ -182,7 +182,14 @@ export default function TeacherLivePage() {
 
       // Soruları çek
       const { data: lq } = await supabase.from('live_quizzes').select('questions').eq('id', data.liveQuizId).single()
-      setLiveQuiz((p: any) => ({ ...p, questions: lq?.questions || [] }))
+      // Doğru cevaplar öğrenciye açık tabloda tutulmaz; öğretmen kendi anahtarını sunucudan alır.
+      let answers: Array<number | null> = []
+      try {
+        const { data: { session: keySession } } = await supabase.auth.getSession()
+        const keyRes = await fetch(`/api/live-quiz/keys?live_quiz_id=${data.liveQuizId}`, { headers: { Authorization: `Bearer ${keySession?.access_token}` } })
+        if (keyRes.ok) answers = (await keyRes.json()).answers || []
+      } catch { /* anahtar alınamazsa doğru şık işaretlenmez */ }
+      setLiveQuiz((p: any) => ({ ...p, questions: (lq?.questions || []).map((q: any, i: number) => ({ ...q, ans: answers[i] ?? undefined })) }))
     } catch (e: any) {
       console.error('[createLiveQuiz] beklenmeyen hata:', e)
       setCreateError(tr('Beklenmeyen bir hata oluştu. Lütfen tekrar dene.'))
