@@ -20,6 +20,7 @@ import DepartmentSelect, { resolveDepartmentValue } from '@/components/Departmen
 import { LocationFields } from '@/components/LocationSelect'
 import { validateLocationDetails, EMPTY_LOCATION_DETAILS, type LocationDetails } from '@/lib/location/validate'
 import { safeNextPath } from '@/lib/safe-next'
+import { lookupInstitutionName, joinInstitution } from '@/lib/institution-lookup-client'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -196,11 +197,8 @@ export default function CompleteProfilePage() {
       }
 
       if (pending.institutionCode) {
-        const { data: inst } = await supabase.from('institutions')
-          .select('id').eq('code', pending.institutionCode.toUpperCase()).eq('active', true).maybeSingle()
-        if (inst) {
-          await supabase.from('institution_users').insert({ institution_id: inst.id, user_id: uid, role: 'student' })
-        }
+        const joined = await joinInstitution(accessToken, pending.institutionCode)
+        if (!joined.ok) console.error('[complete-profile] kuruma bağlanılamadı:', joined.error)
       }
 
       if (pending.ref) {
@@ -356,8 +354,7 @@ export default function CompleteProfilePage() {
 
   async function verifyFbInstitutionCode(val: string) {
     if (val.length === 8) {
-      const { data: inst } = await supabase.from('institutions').select('name').eq('code', val).eq('active', true).maybeSingle()
-      setFbInstitutionName(inst?.name || '')
+      setFbInstitutionName(await lookupInstitutionName(val))
     } else {
       setFbInstitutionName('')
     }

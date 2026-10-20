@@ -94,6 +94,6 @@ ${text.slice(0, 3000)}
     })
   } catch (e: any) {
     console.error('[reading/question]', e)
-    return NextResponse.json({ error: e?.message || 'Sorular üretilemedi.' }, { status: 500 })
+    return NextResponse.json({ error: 'Sorular üretilemedi.' }, { status: 500 })
   }
 }

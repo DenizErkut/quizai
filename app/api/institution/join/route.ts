@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     .insert({ institution_id: inst.id, user_id, role: 'student' })
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Kuruma katılım kaydedilemedi.' }, { status: 500 })
   }
 
   return NextResponse.json({ success: true, institution_name: inst.name })

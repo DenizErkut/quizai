@@ -11,6 +11,7 @@ import { languageFromLocale } from '@/lib/i18n/core'
 import { LocationFields } from '@/components/LocationSelect'
 import { validateLocationDetails, EMPTY_LOCATION_DETAILS, type LocationDetails } from '@/lib/location/validate'
 import { safeNextPath } from '@/lib/safe-next'
+import { lookupInstitutionName, joinInstitution } from '@/lib/institution-lookup-client'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -112,8 +113,7 @@ function RegisterContent() {
   // Kurum davet kodunu doğrular (hem manuel giriş hem de QR/link ile gelen ?kurum= için ortak)
   async function verifyInstitutionCode(val: string) {
     if (val.length === 8) {
-      const { data: inst } = await supabase.from('institutions').select('name').eq('code', val).eq('active', true).maybeSingle()
-      setInstitutionName(inst?.name || '')
+      setInstitutionName(await lookupInstitutionName(val))
     } else {
       setInstitutionName('')
     }
@@ -343,11 +343,8 @@ function RegisterContent() {
 
         // Kurum kodu
         if (institutionCode.trim()) {
-          const { data: inst } = await supabase.from('institutions')
-            .select('id').eq('code', institutionCode.trim().toUpperCase()).eq('active', true).maybeSingle()
-          if (inst) {
-            await supabase.from('institution_users').insert({ institution_id: inst.id, user_id: data.user.id, role: 'student' })
-          }
+          const joined = await joinInstitution(accessToken, institutionCode)
+          if (!joined.ok) console.error('[register] kuruma bağlanılamadı:', joined.error)
         }
 
         // Kayıt yalnızca davet ilişkisini kurar; ödül ücretli üyelik

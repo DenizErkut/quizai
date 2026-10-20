@@ -296,7 +296,7 @@ export async function POST(req: NextRequest) {
 
   } catch (e: any) {
     console.error('[reading/upload]', e)
-    return NextResponse.json({ error: e?.message || 'Dosya işlenemedi.' }, { status: 500 })
+    return NextResponse.json({ error: 'Dosya işlenemedi.' }, { status: 500 })
   } finally {
     // İçerik kalıcı saklanmıyor — işlenen (veya başarısız olan) dosyayı Storage'dan temizle
     if (storagePath) {
