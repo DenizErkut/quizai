@@ -11,6 +11,7 @@ import { LocationFields } from '@/components/LocationSelect'
 import { validateLocationDetails, EMPTY_LOCATION_DETAILS, type LocationDetails } from '@/lib/location/validate'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
+import { lookupInstitutionName } from '@/lib/institution-lookup-client'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -452,8 +453,7 @@ export default function ProfileEditPage() {
                 <button onClick={async () => {
                   if (!confirm(tr('Kurumdan ayrılmak istediğinize emin misiniz?'))) return
                   const { data: { user: u } } = await supabase.auth.getUser()
-                  const { data: inst } = await supabase.from('institutions').select('id').eq('code', instCode).maybeSingle()
-                  if (inst) await supabase.from('institution_users').delete().eq('user_id', u.id).eq('institution_id', inst.id)
+                  await supabase.from('institution_users').delete().eq('user_id', u.id).eq('role', 'student')
                   setInstName(''); setInstCode(''); setInstJoined('')
                 }} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(220,38,38,0.2)', background: 'var(--red-bg)', color: 'var(--red)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>
                   {tr('Ayrıl')}
@@ -477,8 +477,8 @@ export default function ProfileEditPage() {
                     setInstCode(val)
                     setInstMsg('')
                     if (val.length === 8) {
-                      const { data: inst } = await supabase.from('institutions').select('name').eq('code', val).eq('active', true).maybeSingle()
-                      if (inst) setInstMsg(tr('🏛️ {name} — Katılmak için butona bas', { name: inst.name }))
+                      const foundName = await lookupInstitutionName(val)
+                      if (foundName) setInstMsg(tr('🏛️ {name} — Katılmak için butona bas', { name: foundName }))
                       else setInstMsg(tr('Kurum bulunamadı.'))
                     }
                   }}

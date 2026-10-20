@@ -163,6 +163,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, pct: updateData?.[0]?.pct ?? pct })
   } catch (error: any) {
     console.error('[save-quiz] ERROR:', error?.message)
-    return NextResponse.json({ error: error?.message || 'Save failed' }, { status: 500 })
+    return NextResponse.json({ error: 'Save failed' }, { status: 500 })
   }
 }

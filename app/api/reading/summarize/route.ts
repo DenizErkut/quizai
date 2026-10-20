@@ -117,6 +117,6 @@ SADECE özet metnini döndür — başlık, açıklama, markdown veya "İşte ö
     })
   } catch (e: any) {
     console.error('[reading/summarize]', e)
-    return NextResponse.json({ error: e?.message || 'Özet üretilemedi.' }, { status: 500 })
+    return NextResponse.json({ error: 'Özet üretilemedi.' }, { status: 500 })
   }
 }

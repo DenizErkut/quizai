@@ -6,6 +6,7 @@ import DepartmentSelect, { resolveDepartmentValue } from '@/components/Departmen
 import { useT } from '@/lib/i18n/I18nProvider'
 import { languageFromLocale } from '@/lib/i18n/core'
 import { safeNextPath } from '@/lib/safe-next'
+import { lookupInstitutionName, joinInstitution } from '@/lib/institution-lookup-client'
 
 const GRADES = [
   { value: 'ilkokul 1. sinif', label: 'İlkokul 1. Sınıf' },
@@ -132,18 +133,10 @@ function ProfileSetupContent() {
 
     // Kurum kodu işle
     if (institutionCode.trim()) {
-      const { data: inst } = await supabase
-        .from('institutions')
-        .select('id, name')
-        .eq('code', institutionCode.trim().toUpperCase())
-        .eq('active', true)
-        .maybeSingle()
-      if (inst) {
-        await supabase.from('institution_users').upsert({
-          institution_id: inst.id,
-          user_id: user.id,
-          role: 'student',
-        }, { onConflict: 'institution_id,user_id' })
+      const { data: { session: joinSession } } = await supabase.auth.getSession()
+      if (joinSession?.access_token) {
+        const joined = await joinInstitution(joinSession.access_token, institutionCode)
+        if (!joined.ok) console.error('[profile] kuruma bağlanılamadı:', joined.error)
       }
     }
 
@@ -253,8 +246,7 @@ function ProfileSetupContent() {
                     const val = e.target.value.toUpperCase()
                     setInstitutionCode(val)
                     if (val.length === 8) {
-                      const { data: inst } = await supabase.from('institutions').select('name').eq('code', val).eq('active', true).maybeSingle()
-                      setInstitutionName(inst?.name || '')
+                      setInstitutionName(await lookupInstitutionName(val))
                     } else setInstitutionName('')
                   }}
                 />
