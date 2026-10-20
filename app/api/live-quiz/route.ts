@@ -21,6 +21,13 @@ async function isClassroomMember(userId: string, classroomId: string | null): Pr
   return Boolean(data)
 }
 
+/** Doğru cevap: önce anahtar tablosu; eski kayıtlar için (henüz taşınmamışsa) soru JSON'undaki `ans`. */
+async function answerKeyFor(liveQuizId: string, questionIndex: number, legacyQuestion: { ans?: unknown } | undefined): Promise<number | undefined> {
+  const { data } = await supabase.from('live_quiz_keys').select('ans').eq('live_quiz_id', liveQuizId).eq('question_index', questionIndex).maybeSingle()
+  if (data && Number.isInteger(data.ans)) return data.ans as number
+  return Number.isInteger(legacyQuestion?.ans) ? (legacyQuestion!.ans as number) : undefined
+}
+
 async function existingAnswer(liveQuizId: string, userId: string, questionIndex: number): Promise<{ is_correct: boolean; score: number } | null> {
   const { data } = await supabase.from('live_quiz_answers').select('is_correct,score').eq('live_quiz_id', liveQuizId).eq('user_id', userId).eq('question_index', questionIndex).maybeSingle()
   return data ? { is_correct: Boolean(data.is_correct), score: Number(data.score) || 0 } : null
@@ -105,6 +112,11 @@ SADECE geçerli JSON döndür:
     return NextResponse.json({ error: 'Soru üretilemedi.' }, { status: 500 })
   }
 
+  // Doğru cevap anahtarı ayrı tabloda (live_quiz_keys, yalnızca servis rolü) tutulur; sınıf arkadaşlarının
+  // okuyabildiği live_quizzes.questions içinde `ans`/`exp` BULUNMAZ.
+  const answerKeys = questions.map((q: any, index: number) => ({ question_index: index, ans: Number.isInteger(q?.ans) ? q.ans : 0, exp: typeof q?.exp === 'string' ? q.exp : null }))
+  const publicQuestions = questions.map(({ ans: _ans, exp: _exp, ...rest }: any) => rest)
+
   // live_quizzes tablosuna kaydet
   const joinCode = Array.from({ length: 6 }, () => 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[randomInt(31)]).join('')
   await recordTeacherUsage(user.id, 'live_quiz')
@@ -112,13 +124,20 @@ SADECE geçerli JSON döndür:
     teacher_id: teacher.id,
     classroom_id,
     topic,
-    questions,
+    questions: publicQuestions,
     join_code: joinCode,
     time_per_question,
     status: 'waiting', // waiting | active | finished
     current_question: 0,
     started_at: null,
   }).select('id,join_code').single()
+  if (!liveQuiz) return NextResponse.json({ error: 'Quiz oluşturulamadı.' }, { status: 500 })
+  const { error: keyError } = await supabase.from('live_quiz_keys').insert(answerKeys.map((key: { question_index: number; ans: number; exp: string | null }) => ({ live_quiz_id: liveQuiz.id, ...key })))
+  if (keyError) {
+    console.error('[live-quiz] cevap anahtarı yazılamadı:', keyError.message)
+    await supabase.from('live_quizzes').delete().eq('id', liveQuiz.id)
+    return NextResponse.json({ error: 'Quiz oluşturulamadı.' }, { status: 500 })
+  }
 
   // Sınıftaki öğrencilere bildirim gönder
   const { data: students } = await supabase.from('classroom_students').select('student_id').eq('classroom_id', classroom_id)
@@ -198,12 +217,13 @@ export async function PUT(req: NextRequest) {
   const isMember = await isClassroomMember(user.id, lq.classroom_id)
   // Aynı soruya tekrar gönderim (ör. ağ yeniden denemesi) yeni puan YAZMAZ; kayıtlı sonucu aynen döndürür.
   const previous = isMember ? await existingAnswer(live_quiz_id, user.id, question_index) : null
-  if (previous) return NextResponse.json({ ...previous, correct_ans: lq.questions[question_index]?.ans, repeated: true })
+  if (previous) return NextResponse.json({ ...previous, correct_ans: await answerKeyFor(live_quiz_id, question_index, lq.questions[question_index]), repeated: true })
   const decision = liveAnswerDecision({ status: lq.status, currentQuestion: lq.current_question, questionIndex: question_index, isMember, alreadyAnswered: false })
   if (decision) return NextResponse.json({ error: decision.error }, { status: decision.status })
 
   const question = lq.questions[question_index]
-  const is_correct = question?.ans === chosen_answer
+  const correctAns = await answerKeyFor(live_quiz_id, question_index, question)
+  const is_correct = correctAns === chosen_answer
 
   // Cevap süresi (ms) — question_started_at, öğretmenin bu soruyu açtığı an
   // (PATCH 'start'/'next') sunucuda set ediliyor. Eksikse (eski kayıt/edge
@@ -239,7 +259,7 @@ export async function PUT(req: NextRequest) {
     answered_at: now.toISOString(),
   }, { onConflict: 'live_quiz_id,user_id,question_index' })
 
-  return NextResponse.json({ is_correct, correct_ans: question?.ans, score })
+  return NextResponse.json({ is_correct, correct_ans: correctAns, score })
 }
 
 // Öğrenci: quize katıl (join kaydı — question_index: -1 ile marker)
