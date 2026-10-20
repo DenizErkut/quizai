@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { gateTeacherFeature, recordTeacherUsage } from '@/lib/teacher-access'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { liveAnswerDecision } from '@/lib/live-quiz-rules'
+import { randomInt } from 'node:crypto'
 import { generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
 import { pickMeasuredQuizEngine } from '@/lib/ai-gateway/measured-quiz-router'
 
@@ -105,7 +106,7 @@ SADECE geçerli JSON döndür:
   }
 
   // live_quizzes tablosuna kaydet
-  const joinCode = Math.random().toString(36).substring(2, 7).toUpperCase()
+  const joinCode = Array.from({ length: 6 }, () => 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[randomInt(31)]).join('')
   await recordTeacherUsage(user.id, 'live_quiz')
   const { data: liveQuiz } = await supabase.from('live_quizzes').insert({
     teacher_id: teacher.id,

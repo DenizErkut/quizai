@@ -165,7 +165,8 @@ export async function POST(req: NextRequest) {
 
       if (file && file.size > 0) {
         const bytes = await file.arrayBuffer()
-        const path = `${normTR(exam_type)}/${year}/${normTR(subject || 'genel')}_${Date.now()}.pdf`
+        const safeYear = Number.isInteger(parseInt(year)) ? String(parseInt(year)) : 'yilsiz'
+        const path = `${normTR(exam_type)}/${safeYear}/${normTR(subject || 'genel')}_${Date.now()}.pdf`
         const { error: upErr } = await adminDb.storage.from('meb-resources')
           .upload(path, bytes, { contentType: 'application/pdf', upsert: true })
         if (!upErr) {

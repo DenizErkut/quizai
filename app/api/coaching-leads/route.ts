@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { validateLead } from '@/lib/lead-validation'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,24 +25,29 @@ async function requireAdmin() {
 
 // POST — herkese açık, /ozel-kocluk formundan gelir
 export async function POST(req: NextRequest) {
-  const body = await req.json()
-  const { leadType, name, email, phone, institutionName, studentGrade, message } = body
+  const body = await req.json().catch(() => null)
+  const checked = validateLead(body)
+  if (checked.ok === false) return NextResponse.json({ error: checked.error }, { status: 400 })
+  const lead = checked.value
 
-  if (!leadType || !['kurum', 'bireysel'].includes(leadType)) {
-    return NextResponse.json({ error: 'Geçersiz talep türü.' }, { status: 400 })
-  }
-  if (!name?.trim() || !email?.trim()) {
-    return NextResponse.json({ error: 'İsim ve e-posta zorunlu.' }, { status: 400 })
+  // Kötüye kullanım koruması (oturumsuz form): aynı e-postadan saatte 3, toplamda saatte 60 talep.
+  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+  const [byEmail, overall] = await Promise.all([
+    supabaseAdmin.from('coaching_leads').select('id', { count: 'exact', head: true }).eq('email', lead.email).gte('created_at', since),
+    supabaseAdmin.from('coaching_leads').select('id', { count: 'exact', head: true }).gte('created_at', since),
+  ])
+  if ((byEmail.count ?? 0) >= 3 || (overall.count ?? 0) >= 60) {
+    return NextResponse.json({ error: 'Çok sık talep gönderildi. Lütfen biraz sonra tekrar deneyin.' }, { status: 429 })
   }
 
   const { error } = await supabaseAdmin.from('coaching_leads').insert({
-    lead_type: leadType,
-    name: name.trim(),
-    email: email.trim(),
-    phone: phone?.trim() || null,
-    institution_name: institutionName?.trim() || null,
-    student_grade: studentGrade?.trim() || null,
-    message: message?.trim() || null,
+    lead_type: lead.leadType,
+    name: lead.name,
+    email: lead.email,
+    phone: lead.phone,
+    institution_name: lead.institutionName,
+    student_grade: lead.studentGrade,
+    message: lead.message,
   })
 
   if (error) return NextResponse.json({ error: 'Kaydedilemedi, lütfen tekrar dene.' }, { status: 500 })
@@ -55,7 +61,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from('coaching_leads').select('*').order('created_at', { ascending: false })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'Talepler alınamadı.' }, { status: 500 })
   return NextResponse.json({ leads: data })
 }
 

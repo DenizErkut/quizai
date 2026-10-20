@@ -86,8 +86,13 @@ export async function listAllIdentitySupabaseIds(): Promise<Set<string>> {
 }
 
 
+// Yalnızca bu sütunlar güncellenebilir: sütun adları SQL'e katıldığı için anahtarlar ASLA kullanıcı girdisinden gelmemeli.
+const UPDATABLE_IDENTITY_FIELDS = new Set(['full_name', 'email', 'age', 'role', 'parent_email', 'parent_verified', 'institution_name', 'phone', 'postal_code', 'address_line'])
+
 export async function updateIdentity(supabaseUserId: string, updates: Partial<Identity>): Promise<void> {
   const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'supabase_user_id')
+  const rejected = fields.filter(k => !UPDATABLE_IDENTITY_FIELDS.has(k))
+  if (rejected.length > 0) throw new Error(`updateIdentity: izin verilmeyen alan(lar): ${rejected.join(', ')}`)
   if (fields.length === 0) return
   const setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(', ')
   const values = fields.map(f => (updates as any)[f])

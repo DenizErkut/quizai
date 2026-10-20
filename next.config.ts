@@ -1,6 +1,35 @@
 import type { NextConfig } from 'next'
 
+// Güvenlik başlıkları. CSP önce yalnızca raporlama modunda (Report-Only) çalışır: ihlaller tarayıcı konsoluna düşer,
+// hiçbir şey engellenmez. Üretimde ihlal görülmediğinde `Content-Security-Policy`e çevrilebilir.
+const cspReportOnly = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com",
+  "media-src 'self' blob: https://*.supabase.co",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  "frame-src 'self' https://www.paytr.com",
+  "form-action 'self' https://www.paytr.com",
+  "frame-ancestors 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+].join('; ')
+
+const securityHeaders = [
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=()' },
+  { key: 'Strict-Transport-Security', value: 'max-age=31536000' },
+  { key: 'Content-Security-Policy-Report-Only', value: cspReportOnly },
+]
+
 const nextConfig: NextConfig = {
+  async headers() {
+    return [{ source: '/:path*', headers: securityHeaders }]
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: '25mb',

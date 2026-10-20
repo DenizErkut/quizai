@@ -247,7 +247,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Geçersiz istek (path/ext eksik).' }, { status: 400 })
     }
     // Güvenlik: kullanıcı sadece kendi klasöründeki dosyayı işletebilir
-    if (!storagePath.startsWith(`${user.id}/`)) {
+    if (!storagePath.startsWith(`${user.id}/`) || storagePath.includes('..') || storagePath.includes('//') || storagePath.includes('\\')) {
       return NextResponse.json({ error: 'Bu dosyaya erişim yetkiniz yok.' }, { status: 403 })
     }
 

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server-create-client'
 import Anthropic from '@anthropic-ai/sdk'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { getIdentityBySupabaseId } from '@/lib/identity/client'
+import { checkRateLimit, rateLimitExceeded } from '@/lib/rate-limit'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
@@ -20,6 +21,7 @@ export async function POST(req: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  { const limit = await checkRateLimit(user.id, { endpoint: 'ai-analysis', limit: 30 }); if (!limit.allowed) return rateLimitExceeded(limit) }
 
   const { data: profile } = await supabase.from('profiles').select('grade,language').eq('id', user.id).single()
   const identity = await getIdentityBySupabaseId(user.id)

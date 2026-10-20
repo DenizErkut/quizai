@@ -17,6 +17,7 @@ import { createClient } from '@supabase/supabase-js'
 import { loadCanonicalObjectiveCandidates } from '@/lib/learning-objective-mapping'
 import { continuousReviewContent, createContinuousReview } from '@/lib/continuous-question-review'
 import { hasVerifiedBankQuality, hasVerifiedObjectiveMapping } from '@/lib/objective-mapping-verification'
+import { checkRateLimit, rateLimitExceeded } from '@/lib/rate-limit'
 
 const anthropic = new Anthropic()
 const auditDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
@@ -191,6 +192,7 @@ export async function POST(req: NextRequest) {
   const sbAuth = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
   const { data: { user } } = await sbAuth.auth.getUser(token)
   if (!user) return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 })
+  { const limit = await checkRateLimit(user.id, { endpoint: 'verify-questions', limit: 1000 }); if (!limit.allowed) return rateLimitExceeded(limit) }
 
   try {
     const body = await req.json()

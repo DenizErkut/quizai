@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { generateAILiteracyChallenge } from '@/lib/ai-literacy-generation'
+import { checkRateLimit, rateLimitExceeded } from '@/lib/rate-limit'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
   if (!supabase) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  { const limit = await checkRateLimit(user.id, { endpoint: 'ai-literacy', limit: 40 }); if (!limit.allowed) return rateLimitExceeded(limit) }
 
   const body = await req.json().catch(() => ({}))
   const subject = typeof body.subject === 'string' ? body.subject.trim() : ''

@@ -9,6 +9,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { getIdentityBySupabaseId, getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 import { computeParentWeeklySummary, buildParentSummaryEmailHtml, sendResendEmail } from '@/lib/parent-summary'
+import { checkRateLimit, rateLimitExceeded } from '@/lib/rate-limit'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
   )
   const { data: { user } } = await sb.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
+  { const limit = await checkRateLimit(user.id, { endpoint: 'parent-send-summary', limit: 10 }); if (!limit.allowed) return rateLimitExceeded(limit) }
 
   const parentIdentity = await getIdentityBySupabaseId(user.id)
   const parentName = parentIdentity?.full_name || 'Veli'

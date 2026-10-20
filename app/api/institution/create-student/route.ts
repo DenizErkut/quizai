@@ -12,6 +12,7 @@
 // email_confirm: true ile oluşturulur çünkü kurum zaten bu kişinin
 // gerçekliğini biliyor/onaylıyor — ayrıca bir e-posta onayına gerek yok.
 import { NextRequest, NextResponse } from 'next/server'
+import { randomInt } from 'node:crypto'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { createIdentity, updateIdentity } from '@/lib/identity/client'
 
@@ -25,7 +26,7 @@ function generatePassword(): string {
   // bunu öğrenciye kağıt üzerinde de verebilir.
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
   let pass = ''
-  for (let i = 0; i < 10; i++) pass += chars[Math.floor(Math.random() * chars.length)]
+  for (let i = 0; i < 10; i++) pass += chars[randomInt(chars.length)] // kriptografik rastgelelik
   return pass
 }
 

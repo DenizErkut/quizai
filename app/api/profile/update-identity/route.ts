@@ -32,6 +32,9 @@ export async function POST(req: NextRequest) {
   }
 
   const { fullName, age, phone, parentEmail, role } = body || {}
+  if (role !== undefined && role !== null && !['student', 'parent', 'teacher'].includes(role)) {
+    return NextResponse.json({ error: 'Geçersiz rol.' }, { status: 400 })
+  }
   const updates: Record<string, any> = {}
   if (typeof fullName === 'string' && fullName.trim()) updates.full_name = fullName.trim()
   if (age !== undefined) {

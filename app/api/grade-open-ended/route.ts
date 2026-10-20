@@ -9,6 +9,7 @@ export const maxDuration = 60
 export const runtime = 'nodejs'
 import { gradeOpenEndedAnswer } from '@/lib/open-ended-grading'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { checkRateLimit, rateLimitExceeded } from '@/lib/rate-limit'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
 
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    { const limit = await checkRateLimit(user.id, { endpoint: 'grade-open-ended', limit: 100 }); if (!limit.allowed) return rateLimitExceeded(limit) }
 
     const body = await req.json()
     const { sessionId, studentAnswer } = body as { sessionId: string; studentAnswer: string }
