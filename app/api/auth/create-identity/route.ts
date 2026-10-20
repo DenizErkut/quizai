@@ -43,6 +43,10 @@ export async function POST(req: NextRequest) {
   if (!fullName || !role) {
     return NextResponse.json({ error: 'Eksik parametre.' }, { status: 400 })
   }
+  // Kullanıcı kendine yönetici/kurum rolü veremez; yalnızca kayıt rolleri kabul edilir.
+  if (typeof fullName !== 'string' || fullName.length > 200 || !['student', 'parent', 'teacher'].includes(role)) {
+    return NextResponse.json({ error: 'Geçersiz parametre.' }, { status: 400 })
+  }
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
   const numericAge = age != null && age !== '' ? parseInt(String(age)) : undefined

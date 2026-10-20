@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import webpush from 'web-push'
 import { isCronAuthorized } from '@/lib/cron-auth'
+import { parsePushSubscription } from '@/lib/push-endpoint'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,9 +34,12 @@ export async function POST(req: NextRequest) {
   const { subscription, action } = await req.json()
 
   if (action === 'subscribe') {
+    // Yalnızca bilinen push servislerinin https uç noktaları (SSRF koruması)
+    const valid = parsePushSubscription(subscription)
+    if (!valid) return NextResponse.json({ error: 'Geçersiz push aboneliği.' }, { status: 400 })
     await supabaseAdmin.from('push_subscriptions').upsert({
       user_id: user.id,
-      subscription: JSON.stringify(subscription),
+      subscription: JSON.stringify(valid),
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id' })
     return NextResponse.json({ ok: true })
@@ -55,9 +59,11 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (!sub) return NextResponse.json({ error: 'Subscription bulunamadı.' }, { status: 404 })
+    const storedSubscription = parsePushSubscription(sub.subscription)
+    if (!storedSubscription) return NextResponse.json({ error: 'Kayıtlı abonelik geçersiz.' }, { status: 400 })
 
     await webpush.sendNotification(
-      JSON.parse(sub.subscription),
+      storedSubscription,
       JSON.stringify({
         title: 'Pratium 🎯',
         body: 'Bildirimler aktif! Günlük test hatırlatmaları artık sende.',
@@ -104,9 +110,11 @@ export async function GET(req: NextRequest) {
         .single()
 
       if (!todayTest) {
-        // Bugün test çözmemiş — bildirim gönder
+        // Bugün test çözmemiş — bildirim gönder (geçersiz/izin listesi dışı abonelik atlanır ve silinir)
+        const storedSubscription = parsePushSubscription(sub.subscription)
+        if (!storedSubscription) throw new Error('invalid subscription')
         await webpush.sendNotification(
-          JSON.parse(sub.subscription),
+          storedSubscription,
           JSON.stringify({
             title: 'Pratium — Günlük Test 🔥',
             body: 'Bugünkü testini henüz çözmedin! Streakini korumak için hadi başla.',

@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { extractPdfText } from '@/lib/pdf-extract'
 import { createClient } from '@supabase/supabase-js'
+import { checkRateLimit, rateLimitExceeded } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
@@ -50,8 +51,17 @@ async function extractWithGeminiAudio(buffer: Buffer, mimeType: string, filename
   return text.trim()
 }
 
-// Chunk store
-const chunkStore = new Map<string, Buffer[]>()
+// Chunk store — bellek sınırları: parça başına en çok 3,5 MB, kullanıcı başına en çok 3 açık yükleme, 15 dk TTL.
+const MAX_CHUNK_BYTES = 3.5 * 1024 * 1024
+const MAX_OPEN_UPLOADS_PER_USER = 3
+const CHUNK_TTL_MS = 15 * 60 * 1000
+const ALLOWED_EXTENSIONS = new Set(['txt', 'pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png', 'webp', 'mp3', 'm4a', 'wav', 'ogg', 'aac', 'flac', 'opus'])
+const chunkStore = new Map<string, { chunks: Buffer[]; createdAt: number }>()
+
+function sweepChunkStore() {
+  const now = Date.now()
+  for (const [key, entry] of chunkStore) if (now - entry.createdAt > CHUNK_TTL_MS) chunkStore.delete(key)
+}
 
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -81,7 +91,9 @@ export async function POST(req: NextRequest) {
     const ext = (formData.get('ext') as string || '').toLowerCase()
     const filename = formData.get('filename') as string || 'file'
 
-    if (!chunk || !clientSessionId) return NextResponse.json({ error: 'Dosya parçası veya oturum kimliği bulunamadı.' }, { status: 400 })
+    if (!chunk || typeof clientSessionId !== 'string' || !clientSessionId || clientSessionId.length > 100) return NextResponse.json({ error: 'Dosya parçası veya oturum kimliği bulunamadı.' }, { status: 400 })
+    if (!ALLOWED_EXTENSIONS.has(ext)) return NextResponse.json({ error: 'Desteklenmeyen dosya türü.' }, { status: 400 })
+    if (chunk.size > MAX_CHUNK_BYTES) return NextResponse.json({ error: 'Dosya parçası çok büyük.' }, { status: 413 })
     if (!Number.isInteger(chunkIndex) || !Number.isInteger(totalChunks) || totalChunks < 1 || totalChunks > 8 || chunkIndex < 0 || chunkIndex >= totalChunks) {
       return NextResponse.json({ error: 'Geçersiz dosya parçası.' }, { status: 400 })
     }
@@ -89,11 +101,22 @@ export async function POST(req: NextRequest) {
     // Her yüklemeyi kullanıcıya bağla; tahmin edilen sessionId ile başka
     // bir kullanıcının yüklemesi üzerine yazılamaz veya tamamlanamaz.
     const sessionId = `${user.id}:${clientSessionId}`
+    sweepChunkStore()
+
+    // Yeni yükleme (ilk parça) günlük kotadan düşer — paralı Gemini/Anthropic çağrısına gider.
+    if (chunkIndex === 0 && !chunkStore.has(sessionId)) {
+      const limit = await checkRateLimit(user.id, { endpoint: 'extract-file', limit: 40 })
+      if (!limit.allowed) return rateLimitExceeded(limit)
+    }
+    if (!chunkStore.has(sessionId)) {
+      const open = [...chunkStore.keys()].filter(key => key.startsWith(`${user.id}:`)).length
+      if (open >= MAX_OPEN_UPLOADS_PER_USER) return NextResponse.json({ error: 'Çok fazla yarım kalmış yükleme var. Birkaç dakika bekleyin.' }, { status: 429 })
+    }
 
     const chunkBuffer = Buffer.from(await chunk.arrayBuffer())
 
-    if (!chunkStore.has(sessionId)) chunkStore.set(sessionId, [])
-    const chunks = chunkStore.get(sessionId)!
+    if (!chunkStore.has(sessionId)) chunkStore.set(sessionId, { chunks: [], createdAt: Date.now() })
+    const chunks = chunkStore.get(sessionId)!.chunks
     chunks[chunkIndex] = chunkBuffer
 
     const received = chunks.filter(Boolean).length
@@ -114,7 +137,7 @@ export async function POST(req: NextRequest) {
 
   } catch (e: any) {
     console.error('Extract error:', e)
-    return NextResponse.json({ error: e.message || 'Dosya işlenemedi.' }, { status: 500 })
+    return NextResponse.json({ error: 'Dosya işlenemedi.' }, { status: 500 })
   }
 }
 

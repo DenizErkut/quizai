@@ -1,6 +1,7 @@
 // app/api/pdf-tools/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { checkRateLimit, rateLimitExceeded } from '@/lib/rate-limit'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -19,6 +20,7 @@ export async function POST(req: NextRequest) {
     )
     const { data: { user } } = await supabaseUser.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+    { const limit = await checkRateLimit(user.id, { endpoint: 'pdf-tools', limit: 30 }); if (!limit.allowed) return rateLimitExceeded(limit) }
 
     let formData: FormData
     try {

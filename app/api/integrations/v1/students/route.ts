@@ -19,6 +19,7 @@ export async function GET(request: Request) {
     .select('user_id, joined_at')
     .eq('institution_id', auth.integration.institution_id)
     .eq('role', 'student')
+    .or('is_active.is.null,is_active.eq.true')
     .order('user_id', { ascending: true })
     .range(offset, offset + limit)
 

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import Anthropic from '@anthropic-ai/sdk'
 import { logAnthropicUsage } from '@/lib/ai-usage'
+import { checkRateLimit, rateLimitExceeded } from '@/lib/rate-limit'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,9 +25,11 @@ export async function POST(req: NextRequest) {
   )
   const { data: { user } } = await supabaseUser.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  { const limit = await checkRateLimit(user.id, { endpoint: 'ai-grade-analysis', limit: 20 }); if (!limit.allowed) return rateLimitExceeded(limit) }
 
   const { gradeNotes } = await req.json()
   if (!gradeNotes) return NextResponse.json({ error: 'Veri eksik.' }, { status: 400 })
+  if (JSON.stringify(gradeNotes).length > 20000) return NextResponse.json({ error: 'Veri çok büyük.' }, { status: 413 })
 
   const response = await anthropic.messages.create({
     model: CLAUDE_SONNET, ...SONNET_PARAMS,

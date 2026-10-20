@@ -38,7 +38,8 @@ export async function GET(req: NextRequest) {
     .replace(/[öÖ]/g, 'o').replace(/[üÜ]/g, 'u')
     .replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_')
 
-  const ext = fileName.split('.').pop()
+  const rawExt = String(fileName).split('.').pop() || ''
+  const ext = /^[a-z0-9]{1,5}$/i.test(rawExt) ? rawExt.toLowerCase() : 'pdf'
   const storagePath = `${normTR(level)}/${normTR(subject)}/${normTR(unit)}_${Date.now()}.${ext}`
 
   // Service role key ile signed URL üret (1 saatlik)
