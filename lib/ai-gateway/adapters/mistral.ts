@@ -1,3 +1,4 @@
+import { splitMistralUsage } from '@/lib/mistral-usage'
 import { logAIUsage } from '@/lib/ai-usage'
 import type { AIProviderAdapter, IntelligenceRequestContext } from '../contracts'
 
@@ -49,14 +50,14 @@ export class MistralAdapter implements AIProviderAdapter<MistralChatRequest, Mis
     if (!response.ok) throw new Error(`MISTRAL_HTTP_${response.status}`)
     const data = await response.json()
     const durationMs = Date.now() - startedAt
-    const inputTokens = Number(data?.usage?.prompt_tokens || 0)
-    const outputTokens = Number(data?.usage?.completion_tokens || 0)
+    const { promptTokens: inputTokens, inputTokens: billableInputTokens, outputTokens, cacheReadTokens } = splitMistralUsage(data?.usage)
     await logAIUsage({
       operation: context.operationTag || 'generate-quiz:shadow-mistral',
       provider: 'mistral',
       model,
-      inputTokens,
+      inputTokens: billableInputTokens,
       outputTokens,
+      cacheReadTokens,
       durationMs,
       userId: context.userId,
       quizSessionId: context.sessionId,

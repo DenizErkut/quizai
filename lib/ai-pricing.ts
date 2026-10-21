@@ -49,9 +49,8 @@ const PRICES: Record<string, Price> = {
   'gpt-5-mini':                 { input: 0.25, output: 2.00,  cacheRead: 0.025, cacheWrite: 0 },
   // Mistral Large 3 — resmi Mistral API fiyatı, 8 Eylül 2026.
   'mistral-large-latest':       { input: 0.50, output: 1.50, cacheRead: 0.05, cacheWrite: 0 },
-  // Mistral Small 4 — Mistral'ın kendi fiyat sayfasına bu ortamdan erişilemedi; değer üçüncü taraf
-  // fiyat listelerinden (3 Eylül 2026) alındı. Resmi sayfayla doğrulanana dek version 'unverified'
-  // olarak işaretlenir (bkz. PRICE_VERSIONS) ve mutabakatta ayrı izlenebilir.
+  // Mistral Small 4 — 21 Ekim 2026: Mistral konsolundaki Usage → Cost ekranıyla (mistral-small-2603,
+  // global/standard) doğrulandı: giriş 0,15 $, çıkış 0,60 $, önbellekten okuma ~0,015 $ / 1M token.
   'mistral-small-latest':       { input: 0.15, output: 0.60, cacheRead: 0.015, cacheWrite: 0 },
   // Google
   // Google — 6 Eylül 2026: 'gemini-2.0-flash' Google tarafından KALDIRILDI
@@ -72,7 +71,7 @@ const PERIOD_PRICES: Record<string, PricePeriod[]> = {
 }
 
 const PRICE_VERSIONS: Record<string, string> = {
-  'mistral-small-latest': 'mistral-small-unverified-2026-10',
+  'mistral-small-latest': 'mistral-small-official-2026-10',
 }
 
 // Fiyat listesinde olmayan bir model gelirse maliyeti 0 loglanır ama token
