@@ -63,7 +63,7 @@
 | 9 | 816 kazanımsız onaylı soru | 👤 Kazanım Eşleştirme incelemesi bekliyor |
 | 10 | Mistral Small fiyatı | ✅ 21 Ekim: Mistral konsolundaki Usage → Cost ile doğrulandı (mistral-small-2603: giriş 0,15 $, çıkış 0,60 $, önbellek ~0,015 $ / 1M; Large: 0,50 / 1,50 / 0,05). Konsol toplamı 2,56 $ ile hesap tutuyor. Bulgu: Mistral `prompt_tokens` önbellek token'larını içeriyor, biz hepsini normal giriş yazıyorduk (Small'da 13,56 M girişin 9,43 M'i önbellekti); adaptör artık ayırıyor. Geçmiş kayıtlarda 1.650 sıfır maliyetli Small satırı var, geriye dönük doldurma onay bekliyor |
 | 11 | KVKK veri envanteri / saklama süreleri | 🔴 Açık |
-| 12 | Konum zorunluluğu öğretmen/kurum için | 🔴 Karar bekliyor (öğrenciler için tamam) |
+| 12 | Konum zorunluluğu öğretmen/kurum için | ✅ 21 Ekim: öğretmen başvurusunun dört akışında (kayıt, e-posta onayı sonrası, `register/teacher`, `apply-teacher`) ülke/eyalet/şehir zorunlu ve `profiles`'a yazılır; yeni kurum oluşturmada (`create-institution`) üçü de zorunlu, `institutions.country/state/city` eklendi, 7 mevcut kurum `TR` olarak işaretlendi (il/ilçe boş, sonradan tamamlanır) |
 | 13 | Admin sayfa kabuğunu `proxy.ts`'te korumak | ⚪ Yapılmadı: sayfa kabuğu veri içermiyor, tüm admin API'leri sunucuda `is_admin` doğruluyor; oturum çerezini `proxy.ts`'te okuyup yönlendirmek canlıda test edilemeden yöneticileri dışarıda bırakma riski taşıyor |
 | 14 | Negatif yetki testleri | ✅ A2/A3/A8 ve canlı sınav için eklendi. 21 Ekim bulgusu: `tests/` altındaki birim testleri (300+ test) CI'da hiç çalışmıyordu; `npm run test:unit` artık `verify` işinde |
 | 15 | Anormal kullanım / maliyet uyarıları | 🔴 Açık |
@@ -72,10 +72,10 @@
 1. ~~**VPS (TR-PG):** `docs/TR-PG-konum-alanlari.sql`~~ ✅ Yapıldı (21 Ekim, sütunlar doğrulandı).
 2. ~~**Vercel ortam değişkenleri:**~~ ✅ Tamamlandı (21 Ekim): `CRON_SECRET`, `TR_IDENTITY_DB_CA`, `TR_IDENTITY_DB_SSL_SERVERNAME` Production'da. Notlar: `TR_IDENTITY_DB_URL` ve `TR_IDENTITY_DB_SSL` yalnızca Production'da, Preview'da kimlik bağlantısı yok. `TR_IDENTITY_DB_URL` host'u IP (`identity.pratium.com.tr` adı Natro DNS'inde çözümlenmediği için kullanılmıyor). Veritabanı kullanıcı şifresi değişmiş olabilir; yeni şifreyi şifre yöneticinizde saklayın. Natro'ya açılan DNS talebi (#3249126) ana alan adı kaydını değiştirmiş olabileceğinden geri alma talebi yazıldı; `pratium.com.tr` ve `www.pratium.com.tr` kaydının `89.19.30.73` olduğunu doğrulayın (`nslookup`).
 3. ~~**Vercel Firewall:**~~ ✅ 21 Ekim: "Oturumsuz uçlar hız sınırı" kuralı yayınlandı. `^/api/(coaching-leads|resolve-seller-code|referral/referrer-name|institution/lookup|bot)$` yolları için IP başına 60 saniyede 30 istek, aşılınca 429 (Fixed Window). Yeniden deploy gerektirmez; sorun çıkarsa kural Firewall → Rules'tan kapatılabilir.
-4. **CSP'yi zorlamaya geçirme kararı:** Report-Only raporlarında ihlal görülmeyince `Content-Security-Policy` başlığına çevrilmesini onaylayın.
-5. **Supabase Auth paneli:** Sızdırılmış parola koruması, MFA, e-posta onayı ve oturum süreleri bu incelemede kontrol edilemedi; panelden bakın.
+4. **CSP'yi zorlamaya geçirme kararı:** 21 Ekim: ihlal raporları `/api/csp-report` adresine toplanıyor (Vercel günlüğünde `[csp-report]` satırları). Bir hafta sonra günlüğe bakıp (Vercel → Logs → arama `csp-report`) ihlal yoksa `Content-Security-Policy-Report-Only` başlığı `Content-Security-Policy` yapılır.
+5. **Supabase Auth paneli:** 21 Ekim ekran görüntüleri: TOTP MFA etkin, telefon MFA kapalı; oturum zaman sınırı 720 saat (30 gün), hareketsizlik 168 saat (7 gün); "Enforce single session per user" AÇIK (başka cihazdaki oturumu sonlandırır, bilerek mi açıldığı teyit edilmeli). Sızdırılmış parola koruması ve parola kuralları ayrıca kontrol edilmeli.
 6. **Kazanım Eşleştirme incelemesi:** 816 onaylı sorunun eşleştirmesini yönetici panelinden inceleyin.
-7. **Kararlar:** 9 seçmeli lise dersi; (Mistral fiyatı ✅ doğrulandı, geriye dönük maliyet doldurma onayı bekliyor); konum zorunluluğunun öğretmen/kurum kayıtlarına uygulanıp uygulanmayacağı.
+7. **Kararlar:** 9 seçmeli lise dersi (açık); konum zorunluluğu öğretmen/kurum için ✅ uygulandı; Mistral fiyatı ✅ doğrulandı.
 8. ~~**Altyapı:**~~ `migrate-production` elle çalışır hale getirildi (bkz. A.3 madde 1); isterseniz geçmişi `supabase migration repair` ile hizalayıp otomasyonu yeniden açabiliriz. eslint için yeni dosya kapısı eklendi.
 9. ~~**`npm audit fix`**~~ ✅ Uygulandı (21 Ekim).
 

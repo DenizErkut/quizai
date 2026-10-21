@@ -6,6 +6,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { translateAuthError } from '@/lib/auth-error-messages'
 import { useT } from '@/lib/i18n/I18nProvider'
+import { LocationFields } from '@/components/LocationSelect'
+import { validateLocationDetails, EMPTY_LOCATION_DETAILS, type LocationDetails } from '@/lib/location/validate'
+import { saveProfileLocation } from '@/lib/location/client'
 
 function RegisterTeacherContent() {
   const router = useRouter()
@@ -37,6 +40,7 @@ function RegisterTeacherContent() {
   // Öğretmen bilgileri
   const [name, setName] = useState('')
   const [school, setSchool] = useState('')
+  const [loc, setLoc] = useState<LocationDetails>(EMPTY_LOCATION_DETAILS)
   const [subject, setSubject] = useState('')
   const [phone, setPhone] = useState('')
   const [docs, setDocs] = useState<File[]>([])
@@ -119,6 +123,8 @@ function RegisterTeacherContent() {
   async function handleApply() {
     if (!name.trim()) { setError(t('Ad soyad zorunlu.')); return }
     if (!school.trim()) { setError(t('Okul/Kurum zorunlu.')); return }
+    const locCheck = validateLocationDetails(loc)
+    if (locCheck.ok === false) { setError(t(locCheck.field === 'postal' ? 'Geçerli bir posta kodu girin.' : 'Ülke, eyalet/il ve şehir/ilçe zorunludur.')); return }
     setError(''); setLoading(true)
 
     try {
@@ -133,6 +139,7 @@ function RegisterTeacherContent() {
         uid = user?.id || ''
       }
       if (!uid) { setError(t('Oturum bulunamadı. Lütfen önce hesap oluşturun.')); return }
+      if (!(await saveProfileLocation(loc))) { setError(t('Konum kaydedilemedi. Lütfen tekrar deneyin.')); return }
 
       const docUrls: string[] = []
       for (let i = 0; i < docs.length; i++) {
@@ -296,6 +303,11 @@ function RegisterTeacherContent() {
             <label className="field-label">{t('Branşı')}</label>
             <input className="input" placeholder={t('Matematik, Fizik...')}
               value={subject} onChange={e => setSubject(e.target.value)} />
+
+            <div style={{ margin: '4px 0 12px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', marginBottom: '8px' }}>{t('Konum bilgileri')}</div>
+              <LocationFields value={loc} onChange={setLoc} />
+            </div>
 
             <label className="field-label">{t('Telefon (Opsiyonel)')}</label>
             <input className="input" type="tel" placeholder="05xx xxx xx xx"

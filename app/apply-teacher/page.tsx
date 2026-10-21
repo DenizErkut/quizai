@@ -13,6 +13,9 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/i18n/I18nProvider'
+import { LocationFields } from '@/components/LocationSelect'
+import { validateLocationDetails, EMPTY_LOCATION_DETAILS, type LocationDetails } from '@/lib/location/validate'
+import { saveProfileLocation, loadProfileLocation } from '@/lib/location/client'
 
 type Phase = 'loading' | 'form' | 'pending' | 'approved' | 'done' | 'error'
 
@@ -26,6 +29,7 @@ export default function ApplyTeacherPage() {
   const [userId, setUserId] = useState('')
 
   const [school, setSchool] = useState('')
+  const [loc, setLoc] = useState<LocationDetails>(EMPTY_LOCATION_DETAILS)
   const [subject, setSubject] = useState('')
   const [phone, setPhone] = useState('')
   const [docs, setDocs] = useState<File[]>([])
@@ -47,6 +51,9 @@ export default function ApplyTeacherPage() {
       if (existing) {
         setPhase(existing.approved ? 'approved' : 'pending')
       } else {
+        // Öğrenci olarak kayıtlıysa konumu önceden doldur (kullanıcı değiştirebilir).
+        const saved = await loadProfileLocation()
+        if (!cancelled && saved) setLoc(prev => ({ ...prev, ...saved }))
         setPhase('form')
       }
     }
@@ -61,8 +68,11 @@ export default function ApplyTeacherPage() {
 
   async function handleSubmit() {
     if (!school.trim()) { setFormError(tr('Okul/Kurum zorunlu.')); return }
+    const locCheck = validateLocationDetails(loc)
+    if (locCheck.ok === false) { setFormError(tr(locCheck.field === 'postal' ? 'Geçerli bir posta kodu girin.' : 'Ülke, eyalet/il ve şehir/ilçe zorunludur.')); return }
     setFormError(''); setLoading(true)
     try {
+      if (!(await saveProfileLocation(loc))) { setFormError(tr('Konum kaydedilemedi. Lütfen tekrar deneyin.')); return }
       const docUrls: string[] = []
       const uploadErrors: string[] = []
       for (let i = 0; i < docs.length; i++) {
@@ -207,6 +217,11 @@ export default function ApplyTeacherPage() {
           <input className="input" placeholder="Ankara Anadolu Lisesi" value={school} onChange={e => setSchool(e.target.value)} />
           <label className="field-label">{tr('Branş')}</label>
           <input className="input" placeholder="Matematik, Fizik..." value={subject} onChange={e => setSubject(e.target.value)} />
+          <div style={{ margin: '4px 0 12px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', marginBottom: '8px' }}>{tr('Konum bilgileri')}</div>
+              <LocationFields value={loc} onChange={setLoc} />
+            </div>
+
           <label className="field-label">{tr('Telefon (Opsiyonel)')}</label>
           <input className="input" type="tel" placeholder="05xx xxx xx xx" value={phone} onChange={e => setPhone(e.target.value)} />
           <label className="field-label">{tr('Belge Yükle (Opsiyonel)')}</label>
