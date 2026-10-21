@@ -56,17 +56,17 @@
 | 2 | CI'da eslint yok | 🟡 21 Ekim: PR'larda yeni eklenen dosyalar eslint hatasız olmalı (kapı); mevcut dosyalardaki ~540 eski hata kapıyı tetiklemez, temizlik ayrı iş |
 | 3 | Dağınık hız sınırı | ✅ 21 Ekim: son iki eski sınırlayıcı (`topic-summary`, `check-answer`) taşındı; tüm sınırlar `checkRateLimit` üzerinde |
 | 4 | Ortak yardımcılar | ✅ `safe-next`, `cron-auth`, `teacher-scope`, `live-quiz-rules`, `push-endpoint`, `lead-validation`, `internal-origin`, `ip-throttle` |
-| 5 | Ortak hata sarmalayıcı | 🟡 Mesaj sızıntıları temizlendi, ortak sarmalayıcı yazılmadı |
+| 5 | Ortak hata sarmalayıcı | ✅ 21 Ekim: `lib/api-error.ts` (`errorResponse`, `UserFacingError`); kullanıcıya açık rotalarda ham hata mesajı kalmadı. Yönetici rotalarındaki ~95 örnek bilerek bırakıldı (yönetici teşhisi) |
 | 6 | `CRON_SECRET`, `TR_IDENTITY_DB_CA/VERIFY` varlığı | ✅ 21 Ekim: `CRON_SECRET` tanımlı (cron'lar 200); `TR_IDENTITY_DB_CA`, `TR_IDENTITY_DB_SSL_SERVERNAME` tanımlandı |
 | 7 | Kimlik DB TLS doğrulaması | ✅ 21 Ekim: sertifika `TR_IDENTITY_DB_CA` ile sabitlendi, bağlantı IP ile yapılırken adı `TR_IDENTITY_DB_SSL_SERVERNAME=identity.pratium.com.tr` ile doğrulanıyor (PR #88). Doğrulama: yeni deploy'da profil kaydı 200, TR-PG `identities.updated_at` aynı saniyede güncellendi, "doğrulanmıyor" uyarısı kalmadı |
 | 8 | TR-PG konum SQL'i | ✅ 21 Ekim: `postal_code`, `address_line` sütunları kurulu ve yazma çalışıyor |
 | 9 | 816 kazanımsız onaylı soru | 👤 Kazanım Eşleştirme incelemesi bekliyor |
 | 10 | Mistral Small fiyatı | ✅ 21 Ekim: Mistral konsolundaki Usage → Cost ile doğrulandı (mistral-small-2603: giriş 0,15 $, çıkış 0,60 $, önbellek ~0,015 $ / 1M; Large: 0,50 / 1,50 / 0,05). Konsol toplamı 2,56 $ ile hesap tutuyor. Bulgu: Mistral `prompt_tokens` önbellek token'larını içeriyor, biz hepsini normal giriş yazıyorduk (Small'da 13,56 M girişin 9,43 M'i önbellekti); adaptör artık ayırıyor. Geçmiş kayıtlarda 1.650 sıfır maliyetli Small satırı var, geriye dönük doldurma onay bekliyor |
-| 11 | KVKK veri envanteri / saklama süreleri | 🔴 Açık |
+| 11 | KVKK veri envanteri / saklama süreleri | ✅ Envanter belgesi yazıldı (`docs/KVKK-VERI-ENVANTERI-21-EKIM-2026.md`); aydınlatma metni boşlukları ve yer tutucular 👤 sizde |
 | 12 | Konum zorunluluğu öğretmen/kurum için | ✅ 21 Ekim: öğretmen başvurusunun dört akışında (kayıt, e-posta onayı sonrası, `register/teacher`, `apply-teacher`) ülke/eyalet/şehir zorunlu ve `profiles`'a yazılır; yeni kurum oluşturmada (`create-institution`) üçü de zorunlu, `institutions.country/state/city` eklendi, 7 mevcut kurum `TR` olarak işaretlendi (il/ilçe boş, sonradan tamamlanır) |
 | 13 | Admin sayfa kabuğunu `proxy.ts`'te korumak | ⚪ Yapılmadı: sayfa kabuğu veri içermiyor, tüm admin API'leri sunucuda `is_admin` doğruluyor; oturum çerezini `proxy.ts`'te okuyup yönlendirmek canlıda test edilemeden yöneticileri dışarıda bırakma riski taşıyor |
 | 14 | Negatif yetki testleri | ✅ A2/A3/A8 ve canlı sınav için eklendi. 21 Ekim bulgusu: `tests/` altındaki birim testleri (300+ test) CI'da hiç çalışmıyordu; `npm run test:unit` artık `verify` işinde |
-| 15 | Anormal kullanım / maliyet uyarıları | 🔴 Açık |
+| 15 | Anormal kullanım / maliyet uyarıları | ✅ 21 Ekim: `/api/cron/ai-cost-alert` (günlük 06:10 UTC; günlük maliyet, sıçrama, kullanıcı başına çağrı); yöneticilere bildirim |
 
 ## B. 👤 Sizin yapmanız gerekenler
 1. ~~**VPS (TR-PG):** `docs/TR-PG-konum-alanlari.sql`~~ ✅ Yapıldı (21 Ekim, sütunlar doğrulandı).
@@ -90,6 +90,8 @@
 
 ## D. 21 Ekim'de çıkan ek bulgu ve düzeltmeler
 - **Profil düzenleme kaydı tutmuyordu (düzeltildi, PR #86):** İstemci `profiles` yazımları `upsert` kullanıyor; PostgREST bunu `ON CONFLICT DO UPDATE SET id = EXCLUDED.id ...` olarak üretir ve `id` sütununda UPDATE yetkisi ister. 4 Ekim'deki sütun düzeyi yetki listesinde (`20261004112943`) `id` yoktu; Supabase loglarında `POST /rest/v1/profiles` 403 ("permission denied for table profiles") görüldü. Mevcut bir profilin sınıf, okul, cinsiyet ve dil değişiklikleri kaydedilmiyor, sayfa hatayı yok sayıp "kaydedildi" gösteriyordu. Çözüm: `GRANT UPDATE (id) ON public.profiles TO authenticated` (`20261021120000`); RLS `auth.uid() = id` başka satıra geçişi engeller, rollback'li denemeyle doğrulandı. Profil sayfası artık hatayı gösteriyor. Başlangıç tarihi 24 saatlik log penceresinden kesin belirlenemedi.
+- **Katalog doğrulaması:** `docs/KATALOG-KAPSAM-DOGRULAMA-21-EKIM-2026.md`. Türkçe 6/7'de PDF'te olmayan 15 kazanım kodu, İngilizce ENG.5.7 (PDF numaralandırma hatası olası), DKAB (kaynak PDF yok, doğrulanamadı).
+- **Kurum konumu:** Yönetici ve kurum panelinden il/ilçe tamamlanabiliyor (`institutions.country/state/city`).
 - **CI'da eksik olan birim testleri:** `verify` işi yalnızca `tsc` ve tenant-isolation e2e'yi koşuyordu; `tests/` altındaki birim testleri hiç çalışmıyordu. `npm run test:unit` eklendi, Node 22'ye geçildi; `npm run audit:production` bilgi amaçlı (`continue-on-error`) eklendi.
 - **Dağıtım notu:** `Instant Rollback` sonrası Vercel otomatik yayını kapatabilir; yeni bir Production deploy'u Promote edildikten sonra yeniden çalıştığı doğrulandı.
 
