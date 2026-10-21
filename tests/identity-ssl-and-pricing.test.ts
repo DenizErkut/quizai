@@ -26,3 +26,10 @@ test('mistral-small-latest is priced instead of silently costing zero', () => {
 test('an unknown model still returns zero cost', () => {
   assert.equal(computeCostUsd({ operation: 'x', provider: 'mistral', model: 'no-such-model', inputTokens: 10, outputTokens: 10 } as any), 0)
 })
+
+test('identity DB TLS pins the certificate name when TR_IDENTITY_DB_SSL_SERVERNAME is set', () => {
+  const pinned = identityDbSsl({ TR_IDENTITY_DB_SSL: 'true', TR_IDENTITY_DB_CA: 'pem', TR_IDENTITY_DB_SSL_SERVERNAME: ' identity.example.com ' })
+  assert.deepEqual(pinned, { rejectUnauthorized: true, ca: 'pem', servername: 'identity.example.com' })
+  assert.deepEqual(identityDbSsl({ TR_IDENTITY_DB_SSL: 'true', TR_IDENTITY_DB_CA: 'pem' }), { rejectUnauthorized: true, ca: 'pem' })
+  assert.deepEqual(identityDbSsl({ TR_IDENTITY_DB_SSL: 'true', TR_IDENTITY_DB_SSL_VERIFY: 'true', TR_IDENTITY_DB_SSL_SERVERNAME: 'h.example.com' }), { rejectUnauthorized: true, servername: 'h.example.com' })
+})
