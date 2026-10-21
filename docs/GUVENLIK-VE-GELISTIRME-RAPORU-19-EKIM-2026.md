@@ -57,9 +57,9 @@
 | 3 | Dağınık hız sınırı | 🟡 Yeni uçlar `checkRateLimit`'te; 2 rota eski kodda |
 | 4 | Ortak yardımcılar | ✅ `safe-next`, `cron-auth`, `teacher-scope`, `live-quiz-rules`, `push-endpoint`, `lead-validation`, `internal-origin`, `ip-throttle` |
 | 5 | Ortak hata sarmalayıcı | 🟡 Mesaj sızıntıları temizlendi, ortak sarmalayıcı yazılmadı |
-| 6 | `CRON_SECRET`, `TR_IDENTITY_DB_CA/VERIFY` varlığı | 👤 Doğrulanamadı (bkz. B) |
-| 7 | Kimlik DB TLS doğrulaması | 👤 CA tanımlanmalı |
-| 8 | TR-PG konum SQL'i | 👤 Çalıştırılmalı |
+| 6 | `CRON_SECRET`, `TR_IDENTITY_DB_CA/VERIFY` varlığı | 🟡 `CRON_SECRET` ✅ (21 Ekim: Production'da tanımlı, cron'lar 200 dönüyor); `TR_IDENTITY_DB_CA` ertelendi (aşağıya bakın) |
+| 7 | Kimlik DB TLS doğrulaması | ⏳ Ertelendi. Sunucu sertifikası self-signed (CN `identity.pratium.com.tr`, SAN yok); `identity` DNS kaydı eklenemedi (DNS Natro'da, Plesk'te DNS bölümü kapalı). Seçenekler: Natro'ya A kaydı talebi (`identity` → VPS IP) veya `lib/identity/ssl.ts`'e sertifika adı ayarı ekleyip IP ile bağlanmak. Şu an bağlantı şifreli ama sertifika doğrulanmıyor |
+| 8 | TR-PG konum SQL'i | ✅ 21 Ekim: `postal_code`, `address_line` sütunları kurulu ve yazma çalışıyor |
 | 9 | 816 kazanımsız onaylı soru | 👤 Kazanım Eşleştirme incelemesi bekliyor |
 | 10 | Mistral Small fiyatı | 👤 Doğrulanmadı |
 | 11 | KVKK veri envanteri / saklama süreleri | 🔴 Açık |
@@ -69,8 +69,8 @@
 | 15 | Anormal kullanım / maliyet uyarıları | 🔴 Açık |
 
 ## B. 👤 Sizin yapmanız gerekenler
-1. **VPS (TR-PG):** `docs/TR-PG-konum-alanlari.sql` dosyasını çalıştırın. Yapılmazsa posta kodu ve açık adres kaydedilmez.
-2. **Vercel ortam değişkenleri (Production + Preview):** `CRON_SECRET` tanımlayın (yoksa cron rotaları artık güvenli biçimde 401 verir, bildirim/e-posta işleri çalışmaz); `TR_IDENTITY_DB_CA` ve `TR_IDENTITY_DB_SSL_VERIFY` ile kimlik DB'ye TLS doğrulaması ekleyin. Bu oturumda Vercel ortam değişkenleri okunamadığı için mevcut durumu bilmiyorum.
+1. ~~**VPS (TR-PG):** `docs/TR-PG-konum-alanlari.sql`~~ ✅ Yapıldı (21 Ekim, sütunlar doğrulandı).
+2. **Vercel ortam değişkenleri:** ~~`CRON_SECRET`~~ ✅ Production'da tanımlı. **Açık:** `TR_IDENTITY_DB_CA` (bkz. A.3 madde 7). Not: `TR_IDENTITY_DB_URL` ve `TR_IDENTITY_DB_SSL` yalnızca Production'da tanımlı, Preview'da kimlik bağlantısı yok. `TR_IDENTITY_DB_URL` 21 Ekim'de yeniden yazıldı; veritabanı kullanıcı şifresi değişmiş olabilir, yeni şifreyi şifre yöneticinizde saklayın. Host `identity.pratium.com.tr` adı DNS'te çözümlenmediği için IP ile kullanılmalı.
 3. **Vercel Firewall:** Oturumsuz uçlar (`resolve-seller-code`, `referral/referrer-name`, `institution/lookup`, `coaching-leads`, `bot`) için hız sınırı kuralı ekleyin; uygulamadaki IP sınırı örnek başına olduğundan kalıcı koruma değildir.
 4. **CSP'yi zorlamaya geçirme kararı:** Report-Only raporlarında ihlal görülmeyince `Content-Security-Policy` başlığına çevrilmesini onaylayın.
 5. **Supabase Auth paneli:** Sızdırılmış parola koruması, MFA, e-posta onayı ve oturum süreleri bu incelemede kontrol edilemedi; panelden bakın.
@@ -87,6 +87,10 @@
 - **Roster'da `plan` rozeti ve sınıf arkadaşı kimlikleri:** Ürün özelliği olarak korunuyor.
 - **`topic-summary`, `check-answer` eski sınırlayıcıda:** Tablo artık yalnız servis rolüne açık olduğundan istismar edilemez; atomik sınırlayıcıya geçiş düşük öncelikli.
 - **`migrate-production`, eslint kapısı:** Altyapı işi, güvenlik düzeltmelerinden bağımsız.
+
+## D. 21 Ekim'de çıkan ek bulgu ve düzeltmeler
+- **Profil düzenleme kaydı tutmuyordu (düzeltildi, PR #86):** İstemci `profiles` yazımları `upsert` kullanıyor; PostgREST bunu `ON CONFLICT DO UPDATE SET id = EXCLUDED.id ...` olarak üretir ve `id` sütununda UPDATE yetkisi ister. 4 Ekim'deki sütun düzeyi yetki listesinde (`20261004112943`) `id` yoktu; Supabase loglarında `POST /rest/v1/profiles` 403 ("permission denied for table profiles") görüldü. Mevcut bir profilin sınıf, okul, cinsiyet ve dil değişiklikleri kaydedilmiyor, sayfa hatayı yok sayıp "kaydedildi" gösteriyordu. Çözüm: `GRANT UPDATE (id) ON public.profiles TO authenticated` (`20261021120000`); RLS `auth.uid() = id` başka satıra geçişi engeller, rollback'li denemeyle doğrulandı. Profil sayfası artık hatayı gösteriyor. Başlangıç tarihi 24 saatlik log penceresinden kesin belirlenemedi.
+- **Dağıtım notu:** `Instant Rollback` sonrası Vercel otomatik yayını kapatabilir; yeni bir Production deploy'u Promote edildikten sonra yeniden çalıştığı doğrulandı.
 
 ---
 
