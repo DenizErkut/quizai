@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import LocationSelect from '@/components/LocationSelect'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -42,6 +43,9 @@ export default function InstitutionPage() {
   const { t: tr, locale } = useT()
   const dateLocale = intlLocale(locale)
   const [institution, setInstitution] = useState<any>(null)
+  const [instLoc, setInstLoc] = useState({ country: '', state: '', city: '' })
+  const [locSaving, setLocSaving] = useState(false)
+  const [locMsg, setLocMsg] = useState('')
   const [students, setStudents] = useState<any[]>([])
   const [analytics, setAnalytics] = useState<any>(null)
   const [stats, setStats] = useState<any>(null)
@@ -90,6 +94,7 @@ export default function InstitutionPage() {
     if (!instJson.institution) { router.push('/login/institution'); return }
 
     setInstitution(instJson.institution)
+    setInstLoc({ country: instJson.institution.country || '', state: instJson.institution.state || '', city: instJson.institution.city || '' })
     const studentData = instJson.students || []
     setStudents(studentData)
     setAnalytics(instJson.analytics || null)
@@ -143,6 +148,27 @@ export default function InstitutionPage() {
       setAsError(tr('Beklenmeyen bir hata oluştu. Lütfen tekrar dene.'))
     } finally {
       setAsLoading(false)
+    }
+  }
+
+  async function saveInstitutionLocation() {
+    if (!instLoc.country || !instLoc.state.trim() || !instLoc.city.trim()) { setLocMsg('❌ ' + tr('Ülke, eyalet/il ve şehir/ilçe zorunludur.')); return }
+    setLocSaving(true); setLocMsg('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/institution/location', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(instLoc),
+      })
+      if (!res.ok) throw new Error('save failed')
+      setInstitution((prev: any) => ({ ...prev, ...instLoc }))
+      setLocMsg('✅ ' + tr('Konum kaydedildi.'))
+    } catch {
+      setLocMsg('❌ ' + tr('Konum kaydedilemedi. Lütfen tekrar deneyin.'))
+    } finally {
+      setLocSaving(false)
+      setTimeout(() => setLocMsg(''), 4000)
     }
   }
 
@@ -779,6 +805,18 @@ export default function InstitutionPage() {
                   </div>
                 </div>
               </div>
+            </div>
+            <div style={{ marginTop: '16px', padding: '1.25rem', background: '#fff', borderRadius: '16px', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '4px' }}>📍 {tr('Kurum konumu')}</div>
+              {institution && !institution.state && (
+                <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px' }}>{tr('Kurumunuzun il/ilçe bilgisi eksik. Tamamlamanız önerilir.')}</div>
+              )}
+              <LocationSelect value={instLoc} onChange={next => setInstLoc(prev => ({ ...prev, ...next }))} />
+              <button onClick={saveInstitutionLocation} disabled={locSaving}
+                style={{ marginTop: '12px', padding: '10px 20px', borderRadius: '10px', border: 'none', background: locSaving ? 'var(--border)' : '#6366f1', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: locSaving ? 'default' : 'pointer', fontFamily: 'var(--font-sans)' }}>
+                {tr('Konumu kaydet')}
+              </button>
+              {locMsg && <div style={{ fontSize: '12px', marginTop: '10px', color: locMsg.startsWith('✅') ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>{locMsg}</div>}
             </div>
           </div>
         )}

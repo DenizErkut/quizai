@@ -28,7 +28,8 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabaseAdmin.rpc('promote_shadow_reviewed_question_bank_candidates')
   if (error) {
     console.error('[cron/question-bank-review-sweep]', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[cron/question-bank-review-sweep]', error.message)
+    return NextResponse.json({ error: 'Tarama çalıştırılamadı.' }, { status: 500 })
   }
 
   console.log(`[cron/question-bank-review-sweep] promoted=${data ?? 0}`)

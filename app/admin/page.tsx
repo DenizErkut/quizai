@@ -159,7 +159,7 @@ export default function AdminPage() {
   const [instSuccess, setInstSuccess] = useState('')
   const [institutions, setInstitutions] = useState<any[]>([])
   const [editingInst, setEditingInst] = useState<any>(null)
-  const [editInstForm, setEditInstForm] = useState({ name: '', email: '', newPassword: '', discount: '0', active: true, seller_id: '' })
+  const [editInstForm, setEditInstForm] = useState({ name: '', email: '', newPassword: '', discount: '0', active: true, seller_id: '', country: '', state: '', city: '' })
   const [editInstSaving, setEditInstSaving] = useState(false)
   const [instStudentCounts, setInstStudentCounts] = useState<Record<string, number>>({})
   const [expandedInstId, setExpandedInstId] = useState<string | null>(null)
@@ -446,7 +446,7 @@ export default function AdminPage() {
     const res = await fetch('/api/admin/update-institution', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${s?.access_token}` },
-      body: JSON.stringify({ institution_id: editingInst.id, ...editInstForm }),
+      body: JSON.stringify({ institution_id: editingInst.id, ...editInstForm, ...(editInstForm.state.trim() && editInstForm.city.trim() ? {} : { country: undefined, state: undefined, city: undefined }) }),
     })
     const json = await res.json()
     if (json.error) { alert(json.error); setEditInstSaving(false); return }
@@ -1316,6 +1316,12 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>İndirim Oranı (%)</label>
                   <input className="input" type="number" min={0} max={100} value={editInstForm.discount} onChange={e => setEditInstForm(p => ({ ...p, discount: e.target.value }))} style={{ marginBottom: '10px' }} />
 
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Konum (ülke, eyalet/il, şehir/ilçe)</label>
+                  <div style={{ marginBottom: '10px' }}>
+                    <LocationSelect value={{ country: editInstForm.country, state: editInstForm.state, city: editInstForm.city }}
+                      onChange={next => setEditInstForm(p => ({ ...p, ...next }))} />
+                  </div>
+
                   <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Satıcı (Opsiyonel)</label>
                   <select className="input" value={editInstForm.seller_id} onChange={e => setEditInstForm(p => ({ ...p, seller_id: e.target.value }))} style={{ marginBottom: '10px' }}>
                     <option value="">— Doğrudan/Satıcısız —</option>
@@ -1373,7 +1379,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                           </button>
                           <button onClick={() => {
                             setEditingInst(inst)
-                            setEditInstForm({ name: inst.name, email: inst.admin_email || '', newPassword: '', discount: String(inst.discount_rate || 0), active: inst.active, seller_id: inst.seller_id || '' })
+                            setEditInstForm({ name: inst.name, email: inst.admin_email || '', newPassword: '', discount: String(inst.discount_rate || 0), active: inst.active, seller_id: inst.seller_id || '', country: inst.country || '', state: inst.state || '', city: inst.city || '' })
                           }} className="btn btn-sm" style={{ fontSize: '11px' }}>✏️ Düzenle</button>
                           <button onClick={() => toggleInstitutionActive(inst)}
                             className="btn btn-sm"
