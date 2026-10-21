@@ -61,7 +61,7 @@
 | 7 | Kimlik DB TLS doğrulaması | ✅ 21 Ekim: sertifika `TR_IDENTITY_DB_CA` ile sabitlendi, bağlantı IP ile yapılırken adı `TR_IDENTITY_DB_SSL_SERVERNAME=identity.pratium.com.tr` ile doğrulanıyor (PR #88). Doğrulama: yeni deploy'da profil kaydı 200, TR-PG `identities.updated_at` aynı saniyede güncellendi, "doğrulanmıyor" uyarısı kalmadı |
 | 8 | TR-PG konum SQL'i | ✅ 21 Ekim: `postal_code`, `address_line` sütunları kurulu ve yazma çalışıyor |
 | 9 | 816 kazanımsız onaylı soru | 👤 Kazanım Eşleştirme incelemesi bekliyor |
-| 10 | Mistral Small fiyatı | 👤 Doğrulanmadı |
+| 10 | Mistral Small fiyatı | ✅ 21 Ekim: Mistral konsolundaki Usage → Cost ile doğrulandı (mistral-small-2603: giriş 0,15 $, çıkış 0,60 $, önbellek ~0,015 $ / 1M; Large: 0,50 / 1,50 / 0,05). Konsol toplamı 2,56 $ ile hesap tutuyor. Bulgu: Mistral `prompt_tokens` önbellek token'larını içeriyor, biz hepsini normal giriş yazıyorduk (Small'da 13,56 M girişin 9,43 M'i önbellekti); adaptör artık ayırıyor. Geçmiş kayıtlarda 1.650 sıfır maliyetli Small satırı var, geriye dönük doldurma onay bekliyor |
 | 11 | KVKK veri envanteri / saklama süreleri | 🔴 Açık |
 | 12 | Konum zorunluluğu öğretmen/kurum için | 🔴 Karar bekliyor (öğrenciler için tamam) |
 | 13 | Admin sayfa kabuğunu `proxy.ts`'te korumak | ⚪ Yapılmadı: sayfa kabuğu veri içermiyor, tüm admin API'leri sunucuda `is_admin` doğruluyor; oturum çerezini `proxy.ts`'te okuyup yönlendirmek canlıda test edilemeden yöneticileri dışarıda bırakma riski taşıyor |
@@ -75,7 +75,7 @@
 4. **CSP'yi zorlamaya geçirme kararı:** Report-Only raporlarında ihlal görülmeyince `Content-Security-Policy` başlığına çevrilmesini onaylayın.
 5. **Supabase Auth paneli:** Sızdırılmış parola koruması, MFA, e-posta onayı ve oturum süreleri bu incelemede kontrol edilemedi; panelden bakın.
 6. **Kazanım Eşleştirme incelemesi:** 816 onaylı sorunun eşleştirmesini yönetici panelinden inceleyin.
-7. **Kararlar:** 9 seçmeli lise dersi; Mistral Small fiyatının doğrulanması; konum zorunluluğunun öğretmen/kurum kayıtlarına uygulanıp uygulanmayacağı.
+7. **Kararlar:** 9 seçmeli lise dersi; (Mistral fiyatı ✅ doğrulandı, geriye dönük maliyet doldurma onayı bekliyor); konum zorunluluğunun öğretmen/kurum kayıtlarına uygulanıp uygulanmayacağı.
 8. ~~**Altyapı:**~~ `migrate-production` elle çalışır hale getirildi (bkz. A.3 madde 1); isterseniz geçmişi `supabase migration repair` ile hizalayıp otomasyonu yeniden açabiliriz. eslint için yeni dosya kapısı eklendi.
 9. ~~**`npm audit fix`**~~ ✅ Uygulandı (21 Ekim).
 
