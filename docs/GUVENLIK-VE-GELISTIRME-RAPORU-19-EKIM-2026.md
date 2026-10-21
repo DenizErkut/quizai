@@ -53,7 +53,7 @@
 | # | Madde | Son durum |
 |---|---|---|
 | 1 | `migrate-production` işi `main`'de başarısız | ⚪ 21 Ekim: Neden bulundu: GitHub çalıştırıcıları IPv6 kullanamıyor (`IPv6 is not supported on your current network`) ve yerel migrasyon sürümleri canlıdaki kayıtlı sürümlerle uyuşmuyor (ör. yerel `20261018120000_location_fields`, canlıda `20261018191726`); iş başarılı olsaydı eski migrasyonları canlıya yeniden uygulamaya çalışırdı. İş yalnızca elle (`workflow_dispatch`) çalışacak şekilde kısıtlandı; yeniden açmadan önce `supabase migration repair` ve `supabase link` gerekir |
-| 2 | CI'da eslint yok | 🟡 21 Ekim: PR'larda yeni eklenen dosyalar eslint hatasız olmalı (kapı); mevcut dosyalardaki ~540 eski hata kapıyı tetiklemez, temizlik ayrı iş |
+| 2 | CI'da eslint yok | 🟡 21 Ekim: PR'larda değişen her dosyanın eslint hata sayısı `.eslint-baseline.json` tabanını aşamaz, yeni dosyalar 0 hatayla başlar (`npm run lint:ratchet`, `lint:baseline`). Gerçek sayı ~540 değil 1.228 idi; güvenli kategoriler (`no-unescaped-entities`, `prefer-const`, `require-imports`, `no-html-link`) temizlendi, kalan 1.172 hatanın yaklaşık %90'ı `no-explicit-any`; dosyalara dokunuldukça kademeli azaltılacak |
 | 3 | Dağınık hız sınırı | ✅ 21 Ekim: son iki eski sınırlayıcı (`topic-summary`, `check-answer`) taşındı; tüm sınırlar `checkRateLimit` üzerinde |
 | 4 | Ortak yardımcılar | ✅ `safe-next`, `cron-auth`, `teacher-scope`, `live-quiz-rules`, `push-endpoint`, `lead-validation`, `internal-origin`, `ip-throttle` |
 | 5 | Ortak hata sarmalayıcı | ✅ 21 Ekim: `lib/api-error.ts` (`errorResponse`, `UserFacingError`); kullanıcıya açık rotalarda ham hata mesajı kalmadı. Yönetici rotalarındaki ~95 örnek bilerek bırakıldı (yönetici teşhisi) |
