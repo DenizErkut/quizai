@@ -5,6 +5,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { allowByIp } from '@/lib/ip-throttle'
+import { botSystemPrompt } from '@/lib/bot-prompts'
 
 const anthropic = new Anthropic()
 
@@ -19,6 +21,11 @@ export async function POST(req: NextRequest) {
   // Guest (landing page) için auth opsiyonel
   const authHeader = req.headers.get('authorization')
   const isGuest = !authHeader?.startsWith('Bearer ')
+
+  // Oturumsuz kullanım: IP başına kaba sınır (en iyi çaba; kalıcı koruma Vercel Firewall kuralı)
+  if (isGuest && !allowByIp(req, 'bot-guest', 15)) {
+    return NextResponse.json({ reply: 'Çok sık deneme. Lütfen biraz sonra tekrar dene.' }, { status: 429 })
+  }
 
   let botUserId: string | null = null
   if (!isGuest) {
@@ -45,7 +52,8 @@ export async function POST(req: NextRequest) {
       .map(m => ({ role: m.role, content: m.content.slice(0, 2000) }))
     while (messages.length && messages[0].role === 'assistant') messages.shift()
     if (!messages.length) return NextResponse.json({ reply: 'Geçersiz istek.' }, { status: 400 })
-    const system = typeof body?.system === 'string' ? body.system.slice(0, 12000) : undefined
+    // Sistem istemi sunucuda; istemciden yalnızca arayüz dili (izin listesine karşı) alınır.
+    const system = botSystemPrompt(isGuest, body?.locale)
 
     const response = await anthropic.messages.create({
       model: CLAUDE_SONNET, ...SONNET_PARAMS,

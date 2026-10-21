@@ -4,20 +4,39 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
       - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: npm }
+        with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npx tsc --noEmit
+      # tests/ altindaki birim testleri (guvenlik/yetki kurallari dahil) daha once CI'da hic kosmuyordu.
+      - run: npm run test:unit
+      # Yeni eklenen dosyalar eslint hatasi icermemeli (mevcut dosyalardaki eski hatalar kapiyi tetiklemez).
+      - name: Lint new files
+        if: github.event_name == 'pull_request'
+        run: |
+          files=$(git diff --name-only --diff-filter=A "origin/${{ github.base_ref }}...HEAD" -- '*.ts' '*.tsx' '*.mjs' | tr '\n' ' ')
+          if [ -n "$files" ]; then npx eslint $files; fi
+      # Bilgi amacli: uretim bagimliliklarinda yuksek siddette aciklik varsa raporlar, derlemeyi durdurmaz.
+      - run: npm run audit:production
+        continue-on-error: true
       - run: npx playwright test e2e/tenant-isolation.spec.ts --reporter=line
 
+  # UYARI: Bu is artik yalnizca elle (workflow_dispatch) calisir. Her main birlestirmesinde calismasi
+  # (1) GitHub calistiricilari IPv6 kullanamadigi icin `db push` ile baglanamiyordu ve
+  # (2) yerel dosya surumleri ile canlidaki kayitli surumler uyusmadigi icin (ornek: yerel
+  # 20261018120000_location_fields, canlida 20261018191726) basarili olsaydi eski migrasyonlari canliya
+  # yeniden uygulamaya calisirdi. Sema degisiklikleri su an Supabase MCP/panel uzerinden uygulaniyor.
+  # Yeniden acmadan once: `supabase migration repair` ile gecmisi hizalayin ve `supabase link` (IPv4 havuz) kullanin.
   migrate-production:
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     needs: verify
     runs-on: ubuntu-latest
     steps:
