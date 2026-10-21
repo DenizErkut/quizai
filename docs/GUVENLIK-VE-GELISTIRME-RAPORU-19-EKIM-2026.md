@@ -24,14 +24,14 @@
 | A1 `institution/join` oturumsuz | Yüksek | ✅ Token zorunlu, `user_id` gövdeden alınmıyor | #79, #82 |
 | A2 `report?type=teacher` | Yüksek | ✅ `approved` + sınıf sahipliği (`lib/teacher-scope.ts`) + negatif testler | #80 |
 | A3 `buildTeacherContext` / `teacher/reports` | Yüksek | ✅ Sahiplik doğrulaması + negatif testler | #80 |
-| A4 `/api/bot` sınırsız vekil | Yüksek | 🟡 Mesaj sayısı/uzunluk/rol sınırı ve atomik sınır var; misafir IP sınırı ve sunucu tarafı sistem istemi yok (⚪ bkz. C) | #79 |
+| A4 `/api/bot` sınırsız vekil | Yüksek | ✅ Mesaj/uzunluk/rol sınırı + atomik sınır; 21 Ekim: sistem istemi sunucuya alındı (`lib/bot-prompts.ts`, istemciden yalnızca izin listesindeki arayüz dili alınır), misafir için IP sınırı (15/dk) | #79, 21 Ekim |
 | A5 Açık yönlendirme | Yüksek | ✅ Ortak `safeNextPath` (callback + 4 sayfa) | #79 |
 | A6 Cron `Bearer undefined` | Orta | ✅ Ortak `isCronAuthorized` (secret yoksa reddeder, `timingSafeEqual`) | #79 |
 | A7 Canlı sınav kuralları | Orta | ✅ Üyelik, aktif durum, indeks, tek cevap, onaylı öğretmen | #80 |
 | A8 `learning-risk/actions` | Orta | ✅ `classroom_id` zorunlu, sahiplik + üyelik | #80 |
 | A9 Push SSRF | Orta | ✅ https + bilinen push servisleri izin listesi | #81 |
 | A10 `extract-file` | Orta | ✅ Parça/toplam sınır, TTL, uzantı izin listesi, hız sınırı | #81 |
-| A11 Paralı AI/e-posta hız sınırları | Orta | 🟡 İlgili uçlara atomik sınır eklendi; `topic-summary`, `check-answer` eski sınırlayıcıda (⚪ bkz. C) | #81 |
+| A11 Paralı AI/e-posta hız sınırları | Orta | ✅ İlgili uçlara atomik sınır eklendi; 21 Ekim: `topic-summary` ve `check-answer` de `checkRateLimit`'e (atomik, hatada kapalı) taşındı | #81, 21 Ekim |
 | A12 `coaching-leads` | Orta | ✅ IP sınırı, uzunluk ve biçim doğrulaması (`lib/lead-validation.ts`) | #81 |
 | A13 `identity/resolve` / roster | Orta | 🟡 Dizi sınırı + hız sınırı + rol gizleme; ilişki kısıtı yok (⚪ bkz. C) | #81 |
 | A14 Güvenlik başlıkları | Orta | 🟡 X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy aktif; CSP yalnızca **Report-Only** | #81 |
@@ -47,14 +47,14 @@
 | A24 Yükleme uzantısı | Düşük | ✅ | #81 |
 | A25 `reading/upload` `..` | Düşük | ✅ | #81 |
 | A26 Notlama istemi enjeksiyonu | Düşük | ✅ Öğrenci cevabı "yalnızca veri" olarak çerçevelendi, `"""` etkisizleştirildi | #84 |
-| Bağımlılık: `source-map-js` (npm audit) | Yüksek (yalnız derleme) | 🔴 Bu turlarda `npm audit fix` uygulanıp doğrulanmadı | — |
+| Bağımlılık: `source-map-js` (npm audit) | Yüksek (yalnız derleme) | ✅ 21 Ekim: `npm audit fix` ile kapandı, üretim bağımlılıklarında `0 vulnerabilities` (kalan 5 uyarı geliştirme bağımlılığı `eslint-config-next` içinde, düzeltmesi kırıcı sürüm yükseltmesi gerektirdiğinden bırakıldı) | 21 Ekim |
 
 ### A.3 Bölüm 4 (güvenlik dışı) maddeleri
 | # | Madde | Son durum |
 |---|---|---|
-| 1 | `migrate-production` işi `main`'de başarısız | 🔴 Açık (önceden beri; bu PR'lardan bağımsız, şema değişiklikleri MCP ile uygulandı) |
-| 2 | CI'da eslint yok | 🔴 Açık |
-| 3 | Dağınık hız sınırı | 🟡 Yeni uçlar `checkRateLimit`'te; 2 rota eski kodda |
+| 1 | `migrate-production` işi `main`'de başarısız | ⚪ 21 Ekim: Neden bulundu: GitHub çalıştırıcıları IPv6 kullanamıyor (`IPv6 is not supported on your current network`) ve yerel migrasyon sürümleri canlıdaki kayıtlı sürümlerle uyuşmuyor (ör. yerel `20261018120000_location_fields`, canlıda `20261018191726`); iş başarılı olsaydı eski migrasyonları canlıya yeniden uygulamaya çalışırdı. İş yalnızca elle (`workflow_dispatch`) çalışacak şekilde kısıtlandı; yeniden açmadan önce `supabase migration repair` ve `supabase link` gerekir |
+| 2 | CI'da eslint yok | 🟡 21 Ekim: PR'larda yeni eklenen dosyalar eslint hatasız olmalı (kapı); mevcut dosyalardaki ~540 eski hata kapıyı tetiklemez, temizlik ayrı iş |
+| 3 | Dağınık hız sınırı | ✅ 21 Ekim: son iki eski sınırlayıcı (`topic-summary`, `check-answer`) taşındı; tüm sınırlar `checkRateLimit` üzerinde |
 | 4 | Ortak yardımcılar | ✅ `safe-next`, `cron-auth`, `teacher-scope`, `live-quiz-rules`, `push-endpoint`, `lead-validation`, `internal-origin`, `ip-throttle` |
 | 5 | Ortak hata sarmalayıcı | 🟡 Mesaj sızıntıları temizlendi, ortak sarmalayıcı yazılmadı |
 | 6 | `CRON_SECRET`, `TR_IDENTITY_DB_CA/VERIFY` varlığı | ✅ 21 Ekim: `CRON_SECRET` tanımlı (cron'lar 200); `TR_IDENTITY_DB_CA`, `TR_IDENTITY_DB_SSL_SERVERNAME` tanımlandı |
@@ -64,8 +64,8 @@
 | 10 | Mistral Small fiyatı | 👤 Doğrulanmadı |
 | 11 | KVKK veri envanteri / saklama süreleri | 🔴 Açık |
 | 12 | Konum zorunluluğu öğretmen/kurum için | 🔴 Karar bekliyor (öğrenciler için tamam) |
-| 13 | Admin sayfa kabuğunu `proxy.ts`'te korumak | 🔴 Açık (sunucu rotaları zaten kontrol ediyor) |
-| 14 | Negatif yetki testleri | ✅ A2/A3/A8 ve canlı sınav için eklendi |
+| 13 | Admin sayfa kabuğunu `proxy.ts`'te korumak | ⚪ Yapılmadı: sayfa kabuğu veri içermiyor, tüm admin API'leri sunucuda `is_admin` doğruluyor; oturum çerezini `proxy.ts`'te okuyup yönlendirmek canlıda test edilemeden yöneticileri dışarıda bırakma riski taşıyor |
+| 14 | Negatif yetki testleri | ✅ A2/A3/A8 ve canlı sınav için eklendi. 21 Ekim bulgusu: `tests/` altındaki birim testleri (300+ test) CI'da hiç çalışmıyordu; `npm run test:unit` artık `verify` işinde |
 | 15 | Anormal kullanım / maliyet uyarıları | 🔴 Açık |
 
 ## B. 👤 Sizin yapmanız gerekenler
@@ -76,20 +76,21 @@
 5. **Supabase Auth paneli:** Sızdırılmış parola koruması, MFA, e-posta onayı ve oturum süreleri bu incelemede kontrol edilemedi; panelden bakın.
 6. **Kazanım Eşleştirme incelemesi:** 816 onaylı sorunun eşleştirmesini yönetici panelinden inceleyin.
 7. **Kararlar:** 9 seçmeli lise dersi; Mistral Small fiyatının doğrulanması; konum zorunluluğunun öğretmen/kurum kayıtlarına uygulanıp uygulanmayacağı.
-8. **Altyapı:** `migrate-production` işini onarın (`supabase migration repair`) veya kaldırın; isterseniz eslint kapısı için onay verin.
-9. **`npm audit fix`** (`source-map-js`) için onay verirseniz uygularım.
+8. ~~**Altyapı:**~~ `migrate-production` elle çalışır hale getirildi (bkz. A.3 madde 1); isterseniz geçmişi `supabase migration repair` ile hizalayıp otomasyonu yeniden açabiliriz. eslint için yeni dosya kapısı eklendi.
+9. ~~**`npm audit fix`**~~ ✅ Uygulandı (21 Ekim).
 
 ## C. ⚪ Bilinçli olarak bırakılanlar (gerekçeli)
 - **CSP Report-Only:** Zorlanan CSP; KaTeX, Google OAuth, PayTR iframe ve Supabase ile canlı sayfayı bozabilir. Önce rapor toplanır.
 - **IP sınırı en iyi çaba:** Uygulama içi sınır örnek başınadır; kalıcı koruma olarak Vercel Firewall kuralı eklendi (B.3).
-- **`/api/bot` misafir IP sınırı ve sunucu tarafı sistem istemi:** İstemci `system` gönderiyor (uzunluk sınırlı); sistem isteminin sunucuya alınması istemci davranışını değiştirir, ayrı geliştirme.
+- ~~**`/api/bot` misafir IP sınırı ve sunucu tarafı sistem istemi:**~~ ✅ 21 Ekim'de yapıldı.
 - **`identity/resolve` ilişki kısıtı:** Genel liderlik tablosu herkesin adını göstermek zorunda olduğundan ilişkiye bağlamak ürünü bozar; yalnızca dizi/hız sınırı ve rol gizleme uygulandı. Tasarım kararı gerekir.
 - **Roster'da `plan` rozeti ve sınıf arkadaşı kimlikleri:** Ürün özelliği olarak korunuyor.
-- **`topic-summary`, `check-answer` eski sınırlayıcıda:** Tablo artık yalnız servis rolüne açık olduğundan istismar edilemez; atomik sınırlayıcıya geçiş düşük öncelikli.
-- **`migrate-production`, eslint kapısı:** Altyapı işi, güvenlik düzeltmelerinden bağımsız.
+- ~~**`topic-summary`, `check-answer` eski sınırlayıcıda:**~~ ✅ 21 Ekim'de taşındı.
+- **`migrate-production`:** Otomatik çalışması kapatıldı (A.3 madde 1). **eslint:** yalnızca yeni dosyalar için kapı var; mevcut dosyalardaki hatalar ayrı temizlik işi.
 
 ## D. 21 Ekim'de çıkan ek bulgu ve düzeltmeler
 - **Profil düzenleme kaydı tutmuyordu (düzeltildi, PR #86):** İstemci `profiles` yazımları `upsert` kullanıyor; PostgREST bunu `ON CONFLICT DO UPDATE SET id = EXCLUDED.id ...` olarak üretir ve `id` sütununda UPDATE yetkisi ister. 4 Ekim'deki sütun düzeyi yetki listesinde (`20261004112943`) `id` yoktu; Supabase loglarında `POST /rest/v1/profiles` 403 ("permission denied for table profiles") görüldü. Mevcut bir profilin sınıf, okul, cinsiyet ve dil değişiklikleri kaydedilmiyor, sayfa hatayı yok sayıp "kaydedildi" gösteriyordu. Çözüm: `GRANT UPDATE (id) ON public.profiles TO authenticated` (`20261021120000`); RLS `auth.uid() = id` başka satıra geçişi engeller, rollback'li denemeyle doğrulandı. Profil sayfası artık hatayı gösteriyor. Başlangıç tarihi 24 saatlik log penceresinden kesin belirlenemedi.
+- **CI'da eksik olan birim testleri:** `verify` işi yalnızca `tsc` ve tenant-isolation e2e'yi koşuyordu; `tests/` altındaki birim testleri hiç çalışmıyordu. `npm run test:unit` eklendi, Node 22'ye geçildi; `npm run audit:production` bilgi amaçlı (`continue-on-error`) eklendi.
 - **Dağıtım notu:** `Instant Rollback` sonrası Vercel otomatik yayını kapatabilir; yeni bir Production deploy'u Promote edildikten sonra yeniden çalıştığı doğrulandı.
 
 ---

@@ -4,6 +4,7 @@ export const maxDuration = 30
 import Anthropic from '@anthropic-ai/sdk'
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { createClient } from '@/lib/supabase/server-create-client'
+import { checkRateLimit, rateLimitExceeded } from '@/lib/rate-limit'
 import { loadCanonicalObjectiveCandidates } from '@/lib/learning-objective-mapping'
 
 const anthropic = new Anthropic()
@@ -75,15 +76,12 @@ export async function POST(req: NextRequest) {
   // Rate limiting — 20 istek/gün (sadece havuzda YOKSA, yani gerçekten AI
   // çağrısı yapılacaksa devreye giriyor — bir cache hit'i öğrencinin günlük
   // hakkından düşmüyor).
-  try {
-    const rlDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-    const today = new Date().toISOString().split('T')[0]
-    const { data: rl } = await rlDb.from('api_rate_limits').select('id, count').eq('user_id', user.id).eq('endpoint', 'topic-summary').eq('window_date', today).maybeSingle()
-    if (rl) {
-      if (rl.count >= 20) return NextResponse.json({ error: 'Günlük özet limiti aşıldı.', limit: 20 }, { status: 429 })
-      await rlDb.from('api_rate_limits').update({ count: rl.count + 1 }).eq('id', rl.id)
-    } else { await rlDb.from('api_rate_limits').insert({ user_id: user.id, endpoint: 'topic-summary', count: 1, window_date: today }) }
-  } catch { /* devam et */ }
+  const limit = await checkRateLimit(user.id, { endpoint: 'topic-summary', limit: 20 })
+  if (!limit.allowed) {
+    return limit.unavailable
+      ? rateLimitExceeded(limit)
+      : NextResponse.json({ error: 'Günlük özet limiti aşıldı.', limit: 20 }, { status: 429 })
+  }
 
   // 17 Eylül 2026 — Deniz'in isteği: "Konuya Hızlı Bak" o zamana kadar
   // sadece Claude'un kendi genel bilgisinden bir özet üretiyordu, MEB

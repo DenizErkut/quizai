@@ -4,6 +4,7 @@ export const maxDuration = 30
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { logAnthropicUsage } from '@/lib/ai-usage'
+import { checkRateLimit, rateLimitExceeded } from '@/lib/rate-limit'
 
 const anthropic = new Anthropic()
 
@@ -25,17 +26,12 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
   // Rate limiting — 200 istek/gün
-  try {
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!serviceRoleKey) throw new Error('service role key missing')
-    const rlDb = createClient(supabaseUrl, serviceRoleKey)
-    const today = new Date().toISOString().split('T')[0]
-    const { data: rl } = await rlDb.from('api_rate_limits').select('id, count').eq('user_id', user.id).eq('endpoint', 'check-answer').eq('window_date', today).maybeSingle()
-    if (rl) {
-      if (rl.count >= 200) return NextResponse.json({ error: 'Günlük limit aşıldı.', limit: 200 }, { status: 429 })
-      await rlDb.from('api_rate_limits').update({ count: rl.count + 1 }).eq('id', rl.id)
-    } else { await rlDb.from('api_rate_limits').insert({ user_id: user.id, endpoint: 'check-answer', count: 1, window_date: today }) }
-  } catch { /* devam et */ }
+  const limit = await checkRateLimit(user.id, { endpoint: 'check-answer', limit: 200 })
+  if (!limit.allowed) {
+    return limit.unavailable
+      ? rateLimitExceeded(limit)
+      : NextResponse.json({ error: 'Günlük limit aşıldı.', limit: 200 }, { status: 429 })
+  }
 
   try {
     const { question, correctAnswer, userAnswer, language } = await req.json()
