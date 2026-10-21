@@ -8,6 +8,7 @@
 //   adjust     → the teacher can correct any criterion score afterwards
 // Scan images are only sent to the model for transcription; they are NOT stored.
 import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
+import { errorResponse } from '@/lib/api-error'
 import { NextRequest, NextResponse } from 'next/server'
 import { gateTeacherFeature } from '@/lib/teacher-access'
 import Anthropic from '@anthropic-ai/sdk'
@@ -177,7 +178,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: 'Bilinmeyen işlem.' }, { status: 400 })
   } catch (e: any) {
-    console.error('[teacher/import-paper-answers]', e?.message)
-    return NextResponse.json({ error: e?.message || 'Bir hata oluştu, tekrar dene.' }, { status: 500 })
+    return errorResponse('teacher/import-paper-answers', e, 'Bir hata oluştu, tekrar dene.')
   }
 }

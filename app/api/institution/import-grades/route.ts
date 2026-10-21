@@ -1,5 +1,6 @@
 // app/api/institution/import-grades/route.ts
 import { NextRequest, NextResponse } from 'next/server'
+import { errorResponse } from '@/lib/api-error'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { commitGradeImport, ImportRow } from '@/lib/grades-import'
 
@@ -55,6 +56,6 @@ export async function POST(req: NextRequest) {
     })
     return NextResponse.json(result)
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'İçe aktarma başarısız.' }, { status: 500 })
+    return errorResponse('institution/import-grades', e, 'İçe aktarma başarısız.')
   }
 }

@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
     try {
       formData = await req.formData()
     } catch (e: any) {
-      return NextResponse.json({ error: 'Dosya çok büyük veya format hatalı.', detail: e?.message }, { status: 413 })
+      console.warn('[pdf-tools] formData okunamadı:', e?.message)
+      return NextResponse.json({ error: 'Dosya çok büyük veya format hatalı.' }, { status: 413 })
     }
 
     const file = formData.get('file') as File
