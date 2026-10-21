@@ -6,6 +6,7 @@ import { finishBookletProcessing, readBookletResponse } from '@/lib/booklet-proc
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import LocationSelect from '@/components/LocationSelect'
 import { resolveIdentities } from '@/lib/identity/resolve-client'
 import LearningCatalogReview from '@/components/admin/LearningCatalogReview'
 import LearningObjectiveImport from '@/components/admin/LearningObjectiveImport'
@@ -152,7 +153,7 @@ export default function AdminPage() {
   const [mebMsg, setMebMsg] = useState('')
   const [mebFilter, setMebFilter] = useState({ level: '', subject: '' })
 
-  const [instForm, setInstForm] = useState({ name: '', email: '', password: '', code: '', discount: '0', seller_id: '' })
+  const [instForm, setInstForm] = useState({ name: '', email: '', password: '', code: '', discount: '0', seller_id: '', country: '', state: '', city: '' })
   const [instSaving, setInstSaving] = useState(false)
   const [instError, setInstError] = useState('')
   const [instSuccess, setInstSuccess] = useState('')
@@ -506,6 +507,10 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
       setInstError('Kurum adı, mail ve şifre zorunlu.')
       return
     }
+    if (!instForm.country || !instForm.state.trim() || !instForm.city.trim()) {
+      setInstError('Ülke, eyalet/il ve şehir/ilçe zorunlu.')
+      return
+    }
     setInstSaving(true); setInstError(''); setInstSuccess('')
 
     // 1. Auth hesabı oluştur
@@ -524,7 +529,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
 
     const createdCode = authData?.institution?.code || instForm.code
     setInstSuccess(`Kurum "${instForm.name}" oluşturuldu! Kod: ${createdCode}`)
-    setInstForm({ name: '', email: '', password: '', code: '', discount: '0', seller_id: '' })
+    setInstForm({ name: '', email: '', password: '', code: '', discount: '0', seller_id: '', country: '', state: '', city: '' })
     await fetchData()
     setInstSaving(false)
   }
@@ -1257,6 +1262,12 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   <input className="input" type="password" placeholder="En az 8 karakter" value={instForm.password}
                     onChange={e => setInstForm(p => ({ ...p, password: e.target.value }))} />
                 </div>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Konum * (ülke, eyalet/il, şehir/ilçe)</label>
+                <LocationSelect value={{ country: instForm.country, state: instForm.state, city: instForm.city }}
+                  onChange={next => setInstForm(p => ({ ...p, ...next }))} />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>

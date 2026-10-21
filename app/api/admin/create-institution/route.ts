@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { generateUniqueInstitutionCode } from '@/lib/institution-code'
 import { createIdentity } from '@/lib/identity/client'
+import { validateLocationDetails } from '@/lib/location/validate'
+import { isKnownCountry } from '@/lib/location/data'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,6 +36,13 @@ export async function POST(req: NextRequest) {
   if (!name?.trim() || !email?.trim() || !password) {
     return NextResponse.json({ error: 'Kurum adı, e-posta ve şifre zorunlu.' }, { status: 400 })
   }
+
+  // Konum: ülke, eyalet/il ve şehir/ilçe zorunlu (posta kodu/adres kurumlarda tutulmaz).
+  const locationCheck = validateLocationDetails({ country: body.country, state: body.state, city: body.city })
+  if (locationCheck.ok === false || !isKnownCountry(locationCheck.value.country)) {
+    return NextResponse.json({ error: 'Ülke, eyalet/il ve şehir/ilçe zorunlu.' }, { status: 400 })
+  }
+  const { country, state, city } = locationCheck.value
 
   if (code?.trim()) {
     // Admin kendi kodunu girdi — biçim ve benzersizlik kontrolü yap
@@ -91,6 +100,7 @@ export async function POST(req: NextRequest) {
       admin_email: email.trim(),
       discount_rate: parseFloat(discount) || 0,
       seller_id: seller_id || null,
+      country, state, city,
       active: true,
     })
     .select()

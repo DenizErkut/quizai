@@ -9,6 +9,7 @@ import DepartmentSelect, { resolveDepartmentValue } from '@/components/Departmen
 import { useT } from '@/lib/i18n/I18nProvider'
 import { languageFromLocale } from '@/lib/i18n/core'
 import { LocationFields } from '@/components/LocationSelect'
+import { saveProfileLocation } from '@/lib/location/client'
 import { validateLocationDetails, EMPTY_LOCATION_DETAILS, type LocationDetails } from '@/lib/location/validate'
 import { safeNextPath } from '@/lib/safe-next'
 import { lookupInstitutionName, joinInstitution } from '@/lib/institution-lookup-client'
@@ -391,11 +392,14 @@ function RegisterContent() {
 
   async function handleTeacherApply() {
     if (!school.trim()) { setError(t('Okul/Kurum zorunlu.')); return }
+    const teacherLocCheck = validateLocationDetails(loc)
+    if (teacherLocCheck.ok === false) { setError(t(teacherLocCheck.field === 'postal' ? 'Geçerli bir posta kodu girin.' : 'Ülke, eyalet/il ve şehir/ilçe zorunludur.')); return }
     setError(''); setLoading(true)
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setError(t('Oturum bulunamadı.')); return }
+      if (!(await saveProfileLocation(loc))) { setError(t('Konum kaydedilemedi. Lütfen tekrar deneyin.')); return }
 
       const docUrls: string[] = []
       for (let i = 0; i < docs.length; i++) {
@@ -587,6 +591,11 @@ function RegisterContent() {
             <label className="field-label">{t('Branş')}</label>
             <input className="input" placeholder="Matematik, Fizik..."
               value={subject} onChange={e => setSubject(e.target.value)} />
+
+            <div style={{ margin: '4px 0 12px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', marginBottom: '8px' }}>{t('Konum bilgileri')}</div>
+              <LocationFields value={loc} onChange={setLoc} />
+            </div>
 
             <label className="field-label">{t('Telefon (Opsiyonel)')}</label>
             <input className="input" type="tel" placeholder="05xx xxx xx xx"

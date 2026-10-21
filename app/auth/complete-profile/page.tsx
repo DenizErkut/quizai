@@ -18,6 +18,7 @@ import { useT } from '@/lib/i18n/I18nProvider'
 import { loadPendingRegistration, clearPendingRegistration, PendingRole } from '@/lib/pending-registration'
 import DepartmentSelect, { resolveDepartmentValue } from '@/components/DepartmentSelect'
 import { LocationFields } from '@/components/LocationSelect'
+import { saveProfileLocation } from '@/lib/location/client'
 import { validateLocationDetails, EMPTY_LOCATION_DETAILS, type LocationDetails } from '@/lib/location/validate'
 import { safeNextPath } from '@/lib/safe-next'
 import { lookupInstitutionName, joinInstitution } from '@/lib/institution-lookup-client'
@@ -57,6 +58,7 @@ export default function CompleteProfilePage() {
   const [userId, setUserId] = useState('')
   const [nextUrl, setNextUrl] = useState('/home')
   const [school, setSchool] = useState('')
+  const [teacherLoc, setTeacherLoc] = useState<LocationDetails>(EMPTY_LOCATION_DETAILS)
   const [subject, setSubject] = useState('')
   const [phone, setPhone] = useState('')
   const [docs, setDocs] = useState<File[]>([])
@@ -231,9 +233,12 @@ export default function CompleteProfilePage() {
 
   async function handleTeacherApply() {
     if (!school.trim()) { setTeacherError(tr('Okul/Kurum zorunlu.')); return }
+    const teacherLocCheck = validateLocationDetails(teacherLoc)
+    if (teacherLocCheck.ok === false) { setTeacherError(tr(teacherLocCheck.field === 'postal' ? 'Geçerli bir posta kodu girin.' : 'Ülke, eyalet/il ve şehir/ilçe zorunludur.')); return }
     setTeacherError(''); setLoading(true)
 
     try {
+      if (!(await saveProfileLocation(teacherLoc))) { setTeacherError(tr('Konum kaydedilemedi. Lütfen tekrar deneyin.')); return }
       const docUrls: string[] = []
       for (let i = 0; i < docs.length; i++) {
         const file = docs[i]
@@ -429,6 +434,11 @@ export default function CompleteProfilePage() {
             <input className="input" placeholder="Ankara Anadolu Lisesi" value={school} onChange={e => setSchool(e.target.value)} />
             <label className="field-label">{tr('Branş')}</label>
             <input className="input" placeholder={tr('Matematik, Fizik...')} value={subject} onChange={e => setSubject(e.target.value)} />
+            <div style={{ margin: '4px 0 12px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', marginBottom: '8px' }}>{tr('Konum bilgileri')}</div>
+              <LocationFields value={teacherLoc} onChange={setTeacherLoc} />
+            </div>
+
             <label className="field-label">{tr('Telefon (Opsiyonel)')}</label>
             <input className="input" type="tel" placeholder="05xx xxx xx xx" value={phone} onChange={e => setPhone(e.target.value)} />
             <label className="field-label">{tr('Belge Yükle (Opsiyonel)')}</label>

@@ -1,7 +1,8 @@
 import type { NextConfig } from 'next'
 
 // Güvenlik başlıkları. CSP önce yalnızca raporlama modunda (Report-Only) çalışır: ihlaller tarayıcı konsoluna düşer,
-// hiçbir şey engellenmez. Üretimde ihlal görülmediğinde `Content-Security-Policy`e çevrilebilir.
+// hiçbir şey engellenmez. İhlaller /api/csp-report adresine gönderilir ve Vercel günlüğünde `[csp-report]`
+// satırları olarak birikir. Bir hafta ihlal görülmediğinde `Content-Security-Policy`e çevrilebilir.
 const cspReportOnly = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
@@ -15,6 +16,8 @@ const cspReportOnly = [
   "frame-ancestors 'self'",
   "base-uri 'self'",
   "object-src 'none'",
+  'report-uri /api/csp-report',
+  'report-to csp-endpoint',
 ].join('; ')
 
 const securityHeaders = [
@@ -24,6 +27,7 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=()' },
   { key: 'Strict-Transport-Security', value: 'max-age=31536000' },
   { key: 'Content-Security-Policy-Report-Only', value: cspReportOnly },
+  { key: 'Reporting-Endpoints', value: 'csp-endpoint="/api/csp-report"' },
 ]
 
 const nextConfig: NextConfig = {
