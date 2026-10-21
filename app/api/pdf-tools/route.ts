@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
     if (action === 'to-word') {
       // pdf-parse v1: fonksiyon tabanlı, Vercel uyumlu (DOMMatrix gerektirmez)
       // serverExternalPackages: ['pdf-parse'] next.config.ts'de olmalı
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- pdf-parse CommonJS dışa aktarımı; sunucuda dinamik yüklenir
       const pdfParse = require('pdf-parse')
       const data = await pdfParse(buffer)
       const text: string = data.text || ''

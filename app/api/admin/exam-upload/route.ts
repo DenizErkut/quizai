@@ -445,6 +445,7 @@ export async function POST(req: NextRequest) {
       try {
         const pdfBytes = Buffer.from(await fileData.arrayBuffer())
         if (pdfBytes.length < 45 * 1024 * 1024) {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports -- pdf-parse CommonJS dışa aktarımı; sunucuda dinamik yüklenir
           const pdfParse = require('pdf-parse')
           const parsed = await pdfParse(pdfBytes)
           rawText = parsed.text || ''
@@ -482,6 +483,7 @@ export async function POST(req: NextRequest) {
         }
         try {
           if (Buffer.from(bytes).length < 45 * 1024 * 1024) {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports -- pdf-parse CommonJS dışa aktarımı; sunucuda dinamik yüklenir
             const pdfParse = require('pdf-parse')
             const parsed = await pdfParse(Buffer.from(bytes))
             rawText = parsed.text || ''

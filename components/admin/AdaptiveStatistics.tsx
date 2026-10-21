@@ -30,7 +30,7 @@ export default function AdaptiveStatistics() {
   }
   return <div className="card" style={{ marginTop: '1rem' }}>
     <strong style={{ color: 'var(--primary)' }}>📊 İstatistiksel etki raporu</strong>
-    <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text3)' }}>Bu rapor, Adaptive Learning'in mevcut (Standard) yönteme göre öğrenmeyi GERÇEKTEN iyileştirip iyileştirmediğini ölçer. Rastgele iki-üç kişinin sonucuyla bunu söylemek mümkün değil — bu yüzden her grupta en az {min} kişi 7 günlük ölçümü tamamlayana kadar aşağıdaki tüm sayılar "henüz güvenilir değil" olarak işaretlenir.</div>
+    <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text3)' }}>Bu rapor, Adaptive Learning&apos;in mevcut (Standard) yönteme göre öğrenmeyi GERÇEKTEN iyileştirip iyileştirmediğini ölçer. Rastgele iki-üç kişinin sonucuyla bunu söylemek mümkün değil — bu yüzden her grupta en az {min} kişi 7 günlük ölçümü tamamlayana kadar aşağıdaki tüm sayılar &quot;henüz güvenilir değil&quot; olarak işaretlenir.</div>
     {report.isolation_note && <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: '#fff4e5', color: '#8a5200', fontSize: 12, fontWeight: 600 }}>⚠️ {report.isolation_note}</div>}
     <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: report.claim_status === 'supported_by_pilot' ? '#eaf8ef' : '#fff4e5', color: report.claim_status === 'supported_by_pilot' ? '#176b3a' : '#8a5200', fontSize: 12, fontWeight: 700 }}>{report.claim_message}</div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 8, marginTop: 10 }}>{report.cohorts?.map((cohort: any) => <div key={cohort.cohort} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10, fontSize: 12 }}>
@@ -51,7 +51,7 @@ export default function AdaptiveStatistics() {
     {report.segments && <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
       <strong style={{ color: 'var(--primary)' }}>🔍 Öğrenci profiline göre kırılım</strong>
       <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text3)' }}>
-        "Adaptive herkes için mi işe yarıyor, yoksa belirli bir öğrenci profilinde mi?" sorusu için. Segment bilgisi öğrencinin pilota ATANDIĞI andaki durumundan (canlı profilinden değil) donduruldu. Her alt grup ayrıca en az {min} tamamlanmış kişi gerektirir — bu yüzden çoğu satır şu an "henüz yetersiz" görünecektir, bu beklenen bir durumdur.
+        &quot;Adaptive herkes için mi işe yarıyor, yoksa belirli bir öğrenci profilinde mi?&quot; sorusu için. Segment bilgisi öğrencinin pilota ATANDIĞI andaki durumundan (canlı profilinden değil) donduruldu. Her alt grup ayrıca en az {min} tamamlanmış kişi gerektirir — bu yüzden çoğu satır şu an &quot;henüz yetersiz&quot; görünecektir, bu beklenen bir durumdur.
         {report.segment_note && <div style={{ marginTop: 4 }}>{report.segment_note}</div>}
       </div>
       {([

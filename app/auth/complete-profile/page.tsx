@@ -572,7 +572,7 @@ export default function CompleteProfilePage() {
           <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', marginTop: '10px', marginBottom: '8px' }}>
             <input type="checkbox" checked={fbKvkkAydinlatma} onChange={e => setFbKvkkAydinlatma(e.target.checked)} style={{ marginTop: '2px' }} />
             <span style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.5 }}>
-              <a href="/kvkk/aydinlatma" target="_blank" style={{ color: 'var(--accent)', fontWeight: 600 }}>KVKK Aydınlatma Metni</a>'ni okudum.
+              <a href="/kvkk/aydinlatma" target="_blank" style={{ color: 'var(--accent)', fontWeight: 600 }}>KVKK Aydınlatma Metni</a>&apos;ni okudum.
             </span>
           </label>
           <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', marginBottom: '8px' }}>

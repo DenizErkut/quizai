@@ -61,7 +61,7 @@ export function buildQuestionGenerationPlan(count: number): QuestionGenerationBa
   ]
   const raw = roles.map(role => role.weight * size)
   const counts = raw.map(Math.floor)
-  let remaining = size - counts.reduce((sum, value) => sum + value, 0)
+  const remaining = size - counts.reduce((sum, value) => sum + value, 0)
   const order = raw.map((value, index) => ({ index, remainder: value - counts[index] }))
     .sort((a, b) => b.remainder - a.remainder || a.index - b.index)
   for (let index = 0; index < remaining; index++) counts[order[index].index]++

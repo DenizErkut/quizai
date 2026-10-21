@@ -404,7 +404,7 @@ export default function PlanPage() {
               <div className="card" style={{ textAlign: 'center', background: 'var(--accent-bg)', border: '1px solid rgba(91,76,245,0.2)' }}>
                 <div style={{ fontSize: '24px', marginBottom: '8px' }}>⭐</div>
                 <p style={{ fontSize: '14px', color: 'var(--accent)', fontStyle: 'italic', lineHeight: 1.7 }}>
-                  "{plan.motivation}"
+                  &quot;{plan.motivation}&quot;
                 </p>
               </div>
             )}
