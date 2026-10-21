@@ -40,7 +40,7 @@
 | A17 `role` izin listesi | Düşük | ✅ | #81 |
 | A18 `updateIdentity` sütun izin listesi | Düşük | ✅ `UPDATABLE_IDENTITY_FIELDS` | #81 |
 | A19 Dahili fetch kökü | Düşük | ✅ `internalOrigin` izin listesi | #84 |
-| A20 Oturumsuz uçlarda IP sınırı | Düşük | 🟡 Bellek içi, örnek başına en iyi çaba (kalıcı çözüm WAF, bkz. B/C) | #84 |
+| A20 Oturumsuz uçlarda IP sınırı | Düşük | ✅ Uygulama içi en iyi çaba sınırı (#84) + 21 Ekim'de Vercel Firewall hız sınırı kuralı (kalıcı koruma) | #84, Firewall |
 | A21 `integrations/v1/students` | Düşük | ✅ | #81 |
 | A22 PayTR eksik ödeme | Düşük | ✅ İmzalı tutar kayıtlı fiyatın altındaysa reddedilir | #84 |
 | A23 PII günlükleri | Düşük | ✅ | #84 |
@@ -71,7 +71,7 @@
 ## B. 👤 Sizin yapmanız gerekenler
 1. ~~**VPS (TR-PG):** `docs/TR-PG-konum-alanlari.sql`~~ ✅ Yapıldı (21 Ekim, sütunlar doğrulandı).
 2. ~~**Vercel ortam değişkenleri:**~~ ✅ Tamamlandı (21 Ekim): `CRON_SECRET`, `TR_IDENTITY_DB_CA`, `TR_IDENTITY_DB_SSL_SERVERNAME` Production'da. Notlar: `TR_IDENTITY_DB_URL` ve `TR_IDENTITY_DB_SSL` yalnızca Production'da, Preview'da kimlik bağlantısı yok. `TR_IDENTITY_DB_URL` host'u IP (`identity.pratium.com.tr` adı Natro DNS'inde çözümlenmediği için kullanılmıyor). Veritabanı kullanıcı şifresi değişmiş olabilir; yeni şifreyi şifre yöneticinizde saklayın. Natro'ya açılan DNS talebi (#3249126) ana alan adı kaydını değiştirmiş olabileceğinden geri alma talebi yazıldı; `pratium.com.tr` ve `www.pratium.com.tr` kaydının `89.19.30.73` olduğunu doğrulayın (`nslookup`).
-3. **Vercel Firewall:** Oturumsuz uçlar (`resolve-seller-code`, `referral/referrer-name`, `institution/lookup`, `coaching-leads`, `bot`) için hız sınırı kuralı ekleyin; uygulamadaki IP sınırı örnek başına olduğundan kalıcı koruma değildir.
+3. ~~**Vercel Firewall:**~~ ✅ 21 Ekim: "Oturumsuz uçlar hız sınırı" kuralı yayınlandı. `^/api/(coaching-leads|resolve-seller-code|referral/referrer-name|institution/lookup|bot)$` yolları için IP başına 60 saniyede 30 istek, aşılınca 429 (Fixed Window). Yeniden deploy gerektirmez; sorun çıkarsa kural Firewall → Rules'tan kapatılabilir.
 4. **CSP'yi zorlamaya geçirme kararı:** Report-Only raporlarında ihlal görülmeyince `Content-Security-Policy` başlığına çevrilmesini onaylayın.
 5. **Supabase Auth paneli:** Sızdırılmış parola koruması, MFA, e-posta onayı ve oturum süreleri bu incelemede kontrol edilemedi; panelden bakın.
 6. **Kazanım Eşleştirme incelemesi:** 816 onaylı sorunun eşleştirmesini yönetici panelinden inceleyin.
@@ -81,7 +81,7 @@
 
 ## C. ⚪ Bilinçli olarak bırakılanlar (gerekçeli)
 - **CSP Report-Only:** Zorlanan CSP; KaTeX, Google OAuth, PayTR iframe ve Supabase ile canlı sayfayı bozabilir. Önce rapor toplanır.
-- **IP sınırı en iyi çaba:** Sunucusuz ortamda bellek örnekler arasında paylaşılmaz; kalıcı çözüm Vercel WAF (B.3).
+- **IP sınırı en iyi çaba:** Uygulama içi sınır örnek başınadır; kalıcı koruma olarak Vercel Firewall kuralı eklendi (B.3).
 - **`/api/bot` misafir IP sınırı ve sunucu tarafı sistem istemi:** İstemci `system` gönderiyor (uzunluk sınırlı); sistem isteminin sunucuya alınması istemci davranışını değiştirir, ayrı geliştirme.
 - **`identity/resolve` ilişki kısıtı:** Genel liderlik tablosu herkesin adını göstermek zorunda olduğundan ilişkiye bağlamak ürünü bozar; yalnızca dizi/hız sınırı ve rol gizleme uygulandı. Tasarım kararı gerekir.
 - **Roster'da `plan` rozeti ve sınıf arkadaşı kimlikleri:** Ürün özelliği olarak korunuyor.
