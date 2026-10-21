@@ -200,7 +200,7 @@ export default function ProfileEditPage() {
     })
     if (!idRes.ok) { setError(tr('İsim/yaş kaydedilemedi. Lütfen tekrar deneyin.')); setSaving(false); return }
 
-    await supabase.from('profiles').upsert({
+    const { error: profileError } = await supabase.from('profiles').upsert({
       id: user.id,
       gender: gender || null,
       grade,
@@ -208,6 +208,7 @@ export default function ProfileEditPage() {
       school: school || null,
       language: lang,
     })
+    if (profileError) { setError(tr('Profil kaydedilemedi: ') + profileError.message); setSaving(false); return }
 
     const { data: { session: locSession } } = await supabase.auth.getSession()
     const locRes = await fetch('/api/profile/location', {
