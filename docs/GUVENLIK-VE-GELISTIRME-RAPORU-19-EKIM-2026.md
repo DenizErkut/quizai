@@ -57,8 +57,8 @@
 | 3 | Dağınık hız sınırı | 🟡 Yeni uçlar `checkRateLimit`'te; 2 rota eski kodda |
 | 4 | Ortak yardımcılar | ✅ `safe-next`, `cron-auth`, `teacher-scope`, `live-quiz-rules`, `push-endpoint`, `lead-validation`, `internal-origin`, `ip-throttle` |
 | 5 | Ortak hata sarmalayıcı | 🟡 Mesaj sızıntıları temizlendi, ortak sarmalayıcı yazılmadı |
-| 6 | `CRON_SECRET`, `TR_IDENTITY_DB_CA/VERIFY` varlığı | 🟡 `CRON_SECRET` ✅ (21 Ekim: Production'da tanımlı, cron'lar 200 dönüyor); `TR_IDENTITY_DB_CA` ertelendi (aşağıya bakın) |
-| 7 | Kimlik DB TLS doğrulaması | ⏳ Ertelendi. Sunucu sertifikası self-signed (CN `identity.pratium.com.tr`, SAN yok); `identity` DNS kaydı eklenemedi (DNS Natro'da, Plesk'te DNS bölümü kapalı). Seçenekler: Natro'ya A kaydı talebi (`identity` → VPS IP) veya `lib/identity/ssl.ts`'e sertifika adı ayarı ekleyip IP ile bağlanmak. Şu an bağlantı şifreli ama sertifika doğrulanmıyor |
+| 6 | `CRON_SECRET`, `TR_IDENTITY_DB_CA/VERIFY` varlığı | ✅ 21 Ekim: `CRON_SECRET` tanımlı (cron'lar 200); `TR_IDENTITY_DB_CA`, `TR_IDENTITY_DB_SSL_SERVERNAME` tanımlandı |
+| 7 | Kimlik DB TLS doğrulaması | ✅ 21 Ekim: sertifika `TR_IDENTITY_DB_CA` ile sabitlendi, bağlantı IP ile yapılırken adı `TR_IDENTITY_DB_SSL_SERVERNAME=identity.pratium.com.tr` ile doğrulanıyor (PR #88). Doğrulama: yeni deploy'da profil kaydı 200, TR-PG `identities.updated_at` aynı saniyede güncellendi, "doğrulanmıyor" uyarısı kalmadı |
 | 8 | TR-PG konum SQL'i | ✅ 21 Ekim: `postal_code`, `address_line` sütunları kurulu ve yazma çalışıyor |
 | 9 | 816 kazanımsız onaylı soru | 👤 Kazanım Eşleştirme incelemesi bekliyor |
 | 10 | Mistral Small fiyatı | 👤 Doğrulanmadı |
@@ -70,7 +70,7 @@
 
 ## B. 👤 Sizin yapmanız gerekenler
 1. ~~**VPS (TR-PG):** `docs/TR-PG-konum-alanlari.sql`~~ ✅ Yapıldı (21 Ekim, sütunlar doğrulandı).
-2. **Vercel ortam değişkenleri:** ~~`CRON_SECRET`~~ ✅ Production'da tanımlı. **Açık:** `TR_IDENTITY_DB_CA` (bkz. A.3 madde 7). Not: `TR_IDENTITY_DB_URL` ve `TR_IDENTITY_DB_SSL` yalnızca Production'da tanımlı, Preview'da kimlik bağlantısı yok. `TR_IDENTITY_DB_URL` 21 Ekim'de yeniden yazıldı; veritabanı kullanıcı şifresi değişmiş olabilir, yeni şifreyi şifre yöneticinizde saklayın. Host `identity.pratium.com.tr` adı DNS'te çözümlenmediği için IP ile kullanılmalı.
+2. ~~**Vercel ortam değişkenleri:**~~ ✅ Tamamlandı (21 Ekim): `CRON_SECRET`, `TR_IDENTITY_DB_CA`, `TR_IDENTITY_DB_SSL_SERVERNAME` Production'da. Notlar: `TR_IDENTITY_DB_URL` ve `TR_IDENTITY_DB_SSL` yalnızca Production'da, Preview'da kimlik bağlantısı yok. `TR_IDENTITY_DB_URL` host'u IP (`identity.pratium.com.tr` adı Natro DNS'inde çözümlenmediği için kullanılmıyor). Veritabanı kullanıcı şifresi değişmiş olabilir; yeni şifreyi şifre yöneticinizde saklayın. Natro'ya açılan DNS talebi (#3249126) ana alan adı kaydını değiştirmiş olabileceğinden geri alma talebi yazıldı; `pratium.com.tr` ve `www.pratium.com.tr` kaydının `89.19.30.73` olduğunu doğrulayın (`nslookup`).
 3. **Vercel Firewall:** Oturumsuz uçlar (`resolve-seller-code`, `referral/referrer-name`, `institution/lookup`, `coaching-leads`, `bot`) için hız sınırı kuralı ekleyin; uygulamadaki IP sınırı örnek başına olduğundan kalıcı koruma değildir.
 4. **CSP'yi zorlamaya geçirme kararı:** Report-Only raporlarında ihlal görülmeyince `Content-Security-Policy` başlığına çevrilmesini onaylayın.
 5. **Supabase Auth paneli:** Sızdırılmış parola koruması, MFA, e-posta onayı ve oturum süreleri bu incelemede kontrol edilemedi; panelden bakın.
