@@ -9,13 +9,13 @@ export default function AcikRizaPage() {
           Açık Rıza Metni
         </h1>
         <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '1.5rem' }}>
-          KVKK m.5/1 uyarınca — Bu metin Aydınlatma Metni'nden ayrı bir belgedir (Kurul İlke Kararı 2026/347).
+          KVKK m.5/1 uyarınca — Bu metin Aydınlatma Metni&apos;nden ayrı bir belgedir (Kurul İlke Kararı 2026/347).
         </p>
 
         <div style={{ fontSize: '13px', lineHeight: 1.8, color: 'var(--text2)' }}>
           <p style={{ marginBottom: '1rem' }}>
-            [ŞİRKET UNVANI] ("Pratium") tarafından, <a href="/kvkk/aydinlatma" style={{ color: 'var(--accent)' }}>KVKK
-            Aydınlatma Metni</a>'nde detaylı olarak açıklanan kapsamda bilgilendirilmiş olarak;
+            [ŞİRKET UNVANI] (&quot;Pratium&quot;) tarafından, <a href="/kvkk/aydinlatma" style={{ color: 'var(--accent)' }}>KVKK
+            Aydınlatma Metni</a>&apos;nde detaylı olarak açıklanan kapsamda bilgilendirilmiş olarak;
           </p>
 
           <div style={{ padding: '14px 16px', borderRadius: '12px', background: 'var(--bg2)', border: '1px solid var(--border)', marginBottom: '1rem' }}>

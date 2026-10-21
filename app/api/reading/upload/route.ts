@@ -133,6 +133,7 @@ async function extractText(buffer: Buffer, ext: string): Promise<{ text: string;
     let parsedText = ''
     let totalPages = 0
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- pdf-parse CommonJS dışa aktarımı; sunucuda dinamik yüklenir
       const pdfParse = require('pdf-parse')
       const parsed = await pdfParse(buffer, { max: 0 })
       parsedText = (parsed?.text || '').trim()

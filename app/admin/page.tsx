@@ -886,7 +886,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               <div className="card-sm" style={{ marginBottom: '1rem', border: '1px solid rgba(220,38,38,0.25)', background: 'var(--red-bg)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '13px', color: 'var(--red)', fontWeight: 600 }}>
-                    ⚠️ {identityMissing} kullanıcının TR-PG'de kimlik kaydı eksik (admin listesinde &quot;İsimsiz&quot; görünürler).
+                    ⚠️ {identityMissing} kullanıcının TR-PG&apos;de kimlik kaydı eksik (admin listesinde &quot;İsimsiz&quot; görünürler).
                   </span>
                   <button className="btn btn-sm" style={{ marginLeft: 'auto', color: 'var(--red)', borderColor: 'rgba(220,38,38,0.3)' }}
                     onClick={fixIdentityMismatch} disabled={identityFixing}>
@@ -1054,7 +1054,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                                   disabled={updating === u.id}
                                   onClick={() => updatePlan(u.id, 'free')}
                                   style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text2)', cursor: 'pointer' }}>
-                                  Free'ye al
+                                  Free&apos;ye al
                                 </button>
                               </>
                             )}
@@ -1672,7 +1672,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               )
             })() : (
               <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', padding: '1.5rem' }}>
-                "Yükle" butonuna tıklayarak müfredatı görüntüleyin
+                &quot;Yükle&quot; butonuna tıklayarak müfredatı görüntüleyin
               </div>
             )}
           </div>
@@ -1694,7 +1694,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1rem' }}>
               <select value={lgSelectedCurriculumId} onChange={e => setLgSelectedCurriculumId(e.target.value)}
                 style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', flex: 1, minWidth: '220px' }}>
-                <option value="">— Müfredat kaydı seçin (önce yukarıda "Yükle" ile listeleyin) —</option>
+                <option value="">— Müfredat kaydı seçin (önce yukarıda &quot;Yükle&quot; ile listeleyin) —</option>
                 {curriculum.map((c: any) => (
                   <option key={c.id} value={c.id}>
                     {c.level} / {c.grade} / {c.subject} ({Array.isArray(c.topics) ? c.topics.length : 0} konu)
@@ -1786,7 +1786,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               </div>
             ) : (
               <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', padding: '1rem' }}>
-                Bekleyen taslak yok. Bir müfredat kaydı seçip "AI Taslak Üret"e tıklayın ya da "Bekleyen Taslakları Yükle"yi deneyin.
+                Bekleyen taslak yok. Bir müfredat kaydı seçip &quot;AI Taslak Üret&quot;e tıklayın ya da &quot;Bekleyen Taslakları Yükle&quot;yi deneyin.
               </div>
             )}
           </div>
@@ -2083,7 +2083,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               <div>
                 <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)' }}>🩺 Sağlık Taraması</div>
                 <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
-                  TÜM mevcut MEB kaynaklarını geriye dönük tarar (Madde 8'in health check'i sadece yeni yüklemelerde çalışıyor) — en riskli kaynakları ve ders bazlı dağılımı gösterir.
+                  TÜM mevcut MEB kaynaklarını geriye dönük tarar (Madde 8&apos;in health check&apos;i sadece yeni yüklemelerde çalışıyor) — en riskli kaynakları ve ders bazlı dağılımı gösterir.
                 </div>
               </div>
               <button
@@ -2437,7 +2437,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                 <div style={{ textAlign: 'center', padding: '1rem 0' }}>
                   <div style={{ fontSize: '32px', marginBottom: '8px' }}>✅</div>
                   <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)', marginBottom: '10px' }}>
-                    "{sellerCreated.full_name}" satıcı olarak eklendi
+                    &quot;{sellerCreated.full_name}&quot; satıcı olarak eklendi
                   </div>
                   <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', maxWidth: '420px', margin: '0 auto', textAlign: 'left' }}>
                     <div style={{ fontSize: '12px', color: 'var(--text3)' }}>Satıcı Kodu</div>
@@ -2459,7 +2459,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   <input className="input" type="number" step="0.1" placeholder="Komisyon Oranı (%)" value={sellerForm.commission_rate} onChange={e => setSellerForm(p => ({ ...p, commission_rate: e.target.value }))} />
                   <input className="input" type="number" step="0.1" min="0" max="100" placeholder="Müşteri İndirim Oranı (%)" value={sellerForm.discount_rate} onChange={e => setSellerForm(p => ({ ...p, discount_rate: e.target.value }))} />
                   <p style={{ gridColumn: '1 / -1', fontSize: '12px', color: 'var(--text3)', margin: '-4px 0 4px' }}>
-                    Komisyon = Pratium'un satıcıya ödediği pay. İndirim oranı = bu satıcının linkinden/koduyla gelen müşterilerin ödeme sırasında otomatik göreceği fiyat indirimi.
+                    Komisyon = Pratium&apos;un satıcıya ödediği pay. İndirim oranı = bu satıcının linkinden/koduyla gelen müşterilerin ödeme sırasında otomatik göreceği fiyat indirimi.
                   </p>
                   {sellerError && <div style={{ gridColumn: '1 / -1', padding: '10px 12px', background: 'var(--red-bg)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)' }}>{sellerError}</div>}
                   <button className="btn btn-primary" style={{ gridColumn: '1 / -1' }} onClick={createSeller} disabled={sellerSaving}>
@@ -2572,7 +2572,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   <div style={{ fontSize: '12px', color: 'var(--text2)', marginTop: '6px' }}>
                     📧 {l.email} {l.phone ? `· 📞 ${l.phone}` : ''}
                   </div>
-                  {l.message && <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '4px', fontStyle: 'italic' }}>"{l.message}"</div>}
+                  {l.message && <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '4px', fontStyle: 'italic' }}>&quot;{l.message}&quot;</div>}
                   <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
                     {(['yeni', 'gorusuldu', 'anlasma', 'reddedildi'] as const).map(s => (
                       <button key={s} onClick={() => updateLeadStatus(l.id, s)}
@@ -2593,7 +2593,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         <div className="anim-up">
           <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)', marginBottom: '1rem' }}>🎓 Koç Kullanımı</h2>
           <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1rem' }}>
-            Profesör Prati'nin kullanıcı, mesaj ve maliyet rakamları — sadece ücretli üyeler kullanabiliyor (free plan koça hiç erişemiyor).
+            Profesör Prati&apos;nin kullanıcı, mesaj ve maliyet rakamları — sadece ücretli üyeler kullanabiliyor (free plan koça hiç erişemiyor).
           </p>
           <CoachUsage />
           <CoachAnalytics />
@@ -2745,7 +2745,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               🗑️ Silmeden önce tam içeriği kontrol et
             </div>
             <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '10px' }}>
-              "{deletePreview.title}" {deletePreview.kind === 'exam' ? '(sınav kitapçığı, tüm chunk\'ları dahil)' : '(kaynak, tüm chunk\'ları dahil)'} kalıcı olarak silinecek. Bu işlem geri alınamaz.
+              &quot;{deletePreview.title}&quot; {deletePreview.kind === 'exam' ? '(sınav kitapçığı, tüm chunk\'ları dahil)' : '(kaynak, tüm chunk\'ları dahil)'} kalıcı olarak silinecek. Bu işlem geri alınamaz.
             </div>
             <div style={{
               flex: 1, overflowY: 'auto', background: 'var(--bg2)', border: '1px solid var(--border)',

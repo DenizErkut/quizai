@@ -18,7 +18,7 @@ export default function DistanceSalesPage() {
 
         <div className="card" style={{ marginBottom: '1rem', background: 'rgba(30,207,184,0.06)', border: '1px solid rgba(30,207,184,0.2)' }}>
           <p style={{ fontSize: '13px', lineHeight: 1.7, color: 'var(--text)' }}>
-            Bu sayfa, Pratium üzerinden yapılan ücretli abonelik satın alımlarında taraflar arasında kurulan Mesafeli Satış Sözleşmesi'nin genel şartlarını içerir. Her satın alma işleminde, işbu sözleşmenin işlem bilgilerinizle (plan, tutar, tarih) tamamlanmış hali ödeme adımında onayınıza sunulur.
+            Bu sayfa, Pratium üzerinden yapılan ücretli abonelik satın alımlarında taraflar arasında kurulan Mesafeli Satış Sözleşmesi&apos;nin genel şartlarını içerir. Her satın alma işleminde, işbu sözleşmenin işlem bilgilerinizle (plan, tutar, tarih) tamamlanmış hali ödeme adımında onayınıza sunulur.
           </p>
         </div>
 

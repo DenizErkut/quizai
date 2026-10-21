@@ -247,6 +247,7 @@ export default function InstitutionIntegrationsPage() {
       <section style={card}>
         <h2 style={{ margin: '0 0 8px', fontSize: 19 }}>{tr('API bağlantı bilgisi')}</h2>
         <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text3, #68736e)' }}>
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- bu bir sayfa değil, OpenAPI JSON uç noktasıdır */}
           {tr('Anahtarınızın izinlerine göre kurum, öğrenci, sınıf, sonuç, konu hâkimiyeti ve okul notlarını okuyabilir; okul notlarını ve CRM kayıt eşleştirmelerini yazabilirsiniz.')} <a href="/api/integrations/v1/openapi" style={{ color: 'inherit', textDecoration: 'underline' }}>{tr('Tüm uç noktalar için OpenAPI açıklamasına bakın.')}</a>
         </p>
         <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', padding: 14, background: 'var(--bg2, #f7f4ef)', borderRadius: 10, fontSize: 12, lineHeight: 1.6 }}>

@@ -140,7 +140,7 @@ export default function ABTestAdminPage() {
                         </span>
                         <span style={{ fontSize: '11px', color: 'var(--text3)' }}>{v.weight}%</span>
                       </div>
-                      {v.label && <div style={{ fontSize: '11px', color: 'var(--text2)', marginBottom: '8px', fontStyle: 'italic' }}>"{v.label}"</div>}
+                      {v.label && <div style={{ fontSize: '11px', color: 'var(--text2)', marginBottom: '8px', fontStyle: 'italic' }}>&quot;{v.label}&quot;</div>}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '11px' }}>
                         <div><span style={{ color: 'var(--text3)' }}>Atanan:</span> <strong>{v.assignments}</strong></div>
                         <div><span style={{ color: 'var(--text3)' }}>Görüntü:</span> <strong>{v.views}</strong></div>

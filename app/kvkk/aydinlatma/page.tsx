@@ -9,11 +9,11 @@ export default function AydinlatmaPage() {
           Kişisel Verilerin Korunması Aydınlatma Metni
         </h1>
         <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '1.5rem' }}>
-          6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") m.10 uyarınca — Son güncelleme: [TARİH]
+          6698 sayılı Kişisel Verilerin Korunması Kanunu (&quot;KVKK&quot;) m.10 uyarınca — Son güncelleme: [TARİH]
         </p>
 
         <Section title="1. Veri Sorumlusu">
-          Bu aydınlatma metni, [ŞİRKET UNVANI] ("Pratium") tarafından veri sorumlusu sıfatıyla hazırlanmıştır.
+          Bu aydınlatma metni, [ŞİRKET UNVANI] (&quot;Pratium&quot;) tarafından veri sorumlusu sıfatıyla hazırlanmıştır.
           Adres: [ADRES] · E-posta: kvkk@pratium.com.tr · MERSİS: [NO]
         </Section>
 
@@ -44,7 +44,7 @@ export default function AydinlatmaPage() {
 
         <Section title="5. Verilerin Aktarılması">
           Kişisel verileriniz; barındırma, e-posta ve yapay zeka analiz hizmetleri kapsamında,
-          KVKK m.9'daki güvencelere uygun olarak yurt dışında yerleşik hizmet sağlayıcılara aktarılabilmektedir.
+          KVKK m.9&apos;daki güvencelere uygun olarak yurt dışında yerleşik hizmet sağlayıcılara aktarılabilmektedir.
           <b> Yapay zeka servislerine gönderilen içeriklerde kimlik bilgileriniz (ad, e-posta, kullanıcı kimliği)
           yer almaz; yalnızca anonimleştirilmiş soru/cevap içeriği iletilir.</b> Aktarım yapılan hizmet
           sağlayıcılar ve güvence mekanizmaları hakkında detaylı bilgi için kvkk@pratium.com.tr adresine başvurabilirsiniz.

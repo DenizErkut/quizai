@@ -163,7 +163,7 @@ export default function AIQualityTestPage() {
         </button>
         <h1 style={{ color: '#fff', fontWeight: 900, fontSize: '24px', margin: 0 }}>🧪 AI Kalite Testi</h1>
         <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', marginTop: 4 }}>
-          Gerçek öğrenci trafiğini etkilemeden, Mistral / GPT-4.1-mini / Claude Sonnet'i aynı konuyla zorlayıp yan yana karşılaştır (yalnızca admin hesaplar).
+          Gerçek öğrenci trafiğini etkilemeden, Mistral / GPT-4.1-mini / Claude Sonnet&apos;i aynı konuyla zorlayıp yan yana karşılaştır (yalnızca admin hesaplar).
         </p>
         <p style={{ color: '#fff', fontSize: 13 }} role="status">{catalogMessage}</p>
       </div>
@@ -242,7 +242,7 @@ export default function AIQualityTestPage() {
                     </div>
                     {run.data.debugBankFallback && (
                       <div style={{ fontSize: '11px', color: '#dc2626', marginBottom: '8px', padding: '6px 8px', background: 'rgba(220,38,38,0.08)', borderRadius: 6 }}>
-                        ⚠️ Bu sonuç {p.label}'den değil, soru bankası fallback'inden geldi ({p.label} eksik/geçersiz yanıt verdi). Kalite değerlendirmesi için geçerli değil.
+                        ⚠️ Bu sonuç {p.label}&apos;den değil, soru bankası fallback&apos;inden geldi ({p.label} eksik/geçersiz yanıt verdi). Kalite değerlendirmesi için geçerli değil.
                       </div>
                     )}
                     <div style={{ maxHeight: '480px', overflowY: 'auto' }}>

@@ -481,8 +481,8 @@ function CheckoutContent() {
             </div>
 
             <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text3)', marginTop: '0.75rem' }}>
-              Ödemeye geçerek <a href="/terms" target="_blank" style={{ color: 'var(--text2)' }}>Kullanım Şartları</a>'nı ve{' '}
-              <a href="/mesafeli-satis" target="_blank" style={{ color: 'var(--text2)' }}>Mesafeli Satış Sözleşmesi</a>'ni kabul etmiş olursun.
+              Ödemeye geçerek <a href="/terms" target="_blank" style={{ color: 'var(--text2)' }}>Kullanım Şartları</a>&apos;nı ve{' '}
+              <a href="/mesafeli-satis" target="_blank" style={{ color: 'var(--text2)' }}>Mesafeli Satış Sözleşmesi</a>&apos;ni kabul etmiş olursun.
             </p>
           </>
         ) : (

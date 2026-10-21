@@ -781,7 +781,7 @@ function RegisterContent() {
             <input type="checkbox" checked={kvkkAydinlatma} onChange={e => { setKvkkAydinlatma(e.target.checked); setKvkk(e.target.checked && kvkkAcikRiza) }}
               style={{ marginTop: '2px', flexShrink: 0, width: 16, height: 16, accentColor: 'var(--accent)' }} />
             <span style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.5 }}>
-              <Link href="/kvkk/aydinlatma" target="_blank" style={{ color: 'var(--accent)', fontWeight: 600 }}>KVKK Aydınlatma Metni</Link>'ni okudum.
+              <Link href="/kvkk/aydinlatma" target="_blank" style={{ color: 'var(--accent)', fontWeight: 600 }}>KVKK Aydınlatma Metni</Link>&apos;ni okudum.
               (<Link href="/terms" target="_blank" style={{ color: 'var(--accent)' }}>Kullanım Koşulları</Link>)
             </span>
           </label>
