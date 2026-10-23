@@ -49,6 +49,7 @@ import { verifyVisualWithGemini } from '@/lib/gemini-visual-quality'
 import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, minimumNormalTestCount, minimumVerifiedQuestionCount, missingRoleBatches, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, roleBatchMaxTokens, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
 import { phantomVisualIssue, salvageLeakedSvg } from '@/lib/phantom-visual'
 import { fitSvgText } from '@/lib/svg-text-fit'
+import { filterRowsByUserScope } from '@/lib/location/resource-scope'
 import { isSameGradeSource } from '@/lib/meb-source-scope'
 import { visualProfileForSubject, visualQuotaFor, VERBAL_VISUAL_RATIO } from '@/lib/visual-quota-policy'
 import { internalOrigin } from '@/lib/internal-origin'
@@ -1129,13 +1130,14 @@ async function generateVisualWithRetry(q: any, category: string, topic: string, 
   })(), maxMs, null)
 }
 
-async function loadBookletContext(subject: string, grade: string, topic: string): Promise<string> {
-  const { data, error } = await supabase.from('exam_resources')
-    .select('raw_text,subject,grade,topic,subtopic,source_type,review_status')
+async function loadBookletContext(subject: string, grade: string, topic: string, location: { country?: string | null; state?: string | null; city?: string | null }): Promise<string> {
+  const { data: candidates, error } = await supabase.from('exam_resources')
+    .select('raw_text,subject,grade,topic,subtopic,source_type,review_status,country,state,city')
     .eq('purpose', 'instant_test')
     .neq('review_status', 'rejected')
     .limit(12)
-  if (error || !data?.length) return ''
+  const data = filterRowsByUserScope(candidates || [], location, (row: any) => row)
+  if (error || !data.length) return ''
   const subjectKey = normalizeTR(subject)
   const topicKey = normalizeTR(topic)
   const matches = data.filter((row: any) => {
@@ -1479,6 +1481,9 @@ export async function POST(req: NextRequest) {
       .eq('id', user.id)
       .single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+    // Soru havuzu konuma göre ayrılır: okurken ülke/eyalet/şehir, yazarken yalnızca ülke (ülke geneli paylaşılır).
+    const bankReadLocation = { country: profile.country, state: profile.state, city: profile.city }
+    const bankWriteLocation = { country: profile.country }
     // Konum zorunlu: müfredat/kazanım seçimi öğrencinin ülkesine (ve varsa eyalet/şehrine) göre yapılır.
     const locationRequired = profile.role === 'student' && profile.is_admin !== true
     if (locationRequired && !hasLocation(profile)) {
@@ -1791,7 +1796,7 @@ export async function POST(req: NextRequest) {
     }
 
     const bookletContext = !fileContent
-      ? await loadBookletContext(subject, grade, topic).catch(() => '')
+      ? await loadBookletContext(subject, grade, topic, bankReadLocation).catch(() => '')
       : ''
     const isUniversityLevel = level === 'universite'
     const allObjectiveCandidates = await loadCanonicalObjectiveCandidates(supabase, {
@@ -1833,7 +1838,7 @@ export async function POST(req: NextRequest) {
     if (bankEligible) {
       bankQuestions = await getQuestionBankSet(supabase, {
         subject, topic, grade, language: effectiveLang,
-        questionType, difficulty: resolvedDifficulty,
+        questionType, difficulty: resolvedDifficulty, location: bankReadLocation,
       }, safeQCount, recentQuestionTexts)
       bankQuestions = filterQuestionsByRequestedType(bankQuestions, questionType)
 
@@ -2466,7 +2471,7 @@ export async function POST(req: NextRequest) {
         if (bankFallback.length >= missingFromAi) break
         const fallbackQuestions = await getQuestionBankSet(supabase, {
           subject, topic, grade, language: effectiveLang, questionType,
-          difficulty: recoveryDifficulty,
+          difficulty: recoveryDifficulty, location: bankReadLocation,
         }, missingFromAi - bankFallback.length, [
           ...recentQuestionTexts,
           ...bankQuestions.map((question: any) => question?.q).filter(Boolean),
@@ -2527,7 +2532,7 @@ export async function POST(req: NextRequest) {
       if (!response.ok) return null
       const reviewed = await response.json()
       if (bankWriteEligible && !fileContent && Array.isArray(reviewed.reviewExceptions) && reviewed.reviewExceptions.length) {
-        await promoteQuestionsToBank(supabase, { subject,topic,grade,language:effectiveLang,questionType,difficulty:resolvedDifficulty },
+        await promoteQuestionsToBank(supabase, { subject,topic,grade,language:effectiveLang,questionType,difficulty:resolvedDifficulty,location:bankWriteLocation },
           reviewed.reviewExceptions,{ engine:genEngineUsed,teacherExceptions:true })
       }
       return reviewed
@@ -2562,7 +2567,7 @@ export async function POST(req: NextRequest) {
           if (replacements.length >= missing) break
           const bankRows = await getQuestionBankSet(supabase, {
             subject, topic, grade, language: effectiveLang, questionType,
-            difficulty: recoveryDifficulty,
+            difficulty: recoveryDifficulty, location: bankReadLocation,
           }, missing - replacements.length, [...recentQuestionTexts, ...existingTexts, ...replacements.map((question: any) => question.q).filter(Boolean)])
           replacements.push(...filterQuestionsByRequestedType(bankRows, questionType))
         }
@@ -3003,7 +3008,7 @@ export async function POST(req: NextRequest) {
       after(async () => {
         const promoted = await promoteQuestionsToBank(supabase, {
           subject, topic, grade, language: effectiveLang,
-          questionType, difficulty: resolvedDifficulty,
+          questionType, difficulty: resolvedDifficulty, location: bankWriteLocation,
         }, validatedQuestionsForBank, { sessionId, engine: genEngineUsed })
         console.log(`[question-bank] promoted=${promoted} topic=${topic}`)
       })

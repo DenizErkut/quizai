@@ -84,7 +84,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'question-books' | 'exam-books' | 'question-bank' | 'objective-mapping' | 'education-eval' | 'curriculum' | 'learning-graph' | 'kvkk' | 'adaptive' | 'risk' | 'coaching' | 'coach-usage' | 'unit-economics'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'country-sources' | 'question-books' | 'exam-books' | 'question-bank' | 'objective-mapping' | 'education-eval' | 'curriculum' | 'learning-graph' | 'kvkk' | 'adaptive' | 'risk' | 'coaching' | 'coach-usage' | 'unit-economics'>('users')
   const [identityMissing, setIdentityMissing] = useState<number | null>(null)
   const [identityScanning, setIdentityScanning] = useState(false)
   const [identityFixing, setIdentityFixing] = useState(false)
@@ -112,7 +112,7 @@ export default function AdminPage() {
   const [examMsg, setExamMsg] = useState('')
   const [examFile, setExamFile] = useState<File | null>(null)
   const [examEvidenceFiles, setExamEvidenceFiles] = useState<File[]>([])
-  const [examForm, setExamForm] = useState({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '', learningObjectiveCodes: '' })
+  const [examForm, setExamForm] = useState({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '', learningObjectiveCodes: '', country: 'TR', state: '', city: '' })
   const [examList, setExamList] = useState<any[]>([])
   const [examListLoading, setExamListLoading] = useState(false)
   const [examEditor, setExamEditor] = useState<{
@@ -152,6 +152,10 @@ export default function AdminPage() {
   const [mebFile, setMebFile] = useState<File | null>(null)
   const [mebMsg, setMebMsg] = useState('')
   const [mebFilter, setMebFilter] = useState({ level: '', subject: '' })
+  // MEB sekmesi yalnızca Türkiye; "Ülke Kaynakları" sekmesinde ülke zorunlu, eyalet/şehir isteğe bağlı.
+  const [mebScope, setMebScope] = useState({ country: '', state: '', city: '' })
+  const mebUploadScope = tab === 'country-sources' ? mebScope : { country: 'TR', state: '', city: '' }
+  const mebListScope = tab === 'country-sources' ? 'other' : 'tr'
 
   const [instForm, setInstForm] = useState({ name: '', email: '', password: '', code: '', discount: '0', seller_id: '', country: '', state: '', city: '' })
   const [instSaving, setInstSaving] = useState(false)
@@ -354,6 +358,21 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (tab === 'sellers' && isAdmin) loadSellers()
+  }, [tab, isAdmin])
+
+  // Kaynak listesi sekmeye girince yüklenir (Türkiye ve ülke kaynakları ayrı listelenir).
+  useEffect(() => {
+    if ((tab !== 'meb' && tab !== 'country-sources') || !isAdmin) return
+    let cancelled = false
+    setMebLoading(true)
+    setMebResources([])
+    setMebFilter({ level: '', subject: '' })
+    fetch(`/api/admin/meb-upload?level=&subject=&scope=${tab === 'country-sources' ? 'other' : 'tr'}`)
+      .then(res => res.json())
+      .then(data => { if (!cancelled) setMebResources(data.resources || []) })
+      .catch(() => { /* no-op */ })
+      .finally(() => { if (!cancelled) setMebLoading(false) })
+    return () => { cancelled = true }
   }, [tab, isAdmin])
 
   async function createSeller() {
@@ -794,6 +813,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             { key: 'institutions', label: '🏛️ Kurumlar' },
             { key: 'sellers', label: '🤝 Satıcılar' },
             { key: 'meb', label: '📚 MEB Kaynakları' },
+            { key: 'country-sources', label: '🌍 Ülke Kaynakları' },
             { key: 'question-books', label: '📚 Soru Kitapçıkları' },
             { key: 'exam-books', label: '🎯 Sınav Kitapçıkları' },
             { key: 'question-bank', label: '📝 Soru Havuzu' },
@@ -1916,6 +1936,10 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             </div>
 
             {/* Cevap anahtarı */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Konum * (ülke zorunlu; eyalet ve şehir isteğe bağlı, boşsa ülkenin tamamı)</label>
+              <LocationSelect value={{ country: examForm.country, state: examForm.state, city: examForm.city }} onChange={next => setExamForm(p => ({ ...p, ...next }))} optionalPlaces />
+            </div>
             {tab === 'exam-books' && <div style={{ marginBottom: '12px' }}>
               <label style={{ fontSize: '12px', color: 'var(--text2)', display: 'block', marginBottom: '6px' }}>Cevap Anahtarı (opsiyonel)</label>
               <textarea value={examForm.answer_key} onChange={e => setExamForm(p => ({ ...p, answer_key: e.target.value }))}
@@ -1945,7 +1969,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             )}
 
             <button
-              disabled={examUploading || !examFile || !examForm.title || (tab === 'question-books' && (!examForm.grade.trim() || !examForm.subject.trim()))}
+              disabled={examUploading || !examFile || !examForm.title || !examForm.country || (tab === 'question-books' && (!examForm.grade.trim() || !examForm.subject.trim()))}
               onClick={async () => {
                 if (!examFile || !examForm.title) return
                 setExamUploading(true); setExamMsg('')
@@ -1976,7 +2000,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                       if (examEvidenceFiles.length && data.resource_id) await uploadExamEvidence(data.resource_id, examEvidenceFiles)
                       if (data.processingPending && data.resource_id) Object.assign(data, await finishBookletProcessing(data.resource_id, setExamMsg))
                       setExamMsg(tab === 'question-books' && examForm.source_type !== 'anonymous' ? `✅ Yüklendi; ${data.promoted || 0} soru birebir anlık test havuzuna aktarıldı${examEvidenceFiles.length ? ` ve ${examEvidenceFiles.length} yayın izni kanıtı saklandı` : ''}.` : `✅ Yüklendi! ${data.chunks} kaynak parçası işlendi.`)
-                      setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '', learningObjectiveCodes: '' })
+                      setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '', learningObjectiveCodes: '', country: 'TR', state: '', city: '' })
                       setExamFile(null)
                       setExamEvidenceFiles([])
                     } else setExamMsg('❌ ' + (data.error || 'Sunucu hatasi'))
@@ -1993,7 +2017,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                       if (examEvidenceFiles.length && data.resource_id) await uploadExamEvidence(data.resource_id, examEvidenceFiles)
                       if (data.processingPending && data.resource_id) Object.assign(data, await finishBookletProcessing(data.resource_id, setExamMsg))
                       setExamMsg(tab === 'question-books' && examForm.source_type !== 'anonymous' ? `✅ Yüklendi; ${data.promoted || 0} soru birebir anlık test havuzuna aktarıldı${examEvidenceFiles.length ? ` ve ${examEvidenceFiles.length} yayın izni kanıtı saklandı` : ''}.` : `✅ Yüklendi! ${data.chunks} kaynak parçası işlendi.`)
-                      setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '', learningObjectiveCodes: '' })
+                      setExamForm({ title: '', exam_type: 'LGS', year: new Date().getFullYear().toString(), subject: '', grade: '', subtopic: '', source_type: 'anonymous', answer_key: '', learningObjectiveCodes: '', country: 'TR', state: '', city: '' })
                       setExamFile(null)
                       setExamEvidenceFiles([])
                     } else setExamMsg('❌ ' + (data.error || 'Sunucu hatasi'))
@@ -2032,6 +2056,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>🎯</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--primary)' }}>{ex.title}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>🌍 {[ex.country || 'TR', ex.state, ex.city].filter(Boolean).join(' / ')}</div>
                       {tab === 'question-books' && ['teacher', 'ai'].includes(ex.source_type) && ex.review_status === 'approved' && <BookletVisuals resourceId={ex.id} />}
                       {tab === 'question-books' && ['teacher', 'ai'].includes(ex.source_type) && ex.review_status !== 'rejected' && <BookletProcessing resourceId={ex.id} />}
                       <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Anlık test kaynağı · {ex.grade ? `${ex.grade}. sınıf · ` : ''}{ex.subject || 'Ders belirtilmedi'}{(ex.topic || ex.subtopic) ? ` · ${ex.topic || ex.subtopic}` : ''} · {ex.chunk_count || 0} parça{Array.isArray(ex.learning_objective_codes) && ex.learning_objective_codes.length ? ` · kazanım: ${ex.learning_objective_codes.join(', ')}` : ''}{ex.publication_evidence_count ? ` · ${ex.publication_evidence_count} izin kanıtı` : ''}</div>
@@ -2074,7 +2099,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         </div>
       )}
 
-      {tab === 'meb' && (
+      {(tab === 'meb' || tab === 'country-sources') && (
         <div>
           {/* Madde 6: Sistematik sağlık taraması — content-quality-playbook.md'nin
               pilot adımı için ("en riskli 2-3 dersi seç") nesnel bir girdi. */}
@@ -2146,7 +2171,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           {/* Yükleme formu */}
           <div className="card" style={{ marginBottom: '1.5rem' }}>
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>
-              📤 Yeni Kaynak Yükle
+              {tab === 'country-sources' ? '🌍 Yeni Ülke Kaynağı Yükle' : '📤 Yeni Kaynak Yükle'}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
               <div>
@@ -2177,6 +2202,12 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   placeholder="Fen Bilimleri"
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' }} />
               </div>
+              {tab === 'country-sources' && (
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px' }}>Konum * (ülke zorunlu; eyalet ve şehir boşsa kaynak ülkenin tamamında geçerlidir)</label>
+                  <LocationSelect value={mebScope} onChange={setMebScope} optionalPlaces />
+                </div>
+              )}
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px' }}>Ünite *</label>
                 <input value={mebForm.unit} onChange={e => setMebForm(p => ({ ...p, unit: e.target.value }))}
@@ -2213,7 +2244,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             )}
 
             <button
-              disabled={mebUploading || !mebForm.title || !mebForm.grade || !mebForm.subject || !mebForm.unit}
+              disabled={mebUploading || !mebForm.title || !mebForm.grade || !mebForm.subject || !mebForm.unit || !mebUploadScope.country}
               onClick={async () => {
                 setMebUploading(true)
                 setMebMsg('')
@@ -2225,6 +2256,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     .ilike('subject', mebForm.subject)
                     .ilike('unit', mebForm.unit)
                     .eq('grade', mebForm.grade)
+                    .eq('country', mebUploadScope.country)
                     .limit(1)
 
                   if (existing && existing.length > 0) {
@@ -2281,6 +2313,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                         subject: mebForm.subject,
                         unit: mebForm.unit,
                         level: mebForm.level,
+                        country: mebUploadScope.country, state: mebUploadScope.state, city: mebUploadScope.city,
                       })
                     })
                   } else {
@@ -2291,6 +2324,9 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     fd.append('subject', mebForm.subject)
                     fd.append('unit', mebForm.unit)
                     fd.append('level', mebForm.level)
+                    fd.append('country', mebUploadScope.country)
+                    fd.append('state', mebUploadScope.state)
+                    fd.append('city', mebUploadScope.city)
                     fd.append('raw_text', mebForm.raw_text)
                     if (mebFile) fd.append('file', mebFile)
                     res = await fetch('/api/admin/meb-upload', { method: 'POST', body: fd })
@@ -2307,7 +2343,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     setMebForm({ title: '', grade: '', subject: '', unit: '', level: mebForm.level, raw_text: '' })
                     setMebFile(null)
                     // Listeyi yenile
-                    const r2 = await fetch(`/api/admin/meb-upload?level=${mebFilter.level}&subject=${mebFilter.subject}`)
+                    const r2 = await fetch(`/api/admin/meb-upload?level=${mebFilter.level}&subject=${mebFilter.subject}&scope=${mebListScope}`)
                     const d2 = await r2.json()
                     setMebResources(d2.resources || [])
                   } else {
@@ -2335,7 +2371,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   const level = e.target.value
                   setMebFilter(p => ({ ...p, level }))
                   setMebLoading(true)
-                  const res = await fetch(`/api/admin/meb-upload?level=${level}&subject=${mebFilter.subject}`)
+                  const res = await fetch(`/api/admin/meb-upload?level=${level}&subject=${mebFilter.subject}&scope=${mebListScope}`)
                   const data = await res.json()
                   setMebResources(data.resources || [])
                   setMebLoading(false)
@@ -2348,7 +2384,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                 </select>
                 <button onClick={async () => {
                   setMebLoading(true)
-                  const res = await fetch(`/api/admin/meb-upload?level=${mebFilter.level}&subject=${mebFilter.subject}`)
+                  const res = await fetch(`/api/admin/meb-upload?level=${mebFilter.level}&subject=${mebFilter.subject}&scope=${mebListScope}`)
                   const data = await res.json()
                   setMebResources(data.resources || [])
                   setMebLoading(false)
@@ -2383,6 +2419,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                           <span>📚 {r.subject}</span>
                           <span>📖 {r.unit}</span>
                           <span>🎓 {r.grade}</span>
+                          {tab === 'country-sources' && <span>🌍 {[r.country, r.state, r.city].filter(Boolean).join(' / ')}</span>}
                           <span>📄 {r.source_type === 'pdf' ? 'PDF' : 'Metin'}</span>
                           <span>💬 {(r.char_count / 1000).toFixed(1)}K karakter</span>
                           <span>🗓️ {new Date(r.created_at).toLocaleDateString('tr-TR')}</span>

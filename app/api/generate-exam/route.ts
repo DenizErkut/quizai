@@ -7,6 +7,7 @@ import { EXAM_FORMATS, resolveExamFormat, type ExamFormat, type ExamSection } fr
 import { createHash } from 'node:crypto'
 import { generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
 import { pickMeasuredQuizEngine } from '@/lib/ai-gateway/measured-quiz-router'
+import { filterRowsByUserScope } from '@/lib/location/resource-scope'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -75,14 +76,14 @@ SADECE geçerli JSON döndür, markdown yok. passage ve visual gerekmiyorsa null
 {"questions":[{"type":"multiple_choice","q":"Soru metni","opts":[${optionCount === 4 ? '"A şıkkı","B şıkkı","C şıkkı","D şıkkı"' : '"A şıkkı","B şıkkı","C şıkkı","D şıkkı","E şıkkı"'}],"ans":0,"exp":"Kısa açıklama","difficulty":"medium","cognitiveSkill":"reasoning","objective":"ölçülen kazanım","passage":null,"visual":null}]}`
 }
 
-async function getBookletReference(format: ExamFormat, section: ExamSection): Promise<string> {
-  const { data } = await supabase.from('exam_resources')
-    .select('id,title,raw_text,source_type,grade,subject,subtopic')
+async function getBookletReference(format: ExamFormat, section: ExamSection, location: { country?: string | null; state?: string | null; city?: string | null }): Promise<string> {
+  const { data: candidates } = await supabase.from('exam_resources')
+    .select('id,title,raw_text,source_type,grade,subject,subtopic,country,state,city')
     .eq('exam_type', format.label)
     .eq('purpose', 'exam')
     .in('source_type', ['anonymous', 'teacher'])
     .limit(12)
-  const rows = (data || []).filter((r: any) => {
+  const rows = filterRowsByUserScope(candidates || [], location, (r: any) => r).filter((r: any) => {
     const gradeOk = !r.grade || !section.grade || String(r.grade).toLocaleLowerCase('tr') === String(section.grade).toLocaleLowerCase('tr')
     const subjectOk = !r.subject || !section.subject || String(r.subject).toLocaleLowerCase('tr').includes(String(section.subject).toLocaleLowerCase('tr'))
     return gradeOk && subjectOk
@@ -212,7 +213,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: profile } = await supabase
-    .from('profiles').select('plan, grade').eq('id', user.id).single()
+    .from('profiles').select('plan, grade, country, state, city').eq('id', user.id).single()
 
   if (!profile) return NextResponse.json({ error: 'Profil bulunamadı.' }, { status: 404 })
   // 6 Eylül 2026 — GÜVENLİK DÜZELTMESİ: eski kontrol sadece plan==='free'
@@ -272,7 +273,7 @@ export async function POST(req: NextRequest) {
           const accepted: ExamQuestion[] = [...pooled]
           for (let attempt = 0; attempt < 2 && accepted.length < sectionCount; attempt++) {
             const missing = sectionCount - accepted.length
-            const referenceContext = await getBookletReference(format, section)
+            const referenceContext = await getBookletReference(format, section, { country: profile?.country, state: profile?.state, city: profile?.city })
             const prompt = buildSectionPrompt(section, missing, format, referenceContext)
             const examSystemPrompt = 'Sen Türk eğitim sisteminde sınav soruları hazırlayan bir uzmansın. Sadece geçerli JSON döndür, markdown kullanma.'
             let text: string
