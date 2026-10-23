@@ -20,7 +20,7 @@ test('kayıtlar kullanıcının ülke/eyalet/şehrine göre süzülür', () => {
     { id: 'tr', country: 'TR' }, { id: 'us', country: 'US' },
     { id: 'tr-ankara', country: 'TR', state: 'Ankara' }, { id: 'tr-izmir', country: 'TR', state: 'İzmir' },
   ]
-  const ids = (user: any) => filterRowsByUserScope(rows, user, row => row).map(row => row.id)
+  const ids = (user: { country: string; state?: string; city?: string } | null) => filterRowsByUserScope(rows, user, row => row).map(row => row.id)
   assert.deepEqual(ids({ country: 'TR', state: 'Ankara', city: 'Çankaya' }), ['tr', 'tr-ankara'])
   assert.deepEqual(ids({ country: 'US', state: 'Texas', city: 'Austin' }), ['us'])
   assert.deepEqual(ids(null), ['tr'])

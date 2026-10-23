@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
       if (subject) exactQuery = exactQuery.ilike('subject', `%${subject}%`)
       if (unit) exactQuery = exactQuery.ilike('unit', `%${unit}%`)
       const { data: exactResourcesRaw } = await exactQuery
-      const exactResources = filterRowsByUserScope(exactResourcesRaw || [], viewer, (r: any) => r)
+      const exactResources = filterRowsByUserScope(exactResourcesRaw || [], viewer, r => r)
 
       // Kazanım kataloğu kanonik başlığı (örn. "Fizik Bilimi Ve Kariyer
       // Keşfi") kullanırken kaynak belgesi "1. Ünite: ..." taşıyabilir.
@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
           .select(selectFields)
           .ilike('subject', `%${subject}%`)
           .limit(200)
-        allResources = filterRowsByUserScope(subjectResources || [], viewer, (r: any) => r)
+        allResources = filterRowsByUserScope(subjectResources || [], viewer, r => r)
       }
 
       if (allResources?.length) {

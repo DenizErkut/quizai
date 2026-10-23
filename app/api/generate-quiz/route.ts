@@ -1136,7 +1136,7 @@ async function loadBookletContext(subject: string, grade: string, topic: string,
     .eq('purpose', 'instant_test')
     .neq('review_status', 'rejected')
     .limit(12)
-  const data = filterRowsByUserScope(candidates || [], location, (row: any) => row)
+  const data = filterRowsByUserScope(candidates || [], location, row => row)
   if (error || !data.length) return ''
   const subjectKey = normalizeTR(subject)
   const topicKey = normalizeTR(topic)

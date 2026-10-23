@@ -83,7 +83,7 @@ async function getBookletReference(format: ExamFormat, section: ExamSection, loc
     .eq('purpose', 'exam')
     .in('source_type', ['anonymous', 'teacher'])
     .limit(12)
-  const rows = filterRowsByUserScope(candidates || [], location, (r: any) => r).filter((r: any) => {
+  const rows = filterRowsByUserScope(candidates || [], location, r => r).filter((r: any) => {
     const gradeOk = !r.grade || !section.grade || String(r.grade).toLocaleLowerCase('tr') === String(section.grade).toLocaleLowerCase('tr')
     const subjectOk = !r.subject || !section.subject || String(r.subject).toLocaleLowerCase('tr').includes(String(section.subject).toLocaleLowerCase('tr'))
     return gradeOk && subjectOk
