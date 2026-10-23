@@ -9,6 +9,39 @@ interface Objective {
   verification_status: string; lifecycle_status: string; is_active: boolean; source_type: string; source_reference: string | null; version: Version | null
 }
 interface Facets { countries: string[]; states: string[]; cities: string[] }
+interface Detail {
+  objective: Record<string, unknown> & { id: string; objective_code: string; title: string; source_reference: string | null }
+  version: Version | null
+  revisions: Array<{ id: string; revision_number: number; revision_status: string; title: string; change_reason: string; created_at: string }>
+  audit: Array<{ id: number; action: string; reason: string; created_at: string }>
+  usage: Record<string, number> | null
+  usageError: string | null
+}
+interface EditState { id: string; code: string; title: string; sourceReference: string; reason: string; busy: boolean; error: string }
+interface DeleteState { id: string; code: string; title: string; confirm: string; reason: string; busy: boolean; error: string; usage: Record<string, number> | null; loading: boolean }
+
+const USAGE_LABELS: Record<string, string> = {
+  learning_events: 'Öğrenme olayı', student_mastery: 'Öğrenci yetkinlik kaydı', learning_gain_measurements: 'Öğrenme kazancı ölçümü',
+  learning_transfer_checks: 'Transfer kontrolü', verified_learning_cycles: 'Doğrulanmış öğrenme döngüsü', education_eval_benchmark_items: 'Eğitim değerlendirme (benchmark) kaydı',
+  education_eval_ai_question_items: 'Eğitim değerlendirme (AI soru) kaydı', question_bank: 'Soru havuzundaki soru', exam_booklets: 'Kitapçık referansı',
+  replaced_by_references: 'Yerine geçtiği kazanım', graph_prerequisites: 'Öğrenme grafiği ön koşulu',
+}
+const ACTION_LABELS: Record<string, string> = { create: 'oluşturuldu', draft_revision: 'taslak revizyon', publish_revision: 'revizyon yayınlandı', supersede: 'yerine yenisi geçti', retire: 'emekli edildi', reactivate: 'yeniden etkinleştirildi', edit: 'düzenlendi' }
+const dateText = (value: unknown) => { const date = new Date(String(value || '')); return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('tr-TR') }
+const fieldText = (value: unknown) => (value === null || value === undefined || value === '' ? '—' : String(value))
+
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return <div role="dialog" aria-modal="true" aria-label={title} onClick={onClose}
+    style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+    <div onClick={event => event.stopPropagation()} style={{ background: 'var(--bg)', color: 'var(--text)', borderRadius: 14, border: '1px solid var(--border)', width: 'min(720px, 100%)', maxHeight: '88vh', overflow: 'auto', padding: 18 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <strong style={{ fontSize: 14 }}>{title}</strong>
+        <button type="button" className="btn btn-sm" onClick={onClose} aria-label="Kapat">✕</button>
+      </div>
+      {children}
+    </div>
+  </div>
+}
 
 const regionNames = typeof Intl !== 'undefined' && 'DisplayNames' in Intl ? new Intl.DisplayNames(['tr'], { type: 'region' }) : null
 const countryName = (code: string) => { try { return regionNames?.of(code) || code } catch { return code } }
@@ -35,6 +68,71 @@ export default function ObjectiveSourcesBrowser() {
   const [query, setQuery] = useState('')
   const request = useRef(0)
   const searchTimer = useRef(0)
+  const [detail, setDetail] = useState<Detail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [edit, setEdit] = useState<EditState | null>(null)
+  const [del, setDel] = useState<DeleteState | null>(null)
+  const [notice, setNotice] = useState('')
+
+  async function fetchDetail(id: string): Promise<Detail> {
+    const response = await fetch(`/api/admin/learning-objective-sources?id=${encodeURIComponent(id)}`)
+    const data = await response.json()
+    if (!response.ok) throw new Error(data.error || 'Kazanım ayrıntısı alınamadı.')
+    return data as Detail
+  }
+  async function openDetail(id: string) {
+    setDetail(null); setDetailLoading(true); setNotice('')
+    try { setDetail(await fetchDetail(id)) } catch (error) { setNotice(`❌ ${error instanceof Error ? error.message : 'Beklenmeyen hata'}`) }
+    finally { setDetailLoading(false) }
+  }
+  async function saveEdit() {
+    if (!edit) return
+    setEdit({ ...edit, busy: true, error: '' })
+    try {
+      const response = await fetch('/api/admin/learning-objective-sources', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: edit.id, title: edit.title, sourceReference: edit.sourceReference, reason: edit.reason }) })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Kazanım güncellenemedi.')
+      const result = data.result as { title: string; source_reference: string | null }
+      setObjectives(current => current.map(item => item.id === edit.id ? { ...item, title: result.title, source_reference: result.source_reference } : item))
+      setEdit(null); setNotice(`✅ ${edit.code} güncellendi.`)
+    } catch (error) { setEdit(current => current && { ...current, busy: false, error: error instanceof Error ? error.message : 'Beklenmeyen hata' }) }
+  }
+  async function openDelete(objective: Objective) {
+    setNotice('')
+    setDel({ id: objective.id, code: objective.objective_code, title: objective.title, confirm: '', reason: '', busy: false, error: '', usage: null, loading: true })
+    try {
+      const info = await fetchDetail(objective.id)
+      setDel(current => current && { ...current, usage: info.usage, loading: false, error: info.usageError || '' })
+    } catch (error) { setDel(current => current && { ...current, loading: false, error: error instanceof Error ? error.message : 'Kullanım bilgisi alınamadı.' }) }
+  }
+  async function confirmDelete() {
+    if (!del) return
+    setDel({ ...del, busy: true, error: '' })
+    try {
+      const response = await fetch('/api/admin/learning-objective-sources', { method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: del.id, confirmCode: del.confirm, reason: del.reason }) })
+      const data = await response.json()
+      if (!response.ok) {
+        setDel(current => current && { ...current, busy: false, error: data.error || 'Kazanım silinemedi.', usage: data.usage || current.usage })
+        return
+      }
+      setObjectives(current => current.filter(item => item.id !== del.id)); setTotal(current => Math.max(0, current - 1)); setCatalogTotal(current => Math.max(0, current - 1))
+      setDel(null); setNotice(`🗑️ ${del.code} silindi (kopyası silme kaydında saklandı).`)
+    } catch (error) { setDel(current => current && { ...current, busy: false, error: error instanceof Error ? error.message : 'Beklenmeyen hata' }) }
+  }
+  async function retireInstead() {
+    if (!del) return
+    setDel({ ...del, busy: true, error: '' })
+    try {
+      const response = await fetch('/api/admin/learning-objective-lifecycle', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ objectiveId: del.id, action: 'retire', reason: del.reason }) })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Kazanım emekli edilemedi.')
+      setObjectives(current => current.map(item => item.id === del.id ? { ...item, lifecycle_status: 'retired', is_active: false } : item))
+      setDel(null); setNotice(`✅ ${del.code} emekli edildi (öğrenci verileri korunur).`)
+    } catch (error) { setDel(current => current && { ...current, busy: false, error: error instanceof Error ? error.message : 'Beklenmeyen hata' }) }
+  }
 
   const load = useCallback(async (nextPage = 1, append = false) => {
     const id = ++request.current
@@ -106,6 +204,7 @@ export default function ObjectiveSourcesBrowser() {
     </div>}
 
     {message && <div style={{ fontSize: 12, color: 'var(--red)', margin: '8px 0' }}>{message}</div>}
+    {notice && <div style={{ fontSize: 12, margin: '8px 0', color: notice.startsWith('❌') ? 'var(--red)' : 'var(--green)' }}>{notice}</div>}
 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
       {objectives.map(objective => <div key={objective.id} style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg2)' }}>
@@ -123,6 +222,11 @@ export default function ObjectiveSourcesBrowser() {
           {objective.version && <span>🧾 {objective.version.code}</span>}
         </div>
         {objective.source_reference && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4, fontStyle: 'italic' }}>{objective.source_reference}</div>}
+        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+          <button type="button" className="btn btn-sm" onClick={() => openDetail(objective.id)}>👁️ Görüntüle</button>
+          <button type="button" className="btn btn-sm" onClick={() => setEdit({ id: objective.id, code: objective.objective_code, title: objective.title, sourceReference: objective.source_reference || '', reason: '', busy: false, error: '' })}>✏️ Düzenle</button>
+          <button type="button" className="btn btn-sm" style={{ color: 'var(--red)' }} onClick={() => openDelete(objective)}>🗑️ Sil</button>
+        </div>
       </div>)}
       {!busy && !objectives.length && !message && <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text3)' }}>Bu süzgece uyan kazanım yok.</div>}
     </div>
@@ -131,5 +235,66 @@ export default function ObjectiveSourcesBrowser() {
     {objectives.length < total && !busy && <div style={{ textAlign: 'center', marginTop: 10 }}>
       <button type="button" className="btn btn-sm" onClick={() => load(page + 1, true)}>Daha fazla göster ({objectives.length} / {total})</button>
     </div>}
+    {(detail || detailLoading) && <Modal title="Kazanım ayrıntısı" onClose={() => { setDetail(null); setDetailLoading(false) }}>
+      {detailLoading && <div style={{ textAlign: 'center', padding: '1rem' }}><div className="spinner" /></div>}
+      {detail && <div style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div><code style={{ fontWeight: 700 }}>{detail.objective.objective_code}</code><div style={{ fontSize: 13, marginTop: 4 }}>{detail.objective.title}</div></div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 6 }}>
+          {(['level', 'grade', 'subject', 'unit', 'topic', 'lifecycle_status', 'verification_status', 'is_active', 'source_type', 'valid_from', 'valid_to'] as const).map(key =>
+            <div key={key}><span style={{ color: 'var(--text3)' }}>{key}: </span>{fieldText(detail.objective[key])}</div>)}
+          <div><span style={{ color: 'var(--text3)' }}>Oluşturma: </span>{dateText(detail.objective.created_at)}</div>
+          <div><span style={{ color: 'var(--text3)' }}>Güncelleme: </span>{dateText(detail.objective.updated_at)}</div>
+        </div>
+        <div><b>Müfredat sürümü:</b> {detail.version ? `${detail.version.code} · ${scopeText(detail.version)} · ${detail.version.status} · ${detail.version.authority}` : '—'}</div>
+        <div><b>Kaynak referansı:</b> <span style={{ fontStyle: 'italic' }}>{fieldText(detail.objective.source_reference)}</span></div>
+        <div><b>Kullanım:</b> {detail.usage
+          ? (detail.usage.total ? Object.entries(detail.usage).filter(([key, value]) => key !== 'total' && value > 0).map(([key, value]) => `${USAGE_LABELS[key] || key}: ${value}`).join(' · ') : 'Hiçbir yerde kullanılmıyor (silinebilir).')
+          : (detail.usageError || '—')}</div>
+        <div><b>Revizyonlar ({detail.revisions.length}):</b>
+          {detail.revisions.map(revision => <div key={revision.id} style={{ marginTop: 4, color: 'var(--text2)' }}>#{revision.revision_number} · {revision.revision_status} · {dateText(revision.created_at)} · {revision.change_reason}</div>)}</div>
+        <div><b>Denetim kayıtları ({detail.audit.length}):</b>
+          {detail.audit.map(entry => <div key={entry.id} style={{ marginTop: 4, color: 'var(--text2)' }}>{dateText(entry.created_at)} · {ACTION_LABELS[entry.action] || entry.action} · {entry.reason}</div>)}</div>
+        <details><summary style={{ cursor: 'pointer' }}>Ham metadata</summary><pre style={{ whiteSpace: 'pre-wrap', fontSize: 11 }}>{JSON.stringify(detail.objective.metadata ?? {}, null, 2)}</pre></details>
+      </div>}
+    </Modal>}
+
+    {edit && <Modal title={`Kazanımı düzenle · ${edit.code}`} onClose={() => !edit.busy && setEdit(null)}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
+        <label>Kazanım metni *<textarea className="input" rows={4} value={edit.title} maxLength={1000} onChange={event => setEdit({ ...edit, title: event.target.value })} /></label>
+        <label>Kaynak referansı<textarea className="input" rows={2} value={edit.sourceReference} maxLength={1000} onChange={event => setEdit({ ...edit, sourceReference: event.target.value })} /></label>
+        <label>Değişiklik gerekçesi * (denetim kaydına yazılır)<input className="input" value={edit.reason} maxLength={500} placeholder="Örn. yazım hatası düzeltildi" onChange={event => setEdit({ ...edit, reason: event.target.value })} /></label>
+        <div style={{ color: 'var(--text3)' }}>Kod, sınıf, ders, ünite ve konu bu ekrandan değiştirilmez; aktif revizyon ve öğrenme grafiği düğümü yeni metinle güncellenir.</div>
+        {edit.error && <div style={{ color: 'var(--red)' }}>❌ {edit.error}</div>}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button type="button" className="btn btn-sm" disabled={edit.busy} onClick={() => setEdit(null)}>Vazgeç</button>
+          <button type="button" className="btn btn-sm btn-primary" disabled={edit.busy || edit.title.trim().length < 3 || edit.reason.trim().length < 3} onClick={saveEdit}>{edit.busy ? 'Kaydediliyor…' : 'Kaydet'}</button>
+        </div>
+      </div>
+    </Modal>}
+
+    {del && <Modal title={`Kazanımı sil · ${del.code}`} onClose={() => !del.busy && setDel(null)}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
+        <div style={{ fontSize: 13 }}>{del.title}</div>
+        {del.loading && <div>Kullanım kontrol ediliyor…</div>}
+        {!del.loading && del.usage && del.usage.total > 0 && <div style={{ padding: 10, borderRadius: 8, border: '1px solid var(--red)', color: 'var(--red)' }}>
+          <b>Bu kazanım kullanımda, silinemez.</b>
+          <div style={{ marginTop: 4 }}>{Object.entries(del.usage).filter(([key, value]) => key !== 'total' && value > 0).map(([key, value]) => `${USAGE_LABELS[key] || key}: ${value}`).join(' · ')}</div>
+          <div style={{ marginTop: 4, color: 'var(--text2)' }}>Öğrenci ve soru verisini korumak için kazanımı emekli edebilirsiniz (listelerden kalkar, geçmiş veri durur).</div>
+        </div>}
+        {!del.loading && del.usage && del.usage.total === 0 && <div style={{ padding: 10, borderRadius: 8, border: '1px solid var(--border)' }}>
+          Kazanım hiçbir yerde kullanılmıyor. Silinirse revizyonları ve öğrenme grafiği düğümü de silinir; tam bir kopyası silme kaydında saklanır. <b>Bu işlem geri alınamaz.</b>
+        </div>}
+        <label>Silme gerekçesi * <input className="input" value={del.reason} maxLength={500} onChange={event => setDel({ ...del, reason: event.target.value })} /></label>
+        {del.usage?.total === 0 && <label>Onaylamak için kazanım kodunu yazın: <code>{del.code}</code>
+          <input className="input" value={del.confirm} autoComplete="off" onChange={event => setDel({ ...del, confirm: event.target.value })} /></label>}
+        {del.error && <div style={{ color: 'var(--red)' }}>❌ {del.error}</div>}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <button type="button" className="btn btn-sm" disabled={del.busy} onClick={() => setDel(null)}>Vazgeç</button>
+          {del.usage && del.usage.total > 0 && <button type="button" className="btn btn-sm" disabled={del.busy || del.reason.trim().length < 3} onClick={retireInstead}>Emekli et</button>}
+          {del.usage?.total === 0 && <button type="button" className="btn btn-sm" style={{ background: 'var(--red)', color: '#fff' }}
+            disabled={del.busy || del.reason.trim().length < 3 || del.confirm !== del.code} onClick={confirmDelete}>{del.busy ? 'Siliniyor…' : 'Kalıcı olarak sil'}</button>}
+        </div>
+      </div>
+    </Modal>}
   </div>
 }
