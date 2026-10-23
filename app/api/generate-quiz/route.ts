@@ -48,6 +48,7 @@ import { verifyVisualWithMistral } from '@/lib/mistral-quality'
 import { verifyVisualWithGemini } from '@/lib/gemini-visual-quality'
 import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, minimumNormalTestCount, minimumVerifiedQuestionCount, missingRoleBatches, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, roleBatchMaxTokens, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
 import { phantomVisualIssue, salvageLeakedSvg } from '@/lib/phantom-visual'
+import { fitSvgText } from '@/lib/svg-text-fit'
 import { isSameGradeSource } from '@/lib/meb-source-scope'
 import { visualProfileForSubject, visualQuotaFor, VERBAL_VISUAL_RATIO } from '@/lib/visual-quota-policy'
 import { internalOrigin } from '@/lib/internal-origin'
@@ -427,7 +428,9 @@ CRITICAL SVG RULES:
 - Clean white background: <rect width="400" height="280" fill="white"/>
 - Use clear colors: geometry=#2563eb, labels=black, highlights=#ef4444
 - Font: Arial, minimum 13px for readability
-- Add a subtle title at top relating to the question
+- Add a short title at top (MAX 40 characters, font-size 14, text-anchor="middle" at x=200). Never copy the whole question as the title.
+- LAYOUT: every <text> must stay fully inside x=10..390 and y=14..270. Keep each label under 28 characters.
+- Labels must not overlap each other, the shape lines or the points: put a label at least 14px away from lines and from other labels, and never write two labels on the same spot. Use one label per object (no duplicate names such as "AB" plus "M" at the same point).
 - NO JavaScript, NO external resources, NO foreignObject
 - Return ONLY the SVG code, nothing else, starting with <svg
 - CORRECT ANSWER (DO NOT SHOW THIS IN SVG): "${correctAnswer}"
@@ -669,8 +672,10 @@ async function generateVisualForQuestion(
     // SVG'yi temizle — sadece <svg...></svg> al
     const match = text.match(/<svg[\s\S]*<\/svg>/i)
     if (match) {
-      const contextQuality = await visualMatchesQuestion(q.q, match[0], String(correctAnswer))
-      if (contextQuality.passed) return { svg: match[0], contextQuality }
+      // Taşan başlık/etiketler denetimden ve öğrenciye gösterimden önce çizim alanına sığdırılır.
+      const fitted = fitSvgText(match[0])
+      const contextQuality = await visualMatchesQuestion(q.q, fitted, String(correctAnswer))
+      if (contextQuality.passed) return { svg: fitted, contextQuality }
     }
     if (match) console.warn('[generate-visual] rejected unrelated, low-context, or answer-revealing SVG')
     return null
