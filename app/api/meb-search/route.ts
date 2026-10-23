@@ -8,6 +8,8 @@ import {
   findContentStart,
 } from '@/lib/content-filters'
 import { isSameGradeSource } from '@/lib/meb-source-scope'
+import { filterRowsByUserScope, rowScope, userScopeOrDefault } from '@/lib/location/resource-scope'
+import { scopeApplies } from '@/lib/location/curriculum-scope'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -55,6 +57,10 @@ export async function POST(req: NextRequest) {
   try {
     const { topic, grade, subject, unit, level, limit = 4 } = await req.json()
 
+    // Kaynaklar konuma göre ayrılır: yalnızca kullanıcının ülke/eyalet/şehrine uyanlar kullanılır (konum yoksa Türkiye).
+    const { data: viewer } = await adminDb.from('profiles').select('country,state,city').eq('id', user.id).maybeSingle()
+    const viewerScope = userScopeOrDefault(viewer)
+
     // Embedding üret
     const embedding = await embedQuery(topic)
 
@@ -73,7 +79,8 @@ export async function POST(req: NextRequest) {
       if (chunks?.length) {
         // Semantic search bazen ön sayfa chunk'larını da (embedding'i
         // yanlışlıkla konuya yakın çıkabiliyor) döndürebiliyor — filtrele.
-        const cleanChunks = chunks.filter((c: any) => isSameGradeSource(grade, c.grade)
+        // RPC kaynağın konumunu döndürmez; eski/konumsuz parçalar Türkiye kaynağı sayılır.
+        const cleanChunks = chunks.filter((c: any) => scopeApplies(rowScope(c), viewerScope) && isSameGradeSource(grade, c.grade)
           && (!subject || !c.subject || normalizeTR(c.subject) === normalizeTR(subject))
           && !isNonContent(c.content || ''))
         if (cleanChunks.length > 0) {
@@ -87,11 +94,12 @@ export async function POST(req: NextRequest) {
 
     // meb_resources.raw_text'ten direkt ara (chunk'sız — disk IO tasarrufu)
     if (!context) {
-      const selectFields = 'title, subject, unit, grade, raw_text, health_flag'
+      const selectFields = 'title, subject, unit, grade, raw_text, health_flag, country, state, city'
       let exactQuery = adminDb.from('meb_resources').select(selectFields).limit(50)
       if (subject) exactQuery = exactQuery.ilike('subject', `%${subject}%`)
       if (unit) exactQuery = exactQuery.ilike('unit', `%${unit}%`)
-      const { data: exactResources } = await exactQuery
+      const { data: exactResourcesRaw } = await exactQuery
+      const exactResources = filterRowsByUserScope(exactResourcesRaw || [], viewer, r => r)
 
       // Kazanım kataloğu kanonik başlığı (örn. "Fizik Bilimi Ve Kariyer
       // Keşfi") kullanırken kaynak belgesi "1. Ünite: ..." taşıyabilir.
@@ -104,7 +112,7 @@ export async function POST(req: NextRequest) {
           .select(selectFields)
           .ilike('subject', `%${subject}%`)
           .limit(200)
-        allResources = subjectResources || []
+        allResources = filterRowsByUserScope(subjectResources || [], viewer, r => r)
       }
 
       if (allResources?.length) {
@@ -165,7 +173,7 @@ export async function POST(req: NextRequest) {
     if (subject || topic) {
       let examQ = adminDb
         .from('exam_chunks')
-        .select('content, subject, exam_type, year, grade')
+        .select('content, subject, exam_type, year, grade, exam_resources!inner(country, state, city)')
         .limit(12) // Madde 4: filtreden sonra 3'e ineceği için fazladan çek
 
       if (subject) examQ = examQ.ilike('subject', `%${subject}%`)
@@ -189,6 +197,7 @@ export async function POST(req: NextRequest) {
         // desenli, daha hedefli) olduğu gibi kalıyor.
         const examChunks = examChunksRaw
           .filter((c: any) => {
+            if (!scopeApplies(rowScope(Array.isArray(c.exam_resources) ? c.exam_resources[0] : c.exam_resources), viewerScope)) return false
             if (!isSameGradeSource(grade, c.grade)) return false
             const content = c.content || ''
             return !isNonContent(content) && !isKazanimListesi(content)
