@@ -44,6 +44,7 @@ import ProviderObservability from '@/components/admin/ProviderObservability'
 import EducationEvalBenchmark from '@/components/admin/EducationEvalBenchmark'
 import EducationEvalRunner from '@/components/admin/EducationEvalRunner'
 import ObjectiveMappingReview from '@/components/admin/ObjectiveMappingReview'
+import ObjectiveSourcesBrowser from '@/components/admin/ObjectiveSourcesBrowser'
 import PilotAccountSetup from '@/components/admin/PilotAccountSetup'
 
 interface User {
@@ -84,7 +85,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'country-sources' | 'question-books' | 'exam-books' | 'question-bank' | 'objective-mapping' | 'education-eval' | 'curriculum' | 'learning-graph' | 'kvkk' | 'adaptive' | 'risk' | 'coaching' | 'coach-usage' | 'unit-economics'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'country-sources' | 'objective-sources' | 'question-books' | 'exam-books' | 'question-bank' | 'objective-mapping' | 'education-eval' | 'curriculum' | 'learning-graph' | 'kvkk' | 'adaptive' | 'risk' | 'coaching' | 'coach-usage' | 'unit-economics'>('users')
   const [identityMissing, setIdentityMissing] = useState<number | null>(null)
   const [identityScanning, setIdentityScanning] = useState(false)
   const [identityFixing, setIdentityFixing] = useState(false)
@@ -814,6 +815,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             { key: 'sellers', label: '🤝 Satıcılar' },
             { key: 'meb', label: '📚 MEB Kaynakları' },
             { key: 'country-sources', label: '🌍 Ülke Kaynakları' },
+            { key: 'objective-sources', label: '📖 Kazanım Kaynakları' },
             { key: 'question-books', label: '📚 Soru Kitapçıkları' },
             { key: 'exam-books', label: '🎯 Sınav Kitapçıkları' },
             { key: 'question-bank', label: '📝 Soru Havuzu' },
@@ -841,6 +843,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         </div>
 
         {tab === 'objective-mapping' && <ObjectiveMappingReview />}
+        {tab === 'objective-sources' && <ObjectiveSourcesBrowser />}
 
         {/* Stats tab */}
         {tab === 'stats' && stats && (
