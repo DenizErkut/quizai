@@ -45,6 +45,7 @@ import EducationEvalBenchmark from '@/components/admin/EducationEvalBenchmark'
 import EducationEvalRunner from '@/components/admin/EducationEvalRunner'
 import ObjectiveMappingReview from '@/components/admin/ObjectiveMappingReview'
 import ObjectiveSourcesBrowser from '@/components/admin/ObjectiveSourcesBrowser'
+import QuestionBankSvgFit from '@/components/admin/QuestionBankSvgFit'
 import PilotAccountSetup from '@/components/admin/PilotAccountSetup'
 
 interface User {
@@ -1842,6 +1843,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         <div className="anim-up">
           <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)', marginBottom: '1rem' }}>📝 Soru Havuzu</h2>
           <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1rem' }}>Anlık testlerde kullanılacak soruları inceleyin, düzenleyin ve yeniden onaya gönderin.</p>
+          <QuestionBankSvgFit />
           <QuestionBankEditor />
         </div>
       )}

@@ -7,7 +7,7 @@ import { EXAM_FORMATS, resolveExamFormat, type ExamFormat, type ExamSection } fr
 import { createHash } from 'node:crypto'
 import { generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
 import { pickMeasuredQuizEngine } from '@/lib/ai-gateway/measured-quiz-router'
-import { filterRowsByUserScope } from '@/lib/location/resource-scope'
+import { filterRowsByUserScope, userScopeOrDefault } from '@/lib/location/resource-scope'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -156,9 +156,17 @@ function examFingerprint(question: ExamQuestion, format: ExamFormat, section: Ex
   })).digest('hex')
 }
 
-async function getApprovedExamQuestions(format: ExamFormat, section: ExamSection, count: number): Promise<ExamQuestion[]> {
+type PoolLocation = { country?: string | null; state?: string | null; city?: string | null }
+
+async function getApprovedExamQuestions(format: ExamFormat, section: ExamSection, count: number, location: PoolLocation): Promise<ExamQuestion[]> {
+  const quote = (value: string) => `"${value.replace(/["\\]/g, '')}"`
+  const state = (location.state || '').trim()
+  const city = (location.city || '').trim()
   const { data, error } = await supabase.from('exam_question_bank')
     .select('id, question')
+    .eq('country', (location.country || 'TR').trim().toUpperCase())
+    .or(state ? `state.is.null,state.eq.${quote(state)}` : 'state.is.null')
+    .or(city ? `city.is.null,city.eq.${quote(city)}` : 'city.is.null')
     .eq('exam_year', format.examYear)
     .eq('exam_type', format.label)
     .eq('track', format.track || '')
@@ -178,10 +186,10 @@ async function getApprovedExamQuestions(format: ExamFormat, section: ExamSection
   return rows.map(row => row.question as ExamQuestion)
 }
 
-async function storeApprovedExamQuestions(format: ExamFormat, section: ExamSection, questions: ExamQuestion[]) {
+async function storeApprovedExamQuestions(format: ExamFormat, section: ExamSection, questions: ExamQuestion[], country: string) {
   if (!questions.length) return
   const rows = questions.map(question => ({
-    fingerprint: examFingerprint(question, format, section), exam_year: format.examYear, exam_type: format.label,
+    fingerprint: examFingerprint(question, format, section), country, exam_year: format.examYear, exam_type: format.label,
     track: format.track || '', language: format.language || 'Türkçe', section_id: section.id,
     subject: section.subject, grade: section.grade, curriculum_version: format.curriculumVersion,
     objective: question.objective || '', cognitive_skill: question.cognitiveSkill || 'application',
@@ -262,6 +270,7 @@ export async function POST(req: NextRequest) {
   try {
     const results: Record<string, any[]> = {}
 
+    const poolLocation = userScopeOrDefault(profile)
     const CHUNK = 3
     for (let i = 0; i < sectionsToGenerate.length; i += CHUNK) {
       const chunk = sectionsToGenerate.slice(i, i + CHUNK)
@@ -269,7 +278,7 @@ export async function POST(req: NextRequest) {
         const sectionCount = isDemoOnly ? 1 : Math.max(4, Math.round(section.count * countMultiplier))
 
         try {
-          const pooled = await getApprovedExamQuestions(format, section, sectionCount)
+          const pooled = await getApprovedExamQuestions(format, section, sectionCount, poolLocation)
           const accepted: ExamQuestion[] = [...pooled]
           for (let attempt = 0; attempt < 2 && accepted.length < sectionCount; attempt++) {
             const missing = sectionCount - accepted.length
@@ -300,7 +309,7 @@ export async function POST(req: NextRequest) {
             const structurallyAccepted = uniqueQualityQuestions((parsed.questions || []) as ExamQuestion[], optionCount)
               .slice(0, missing)
             const independentlyAccepted = await validateWithIndependentModel(structurallyAccepted, section, format, user.id)
-            await storeApprovedExamQuestions(format, section, independentlyAccepted)
+            await storeApprovedExamQuestions(format, section, independentlyAccepted, poolLocation.country || 'TR')
             accepted.push(...independentlyAccepted)
           }
           if (accepted.length < sectionCount) throw new Error(`Kalite kontrolünden geçen soru sayısı yetersiz: ${accepted.length}/${sectionCount}`)
