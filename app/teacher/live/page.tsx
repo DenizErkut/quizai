@@ -12,7 +12,7 @@ export default function TeacherLivePage() {
   const router = useRouter()
   const supabase = createClient() as any
 
-  const [teacher, setTeacher] = useState<any>(null)
+  const [teacher, setTeacher] = useState<unknown>(null)
   const [classrooms, setClassrooms] = useState<any[]>([])
   const [screen, setScreen] = useState<'setup' | 'waiting' | 'active' | 'reveal' | 'results'>('setup')
   const [form, setForm] = useState({ classroom_id: '', topic: '', question_count: 5, difficulty: 'normal', time_per_question: 30 })
@@ -35,7 +35,7 @@ export default function TeacherLivePage() {
   const [actionError, setActionError] = useState('')
   const lastActionRef = useRef<(() => void) | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
-  const realtimeRef = useRef<any>(null)
+  const realtimeRef = useRef<unknown>(null)
 
   async function patchLiveQuiz(body): Promise<boolean> {
     try {

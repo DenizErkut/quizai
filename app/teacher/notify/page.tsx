@@ -15,7 +15,7 @@ const TEMPLATES = [
 
 export default function TeacherNotifyPage() {
   const { t: tr, locale } = useT()
-  const [teacher, setTeacher] = useState<any>(null)
+  const [teacher, setTeacher] = useState<unknown>(null)
   const [classrooms, setClassrooms] = useState<any[]>([])
   const [selectedClass, setSelectedClass] = useState<string>('')
   const [message, setMessage] = useState('')
@@ -86,7 +86,7 @@ export default function TeacherNotifyPage() {
       setResult({ recipientCount: json.recipientCount, pushDelivered: json.pushDelivered })
       setMessage('')
       setSent(true)
-      if (json.notifRecord) setHistory((prev: any[]) => [json.notifRecord, ...prev])
+      if (json.notifRecord) setHistory((prev: unknown[]) => [json.notifRecord, ...prev])
       setTimeout(() => setSent(false), 4000)
     } catch (err) {
       alert(tr('Hata: {msg}', { msg: err.message ?? tr('Bilinmeyen hata') }))

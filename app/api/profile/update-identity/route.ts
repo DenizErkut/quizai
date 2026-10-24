@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
         age: updates.age ?? undefined,
         role: role || 'student',
       })
-      const followUp: Record<string, any> = {}
+      const followUp: Record<string, unknown> = {}
       if (updates.phone !== undefined) followUp.phone = updates.phone
       if (updates.parent_email !== undefined) followUp.parent_email = updates.parent_email
       if (Object.keys(followUp).length > 0) await updateIdentity(user.id, followUp)

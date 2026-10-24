@@ -268,7 +268,7 @@ export async function POST(req: NextRequest) {
   const examGenDecision = await pickMeasuredQuizEngine({ bucketKey: `exam-generation-v1:${user.id}` })
 
   try {
-    const results: Record<string, any[]> = {}
+    const results: Record<string, unknown[]> = {}
 
     const poolLocation = userScopeOrDefault(profile)
     const CHUNK = 3

@@ -114,7 +114,7 @@ export default function StudentReportPage() {
                   <CartesianGrid strokeDasharray="4 5" vertical={false} stroke="var(--border)" />
                   <XAxis dataKey="label" tick={{fontSize:11,fill:'var(--text3)'}} axisLine={false} tickLine={false}/>
                   <YAxis domain={[0,100]} tickFormatter={v=>`%${v}`} tick={{fontSize:11,fill:'var(--text3)'}} axisLine={false} tickLine={false}/>
-                  <Tooltip formatter={(v:any, _n:any, p:any)=>[`%${v}`,p.payload.topic]} contentStyle={{borderRadius:14,border:'1px solid var(--border)',background:'var(--bg)'}} />
+                  <Tooltip formatter={(v:unknown, _n:unknown, p:any)=>[`%${v}`,p.payload.topic]} contentStyle={{borderRadius:14,border:'1px solid var(--border)',background:'var(--bg)'}} />
                   <Area type="monotone" dataKey="pct" stroke="#df5c3f" strokeWidth={3} fill="url(#warmTrend)" dot={{r:4,fill:'#fffaf4',stroke:'#df5c3f',strokeWidth:2}} activeDot={{r:6}} />
                 </AreaChart>
               </ResponsiveContainer> : <div className="report-empty-chart">{tr('Grafik için birkaç test daha çöz.')}</div>}

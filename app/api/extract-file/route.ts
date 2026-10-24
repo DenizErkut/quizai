@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
 // Gemini API helper — fetch tabanlı (SDK gerektirmez)
-async function callGemini(model: string, parts: any[]): Promise<string> {
+async function callGemini(model: string, parts: unknown[]): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY!
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
   const res = await fetch(url, {

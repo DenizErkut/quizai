@@ -16,7 +16,7 @@ interface Challenge { id: string; date: string; topic: string; subject: string; 
 export default function DailyPage() {
   const router = useRouter()
   const { t, locale } = useT()
-  const [profile, setProfile] = useState<any>(null)
+  const [profile, setProfile] = useState<unknown>(null)
   const [streak, setStreak] = useState<Streak | null>(null)
   const [challenge, setChallenge] = useState<Challenge | null>(null)
   const [challengeError, setChallengeError] = useState('')
@@ -292,7 +292,7 @@ export default function DailyPage() {
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {qq.pairs.map((pair, i: number) => {
-                        const sel = (chosen as any)?.[i]
+                        const sel = (chosen as unknown)?.[i]
                         const rightOptions = qq.pairs.map((p) => p.right)
                         return (
                           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

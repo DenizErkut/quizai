@@ -2151,7 +2151,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
 
                 {Object.keys(healthScan.bySubject || {}).length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
-                    {Object.entries(healthScan.bySubject).sort((a: any, b: any) => b[1] - a[1]).map(([subj, cnt]: any) => (
+                    {Object.entries(healthScan.bySubject).sort((a: unknown, b: unknown) => b[1] - a[1]).map(([subj, cnt]: any) => (
                       <span key={subj} style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '99px', background: 'rgba(217,119,6,0.1)', color: '#d97706', fontWeight: 600 }}>
                         {subj}: {cnt}
                       </span>

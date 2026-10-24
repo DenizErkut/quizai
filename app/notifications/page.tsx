@@ -16,7 +16,7 @@ interface Notification {
   read: boolean
   created_at: string
   action_url?: string
-  data?: any
+  data?: unknown
 }
 
 const TYPE_META: Record<string, { icon: string; color: string; bg: string; label: string }> = {

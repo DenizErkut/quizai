@@ -51,7 +51,7 @@ async function all(table: string, columns: string, cutoff?: string) {
     if (data.length<500) return rows
   }
 }
-let catalogCache: { at: number; rows: Record<string, any>[] } | null = null
+let catalogCache: { at: number; rows: Record<string, unknown>[] } | null = null
 async function catalog() {
   if (catalogCache && Date.now()-catalogCache.at<60000) return catalogCache.rows
   const rows = await all('learning_objective_catalog','id,objective_code,title,grade,subject,topic,unit,curriculum_version_id,current_revision_id')
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
   if(!Array.isArray(body?.entries)||body.entries.length<1||body.entries.length>8
     ||body.entries.reduce((sum: number,entry)=>sum+(Array.isArray(entry.items)?entry.items.length:1000),0)>200) return NextResponse.json({ error:'Geçersiz inceleme grubu.' },{ status:400 })
   const objectives=await catalog()
-  const entries: Array<{ signature: string; items: Target[]; question: Record<string,unknown>; candidates: any[] }> = []
+  const entries: Array<{ signature: string; items: Target[]; question: Record<string,unknown>; candidates: unknown[] }> = []
   const skipped: string[]=[]
   for(const entry of body.entries) {
     if(typeof entry.signature!=='string'||!Array.isArray(entry.items)) return NextResponse.json({ error:'İnceleme kaydı eksik.' },{ status:400 })

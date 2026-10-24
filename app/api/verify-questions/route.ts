@@ -211,7 +211,7 @@ export async function POST(req: NextRequest) {
     const objectiveCandidates = strictQualityPolicy ? await loadCanonicalObjectiveCandidates(auditDb, {
       subject: typeof body.subject === 'string' ? body.subject : '', grade: String(grade || ''), topic: String(topic || ''),
     }) : []
-    const exceptions: any[] = []
+    const exceptions: unknown[] = []
     const teacherException = (q, reason: string) => exceptions.push({ ...q,objectiveMappingStatus:'review_required',objectiveReviewException:reason })
     if (!questions?.length) return NextResponse.json({ questions: [] })
 
@@ -482,7 +482,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Reddedilen sorular için yenilerini üret
-    let replacements: any[] = []
+    let replacements: unknown[] = []
     if (rejected.length > 0 && !strictQualityPolicy) {
       try {
         const replaceType = questionType || 'multiple_choice'

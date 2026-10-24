@@ -405,7 +405,7 @@ function canonicalQuestionDifficulty(value: unknown, fallback: string): string {
   return ['kolay', 'normal', 'zor', 'cok zor'].includes(normalized) ? normalized : fallback
 }
 
-function visualQuestionIndexes(questions: any[], category: string | null, requestedCount: number, attemptsOverride?: number): number[] {
+function visualQuestionIndexes(questions: unknown[], category: string | null, requestedCount: number, attemptsOverride?: number): number[] {
   if (!category || requestedCount <= 0) return []
   const target = attemptsOverride ?? visualAttemptCount(requestedCount)
   const preferred = questions
@@ -478,7 +478,7 @@ The student must figure out the answer from the question, NOT from your diagram.
 
 type VisualContextQuality = { passed: boolean; score: number; reason: string }
 
-async function repairChartDataForQuestion(q, topic: string, grade: string): Promise<any | null> {
+async function repairChartDataForQuestion(q, topic: string, grade: string): Promise<unknown | null> {
   try {
     const raw = await callOpenAI([
       {
@@ -964,7 +964,7 @@ function stripStaticPartsForCaching(fullPrompt: string, type: string, language: 
 // Öğretmen geri bildirimleriyle bulunan 4 ayrı içerik kalitesi hatasına
 // karşı TEK, paylaşılan filtre fonksiyonu (hem ana üretim hem eksik-soru
 // tamamlama turu bunu kullanır — kopya mantık yok).
-function applyContentQualityFilters(qs: any[], mebContext: string, options: { visualsWillBeAttached?: boolean } = {}): any[] {
+function applyContentQualityFilters(qs: any[], mebContext: string, options: { visualsWillBeAttached?: boolean } = {}): unknown[] {
   // 29 Ağustos 2026 — Deniz'in gerçek log karşılaştırmasıyla bulunan sorun:
   // bu filtreler bazı çağrılarda üretilen soruların %60-100'ünü eliyordu
   // (log: "5 -> 2", "2 -> 0", "5 -> 2") ama HANGİ filtrenin HANGİ soruyu
@@ -1203,7 +1203,7 @@ function extractProviderQuestions(raw: string): any[] {
     const start = clean.indexOf('"questions"')
     const arrayStart = start >= 0 ? clean.indexOf('[', start) : -1
     if (arrayStart < 0) return []
-    const found: any[] = []
+    const found: unknown[] = []
     let index = arrayStart + 1
     while (index < clean.length) {
       while (index < clean.length && /[\s,]/.test(clean[index])) index++
@@ -1240,7 +1240,7 @@ async function generateProviderQuestionBatch(args: {
   sessionId?: string
   requestId?: string
   requestStartTime: number
-}): Promise<any[]> {
+}): Promise<unknown[]> {
   const { batch } = args
   const difficultyLabel = batch.difficulty === 'cok zor' ? 'ÇOK ZOR' : batch.difficulty === 'zor' ? 'ZOR' : batch.difficulty === 'normal' ? 'NORMAL' : 'KOLAY'
   const rolePrompt = `${args.prompt}\n\nBU SAĞLAYICIYA ÖZEL GÖREV: Yalnızca ${difficultyLabel} seviyesinde, tam ${batch.count} yeni soru üret. Bu grubun bütün sorularında difficulty alanı "${batch.difficulty}" olsun. Başka zorluk seviyesinden soru üretme. Bu talimat genel dağılım hedefinin bu grup için ayrıntılandırılmış hâlidir. JSON dışında açıklama yazma.`
@@ -1337,10 +1337,10 @@ function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
   return union === 0 ? 0 : overlap / union
 }
 const DUP_SIMILARITY_THRESHOLD = 0.4
-function filterOutNearDuplicates(qs: any[], alreadyAskedTexts: string[]): any[] {
+function filterOutNearDuplicates(qs: any[], alreadyAskedTexts: string[]): unknown[] {
   const alreadyAskedWordSets = alreadyAskedTexts.map(normalizeWordsForDupCheck)
   const acceptedWordSets: Set<string>[] = []
-  const result: any[] = []
+  const result: unknown[] = []
   for (const q of qs) {
     const qWords = normalizeWordsForDupCheck(q.q || '')
     const isDup =
@@ -2228,12 +2228,12 @@ export async function POST(req: NextRequest) {
     // sadece yarım kalan son soruyu atlayan sağlam bir çözümleyici. 5 senaryoyla
     // izole test edildi (tam JSON, nested obje, kesilmiş JSON, kaçışlı karakter,
     // gerçek hataya yol açan 7-soru senaryosu) — hepsi doğru sonuç verdi.
-    function extractQuestionObjects(raw: string): any[] {
+    function extractQuestionObjects(raw: string): unknown[] {
       const key = raw.indexOf('"questions"')
       if (key === -1) return []
       const arrStart = raw.indexOf('[', key)
       if (arrStart === -1) return []
-      const results: any[] = []
+      const results: unknown[] = []
       let i = arrStart + 1
       while (i < raw.length) {
         while (i < raw.length && /[\s,]/.test(raw[i])) i++
@@ -2334,7 +2334,7 @@ export async function POST(req: NextRequest) {
     // Only this externally validated slice may enter the shared bank. Top-up
     // questions are generated later and are intentionally excluded until they
     // pass the same independent validation path in a future request.
-    let validatedQuestionsForBank: any[] = []
+    let validatedQuestionsForBank: unknown[] = []
 
     // 14 Ağustos 2026'da öğretmen geri bildirimiyle bulunan ayrı bir hata:
     // istenen soru sayısı ile üretilen soru sayısı SIK SIK uyuşmuyordu
@@ -2506,7 +2506,7 @@ export async function POST(req: NextRequest) {
       }, { status: 503 })
     }
 
-    const verifyQuestionCandidates = async (candidateQuestions: any[]) => fetch(`${internalOrigin(req.nextUrl.origin)}/api/verify-questions`, {
+    const verifyQuestionCandidates = async (candidateQuestions: unknown[]) => fetch(`${internalOrigin(req.nextUrl.origin)}/api/verify-questions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
