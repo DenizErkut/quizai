@@ -95,6 +95,15 @@
 - **CI'da eksik olan birim testleri:** `verify` işi yalnızca `tsc` ve tenant-isolation e2e'yi koşuyordu; `tests/` altındaki birim testleri hiç çalışmıyordu. `npm run test:unit` eklendi, Node 22'ye geçildi; `npm run audit:production` bilgi amaçlı (`continue-on-error`) eklendi.
 - **Dağıtım notu:** `Instant Rollback` sonrası Vercel otomatik yayını kapatabilir; yeni bir Production deploy'u Promote edildikten sonra yeniden çalıştığı doğrulandı.
 
+## E. 22–24 Ekim'de eklenen işler
+- **Konum kapsamı (ülke zorunlu, eyalet/şehir opsiyonel):** `resource_location_scope` (`20261023100000`) ile `meb_resources`, `exam_resources` ve `question_bank` kayıtlarına `country/state/city` eklendi; mevcut tüm veri TR olarak işaretlendi. Okuma tarafı (soru havuzu, MEB arama, kitapçık bağlamı, sınav üretimi) kullanıcının konumuna göre süzülüyor; konumu olmayan kullanıcı Türkiye sayılır. Yönetici panelinde "Ülke Kaynakları" sekmesi ve yüklemelerde ülke seçimi var. 24 Ekim: sınav üretiminin ayrı havuzu `exam_question_bank` da aynı kapsama alındı (`20261024090000`).
+- **Yeni ülkelerin kazanımları:** İngiltere `DFE-NC-2014` (532 kazanım, Open Government Licence v3.0) ve Avustralya `ACARA-AC9` (228 kazanım, CC BY 4.0), ülke geneli kapsamla, yalnızca Matematik. Katar'da lisans "tüm hakları saklıdır" olduğundan hiçbir şey aktarılmadı. Atıf metinleri herkese açık `/kaynaklar` sayfasında ve alt bilgi bağlantısında.
+- **Kazanım Kaynakları sekmesi:** ülke/eyalet/şehir, sınıf ve derse göre filtreli görüntüleme; Görüntüle / Düzenle / Sil. Silme kod yazarak onay ister; öğrenme olayı, ustalık kaydı, soru havuzu, kitapçık ya da önkoşul bağı olan kazanım silinmez (emekli etme önerilir). Silinenin tam kopyası `learning_objective_deletion_log` tablosunda (yalnızca service_role). Düzenleme `lifecycle_audit`'e yazılır. Fonksiyonlar `SECURITY INVOKER`, yalnızca service_role çağırır.
+- **Eski kazanım incelemesi:** PDF'te karşılığı olmayan 15 Türkçe kodu `candidate` durumuna alındı (öğrenciye konu listesinde çıkmaz), `metadata.needs_review=true` ve denetim kaydı eklendi; geri almak için `verification_status='verified'` yapılır.
+- **Kurum konumu:** 7 mevcut kurum TR / İstanbul / İstanbul olarak dolduruldu (ilçe bilinmiyor; kurumlar panelinden düzeltilebilir).
+- **SVG yazı taşması:** Yeni görsellerde otomatik sığdırma (`lib/svg-text-fit.ts`) ve görsel denetimine taşma kontrolü eklendi. Havuzdaki eski görseller için Soru Havuzu sekmesinde "Say / Düzelt" aracı var.
+- **Açık kalan:** Katar için resmi belge/izin; diğer dersler ve ülkeler; ESLint mevcut hata temizliği; kullanıcı tarafı maddeleri (B).
+
 ---
 
 # Ek: İlk rapor (19 Ekim 2026, değiştirilmeden)
