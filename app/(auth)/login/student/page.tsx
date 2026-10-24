@@ -22,7 +22,7 @@ function LoginPageContent() {
   const [resetSent, setResetSent] = useState(false)
   const [resetLoading, setResetLoading] = useState(false)
 
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   async function handleLogin() {
     if (!email.trim() || !pass) { setError(t('E-posta ve şifre gerekli.')); return }

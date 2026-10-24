@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
     .eq('id', targetId)
     .maybeSingle()
 
-  let identityRow = null as any
+  let identityRow = null
   let identityError: string | null = null
   try {
     identityRow = await getIdentityBySupabaseId(targetId)

@@ -73,7 +73,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
     setLoading(true)
 
     try {
-      const supabase = createClient() as any
+      const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
 
@@ -223,7 +223,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
                   setMessages(prev => [...prev, { role: 'user', content: q }])
                   setLoading(true)
                   try {
-                    const supabase = createClient() as any
+                    const supabase = createClient()
                     const { data: { session } } = await supabase.auth.getSession()
                     const tok = session?.access_token
                     const res = await fetch('/api/bot', {

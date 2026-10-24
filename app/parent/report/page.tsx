@@ -46,7 +46,7 @@ function DetailReport({ childId, onBack }: { childId: string; onBack: () => void
   const { t: tr } = useT()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   useEffect(() => {
     async function load() {
@@ -153,7 +153,7 @@ export default function ParentReportPage() {
   const [selectedChild, setSelectedChild] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   useEffect(() => {
     async function load() {

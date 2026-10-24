@@ -23,7 +23,7 @@ interface ABTestResult {
 export function useABTest(testName: string): ABTestResult {
   const [variant, setVariant] = useState<string>('control')
   const [loading, setLoading] = useState(true)
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   useEffect(() => {
     async function load() {

@@ -15,7 +15,7 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
   const [ready, setReady] = useState(false)
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   useEffect(() => {
     let active = true

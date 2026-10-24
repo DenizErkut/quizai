@@ -89,7 +89,7 @@ Yalnızca şu JSON formatında yanıt ver, başka hiçbir şey yazma:
     ...SONNET_PARAMS,
     max_tokens: sonnetTokens(900),
     messages: [{ role: 'user', content: prompt }],
-  })) as any
+  }))
   await logAnthropicUsage('ai-literacy-generate', AI_LITERACY_MODEL, message, { userId })
 
   const textBlock = message?.content?.find((b) => b.type === 'text')

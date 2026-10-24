@@ -5,7 +5,7 @@ import { balanceAnswerPositions, questionBankKey } from '@/lib/question-bank'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!) as any
+const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 function today() {
   return new Date().toISOString().slice(0, 10)

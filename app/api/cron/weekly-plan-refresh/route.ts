@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
   for (const uid of toRegenerate) {
     try {
       const prof = profileMap.get(uid)
-      const identity = (identities as any)[uid]
+      const identity = (identities)[uid]
       // Faz 7 (sürekli öğrenme döngüsü): önceki planın hedef anlık
       // görüntüsü varsa, "geçen hafta bu konulara odaklandın, sonuç
       // şöyleydi" bağlamı yeni plana otomatik ekleniyor.

@@ -206,7 +206,7 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
           { type: 'text', text: 'Bu görseldeki tüm metni çıkar. Ders notu, soru veya içerik varsa olduğu gibi yaz.' },
         ],
       }],
-    }) as any
+    })
     return { content: responseText(message), type: 'image', filename }
   }
 

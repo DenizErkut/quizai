@@ -70,7 +70,7 @@ export default function PdfToolsPage() {
   } | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   function handleFile(f: File) {
     if (!f.name.toLowerCase().endsWith('.pdf')) {

@@ -14,7 +14,7 @@ interface CriteriaResult { criterion: string; maxPoints: number; earnedPoints: n
 export default function AcikUcluPage() {
   const router = useRouter()
   const { t, locale } = useT()
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   const [loading, setLoading] = useState(true)
   const [subjectCatalog, setSubjectCatalog] = useState<Record<string, string[]>>({})

@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
   const identities = await getIdentitiesBySupabaseIds(studentIds)
   const studentNames: Record<string, string> = {}
   for (const [id, identity] of Object.entries(identities)) {
-    studentNames[id] = (identity as any)?.full_name || 'Öğrenci'
+    studentNames[id] = (identity)?.full_name || 'Öğrenci'
   }
 
   const summary = await computeClassMisconceptionSummary(supabaseAdmin, studentIds, studentNames)

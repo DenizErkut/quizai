@@ -35,7 +35,7 @@ export function parsePrioritySubjects(raw: unknown): PrioritySubject[] {
   const valid: SelfReportLevel[] = ['zayif', 'orta', 'iyi']
   return raw
     .filter((row): row is { subject: unknown; self_report: unknown } => !!row && typeof row === 'object')
-    .map(row => ({ subject: String((row as any).subject || ''), self_report: (row as any).self_report as SelfReportLevel }))
+    .map(row => ({ subject: String((row).subject || ''), self_report: (row).self_report as SelfReportLevel }))
     .filter(row => row.subject.length > 0 && valid.includes(row.self_report))
     .slice(0, 2)
 }

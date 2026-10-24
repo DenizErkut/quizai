@@ -53,14 +53,14 @@ export async function GET(req: NextRequest) {
 
   const childNames: Record<string, string> = {}
   for (const [id, identity] of Object.entries(childIdentities)) {
-    childNames[id] = (identity as any)?.full_name || 'Öğrenci'
+    childNames[id] = (identity)?.full_name || 'Öğrenci'
   }
 
   let emailsSent = 0, skipped = 0, failed = 0
 
   for (const parentId of parentIds) {
     try {
-      const parentIdentity = (parentIdentities as any)[parentId]
+      const parentIdentity = (parentIdentities)[parentId]
       const parentEmail = parentIdentity?.email
       const parentName = parentIdentity?.full_name || 'Veli'
       if (!parentEmail) { skipped++; continue }

@@ -36,7 +36,7 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
   const voice = useVoiceTutor(
     text => void send(text),
     metric => {
-      const supabase = createClient() as any
+      const supabase = createClient()
       void supabase.auth.getSession().then(({ data: { session } }: { data: { session: VoiceSession } }) => fetch('/api/voice-tutor/telemetry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
@@ -66,7 +66,7 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
     setLoading(true)
 
     try {
-      const supabase = createClient() as any
+      const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -93,7 +93,7 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
       setInput('')
       setMessages(prev => [...prev, { role: 'user', content: text }])
       setLoading(true)
-      const supabase2 = createClient() as any
+      const supabase2 = createClient()
       const { data: { session: sess2 } } = await supabase2.auth.getSession()
       fetch('/api/chat', {
         method: 'POST',

@@ -46,7 +46,7 @@ export default function AnalysisPage() {
   const [loadingAi, setLoadingAi] = useState(false)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'overview' | 'subjects' | 'trend' | 'weakpoints'>('overview')
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   useEffect(() => {
     async function load() {
@@ -129,7 +129,7 @@ export default function AnalysisPage() {
           'ordering': 'Sıralama‖soru tipi',
           'multi_true_false': 'Çoklu D/Y',
           'table_fill': 'Tablo',
-        } as any)[t] || t
+        })[t] || t
         if (!map[label]) map[label] = { type: label, correct: 0, total: 0 }
         map[label].total += 1
         if (answers[i]?.correct) map[label].correct += 1

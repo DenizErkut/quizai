@@ -84,7 +84,7 @@ export async function checkAndNotifyRiskyTopic(
 
     let anySent = false
     for (const parentId of parentIds) {
-      const parentIdentity = (parentIdentities as any)[parentId]
+      const parentIdentity = (parentIdentities)[parentId]
       const parentEmail = parentIdentity?.email
       if (!parentEmail) continue
 

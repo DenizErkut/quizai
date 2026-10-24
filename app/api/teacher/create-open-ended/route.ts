@@ -194,7 +194,7 @@ export async function POST(req: NextRequest) {
       mode: 'ai' | 'manual'; classroom_id: string; title: string
       grade?: string; subject?: string; topic?: string; due_date?: string; preview?: boolean
     }
-    const questionCount = Math.min(5, Math.max(1, Math.trunc(Number((body as any).count) || 1)))
+    const questionCount = Math.min(5, Math.max(1, Math.trunc(Number((body).count) || 1)))
 
     if (mode === 'ai') {
       const blocked = await gateTeacherFeature(user.id, 'ai_generation')
@@ -229,7 +229,7 @@ export async function POST(req: NextRequest) {
 
     // Several questions on one topic: saved as one BATCH (shared batch_id) of ordinary
     // open-ended assignments, so students, grading and reports keep working per question.
-    const batchRaw = mode === 'manual' ? (body as any).items : null
+    const batchRaw = mode === 'manual' ? (body).items : null
     if (Array.isArray(batchRaw) && batchRaw.length > 1) {
       if (batchRaw.length > 10) return NextResponse.json({ error: 'Bir seferde en fazla 10 soru kaydedilebilir.' }, { status: 400 })
       const items = batchRaw.map((item) => ({
@@ -248,7 +248,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Soru ${failed + 1} MEB uygunluk kontrolünden geçemedi: ${checks[failed]?.reason || 'Uygun bulunmadı.'} Lütfen düzenleyip tekrar dene.` }, { status: 422 })
       }
       const batchId = crypto.randomUUID()
-      const createdVia = (body as any).created_via === 'ai' ? 'ai' : 'manual'
+      const createdVia = (body).created_via === 'ai' ? 'ai' : 'manual'
       const { data: createdBatch, error: batchError } = await supabase.from('open_ended_assignments').insert(items.map((item, index) => ({
         teacher_id: teacherRow.id, classroom_id, title: `${title.trim()} — Soru ${index + 1}/${items.length}`,
         grade: grade || null, subject: subject?.trim() || null, topic: topic?.trim() || null,
@@ -281,7 +281,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: e?.message || 'Soru üretilemedi, tekrar dene.' }, { status: 500 })
       }
     } else if (mode === 'manual') {
-      const b = body as any
+      const b = body
       if (!b.scenario?.trim() || !b.question?.trim()) {
         return NextResponse.json({ error: 'Senaryo ve soru zorunlu.' }, { status: 400 })
       }
@@ -301,7 +301,7 @@ export async function POST(req: NextRequest) {
       // Frontend, AI-üretimli-ama-onaylanmış içerik için de 'manual' yolunu
       // kullanıyor; asıl kaynağı ayırt etmek istersen body.created_via
       // opsiyonel olarak gönderilebilir.
-      createdVia = (b.created_via === 'ai' ? 'ai' : 'manual') as any
+      createdVia = (b.created_via === 'ai' ? 'ai' : 'manual')
     } else {
       return NextResponse.json({ error: "mode 'ai' veya 'manual' olmalı." }, { status: 400 })
     }

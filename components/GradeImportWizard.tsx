@@ -36,7 +36,7 @@ export default function GradeImportWizard({
   commitEndpoint: string
 }) {
   const { t: tr } = useT()
-  const supabase = createClient() as any
+  const supabase = createClient()
   const [mode, setMode] = useState<'file' | 'manual'>('file')
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview' | 'done'>('upload')
   const [fileName, setFileName] = useState('')

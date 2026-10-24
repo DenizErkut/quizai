@@ -22,7 +22,7 @@ async function compress(file: File): Promise<{ mediaType: 'image/jpeg'; data: st
 
 export default function PaperAnswerImport({ group, onClose }: { group: Assignment[]; onClose: () => void }) {
   const { t } = useT()
-  const supabase = createClient() as any
+  const supabase = createClient()
   const [students, setStudents] = useState<Student[]>([])
   const [studentId, setStudentId] = useState('')
   const [files, setFiles] = useState<File[]>([])

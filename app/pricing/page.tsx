@@ -32,7 +32,7 @@ export default function PricingPage() {
 
   useEffect(() => {
     async function load() {
-      const supabase = createClient() as any
+      const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const { data: { session } } = await supabase.auth.getSession()

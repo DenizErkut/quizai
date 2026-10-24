@@ -95,7 +95,7 @@ export async function updateIdentity(supabaseUserId: string, updates: Partial<Id
   if (rejected.length > 0) throw new Error(`updateIdentity: izin verilmeyen alan(lar): ${rejected.join(', ')}`)
   if (fields.length === 0) return
   const setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(', ')
-  const values = fields.map(f => (updates as any)[f])
+  const values = fields.map(f => (updates)[f])
   await trPool.query(
     `UPDATE identities SET ${setClause} WHERE supabase_user_id = $1`,
     [supabaseUserId, ...values]
@@ -154,7 +154,7 @@ export async function getConsentStatus(identityId: string, applicableTypes: stri
   )
   const latestByType = new Map(rows.map((r) => [r.consent_type, r]))
   return applicableTypes.map(type => {
-    const latest = latestByType.get(type) as any
+    const latest = latestByType.get(type)
     const currentVersion = CURRENT_CONSENT_VERSIONS[type] || 'v1.0'
     return {
       consentType: type,

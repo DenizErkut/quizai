@@ -139,7 +139,7 @@ async function extractText(buffer: Buffer, ext: string): Promise<{ text: string;
       parsedText = (parsed?.text || '').trim()
       totalPages = parsed?.numpages || 0
     } catch (e) {
-      console.warn('[reading/upload] pdf-parse basarisiz:', (e as any)?.message)
+      console.warn('[reading/upload] pdf-parse basarisiz:', (e)?.message)
     }
 
     // Yeterli metin çıktıysa direkt kullan
@@ -159,7 +159,7 @@ async function extractText(buffer: Buffer, ext: string): Promise<{ text: string;
           const batches = await splitPdfIntoBatches(buffer, BATCH_SIZE)
           const texts = await mapWithConcurrency(batches, CONCURRENCY, async (batchBuf) => {
             try { return await extractWithGeminiVision(batchBuf) } catch (e) {
-              console.warn('[reading/upload] Gemini batch basarisiz:', (e as any)?.message)
+              console.warn('[reading/upload] Gemini batch basarisiz:', (e)?.message)
               return ''
             }
           })
@@ -175,7 +175,7 @@ async function extractText(buffer: Buffer, ext: string): Promise<{ text: string;
           }
         }
       } catch (e) {
-        console.warn('[reading/upload] Gemini Vision basarisiz:', (e as any)?.message)
+        console.warn('[reading/upload] Gemini Vision basarisiz:', (e)?.message)
       }
     }
 
@@ -192,14 +192,14 @@ async function extractText(buffer: Buffer, ext: string): Promise<{ text: string;
               messages: [{
                 role: 'user',
                 content: [
-                  { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } } as any,
+                  { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
                   { type: 'text', text: 'Bu PDF taranmis/gorsel bir kitabin bir bolumu. Tum sayfalardaki metni sayfa sirasina gore eksiksiz cikar. Sadece metni dondur.' },
                 ],
               }],
-            }) as any
+            })
             return responseText(message).trim()
           } catch (e) {
-            console.warn('[reading/upload] Claude batch basarisiz:', (e as any)?.message)
+            console.warn('[reading/upload] Claude batch basarisiz:', (e)?.message)
             return ''
           }
         })
@@ -208,7 +208,7 @@ async function extractText(buffer: Buffer, ext: string): Promise<{ text: string;
           return { text: combined.slice(0, MAX_CHARS), engine: 'claude-parallel' }
         }
       } catch (e) {
-        console.warn('[reading/upload] Claude fallback basarisiz:', (e as any)?.message)
+        console.warn('[reading/upload] Claude fallback basarisiz:', (e)?.message)
       }
     }
 

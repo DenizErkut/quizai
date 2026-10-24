@@ -17,7 +17,7 @@ function JoinContent() {
   const [success, setSuccess] = useState<any>(null)
   const [alreadyJoined, setAlreadyJoined] = useState(false)
   const [myClasses, setMyClasses] = useState<any[]>([])
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   useEffect(() => {
     loadMyClasses()

@@ -76,7 +76,7 @@ export default function ReportsHub({
 // ────────────────────────────────────────────────────────────────────────
 function GenericReportPanel({ scope, hubEndpoint, report }: { scope: string; hubEndpoint: string; report: ReportKey }) {
   const { t: tr } = useT()
-  const supabase = createClient() as any
+  const supabase = createClient()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -189,7 +189,7 @@ function ProgressPanel({ data }: { data: any }) {
 // geneli risk dağılımı" veli için anlamlı bir kavram değil.
 function ClassRiskInsight({ classroomId }: { classroomId: string }) {
   const { t: tr } = useT()
-  const supabase = createClient() as any
+  const supabase = createClient()
   const [risk, setRisk] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
@@ -239,7 +239,7 @@ function ClassRiskInsight({ classroomId }: { classroomId: string }) {
 function ClassMisconceptionInsight({ classroomId }: { classroomId: string }) {
   const { t: tr, locale } = useT()
   const dl = intlLocale(locale)
-  const supabase = createClient() as any
+  const supabase = createClient()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(false)

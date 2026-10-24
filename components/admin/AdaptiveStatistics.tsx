@@ -66,7 +66,7 @@ export default function AdaptiveStatistics() {
             {report.segments[field]?.map((seg) => {
               const minCompletedSeg = Math.min(...(seg.cohorts?.map((c) => c.completed_sample) ?? [0]))
               return <div key={seg.segment_value} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 8, fontSize: 12 }}>
-                <div style={{ fontWeight: 700 }}>{(valueLabels as any)[seg.segment_value] || seg.segment_value}</div>
+                <div style={{ fontWeight: 700 }}>{(valueLabels)[seg.segment_value] || seg.segment_value}</div>
                 <div style={{ color: 'var(--text3)', marginTop: 2 }}>{seg.cohorts.map((c) => `${c.cohort === 'adaptive' ? 'Adaptive' : 'Standard'}: ${c.completed_sample}`).join(' · ')}</div>
                 <div style={{ marginTop: 3, color: seg.interpretable ? 'inherit' : 'var(--text3)', fontWeight: seg.interpretable ? 700 : 400 }}>
                   {seg.interpretable ? seg.claim_message : `Henüz güvenilir değil (${minCompletedSeg}/${min}).`}

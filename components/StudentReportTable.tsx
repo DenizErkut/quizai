@@ -27,7 +27,7 @@ interface ReportData {
 export default function StudentReportTable({ fetchEndpoint }: { fetchEndpoint: string }) {
   const { t: tr, locale } = useT()
   const dl = intlLocale(locale)
-  const supabase = createClient() as any
+  const supabase = createClient()
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [importId, setImportId] = useState<string>('')

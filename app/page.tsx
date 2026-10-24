@@ -30,7 +30,7 @@ export default function LandingPage() {
   const [openFaq,setOpenFaq] = useState<number|null>(0)
   useEffect(()=>{
     let active = true
-    ;(createClient() as any).auth.getUser()
+    ;(createClient()).auth.getUser()
       .then(({data:{user}}:any)=>{ if (!active) return; user ? router.replace('/quiz') : setChecking(false) })
       .catch(()=>{ if (active) setChecking(false) })
     return () => { active = false }

@@ -22,7 +22,7 @@ const CONSENT_LABELS: Record<string, string> = {
 
 export default function ConsentGate() {
   const { t: tr } = useT()
-  const supabase = createClient() as any
+  const supabase = createClient()
   const [needsReconsent, setNeedsReconsent] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')

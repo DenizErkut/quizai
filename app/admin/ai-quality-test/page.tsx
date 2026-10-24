@@ -62,7 +62,7 @@ type RunResult = {
 
 export default function AIQualityTestPage() {
   const router = useRouter()
-  const supabase = createClient() as any
+  const supabase = createClient()
   const [grade, setGrade] = useState('lise 9. sinif')
   const [topicsBySubject, setTopicsBySubject] = useState<Record<string, string[]>>({})
   const [catalogMessage, setCatalogMessage] = useState('')

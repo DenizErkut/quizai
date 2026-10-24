@@ -306,7 +306,7 @@ export async function buildClassroomCompareReport(roster: ReportStudentBase[], g
 
   const groups = new Map<string, { sum: number; count: number; studentCount: number }>()
   for (const s of roster) {
-    const key = (s as any)[groupField] || 'Belirtilmemiş'
+    const key = (s)[groupField] || 'Belirtilmemiş'
     const stat = pctByStudent.get(s.id)
     const cur = groups.get(key) ?? { sum: 0, count: 0, studentCount: 0 }
     cur.studentCount += 1

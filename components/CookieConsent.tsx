@@ -17,7 +17,7 @@ export default function CookieConsent() {
   const [personalization, setPersonalization] = useState(false)
 
   useEffect(() => {
-    const supabase = createClient() as any
+    const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }: any) => {
       if (!user) return
       setUserId(user.id)

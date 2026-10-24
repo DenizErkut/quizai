@@ -39,7 +39,7 @@ export default function StudentReportPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'overview' | 'graphs' | 'topics'>('overview')
   const router = useRouter()
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   useEffect(() => {
     async function load() {

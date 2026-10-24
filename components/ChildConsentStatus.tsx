@@ -16,7 +16,7 @@ const CONSENT_LABELS: Record<string, string> = {
 
 export default function ChildConsentStatus({ childId }: { childId: string }) {
   const { t: tr } = useT()
-  const supabase = createClient() as any
+  const supabase = createClient()
   const [status, setStatus] = useState<any[] | null>(null)
   const [loading, setLoading] = useState(true)
 

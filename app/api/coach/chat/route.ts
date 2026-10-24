@@ -36,7 +36,7 @@ const MAX_USER_MESSAGE_LENGTH = 2000
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
-) as any
+)
 
 function authClient(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -46,7 +46,7 @@ function authClient(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { global: { headers: { Authorization: `Bearer ${token}` } } }
-  ) as any
+  )
 }
 
 async function getOrCreateConversation(supabase, userId: string): Promise<string> {

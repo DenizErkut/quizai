@@ -72,7 +72,7 @@ export default function InstitutionPage() {
   const [asCreated, setAsCreated] = useState<{ email: string; password: string } | null>(null)
 
   const router = useRouter()
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   useEffect(() => { load() }, [])
 
@@ -729,7 +729,7 @@ export default function InstitutionPage() {
                 ].map((item, i) => (
                   <div key={i} style={{ padding: '10px 14px', background: 'var(--bg2)', borderRadius: '10px' }}>
                     <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '4px', fontWeight: 600 }}>{item.label}</div>
-                    <div style={{ fontWeight: 600, color: 'var(--primary)', fontFamily: (item as any).mono ? 'monospace' : undefined }}>
+                    <div style={{ fontWeight: 600, color: 'var(--primary)', fontFamily: (item).mono ? 'monospace' : undefined }}>
                       {item.value || '—'}
                     </div>
                   </div>

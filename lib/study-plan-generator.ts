@@ -221,7 +221,7 @@ Dil: ${opts.language || 'Turkce'}
 SADECE JSON don:
 {"summary":"2-3 cumle","weeks":[{"week":1,"goal":"hedef","topics":["konu1"],"daily_minutes":20,"focus":"odak"}],"motivation":"motivasyon"}`,
     }],
-  }) as any
+  })
     logAnthropicUsage('study-plan-generator', CLAUDE_SONNET, message)
 
   try {

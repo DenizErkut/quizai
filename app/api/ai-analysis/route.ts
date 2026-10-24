@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { global: { headers: { Authorization: `Bearer ${token}` } } }
-  ) as any
+  )
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
@@ -45,7 +45,7 @@ Zayıf konular: ${weakTopics}
 
 Kısa ve motive edici yaz. Maksimum 200 kelime.`,
     }],
-  }) as any
+  })
     await logAnthropicUsage('ai-analysis', CLAUDE_SONNET, message, { userId: user.id })
 
   return NextResponse.json({ analysis: responseText(message) })

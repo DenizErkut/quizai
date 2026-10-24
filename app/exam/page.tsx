@@ -47,7 +47,7 @@ function pctColor(p: number) {
 export default function ExamPage() {
   const router = useRouter()
   const { t: tr, locale } = useT()
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   // Ekranlar
   const [screen, setScreen] = useState<Screen>('select')

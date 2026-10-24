@@ -52,7 +52,7 @@ export async function extractPdfText(buffer: Buffer, opts?: { minLength?: number
   let pageCount = 0
 
   try {
-    const { default: pdfParse } = await import('pdf-parse') as any
+    const { default: pdfParse } = await import('pdf-parse')
     const pdfData = await pdfParse(buffer, { max: 0 })
     pageCount = pdfData?.numpages || 0
     const parsedText = (pdfData?.text || '').trim()
@@ -86,7 +86,7 @@ export async function extractPdfText(buffer: Buffer, opts?: { minLength?: number
         messages: [{
           role: 'user',
           content: [
-            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } } as any,
+            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
             { type: 'text', text: 'Bu PDF dosyasının tüm metin içeriğini çıkar. Sadece metni döndür.' },
           ],
         }],
