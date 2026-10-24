@@ -49,7 +49,7 @@ function authClient(req: NextRequest) {
   ) as any
 }
 
-async function getOrCreateConversation(supabase: any, userId: string): Promise<string> {
+async function getOrCreateConversation(supabase, userId: string): Promise<string> {
   const { data: existing } = await supabase
     .from('coach_conversations')
     .select('id')
@@ -70,13 +70,13 @@ async function getOrCreateConversation(supabase: any, userId: string): Promise<s
 
 // The suggest_practice button must start a quiz: drop actions whose topic has no verified catalog objective
 // for the student's grade (the quiz page would answer "Kazanım bulunamadı").
-async function startableAction<T extends { action: { topic: string; subject?: string } | null }>(supabase: any, ctx: CoachContext, turn: T): Promise<T> {
+async function startableAction<T extends { action: { topic: string; subject?: string } | null }>(supabase, ctx: CoachContext, turn: T): Promise<T> {
   if (!turn.action) return turn
   const ready = await keepQuizReadyTopics(supabase, ctx.grade, [{ topic: turn.action.topic, subject: turn.action.subject ?? null }])
   return ready.length ? turn : { ...turn, action: null }
 }
 
-async function loadCoachContext(supabase: any, userId: string): Promise<CoachContext> {
+async function loadCoachContext(supabase, userId: string): Promise<CoachContext> {
   const { data: profile } = await supabase.from('profiles').select('grade,language').eq('id', userId).single()
   const identity = await getIdentityBySupabaseId(userId)
   return buildCoachContext(supabase, userId, {

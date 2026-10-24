@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
       // (checkAndNotifyRiskyTopic kendi içinde hataları yutuyor).
       try {
         await checkAndNotifyRiskyTopic(supabase, userId, session.topic)
-      } catch (e: any) {
+      } catch (e) {
         console.error('[save-quiz] risk bildirimi hatasi (yok sayildi):', e.message)
       }
     }
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
     const dbPct = updateData?.[0]?.pct ?? pct
     console.log(`[save-quiz] SUCCESS sessionId=${sessionId} pct=${dbPct}`)
     return NextResponse.json({ success: true, pct: updateData?.[0]?.pct ?? pct })
-  } catch (error: any) {
+  } catch (error) {
     console.error('[save-quiz] ERROR:', error?.message)
     return NextResponse.json({ error: 'Save failed' }, { status: 500 })
   }

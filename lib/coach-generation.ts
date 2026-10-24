@@ -78,10 +78,10 @@ function findRecommendationId(ctx: CoachContext, topic: string): string | undefi
   return match?.recommendationId
 }
 
-function extractTurn(message: any, ctx: CoachContext): CoachTurn {
+function extractTurn(message, ctx: CoachContext): CoachTurn {
   const blocks = message?.content ?? []
-  const textBlock = blocks.find((b: any) => b.type === 'text')
-  const toolBlock = blocks.find((b: any) => b.type === 'tool_use' && b.name === 'suggest_practice')
+  const textBlock = blocks.find((b) => b.type === 'text')
+  const toolBlock = blocks.find((b) => b.type === 'tool_use' && b.name === 'suggest_practice')
 
   let action: CoachAction | null = null
   if (toolBlock?.input?.topic) {

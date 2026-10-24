@@ -95,7 +95,7 @@ export async function reconcileIdentities(opts: { dryRun?: boolean } = {}): Prom
 
       result.fixed++
       result.fixedUsers.push({ id: profile.id, fullName, role })
-    } catch (e: any) {
+    } catch (e) {
       result.failed.push({ id: profile.id, reason: e?.message || 'bilinmeyen hata' })
     }
   }

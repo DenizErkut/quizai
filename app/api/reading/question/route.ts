@@ -69,7 +69,7 @@ ${text.slice(0, 3000)}
     const questions = parsed?.questions
     // correct_index bazen sayı yerine "0" gibi string gelebiliyor — normalize et
     if (Array.isArray(questions)) {
-      questions.forEach((q: any) => {
+      questions.forEach((q) => {
         if (q && typeof q.correct_index === 'string' && /^\d+$/.test(q.correct_index)) {
           q.correct_index = parseInt(q.correct_index, 10)
         }
@@ -77,7 +77,7 @@ ${text.slice(0, 3000)}
     }
     if (
       !Array.isArray(questions) || questions.length < QUESTION_COUNT ||
-      questions.some((q: any) =>
+      questions.some((q) =>
         !q?.question || !Array.isArray(q.options) || q.options.length !== 4 ||
         typeof q.correct_index !== 'number' || q.correct_index < 0 || q.correct_index > 3
       )
@@ -86,13 +86,13 @@ ${text.slice(0, 3000)}
     }
 
     return NextResponse.json({
-      questions: questions.slice(0, QUESTION_COUNT).map((q: any) => ({
+      questions: questions.slice(0, QUESTION_COUNT).map((q) => ({
         question: q.question,
         options: q.options,
         correct_index: q.correct_index,
       })),
     })
-  } catch (e: any) {
+  } catch (e) {
     console.error('[reading/question]', e)
     return NextResponse.json({ error: 'Sorular üretilemedi.' }, { status: 500 })
   }

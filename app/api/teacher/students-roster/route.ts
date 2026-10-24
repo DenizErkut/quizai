@@ -35,26 +35,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ teacherId: teacher.id, students: [] })
   }
 
-  const classroomMap = new Map(classrooms.map((c: any) => [c.id, c.name]))
+  const classroomMap = new Map(classrooms.map((c) => [c.id, c.name]))
   const { data: members } = await supabaseAdmin
     .from('classroom_students')
     .select('student_id, classroom_id')
-    .in('classroom_id', classrooms.map((c: any) => c.id))
+    .in('classroom_id', classrooms.map((c) => c.id))
 
   if (!members?.length) {
     return NextResponse.json({ teacherId: teacher.id, students: [] })
   }
 
-  const userIds = [...new Set(members.map((m: any) => m.student_id))]
+  const userIds = [...new Set(members.map((m) => m.student_id))]
   const identities = await getIdentitiesBySupabaseIds(userIds)
 
   const { data: profiles } = await supabaseAdmin
     .from('profiles')
     .select('id, class_number, grade')
     .in('id', userIds)
-  const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]))
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]))
 
-  const students = members.map((m: any) => ({
+  const students = members.map((m) => ({
     id: m.student_id,
     schoolNo: profileMap.get(m.student_id)?.class_number ?? null,
     fullName: identities[m.student_id]?.full_name ?? 'İsimsiz',

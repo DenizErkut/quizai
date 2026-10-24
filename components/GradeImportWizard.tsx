@@ -97,7 +97,7 @@ export default function GradeImportWizard({
       if (!res.ok) { setError(json.error || tr('Kaydetme başarısız.')); setManualSaving(false); return }
       setManualResult({ gradesInserted: json.gradesInserted })
       setManualSubjects([{ name: '', value: '' }])
-    } catch (e: any) {
+    } catch (e) {
       setError(e?.message || tr('Kaydetme başarısız.'))
     }
     setManualSaving(false)
@@ -117,7 +117,7 @@ export default function GradeImportWizard({
     const buf = await file.arrayBuffer()
     const rows = parseGradeImport(buf)
 
-    const head = rows[0].map((h: any) => String(h ?? '').trim())
+    const head = rows[0].map((h) => String(h ?? '').trim())
     const body = rows.slice(1).map(r => head.map((_, i) => String(r[i] ?? '').trim()))
 
     // Otomatik sütun tahmini
@@ -216,7 +216,7 @@ export default function GradeImportWizard({
       if (!res.ok) { setError(json.error || tr('Kaydetme başarısız.')); setSaving(false); return }
       setResult(json)
       setStep('done')
-    } catch (e: any) {
+    } catch (e) {
       setError(e?.message || tr('Kaydetme başarısız.'))
     }
     setSaving(false)

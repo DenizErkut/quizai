@@ -99,15 +99,15 @@ export default function InstitutionPage() {
     setStudents(studentData)
     setAnalytics(instJson.analytics || null)
 
-    const active = studentData.filter((s: any) => s.totalTests > 0)
+    const active = studentData.filter((s) => s.totalTests > 0)
     const overallAvg = active.length
-      ? Math.round(active.reduce((a: number, s: any) => a + (s.avgPct ?? 0), 0) / active.length) : 0
+      ? Math.round(active.reduce((a: number, s) => a + (s.avgPct ?? 0), 0) / active.length) : 0
     setStats({
       total: studentData.length,
       active: active.length,
       overallAvg,
-      topStreaker: [...studentData].sort((a: any, b: any) => b.streak - a.streak)[0],
-      topScorer: [...studentData].sort((a: any, b: any) => (b.avgPct ?? 0) - (a.avgPct ?? 0))[0],
+      topStreaker: [...studentData].sort((a, b) => b.streak - a.streak)[0],
+      topScorer: [...studentData].sort((a, b) => (b.avgPct ?? 0) - (a.avgPct ?? 0))[0],
     })
     setLoading(false)
   }
@@ -143,7 +143,7 @@ export default function InstitutionPage() {
       setAsName(''); setAsSurname(''); setAsEmail(''); setAsAge(''); setAsGrade('')
       setAsClassNumber(''); setAsParentEmail(''); setAsPhone('')
       load() // ogrenci listesini tazele
-    } catch (e: any) {
+    } catch (e) {
       console.error('[handleAddStudent] beklenmeyen hata:', e)
       setAsError(tr('Beklenmeyen bir hata oluştu. Lütfen tekrar dene.'))
     } finally {
@@ -162,7 +162,7 @@ export default function InstitutionPage() {
         body: JSON.stringify(instLoc),
       })
       if (!res.ok) throw new Error('save failed')
-      setInstitution((prev: any) => ({ ...prev, ...instLoc }))
+      setInstitution((prev) => ({ ...prev, ...instLoc }))
       setLocMsg('✅ ' + tr('Konum kaydedildi.'))
     } catch {
       setLocMsg('❌ ' + tr('Konum kaydedilemedi. Lütfen tekrar deneyin.'))
@@ -190,9 +190,9 @@ export default function InstitutionPage() {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || tr('Kod oluşturulamadı.'))
-      setInstitution((prev: any) => ({ ...prev, code: json.code }))
+      setInstitution((prev) => ({ ...prev, code: json.code }))
       setRegenMsg(tr('✅ Yeni davet kodu oluşturuldu.'))
-    } catch (e: any) {
+    } catch (e) {
       setRegenMsg('❌ ' + (e.message || tr('Kod oluşturulamadı.')))
     } finally {
       setRegenerating(false)
@@ -225,7 +225,7 @@ export default function InstitutionPage() {
 
   const filtered = students
     .filter(s => !search || s.name?.toLowerCase().includes(search.toLowerCase()) || s.grade?.toLowerCase().includes(search.toLowerCase()))
-    .sort((a: any, b: any) => {
+    .sort((a, b) => {
       if (sortBy === 'name') return a.name?.localeCompare(b.name)
       if (sortBy === 'avgPct') return (b.avgPct ?? -1) - (a.avgPct ?? -1)
       if (sortBy === 'totalTests') return b.totalTests - a.totalTests
@@ -354,7 +354,7 @@ export default function InstitutionPage() {
             {/* Top 5 Liderlik */}
             <div className="card">
               <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>{tr('🏆 Top 5 Öğrenci')}</div>
-              {leaderboard.slice(0, 5).map((s: any, i: number) => (
+              {leaderboard.slice(0, 5).map((s, i: number) => (
                 <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
                   <div style={{ fontSize: i < 3 ? '18px' : '13px', fontWeight: 700, width: 28, textAlign: 'center', color: 'var(--text3)' }}>
                     {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
@@ -501,7 +501,7 @@ export default function InstitutionPage() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {filtered.map((s: any) => (
+                {filtered.map((s) => (
                   <div key={s.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'linear-gradient(135deg, #082465, #1ECFB8)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '13px', flexShrink: 0, overflow: 'hidden' }}>
                       {s.avatar_url ? <img src={s.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : s.name?.slice(0, 2).toUpperCase()}
@@ -519,7 +519,7 @@ export default function InstitutionPage() {
                       </div>
                       {s.weakTopics?.length > 0 && (
                         <div style={{ marginTop: '4px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                          {s.weakTopics.map((t: any) => (
+                          {s.weakTopics.map((t) => (
                             <span key={t.topic} style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(220,38,38,0.08)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.15)' }}>
                               ⚠️ {tr(t.topic).slice(0, 12)} %{t.avg}
                             </span>
@@ -553,18 +553,18 @@ export default function InstitutionPage() {
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={analytics.gradeBreakdown} barSize={32}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="grade" tickFormatter={(v: any) => gradeLabel(String(v), tr)} tick={{ fontSize: 11, fill: "var(--text3)" }} />
+                    <XAxis dataKey="grade" tickFormatter={(v) => gradeLabel(String(v), tr)} tick={{ fontSize: 11, fill: "var(--text3)" }} />
                     <YAxis tick={{ fontSize: 11, fill: 'var(--text3)' }} domain={[0, 100]} unit="%" />
-                    <Tooltip formatter={(v: any) => [`%${v}`, tr('Ortalama')]} contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
+                    <Tooltip formatter={(v) => [`%${v}`, tr('Ortalama')]} contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
                     <Bar dataKey="avgPct" name={tr('Ortalama')} radius={[6, 6, 0, 0]}>
-                      {analytics.gradeBreakdown.map((entry: any, i: number) => (
+                      {analytics.gradeBreakdown.map((entry, i: number) => (
                         <Cell key={i} fill={entry.avgPct >= 70 ? '#16a34a' : entry.avgPct >= 50 ? '#d97706' : '#dc2626'} />
                       ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
-                  {analytics.gradeBreakdown.map((g: any) => (
+                  {analytics.gradeBreakdown.map((g) => (
                     <div key={g.grade} style={{ padding: '6px 10px', borderRadius: '8px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '12px' }}>
                       <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{gradeLabel(g.grade, tr)}</span>
                       <span style={{ color: 'var(--text3)', marginLeft: '6px' }}>{tr('{n} öğrenci · {tests} test', { n: g.count, tests: g.tests })}</span>
@@ -604,7 +604,7 @@ export default function InstitutionPage() {
               <div className="card">
                 <div style={{ fontSize: '13px', fontWeight: 700, color: '#dc2626', marginBottom: '12px' }}>{tr('⚠️ Zayıf Konular')}</div>
                 {analytics.weakTopics?.length === 0 && <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{tr('Zayıf konu yok! 🎉')}</div>}
-                {analytics.weakTopics?.map((t: any, i: number) => (
+                {analytics.weakTopics?.map((t, i: number) => (
                   <div key={i} style={{ marginBottom: '10px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                       <span style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 500 }}>{tr(t.topic)}</span>
@@ -621,7 +621,7 @@ export default function InstitutionPage() {
               <div className="card">
                 <div style={{ fontSize: '13px', fontWeight: 700, color: '#16a34a', marginBottom: '12px' }}>{tr('✅ Güçlü Konular')}</div>
                 {analytics.strongTopics?.length === 0 && <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{tr('Henüz yeterli veri yok.')}</div>}
-                {analytics.strongTopics?.map((t: any, i: number) => (
+                {analytics.strongTopics?.map((t, i: number) => (
                   <div key={i} style={{ marginBottom: '10px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                       <span style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 500 }}>{tr(t.topic)}</span>
@@ -657,7 +657,7 @@ export default function InstitutionPage() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {analytics.riskStudents.map((s: any) => {
+                {analytics.riskStudents.map((s) => {
                   const daysSince = s.lastActive
                     ? Math.floor((Date.now() - new Date(s.lastActive).getTime()) / 86400000)
                     : null

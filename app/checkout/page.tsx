@@ -311,7 +311,7 @@ function CheckoutContent() {
       if (!res.ok) throw new Error(data.error)
 
       setPaytrToken(data.token)
-    } catch (e: any) {
+    } catch (e) {
       setError(e.message || tr('Ödeme başlatılamadı.'))
     } finally {
       setLoading(false)

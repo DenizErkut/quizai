@@ -11,7 +11,7 @@ export interface ResolvedIdentity {
 
 // Birden çok kullanıcı id'si için isim/rol çöz (sınıf listesi, sıralama, vb.)
 export async function resolveIdentities(
-  supabase: any,
+  supabase,
   ids: string[],
 ): Promise<Record<string, ResolvedIdentity>> {
   const clean = [...new Set(ids.filter(Boolean))]
@@ -36,7 +36,7 @@ export async function resolveIdentities(
 }
 
 // Tek kullanıcının adını çöz (bulunamazsa null)
-export async function resolveName(supabase: any, id: string): Promise<string | null> {
+export async function resolveName(supabase, id: string): Promise<string | null> {
   if (!id) return null
   const map = await resolveIdentities(supabase, [id])
   return map[id]?.full_name ?? null
@@ -54,7 +54,7 @@ export interface OwnIdentity {
 // resolveIdentities()'ten FARKLI olarak başka bir kullanıcı id'si kabul
 // etmez — /api/identity/me, token'daki kullanıcıdan başka kimseye asla
 // erişmez, bu yüzden yaş gibi hassas alanları güvenle döndürebilir.
-export async function resolveOwnIdentity(supabase: any): Promise<OwnIdentity | null> {
+export async function resolveOwnIdentity(supabase): Promise<OwnIdentity | null> {
   try {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return null

@@ -15,7 +15,7 @@ export interface ResolvedDiscountCode {
   label: string
 }
 
-export async function resolveDiscountCode(supabaseAdmin: any, rawCode: string): Promise<ResolvedDiscountCode> {
+export async function resolveDiscountCode(supabaseAdmin, rawCode: string): Promise<ResolvedDiscountCode> {
   const code = (rawCode || '').toUpperCase().trim()
   if (!code) return { found: false, discountRate: 0, sellerId: null, label: '' }
 

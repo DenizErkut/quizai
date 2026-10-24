@@ -38,10 +38,10 @@ export async function POST(req: NextRequest) {
   // Sihirbaz zaten sadece kendi roster'ından seçtiriyor ama bu kontrolü
   // sadece arayüze bırakmak yetmez — istek doğrudan API'ye de atılabilir.
   const { data: classrooms } = await supabaseAdmin.from('classrooms').select('id').eq('teacher_id', teacher.id)
-  const classroomIds = (classrooms ?? []).map((c: any) => c.id)
+  const classroomIds = (classrooms ?? []).map((c) => c.id)
   const { data: members } = classroomIds.length
     ? await supabaseAdmin.from('classroom_students').select('student_id').in('classroom_id', classroomIds)
-    : { data: [] as any[] }
+    : { data: [] as unknown[] }
   const allowedStudentIds = new Set((members ?? []).map((m: any) => m.student_id))
   const invalidRows = rows.filter(r => !allowedStudentIds.has(r.studentId))
   if (invalidRows.length > 0) {
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       rows,
     })
     return NextResponse.json(result)
-  } catch (e: any) {
+  } catch (e: unknown) {
     return errorResponse('teacher/import-grades', e, 'İçe aktarma başarısız.')
   }
 }

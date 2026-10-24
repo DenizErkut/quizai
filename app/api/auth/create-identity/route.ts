@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, identityId: identity.id })
-  } catch (e: any) {
+  } catch (e) {
     console.error('[auth/create-identity] error:', e.message)
     return NextResponse.json({ error: 'Kimlik oluşturulamadı: ' + e.message }, { status: 500 })
   }

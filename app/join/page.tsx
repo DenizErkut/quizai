@@ -164,7 +164,7 @@ function JoinContent() {
               {tr('📚 Sınıflarım ({n})', { n: myClasses.length })}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {myClasses.map((cls: any) => (
+              {myClasses.map((cls) => (
                 <div key={cls.id} style={{ padding: '12px 14px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary)' }}>{cls.name}</div>

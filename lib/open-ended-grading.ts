@@ -109,7 +109,7 @@ SADECE aşağıdaki JSON formatında yanıt ver:
 
   // Guvenlik agi: yabanci alfabe karakterlerini temizle
   const canonicalRubric = Array.isArray(session.rubric) ? session.rubric : []
-  parsed.criteriaResults = canonicalRubric.map((criterion: any, index: number) => {
+  parsed.criteriaResults = canonicalRubric.map((criterion, index: number) => {
     const modelResult = parsed.criteriaResults[index] || {}
     const maxPoints = Math.max(0, Number(criterion.maxPoints) || 0)
     const earnedPoints = Math.min(maxPoints, Math.max(0, Math.round(Number(modelResult.earnedPoints) || 0)))
@@ -123,6 +123,6 @@ SADECE aşağıdaki JSON formatında yanıt ver:
   parsed.overallFeedback = stripForeignScripts(parsed.overallFeedback || '')
 
   const totalEarned = Math.min(Number(session.total_possible) || 0,
-    parsed.criteriaResults.reduce((s: number, r: any) => s + r.earnedPoints, 0))
+    parsed.criteriaResults.reduce((s: number, r) => s + r.earnedPoints, 0))
   return { criteriaResults: parsed.criteriaResults, overallFeedback: parsed.overallFeedback || '', totalEarned }
 }

@@ -57,7 +57,7 @@ export async function computeAutonomousGoals(
     : []
 
   if (startable.length) {
-    return startable.map((row: any) => ({
+    return startable.map((row) => ({
       topic: row.topic,
       subject: row.subject,
       masteryScore: Number(row.evidence?.masteryScore ?? row.evidence?.prerequisiteMastery ?? 0),
@@ -76,7 +76,7 @@ export async function computeAutonomousGoals(
   if (!rows?.length) return []
 
   const scored = rows
-    .map((r: any) => computeTopicMastery(r))
+    .map((r) => computeTopicMastery(r))
     .filter((m: TopicMastery) => m.totalCount >= 2) // çok az veriyle hedef belirlemek gürültülü olur
     .map((m: TopicMastery) => {
       const riskBonus = m.forgettingRisk === 'yüksek' ? 30 : m.forgettingRisk === 'orta' ? 15 : 0
@@ -86,7 +86,7 @@ export async function computeAutonomousGoals(
         : `Bu konuyu bir süredir tekrar etmedin, unutma riski var`
       return { topic: m.topic, masteryScore: m.masteryScore, forgettingRisk: m.forgettingRisk, reason, priority: priority as number }
     })
-    .sort((a: any, b: any) => b.priority - a.priority)
+    .sort((a, b) => b.priority - a.priority)
     .slice(0, maxGoals)
 
   return scored.map(({ priority, ...rest }: any) => rest)
@@ -139,7 +139,7 @@ export async function evaluatePreviousGoals(
     .in('topic', previousGoals.map(g => g.topic))
 
   const currentByTopic = new Map<string, TopicMastery>()
-  ;(rows ?? []).forEach((r: any) => currentByTopic.set(r.topic, computeTopicMastery(r)))
+  ;(rows ?? []).forEach((r) => currentByTopic.set(r.topic, computeTopicMastery(r)))
 
   return previousGoals.map(g => {
     const current = currentByTopic.get(g.topic)
@@ -162,12 +162,12 @@ export async function generateStudyPlan(
   const { data: notesData } = await supabase
     .from('user_notes').select('content').eq('user_id', userId)
     .order('updated_at', { ascending: false }).limit(5)
-  const userNotes = notesData?.map((n: any) => n.content).join('\n---\n') || ''
+  const userNotes = notesData?.map((n) => n.content).join('\n---\n') || ''
 
   const { data: sessions } = await supabase
     .from('quiz_sessions').select('pct').eq('user_id', userId).eq('completed', true)
   const avgPct = sessions?.length
-    ? Math.round(sessions.reduce((s: number, x: any) => s + x.pct, 0) / sessions.length)
+    ? Math.round(sessions.reduce((s: number, x) => s + x.pct, 0) / sessions.length)
     : 0
 
   const goalsText = goals.length > 0

@@ -49,7 +49,7 @@ export default function ChildConsentStatus({ childId }: { childId: string }) {
         {tr('📋 Rıza Durumu')}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        {status.map((s: any) => (
+        {status.map((s) => (
           <div key={s.consentType} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
             <span>{CONSENT_LABELS[s.consentType] ? tr(CONSENT_LABELS[s.consentType]) : s.consentType}</span>
             <span style={{

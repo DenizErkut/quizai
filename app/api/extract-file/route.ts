@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
     const result = await processFile(fullBuffer, ext, filename)
     return NextResponse.json({ status: 'complete', progress: 100, ...result })
 
-  } catch (e: any) {
+  } catch (e) {
     console.error('Extract error:', e)
     return NextResponse.json({ error: 'Dosya işlenemedi.' }, { status: 500 })
   }
@@ -172,7 +172,7 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
         ...(result.engine === 'claude' ? { engine: 'claude' } : {}),
       }
 
-    } catch (pdfErr: any) {
+    } catch (pdfErr) {
       return { error: 'pdf_error', content: '', type: 'pdf', filename, message: 'PDF işlenemedi.' }
     }
   }
@@ -248,7 +248,7 @@ async function processFile(buffer: Buffer, ext: string, filename: string) {
         note: '🎤 Gemini Audio ile transkribe edildi',
         engine: 'gemini-audio',
       }
-    } catch (audioErr: any) {
+    } catch (audioErr) {
       console.error('[extract-file] Audio error:', audioErr)
       return {
         error: 'audio_error',

@@ -53,7 +53,7 @@ export default function StudentReportTable({ fetchEndpoint }: { fetchEndpoint: s
       if (!res.ok) { setError(json.error || tr('Rapor yüklenemedi.')); setLoading(false); return }
       setData(json)
       if (json.selectedImportId) setImportId(json.selectedImportId)
-    } catch (e: any) {
+    } catch (e) {
       setError(e?.message || tr('Rapor yüklenemedi.'))
     }
     setLoading(false)

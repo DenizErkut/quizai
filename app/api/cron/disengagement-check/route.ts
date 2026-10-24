@@ -143,7 +143,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ checked, flagged, recovered })
-  } catch (e: any) {
+  } catch (e) {
     console.error('[disengagement-check] Hata:', e)
     return NextResponse.json({ error: e.message || 'Kontrol başarısız.' }, { status: 500 })
   }

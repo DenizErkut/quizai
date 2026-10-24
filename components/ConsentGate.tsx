@@ -59,7 +59,7 @@ export default function ConsentGate() {
         throw new Error(data.error || tr('Kaydedilemedi.'))
       }
       setNeedsReconsent([])
-    } catch (e: any) {
+    } catch (e) {
       setError(e.message || tr('Bir hata oluştu, tekrar dene.'))
     } finally {
       setSubmitting(false)

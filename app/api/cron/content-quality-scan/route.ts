@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
       const questions = Array.isArray(session.questions) ? session.questions : []
       if (!questions.length) continue
 
-      const forScan = questions.slice(0, MAX_QUESTIONS_PER_SESSION).map((q: any, i: number) => ({
+      const forScan = questions.slice(0, MAX_QUESTIONS_PER_SESSION).map((q, i: number) => ({
         index: i, q: q.q, opts: q.opts, ans: q.ans, exp: q.exp, type: q.type,
       }))
       totalScanned += forScan.length
@@ -216,7 +216,7 @@ export async function GET(req: NextRequest) {
         summary: sourceFlagSummary,
       },
     })
-  } catch (e: any) {
+  } catch (e) {
     console.error('[content-quality-scan] Hata:', e)
     return NextResponse.json({ error: e.message || 'Tarama başarısız.' }, { status: 500 })
   }

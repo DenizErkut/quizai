@@ -112,7 +112,7 @@ export default function ABTestAdminPage() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {tests.map((test: any) => (
+            {tests.map((test) => (
               <div key={test.id} className="card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                   <div>
@@ -132,7 +132,7 @@ export default function ABTestAdminPage() {
 
                 {/* Varyant sonuçları */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
-                  {test.variantResults?.map((v: any) => (
+                  {test.variantResults?.map((v) => (
                     <div key={v.id} style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg2)', border: `1.5px solid ${v.id === 'control' ? 'rgba(99,102,241,0.3)' : 'rgba(16,163,74,0.3)'}` }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                         <span style={{ fontSize: '12px', fontWeight: 700, color: v.id === 'control' ? '#6366f1' : '#16a34a' }}>

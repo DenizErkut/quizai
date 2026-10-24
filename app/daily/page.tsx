@@ -109,7 +109,7 @@ export default function DailyPage() {
       })
       if (error) throw error
       setReportedQuestions(previous => new Set([...previous, current]))
-    } catch (error: any) {
+    } catch (error) {
       setReportError(error?.message || t('Bildirim gönderilemedi.'))
     } finally {
       setReportingQuestion(null)
@@ -291,9 +291,9 @@ export default function DailyPage() {
                 if (qq.type === 'matching' && qq.pairs) {
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {qq.pairs.map((pair: any, i: number) => {
+                      {qq.pairs.map((pair, i: number) => {
                         const sel = (chosen as any)?.[i]
-                        const rightOptions = qq.pairs.map((p: any) => p.right)
+                        const rightOptions = qq.pairs.map((p) => p.right)
                         return (
                           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <div style={{ flex: 1, padding: '10px 13px', borderRadius: '9px', background: 'var(--bg2)', border: '1.5px solid var(--border)', fontSize: '13px', fontWeight: 600 }}><MathText text={pair.left} /></div>
@@ -304,7 +304,7 @@ export default function DailyPage() {
                                 const prev: any = (typeof chosen === 'object' && chosen !== null) ? chosen : {}
                                 const next = { ...prev, [i]: e.target.value }
                                 if (Object.keys(next).length === qq.pairs.length) {
-                                  const allCorrect = qq.pairs.every((p: any, idx: number) => next[idx] === p.right)
+                                  const allCorrect = qq.pairs.every((p, idx: number) => next[idx] === p.right)
                                   choose(allCorrect ? qq.ans : -1)
                                 } else { setChosen(next as any) }
                               }}
@@ -338,7 +338,7 @@ export default function DailyPage() {
                 if (qq.type === 'multi_true_false' && Array.isArray(qq.statements)) {
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {qq.statements.map((statement: any, statementIndex: number) => {
+                      {qq.statements.map((statement, statementIndex: number) => {
                         const answered = chosen !== null
                         const correct = multiTFAnswer[statementIndex] === statement.correct
                         return (
@@ -359,8 +359,8 @@ export default function DailyPage() {
                       })}
                       {chosen === null && (
                         <button type="button" className="btn btn-primary"
-                          disabled={qq.statements.some((_: any, index: number) => multiTFAnswer[index] === undefined)}
-                          onClick={() => choose(qq.statements.every((statement: any, index: number) => multiTFAnswer[index] === statement.correct) ? qq.ans : -1)}
+                          disabled={qq.statements.some((_, index: number) => multiTFAnswer[index] === undefined)}
+                          onClick={() => choose(qq.statements.every((statement, index: number) => multiTFAnswer[index] === statement.correct) ? qq.ans : -1)}
                           style={{ width: '100%', justifyContent: 'center', marginTop: '4px' }}>
                           {t('Cevapları onayla ✓')}
                         </button>

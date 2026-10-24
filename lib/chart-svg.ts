@@ -98,7 +98,7 @@ function svgWrap(body: string, title?: string): string {
 // Model bozuk/eksik chartData gönderirse (yanlış tip, NaN, boş dizi vb.)
 // burada reddedilir — çağıran taraf (route.ts) bunu veri onarımına yönlendirmek
 // veya görseli güvenle atlamak için kullanır.
-export function validateChartData(data: any): data is ChartData {
+export function validateChartData(data): data is ChartData {
   if (!data || typeof data !== 'object') return false
   switch (data.type) {
     case 'numberline':
@@ -106,7 +106,7 @@ export function validateChartData(data: any): data is ChartData {
         isFiniteNum(data.min) && isFiniteNum(data.max) && data.max > data.min &&
         (data.points === undefined ||
           (Array.isArray(data.points) && data.points.length <= 8 &&
-            data.points.every((p: any) => isFiniteNum(p?.value))))
+            data.points.every((p) => isFiniteNum(p?.value))))
       )
     case 'coordinate':
       return (
@@ -114,28 +114,28 @@ export function validateChartData(data: any): data is ChartData {
         data.xMax > data.xMin && data.yMax > data.yMin &&
         (data.points === undefined ||
           (Array.isArray(data.points) && data.points.length <= 10 &&
-            data.points.every((p: any) => isFiniteNum(p?.x) && isFiniteNum(p?.y)))) &&
+            data.points.every((p) => isFiniteNum(p?.x) && isFiniteNum(p?.y)))) &&
         (data.lines === undefined ||
           (Array.isArray(data.lines) && data.lines.length <= 4 &&
-            data.lines.every((l: any) =>
+            data.lines.every((l) =>
               Array.isArray(l?.points) && l.points.length >= 2 && l.points.length <= 40 &&
-              l.points.every((p: any) => isFiniteNum(p?.x) && isFiniteNum(p?.y)))))
+              l.points.every((p) => isFiniteNum(p?.x) && isFiniteNum(p?.y)))))
       )
     case 'bar':
     case 'line':
       return (
         Array.isArray(data.categories) && data.categories.length >= 1 && data.categories.length <= 12 &&
-        data.categories.every((c: any) => typeof c === 'string') &&
+        data.categories.every((c) => typeof c === 'string') &&
         Array.isArray(data.series) && data.series.length >= 1 && data.series.length <= 4 &&
-        data.series.every((s: any) =>
+        data.series.every((s) =>
           Array.isArray(s?.values) && s.values.length === data.categories.length &&
           s.values.every(isFiniteNum))
       )
     case 'pie':
       return (
         Array.isArray(data.segments) && data.segments.length >= 2 && data.segments.length <= 8 &&
-        data.segments.every((s: any) => typeof s?.label === 'string' && isFiniteNum(s?.value) && s.value >= 0) &&
-        data.segments.some((s: any) => s.value > 0)
+        data.segments.every((s) => typeof s?.label === 'string' && isFiniteNum(s?.value) && s.value >= 0) &&
+        data.segments.some((s) => s.value > 0)
       )
     default:
       return false
@@ -312,7 +312,7 @@ function renderPie(d: PieChart): string {
 // chartData GEÇERLİ değilse null döner — çağıran taraf bunu eski AI-SVG
 // yoluna güvenle geri düşmek için kullanmalı, ASLA kısmi/bozuk bir SVG
 // döndürülmez.
-export function renderChartSVG(data: any): string | null {
+export function renderChartSVG(data): string | null {
   if (!validateChartData(data)) return null
   switch (data.type) {
     case 'numberline': return renderNumberline(data)

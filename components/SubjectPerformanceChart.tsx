@@ -35,7 +35,7 @@ export default function SubjectPerformanceChart({
         <XAxis dataKey="subject" tick={{ fontSize: 11, fill: 'var(--text3)' }} axisLine={false} tickLine={false} interval={0} angle={-15} textAnchor="end" height={50} />
         <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--text3)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `%${v}`} />
         <Tooltip
-          formatter={(value: any, _name: any, props: any) => [
+          formatter={(value, _name, props) => [
             props?.payload?.testCount ? tr('{pct} ({n} test)', { pct: `%${value}`, n: props.payload.testCount }) : `%${value}`,
             tr('Ortalama'),
           ]}

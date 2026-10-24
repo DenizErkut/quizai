@@ -180,7 +180,7 @@ export async function buildCoachContext(supabase: SupabaseClient, userId: string
     loadCoachGain(supabase, userId).catch(() => ({ available: false, recordedPairs: 0, currentPairs: 0, transferPairs: 0, verifiedTransferPairs: 0, averageGainPp: null, objectives: [] })),
   ])
   const streakRow = (streakRes as any)?.data
-  const sessions: CoachSession[] = ((sessionsRes as any)?.data ?? []).map((s: any) => ({ topic: s.topic, pct: Number(s.pct ?? 0), score: Number(s.score ?? 0), questionCount: Number(s.question_count ?? 0), createdAt: s.created_at }))
+  const sessions: CoachSession[] = ((sessionsRes as any)?.data ?? []).map((s) => ({ topic: s.topic, pct: Number(s.pct ?? 0), score: Number(s.score ?? 0), questionCount: Number(s.question_count ?? 0), createdAt: s.created_at }))
   const otherActivity = [...openEnded, ...liveQuiz, ...exam, ...reading]
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
     .slice(0, 15)

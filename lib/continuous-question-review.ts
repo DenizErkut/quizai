@@ -39,8 +39,8 @@ export function hasContinuousApproval(q: Question): boolean {
   if (!r || r.policyVersion !== CONTINUOUS_REVIEW_POLICY || r.decision !== 'approved' || needsVisualTeacherReview(q)
     || r.content !== continuousReviewContent(q) || r.objectiveId !== q.learningObjectiveId || r.objectiveCode !== q.learningObjectiveCode
     || !r.revisionId || r.revisionId !== q.learningObjectiveRevisionId || r.curriculumVersionId !== q.curriculumVersionId) return false
-  return Array.isArray(r.audits) && r.audits.length === 2 && new Set(r.audits.map((a: any) => a.provider)).size === 2
-    && r.audits.every((a: any) => ['openai','mistral','anthropic','google'].includes(a.provider) && a.ok === true && Number.isFinite(a.score)
+  return Array.isArray(r.audits) && r.audits.length === 2 && new Set(r.audits.map((a) => a.provider)).size === 2
+    && r.audits.every((a) => ['openai','mistral','anthropic','google'].includes(a.provider) && a.ok === true && Number.isFinite(a.score)
       && a.score >= 80 && a.score <= 100 && a.difficultyMatches === true && a.objectiveMatches === true
       && a.answerCorrect === true && a.explanationConsistent === true && a.ageAppropriate === true && a.unambiguous === true)
 }

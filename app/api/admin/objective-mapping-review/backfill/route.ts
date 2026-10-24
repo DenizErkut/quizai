@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(error?{ error:error.message }:{ success:true },{ status:error?500:200 })
   }
   if(!Array.isArray(body?.entries)||body.entries.length<1||body.entries.length>8
-    ||body.entries.reduce((sum: number,entry: any)=>sum+(Array.isArray(entry.items)?entry.items.length:1000),0)>200) return NextResponse.json({ error:'Geçersiz inceleme grubu.' },{ status:400 })
+    ||body.entries.reduce((sum: number,entry)=>sum+(Array.isArray(entry.items)?entry.items.length:1000),0)>200) return NextResponse.json({ error:'Geçersiz inceleme grubu.' },{ status:400 })
   const objectives=await catalog()
   const entries: Array<{ signature: string; items: Target[]; question: Record<string,unknown>; candidates: any[] }> = []
   const skipped: string[]=[]

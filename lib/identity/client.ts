@@ -152,7 +152,7 @@ export async function getConsentStatus(identityId: string, applicableTypes: stri
      ORDER BY consent_type, created_at DESC`,
     [identityId]
   )
-  const latestByType = new Map(rows.map((r: any) => [r.consent_type, r]))
+  const latestByType = new Map(rows.map((r) => [r.consent_type, r]))
   return applicableTypes.map(type => {
     const latest = latestByType.get(type) as any
     const currentVersion = CURRENT_CONSENT_VERSIONS[type] || 'v1.0'

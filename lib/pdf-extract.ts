@@ -16,7 +16,7 @@ import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
-async function callGemini(model: string, parts: any[]): Promise<string> {
+async function callGemini(model: string, parts: unknown[]): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY!
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
   const res = await fetch(url, {
@@ -90,7 +90,7 @@ export async function extractPdfText(buffer: Buffer, opts?: { minLength?: number
             { type: 'text', text: 'Bu PDF dosyasının tüm metin içeriğini çıkar. Sadece metni döndür.' },
           ],
         }],
-      }) as any
+      }) as unknown
       const text = responseText(message).trim()
       if (text.length > 0) return { text, engine: 'claude', pageCount }
     } catch (e) {

@@ -118,7 +118,7 @@ export default function AnalysisPage() {
     sessions.forEach(s => {
       const questions = s.questions || []
       const answers = s.answers || []
-      questions.forEach((q: any, i: number) => {
+      questions.forEach((q, i: number) => {
         const t = q.type || 'multiple_choice'
         const label = ({
           'multiple_choice': 'Çoktan Seçmeli',
@@ -244,7 +244,7 @@ export default function AnalysisPage() {
                     <PolarGrid stroke="var(--border)" />
                     <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11, fill: 'var(--text3)' }} />
                     <Radar name={t('Puan')} dataKey="puan" stroke="#6366f1" fill="#6366f1" fillOpacity={0.25} />
-                    <Tooltip formatter={(v: any) => [`%${v}`, t('Başarı')]} />
+                    <Tooltip formatter={(v) => [`%${v}`, t('Başarı')]} />
                   </RadarChart>
                 </ResponsiveContainer>
               </div>
@@ -257,7 +257,7 @@ export default function AnalysisPage() {
                     <Pie data={subjectData} dataKey="count" nameKey="subject" cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3}>
                       {subjectData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                     </Pie>
-                    <Tooltip formatter={(v: any, name: any) => [t('{n} test', { n: v }), name]} />
+                    <Tooltip formatter={(v, name) => [t('{n} test', { n: v }), name]} />
                     <Legend iconSize={10} wrapperStyle={{ fontSize: '11px' }} />
                   </PieChart>
                 </ResponsiveContainer>
@@ -272,8 +272,8 @@ export default function AnalysisPage() {
                   <BarChart data={typeData} layout="vertical" margin={{ left: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={v => `%${v}`} />
-                    <YAxis type="category" dataKey="type" tickFormatter={(v: any) => t(String(v))} tick={{ fontSize: 11, fill: 'var(--text2)' }} width={130} />
-                    <Tooltip formatter={(v: any) => [`%${v}`, t('Başarı')]} />
+                    <YAxis type="category" dataKey="type" tickFormatter={(v) => t(String(v))} tick={{ fontSize: 11, fill: 'var(--text2)' }} width={130} />
+                    <Tooltip formatter={(v) => [`%${v}`, t('Başarı')]} />
                     <Bar dataKey="pct" radius={[0, 6, 6, 0]}>
                       {typeData.map((d, i) => <Cell key={i} fill={pctColor(d.pct)} />)}
                     </Bar>
@@ -294,7 +294,7 @@ export default function AnalysisPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="subject" tick={{ fontSize: 11, fill: 'var(--text2)' }} angle={-25} textAnchor="end" interval={0} />
                   <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={v => `%${v}`} />
-                  <Tooltip formatter={(v: any) => [`%${v}`, t('Ortalama')]} />
+                  <Tooltip formatter={(v) => [`%${v}`, t('Ortalama')]} />
                   <Bar dataKey="avg" radius={[6, 6, 0, 0]} name={t('Ortalama')}>
                     {subjectData.map((d, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Bar>
@@ -356,7 +356,7 @@ export default function AnalysisPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="week" tick={{ fontSize: 12 }} />
                   <YAxis domain={[0, 100]} tickFormatter={v => `%${v}`} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v: any) => [`%${v}`, t('Ortalama')]} />
+                  <Tooltip formatter={(v) => [`%${v}`, t('Ortalama')]} />
                   <Area type="monotone" dataKey="avg" stroke="#6366f1" strokeWidth={2.5} fill="url(#colorAvg)" dot={{ fill: '#6366f1', r: 4 }} activeDot={{ r: 6 }} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -370,7 +370,7 @@ export default function AnalysisPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                   <YAxis domain={[0, 100]} tickFormatter={v => `%${v}`} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v: any, _: any, p: any) => [`%${v} — ${p.payload.topic}`, t('Başarı')]} />
+                  <Tooltip formatter={(v, _, p) => [`%${v} — ${p.payload.topic}`, t('Başarı')]} />
                   <Bar dataKey="pct" radius={[4, 4, 0, 0]}>
                     {sessions.slice(0, 10).map((s, i) => <Cell key={i} fill={pctColor(s.pct)} />)}
                   </Bar>
@@ -393,7 +393,7 @@ export default function AnalysisPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis type="number" domain={[0, 100]} tickFormatter={v => `%${v}`} tick={{ fontSize: 11 }} />
                     <YAxis type="category" dataKey="topic" width={140} tick={{ fontSize: 11, fill: 'var(--text2)' }} />
-                    <Tooltip formatter={(v: any, _: any, p: any) => [t('%{v} hata oranı ({a}/{b})', { v, a: p.payload.yanlış, b: p.payload.toplam }), t('Yanlış‖istatistik')]} />
+                    <Tooltip formatter={(v, _, p) => [t('%{v} hata oranı ({a}/{b})', { v, a: p.payload.yanlış, b: p.payload.toplam }), t('Yanlış‖istatistik')]} />
                     <Bar dataKey="oran" radius={[0, 6, 6, 0]} fill="#ef4444" />
                   </BarChart>
                 </ResponsiveContainer>

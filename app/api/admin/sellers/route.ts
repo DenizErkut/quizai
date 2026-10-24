@@ -31,11 +31,11 @@ export async function GET(req: NextRequest) {
   const { data: profileRows } = await supabaseAdmin.from('profiles').select('seller_id').not('seller_id', 'is', null)
 
   const instCounts: Record<string, number> = {}
-  ;(instRows ?? []).forEach((r: any) => { instCounts[r.seller_id] = (instCounts[r.seller_id] || 0) + 1 })
+  ;(instRows ?? []).forEach((r) => { instCounts[r.seller_id] = (instCounts[r.seller_id] || 0) + 1 })
   const profileCounts: Record<string, number> = {}
-  ;(profileRows ?? []).forEach((r: any) => { profileCounts[r.seller_id] = (profileCounts[r.seller_id] || 0) + 1 })
+  ;(profileRows ?? []).forEach((r) => { profileCounts[r.seller_id] = (profileCounts[r.seller_id] || 0) + 1 })
 
-  const withCounts = (sellers ?? []).map((s: any) => ({
+  const withCounts = (sellers ?? []).map((s) => ({
     ...s,
     institution_count: instCounts[s.id] || 0,
     individual_count: profileCounts[s.id] || 0,

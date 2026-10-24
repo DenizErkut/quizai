@@ -101,7 +101,7 @@ function RegisterTeacherContent() {
         return
       }
       setStep('info')
-    } catch (e: any) {
+    } catch (e) {
       console.error('[handleCreateAccount] beklenmeyen hata:', e)
       setError(t('Beklenmeyen bir hata oluştu ({msg}). Lütfen tekrar dene.', { msg: e?.message || t('bilinmeyen') }))
     } finally {
@@ -174,7 +174,7 @@ function RegisterTeacherContent() {
       if (insertErr) { setError(insertErr.message); return }
 
       setStep('done')
-    } catch (e: any) {
+    } catch (e) {
       console.error('[handleApply] beklenmeyen hata:', e)
       setError(t('Beklenmeyen bir hata oluştu ({msg}). Lütfen tekrar dene.', { msg: e?.message || t('bilinmeyen') }))
     } finally {

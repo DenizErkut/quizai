@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
   if (institutionId) linksQuery = linksQuery.eq('institution_id', institutionId)
   const { data: links } = await linksQuery
 
-  const userIds = (links ?? []).map((l: any) => l.user_id)
+  const userIds = (links ?? []).map((l) => l.user_id)
   if (userIds.length === 0) return NextResponse.json({ students: [] })
 
   const instNameByUser: Record<string, string> = {}
@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
   const identities = await getIdentitiesBySupabaseIds(userIds)
 
   const students = (profiles ?? [])
-    .map((p: any) => {
+    .map((p) => {
       const id = identities[p.id]
       return {
         // institution_id filtresi yoksa (tüm kurumlar) hangi kuruma ait
@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
         created_at: p.created_at,
       }
     })
-    .sort((a: any, b: any) => (a.grade || '').localeCompare(b.grade || ''))
+    .sort((a, b) => (a.grade || '').localeCompare(b.grade || ''))
 
   return NextResponse.json({ students })
 }

@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     })
 
     if (phone?.trim()) {
-      await updateIdentity(newUserId, { phone: phone.trim() } as any)
+      await updateIdentity(newUserId, { phone: phone.trim() } as unknown)
     }
 
     await supabaseAdmin.from('profiles').upsert({
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
       user_id: newUserId,
       role: 'student',
     })
-  } catch (e: any) {
+  } catch (e: unknown) {
     // Kimlik/profil oluşturma başarısız olursa yarım kalmış auth kullanıcısını
     // temizle — yoksa "e-posta zaten kayıtlı ama hesap kullanılamaz" durumu olur.
     console.error('[create-student] kimlik/profil hatasi, auth kullanicisi geri aliniyor:', e)

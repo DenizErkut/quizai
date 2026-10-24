@@ -92,7 +92,7 @@ Yalnızca şu JSON formatında yanıt ver, başka hiçbir şey yazma:
   })) as any
   await logAnthropicUsage('ai-literacy-generate', AI_LITERACY_MODEL, message, { userId })
 
-  const textBlock = message?.content?.find((b: any) => b.type === 'text')
+  const textBlock = message?.content?.find((b) => b.type === 'text')
   if (!textBlock?.text) throw new Error('ai_literacy_empty_response')
   const parsed = extractJson(textBlock.text)
 

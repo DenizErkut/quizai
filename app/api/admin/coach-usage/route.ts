@@ -88,15 +88,15 @@ export async function GET(req: NextRequest) {
   const conversations = conversationsResult.data ?? []
   const userIdByConversation = new Map(conversations.map(c => [c.id, c.user_id]))
   const totalCoachUsersAllTime = new Set(conversations.map(c => c.user_id)).size
-  const allTimeCostUsd = (allTimeCostResult.data ?? []).reduce((s, r: any) => s + Number(r.cost_usd || 0), 0)
+  const allTimeCostUsd = (allTimeCostResult.data ?? []).reduce((s, r) => s + Number(r.cost_usd || 0), 0)
 
   const todayMessages = todayMessagesResult.data ?? []
-  const todayCostUsd = (todayCostResult.data ?? []).reduce((s, r: any) => s + Number(r.cost_usd || 0), 0)
+  const todayCostUsd = (todayCostResult.data ?? []).reduce((s, r) => s + Number(r.cost_usd || 0), 0)
   const todayActiveUsers = new Set(todayMessages.map(m => userIdByConversation.get(m.conversation_id)).filter(Boolean))
 
   const rangeMessages = rangeMessagesResult.data ?? []
   const rangeCostRows = rangeCostResult.data ?? []
-  const rangeCostUsd = rangeCostRows.reduce((s, r: any) => s + Number(r.cost_usd || 0), 0)
+  const rangeCostUsd = rangeCostRows.reduce((s, r) => s + Number(r.cost_usd || 0), 0)
   const rangeActiveUserIds = new Set(
     rangeMessages.map(m => userIdByConversation.get(m.conversation_id)).filter(Boolean) as string[]
   )
@@ -134,7 +134,7 @@ export async function GET(req: NextRequest) {
   let profileById = new Map<string, any>()
   if (involvedUserIds.length) {
     const { data: profileRows } = await db.from('profiles').select('id,name,surname,plan,grade').in('id', involvedUserIds)
-    profileById = new Map((profileRows ?? []).map((p: any) => [p.id, p]))
+    profileById = new Map((profileRows ?? []).map((p) => [p.id, p]))
   }
 
   const users = involvedUserIds

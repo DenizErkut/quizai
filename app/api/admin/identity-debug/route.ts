@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
   let identityError: string | null = null
   try {
     identityRow = await getIdentityBySupabaseId(targetId)
-  } catch (e: any) {
+  } catch (e) {
     identityError = e?.message || 'TR-PG sorgu hatası'
   }
 
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
   let resolveError: string | null = null
   try {
     resolveMapResult = await getIdentitiesBySupabaseIds([targetId])
-  } catch (e: any) {
+  } catch (e) {
     resolveError = e?.message || 'TR-PG toplu sorgu hatası'
   }
 

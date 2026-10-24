@@ -74,7 +74,7 @@ export async function checkAndNotifyRiskyTopic(
   try {
     const studentIdentity = await getIdentityBySupabaseId(studentId)
     const childName = studentIdentity?.full_name || 'Öğrenci'
-    const parentIds = [...new Set(links.map((l: any) => l.parent_id))]
+    const parentIds = [...new Set(links.map((l) => l.parent_id))]
     const parentIdentities = await getIdentitiesBySupabaseIds(parentIds)
 
     const actionSentence = await generateActionSentence(childName, topic, mastery.masteryScore, mastery.forgettingRisk)
@@ -109,7 +109,7 @@ export async function checkAndNotifyRiskyTopic(
     if (anySent) {
       await supabase.from('weak_topics').update({ risk_notified: true }).eq('id', wt.id)
     }
-  } catch (e: any) {
+  } catch (e) {
     console.error('[parent-risk-alert] hata:', e.message)
     // Bildirim başarısız olsa bile quiz kaydını etkilememeli — save-quiz
     // çağıran taraf bu hatayı yutmalı (fire-and-forget mantığı).

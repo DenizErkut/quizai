@@ -48,14 +48,14 @@ export async function GET(req: NextRequest) {
       // Kuruma bağlı öğretmenlerin sınıfları üzerinden
       const { data: instTeachers } = await supabaseAdmin
         .from('institution_users').select('user_id').eq('institution_id', institutionId).eq('role', 'teacher').eq('is_active', true)
-      const teacherUserIds = (instTeachers ?? []).map((t: any) => t.user_id)
+      const teacherUserIds = (instTeachers ?? []).map((t) => t.user_id)
       let classroomIds: string[] = []
       if (teacherUserIds.length) {
         const { data: teacherRows } = await supabaseAdmin.from('teachers').select('id').in('user_id', teacherUserIds)
-        const teacherIds = (teacherRows ?? []).map((t: any) => t.id)
+        const teacherIds = (teacherRows ?? []).map((t) => t.id)
         if (teacherIds.length) {
           const { data: classrooms } = await supabaseAdmin.from('classrooms').select('id').in('teacher_id', teacherIds)
-          classroomIds = (classrooms ?? []).map((c: any) => c.id)
+          classroomIds = (classrooms ?? []).map((c) => c.id)
         }
       }
       if (report === 'assignments') return NextResponse.json(await buildAssignmentsReport(roster, classroomIds))

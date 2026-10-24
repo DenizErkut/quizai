@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
         institution_name: identity.institution_name,
       },
     })
-  } catch (e: any) {
+  } catch (e) {
     console.error('[identity/me] error:', e.message)
     return NextResponse.json({ error: 'Kimlik alınamadı.' }, { status: 500 })
   }

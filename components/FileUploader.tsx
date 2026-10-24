@@ -130,7 +130,7 @@ export default function FileUploader({ onFilesChange, maxFiles = 5, maxMB = 20, 
           })
         }
       }
-    } catch (e: any) {
+    } catch (e) {
       updateFile(id, { status: 'error', error: e.message, progress: 0 })
     }
   }

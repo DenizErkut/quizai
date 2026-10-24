@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     .from('parent_children')
     .select('parent_id')
 
-  const parentIds = [...new Set((parentLinks ?? []).map((l: any) => l.parent_id))]
+  const parentIds = [...new Set((parentLinks ?? []).map((l) => l.parent_id))]
   if (!parentIds.length) {
     return NextResponse.json({ ok: true, parentsChecked: 0, emailsSent: 0, skipped: 0, failed: 0 })
   }
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   const { data: allChildLinks } = await supabaseAdmin
     .from('parent_children')
     .select('parent_id, child_id')
-  const allChildIds = [...new Set((allChildLinks ?? []).map((l: any) => l.child_id))]
+  const allChildIds = [...new Set((allChildLinks ?? []).map((l) => l.child_id))]
 
   const [parentIdentities, childIdentities] = await Promise.all([
     getIdentitiesBySupabaseIds(parentIds),
@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
         })
       }
       else failed++
-    } catch (e: any) {
+    } catch (e) {
       console.error('[weekly-parent-summary] parent hatasi:', parentId, e.message)
       failed++
     }

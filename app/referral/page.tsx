@@ -51,8 +51,8 @@ export default function ReferralPage() {
 
       setProfile(p)
       // Davet edilen kullanıcıların isimleri TR-PG'den
-      const refIdentities = await resolveIdentities(supabase, (refs || []).map((r: any) => r.referred_id))
-      setReferrals((refs || []).map((r: any) => ({
+      const refIdentities = await resolveIdentities(supabase, (refs || []).map((r) => r.referred_id))
+      setReferrals((refs || []).map((r) => ({
         id: r.referred_id,
         name: refIdentities[r.referred_id]?.full_name || t('Kullanıcı'),
         grade: r.profiles?.grade || '',

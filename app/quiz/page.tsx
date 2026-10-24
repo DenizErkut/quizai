@@ -180,7 +180,7 @@ function QuizPageContent() {
           : 'universite'
 
         const subjects = (data.curriculum || [])
-          .filter((c: any) => {
+          .filter((c) => {
             if (!c.is_active) return false
             // Level eşleşmeli
             if (c.level !== userLevel) return false
@@ -188,7 +188,7 @@ function QuizPageContent() {
             const cGradeNum = (c.grade.match(/\d+/) || [])[0] || ''
             return cGradeNum === userGradeNum
           })
-          .map((c: any) => c.subject)
+          .map((c) => c.subject)
         setDynamicSubjects([...new Set(subjects)] as string[])
       } catch {}
     }
@@ -684,7 +684,7 @@ function QuizPageContent() {
             topic, subject: selectedSubject || undefined, language: lang, questionType, includeVisuals,
             difficulty: (data.resolvedDifficulty || 'normal') as DifficultyValue,
             sessionId: data.sessionId, missing: firstChunkSize - collected.length,
-            existingTexts: collected.map((q: any) => q.q).filter(Boolean),
+            existingTexts: collected.map((q) => q.q).filter(Boolean),
             accessToken: freshSession?.access_token,
           })
           if (extra.length === 0) break // ilerleme yok, tekrar denemenin faydası yok
@@ -706,7 +706,7 @@ function QuizPageContent() {
       setChunkBoundary(isAdaptiveEligible && actualFirstChunkLen >= 2 ? actualFirstChunkLen : null)
       setCurrent(0); setAnswers([]); answersRef.current = []; setChosen(null); setCheckingAnswer(false)
       setScreen('quiz')
-    } catch (e: any) {
+    } catch (e) {
       clearInterval(iv)
       const errCode = e?.message || 'unknown'
       const errInfo = getErrorInfo(errCode)
@@ -862,7 +862,7 @@ function QuizPageContent() {
     const pairs = q.pairs || []
 
     // Check if right values are unique (proper matching) or repeated (D/Y style)
-    const rightValues = pairs.map((p: any) => p.right)
+    const rightValues = pairs.map((p) => p.right)
     const uniqueRights = new Set(rightValues)
     const isProperMatching = uniqueRights.size === pairs.length
 
@@ -870,13 +870,13 @@ function QuizPageContent() {
 
     if (isProperMatching) {
       // Standard: shuffledIndexMap[userSelection] must equal original pair index
-      pairs.forEach((_: any, i: number) => {
+      pairs.forEach((_, i: number) => {
         const userShuffledIdx = matchSelections[i]
         if (userShuffledIdx !== undefined && shuffledIndexMap[userShuffledIdx] === i) correctCount++
       })
     } else {
       // Repeated values (e.g. True/False): match by text content directly
-      pairs.forEach((pair: any, i: number) => {
+      pairs.forEach((pair, i: number) => {
         const userShuffledIdx = matchSelections[i]
         if (userShuffledIdx !== undefined) {
           const selectedText = shuffledPairs[userShuffledIdx]
@@ -929,14 +929,14 @@ function QuizPageContent() {
     setMatchSelections({})
     setMTFAnswers({})
     setTInputs(Array(
-      q.tableData?.rows?.reduce((s: number, r: any) => s + (r.blanks?.length || 0), 0) || 0
+      q.tableData?.rows?.reduce((s: number, r) => s + (r.blanks?.length || 0), 0) || 0
     ).fill(''))
     if (q.items) setOrderItems([...q.items].sort(() => Math.random() - 0.5))
     if (q.pairs) {
-      const rights = q.pairs.map((p: any, i: number) => ({ text: p.right, originalIndex: i }))
+      const rights = q.pairs.map((p, i: number) => ({ text: p.right, originalIndex: i }))
       const shuffled = [...rights].sort(() => Math.random() - 0.5)
-      setShuffledPairs(shuffled.map((s: any) => s.text))
-      setShuffledIndexMap(shuffled.map((s: any) => s.originalIndex))
+      setShuffledPairs(shuffled.map((s) => s.text))
+      setShuffledIndexMap(shuffled.map((s) => s.originalIndex))
     }
   }, [current, questions])
 
@@ -1016,7 +1016,7 @@ function QuizPageContent() {
               topic, subject: selectedSubject || undefined, language: currentLang, questionType: nextQuestionType, includeVisuals,
               difficulty: nextDiff,
               sessionId, missing: targetSecondChunk - secondChunk.length,
-              existingTexts: [...excludeTexts, ...secondChunk.map((q: any) => q.q).filter(Boolean)],
+              existingTexts: [...excludeTexts, ...secondChunk.map((q) => q.q).filter(Boolean)],
               accessToken: freshSession?.access_token,
               adaptiveCandidateBatch: true,
             })

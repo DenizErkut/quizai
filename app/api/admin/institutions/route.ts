@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   if (institutions?.length) {
     const { data: instUsers } = await supabaseAdmin
       .from('institution_users').select('institution_id').eq('role', 'student')
-    ;(instUsers || []).forEach((u: any) => {
+    ;(instUsers || []).forEach((u) => {
       counts[u.institution_id] = (counts[u.institution_id] || 0) + 1
     })
   }

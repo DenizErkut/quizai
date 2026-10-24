@@ -204,13 +204,13 @@ export default function AcikUcluPage() {
         )}
 
         {/* Öğretmen tarafından atanmış, HENÜZ ÇÖZÜLMEMİŞ ödevler */}
-        {step === 'setup' && !assignedLoading && assignedList.some((a: any) => !a.completed) && (
+        {step === 'setup' && !assignedLoading && assignedList.some((a) => !a.completed) && (
           <div style={{ marginBottom: '1.25rem' }}>
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>
               {t('📋 Sana Atanan Ödevler')}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {assignedList.filter((a: any) => !a.completed).map((a: any) => {
+              {assignedList.filter((a) => !a.completed).map((a) => {
                 const isOverdue = a.due_date && new Date(a.due_date) < new Date()
                 return (
                   <div key={a.id} className="card" style={{ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', borderLeft: '3px solid #6366f1' }}>
@@ -263,13 +263,13 @@ export default function AcikUcluPage() {
         )}
 
         {/* Daha önce çözülmüş (tamamlanmış) AUS ödevleri — Serbest Pratik'in ALTINDA */}
-        {step === 'setup' && !assignedLoading && assignedList.some((a: any) => a.completed) && (
+        {step === 'setup' && !assignedLoading && assignedList.some((a) => a.completed) && (
           <div style={{ marginTop: '1.25rem' }}>
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text2)', marginBottom: '8px' }}>
               {t('✅ Tamamlanan Ödevler')}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {assignedList.filter((a: any) => a.completed).map((a: any) => (
+              {assignedList.filter((a) => a.completed).map((a) => (
                 <div key={a.id} className="card" style={{ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', borderLeft: '3px solid var(--green)' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary)' }}>{a.title}</div>

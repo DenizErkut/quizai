@@ -114,7 +114,7 @@ SADECE geçerli JSON döndür:
 
   // Doğru cevap anahtarı ayrı tabloda (live_quiz_keys, yalnızca servis rolü) tutulur; sınıf arkadaşlarının
   // okuyabildiği live_quizzes.questions içinde `ans`/`exp` BULUNMAZ.
-  const answerKeys = questions.map((q: any, index: number) => ({ question_index: index, ans: Number.isInteger(q?.ans) ? q.ans : 0, exp: typeof q?.exp === 'string' ? q.exp : null }))
+  const answerKeys = questions.map((q, index: number) => ({ question_index: index, ans: Number.isInteger(q?.ans) ? q.ans : 0, exp: typeof q?.exp === 'string' ? q.exp : null }))
   const publicQuestions = questions.map(({ ans: _ans, exp: _exp, ...rest }: any) => rest)
 
   // live_quizzes tablosuna kaydet
@@ -141,7 +141,7 @@ SADECE geçerli JSON döndür:
 
   // Sınıftaki öğrencilere bildirim gönder
   const { data: students } = await supabase.from('classroom_students').select('student_id').eq('classroom_id', classroom_id)
-  const studentIds = (students ?? []).map((s: any) => s.student_id)
+  const studentIds = (students ?? []).map((s) => s.student_id)
 
   if (studentIds.length > 0) {
     await supabase.from('notifications').insert(

@@ -295,13 +295,13 @@ export async function POST(req: NextRequest) {
       char_count: material.char_count,
     })
 
-  } catch (e: any) {
+  } catch (e) {
     console.error('[reading/upload]', e)
     return NextResponse.json({ error: 'Dosya işlenemedi.' }, { status: 500 })
   } finally {
     // İçerik kalıcı saklanmıyor — işlenen (veya başarısız olan) dosyayı Storage'dan temizle
     if (storagePath) {
-      adminDb.storage.from(BUCKET).remove([storagePath]).catch((e: any) =>
+      adminDb.storage.from(BUCKET).remove([storagePath]).catch((e) =>
         console.warn('[reading/upload] Storage temizligi basarisiz:', e?.message))
     }
   }

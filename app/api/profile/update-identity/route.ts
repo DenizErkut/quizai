@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       await updateIdentity(user.id, updates)
     }
     return NextResponse.json({ success: true })
-  } catch (e: any) {
+  } catch (e) {
     console.error('[profile/update-identity] error:', e.message)
     return NextResponse.json({ error: 'Kimlik güncellenemedi.' }, { status: 500 })
   }

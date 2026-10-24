@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
   const today_date = new Date().toISOString().split('T')[0]
   const nextReview = today_date  // Yeni kartlar bugün gösterilsin
 
-  const cards = (questions || []).map((q: any) => ({
+  const cards = (questions || []).map((q) => ({
     user_id: user.id,
     topic,
     question: q.q,
