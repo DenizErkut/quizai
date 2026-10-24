@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 export default function DataLifecycleRequests() {
   const [items, setItems] = useState<any[]>([])
   const [preview, setPreview] = useState<any>(null)
-  const load = async () => { const { data: { session } } = await createClient().auth.getSession(); if (!session) return; const r = await fetch('/api/admin/data-lifecycle-requests', { headers: { Authorization: `Bearer ${session.access_token}` } }); if (r.ok) setItems(((await r.json()).requests || []).filter((item: any) => ['pending', 'verified', 'in_progress'].includes(item.status))) }
+  const load = async () => { const { data: { session } } = await createClient().auth.getSession(); if (!session) return; const r = await fetch('/api/admin/data-lifecycle-requests', { headers: { Authorization: `Bearer ${session.access_token}` } }); if (r.ok) setItems(((await r.json()).requests || []).filter((item) => ['pending', 'verified', 'in_progress'].includes(item.status))) }
   useEffect(() => { void load() }, [])
   async function update(id: string, status: string) { const { data: { session } } = await createClient().auth.getSession(); if (!session) return; await fetch('/api/admin/data-lifecycle-requests', { method: 'PATCH', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) }); load() }
   async function showPreview(id: string) { const { data: { session } } = await createClient().auth.getSession(); if (!session) return; const r = await fetch(`/api/admin/data-lifecycle-requests/${id}/preview`, { headers: { Authorization: `Bearer ${session.access_token}` } }); if (r.ok) setPreview(await r.json()) }

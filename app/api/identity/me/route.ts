@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { global: { headers: { Authorization: `Bearer ${token}` } } }
-  ) as any
+  )
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
         institution_name: identity.institution_name,
       },
     })
-  } catch (e: any) {
+  } catch (e) {
     console.error('[identity/me] error:', e.message)
     return NextResponse.json({ error: 'Kimlik alınamadı.' }, { status: 500 })
   }

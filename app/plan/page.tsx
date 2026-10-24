@@ -85,10 +85,10 @@ export default function PlanPage() {
     const { data: { session } } = await supabase.auth.getSession()
 
     const avgPct = stats.sessions.length
-      ? Math.round(stats.sessions.reduce((s: number, x: any) => s + x.pct, 0) / stats.sessions.length)
+      ? Math.round(stats.sessions.reduce((s: number, x) => s + x.pct, 0) / stats.sessions.length)
       : 0
 
-    const weakList = stats.weakTopics.map((w: any) => w.topic).join(', ')
+    const weakList = stats.weakTopics.map((w) => w.topic).join(', ')
 
     const res = await fetch('/api/study-plan', {
       method: 'POST',
@@ -177,7 +177,7 @@ export default function PlanPage() {
   }
 
   const avgPct = stats?.sessions?.length
-    ? Math.round(stats.sessions.reduce((s: number, x: any) => s + x.pct, 0) / stats.sessions.length)
+    ? Math.round(stats.sessions.reduce((s: number, x) => s + x.pct, 0) / stats.sessions.length)
     : 0
 
   async function exportPDF() {
@@ -232,7 +232,7 @@ export default function PlanPage() {
             <div>
               <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px' }}>{tr('Odaklanılacak konular:')}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {stats.weakTopics.slice(0, 5).map((w: any, i: number) => (
+                {stats.weakTopics.slice(0, 5).map((w, i: number) => (
                   <span key={i} style={{ fontSize: '12px', padding: '3px 10px', borderRadius: '99px', background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid rgba(220,38,38,0.15)' }}>
                     {tr(w.topic)}
                   </span>

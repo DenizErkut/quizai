@@ -81,7 +81,7 @@ export default function ContentIssueReporter({ reporterRole }: { reporterRole: '
       setTopic('')
       setDescription('')
       loadMyReports()
-    } catch (e: any) {
+    } catch (e) {
       setMsg(`❌ ${e.message || tr('Bildirim gönderilemedi.')}`)
     } finally {
       setSubmitting(false)

@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     const identity = await getIdentityBySupabaseId(profile.id)
     const firstName = identity?.full_name?.split(' ')[0] ?? null
     return NextResponse.json({ firstName })
-  } catch (e: any) {
+  } catch (e) {
     console.error('[referral/referrer-name] error:', e.message)
     return NextResponse.json({ firstName: null })
   }

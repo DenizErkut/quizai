@@ -36,8 +36,8 @@ export async function checkDisengagement(
   const daysSinceLastActivity = Math.floor((now - lastTime) / (24 * 60 * 60 * 1000))
 
   const midpoint = now - 14 * 24 * 60 * 60 * 1000
-  const recentCount = sessions.filter((s: any) => new Date(s.created_at).getTime() >= midpoint).length
-  const priorCount = sessions.filter((s: any) => new Date(s.created_at).getTime() < midpoint).length
+  const recentCount = sessions.filter((s) => new Date(s.created_at).getTime() >= midpoint).length
+  const priorCount = sessions.filter((s) => new Date(s.created_at).getTime() < midpoint).length
 
   const recentWeeklyAvg = Math.round((recentCount / 2) * 10) / 10
   const priorWeeklyAvg = Math.round((priorCount / 2) * 10) / 10

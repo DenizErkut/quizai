@@ -36,21 +36,21 @@ async function getUserStats(userId: string) {
 
   const s = sessions ?? []
   const totalTests = s.length
-  const totalQuestions = s.reduce((a: number, x: any) => a + (x.question_count || 0), 0)
-  const totalCorrect = s.reduce((a: number, x: any) => a + (x.score || 0), 0)
-  const avgPct = totalTests > 0 ? Math.round(s.reduce((a: number, x: any) => a + (x.pct || 0), 0) / totalTests) : 0
-  const perfect = s.filter((x: any) => x.pct === 100).length
-  const failing = s.filter((x: any) => x.pct < 50).length
-  const passing = s.filter((x: any) => x.pct >= 50 && x.pct < 80).length
-  const good = s.filter((x: any) => x.pct >= 80 && x.pct < 100).length
+  const totalQuestions = s.reduce((a: number, x) => a + (x.question_count || 0), 0)
+  const totalCorrect = s.reduce((a: number, x) => a + (x.score || 0), 0)
+  const avgPct = totalTests > 0 ? Math.round(s.reduce((a: number, x) => a + (x.pct || 0), 0) / totalTests) : 0
+  const perfect = s.filter((x) => x.pct === 100).length
+  const failing = s.filter((x) => x.pct < 50).length
+  const passing = s.filter((x) => x.pct >= 50 && x.pct < 80).length
+  const good = s.filter((x) => x.pct >= 80 && x.pct < 100).length
 
   // Son 7 gün
   const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
-  const weeklyTests = s.filter((x: any) => new Date(x.created_at) > weekAgo).length
+  const weeklyTests = s.filter((x) => new Date(x.created_at) > weekAgo).length
 
   // Konu dağılımı — en çok çözülen 5 konu
   const topicCounts: Record<string, { count: number; totalPct: number }> = {}
-  s.forEach((x: any) => {
+  s.forEach((x) => {
     if (!x.topic) return
     if (!topicCounts[x.topic]) topicCounts[x.topic] = { count: 0, totalPct: 0 }
     topicCounts[x.topic].count++
@@ -63,14 +63,14 @@ async function getUserStats(userId: string) {
 
   // Soru tipi dağılımı
   const typeCounts: Record<string, number> = {}
-  s.forEach((x: any) => { if (x.question_type) typeCounts[x.question_type] = (typeCounts[x.question_type] || 0) + 1 })
+  s.forEach((x) => { if (x.question_type) typeCounts[x.question_type] = (typeCounts[x.question_type] || 0) + 1 })
 
   // Ders bazlı ortalama başarı — lib/student-report-topics.ts'teki inferSubject()
   // ile aynı, KANITLANMIŞ eşleme mantığı kullanılıyor (SectionalReportTable'ın
   // öğretmen/kurum/veli tarafında zaten kullandığı fonksiyon) — burada ayrı,
   // tutarsız bir ders eşlemesi icat edilmiyor.
   const subjectAgg: Record<string, { sum: number; count: number }> = {}
-  s.forEach((x: any) => {
+  s.forEach((x) => {
     const subj = inferSubject(x.topic, x.grade)
     if (!subjectAgg[subj]) subjectAgg[subj] = { sum: 0, count: 0 }
     subjectAgg[subj].sum += x.pct || 0
@@ -81,7 +81,7 @@ async function getUserStats(userId: string) {
     .sort((a, b) => b.testCount - a.testCount)
 
   // Son 10 test için trend (pct değerleri)
-  const trend = s.slice(0, 10).reverse().map((x: any) => ({ pct: x.pct, topic: x.topic, date: x.created_at }))
+  const trend = s.slice(0, 10).reverse().map((x) => ({ pct: x.pct, topic: x.topic, date: x.created_at }))
 
   return {
     totalTests, totalQuestions, totalCorrect, avgPct,
@@ -143,8 +143,8 @@ export async function GET(req: NextRequest) {
       if (!links?.length) return NextResponse.json({ type: 'parent', children: [] })
 
       // İsimler TR-PG'den toplu çekilir; grade Supabase'de kalır
-      const childIdentities = await getIdentitiesBySupabaseIds(links.map((l: any) => l.child_id))
-      const children = await Promise.all(links.map(async (l: any) => {
+      const childIdentities = await getIdentitiesBySupabaseIds(links.map((l) => l.child_id))
+      const children = await Promise.all(links.map(async (l) => {
         const { data: p } = await adminClient.from('profiles').select('grade').eq('id', l.child_id).maybeSingle()
         const childName = childIdentities[l.child_id]?.full_name
         const stats = await getUserStats(l.child_id)
@@ -191,8 +191,8 @@ export async function GET(req: NextRequest) {
     const { data: members } = await adminClient.from('classroom_students').select('student_id').eq('classroom_id', classId)
     if (!members?.length) return NextResponse.json({ type: 'teacher', students: [] })
 
-    const studentIdentities = await getIdentitiesBySupabaseIds(members.map((m: any) => m.student_id))
-    const students = await Promise.all(members.map(async (m: any) => {
+    const studentIdentities = await getIdentitiesBySupabaseIds(members.map((m) => m.student_id))
+    const students = await Promise.all(members.map(async (m) => {
       const { data: p } = await adminClient.from('profiles').select('grade').eq('id', m.student_id).maybeSingle()
       const stats = await getUserStats(m.student_id)
       const { data: streak } = await adminClient.from('streaks').select('current_streak').eq('user_id', m.student_id).maybeSingle()
@@ -234,7 +234,7 @@ export async function GET(req: NextRequest) {
       .select('created_at')
       .eq('completed', true)
       .gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString())
-    weekSessions?.forEach((s: any) => {
+    weekSessions?.forEach((s) => {
       const d = s.created_at.split('T')[0]
       if (daily[d] !== undefined) daily[d]++
     })

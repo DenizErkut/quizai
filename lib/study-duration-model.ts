@@ -44,10 +44,10 @@ export async function analyzeStudyDuration(
 
   // Sadece timeMs verisi İÇEREN (yeni özellik sonrası çözülmüş) VE
   // yeterli soru sayısına sahip oturumlar sayılır.
-  const validSessions = (sessions || []).filter((s: any) => {
+  const validSessions = (sessions || []).filter((s) => {
     const a = s.answers
     return Array.isArray(a) && a.length >= MIN_QUESTIONS_PER_SESSION &&
-      a.every((x: any) => typeof x.timeMs === 'number' && x.timeMs >= 0)
+      a.every((x) => typeof x.timeMs === 'number' && x.timeMs >= 0)
   })
 
   if (validSessions.length < MIN_SESSIONS_WITH_TIMING) {
@@ -88,9 +88,9 @@ export async function analyzeStudyDuration(
   }
 
   const totalTimeMs = validSessions.reduce(
-    (sum: number, s: any) => sum + s.answers.reduce((a: number, x: any) => a + (x.timeMs || 0), 0), 0
+    (sum: number, s) => sum + s.answers.reduce((a: number, x) => a + (x.timeMs || 0), 0), 0
   )
-  const totalQuestions = validSessions.reduce((sum: number, s: any) => sum + s.answers.length, 0)
+  const totalQuestions = validSessions.reduce((sum: number, s) => sum + s.answers.length, 0)
   const avgTimePerQuestionSec = totalQuestions > 0 ? Math.round(totalTimeMs / totalQuestions / 1000) : null
 
   return {

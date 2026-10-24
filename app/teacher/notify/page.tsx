@@ -88,7 +88,7 @@ export default function TeacherNotifyPage() {
       setSent(true)
       if (json.notifRecord) setHistory((prev: any[]) => [json.notifRecord, ...prev])
       setTimeout(() => setSent(false), 4000)
-    } catch (err: any) {
+    } catch (err) {
       alert(tr('Hata: {msg}', { msg: err.message ?? tr('Bilinmeyen hata') }))
     } finally {
       setSending(false)
@@ -174,7 +174,7 @@ export default function TeacherNotifyPage() {
             <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               {tr('Gönderim Geçmişi')}
             </div>
-            {history.map((h: any, i: number) => (
+            {history.map((h, i: number) => (
               <div key={h.id} style={{ padding: '10px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
                 <div style={{ fontSize: '13px', marginBottom: '4px', lineHeight: 1.5 }}>{h.message}</div>
                 <div style={{ fontSize: '11px', color: 'var(--text3)', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>

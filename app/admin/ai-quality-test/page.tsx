@@ -62,7 +62,7 @@ type RunResult = {
 
 export default function AIQualityTestPage() {
   const router = useRouter()
-  const supabase = createClient() as any
+  const supabase = createClient()
   const [grade, setGrade] = useState('lise 9. sinif')
   const [topicsBySubject, setTopicsBySubject] = useState<Record<string, string[]>>({})
   const [catalogMessage, setCatalogMessage] = useState('')
@@ -144,7 +144,7 @@ export default function AIQualityTestPage() {
       } else {
         setRuns(prev => ({ ...prev, [provider]: { ...prev[provider], loading: false, data, clientMs } }))
       }
-    } catch (e: any) {
+    } catch (e) {
       setRuns(prev => ({ ...prev, [provider]: { ...prev[provider], loading: false, error: e?.message || 'Beklenmeyen hata', clientMs: Date.now() - startedAt } }))
     }
   }
@@ -246,7 +246,7 @@ export default function AIQualityTestPage() {
                       </div>
                     )}
                     <div style={{ maxHeight: '480px', overflowY: 'auto' }}>
-                      {(run.data.questions || []).map((q: any, i: number) => (
+                      {(run.data.questions || []).map((q, i: number) => (
                         <div key={i} style={{ padding: '10px', borderRadius: '8px', background: 'var(--bg2)', marginBottom: '8px' }}>
                           <div style={{ fontWeight: 700, fontSize: '12px', marginBottom: 5, whiteSpace: 'pre-wrap' }}>{i + 1}. <MathText text={q.q} /></div>
                           {Array.isArray(q.opts) && (

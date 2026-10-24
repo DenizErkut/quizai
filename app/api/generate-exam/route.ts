@@ -83,12 +83,12 @@ async function getBookletReference(format: ExamFormat, section: ExamSection, loc
     .eq('purpose', 'exam')
     .in('source_type', ['anonymous', 'teacher'])
     .limit(12)
-  const rows = filterRowsByUserScope(candidates || [], location, r => r).filter((r: any) => {
+  const rows = filterRowsByUserScope(candidates || [], location, r => r).filter((r) => {
     const gradeOk = !r.grade || !section.grade || String(r.grade).toLocaleLowerCase('tr') === String(section.grade).toLocaleLowerCase('tr')
     const subjectOk = !r.subject || !section.subject || String(r.subject).toLocaleLowerCase('tr').includes(String(section.subject).toLocaleLowerCase('tr'))
     return gradeOk && subjectOk
   }).slice(0, 3)
-  return rows.map((r: any) => `[${r.source_type === 'teacher' ? 'öğretmen imzalı' : r.source_type === 'ai' ? 'AI kitapçığı' : 'anonim'} referans] ${(r.raw_text || '').slice(0, 1400)}`).filter((s: string) => s.length > 40).join('\n---\n')
+  return rows.map((r) => `[${r.source_type === 'teacher' ? 'öğretmen imzalı' : r.source_type === 'ai' ? 'AI kitapçığı' : 'anonim'} referans] ${(r.raw_text || '').slice(0, 1400)}`).filter((s: string) => s.length > 40).join('\n---\n')
 }
 
 function structurallyValid(question: ExamQuestion, optionCount: number): boolean {
@@ -249,7 +249,7 @@ export async function POST(req: NextRequest) {
   if (!format) return NextResponse.json({ error: 'Geçersiz sınav türü.' }, { status: 400 })
 
   const sectionsToGenerate = sectionIds
-    ? format.sections.filter((s: any) => sectionIds.includes(s.id))
+    ? format.sections.filter((s) => sectionIds.includes(s.id))
     : format.sections
 
   // Demo: her bölümden 4 soru (hızlı) — Freemium demo: her alanda TAM 1 soru
@@ -274,7 +274,7 @@ export async function POST(req: NextRequest) {
     const CHUNK = 3
     for (let i = 0; i < sectionsToGenerate.length; i += CHUNK) {
       const chunk = sectionsToGenerate.slice(i, i + CHUNK)
-      await Promise.all(chunk.map(async (section: any) => {
+      await Promise.all(chunk.map(async (section) => {
         const sectionCount = isDemoOnly ? 1 : Math.max(4, Math.round(section.count * countMultiplier))
 
         try {
@@ -371,11 +371,11 @@ export async function PATCH(req: NextRequest) {
   let totalNet = 0
 
   for (const [sectionId, sectionAnswers] of Object.entries(answers as Record<string, any[]>)) {
-    const section = (format.sections as unknown as any[]).find((s: any) => s.id === sectionId)
+    const section = (format.sections as unknown as any[]).find((s) => s.id === sectionId)
     if (!section) continue
 
     let correct = 0, wrong = 0, empty = 0
-    ;(sectionAnswers || []).forEach((ans: any) => {
+    ;(sectionAnswers || []).forEach((ans) => {
       if (ans === null || ans === undefined) { empty++; return }
       if (ans.correct === true) correct++
       else wrong++
@@ -387,7 +387,7 @@ export async function PATCH(req: NextRequest) {
     totalNet += net * (section.netCoef || 1)
   }
 
-  const maxPossibleNet = (format.sections as unknown as any[]).reduce((sum: number, s: any) => sum + s.count * (s.netCoef || 1), 0)
+  const maxPossibleNet = (format.sections as unknown as any[]).reduce((sum: number, s) => sum + s.count * (s.netCoef || 1), 0)
   const estimatedScore = maxPossibleNet > 0
     ? Math.round((totalNet / maxPossibleNet) * format.maxScore)
     : 0

@@ -37,7 +37,7 @@ export default function TeacherLivePage() {
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const realtimeRef = useRef<any>(null)
 
-  async function patchLiveQuiz(body: any): Promise<boolean> {
+  async function patchLiveQuiz(body): Promise<boolean> {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.access_token) return false
@@ -104,13 +104,13 @@ export default function TeacherLivePage() {
       .select('user_id, question_index, chosen_answer, is_correct, answered_at, score, profiles(avatar_url)')
       .eq('live_quiz_id', liveQuizId)
     // İsimler TR-PG'den; her cevap satırına profiles.name olarak enjekte edilir
-    const identities = await resolveIdentities(supabase, (ans ?? []).map((a: any) => a.user_id))
-    const enriched = (ans ?? []).map((a: any) => ({
+    const identities = await resolveIdentities(supabase, (ans ?? []).map((a) => a.user_id))
+    const enriched = (ans ?? []).map((a) => ({
       ...a,
       profiles: { name: identities[a.user_id]?.full_name || null, avatar_url: a.profiles?.avatar_url || null },
     }))
     // Join marker'ları (-1) UI hesaplamalarından hariç tut
-    const realAnswers = enriched.filter((a: any) => a.question_index >= 0)
+    const realAnswers = enriched.filter((a) => a.question_index >= 0)
     setAnswers(realAnswers)
 
     // Liderboard hesapla — Kahoot tarzı puan (doğruluk + hız) toplamına göre
@@ -136,9 +136,9 @@ export default function TeacherLivePage() {
       .eq('live_quiz_id', liveQuizId)
       .eq('question_index', -1)
     // İsimler TR-PG'den; profiles.name olarak enjekte edilir
-    const identities = await resolveIdentities(supabase, (data ?? []).map((d: any) => d.user_id))
-    const enriched = (data ?? []).map((d: any) => ({ ...d, profiles: { name: identities[d.user_id]?.full_name || null } }))
-    const unique = [...new Map(enriched.map((d: any) => [d.user_id, d])).values()]
+    const identities = await resolveIdentities(supabase, (data ?? []).map((d) => d.user_id))
+    const enriched = (data ?? []).map((d) => ({ ...d, profiles: { name: identities[d.user_id]?.full_name || null } }))
+    const unique = [...new Map(enriched.map((d) => [d.user_id, d])).values()]
     setParticipants(unique)
   }
 
@@ -189,8 +189,8 @@ export default function TeacherLivePage() {
         const keyRes = await fetch(`/api/live-quiz/keys?live_quiz_id=${data.liveQuizId}`, { headers: { Authorization: `Bearer ${keySession?.access_token}` } })
         if (keyRes.ok) answers = (await keyRes.json()).answers || []
       } catch { /* anahtar alınamazsa doğru şık işaretlenmez */ }
-      setLiveQuiz((p: any) => ({ ...p, questions: (lq?.questions || []).map((q: any, i: number) => ({ ...q, ans: answers[i] ?? undefined })) }))
-    } catch (e: any) {
+      setLiveQuiz((p) => ({ ...p, questions: (lq?.questions || []).map((q, i: number) => ({ ...q, ans: answers[i] ?? undefined })) }))
+    } catch (e) {
       console.error('[createLiveQuiz] beklenmeyen hata:', e)
       setCreateError(tr('Beklenmeyen bir hata oluştu. Lütfen tekrar dene.'))
     } finally {
@@ -357,7 +357,7 @@ export default function TeacherLivePage() {
             <div style={{ fontSize: '13px', color: 'var(--text3)', padding: '1rem' }}>{tr('Henüz kimse katılmadı...')}</div>
           ) : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
-              {participants.map((p: any) => (
+              {participants.map((p) => (
                 <div key={p.user_id} style={{ padding: '5px 12px', borderRadius: '99px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', fontSize: '13px', color: '#6366f1', fontWeight: 500 }}>
                   {p.profiles?.name || tr('Öğrenci‖canlı')}
                 </div>

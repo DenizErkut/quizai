@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
         'X-RateLimit-Remaining': rl.remaining.toString(),
       },
     })
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('[reading/tts]', e)
     return NextResponse.json({ error: 'Ses üretilemedi.' }, { status: 500 })
   }

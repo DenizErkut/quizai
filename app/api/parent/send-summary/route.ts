@@ -37,10 +37,10 @@ export async function POST(req: NextRequest) {
     .eq('parent_id', user.id)
   if (!links?.length) return NextResponse.json({ error: 'Çocuk bulunamadı' }, { status: 400 })
 
-  const childIdentities = await getIdentitiesBySupabaseIds(links.map((l: any) => l.child_id))
+  const childIdentities = await getIdentitiesBySupabaseIds(links.map((l) => l.child_id))
   const childNames: Record<string, string> = {}
   for (const [id, identity] of Object.entries(childIdentities)) {
-    childNames[id] = (identity as any)?.full_name || 'Öğrenci'
+    childNames[id] = (identity)?.full_name || 'Öğrenci'
   }
 
   const childSummaries = await computeParentWeeklySummary(adminDb, user.id, childNames)

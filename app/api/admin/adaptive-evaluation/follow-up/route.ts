@@ -28,7 +28,7 @@ function average(values: number[]) {
 function sessionMetrics(sessions: any[]) {
   const completed = sessions.filter(row => row.completed)
   const durations = completed.map(row => Array.isArray(row.answers)
-    ? row.answers.reduce((sum: number, answer: any) => sum + Math.max(0, Number(answer?.timeMs || 0)), 0) / 1000
+    ? row.answers.reduce((sum: number, answer) => sum + Math.max(0, Number(answer?.timeMs || 0)), 0) / 1000
     : 0).filter((seconds: number) => seconds > 0)
   return {
     pct: average(completed.map(row => Number(row.pct)).filter(Number.isFinite)),

@@ -49,7 +49,7 @@ export default function PWAInstallBanner() {
     }
 
     // Install prompt
-    const handler = (e: any) => {
+    const handler = (e) => {
       e.preventDefault()
       setDeferredPrompt(e)
       if (!localStorage.getItem('pwa-dismissed')) {
@@ -67,7 +67,7 @@ export default function PWAInstallBanner() {
   function install() {
     if (!deferredPrompt) return
     deferredPrompt.prompt()
-    deferredPrompt.userChoice.then((r: any) => {
+    deferredPrompt.userChoice.then((r) => {
       if (r.outcome === 'accepted') localStorage.setItem('pwa-dismissed', '1')
       setDeferredPrompt(null)
       setShow(false)

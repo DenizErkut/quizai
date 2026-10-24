@@ -16,7 +16,7 @@ export default function SessionDetailPage() {
   const [notFound, setNotFound] = useState(false)
   const router = useRouter()
   let wrongQuestions: any[] = []
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   useEffect(() => {
     if (!id) return

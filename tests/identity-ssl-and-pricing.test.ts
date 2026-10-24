@@ -19,12 +19,12 @@ test('identity DB TLS keeps the legacy behaviour when nothing else is configured
 })
 
 test('mistral-small-latest is priced instead of silently costing zero', () => {
-  const cost = computeCostUsd({ operation: 'x', provider: 'mistral', model: 'mistral-small-latest', inputTokens: 1_000_000, outputTokens: 1_000_000 } as any)
+  const cost = computeCostUsd({ operation: 'x', provider: 'mistral', model: 'mistral-small-latest', inputTokens: 1_000_000, outputTokens: 1_000_000 })
   assert.ok(cost > 0)
 })
 
 test('an unknown model still returns zero cost', () => {
-  assert.equal(computeCostUsd({ operation: 'x', provider: 'mistral', model: 'no-such-model', inputTokens: 10, outputTokens: 10 } as any), 0)
+  assert.equal(computeCostUsd({ operation: 'x', provider: 'mistral', model: 'no-such-model', inputTokens: 10, outputTokens: 10 }), 0)
 })
 
 test('identity DB TLS pins the certificate name when TR_IDENTITY_DB_SSL_SERVERNAME is set', () => {

@@ -39,7 +39,7 @@ export default function StudentReportPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'overview' | 'graphs' | 'topics'>('overview')
   const router = useRouter()
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   useEffect(() => {
     async function load() {
@@ -59,7 +59,7 @@ export default function StudentReportPage() {
 
   const { stats, streak, weakTopics } = data
   const pctColor = (p: number) => p >= 80 ? 'var(--green)' : p >= 50 ? '#f59e0b' : 'var(--red)'
-  const trendData = (stats.trend || []).map((t: any, i: number) => ({ ...t, label: tr('{n}. test', { n: i + 1 }) }))
+  const trendData = (stats.trend || []).map((t, i: number) => ({ ...t, label: tr('{n}. test', { n: i + 1 }) }))
   const distributionData = [
     { name: tr('Mükemmel'), value: stats.perfect, color: '#3f725f' },
     { name: tr('İyi'), value: stats.good, color: '#76a38f' },
@@ -172,7 +172,7 @@ export default function StudentReportPage() {
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Son {stats.trend.length} Test Trendi</div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '70px' }}>
-              {stats.trend.map((t: any, i: number) => (
+              {stats.trend.map((t, i: number) => (
                 <div key={i} title={`${t.topic}: %${t.pct}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
                   <div style={{ width: '100%', borderRadius: '4px 4px 0 0', height: `${Math.max(t.pct * 0.7, 4)}px`, background: pctColor(t.pct), opacity: 0.85 }} />
                 </div>
@@ -190,7 +190,7 @@ export default function StudentReportPage() {
         {(tab === 'overview' || tab === 'topics') && stats.topTopics.length > 0 && (
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>{tr('En Çok Çözülen Konular')}</div>
-            {stats.topTopics.map((t: any, i: number) => (
+            {stats.topTopics.map((t, i: number) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
                 <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: 'var(--text3)', flexShrink: 0 }}>{i + 1}</div>
                 <div style={{ flex: 1, fontSize: '13px', fontWeight: 500 }}>{tr(t.topic)}</div>
@@ -205,7 +205,7 @@ export default function StudentReportPage() {
         {(tab === 'overview' || tab === 'topics') && weakTopics.length > 0 && (
           <div className="card" style={{ marginBottom: '1rem', borderLeft: '3px solid var(--red)' }}>
             <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>{tr('⚠️ Zayıf Konular')}</div>
-            {weakTopics.map((w: any, i: number) => (
+            {weakTopics.map((w, i: number) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
                 <div style={{ flex: 1, fontSize: '13px' }}>{tr(w.topic)}</div>
                 <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{tr('{n} yanlış',{n:w.wrong_count})}</div>

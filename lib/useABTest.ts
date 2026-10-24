@@ -17,13 +17,13 @@ function getSessionId(): string {
 interface ABTestResult {
   variant: 'control' | 'treatment' | string
   loading: boolean
-  track: (eventType: 'view' | 'click' | 'conversion', metadata?: any) => void
+  track: (eventType: 'view' | 'click' | 'conversion', metadata?) => void
 }
 
 export function useABTest(testName: string): ABTestResult {
   const [variant, setVariant] = useState<string>('control')
   const [loading, setLoading] = useState(true)
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   useEffect(() => {
     async function load() {
@@ -44,7 +44,7 @@ export function useABTest(testName: string): ABTestResult {
     load()
   }, [testName])
 
-  async function track(v: string, eventType: string, metadata?: any) {
+  async function track(v: string, eventType: string, metadata?) {
     const { data: { session } } = await supabase.auth.getSession()
     const token = session?.access_token
 

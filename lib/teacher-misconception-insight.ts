@@ -73,10 +73,10 @@ export async function computeClassMisconceptionSummary(
     supabase.from('misconception_catalog').select('id, label'),
   ])
 
-  const labelById = new Map<string, string>((catalogRows ?? []).map((c: any) => [c.id, c.label]))
+  const labelById = new Map<string, string>((catalogRows ?? []).map((c) => [c.id, c.label]))
 
   const byStudent = new Map<string, StudentMisconceptionEntry[]>()
-  ;(rows ?? []).forEach((r: any) => {
+  ;(rows ?? []).forEach((r) => {
     const entry: StudentMisconceptionEntry = {
       misconceptionId: r.misconception_id,
       label: labelById.get(r.misconception_id) || r.topic || 'Kavram yanılgısı',

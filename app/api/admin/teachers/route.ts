@@ -39,8 +39,8 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Kimlik alanları (name/email/phone) artık TR-PG'de — user_id ile eşleyip ekle
-  const identities = await getIdentitiesBySupabaseIds((teachers ?? []).map((t: any) => t.user_id))
-  const withIdentity = (teachers ?? []).map((t: any) => {
+  const identities = await getIdentitiesBySupabaseIds((teachers ?? []).map((t) => t.user_id))
+  const withIdentity = (teachers ?? []).map((t) => {
     const id = identities[t.user_id]
     return { ...t, name: id?.full_name ?? null, email: id?.email ?? null, phone: id?.phone ?? null }
   })
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
     return signed?.signedUrl || null
   }
 
-  const withDocs = await Promise.all(withIdentity.map(async (t: any) => {
+  const withDocs = await Promise.all(withIdentity.map(async (t) => {
     // Çoklu belge (document_urls) varsa hepsini imzalı URL'e çevir.
     if (Array.isArray(t.document_urls) && t.document_urls.length > 0) {
       const signedUrls = (await Promise.all(t.document_urls.map(toSignedUrl))).filter(Boolean)

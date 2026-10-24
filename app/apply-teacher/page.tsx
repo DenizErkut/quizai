@@ -112,7 +112,7 @@ export default function ApplyTeacherPage() {
       }
 
       setPhase('done')
-    } catch (e: any) {
+    } catch (e) {
       console.error('[apply-teacher handleSubmit] beklenmeyen hata:', e)
       setFormError(tr('Beklenmeyen bir hata oluştu. Lütfen tekrar dene.'))
     } finally {

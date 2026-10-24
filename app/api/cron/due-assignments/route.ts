@@ -52,12 +52,12 @@ export async function GET(req: NextRequest) {
       .select('student_id')
       .eq('assignment_id', asgn.id)
 
-    const completedIds = new Set((completions ?? []).map((c: any) => c.student_id))
-    const pendingStudents = (students ?? []).filter((s: any) => !completedIds.has(s.student_id))
+    const completedIds = new Set((completions ?? []).map((c) => c.student_id))
+    const pendingStudents = (students ?? []).filter((s) => !completedIds.has(s.student_id))
 
     if (!pendingStudents.length) continue
 
-    const notifRows = pendingStudents.map((s: any) => ({
+    const notifRows = pendingStudents.map((s) => ({
       user_id: s.student_id,
       type: 'assignment',
       title: '⏰ Ödev yarın bitiyor!',
@@ -82,12 +82,12 @@ export async function GET(req: NextRequest) {
       .select('student_id')
       .eq('assignment_id', asgn.id)
 
-    const completedIds = new Set((completions ?? []).map((c: any) => c.student_id))
-    const pendingStudents = (students ?? []).filter((s: any) => !completedIds.has(s.student_id))
+    const completedIds = new Set((completions ?? []).map((c) => c.student_id))
+    const pendingStudents = (students ?? []).filter((s) => !completedIds.has(s.student_id))
 
     if (!pendingStudents.length) continue
 
-    const notifRows = pendingStudents.map((s: any) => ({
+    const notifRows = pendingStudents.map((s) => ({
       user_id: s.student_id,
       type: 'assignment',
       title: '🚨 Ödev bugün bitiyor!',

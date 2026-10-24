@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { global: { headers: { Authorization: `Bearer ${token}` } } }
-  ) as any
+  )
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       identities[id] = { full_name: identity.full_name, role: id === user.id ? identity.role : '' }
     }
     return NextResponse.json({ identities })
-  } catch (e: any) {
+  } catch (e) {
     console.error('[identity/resolve] error:', e.message)
     return NextResponse.json({ error: 'Kimlik çözümlenemedi.' }, { status: 500 })
   }

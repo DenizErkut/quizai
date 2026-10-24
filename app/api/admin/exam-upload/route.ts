@@ -252,7 +252,7 @@ async function promoteExactQuestions(row: { id?: string; country?: string | null
   const sourceLabel = sourceType === 'teacher' ? 'öğretmen imzalı' : 'yapay zekâ ile ayrıca hazırlanmış'
   const labels = bookletQuestionLabels(batch)
   // A question that points at a figure it does not contain waits for its figure instead of entering the pool.
-  const needsVisual = (q: any) => requiresBookletVisual(q) || phantomVisualIssue({ q: q.q, opts: q.opts }) === 'missing_visual'
+  const needsVisual = (q) => requiresBookletVisual(q) || phantomVisualIssue({ q: q.q, opts: q.opts }) === 'missing_visual'
   const mixed = isMixedSubject(row.subject)
   const gradeObjectives = mixed ? await loadGradeObjectives(row.grade) : []
   const objectiveByCode = new Map(gradeObjectives.map(objective => [objective.objective_code.toLocaleUpperCase('tr-TR'), objective]))
@@ -275,11 +275,11 @@ async function promoteExactQuestions(row: { id?: string; country?: string | null
     return parsed.questions
   }))
   const rawExtracted = extractedGroups.flat()
-  const extracted = rawExtracted.filter((q: any) => q && validBookletQuestion(q))
+  const extracted = rawExtracted.filter((q) => q && validBookletQuestion(q))
   // Every question that does not reach the pool is recorded with its reason (never blocks the import).
   const rejections: Array<{ number: number | null; text: string; stage: 'not_extracted' | 'invalid_shape' | 'validator'; reason: string }> = []
-  const numberOf = (q: any) => printedQuestionNumber(String(q?.q || ''), labels)
-  rawExtracted.filter((q: any) => !(q && validBookletQuestion(q))).forEach((q: any) =>
+  const numberOf = (q) => printedQuestionNumber(String(q?.q || ''), labels)
+  rawExtracted.filter((q) => !(q && validBookletQuestion(q))).forEach((q) =>
     rejections.push({ number: numberOf(q), text: String(q?.q || '').slice(0, 300), stage: 'invalid_shape', reason: 'Soru biçimi geçersiz: şık sayısı (4-5), cevap indeksi, gerekçe veya kısa cevap kuralı (tek cümle, tek cevap) sağlanmadı.' }))
   const seenNumbers = new Set(rawExtracted.map(numberOf).filter((n): n is number => n !== null))
   labels.filter(label => label.number !== null && !seenNumbers.has(label.number)).forEach(label => {
@@ -300,7 +300,7 @@ async function promoteExactQuestions(row: { id?: string; country?: string | null
   const validateItems = async (items: any[]) => {
     const text = await callOpenAI([
       { role: 'system', content: 'Sen bağımsız soru kalite denetçisisin. Soruları değiştirme. Yalnızca doğru cevabı kesin, seçenekleri benzersiz ve soru eksiksiz olan kayıtları onayla. type "short_answer" ise opts tek elemanlıdır ve yalnız referans cevaptır; tek seçenek olması kusur değildir, cevabın doğruluğunu ve sorunun eksiksizliğini değerlendir. "reason" alanın kararınla tutarlı olsun: gerekçen "doğru/onaylanabilir" diyorsa approved true yaz. JSON döndür.' },
-      { role: 'user', content: `${JSON.stringify({ questions: items.map((q: any, index: number) => ({ index, type: q.type === 'short_answer' ? 'short_answer' : 'multiple_choice', q: q.q, opts: q.opts, ans: q.ans, exp: q.exp })) })}\nYanıt şeması: {"results":[{"index":0,"approved":true,"reason":"..."}]}` },
+      { role: 'user', content: `${JSON.stringify({ questions: items.map((q, index: number) => ({ index, type: q.type === 'short_answer' ? 'short_answer' : 'multiple_choice', q: q.q, opts: q.opts, ans: q.ans, exp: q.exp })) })}\nYanıt şeması: {"results":[{"index":0,"approved":true,"reason":"..."}]}` },
     ], { model: process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini', max_tokens: 4000, json: true, timeoutMs: 25000, requireComplete: true, operation: `${sourceType}-booklet-validator` })
     const parsed = JSON.parse(text)
     if (!Array.isArray(parsed.results) || parsed.results.length !== items.length
@@ -323,15 +323,15 @@ async function promoteExactQuestions(row: { id?: string; country?: string | null
       else original.reason = `${original.reason || ''} | İkinci kontrol: ${verdict.reason || ''}`.slice(0, 480)
     })
   }
-  const approvedIndexes = new Set<number>((validation.results || []).filter((item: any) => item.approved === true).map((item: any) => Number(item.index)))
-  const questions = extracted.filter((q: any, index: number) => approvedIndexes.has(index) || needsVisual(q))
-  extracted.forEach((q: any, index: number) => {
+  const approvedIndexes = new Set<number>((validation.results || []).filter((item) => item.approved === true).map((item) => Number(item.index)))
+  const questions = extracted.filter((q, index: number) => approvedIndexes.has(index) || needsVisual(q))
+  extracted.forEach((q, index: number) => {
     if (approvedIndexes.has(index) || needsVisual(q)) return
-    const verdict = (validation.results || []).find((item: any) => Number(item.index) === index)
+    const verdict = (validation.results || []).find((item) => Number(item.index) === index)
     rejections.push({ number: numberOf(q), text: String(q.q || '').slice(0, 300), stage: 'validator', reason: `Bağımsız kalite denetçisi reddetti: ${String(verdict?.reason || 'gerekçe verilmedi')}` })
   })
   await recordRejections()
-  let rows = questions.map((q: any) => ({
+  let rows = questions.map((q) => ({
     fingerprint: createHash('sha256').update(`${q.q}|${q.opts.join('|')}`.toLocaleLowerCase('tr')).digest('hex'),
     subject_key: questionBankKey(row.subject || 'genel'),
     // `topic_key` is the booklet's selected parent unit so all extracted
@@ -345,7 +345,7 @@ async function promoteExactQuestions(row: { id?: string; country?: string | null
   }))
   if (mixed) {
     // Subject and unit come from the catalog objective; an unplaced question waits for review instead of entering the pool under a guessed subject.
-    rows = rows.map((item: any, index: number) => {
+    rows = rows.map((item, index: number) => {
       const source: any = questions[index]
       // The code printed in the question heading is more reliable than the extractor's pick.
       const printed = printedQuestionObjective(source.q, labels, verifiedCodes)
@@ -520,7 +520,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, ...result, promoted: 0, processingPending: true })
 
-  } catch (e: any) {
+  } catch (e) {
     console.error('[exam-upload]', e)
     const msg = e?.message || 'Bilinmeyen hata'
     return NextResponse.json({ error: msg }, { status: 500 })

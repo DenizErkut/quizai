@@ -51,7 +51,7 @@ export async function analyzeTrend(
 
   if (!sessions || sessions.length < minSessions) return null
 
-  const pctSequence = [...sessions].reverse().map((s: any) => s.pct) // eskiden yeniye
+  const pctSequence = [...sessions].reverse().map((s) => s.pct) // eskiden yeniye
   const slope = linearSlope(pctSequence)
   const trend: TrendAnalysis['trend'] = slope < -3 ? 'düşüyor' : slope > 3 ? 'yükseliyor' : 'sabit'
   const lastPct = pctSequence[pctSequence.length - 1]

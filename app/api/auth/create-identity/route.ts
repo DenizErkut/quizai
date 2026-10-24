@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { global: { headers: { Authorization: `Bearer ${token}` } } }
-  ) as any
+  )
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, identityId: identity.id })
-  } catch (e: any) {
+  } catch (e) {
     console.error('[auth/create-identity] error:', e.message)
     return NextResponse.json({ error: 'Kimlik oluşturulamadı: ' + e.message }, { status: 500 })
   }

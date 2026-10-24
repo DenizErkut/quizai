@@ -41,7 +41,7 @@ export default function ChallengePage() {
     const { data: ch } = await supabase.from('challenges')
       .select('questions,id').eq('share_code', code).single()
     if (!ch) return
-    setChallenge((p: any) => ({ ...p, id: ch.id }))
+    setChallenge((p) => ({ ...p, id: ch.id }))
     setQuestions(ch.questions || [])
     setScreen('quiz')
   }
@@ -175,7 +175,7 @@ export default function ChallengePage() {
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '1.25rem 1rem' }}>
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text2)', marginBottom: '1rem' }}>{tr('🏆 Sıralama')}</div>
-          {leaderboard.slice(0, 5).map((e: any, i: number) => (
+          {leaderboard.slice(0, 5).map((e, i: number) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
               <span style={{ fontWeight: 800, fontSize: '16px', width: 24 }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}</span>
               <span style={{ flex: 1, fontSize: '14px', color: 'var(--primary)' }}>{e.profiles?.name || tr('Öğrenci')}</span>

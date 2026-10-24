@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
     .select('user_id')
     .eq('completed', true)
 
-  const candidateIds = [...new Set((activeSessions ?? []).map((r: any) => r.user_id))]
+  const candidateIds = [...new Set((activeSessions ?? []).map((r) => r.user_id))]
   if (!candidateIds.length) {
     return NextResponse.json({ ok: true, checked: 0, generated: 0, skipped: 0, failed: 0 })
   }
@@ -68,14 +68,14 @@ export async function GET(req: NextRequest) {
 
   const { data: profiles } = await supabaseAdmin
     .from('profiles').select('id, grade, language').in('id', toRegenerate)
-  const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]))
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]))
   const identities = await getIdentitiesBySupabaseIds(toRegenerate)
 
   let generated = 0, failed = 0
   for (const uid of toRegenerate) {
     try {
       const prof = profileMap.get(uid)
-      const identity = (identities as any)[uid]
+      const identity = (identities)[uid]
       // Faz 7 (sürekli öğrenme döngüsü): önceki planın hedef anlık
       // görüntüsü varsa, "geçen hafta bu konulara odaklandın, sonuç
       // şöyleydi" bağlamı yeni plana otomatik ekleniyor.
@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
         data: { href: '/plan' },
       })
       generated++
-    } catch (e: any) {
+    } catch (e) {
       console.error('[weekly-plan-refresh] user hatasi:', uid, e.message)
       failed++
     }

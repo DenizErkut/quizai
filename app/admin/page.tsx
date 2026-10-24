@@ -476,7 +476,7 @@ export default function AdminPage() {
     setEditInstSaving(false)
   }
 
-  async function toggleInstitutionActive(inst: any) {
+  async function toggleInstitutionActive(inst) {
     const { data: { session: s } } = await supabase.auth.getSession()
     await fetch('/api/admin/update-institution', {
       method: 'POST',
@@ -572,13 +572,13 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
 
     // auth.users'dan email çek (service role gerekir — şimdilik profiles'dan)
     const userMap: Record<string, { count: number; total_pct: number }> = {}
-    sessionData?.forEach((s: any) => {
+    sessionData?.forEach((s) => {
       if (!userMap[s.user_id]) userMap[s.user_id] = { count: 0, total_pct: 0 }
       userMap[s.user_id].count++
       userMap[s.user_id].total_pct += s.pct || 0
     })
 
-    const enriched = (profileData || []).map((p: any) => ({
+    const enriched = (profileData || []).map((p) => ({
       ...p,
       total_sessions: userMap[p.id]?.count || 0,
       avg_pct: userMap[p.id]?.count
@@ -601,7 +601,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
       total_sessions: sessionData?.length || 0,
       sessions_today: todaySessions || 0,
       avg_score: sessionData?.length
-        ? Math.round(sessionData.reduce((s: number, x: any) => s + (x.pct || 0), 0) / sessionData.length)
+        ? Math.round(sessionData.reduce((s: number, x) => s + (x.pct || 0), 0) / sessionData.length)
         : 0,
     })
 
@@ -610,8 +610,8 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
       .from('error_reports')
       .select('*')
       .order('reported_at', { ascending: false })
-    const reportIdentities = await resolveIdentities(supabase, (reports || []).map((r: any) => r.user_id))
-    const reportsWithNames = (reports || []).map((r: any) => ({ ...r, profiles: { name: reportIdentities[r.user_id]?.full_name || null } }))
+    const reportIdentities = await resolveIdentities(supabase, (reports || []).map((r) => r.user_id))
+    const reportsWithNames = (reports || []).map((r) => ({ ...r, profiles: { name: reportIdentities[r.user_id]?.full_name || null } }))
     setErrorReports(reportsWithNames)
     setPendingCount(reportsWithNames.filter((r: ErrorReport) => r.status === 'pending').length)
 
@@ -692,7 +692,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
       setUsers(prev => prev.map(u => u.id === userId
         ? { ...u, plan, plan_expires_at: expires }
         : u))
-    } catch(e: any) {
+    } catch(e) {
       alert(`Bağlantı hatası: ${e.message}`)
     } finally {
       setUpdating(null)
@@ -1197,7 +1197,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                 <select value={reportFilterInstId} onChange={e => setReportFilterInstId(e.target.value)}
                   style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', minWidth: '220px' }}>
                   <option value="">Tüm Kurumlar</option>
-                  {institutions.map((inst: any) => (
+                  {institutions.map((inst) => (
                     <option key={inst.id} value={inst.id}>{inst.name}</option>
                   ))}
                 </select>
@@ -1231,7 +1231,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                         </tr>
                       </thead>
                       <tbody>
-                        {reportStudents.map((st: any, i: number) => (
+                        {reportStudents.map((st, i: number) => (
                           <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
                             {!reportFilterInstId && (
                               <td style={{ padding: '6px 10px', color: 'var(--primary)', fontWeight: 500 }}>{st.institution_name}</td>
@@ -1304,7 +1304,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Satıcı (Opsiyonel)</label>
                   <select className="input" value={instForm.seller_id} onChange={e => setInstForm(p => ({ ...p, seller_id: e.target.value }))}>
                     <option value="">— Doğrudan/Satıcısız —</option>
-                    {sellers.map((s: any) => <option key={s.id} value={s.id}>{s.full_name} ({s.code})</option>)}
+                    {sellers.map((s) => <option key={s.id} value={s.id}>{s.full_name} ({s.code})</option>)}
                   </select>
                 </div>
               </div>
@@ -1349,7 +1349,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Satıcı (Opsiyonel)</label>
                   <select className="input" value={editInstForm.seller_id} onChange={e => setEditInstForm(p => ({ ...p, seller_id: e.target.value }))} style={{ marginBottom: '10px' }}>
                     <option value="">— Doğrudan/Satıcısız —</option>
-                    {sellers.map((s: any) => <option key={s.id} value={s.id}>{s.full_name} ({s.code})</option>)}
+                    {sellers.map((s) => <option key={s.id} value={s.id}>{s.full_name} ({s.code})</option>)}
                   </select>
 
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', cursor: 'pointer' }}>
@@ -1376,7 +1376,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                 <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text3)', fontSize: '13px' }}>Henüz kurum yok.</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {institutions.map((inst: any) => (
+                  {institutions.map((inst) => (
                     <div key={inst.id} style={{ padding: '14px 16px', borderRadius: '12px', border: `1.5px solid ${inst.active ? 'var(--border)' : 'rgba(220,38,38,0.2)'}`, background: inst.active ? 'var(--bg)' : 'var(--red-bg)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
                         <div style={{ flex: 1 }}>
@@ -1433,7 +1433,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {instStudentsReport[inst.id].map((st: any, i: number) => (
+                                  {instStudentsReport[inst.id].map((st, i: number) => (
                                     <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
                                       <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>{st.name_masked}</td>
                                       <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>{st.email_masked}</td>
@@ -1646,7 +1646,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                         📚 {grade}
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                        {filtered.filter(c => c.grade === grade).map((item: any) => (
+                        {filtered.filter(c => c.grade === grade).map((item) => (
                           <div key={item.id} style={{
                             display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px',
                             borderRadius: '10px', border: `1.5px solid ${item.is_active ? 'var(--border)' : 'rgba(220,38,38,0.3)'}`,
@@ -1719,7 +1719,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               <select value={lgSelectedCurriculumId} onChange={e => setLgSelectedCurriculumId(e.target.value)}
                 style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--primary)', fontSize: '13px', fontFamily: 'var(--font-sans)', flex: 1, minWidth: '220px' }}>
                 <option value="">— Müfredat kaydı seçin (önce yukarıda &quot;Yükle&quot; ile listeleyin) —</option>
-                {curriculum.map((c: any) => (
+                {curriculum.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.level} / {c.grade} / {c.subject} ({Array.isArray(c.topics) ? c.topics.length : 0} konu)
                   </option>
@@ -1738,7 +1738,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   if (res.ok) {
                     setLgMsg(`✅ ${data.inserted} AI adayı uzman ön koşul paketine aktarıldı${data.dropped ? `; ${data.dropped} geçersiz öneri elendi` : ''}. Aşağıdaki “Uzman Ön Koşul Paketleri” alanından inceleyin.`)
                   } else setLgMsg('❌ ' + data.error)
-                } catch (e: any) {
+                } catch (e) {
                   setLgMsg('❌ ' + (e?.message || 'Hata'))
                 } finally {
                   setLgSuggesting(false)
@@ -1763,7 +1763,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text3)' }}>Yükleniyor...</div>
             ) : lgDrafts.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {lgDrafts.map((d: any) => {
+                {lgDrafts.map((d) => {
                   const edit = lgEdits[d.id] || { topic: d.topic, prerequisite_topic: d.prerequisite_topic }
                   const confColor = d.confidence === 'high' ? '#16a34a' : d.confidence === 'low' ? '#dc2626' : '#d97706'
                   return (
@@ -2027,7 +2027,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                       setExamEvidenceFiles([])
                     } else setExamMsg('❌ ' + (data.error || 'Sunucu hatasi'))
                   }
-                } catch (e: any) {
+                } catch (e) {
                   setExamMsg('❌ ' + e.message)
                 } finally {
                   setExamUploading(false)
@@ -2056,7 +2056,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               <div style={{ textAlign: 'center', color: 'var(--text3)', padding: '2rem', fontSize: '13px' }}>Henuz kitapcik yuklenmemis.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {examList.map((ex: any) => (
+                {examList.map((ex) => (
                   <div key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
                     <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>🎯</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -2090,7 +2090,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                         const res = await fetch(`/api/admin/exam-upload?id=${ex.id}`)
                         const data = await res.json()
                         setDeletePreview({ kind: 'exam', id: ex.id, title: ex.title, content: res.ok ? (data.exam?.raw_text || '(içerik boş)') : `Hata: ${data.error}`, loading: false })
-                      } catch (e: any) {
+                      } catch (e) {
                         setDeletePreview({ kind: 'exam', id: ex.id, title: ex.title, content: `Hata: ${e.message}`, loading: false })
                       }
                     }} style={{ padding: '5px 10px', borderRadius: '7px', border: '1px solid rgba(220,38,38,0.3)', background: 'var(--red-bg)', color: 'var(--red)', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>
@@ -2127,7 +2127,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                     })
                     const data = await res.json()
                     setHealthScan(res.ok ? data : { error: data.error })
-                  } catch (e: any) {
+                  } catch (e) {
                     setHealthScan({ error: e.message })
                   } finally {
                     setHealthScanLoading(false)
@@ -2161,7 +2161,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
 
                 {healthScan.top?.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {healthScan.top.map((r: any) => (
+                    {healthScan.top.map((r) => (
                       <div key={r.id} style={{ fontSize: '12px', padding: '8px 10px', borderRadius: '8px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
                         <b>{r.title}</b> — {r.subject} / {r.grade} · {(r.char_count / 1000).toFixed(1)}K karakter
                         <div style={{ color: '#d97706', marginTop: '2px' }}>⚠️ {r.flags.join(', ')}</div>
@@ -2354,7 +2354,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                   } else {
                     setMebMsg(`❌ Hata: ${data.error}`)
                   }
-                } catch (e: any) {
+                } catch (e) {
                   setMebMsg(`❌ ${e.message}`)
                 } finally {
                   setMebUploading(false)
@@ -2408,7 +2408,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {mebResources.map((r: any) => (
+                {mebResources.map((r) => (
                   <div key={r.id} style={{ padding: '12px 14px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg2)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={{ flex: 1 }}>
@@ -2521,7 +2521,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {sellers.map((s: any) => (
+              {sellers.map((s) => (
                 <div key={s.id} className="card" style={{ padding: '14px 16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
                     <div>
@@ -2599,7 +2599,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             <p style={{ fontSize: '13px', color: 'var(--text3)' }}>Henüz talep yok.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {coachingLeads.map((l: any) => (
+              {coachingLeads.map((l) => (
                 <div key={l.id} className="card-sm" style={{ padding: '12px 14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                     <div>
@@ -2809,14 +2809,14 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
                       body: JSON.stringify({ id: deletePreview.id, confirmed: true }),
                     })
                     if (res.ok) {
-                      if (deletePreview.kind === 'meb') setMebResources(prev => prev.filter((x: any) => x.id !== deletePreview.id))
-                      else setExamList(prev => prev.filter((x: any) => x.id !== deletePreview.id))
+                      if (deletePreview.kind === 'meb') setMebResources(prev => prev.filter((x) => x.id !== deletePreview.id))
+                      else setExamList(prev => prev.filter((x) => x.id !== deletePreview.id))
                       setDeletePreview(null)
                     } else {
                       const data = await res.json().catch(() => ({}))
                       alert('Silme başarısız: ' + (data.error || res.status))
                     }
-                  } catch (e: any) {
+                  } catch (e) {
                     alert('Silme başarısız: ' + e.message)
                   } finally {
                     setDeleteConfirming(false)

@@ -48,11 +48,11 @@ export async function computeWeeklyGrowth(
     .lt('created_at', thisWeek.end.toISOString())
 
   const rows = sessions ?? []
-  const thisWeekSessions = rows.filter((s: any) => {
+  const thisWeekSessions = rows.filter((s) => {
     const t = new Date(s.created_at).getTime()
     return t >= thisWeek.start.getTime() && t < thisWeek.end.getTime()
   })
-  const lastWeekSessions = rows.filter((s: any) => {
+  const lastWeekSessions = rows.filter((s) => {
     const t = new Date(s.created_at).getTime()
     return t >= lastWeek.start.getTime() && t < lastWeek.end.getTime()
   })

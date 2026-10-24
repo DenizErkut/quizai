@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ institutionId: instUser.institution_id, students: [] })
   }
 
-  const userIds = members.map((m: any) => m.user_id)
+  const userIds = members.map((m) => m.user_id)
   const identities = await getIdentitiesBySupabaseIds(userIds)
 
   const { data: profiles } = await supabaseAdmin
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
     .select('id, class_number, grade')
     .in('id', userIds)
 
-  const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]))
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]))
 
   const students = userIds.map((uid: string) => ({
     id: uid,

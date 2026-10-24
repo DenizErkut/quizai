@@ -78,10 +78,10 @@ function findRecommendationId(ctx: CoachContext, topic: string): string | undefi
   return match?.recommendationId
 }
 
-function extractTurn(message: any, ctx: CoachContext): CoachTurn {
+function extractTurn(message, ctx: CoachContext): CoachTurn {
   const blocks = message?.content ?? []
-  const textBlock = blocks.find((b: any) => b.type === 'text')
-  const toolBlock = blocks.find((b: any) => b.type === 'tool_use' && b.name === 'suggest_practice')
+  const textBlock = blocks.find((b) => b.type === 'text')
+  const toolBlock = blocks.find((b) => b.type === 'tool_use' && b.name === 'suggest_practice')
 
   let action: CoachAction | null = null
   if (toolBlock?.input?.topic) {
@@ -143,7 +143,7 @@ export async function generateCoachReply(
     system: buildCoachSystemPrompt(ctx),
     tools: [SUGGEST_PRACTICE_TOOL],
     messages: history.length ? history : [{ role: 'user', content: 'Merhaba' }],
-  })) as any
+  }))
   await logAnthropicUsage(operation, COACH_MODEL, message, { userId })
   return extractTurn(message, ctx)
 }
@@ -159,7 +159,7 @@ export async function generateCoachOpening(ctx: CoachContext, userId: string, op
       role: 'user',
       content: 'Bu, öğrencinin bugün seninle ilk karşılaşması. Yukarıdaki gerçek veriye dayanarak, onu karşılayan ve en dikkat çekici tek sinyali (seri, gerileme veya en öncelikli çalışma önerisi) vurgulayan kısa bir açılış mesajı yaz. Soru sorup bekleme, doğrudan yaz.',
     }],
-  })) as any
+  }))
   await logAnthropicUsage(operation, COACH_MODEL, message, { userId })
   const turn = extractTurn(message, ctx)
   return turn.text ? turn : { text: 'Merhaba! Bugün nasıl gidiyor?', action: null }

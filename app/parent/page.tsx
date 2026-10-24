@@ -105,9 +105,9 @@ function ParentContent() {
 
     if (!links?.length) { setLoading(false); return }
 
-    const childIds = links.map((l: any) => l.child_id)
+    const childIds = links.map((l) => l.child_id)
     const nicknameMap: Record<string, string> = {}
-    links.forEach((l: any) => { nicknameMap[l.child_id] = l.nickname || '' })
+    links.forEach((l) => { nicknameMap[l.child_id] = l.nickname || '' })
 
     // İsimler TR-PG'den toplu çekilir; grade Supabase'de kalır
     const childIdentities = await resolveIdentities(supabase, childIds)
@@ -136,9 +136,9 @@ function ParentContent() {
       ])
       const sessions = sessionsRes.data ?? []
       const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
-      const weeklyTests = sessions.filter((s: any) => new Date(s.created_at) > weekAgo).length
-      const avgPct = sessions.length ? Math.round(sessions.reduce((a: number, s: any) => a + s.pct, 0) / sessions.length) : null
-      const recentTopics = [...new Set(sessions.slice(0, 5).map((s: any) => s.topic))].slice(0, 3) as string[]
+      const weeklyTests = sessions.filter((s) => new Date(s.created_at) > weekAgo).length
+      const avgPct = sessions.length ? Math.round(sessions.reduce((a: number, s) => a + s.pct, 0) / sessions.length) : null
+      const recentTopics = [...new Set(sessions.slice(0, 5).map((s) => s.topic))].slice(0, 3) as string[]
 
       const weakTopicsRaw: WeakTopicRow[] = weakRes.data ?? []
       const weakTopics = weakTopicsRaw.slice(0, 3).map(w => w.topic)
@@ -199,10 +199,10 @@ function ParentContent() {
       .limit(100)
 
     if (lbData?.length) {
-      const lbIdentities = await resolveIdentities(supabase, lbData.map((p: any) => p.id))
-      const lbWithStats = await Promise.all(lbData.map(async (p: any) => {
+      const lbIdentities = await resolveIdentities(supabase, lbData.map((p) => p.id))
+      const lbWithStats = await Promise.all(lbData.map(async (p) => {
         const { data: s } = await supabase.from('quiz_sessions').select('pct').eq('user_id', p.id).eq('completed', true)
-        const avg = s?.length ? Math.round(s.reduce((a: number, x: any) => a + x.pct, 0) / s.length) : 0
+        const avg = s?.length ? Math.round(s.reduce((a: number, x) => a + x.pct, 0) / s.length) : 0
         return { ...p, name: lbIdentities[p.id]?.full_name ?? tr('İsimsiz'), avgPct: avg, totalTests: s?.length ?? 0 }
       }))
       const sorted = lbWithStats.filter(p => p.totalTests > 0).sort((a, b) => b.avgPct - a.avgPct)
@@ -441,7 +441,7 @@ function ParentContent() {
             {selected.sessions.length > 0 && (
               <div className="card">
                 <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>{tr('📝 Son Çözülen Testler')}</div>
-                {selected.sessions.slice(0, 5).map((s: any) => (
+                {selected.sessions.slice(0, 5).map((s) => (
                   <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                     <div>
                       <div style={{ fontSize: '13px', fontWeight: 500 }}>{tr(s.topic)}</div>
@@ -477,7 +477,7 @@ function ParentContent() {
 
           // Haftalık trend
           const weeks: Record<string, {week: string; total: number; count: number}> = {}
-          selected.sessions.forEach((s: any) => {
+          selected.sessions.forEach((s) => {
             const d = new Date(s.created_at)
             const weekStart = new Date(d)
             weekStart.setDate(d.getDate() - d.getDay())
@@ -494,7 +494,7 @@ function ParentContent() {
 
           // Konu başarısı
           const topicMap: Record<string, {total: number; count: number}> = {}
-          selected.sessions.forEach((s: any) => {
+          selected.sessions.forEach((s) => {
             if (!topicMap[s.topic]) topicMap[s.topic] = { total: 0, count: 0 }
             topicMap[s.topic].total += s.pct
             topicMap[s.topic].count += 1
@@ -546,7 +546,7 @@ function ParentContent() {
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                       <XAxis dataKey="week" tick={{ fontSize: 12 }} />
                       <YAxis domain={[0,100]} tickFormatter={v => `%${v}`} tick={{ fontSize: 11 }} />
-                      <Tooltip formatter={(v: any) => [`%${v}`, tr('Haftalık Ort.')]} />
+                      <Tooltip formatter={(v) => [`%${v}`, tr('Haftalık Ort.')]} />
                       <Area type="monotone" dataKey="avg" stroke="#6366f1" strokeWidth={2.5} fill="url(#parentTrend)" dot={{ fill: '#6366f1', r: 4 }} />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -562,7 +562,7 @@ function ParentContent() {
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                       <XAxis type="number" domain={[0,100]} tickFormatter={v => `%${v}`} tick={{ fontSize: 11 }} />
                       <YAxis type="category" dataKey="topic" width={120} tick={{ fontSize: 11, fill: 'var(--text2)' }} />
-                      <Tooltip formatter={(v: any) => [`%${v}`, tr('Başarı')]} />
+                      <Tooltip formatter={(v) => [`%${v}`, tr('Başarı')]} />
                       <Bar dataKey="avg" radius={[0,6,6,0]}>
                         {topicData.map((d, i) => <Cell key={i} fill={pctColor(d.avg)} />)}
                       </Bar>
@@ -750,7 +750,7 @@ function ParentContent() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {selected.sessions.map((s: any) => (
+                {selected.sessions.map((s) => (
                   <div key={s.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                     <div style={{ width: 52, height: 52, borderRadius: '12px', background: s.pct >= 70 ? 'var(--green-bg)' : s.pct >= 50 ? 'rgba(245,158,11,0.08)' : 'var(--red-bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <span style={{ fontWeight: 800, fontSize: '16px', color: pctColor(s.pct), lineHeight: 1 }}>%{s.pct}</span>
@@ -789,7 +789,7 @@ function ParentContent() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {leaderboard.map((p: any, idx: number) => {
+                {leaderboard.map((p, idx: number) => {
                   const isChild = children.some(c => c.child_id === p.id)
                   return (
                     <div key={p.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: '14px', borderLeft: isChild ? '3px solid var(--accent)' : idx < 3 ? '3px solid' : undefined, borderLeftColor: isChild ? 'var(--accent)' : idx === 0 ? '#F59E0B' : idx === 1 ? '#94A3B8' : '#B45309', background: isChild ? 'var(--accent-bg)' : undefined }}>

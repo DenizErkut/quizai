@@ -33,7 +33,7 @@ interface ReportData {
 export default function SectionalReportTable({ fetchEndpoint }: { fetchEndpoint: string }) {
   const { t: tr, locale } = useT()
   const dl = intlLocale(locale)
-  const supabase = createClient() as any
+  const supabase = createClient()
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [importId, setImportId] = useState('')
@@ -58,7 +58,7 @@ export default function SectionalReportTable({ fetchEndpoint }: { fetchEndpoint:
       if (!res.ok) { setError(json.error || tr('Rapor yüklenemedi.')); setLoading(false); return }
       setData(json)
       if (json.selectedImportId) setImportId(json.selectedImportId)
-    } catch (e: any) {
+    } catch (e) {
       setError(e?.message || tr('Rapor yüklenemedi.'))
     }
     setLoading(false)

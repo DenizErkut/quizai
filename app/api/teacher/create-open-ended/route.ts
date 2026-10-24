@@ -160,10 +160,10 @@ async function generateWithAI(subject: string, topic: string, grade: string, ori
   // Ders Çince/Japonca/Korece ise senaryo/soru bilerek o alfabede üretiliyor
   // — stripForeignScripts çalışırsa hedef dilin kendisini silerdi.
   const skipStrip = isForeignLanguageSubject(subject)
-  const normalize = (item: any) => ({
+  const normalize = (item) => ({
     scenario: skipStrip ? item.scenario : stripForeignScripts(item.scenario),
     question: skipStrip ? item.question : stripForeignScripts(item.question),
-    rubric: item.rubric.map((r: any) => ({
+    rubric: item.rubric.map((r) => ({
       criterion: stripForeignScripts(r.criterion || ''),
       maxPoints: Number(r.maxPoints) || 0,
       description: stripForeignScripts(r.description || ''),
@@ -194,7 +194,7 @@ export async function POST(req: NextRequest) {
       mode: 'ai' | 'manual'; classroom_id: string; title: string
       grade?: string; subject?: string; topic?: string; due_date?: string; preview?: boolean
     }
-    const questionCount = Math.min(5, Math.max(1, Math.trunc(Number((body as any).count) || 1)))
+    const questionCount = Math.min(5, Math.max(1, Math.trunc(Number((body).count) || 1)))
 
     if (mode === 'ai') {
       const blocked = await gateTeacherFeature(user.id, 'ai_generation')
@@ -211,7 +211,7 @@ export async function POST(req: NextRequest) {
         const result = await generateWithAI(subject, topic, grade || '', internalOrigin(req.nextUrl.origin), user.id, token, questionCount)
         await recordTeacherUsage(user.id, 'ai_generation')
         return NextResponse.json(result)
-      } catch (e: any) {
+      } catch (e) {
         return NextResponse.json({ error: e?.message || 'Soru üretilemedi, tekrar dene.' }, { status: 500 })
       }
     }
@@ -229,26 +229,26 @@ export async function POST(req: NextRequest) {
 
     // Several questions on one topic: saved as one BATCH (shared batch_id) of ordinary
     // open-ended assignments, so students, grading and reports keep working per question.
-    const batchRaw = mode === 'manual' ? (body as any).items : null
+    const batchRaw = mode === 'manual' ? (body).items : null
     if (Array.isArray(batchRaw) && batchRaw.length > 1) {
       if (batchRaw.length > 10) return NextResponse.json({ error: 'Bir seferde en fazla 10 soru kaydedilebilir.' }, { status: 400 })
-      const items = batchRaw.map((item: any) => ({
+      const items = batchRaw.map((item) => ({
         scenario: String(item?.scenario || '').trim(),
         question: String(item?.question || '').trim(),
-        rubric: (Array.isArray(item?.rubric) ? item.rubric : []).map((r: any) => ({
+        rubric: (Array.isArray(item?.rubric) ? item.rubric : []).map((r) => ({
           criterion: String(r?.criterion || '').trim(), maxPoints: Number(r?.maxPoints) || 0, description: String(r?.description || '').trim(),
-        })).filter((r: any) => r.criterion && r.maxPoints > 0),
+        })).filter((r) => r.criterion && r.maxPoints > 0),
       }))
       const bad = items.findIndex(item => !item.scenario || !item.question || item.rubric.length === 0)
       if (bad >= 0) return NextResponse.json({ error: `Soru ${bad + 1}: senaryo, soru ve en az bir puanlama kriteri zorunlu.` }, { status: 400 })
       const checks = await Promise.all(items.map(item => verifyQuestionWithOpenAI(
-        `Bir öğretmen, ${grade || 'belirtilmemiş'} seviyesindeki öğrencilerine "${subject || 'belirtilmemiş'}" dersinde şu açık uçlu soruyu ödev olarak atamak istiyor. Bu içerik MEB müfredatına, yaş grubuna ve güvenlik kurallarına uygun mu?\n\nSENARYO: "${item.scenario}"\nSORU: "${item.question}"\nPUANLAMA KRİTERLERİ: ${item.rubric.map((r: any) => `${r.criterion} (${r.maxPoints}p)`).join(', ')}\n\nSadece şu JSON formatında yanıt ver:\n{"ok": true veya false, "reason": "Türkçe, kısa (1 cümle) gerekçe"}`)))
+        `Bir öğretmen, ${grade || 'belirtilmemiş'} seviyesindeki öğrencilerine "${subject || 'belirtilmemiş'}" dersinde şu açık uçlu soruyu ödev olarak atamak istiyor. Bu içerik MEB müfredatına, yaş grubuna ve güvenlik kurallarına uygun mu?\n\nSENARYO: "${item.scenario}"\nSORU: "${item.question}"\nPUANLAMA KRİTERLERİ: ${item.rubric.map((r) => `${r.criterion} (${r.maxPoints}p)`).join(', ')}\n\nSadece şu JSON formatında yanıt ver:\n{"ok": true veya false, "reason": "Türkçe, kısa (1 cümle) gerekçe"}`)))
       const failed = checks.findIndex(check => check?.ok === false)
       if (failed >= 0) {
         return NextResponse.json({ error: `Soru ${failed + 1} MEB uygunluk kontrolünden geçemedi: ${checks[failed]?.reason || 'Uygun bulunmadı.'} Lütfen düzenleyip tekrar dene.` }, { status: 422 })
       }
       const batchId = crypto.randomUUID()
-      const createdVia = (body as any).created_via === 'ai' ? 'ai' : 'manual'
+      const createdVia = (body).created_via === 'ai' ? 'ai' : 'manual'
       const { data: createdBatch, error: batchError } = await supabase.from('open_ended_assignments').insert(items.map((item, index) => ({
         teacher_id: teacherRow.id, classroom_id, title: `${title.trim()} — Soru ${index + 1}/${items.length}`,
         grade: grade || null, subject: subject?.trim() || null, topic: topic?.trim() || null,
@@ -277,11 +277,11 @@ export async function POST(req: NextRequest) {
         const result = await generateWithAI(subject, topic, grade || '', internalOrigin(req.nextUrl.origin), user.id, token)
         scenario = result.scenario; question = result.question; rubric = result.rubric
         await recordTeacherUsage(user.id, 'ai_generation')
-      } catch (e: any) {
+      } catch (e) {
         return NextResponse.json({ error: e?.message || 'Soru üretilemedi, tekrar dene.' }, { status: 500 })
       }
     } else if (mode === 'manual') {
-      const b = body as any
+      const b = body
       if (!b.scenario?.trim() || !b.question?.trim()) {
         return NextResponse.json({ error: 'Senaryo ve soru zorunlu.' }, { status: 400 })
       }
@@ -290,18 +290,18 @@ export async function POST(req: NextRequest) {
       }
       scenario = b.scenario.trim()
       question = b.question.trim()
-      rubric = b.rubric.map((r: any) => ({
+      rubric = b.rubric.map((r) => ({
         criterion: (r.criterion || '').trim(),
         maxPoints: Number(r.maxPoints) || 0,
         description: (r.description || '').trim(),
-      })).filter((r: any) => r.criterion && r.maxPoints > 0)
+      })).filter((r) => r.criterion && r.maxPoints > 0)
       if (rubric.length === 0) {
         return NextResponse.json({ error: 'Geçerli bir puanlama kriteri girmelisiniz (kriter adı + puan).' }, { status: 400 })
       }
       // Frontend, AI-üretimli-ama-onaylanmış içerik için de 'manual' yolunu
       // kullanıyor; asıl kaynağı ayırt etmek istersen body.created_via
       // opsiyonel olarak gönderilebilir.
-      createdVia = (b.created_via === 'ai' ? 'ai' : 'manual') as any
+      createdVia = (b.created_via === 'ai' ? 'ai' : 'manual')
     } else {
       return NextResponse.json({ error: "mode 'ai' veya 'manual' olmalı." }, { status: 400 })
     }
@@ -354,7 +354,7 @@ Bu içerik, belirtilen seviyedeki öğrencilere gösterilmeye uygun mu? Sadece �
     }
 
     return NextResponse.json({ assignment: created })
-  } catch (e: any) {
+  } catch (e) {
     console.error('[create-open-ended]', e?.message)
     return NextResponse.json({ error: 'Bir hata oluştu, tekrar dene.' }, { status: 500 })
   }

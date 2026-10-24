@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { global: { headers: { Authorization: `Bearer ${token}` } } }
-  ) as any
+  )
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       await updateIdentity(user.id, updates)
     }
     return NextResponse.json({ success: true })
-  } catch (e: any) {
+  } catch (e) {
     console.error('[profile/update-identity] error:', e.message)
     return NextResponse.json({ error: 'Kimlik güncellenemedi.' }, { status: 500 })
   }

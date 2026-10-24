@@ -122,7 +122,7 @@ export async function PATCH(req: NextRequest) {
   // Tüm testler + sonuçlar
   const { data: tests } = await supabase.from('ab_tests').select('*').order('created_at', { ascending: false })
 
-  const results = await Promise.all((tests || []).map(async (test: any) => {
+  const results = await Promise.all((tests || []).map(async (test) => {
     const { data: events } = await supabase
       .from('ab_events')
       .select('variant_id, event_type')
@@ -149,14 +149,14 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Conversion rate ve uplift hesapla
-    const variantResults = test.variants.map((v: any) => {
+    const variantResults = test.variants.map((v) => {
       const s = variantStats[v.id]
       const convRate = s.views > 0 ? (s.conversions / s.views * 100).toFixed(1) : '0'
       return { ...v, ...s, convRate: parseFloat(convRate) }
     })
 
-    const control = variantResults.find((v: any) => v.id === 'control')
-    const treatment = variantResults.find((v: any) => v.id === 'treatment')
+    const control = variantResults.find((v) => v.id === 'control')
+    const treatment = variantResults.find((v) => v.id === 'treatment')
     const uplift = control && treatment && control.convRate > 0
       ? (((treatment.convRate - control.convRate) / control.convRate) * 100).toFixed(1)
       : null

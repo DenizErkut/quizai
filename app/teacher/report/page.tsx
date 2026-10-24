@@ -17,7 +17,7 @@ export default function TeacherReportPage() {
   const [loading, setLoading] = useState(true)
   const [studentsLoading, setStudentsLoading] = useState(false)
   const router = useRouter()
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   useEffect(() => {
     async function load() {
@@ -65,7 +65,7 @@ export default function TeacherReportPage() {
         {/* Sınıf seçici */}
         {classrooms.length > 1 && (
           <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-            {classrooms.map((c: any) => (
+            {classrooms.map((c) => (
               <button key={c.id} onClick={() => { setSelectedClass(c.id); loadStudents(c.id) }}
                 style={{ padding: '7px 14px', borderRadius: '8px', border: `1px solid ${selectedClass === c.id ? 'var(--accent)' : 'var(--border)'}`, background: selectedClass === c.id ? 'var(--accent-bg)' : 'var(--bg)', color: selectedClass === c.id ? 'var(--accent)' : 'var(--text2)', fontSize: '13px', fontWeight: selectedClass === c.id ? 700 : 400, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
                 {c.name}
@@ -110,7 +110,7 @@ export default function TeacherReportPage() {
               <div className="card" style={{ marginBottom: '1rem' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', marginBottom: '10px' }}>{tr('Test Trendi')}</div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: '5px', height: '60px' }}>
-                  {selectedStudent.trend.map((t: any, i: number) => (
+                  {selectedStudent.trend.map((t, i: number) => (
                     <div key={i} title={`${t.topic}: %${t.pct}`} style={{ flex: 1 }}>
                       <div style={{ width: '100%', borderRadius: '3px 3px 0 0', height: `${Math.max(t.pct * 0.6, 3)}px`, background: pctColor(t.pct) }} />
                     </div>
@@ -123,7 +123,7 @@ export default function TeacherReportPage() {
             {selectedStudent.topTopics?.length > 0 && (
               <div className="card">
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', marginBottom: '10px' }}>{tr('Çalışılan Konular')}</div>
-                {selectedStudent.topTopics.map((t: any, i: number) => (
+                {selectedStudent.topTopics.map((t, i: number) => (
                   <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', padding: '6px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
                     <div style={{ flex: 1, fontSize: '13px' }}>{tr(t.topic)}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{t.count}x</div>

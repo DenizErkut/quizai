@@ -76,7 +76,7 @@ export default function ReportsHub({
 // ────────────────────────────────────────────────────────────────────────
 function GenericReportPanel({ scope, hubEndpoint, report }: { scope: string; hubEndpoint: string; report: ReportKey }) {
   const { t: tr } = useT()
-  const supabase = createClient() as any
+  const supabase = createClient()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -94,7 +94,7 @@ function GenericReportPanel({ scope, hubEndpoint, report }: { scope: string; hub
       const json = await res.json()
       if (!res.ok) { setError(json.error || tr('Rapor yüklenemedi.')); setLoading(false); return }
       setData(json)
-    } catch (e: any) {
+    } catch (e) {
       setError(e?.message || tr('Rapor yüklenemedi.'))
     }
     setLoading(false)
@@ -110,7 +110,7 @@ function GenericReportPanel({ scope, hubEndpoint, report }: { scope: string; hub
     <select className="input" style={{ maxWidth: '200px', marginBottom: '1rem' }} value={classroomId}
       onChange={e => { setClassroomId(e.target.value); load(e.target.value || undefined) }}>
       <option value="">{tr('Tüm sınıflarım')}</option>
-      {data.classrooms.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+      {data.classrooms.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
     </select>
   )
 
@@ -144,7 +144,7 @@ function ProgressPanel({ data }: { data: any }) {
   const dl = intlLocale(locale)
   const { weeklyTrend, students } = data
   if (!weeklyTrend?.length) return empty
-  const chartData = weeklyTrend.map((w: any) => ({
+  const chartData = weeklyTrend.map((w) => ({
     weekLabel: new Date(w.week).toLocaleDateString(dl, { day: '2-digit', month: '2-digit' }),
     avgPct: w.avgPct,
   }))
@@ -157,7 +157,7 @@ function ProgressPanel({ data }: { data: any }) {
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
             <XAxis dataKey="weekLabel" tick={{ fontSize: 11 }} />
             <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={(v) => `%${v}`} />
-            <Tooltip formatter={(value: any) => [`%${value}`, tr('Ortalama')]} />
+            <Tooltip formatter={(value) => [`%${value}`, tr('Ortalama')]} />
             <Line type="monotone" dataKey="avgPct" stroke="var(--accent)" strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
           </LineChart>
         </ResponsiveContainer>
@@ -166,7 +166,7 @@ function ProgressPanel({ data }: { data: any }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
         <thead><tr><th style={th}>{tr('İsim')}</th><th style={th}>{tr('Önceki %')}</th><th style={th}>{tr('Son 4 Hafta %')}</th><th style={th}>{tr('Değişim')}</th></tr></thead>
         <tbody>
-          {students.map((s: any) => (
+          {students.map((s) => (
             <tr key={s.id}>
               <td style={{ ...td, fontWeight: 600 }}>{s.fullName}</td>
               <td style={td}>{s.before != null ? `%${s.before}` : '—'}</td>
@@ -189,7 +189,7 @@ function ProgressPanel({ data }: { data: any }) {
 // geneli risk dağılımı" veli için anlamlı bir kavram değil.
 function ClassRiskInsight({ classroomId }: { classroomId: string }) {
   const { t: tr } = useT()
-  const supabase = createClient() as any
+  const supabase = createClient()
   const [risk, setRisk] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
@@ -239,7 +239,7 @@ function ClassRiskInsight({ classroomId }: { classroomId: string }) {
 function ClassMisconceptionInsight({ classroomId }: { classroomId: string }) {
   const { t: tr, locale } = useT()
   const dl = intlLocale(locale)
-  const supabase = createClient() as any
+  const supabase = createClient()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(false)
@@ -279,14 +279,14 @@ function ClassMisconceptionInsight({ classroomId }: { classroomId: string }) {
       </div>
       {summary.topOpenMisconceptions.length > 0 && (
         <div style={{ fontSize: '12.5px', color: 'var(--text2)', marginBottom: '12px' }}>
-          {tr('Sınıfta en çok tekrar eden açık yanılgı: {list}', { list: summary.topOpenMisconceptions.map((m: any) => tr('"{label}" ({n} öğrenci)', { label: m.label, n: m.studentCount })).join(', ') })}
+          {tr('Sınıfta en çok tekrar eden açık yanılgı: {list}', { list: summary.topOpenMisconceptions.map((m) => tr('"{label}" ({n} öğrenci)', { label: m.label, n: m.studentCount })).join(', ') })}
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {visibleStudents.map((s: any) => (
+        {visibleStudents.map((s) => (
           <div key={s.studentId} style={{ fontSize: '13px', lineHeight: 1.6, borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
             <strong>{s.fullName}</strong>
-            {s.entries.map((e: any) => (
+            {s.entries.map((e) => (
               <div key={e.misconceptionId} style={{ color: 'var(--text2)', marginLeft: '4px' }}>
                 {e.status === 'resolved'
                   ? `${tr('✅ "{label}" yanılgısı çözüldü', { label: e.label })}${e.resolvedAt ? ` (${new Date(e.resolvedAt).toLocaleDateString(dl, { timeZone: 'Europe/Istanbul' })})` : ''}${e.reopenedAt ? ` — ${tr('sonra yeniden açıldı')}` : ''}`
@@ -311,9 +311,9 @@ function WeakTopicsPanel({ data, scope, classroomId }: { data: any; scope: strin
   // olmaması için sınırlandırıldı, tablo zaten tüm konuları gösteriyor.
   const chartTopics = (data.topics ?? [])
     .slice()
-    .sort((a: any, b: any) => b.errorRate - a.errorRate)
+    .sort((a, b) => b.errorRate - a.errorRate)
     .slice(0, 8)
-    .map((t: any) => ({ subject: tr(t.topic), avgPct: 100 - t.errorRate, testCount: t.totalCount }))
+    .map((t) => ({ subject: tr(t.topic), avgPct: 100 - t.errorRate, testCount: t.totalCount }))
 
   return (
     <div>
@@ -330,7 +330,7 @@ function WeakTopicsPanel({ data, scope, classroomId }: { data: any; scope: strin
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
           <thead><tr><th style={th}>{tr('Kazanım / Konu')}</th><th style={th}>{tr('Ders')}</th><th style={th}>{tr('Yanlış')}</th><th style={th}>{tr('Hata Oranı')}</th><th style={th}>{tr('Kaç Öğrenci')}</th></tr></thead>
           <tbody>
-            {data.topics.map((t: any, i: number) => (
+            {data.topics.map((t, i: number) => (
               <tr key={i}>
                 <td style={{ ...td, fontWeight: 600 }}>{tr(t.topic)}</td>
                 <td style={td}>{tr(t.subject)}</td>
@@ -352,8 +352,8 @@ function AssignmentsPanel({ data }: { data: any }) {
   const dl = intlLocale(locale)
   if (!data.assignments?.length) return empty
   const chartData = data.assignments
-    .filter((a: any) => a.avgPct != null)
-    .map((a: any) => ({ subject: a.title, avgPct: a.avgPct, testCount: a.completedCount }))
+    .filter((a) => a.avgPct != null)
+    .map((a) => ({ subject: a.title, avgPct: a.avgPct, testCount: a.completedCount }))
   return (
     <div>
       {chartData.length > 0 && (
@@ -367,7 +367,7 @@ function AssignmentsPanel({ data }: { data: any }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', marginBottom: '1.5rem' }}>
         <thead><tr><th style={th}>{tr('Ödev')}</th><th style={th}>{tr('Konu')}</th><th style={th}>{tr('Son Tarih')}</th><th style={th}>{tr('Tamamlayan')}</th><th style={th}>{tr('Ort. %')}</th></tr></thead>
         <tbody>
-          {data.assignments.map((a: any) => (
+          {data.assignments.map((a) => (
             <tr key={a.id}>
               <td style={{ ...td, fontWeight: 600 }}>{a.title}</td>
               <td style={td}>{tr(a.topic)}</td>
@@ -382,7 +382,7 @@ function AssignmentsPanel({ data }: { data: any }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
         <thead><tr><th style={th}>{tr('İsim')}</th><th style={th}>{tr('Tamamlanan / Atanan')}</th></tr></thead>
         <tbody>
-          {data.students.map((s: any) => (
+          {data.students.map((s) => (
             <tr key={s.id}>
               <td style={{ ...td, fontWeight: 600 }}>{s.fullName}</td>
               <td style={{ ...td, color: s.completedCount < s.assignedCount ? 'var(--red)' : 'var(--green)', fontWeight: 700 }}>{s.completedCount} / {s.assignedCount}</td>
@@ -402,7 +402,7 @@ function LiveQuizPanel({ data }: { data: any }) {
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
       <thead><tr><th style={th}>{tr('Konu')}</th><th style={th}>{tr('Tarih')}</th><th style={th}>{tr('Durum')}</th><th style={th}>{tr('Katılımcı')}</th><th style={th}>{tr('Doğruluk')}</th></tr></thead>
       <tbody>
-        {data.quizzes.map((q: any) => (
+        {data.quizzes.map((q) => (
           <tr key={q.id}>
             <td style={{ ...td, fontWeight: 600 }}>{tr(q.topic)}</td>
             <td style={td}>{new Date(q.date).toLocaleDateString(dl)}</td>
@@ -424,7 +424,7 @@ function InactivityPanel({ data }: { data: any }) {
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
       <thead><tr><th style={th}>{tr('İsim')}</th><th style={th}>{tr('Son Aktivite')}</th><th style={th}>{tr('Kaç Gün Pasif')}</th><th style={th}>{tr('🔥 Streak')}</th></tr></thead>
       <tbody>
-        {data.students.map((s: any) => (
+        {data.students.map((s) => (
           <tr key={s.id}>
             <td style={{ ...td, fontWeight: 600 }}>{s.fullName}</td>
             <td style={td}>{s.lastActive ? new Date(s.lastActive).toLocaleDateString(dl) : tr('Hiç aktivite yok')}</td>
@@ -444,7 +444,7 @@ function ReadingPanel({ data }: { data: any }) {
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
       <thead><tr><th style={th}>{tr('İsim')}</th><th style={th}>{tr('Tamamlanan Materyal')}</th><th style={th}>{tr('Dikkat Sorusu Doğruluk')}</th></tr></thead>
       <tbody>
-        {data.students.map((s: any) => (
+        {data.students.map((s) => (
           <tr key={s.id}>
             <td style={{ ...td, fontWeight: 600 }}>{s.fullName}</td>
             <td style={td}>{s.materialsCompleted}</td>
@@ -460,13 +460,13 @@ function OpenEndedPanel({ data }: { data: any }) {
   const { t: tr, locale } = useT()
   const dl = intlLocale(locale)
   if (!data.students?.length) return empty
-  const answered = data.students.filter((s: any) => s.questionsAnswered > 0)
+  const answered = data.students.filter((s) => s.questionsAnswered > 0)
   if (!answered.length) return <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', padding: '2rem 0' }}>{tr("Henüz Açık Uçlu Sorular'dan çözülen bir soru yok.")}</p>
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
       <thead><tr><th style={th}>{tr('İsim')}</th><th style={th}>{tr('Çözülen Soru')}</th><th style={th}>{tr('Ort. Başarı')}</th><th style={th}>{tr('Dersler')}</th><th style={th}>{tr('Son Aktivite')}</th></tr></thead>
       <tbody>
-        {answered.map((s: any) => (
+        {answered.map((s) => (
           <tr key={s.id}>
             <td style={{ ...td, fontWeight: 600 }}>{s.fullName}</td>
             <td style={td}>{s.questionsAnswered}</td>
@@ -494,7 +494,7 @@ function OpenEndedArchivePanel({ data }: { data: any }) {
         {tr('Tıkla — senaryo, soru ve öğrencinin verdiği cevabın tamamını gör.')}
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {data.entries.map((e: any) => {
+        {data.entries.map((e) => {
           const isOpen = expandedId === e.id
           const pct = e.totalPossible ? Math.round((e.totalEarned / e.totalPossible) * 100) : null
           return (
@@ -534,7 +534,7 @@ function OpenEndedArchivePanel({ data }: { data: any }) {
                       <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>{tr('Kriter Kriter Puanlama')}</div>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                         <tbody>
-                          {e.criteriaResults.map((c: any, i: number) => (
+                          {e.criteriaResults.map((c, i: number) => (
                             <tr key={i}>
                               <td style={{ padding: '4px 8px 4px 0', color: 'var(--text2)' }}><MathText text={c.criterion} /></td>
                               <td style={{ padding: '4px 8px', fontWeight: 700, color: 'var(--primary)', whiteSpace: 'nowrap' }}>{c.earnedPoints}/{c.maxPoints}</td>
@@ -565,13 +565,13 @@ function ComparisonPanel({ data }: { data: any }) {
   if (!data.students?.length) return <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', padding: '2rem 0' }}>{tr('Karşılaştırma için ne kendi girilen not (Notlarım) ne içe aktarılan kurum notu bulunamadı.')}</p>
   return (
     <div>
-      {data.students.map((s: any) => (
+      {data.students.map((s) => (
         <div key={s.id} className="card-sm" style={{ marginBottom: '10px', padding: '10px 14px' }}>
           <div style={{ fontWeight: 700, marginBottom: '6px' }}>{s.fullName}</div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead><tr><th style={th}>{tr('Ders')}</th><th style={th}>{tr('Kendi Beyanı')}</th><th style={th}>{tr('Kurum Kaydı')}</th><th style={th}>{tr('Fark')}</th></tr></thead>
             <tbody>
-              {s.subjects.map((r: any, i: number) => (
+              {s.subjects.map((r, i: number) => (
                 <tr key={i}>
                   <td style={td}>{tr(r.subject)}</td>
                   <td style={td}>{r.selfReported ?? '—'}</td>
@@ -591,8 +591,8 @@ function ClassroomComparePanel({ data }: { data: any }) {
   const { t: tr } = useT()
   if (!data.groups?.length) return empty
   const chartData = data.groups
-    .filter((g: any) => g.avgPct != null)
-    .map((g: any) => ({ subject: gradeLabel(g.name, tr), avgPct: g.avgPct, testCount: g.testCount }))
+    .filter((g) => g.avgPct != null)
+    .map((g) => ({ subject: gradeLabel(g.name, tr), avgPct: g.avgPct, testCount: g.testCount }))
   return (
     <div>
       {chartData.length > 0 && (
@@ -606,7 +606,7 @@ function ClassroomComparePanel({ data }: { data: any }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
         <thead><tr><th style={th}>{tr('Grup')}</th><th style={th}>{tr('Öğrenci‖rapor')}</th><th style={th}>{tr('Test Sayısı')}</th><th style={th}>{tr('Ortalama %')}</th></tr></thead>
         <tbody>
-          {data.groups.map((g: any) => (
+          {data.groups.map((g) => (
             <tr key={g.name}>
               <td style={{ ...td, fontWeight: 600 }}>{gradeLabel(g.name, tr)}</td>
               <td style={td}>{g.studentCount}</td>

@@ -373,7 +373,7 @@ function chartDataInstruction(category: string | null): string {
 KRİTİK KURALLAR: (a) chartData içindeki TÜM sayı ve etiket, sorunun "q" metninde geçen değerlerle BİREBİR aynı olmalı — uydurma veri ekleme. (b) Cevabı ifşa eden bir nokta/çubuk/segment EKLEME — sadece sorunun VERDİĞİ bilgiyi göster, sorunun SORDUĞU/bilinmeyen değeri göstermeye çalışma. (c) categories/series uzunlukları birbirini tutmalı (her seri, her kategori için bir değer). (d) Sayısal olmayan, tahmini veya soruda geçmeyen bir değer YAZMA.`
 }
 
-function visualQuestionCandidate(question: any, category: string | null): boolean {
+function visualQuestionCandidate(question, category: string | null): boolean {
   if (!question) return false
   const text = normalizeTR(String(question.q || ''))
   const explicitVisual = /sekil|grafik|tablo|diyagram|koordinat|venn|sema|harita|zaman cizelgesi|veri/.test(text)
@@ -412,7 +412,7 @@ function visualQuestionIndexes(questions: any[], category: string | null, reques
     .map((question, index) => ({ question, index }))
     .filter(({ question }) => visualQuestionCandidate(question, category))
     .map(({ index }) => index)
-  const fallback = questions.map((_: any, index: number) => index).filter(index => !preferred.includes(index))
+  const fallback = questions.map((_, index: number) => index).filter(index => !preferred.includes(index))
   return [...preferred, ...fallback].slice(0, Math.min(target, questions.length))
 }
 
@@ -478,7 +478,7 @@ The student must figure out the answer from the question, NOT from your diagram.
 
 type VisualContextQuality = { passed: boolean; score: number; reason: string }
 
-async function repairChartDataForQuestion(q: any, topic: string, grade: string): Promise<any | null> {
+async function repairChartDataForQuestion(q, topic: string, grade: string): Promise<any | null> {
   try {
     const raw = await callOpenAI([
       {
@@ -587,7 +587,7 @@ const SVG_MAX_TOKENS_DEFAULT = 1300
 const SVG_MAX_TOKENS_CEILING = 2800
 
 async function generateVisualForQuestion(
-  q: any,
+  q,
   category: string,
   topic: string,
   grade: string
@@ -974,14 +974,14 @@ function applyContentQualityFilters(qs: any[], mebContext: string, options: { vi
   // artırıyordu. Artık her filtre, elediği soruyu (ilk 70 karakter) ve
   // gerekçesini greplenebilir bir etiketle logluyor — bir sonraki
   // yoğun-eleme olayında kör tahmin yerine gerçek kanıt olacak.
-  const logRejected = (stage: string, q: any, reason: string) => {
+  const logRejected = (stage: string, q, reason: string) => {
     console.warn(`[content-filter-reject] stage=${stage} reason="${reason}" question_length=${String(q.q || '').length}`)
   }
 
   // 0) Öğrencinin hiç göremeyeceği görsele atıf (hayalet görsel, yer tutucu, sızan <svg>)
   // Şekil işaretlemesi soru metnine sızdıysa (Sonnet 5.5 sık yapıyor) soruyu atmak yerine şekil alanına taşı.
-  qs = qs.map((q: any) => salvageLeakedSvg(q))
-  qs = qs.filter((q: any) => {
+  qs = qs.map((q) => salvageLeakedSvg(q))
+  qs = qs.filter((q) => {
     const issue = phantomVisualIssue(q, { deferMissingVisual: options.visualsWillBeAttached === true })
     if (issue) logRejected('phantom-visual', q, issue)
     return !issue
@@ -989,7 +989,7 @@ function applyContentQualityFilters(qs: any[], mebContext: string, options: { vi
 
   // 1) Kaynağın kendisi (yazar, ISBN, İçindekiler) hakkında soru
   const bookMetadataPattern = /\bISBN\b|yazar kadrosu|kaç yazar (tarafından|kişi)|kitab(ı|ın)[ıi]n yazarlarından|(ders kitab|kaynağ[ıi]n yer ald[ıi]ğ[ıi] kitab).{0,30}(hazırlanmıştır|hazırlamıştır)|kitab[ıi]n künye|İçindekiler/i
-  let result = qs.filter((q: any) => {
+  let result = qs.filter((q) => {
     const ok = !bookMetadataPattern.test(q.q || '')
     if (!ok) logRejected('book-metadata', q, 'kaynağın kendisi hakkında soru')
     return ok
@@ -1032,7 +1032,7 @@ function applyContentQualityFilters(qs: any[], mebContext: string, options: { vi
     // daha — bkz. .toLocaleLowerCase('tr') notları). Sondaki \b sorun
     // değil çünkü "si"/"nin" ekleri ASCII harfle bitiyor.
     /öğrenci(nin|si)?\b/i.test(text) && QUOTE_PATTERN.test(text)
-  result = result.filter((q: any) => {
+  result = result.filter((q) => {
     const text = q.q || ''
     const flagged = unseenPassagePattern.test(text) && !hasEmbeddedQuote(text) && !isSelfContainedMisconceptionQuestion(text)
     if (flagged) logRejected('unseen-passage-reference', q, 'metne/parçaya atıf var ama alıntı/self-contained değil')
@@ -1046,7 +1046,7 @@ function applyContentQualityFilters(qs: any[], mebContext: string, options: { vi
   // Referans var ama işaret yoksa soru birden fazla şekilde yorumlanabilir;
   // öğrenciye ulaşmadan elenir ve aşağıdaki top-up akışı yerine yenisini üretir.
   const invisibleEmphasisPattern = /alt[ıi] (çizili|cizili)|vurgulan(an|mış|mis)|underlined|highlighted/i
-  result = result.filter((q: any) => {
+  result = result.filter((q) => {
     const text = String(q.q || '')
     const hasVisibleTarget = /\[[^\]\n]{1,120}\]/.test(text)
     const flagged = invisibleEmphasisPattern.test(text) && !hasVisibleTarget
@@ -1075,7 +1075,7 @@ function applyContentQualityFilters(qs: any[], mebContext: string, options: { vi
   //     .toLowerCase() sonrası aranan küçük harfli string ile HİÇ
   //     eşleşmiyordu. .toLocaleLowerCase('tr') kullanılarak düzeltildi.
   const namedWorkMarkers = ['gençliğe hitabe', 'izmihlal', 'izmihlâl', 'hürriyyet', 'müstevli', 'ey türk gençliği', 'istiklal marşı', 'istiklâl marşı']
-  result = result.filter((q: any) => {
+  result = result.filter((q) => {
     const text = (q.q || '').toLocaleLowerCase('tr')
     const ctx = mebContext.toLocaleLowerCase('tr')
     for (const marker of namedWorkMarkers) {
@@ -1091,7 +1091,7 @@ function applyContentQualityFilters(qs: any[], mebContext: string, options: { vi
   // (Köprü Kurma, Performans Görevi vb.) hakkında soru — öğretmene
   // yönelik metodoloji, öğrenciye sorulacak konu içeriği değil.
   const curriculumMetaPattern = /Öğrenme Kanıtları|Performans Görevi|Köprü Kurma|Öğrenme-Öğretme Yaşantıları|Ön Değerlendirme Süreci|Beceriler Arası İlişkiler|Disiplinler Arası İlişkiler|Öğrenme Çıktıları ve Süreç Bileşenleri/
-  result = result.filter((q: any) => {
+  result = result.filter((q) => {
     const ok = !curriculumMetaPattern.test(q.q || '')
     if (!ok) logRejected('curriculum-meta', q, 'müfredat dokümanının idari başlığı')
     return ok
@@ -1122,7 +1122,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
 // Sabit bir süre yerine artık ÇAĞIRANIN o an isteğin 120sn'lik bütçesinden
 // GERÇEKTEN ne kadar kaldığını hesaplayıp verdiği payı kullanıyoruz — böylece
 // tek bir görsel zinciri, kalan süreden fazlasını asla harcayamaz.
-async function generateVisualWithRetry(q: any, category: string, topic: string, grade: string, maxMs: number): Promise<{ svg: string; contextQuality: VisualContextQuality } | null> {
+async function generateVisualWithRetry(q, category: string, topic: string, grade: string, maxMs: number): Promise<{ svg: string; contextQuality: VisualContextQuality } | null> {
   return withTimeout((async () => {
     const first = await generateVisualForQuestion(q, category, topic, grade)
     if (first) return first
@@ -1140,7 +1140,7 @@ async function loadBookletContext(subject: string, grade: string, topic: string,
   if (error || !data.length) return ''
   const subjectKey = normalizeTR(subject)
   const topicKey = normalizeTR(topic)
-  const matches = data.filter((row: any) => {
+  const matches = data.filter((row) => {
     const rowSubject = normalizeTR(String(row.subject || ''))
     const rowGrade = typeof row.grade === 'string' ? row.grade : ''
     const rowTopic = normalizeTR(String(row.topic || row.subtopic || ''))
@@ -1150,18 +1150,18 @@ async function loadBookletContext(subject: string, grade: string, topic: string,
       && (rowTopic.includes(topicKey) || topicKey.includes(rowTopic))
   })
   if (!matches.length) return ''
-  const teacher = matches.filter((row: any) => row.source_type === 'teacher' && row.review_status === 'approved').slice(0, 2)
-  const ai = matches.filter((row: any) => row.source_type === 'ai' && row.review_status === 'approved').slice(0, 2)
-  const anonymous = matches.filter((row: any) => row.source_type === 'anonymous').slice(0, 2)
+  const teacher = matches.filter((row) => row.source_type === 'teacher' && row.review_status === 'approved').slice(0, 2)
+  const ai = matches.filter((row) => row.source_type === 'ai' && row.review_status === 'approved').slice(0, 2)
+  const anonymous = matches.filter((row) => row.source_type === 'anonymous').slice(0, 2)
   const blocks: string[] = []
   if (teacher.length) {
-    blocks.push(`ÖĞRETMEN İMZALI SORU KİTAPÇIĞI REFERANSI:\n${teacher.map((row: any) => String(row.raw_text || '').slice(0, 3500)).join('\n---\n')}\nYeni soru üretirken bu soruların ölçtüğü kazanımı, çözüm mantığını, bilişsel seviyeyi ve seçenek tasarımını MUTLAKA temel al. Yeni üretilen soru özgün olmalı; ancak konu ve ölçme yaklaşımı bu öğretmen sorularıyla açıkça aynı çizgide kalmalı. Öğretmen imzalı sorular ayrıca onaylı soru havuzundan öğrenciye birebir sunulabilir.`)
+    blocks.push(`ÖĞRETMEN İMZALI SORU KİTAPÇIĞI REFERANSI:\n${teacher.map((row) => String(row.raw_text || '').slice(0, 3500)).join('\n---\n')}\nYeni soru üretirken bu soruların ölçtüğü kazanımı, çözüm mantığını, bilişsel seviyeyi ve seçenek tasarımını MUTLAKA temel al. Yeni üretilen soru özgün olmalı; ancak konu ve ölçme yaklaşımı bu öğretmen sorularıyla açıkça aynı çizgide kalmalı. Öğretmen imzalı sorular ayrıca onaylı soru havuzundan öğrenciye birebir sunulabilir.`)
   }
   if (ai.length) {
-    blocks.push(`AI SORU KİTAPÇIĞI REFERANSI — BİREBİR + YENİ ÜRETİM:\n${ai.map((row: any) => String(row.raw_text || '').slice(0, 3500)).join('\n---\n')}\nBu onaylı AI kitapçığındaki sorular soru havuzundan öğrenciye birebir sunulabilir. Yeni soru üretirken de ölçülen kazanımı, çözüm mantığını, bilişsel seviyeyi ve seçenek tasarımını referans al; eksik kalan kontenjan için aynı kazanımı ölçen yeni ve özgün sorular üret.`)
+    blocks.push(`AI SORU KİTAPÇIĞI REFERANSI — BİREBİR + YENİ ÜRETİM:\n${ai.map((row) => String(row.raw_text || '').slice(0, 3500)).join('\n---\n')}\nBu onaylı AI kitapçığındaki sorular soru havuzundan öğrenciye birebir sunulabilir. Yeni soru üretirken de ölçülen kazanımı, çözüm mantığını, bilişsel seviyeyi ve seçenek tasarımını referans al; eksik kalan kontenjan için aynı kazanımı ölçen yeni ve özgün sorular üret.`)
   }
   if (anonymous.length) {
-    blocks.push(`ANONİM SORU KİTAPÇIĞI REFERANSI — KOPYALAMA YASAK:\n${anonymous.map((row: any) => String(row.raw_text || '').slice(0, 2500)).join('\n---\n')}\nBu kaynak yalnızca ölçülen kavram, soru mantığı ve zorluk seviyesini anlamak içindir. Kaynaktaki soru cümlesini, sayıları, özel isimleri, seçenekleri veya kurguyu aynen kullanma. Öğrencinin karşısına tamamen yeni fakat aynı kazanımı ölçen benzer bir soru çıkar.`)
+    blocks.push(`ANONİM SORU KİTAPÇIĞI REFERANSI — KOPYALAMA YASAK:\n${anonymous.map((row) => String(row.raw_text || '').slice(0, 2500)).join('\n---\n')}\nBu kaynak yalnızca ölçülen kavram, soru mantığı ve zorluk seviyesini anlamak içindir. Kaynaktaki soru cümlesini, sayıları, özel isimleri, seçenekleri veya kurguyu aynen kullanma. Öğrencinin karşısına tamamen yeni fakat aynı kazanımı ölçen benzer bir soru çıkar.`)
   }
   return blocks.length ? `\n\n${blocks.join('\n\n')}` : ''
 }
@@ -1169,7 +1169,7 @@ async function loadBookletContext(subject: string, grade: string, topic: string,
 // Model/provider çıktısı UI'ya ulaşmadan önce soru tiplerinin zorunlu alanlarını
 // tek biçime getirir. Prompt talimatları tek başına şema garantisi değildir;
 // özellikle true_false sorularında opts'un atlanması sonuç ekranını çökertebilir.
-function normalizeInteractiveQuestionShape(q: any, language: string): any {
+function normalizeInteractiveQuestionShape(q, language: string): any {
   const normalized = { ...q }
   const canonicalDifficulty = normalizeDifficultyLevel(normalized.difficulty)
   if (canonicalDifficulty) normalized.difficulty = canonicalDifficulty
@@ -1418,7 +1418,7 @@ function extractMeaningfulWords(text: string): Set<string> {
   const matches = text.toLocaleLowerCase('tr').match(/[a-zçğıöşüâî]{4,}/g) || []
   return new Set(matches.filter(w => !PASSAGE_OVERLAP_STOPWORDS.has(w)))
 }
-function questionReferencesPassage(q: any, passage: string, passageWords: Set<string>): boolean {
+function questionReferencesPassage(q, passage: string, passageWords: Set<string>): boolean {
   // 4 Eylül 2026 — Deniz'in bulduğu sorun: soru üretimi artık %30 kaynağa
   // dayalı / %70 genel-bilgi karışımı üretiyor (bkz. KAYNAK KULLANIM ORANI
   // kuralı), ama bu fonksiyon hâlâ SADECE kelime-örtüşümüne bakıyordu —
@@ -1679,8 +1679,8 @@ export async function POST(req: NextRequest) {
         // Anahtar kelimeler çıkar — benzer soruları da yakala
         const prevKeywords = new Set<string>()
 
-        recentSessions.forEach((s: any) => {
-          (s.questions || []).forEach((q: any) => {
+        recentSessions.forEach((s) => {
+          (s.questions || []).forEach((q) => {
             if (!q.q) return
             if (prevQTexts.length < 50) prevQTexts.push(q.q.slice(0, 100))
             if (recentQuestionTexts.length < 100) recentQuestionTexts.push(q.q)
@@ -1725,8 +1725,8 @@ export async function POST(req: NextRequest) {
         .select('subject, term1_avg, term2_avg')
         .eq('user_id', user.id)
       const weakSubjects = (gradeNotes ?? [])
-        .filter((g: any) => (g.term1_avg ?? 100) < 70 || (g.term2_avg ?? 100) < 70)
-        .map((g: any) => g.subject)
+        .filter((g) => (g.term1_avg ?? 100) < 70 || (g.term2_avg ?? 100) < 70)
+        .map((g) => g.subject)
       if (weakSubjects.length > 0) {
         gradeContext = `\n\nNOTE: This student has low grades in: ${weakSubjects.join(', ')}. Focus on fundamentals.`
       }
@@ -2289,7 +2289,7 @@ export async function POST(req: NextRequest) {
     }
 
     const defaultGenerationProvider = genEngineUsed.startsWith('mistral') ? 'mistral' : genEngineUsed.startsWith('gpt') ? 'openai' : 'anthropic'
-    let questions = (parsed.questions || []).map((q: any) => ({
+    let questions = (parsed.questions || []).map((q) => ({
       ...normalizeInteractiveQuestionShape(q, effectiveLang),
       generationProvider: q.generationProvider || defaultGenerationProvider,
     }))
@@ -2325,7 +2325,7 @@ export async function POST(req: NextRequest) {
     const beforeDupCount = questions.length
     questions = filterOutNearDuplicates(questions, [
       ...(Array.isArray(excludeQuestionTexts) ? excludeQuestionTexts : []),
-      ...bankQuestions.map((question: any) => question.q).filter(Boolean),
+      ...bankQuestions.map((question) => question.q).filter(Boolean),
     ])
     if (questions.length < beforeDupCount) {
       console.warn(`[generate-quiz] yakın-tekrar kontrolü sonrası ${beforeDupCount - questions.length} soru elendi (${beforeDupCount} -> ${questions.length})`)
@@ -2428,17 +2428,17 @@ export async function POST(req: NextRequest) {
               const recovered = extractQuestionObjects(topupText)
               if (recovered.length) topupParsed = { questions: recovered }
             }
-            topupQuestions = (topupParsed?.questions || []).map((q: any) => ({ ...q, generationProvider: 'anthropic' }))
+            topupQuestions = (topupParsed?.questions || []).map((q) => ({ ...q, generationProvider: 'anthropic' }))
           }
-          topupQuestions = topupQuestions.map((q: any) => normalizeInteractiveQuestionShape(q, effectiveLang))
+          topupQuestions = topupQuestions.map((q) => normalizeInteractiveQuestionShape(q, effectiveLang))
           topupQuestions = filterQuestionsByRequestedType(topupQuestions, questionType)
           topupQuestions = applyContentQualityFilters(topupQuestions, mebContext, { visualsWillBeAttached })
           // Yakın-tekrar kontrolü: hem önceki parçanın sorularına (excludeQuestionTexts)
           // hem de bu çağrıda ŞİMDİYE KADAR kabul edilmiş sorulara (questions) karşı.
           const alreadyAsked = [
             ...(Array.isArray(excludeQuestionTexts) ? excludeQuestionTexts : []),
-            ...bankQuestions.map((q: any) => q.q).filter(Boolean),
-            ...questions.map((q: any) => q.q).filter(Boolean),
+            ...bankQuestions.map((q) => q.q).filter(Boolean),
+            ...questions.map((q) => q.q).filter(Boolean),
           ]
           topupQuestions = filterOutNearDuplicates(topupQuestions, alreadyAsked)
           if (roleMixEnabled) {
@@ -2474,9 +2474,9 @@ export async function POST(req: NextRequest) {
           difficulty: recoveryDifficulty, location: bankReadLocation,
         }, missingFromAi - bankFallback.length, [
           ...recentQuestionTexts,
-          ...bankQuestions.map((question: any) => question?.q).filter(Boolean),
-          ...questions.map((question: any) => question?.q).filter(Boolean),
-          ...bankFallback.map((question: any) => question?.q).filter(Boolean),
+          ...bankQuestions.map((question) => question?.q).filter(Boolean),
+          ...questions.map((question) => question?.q).filter(Boolean),
+          ...bankFallback.map((question) => question?.q).filter(Boolean),
         ])
         bankFallback.push(...filterQuestionsByRequestedType(fallbackQuestions, questionType))
       }
@@ -2556,7 +2556,7 @@ export async function POST(req: NextRequest) {
     for (let recoveryRound = 0; verifiedQuestions.length < safeQCount && recoveryRound < 4; recoveryRound++) {
       if (Date.now() >= replenishDeadline) break
       const missing = safeQCount - verifiedQuestions.length
-      const existingTexts = [...questions, ...verifiedQuestions].map((question: any) => question?.q).filter(Boolean)
+      const existingTexts = [...questions, ...verifiedQuestions].map((question) => question?.q).filter(Boolean)
       let replacements: any[] = []
 
       if (bankWriteEligible && !fileContent) {
@@ -2568,7 +2568,7 @@ export async function POST(req: NextRequest) {
           const bankRows = await getQuestionBankSet(supabase, {
             subject, topic, grade, language: effectiveLang, questionType,
             difficulty: recoveryDifficulty, location: bankReadLocation,
-          }, missing - replacements.length, [...recentQuestionTexts, ...existingTexts, ...replacements.map((question: any) => question.q).filter(Boolean)])
+          }, missing - replacements.length, [...recentQuestionTexts, ...existingTexts, ...replacements.map((question) => question.q).filter(Boolean)])
           replacements.push(...filterQuestionsByRequestedType(bankRows, questionType))
         }
       }
@@ -2611,7 +2611,7 @@ export async function POST(req: NextRequest) {
                     { type: 'text' as const, text: 'Sen Türkiye Milli Eğitim Bakanlığı (MEB) müfredatına göre soru üreten bir eğitim asistanısın. Yalnızca belirtilen sınıf ve kazanıma uygun, doğru ve yaşa uygun içerik üret.' },
                     { type: 'text' as const, text: getStaticSystemBlock(questionType, effectiveLang), cache_control: { type: 'ephemeral' as const } },
                   ],
-              messages: [{ role: 'user', content: `${prompt}\n\nRECOVERY: Produce exactly ${finalMissing} fresh replacement questions. Preserve the requested class, course, topic, learning outcomes and question type. Avoid every prepared question listed here: ${[...existingTexts, ...replacements.map((question: any) => question?.q).filter(Boolean)].slice(-12).join(' | ').slice(0, 3500)}.` }],
+              messages: [{ role: 'user', content: `${prompt}\n\nRECOVERY: Produce exactly ${finalMissing} fresh replacement questions. Preserve the requested class, course, topic, learning outcomes and question type. Avoid every prepared question listed here: ${[...existingTexts, ...replacements.map((question) => question?.q).filter(Boolean)].slice(-12).join(' | ').slice(0, 3500)}.` }],
             }, { timeout: Math.max(1000, Math.min(45000, remainingMs)), maxRetries: 0 })
             await logAnthropicUsage('generate-quiz:verification-recovery', CLAUDE_SONNET, recoveryResponse, {
               userId: user.id,
@@ -2620,7 +2620,7 @@ export async function POST(req: NextRequest) {
               meta: { requested: finalMissing, recoveryRound: recoveryRound + 1, subject, grade, topic },
             })
             const recoveryText = responseText(recoveryResponse)
-            replacements.push(...extractProviderQuestions(recoveryText).map((question: any) => ({
+            replacements.push(...extractProviderQuestions(recoveryText).map((question) => ({
               ...question,
               generationProvider: question.generationProvider || 'anthropic',
             })))
@@ -2630,10 +2630,10 @@ export async function POST(req: NextRequest) {
         }
 
         let generated = replacements
-          .map((question: any) => normalizeInteractiveQuestionShape(question, effectiveLang))
+          .map((question) => normalizeInteractiveQuestionShape(question, effectiveLang))
         generated = filterQuestionsByRequestedType(generated, questionType)
         generated = applyContentQualityFilters(generated, mebContext, { visualsWillBeAttached })
-        generated = filterOutNearDuplicates(generated, [...existingTexts, ...bankQuestions.map((question: any) => question.q).filter(Boolean), ...verifiedQuestions.map((question: any) => question.q).filter(Boolean)])
+        generated = filterOutNearDuplicates(generated, [...existingTexts, ...bankQuestions.map((question) => question.q).filter(Boolean), ...verifiedQuestions.map((question) => question.q).filter(Boolean)])
         replacements = generated
       }
 
@@ -2641,8 +2641,8 @@ export async function POST(req: NextRequest) {
       if (!replacements.length) break
       const replacementReview = await verifyQuestionCandidates(replacements)
       const acceptedReplacements = Array.isArray(replacementReview?.questions) ? replacementReview.questions : []
-      const existingKeys = new Set(verifiedQuestions.map((question: any) => String(question?.q || '').trim().toLocaleLowerCase('tr-TR')))
-      const uniqueAccepted = acceptedReplacements.filter((question: any) => {
+      const existingKeys = new Set(verifiedQuestions.map((question) => String(question?.q || '').trim().toLocaleLowerCase('tr-TR')))
+      const uniqueAccepted = acceptedReplacements.filter((question) => {
         const key = String(question?.q || '').trim().toLocaleLowerCase('tr-TR')
         if (!key || existingKeys.has(key)) return false
         existingKeys.add(key)
@@ -2657,7 +2657,7 @@ export async function POST(req: NextRequest) {
       console.error(`[generate-quiz] strict_verification_failed verified=${verifiedCandidateCount}/${safeQCount} minimum=${minimumVerifiedCount}`)
       return NextResponse.json({ error: 'insufficient_questions', reason: 'independent_verification', message: `İstenen ${safeQCount} sorudan en az ${minimumVerifiedCount} tanesi kalite kontrolünü geçmeliydi; ${verifiedCandidateCount} soru geçti.`, requestedCount: safeQCount, deliveredCount: verifiedCandidateCount, minimumVerifiedCount }, { status: 503 })
     }
-    questions = verifiedQuestions.map((question: any) => normalizeInteractiveQuestionShape(question, effectiveLang))
+    questions = verifiedQuestions.map((question) => normalizeInteractiveQuestionShape(question, effectiveLang))
     questions = filterQuestionsByRequestedType(questions, questionType)
     const adaptiveBatchHasMinimum = adaptiveCandidateBatch && questions.length > 0 && questions.length >= minimumVerifiedCount
     if (!adaptiveBatchHasMinimum && questions.length < minimumVerifiedCount) {
@@ -2742,7 +2742,7 @@ export async function POST(req: NextRequest) {
     // Every question that points at "the figure" needs one, whatever the quota says; those left without a
     // figure are dropped below instead of reaching a student as an unanswerable question.
     const figureClaimIndexes = visualsWillBeAttached
-      ? questions.map((question: any, index: number) => (phantomVisualIssue(question) === 'missing_visual' ? index : -1)).filter((index: number) => index >= 0)
+      ? questions.map((question, index: number) => (phantomVisualIssue(question) === 'missing_visual' ? index : -1)).filter((index: number) => index >= 0)
       : []
     const visualIndexes = [...new Set([...quotaVisualIndexes, ...figureClaimIndexes])]
     const shouldGenerateVisuals = Boolean(visualCategory && visualIndexes.length > 0 && visualBudgetMs > 15000)
@@ -2768,7 +2768,7 @@ export async function POST(req: NextRequest) {
     }
 
     const beforePhantomSweep = questions.length
-    questions = questions.filter((question: any) => {
+    questions = questions.filter((question) => {
       const issue = phantomVisualIssue(question)
       if (issue) console.warn(`[content-filter-reject] stage=phantom-visual-final reason="${issue}" question_length=${String(question?.q || '').length}`)
       return !issue
@@ -2807,7 +2807,7 @@ export async function POST(req: NextRequest) {
       : cleanPassageForDisplay(mebContext || '')
     if (sourcePassage) {
       const passageWords = extractMeaningfulWords(sourcePassage)
-      questions = questions.map((q: any) =>
+      questions = questions.map((q) =>
         questionReferencesPassage(q, sourcePassage, passageWords)
           ? { ...q, passage: sourcePassage }
           : q
@@ -2821,7 +2821,7 @@ export async function POST(req: NextRequest) {
     const canonicalSubject = typeof subject === 'string' && subject.trim()
       ? subject.trim()
       : 'Genel'
-    questions = questions.map((q: any, questionIndex: number) => ({
+    questions = questions.map((q, questionIndex: number) => ({
       ...normalizeQuestionMisconceptions(q),
       subject: canonicalSubject,
       // Setin istek düzeyini ayrıca korurken modelin her soru için verdiği
@@ -2853,7 +2853,7 @@ export async function POST(req: NextRequest) {
     questions = balanceAnswerPositions(questions)
     // Bind the decision to the final, actually delivered content. New visuals
     // or passages invalidate the text-only verdict and enter teacher review.
-    questions = questions.map((question: any) => finalizeContinuousReview(question))
+    questions = questions.map((question) => finalizeContinuousReview(question))
     // Havuza doğrulama öncesi kopyayı değil, son görseli ve son metadata'sı
     // eklenmiş öğrenciye sunulan nihai soruyu yaz. Böylece SVG/chartData soru
     // ile aynı JSON kaydında kalır ve tekrar kullanımda kaybolmaz.
@@ -2883,7 +2883,7 @@ export async function POST(req: NextRequest) {
 
       if (existing) {
         const mergedQuestions = [...(existing.questions || []), ...questions]
-        const mergedObjectiveMappedCount = mergedQuestions.filter((question: any) => question && hasVerifiedObjectiveMapping(question)).length
+        const mergedObjectiveMappedCount = mergedQuestions.filter((question) => question && hasVerifiedObjectiveMapping(question)).length
         await supabase
           .from('quiz_sessions')
           .update({
@@ -3029,7 +3029,7 @@ export async function POST(req: NextRequest) {
       // göremiyordu). Normal öğrenci trafiğinde bu alan hiç eklenmiyor.
       ...(isForcedProviderTest ? { debugGenEngine: genEngineUsed, debugBankFallback: bankQuestions.length > 0 } : {}),
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Generate quiz error, trying OpenAI fallback:', error?.message)
     // Once the strict production policy is active, never return an unscreened
     // fallback set. A provider/verification outage must fail closed.
@@ -3054,14 +3054,14 @@ export async function POST(req: NextRequest) {
       if (Array.isArray(fbQuestions) && fbQuestions.length > 0) {
         console.log('[generate-quiz] OpenAI fallback success:', fbQuestions.length, 'questions')
         const fbFinal = balanceAnswerPositions(sourcePassage
-          ? fbQuestions.map((q: any) => {
+          ? fbQuestions.map((q) => {
               const passageWords = extractMeaningfulWords(sourcePassage)
               return questionReferencesPassage(q, sourcePassage, passageWords) ? { ...q, passage: sourcePassage } : q
             })
           : fbQuestions)
         return NextResponse.json({ questions: fbFinal, sessionId: crypto.randomUUID() })
       }
-    } catch (fe: any) {
+    } catch (fe) {
       console.error('[generate-quiz] OpenAI fallback failed:', fe?.message)
     }
     return NextResponse.json({ error: 'Quiz generation failed' }, { status: 500 })
@@ -3120,7 +3120,7 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    const wrongAnswers = (answers || []).filter((a: any) => !a.correct)
+    const wrongAnswers = (answers || []).filter((a) => !a.correct)
     if (wrongAnswers.length > 0 && session.topic) {
       const { data: existing } = await supabase.from('weak_topics').select('*').eq('user_id', user.id).eq('topic', session.topic).single()
       if (existing) {

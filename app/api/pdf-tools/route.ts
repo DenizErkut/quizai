@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     let formData: FormData
     try {
       formData = await req.formData()
-    } catch (e: any) {
+    } catch (e) {
       console.warn('[pdf-tools] formData okunamadı:', e?.message)
       return NextResponse.json({ error: 'Dosya çok büyük veya format hatalı.' }, { status: 413 })
     }
@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: 'Geçersiz işlem.' }, { status: 400 })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('[pdf-tools] error:', error?.message, error?.stack)
     return NextResponse.json({
       error: error?.message || 'İşlem başarısız.',

@@ -96,7 +96,7 @@ export default function LiveContent() {
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'live_quizzes',
         filter: `id=eq.${lq.id}`,
-      }, (payload: any) => {
+      }, (payload) => {
         handleQuizUpdate(payload.new)
       })
       .subscribe((status: string) => {
@@ -140,7 +140,7 @@ export default function LiveContent() {
     setTimeout(() => clearInterval(pollId), 30 * 60 * 1000)
   }
 
-  function handleQuizUpdate(updated: any) {
+  function handleQuizUpdate(updated) {
     const prev = liveQuizRef.current
     if (!prev) return
 
@@ -150,7 +150,7 @@ export default function LiveContent() {
       fetchLeaderboard(prev.id)
       setScreen('results')
       screenRef.current = 'results'
-      setLiveQuiz((p: any) => ({ ...p, ...updated }))
+      setLiveQuiz((p) => ({ ...p, ...updated }))
       return
     }
 
@@ -162,7 +162,7 @@ export default function LiveContent() {
       fetchLeaderboard(prev.id, 3)
       setScreen('leaderboard')
       screenRef.current = 'leaderboard'
-      setLiveQuiz((p: any) => ({ ...p, ...updated }))
+      setLiveQuiz((p) => ({ ...p, ...updated }))
       return
     }
 
@@ -179,7 +179,7 @@ export default function LiveContent() {
       setScreen('question')
       screenRef.current = 'question'
       startTimer(updated.time_per_question || prev.time_per_question || 30)
-      setLiveQuiz((p: any) => ({ ...p, ...updated }))
+      setLiveQuiz((p) => ({ ...p, ...updated }))
       return
     }
 
@@ -192,12 +192,12 @@ export default function LiveContent() {
       setScreen('question')
       screenRef.current = 'question'
       startTimer(updated.time_per_question || prev.time_per_question || 30)
-      setLiveQuiz((p: any) => ({ ...p, ...updated }))
+      setLiveQuiz((p) => ({ ...p, ...updated }))
       return
     }
 
     // Diğer durumlarda sadece state güncelle
-    setLiveQuiz((p: any) => ({ ...p, ...updated }))
+    setLiveQuiz((p) => ({ ...p, ...updated }))
   }
 
   function startTimer(duration: number) {
@@ -283,7 +283,7 @@ export default function LiveContent() {
       .select('user_id, question_index, is_correct, score')
       .eq('live_quiz_id', liveQuizId)
     // İsimler TR-PG'den toplu çekilir
-    const identities = await resolveIdentities(supabase, (ans ?? []).map((a: any) => a.user_id))
+    const identities = await resolveIdentities(supabase, (ans ?? []).map((a) => a.user_id))
     const scoreMap: Record<string, { name: string; correct: number; total: number; points: number }> = {}
     for (const a of (ans ?? [])) {
       if (a.question_index < 0) continue  // join marker'ı atla

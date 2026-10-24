@@ -117,7 +117,7 @@ export default function CompleteProfilePage() {
         const metaRole = (user.user_metadata?.pending_role as PendingRole) || 'student'
         setFbRole(metaRole)
         setPhase('fallback-form')
-      } catch (e: any) {
+      } catch (e) {
         // Hiçbir hata 'loading' ekranında sonsuza kadar takılı bırakmasın —
         // kullanıcı en azından tekrar deneme/giriş seçenekleri görsün.
         if (cancelled) return
@@ -269,7 +269,7 @@ export default function CompleteProfilePage() {
       }
 
       setPhase('teacher-done')
-    } catch (e: any) {
+    } catch (e) {
       console.error('[complete-profile handleTeacherApply] beklenmeyen hata:', e)
       setTeacherError(tr('Beklenmeyen bir hata oluştu ({msg}). Lütfen tekrar dene.', { msg: e?.message || tr('bilinmeyen') }))
     } finally {
@@ -349,7 +349,7 @@ export default function CompleteProfilePage() {
         await supabase.from('profiles').upsert({ id: userId, language: 'Türkçe', role: 'teacher' })
         setPhase('teacher-apply')
       }
-    } catch (e: any) {
+    } catch (e) {
       console.error('[handleFallbackSubmit] beklenmeyen hata:', e)
       setFbError(tr('Beklenmeyen bir hata oluştu ({msg}). Lütfen tekrar dene.', { msg: e?.message || tr('bilinmeyen') }))
     } finally {

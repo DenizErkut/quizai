@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   const { data: members } = await supabaseAdmin
     .from('institution_users').select('user_id')
     .eq('institution_id', instUser.institution_id).eq('role', 'student')
-  const allowedStudentIds = new Set((members ?? []).map((m: any) => m.user_id))
+  const allowedStudentIds = new Set((members ?? []).map((m) => m.user_id))
   const invalidRows = rows.filter(r => !allowedStudentIds.has(r.studentId))
   if (invalidRows.length > 0) {
     return NextResponse.json({ error: `${invalidRows.length} öğrenci senin kurumuna ait değil.` }, { status: 403 })
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       rows,
     })
     return NextResponse.json(result)
-  } catch (e: any) {
+  } catch (e: unknown) {
     return errorResponse('institution/import-grades', e, 'İçe aktarma başarısız.')
   }
 }
