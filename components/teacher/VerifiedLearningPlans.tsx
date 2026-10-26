@@ -8,10 +8,14 @@ import type { verifiedLearningMetrics } from '@/lib/verified-learning-metrics'
 import InterventionReviewQueue from './InterventionReviewQueue'
 
 type Option = { id: string; objective_code: string; title: string; availableItems: number; seenItems?: number; ready: boolean }
-type Cycle = { id: string; status: string; metrics?: ReturnType<typeof verifiedLearningMetrics>; objective?: { objective_code: string; title: string }; attempts: { stage: string; status: string; score_pct: number | null }[] }
+type Cycle = { id: string; learning_objective_id: string; created_at: string; status: string; metrics?: ReturnType<typeof verifiedLearningMetrics>; objective?: { objective_code: string; title: string }; attempts: { stage: string; status: string; score_pct: number | null }[] }
 type NextObjective = { status: string; candidate: { id: string; objectiveCode: string; title: string } | null; reason: string }
 
-export default function VerifiedLearningPlans({ classroomId, studentId }: { classroomId: string; studentId: string }) {
+export default function VerifiedLearningPlans({ classroomId, studentId, proposalScope, onLinkCycle }: {
+  classroomId: string; studentId: string;
+  proposalScope?: { objectiveId: string; reviewedAt: string };
+  onLinkCycle?: (cycleId: string) => Promise<void>;
+}) {
   const { t: tr } = useT()
   const [options, setOptions] = useState<Option[]>([])
   const [cycles, setCycles] = useState<Cycle[]>([])
@@ -19,6 +23,7 @@ export default function VerifiedLearningPlans({ classroomId, studentId }: { clas
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [nextObjective, setNextObjective] = useState<NextObjective|null>(null)
+  const proposalObjectiveId = proposalScope?.objectiveId
 
   const load = useCallback(async () => {
     if (!classroomId || !studentId) return
@@ -29,8 +34,9 @@ export default function VerifiedLearningPlans({ classroomId, studentId }: { clas
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || tr('Pilot durumu alınamadı.'))
       setOptions(data.options || []); setCycles(data.cycles || []); setNextObjective(data.nextObjective || null); setMessage('')
+      if (proposalObjectiveId) setObjectiveId(proposalObjectiveId)
     } catch (error) { setMessage(error instanceof Error ? error.message : tr('Pilot durumu alınamadı.')) }
-  }, [classroomId, studentId, tr])
+  }, [classroomId, studentId, proposalObjectiveId, tr])
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void load() }, 0)
@@ -51,6 +57,11 @@ export default function VerifiedLearningPlans({ classroomId, studentId }: { clas
       if (!response.ok) throw new Error(data.error || tr('Pilot başlatılamadı.'))
       await load()
       setMessage(tr('Ölçüm döngüsü öğrenciye atandı. Öğrenci panelindeki “Doğrulanmış Öğrenme Pilotu” bağlantısından başlayabilir.'))
+      // Assignment succeeded even if linking fails: keep the actual cycle visible for an explicit retry.
+      if (onLinkCycle && data.cycleId) {
+        try { await onLinkCycle(data.cycleId) }
+        catch { setMessage(tr('Döngü atandı; öneriye bağlantı kaydedilemedi. Aşağıdaki döngüyü takibe bağlayarak yeniden deneyin.')) }
+      }
     } catch (error) { setMessage(error instanceof Error ? error.message : tr('Pilot başlatılamadı.')) }
     finally { setBusy(false) }
   }
@@ -62,11 +73,11 @@ export default function VerifiedLearningPlans({ classroomId, studentId }: { clas
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
       <select aria-label={tr('Pilot kazanımı')} value={objectiveId} onChange={event => setObjectiveId(event.target.value)} style={{ padding: 9, borderRadius: 8, maxWidth: '100%' }}>
         <option value="">{tr('Kazanım seçin')}</option>
-        {options.map(item => <option key={item.id} value={item.id}>{item.seenItems ? tr('{code} · {n}/16 yeni doğrulanmış soru', { code: item.objective_code, n: item.availableItems }) : tr('{code} · {n}/16 doğrulanmış soru', { code: item.objective_code, n: item.availableItems })}{item.seenItems ? ` ${tr('(öğrenci {n} soruyu gördü)', { n: item.seenItems })}` : ''} {item.ready ? tr('✓ hazır') : tr('· eksik')}</option>)}
+        {options.filter(item => !proposalScope || item.id === proposalScope.objectiveId).map(item => <option key={item.id} value={item.id}>{item.seenItems ? tr('{code} · {n}/16 yeni doğrulanmış soru', { code: item.objective_code, n: item.availableItems }) : tr('{code} · {n}/16 doğrulanmış soru', { code: item.objective_code, n: item.availableItems })}{item.seenItems ? ` ${tr('(öğrenci {n} soruyu gördü)', { n: item.seenItems })}` : ''} {item.ready ? tr('✓ hazır') : tr('· eksik')}</option>)}
       </select>
       <button className="btn btn-primary" disabled={busy || !options.find(item => item.id === objectiveId)?.ready} onClick={() => void create()}>{tr('Öğrenciye ata')}</button>
     </div>
-    {nextObjective && <div style={{ marginTop: 10, padding: 10, border: '1px solid var(--border)', borderRadius: 8 }}>
+    {!proposalScope && nextObjective && <div style={{ marginTop: 10, padding: 10, border: '1px solid var(--border)', borderRadius: 8 }}>
       <strong>{tr('Doğrulanmış döngüden sonraki aday')}</strong>
       <p style={{ margin: '5px 0', color: 'var(--text3)' }}>{nextObjective.candidate ? `${nextObjective.candidate.objectiveCode} · ${nextObjective.candidate.title}` : tr('Güvenilir aday bulunamadı.')}</p>
       <p style={{ margin: '5px 0', fontSize: 12 }}>{nextObjective.reason}</p>
@@ -77,6 +88,13 @@ export default function VerifiedLearningPlans({ classroomId, studentId }: { clas
     {cycles.length > 0 && <div style={{ marginTop: 12 }}>{cycles.map(cycle => <div key={cycle.id} style={{ padding: '7px 0', borderTop: '1px solid var(--border)' }}>
       {cycle.objective?.objective_code || tr('Kazanım')} · {cycle.status === 'active' ? tr('Sürüyor') : tr('Aşamalar tamamlandı')} · {cycle.attempts.map(attempt => `${attempt.stage}: ${attempt.status === 'completed' ? `%${attempt.score_pct}` : attempt.status}`).join(' · ') || tr('Ön test bekliyor')}
       {cycle.metrics && <VerifiedLearningMetrics metrics={cycle.metrics} />}
+      {onLinkCycle && proposalScope && cycle.learning_objective_id === proposalScope.objectiveId && Date.parse(cycle.created_at) >= Date.parse(proposalScope.reviewedAt) &&
+        <button className="btn" disabled={busy} onClick={async () => {
+          setBusy(true)
+          try { await onLinkCycle(cycle.id); setMessage(tr('Döngü önerinin takibine bağlandı.')) }
+          catch { setMessage(tr('Döngü bağlantısı kaydedilemedi.')) }
+          finally { setBusy(false) }
+        }}>{tr('Bu döngüyü takibe bağla')}</button>}
     </div>)}</div>}
     <InterventionReviewQueue key={`${classroomId}:${studentId}`} classroomId={classroomId} studentId={studentId}/>
   </section>

@@ -20,7 +20,7 @@ type Evidence = {
   caveats: string[]
 }
 
-export default function LearningEvidenceChain({ classroomId, studentId }: { classroomId: string; studentId: string }) {
+export default function LearningEvidenceChain({ classroomId, studentId, initialObjectiveId }: { classroomId: string; studentId: string; initialObjectiveId?: string }) {
   const { t: tr, locale } = useT()
   const dl = intlLocale(locale)
   const none = tr('Yok')
@@ -31,19 +31,28 @@ export default function LearningEvidenceChain({ classroomId, studentId }: { clas
 
   useEffect(() => {
     if (!classroomId || !studentId) return
+    const controller = new AbortController()
     const timer = window.setTimeout(async () => {
       try {
         const { data: { session } } = await createClient().auth.getSession()
         if (!session) throw new Error(tr('Oturum gerekli.'))
-        const response = await fetch(`/api/teacher/learning-evidence?${new URLSearchParams({ classroomId, studentId })}`, { headers: { Authorization: `Bearer ${session.access_token}` } })
+        const response = await fetch(`/api/teacher/learning-evidence?${new URLSearchParams({ classroomId, studentId })}`, { signal: controller.signal, cache: 'no-store', headers: { Authorization: `Bearer ${session.access_token}` } })
         const data = await response.json()
         if (!response.ok) throw new Error(data.error || tr('Kazanımlar yüklenemedi.'))
+        if (controller.signal.aborted) return
         setObjectives(data.objectives || [])
         setObjectiveId(''); setDetail(null); setMessage('')
-      } catch (error) { setMessage(error instanceof Error ? error.message : tr('Kazanımlar yüklenemedi.')) }
+        if (initialObjectiveId && (data.objectives || []).some((item: Objective) => item.id === initialObjectiveId)) {
+          const detailResponse = await fetch(`/api/teacher/learning-evidence?${new URLSearchParams({ classroomId, studentId, objectiveId: initialObjectiveId })}`,
+            { signal: controller.signal, cache: 'no-store', headers: { Authorization: `Bearer ${session.access_token}` } })
+          const evidence = await detailResponse.json()
+          if (!detailResponse.ok) throw new Error(evidence.error || tr('Kanıt zinciri alınamadı.'))
+          if (!controller.signal.aborted) { setObjectiveId(initialObjectiveId); setDetail(evidence) }
+        }
+      } catch (error) { if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : tr('Kazanımlar yüklenemedi.')) }
     }, 0)
-    return () => window.clearTimeout(timer)
-  }, [classroomId, studentId, tr])
+    return () => { window.clearTimeout(timer); controller.abort() }
+  }, [classroomId, studentId, initialObjectiveId, tr])
 
   async function load(id: string) {
     setObjectiveId(id); setDetail(null); setMessage('')
