@@ -31,9 +31,9 @@ function fixture({status='pending',member=true,approved=true}={}) {
     throw Error(`Unexpected import ${name}`)
   }
   const code=ts.transpileModule(readFileSync(new URL('../app/api/teacher/agent-approvals/route.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText
-  const module={exports:{}};new Function('require','module','exports',code)(fakeRequire,module,module.exports)
+  const evaluated={exports:{}};new Function('require','module','exports',code)(fakeRequire,evaluated,evaluated.exports)
   const req=(body,token=true,statusQuery='pending')=>({headers:new Headers(token?{Authorization:'Bearer test'}:{}),json:async()=>body,nextUrl:new URL(`https://example.invalid/api?status=${statusQuery}`)})
-  return {api:module.exports,req,rows,writes}
+  return {api:evaluated.exports,req,rows,writes}
 }
 test('actual handlers reject anonymous and unapproved callers without writes',async()=>{
   for(const options of [{},{approved:false}]){const f=fixture(options)
