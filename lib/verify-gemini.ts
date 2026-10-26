@@ -61,7 +61,7 @@ export async function verifyQuestionWithGemini(prompt: string): Promise<{ ok: bo
     const match = clean.match(/\{[\s\S]*\}/)
     if (!match) return null
     return JSON.parse(match[0])
-  } catch (e: any) {
+  } catch (e) {
     console.warn(`[verify-gemini] ağ/parse hatası, bu katman atlandı: ${e?.message || e}`)
     return null // Ağ/parse hatası — bu katmanı sessizce atla, üretimi bozma
   }

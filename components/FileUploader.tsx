@@ -53,7 +53,7 @@ export default function FileUploader({ onFilesChange, maxFiles = 5, maxMB = 20, 
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingFile])
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   const updateFile = useCallback((id: string, patch: Partial<UploadedFile>) => {
     setFiles(prev => {
@@ -130,7 +130,7 @@ export default function FileUploader({ onFilesChange, maxFiles = 5, maxMB = 20, 
           })
         }
       }
-    } catch (e: any) {
+    } catch (e) {
       updateFile(id, { status: 'error', error: e.message, progress: 0 })
     }
   }

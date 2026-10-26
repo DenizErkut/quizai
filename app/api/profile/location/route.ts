@@ -10,7 +10,7 @@ import { isKnownCountry } from '@/lib/location/data'
 
 export const runtime = 'nodejs'
 
-const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!) as any
+const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 async function currentUser(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     const identity = await getIdentityBySupabaseId(user.id)
     postalCode = identity?.postal_code || ''
     addressLine = identity?.address_line || ''
-  } catch (e: any) {
+  } catch (e) {
     console.warn('[profile/location] identity read skipped:', e?.message)
   }
   return NextResponse.json({
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     const identity = await getIdentityBySupabaseId(user.id)
     if (identity) await updateIdentity(user.id, { postal_code: postalCode || null, address_line: addressLine || null })
     else identitySaved = !postalCode && !addressLine
-  } catch (e: any) {
+  } catch (e) {
     identitySaved = !postalCode && !addressLine
     console.warn('[profile/location] identity write skipped:', e?.message)
   }

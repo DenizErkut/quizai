@@ -73,7 +73,7 @@ export default function TeacherDashboard() {
           .from('classroom_students')
           .select('student_id')
           .eq('classroom_id', c.id)
-        const ids = (cs ?? []).map((x: any) => x.student_id)
+        const ids = (cs ?? []).map((x) => x.student_id)
         classStudentMap[c.id] = ids
         ids.forEach((id: string) => { if (!allStudentIds.includes(id)) allStudentIds.push(id) })
       }
@@ -88,7 +88,7 @@ export default function TeacherDashboard() {
         ])
         const sessions = sessionsRes.data ?? []
         const completions = completionsRes.data ?? []
-        const avgPct = sessions.length ? Math.round(sessions.reduce((a: number, s: any) => a + s.pct, 0) / sessions.length) : null
+        const avgPct = sessions.length ? Math.round(sessions.reduce((a: number, s) => a + s.pct, 0) / sessions.length) : null
         const classroomIds = Object.entries(classStudentMap).filter(([, ids]) => ids.includes(sid)).map(([cid]) => cid)
         return {
           id: sid,
@@ -123,7 +123,7 @@ export default function TeacherDashboard() {
 
   async function removeStudentFromClasses(student: { id: string; name: string }) {
     const scope = selectedClass === 'all' ? undefined : selectedClass
-    const className = classrooms.find((c: any) => c.id === scope)?.name
+    const className = classrooms.find((c) => c.id === scope)?.name
     const message = scope
       ? tr('{name} öğrencisini "{cls}" sınıfından çıkarmak istediğine emin misin? Hesabı ve test geçmişi silinmez.', { name: student.name, cls: className || '' })
       : tr('{name} öğrencisini tüm sınıflarından çıkarmak istediğine emin misin? Hesabı ve test geçmişi silinmez.', { name: student.name })
@@ -191,7 +191,7 @@ export default function TeacherDashboard() {
   const overallAvg = students.filter(s => s.avgPct !== null).length
     ? Math.round(students.filter(s => s.avgPct !== null).reduce((a, s) => a + (s.avgPct ?? 0), 0) / students.filter(s => s.avgPct !== null).length)
     : 0
-  const pendingAssignments = assignments.filter((a: any) => !a.due_date || new Date(a.due_date) > new Date()).length
+  const pendingAssignments = assignments.filter((a) => !a.due_date || new Date(a.due_date) > new Date()).length
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
@@ -286,7 +286,7 @@ export default function TeacherDashboard() {
                 <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>{tr('🏫 Sınıflarım')}</div>
                 {classrooms.length === 0 ? (
                   <div style={{ fontSize: '13px', color: 'var(--text3)' }}>{tr('Henüz sınıf yok.')}</div>
-                ) : classrooms.map((c: any) => (
+                ) : classrooms.map((c) => (
                   <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: '13px' }}>
                     <span style={{ fontWeight: 600 }}>{c.name}</span>
                     <span style={{ color: 'var(--text3)' }}>{tr('{n} öğrenci', { n: c.classroom_students?.[0]?.count ?? 0 })}</span>
@@ -303,7 +303,7 @@ export default function TeacherDashboard() {
                 <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>{tr('📝 Son Ödevler')}</div>
                 {assignments.slice(0, 5).length === 0 ? (
                   <div style={{ fontSize: '13px', color: 'var(--text3)' }}>{tr('Henüz ödev yok.')}</div>
-                ) : assignments.slice(0, 5).map((a: any) => (
+                ) : assignments.slice(0, 5).map((a) => (
                   <div key={a.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                     <div style={{ fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
@@ -351,7 +351,7 @@ export default function TeacherDashboard() {
                 <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)}
                   style={{ padding: '7px 12px', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '12px', fontFamily: 'var(--font-sans)', outline: 'none' }}>
                   <option value="all">{tr('Tüm Sınıflar')}</option>
-                  {classrooms.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {classrooms.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
                 <button onClick={() => router.push('/teacher/students')} className="btn btn-sm">{tr('+ Sınıf Yönet')}</button>
               </div>
@@ -411,7 +411,7 @@ export default function TeacherDashboard() {
             {assignments.length > 0 && (
               <div className="card" style={{ marginTop: '1rem' }}>
                 <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>{tr('Son Ödevler')}</div>
-                {assignments.map((a: any) => (
+                {assignments.map((a) => (
                   <div key={a.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <div style={{ fontSize: '13px', fontWeight: 600 }}>{a.title}</div>
@@ -438,7 +438,7 @@ export default function TeacherDashboard() {
               <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)}
                 style={{ padding: '7px 12px', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '12px', fontFamily: 'var(--font-sans)', outline: 'none' }}>
                 <option value="all">{tr('Tüm Sınıflar')}</option>
-                {classrooms.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {classrooms.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
 
@@ -521,7 +521,7 @@ export default function TeacherDashboard() {
               <select value={notifyClass} onChange={e => setNotifyClass(e.target.value)}
                 style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', outline: 'none', marginBottom: '12px' }}>
                 <option value="">{tr('Tüm sınıflarım')}</option>
-                {classrooms.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {classrooms.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
 
               {/* Mesaj */}
@@ -564,7 +564,7 @@ export default function TeacherDashboard() {
             {notifyHistory.length > 0 && (
               <div className="card">
                 <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '10px' }}>{tr('📋 Geçmiş Bildirimler')}</div>
-                {notifyHistory.map((n: any) => (
+                {notifyHistory.map((n) => (
                   <div key={n.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                     <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.5 }}>{n.message}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text4)', marginTop: '4px', display: 'flex', gap: '8px' }}>

@@ -9,6 +9,8 @@ type AnyDb = any
 type Question = Record<string, any>
 
 export type QuestionBankDimensions = {
+  // Havuz konuma göre ayrılır: ülke zorunlu, eyalet/şehir boşsa ülke geneli. Verilmezse süzme yapılmaz.
+  location?: { country?: string | null; state?: string | null; city?: string | null } | null
   subject?: string | null
   topic: string
   grade: string
@@ -188,6 +190,19 @@ function validQuestion(question: Question): boolean {
   return true
 }
 
+// PostgREST süzgeci: aynı ülke ve (eyalet boş veya kullanıcının eyaleti) ve (şehir boş veya kullanıcının şehri).
+function scopeToLocation<T extends { eq: (c: string, v: string) => T; or: (f: string) => T }>(request: T, location: QuestionBankDimensions['location']): T {
+  const country = (location?.country || '').trim().toUpperCase()
+  if (!country) return request
+  let scoped = request.eq('country', country)
+  const quote = (value: string) => `"${value.replace(/["\\]/g, '')}"`
+  const state = (location?.state || '').trim()
+  const city = (location?.city || '').trim()
+  scoped = scoped.or(state ? `state.is.null,state.eq.${quote(state)}` : 'state.is.null')
+  scoped = scoped.or(city ? `city.is.null,city.eq.${quote(city)}` : 'city.is.null')
+  return scoped
+}
+
 export async function getQuestionBankSet(
   db: AnyDb,
   dimensions: QuestionBankDimensions,
@@ -205,6 +220,7 @@ export async function getQuestionBankSet(
       .order('use_count', { ascending: true })
       .order('last_used_at', { ascending: true, nullsFirst: true })
       .limit(Math.max(count * 5, 30))
+    request = scopeToLocation(request, dimensions.location)
     if (exactDifficulty) request = request.eq('difficulty', dimensions.difficulty)
     if (includeSubject) request = request.eq('subject_key', questionBankKey(dimensions.subject || 'genel'))
     const typeFilter = questionBankTypeFilter(dimensions.questionType)
@@ -241,11 +257,11 @@ export async function getQuestionBankSet(
   // normalizasyondan önce yazılmış olabileceği için yalnızca tam difficulty
   // filtresine bağlı kalma; aynı sınıf/dil/tip içindeki exact soruları
   // getirip konu ve ders eşleşmesini uygulama tarafında yeniden doğrula.
-  const exactRows = await db.from('question_bank')
+  const exactRows = await scopeToLocation(db.from('question_bank')
     .select('id, question, fingerprint, use_count, subject_key, topic_key')
     .eq('grade_key', questionBankKey(dimensions.grade))
     .eq('review_status', 'approved')
-    .eq('report_count', 0)
+    .eq('report_count', 0), dimensions.location)
     .order('use_count', { ascending: true })
     .limit(250)
   if (!exactRows.error && Array.isArray(exactRows.data)) {
@@ -355,6 +371,7 @@ export async function promoteQuestionsToBank(
         quality_score: automaticApproval ? Number(question.objectiveProductionReview.score) / 100 : requiresTeacher ? 0 : 1,
         source_session_id: source.sessionId || null,
         source_engine: source.engine || null,
+        ...(dimensions.location?.country ? { country: dimensions.location.country.trim().toUpperCase(), state: dimensions.location.state || null, city: dimensions.location.city || null } : {}),
         updated_at: new Date().toISOString(),
       }
     })

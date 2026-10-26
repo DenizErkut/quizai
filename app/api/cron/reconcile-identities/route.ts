@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
       if (result.fixed > 0) parts.push(`${result.fixed} kimlik otomatik dolduruldu`)
       if (result.failed.length > 0) parts.push(`${result.failed.length} kayıt elle kontrol gerektiriyor`)
 
-      const notifRows = admins.map((a: any) => ({
+      const notifRows = admins.map((a) => ({
         user_id: a.id,
         type: 'system',
         title: '🔧 Kimlik uzlaştırma raporu',

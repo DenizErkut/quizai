@@ -115,7 +115,7 @@ SADECE özet metnini döndür — başlık, açıklama, markdown veya "İşte ö
       char_count: summary.length,
       truncated, // istemci isterse "sadece kitabın başından özetlendi" notu gösterebilir
     })
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('[reading/summarize]', e)
     return NextResponse.json({ error: 'Özet üretilemedi.' }, { status: 500 })
   }

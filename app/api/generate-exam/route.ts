@@ -7,6 +7,7 @@ import { EXAM_FORMATS, resolveExamFormat, type ExamFormat, type ExamSection } fr
 import { createHash } from 'node:crypto'
 import { generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
 import { pickMeasuredQuizEngine } from '@/lib/ai-gateway/measured-quiz-router'
+import { filterRowsByUserScope, userScopeOrDefault } from '@/lib/location/resource-scope'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -75,19 +76,19 @@ SADECE geçerli JSON döndür, markdown yok. passage ve visual gerekmiyorsa null
 {"questions":[{"type":"multiple_choice","q":"Soru metni","opts":[${optionCount === 4 ? '"A şıkkı","B şıkkı","C şıkkı","D şıkkı"' : '"A şıkkı","B şıkkı","C şıkkı","D şıkkı","E şıkkı"'}],"ans":0,"exp":"Kısa açıklama","difficulty":"medium","cognitiveSkill":"reasoning","objective":"ölçülen kazanım","passage":null,"visual":null}]}`
 }
 
-async function getBookletReference(format: ExamFormat, section: ExamSection): Promise<string> {
-  const { data } = await supabase.from('exam_resources')
-    .select('id,title,raw_text,source_type,grade,subject,subtopic')
+async function getBookletReference(format: ExamFormat, section: ExamSection, location: { country?: string | null; state?: string | null; city?: string | null }): Promise<string> {
+  const { data: candidates } = await supabase.from('exam_resources')
+    .select('id,title,raw_text,source_type,grade,subject,subtopic,country,state,city')
     .eq('exam_type', format.label)
     .eq('purpose', 'exam')
     .in('source_type', ['anonymous', 'teacher'])
     .limit(12)
-  const rows = (data || []).filter((r: any) => {
+  const rows = filterRowsByUserScope(candidates || [], location, r => r).filter((r) => {
     const gradeOk = !r.grade || !section.grade || String(r.grade).toLocaleLowerCase('tr') === String(section.grade).toLocaleLowerCase('tr')
     const subjectOk = !r.subject || !section.subject || String(r.subject).toLocaleLowerCase('tr').includes(String(section.subject).toLocaleLowerCase('tr'))
     return gradeOk && subjectOk
   }).slice(0, 3)
-  return rows.map((r: any) => `[${r.source_type === 'teacher' ? 'öğretmen imzalı' : r.source_type === 'ai' ? 'AI kitapçığı' : 'anonim'} referans] ${(r.raw_text || '').slice(0, 1400)}`).filter((s: string) => s.length > 40).join('\n---\n')
+  return rows.map((r) => `[${r.source_type === 'teacher' ? 'öğretmen imzalı' : r.source_type === 'ai' ? 'AI kitapçığı' : 'anonim'} referans] ${(r.raw_text || '').slice(0, 1400)}`).filter((s: string) => s.length > 40).join('\n---\n')
 }
 
 function structurallyValid(question: ExamQuestion, optionCount: number): boolean {
@@ -155,9 +156,17 @@ function examFingerprint(question: ExamQuestion, format: ExamFormat, section: Ex
   })).digest('hex')
 }
 
-async function getApprovedExamQuestions(format: ExamFormat, section: ExamSection, count: number): Promise<ExamQuestion[]> {
+type PoolLocation = { country?: string | null; state?: string | null; city?: string | null }
+
+async function getApprovedExamQuestions(format: ExamFormat, section: ExamSection, count: number, location: PoolLocation): Promise<ExamQuestion[]> {
+  const quote = (value: string) => `"${value.replace(/["\\]/g, '')}"`
+  const state = (location.state || '').trim()
+  const city = (location.city || '').trim()
   const { data, error } = await supabase.from('exam_question_bank')
     .select('id, question')
+    .eq('country', (location.country || 'TR').trim().toUpperCase())
+    .or(state ? `state.is.null,state.eq.${quote(state)}` : 'state.is.null')
+    .or(city ? `city.is.null,city.eq.${quote(city)}` : 'city.is.null')
     .eq('exam_year', format.examYear)
     .eq('exam_type', format.label)
     .eq('track', format.track || '')
@@ -177,10 +186,10 @@ async function getApprovedExamQuestions(format: ExamFormat, section: ExamSection
   return rows.map(row => row.question as ExamQuestion)
 }
 
-async function storeApprovedExamQuestions(format: ExamFormat, section: ExamSection, questions: ExamQuestion[]) {
+async function storeApprovedExamQuestions(format: ExamFormat, section: ExamSection, questions: ExamQuestion[], country: string) {
   if (!questions.length) return
   const rows = questions.map(question => ({
-    fingerprint: examFingerprint(question, format, section), exam_year: format.examYear, exam_type: format.label,
+    fingerprint: examFingerprint(question, format, section), country, exam_year: format.examYear, exam_type: format.label,
     track: format.track || '', language: format.language || 'Türkçe', section_id: section.id,
     subject: section.subject, grade: section.grade, curriculum_version: format.curriculumVersion,
     objective: question.objective || '', cognitive_skill: question.cognitiveSkill || 'application',
@@ -212,7 +221,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: profile } = await supabase
-    .from('profiles').select('plan, grade').eq('id', user.id).single()
+    .from('profiles').select('plan, grade, country, state, city').eq('id', user.id).single()
 
   if (!profile) return NextResponse.json({ error: 'Profil bulunamadı.' }, { status: 404 })
   // 6 Eylül 2026 — GÜVENLİK DÜZELTMESİ: eski kontrol sadece plan==='free'
@@ -240,7 +249,7 @@ export async function POST(req: NextRequest) {
   if (!format) return NextResponse.json({ error: 'Geçersiz sınav türü.' }, { status: 400 })
 
   const sectionsToGenerate = sectionIds
-    ? format.sections.filter((s: any) => sectionIds.includes(s.id))
+    ? format.sections.filter((s) => sectionIds.includes(s.id))
     : format.sections
 
   // Demo: her bölümden 4 soru (hızlı) — Freemium demo: her alanda TAM 1 soru
@@ -261,18 +270,19 @@ export async function POST(req: NextRequest) {
   try {
     const results: Record<string, any[]> = {}
 
+    const poolLocation = userScopeOrDefault(profile)
     const CHUNK = 3
     for (let i = 0; i < sectionsToGenerate.length; i += CHUNK) {
       const chunk = sectionsToGenerate.slice(i, i + CHUNK)
-      await Promise.all(chunk.map(async (section: any) => {
+      await Promise.all(chunk.map(async (section) => {
         const sectionCount = isDemoOnly ? 1 : Math.max(4, Math.round(section.count * countMultiplier))
 
         try {
-          const pooled = await getApprovedExamQuestions(format, section, sectionCount)
+          const pooled = await getApprovedExamQuestions(format, section, sectionCount, poolLocation)
           const accepted: ExamQuestion[] = [...pooled]
           for (let attempt = 0; attempt < 2 && accepted.length < sectionCount; attempt++) {
             const missing = sectionCount - accepted.length
-            const referenceContext = await getBookletReference(format, section)
+            const referenceContext = await getBookletReference(format, section, { country: profile?.country, state: profile?.state, city: profile?.city })
             const prompt = buildSectionPrompt(section, missing, format, referenceContext)
             const examSystemPrompt = 'Sen Türk eğitim sisteminde sınav soruları hazırlayan bir uzmansın. Sadece geçerli JSON döndür, markdown kullanma.'
             let text: string
@@ -299,7 +309,7 @@ export async function POST(req: NextRequest) {
             const structurallyAccepted = uniqueQualityQuestions((parsed.questions || []) as ExamQuestion[], optionCount)
               .slice(0, missing)
             const independentlyAccepted = await validateWithIndependentModel(structurallyAccepted, section, format, user.id)
-            await storeApprovedExamQuestions(format, section, independentlyAccepted)
+            await storeApprovedExamQuestions(format, section, independentlyAccepted, poolLocation.country || 'TR')
             accepted.push(...independentlyAccepted)
           }
           if (accepted.length < sectionCount) throw new Error(`Kalite kontrolünden geçen soru sayısı yetersiz: ${accepted.length}/${sectionCount}`)
@@ -361,11 +371,11 @@ export async function PATCH(req: NextRequest) {
   let totalNet = 0
 
   for (const [sectionId, sectionAnswers] of Object.entries(answers as Record<string, any[]>)) {
-    const section = (format.sections as unknown as any[]).find((s: any) => s.id === sectionId)
+    const section = (format.sections as unknown as any[]).find((s) => s.id === sectionId)
     if (!section) continue
 
     let correct = 0, wrong = 0, empty = 0
-    ;(sectionAnswers || []).forEach((ans: any) => {
+    ;(sectionAnswers || []).forEach((ans) => {
       if (ans === null || ans === undefined) { empty++; return }
       if (ans.correct === true) correct++
       else wrong++
@@ -377,7 +387,7 @@ export async function PATCH(req: NextRequest) {
     totalNet += net * (section.netCoef || 1)
   }
 
-  const maxPossibleNet = (format.sections as unknown as any[]).reduce((sum: number, s: any) => sum + s.count * (s.netCoef || 1), 0)
+  const maxPossibleNet = (format.sections as unknown as any[]).reduce((sum: number, s) => sum + s.count * (s.netCoef || 1), 0)
   const estimatedScore = maxPossibleNet > 0
     ? Math.round((totalNet / maxPossibleNet) * format.maxScore)
     : 0

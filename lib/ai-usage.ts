@@ -66,7 +66,7 @@ export async function logAIUsage(u: AIUsageInput): Promise<void> {
       meta: u.meta || null,
     })
     if (error) console.warn(`[ai-usage] DB log başarısız (yutuldu): ${error.message}`)
-  } catch (e: any) {
+  } catch (e) {
     // Loglama ASLA ana akışı bozmamalı. Sadece uyar, yut.
     console.warn(`[ai-usage] DB log başarısız (yutuldu): ${e?.message || e}`)
   }
@@ -79,7 +79,7 @@ export async function logAIUsage(u: AIUsageInput): Promise<void> {
 export function logAnthropicUsage(
   operation: string,
   model: string,
-  response: any,
+  response,
   extra?: Partial<AIUsageInput>
 ): Promise<void> {
   const usage = response?.usage || {}
@@ -100,7 +100,7 @@ export function logAnthropicUsage(
 export function logOpenAIUsage(
   operation: string,
   model: string,
-  response: any,
+  response,
   extra?: Partial<AIUsageInput>
 ): Promise<void> {
   const usage = response?.usage || {}
@@ -122,7 +122,7 @@ export function logOpenAIUsage(
 export function logGeminiUsage(
   operation: string,
   model: string,
-  usageMetadata: any,
+  usageMetadata,
   extra?: Partial<AIUsageInput>
 ): Promise<void> {
   const u = usageMetadata || {}

@@ -106,7 +106,7 @@ export default function QuizResult({ questions, answers, topic, difficulty, lang
   const { t } = useT()
   const [reportedIdx, setReportedIdx] = useState<Set<number>>(new Set())
   const [reportingIdx, setReportingIdx] = useState<number | null>(null)
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   const finalScore = Math.round(answers.reduce((total, answer) => total + answerScore(answer), 0) * 10) / 10
   const finalPct = questions.length > 0 ? Math.round((finalScore / questions.length) * 100) : 0

@@ -109,8 +109,8 @@ export default function LeaderboardPage() {
       }
 
       // İsimler TR-PG'den çözülür; leaderboard view'i yalnızca id/grade/puan sağlar
-      const identities = await resolveIdentities(supabase, (lb || []).map((e: any) => e.id))
-      const allEntries = (lb || []).map((e: any) => {
+      const identities = await resolveIdentities(supabase, (lb || []).map((e) => e.id))
+      const allEntries = (lb || []).map((e) => {
         const resolvedName = identities[e.id]?.full_name
         // Kendi satırın hariç, gerçek bir isim bulunduysa maskelenir.
         // "İsimsiz" yer tutucusu bir isim DEĞİL — maskelenmemeli.

@@ -202,13 +202,13 @@ Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
       parsed.scenario = stripForeignScripts(parsed.scenario)
       parsed.question = stripForeignScripts(parsed.question)
     }
-    parsed.rubric = parsed.rubric.map((r: any) => ({
+    parsed.rubric = parsed.rubric.map((r) => ({
       ...r,
       criterion: stripForeignScripts(r.criterion || ''),
       description: stripForeignScripts(r.description || ''),
     }))
 
-    const totalPossible = parsed.rubric.reduce((s: number, r: any) => s + (r.maxPoints || 0), 0)
+    const totalPossible = parsed.rubric.reduce((s: number, r) => s + (r.maxPoints || 0), 0)
 
     const { data: sessionRow, error: insErr } = await supabase
       .from('open_ended_sessions')
@@ -241,7 +241,7 @@ Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
       rubric: parsed.rubric,
       totalPossible,
     })
-  } catch (e: any) {
+  } catch (e) {
     console.error('[generate-open-ended]', e?.message)
     return NextResponse.json({ error: 'Bir hata oluştu, tekrar dene.' }, { status: 500 })
   }

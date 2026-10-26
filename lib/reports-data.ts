@@ -114,7 +114,7 @@ export async function buildAssignmentsReport(roster: ReportStudentBase[], classr
 
   const { data: completions } = await supabaseAdmin
     .from('assignment_completions').select('assignment_id, student_id, pct, completed_at')
-    .in('assignment_id', assignments.map((a: any) => a.id))
+    .in('assignment_id', assignments.map((a) => a.id))
 
   const completionsByAssignment = new Map<string, any[]>()
   const completedByStudent = new Map<string, number>()
@@ -124,7 +124,7 @@ export async function buildAssignmentsReport(roster: ReportStudentBase[], classr
     completedByStudent.set(c.student_id, (completedByStudent.get(c.student_id) ?? 0) + 1)
   }
 
-  const assignmentRows = assignments.map((a: any) => {
+  const assignmentRows = assignments.map((a) => {
     const comps = completionsByAssignment.get(a.id) ?? []
     const avgPct = comps.length ? Math.round(comps.reduce((s, c) => s + (c.pct ?? 0), 0) / comps.length) : null
     return {
@@ -155,7 +155,7 @@ export async function buildLiveQuizReport(classroomIds: string[]) {
 
   const { data: answers } = await supabaseAdmin
     .from('live_quiz_answers').select('live_quiz_id, user_id, is_correct')
-    .in('live_quiz_id', quizzes.map((q: any) => q.id))
+    .in('live_quiz_id', quizzes.map((q) => q.id))
 
   const statsByQuiz = new Map<string, { participants: Set<string>; correct: number; total: number }>()
   for (const a of (answers ?? [])) {
@@ -166,7 +166,7 @@ export async function buildLiveQuizReport(classroomIds: string[]) {
     statsByQuiz.set(a.live_quiz_id, cur)
   }
 
-  const rows = quizzes.map((q: any) => {
+  const rows = quizzes.map((q) => {
     const stat = statsByQuiz.get(q.id)
     return {
       id: q.id, topic: q.topic, status: q.status, date: q.created_at,
@@ -185,7 +185,7 @@ export async function buildInactivityReport(roster: ReportStudentBase[]) {
   if (!roster.length) return { students: [] }
   const { data: streaks } = await supabaseAdmin
     .from('streaks').select('user_id, last_activity_date, current_streak').in('user_id', ids(roster))
-  const streakMap = new Map((streaks ?? []).map((s: any) => [s.user_id, s]))
+  const streakMap = new Map((streaks ?? []).map((s) => [s.user_id, s]))
 
   const today = new Date()
   const students = roster.map(s => {
@@ -256,7 +256,7 @@ export async function buildGradeComparisonReport(roster: ReportStudentBase[], im
   const selfReported = new Map<string, Map<string, number | null>>()
   for (const n of (notesRes.data ?? [])) {
     if (!selfReported.has(n.user_id)) selfReported.set(n.user_id, new Map())
-    const avg = [n.term1_avg, n.term2_avg].filter((v: any) => v != null)
+    const avg = [n.term1_avg, n.term2_avg].filter((v) => v != null)
     const combined = avg.length ? avg.reduce((a: number, b: number) => a + b, 0) / avg.length : null
     selfReported.get(n.user_id)!.set(normalizeSubjectName(n.subject), combined)
   }
@@ -306,7 +306,7 @@ export async function buildClassroomCompareReport(roster: ReportStudentBase[], g
 
   const groups = new Map<string, { sum: number; count: number; studentCount: number }>()
   for (const s of roster) {
-    const key = (s as any)[groupField] || 'Belirtilmemiş'
+    const key = (s)[groupField] || 'Belirtilmemiş'
     const stat = pctByStudent.get(s.id)
     const cur = groups.get(key) ?? { sum: 0, count: 0, studentCount: 0 }
     cur.studentCount += 1
@@ -375,7 +375,7 @@ export async function buildOpenEndedArchiveReport(roster: ReportStudentBase[]) {
     .order('graded_at', { ascending: false })
 
   const nameMap = nameOf(roster)
-  const entries = (data ?? []).map((r: any) => ({
+  const entries = (data ?? []).map((r) => ({
     id: r.id,
     studentId: r.user_id,
     studentName: nameMap.get(r.user_id)?.fullName ?? 'Öğrenci',

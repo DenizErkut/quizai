@@ -60,7 +60,7 @@ function ConfirmInner() {
   const router = useRouter()
   const { t: tr } = useT()
   const searchParams = useSearchParams()
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   const tokenHash = searchParams.get('token_hash') || searchParams.get('token') || ''
   const type = (searchParams.get('type') || 'signup') as OtpType

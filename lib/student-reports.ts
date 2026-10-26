@@ -67,7 +67,7 @@ export async function attachGradesAndStats(
     statsByStudent.set(s.user_id, cur)
   }
 
-  const streakByStudent = new Map((streaksRes.data ?? []).map((s: any) => [s.user_id, s.current_streak ?? 0]))
+  const streakByStudent = new Map((streaksRes.data ?? []).map((s) => [s.user_id, s.current_streak ?? 0]))
 
   const students: ReportStudent[] = roster.map(s => {
     const stat = statsByStudent.get(s.id)

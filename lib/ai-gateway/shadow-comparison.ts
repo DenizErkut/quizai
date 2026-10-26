@@ -28,7 +28,7 @@ function parseQuestions(content: string): unknown[] {
   return Array.isArray(parsed) ? parsed : Array.isArray(parsed?.questions) ? parsed.questions : []
 }
 
-function normalizedQuestionText(question: any): string {
+function normalizedQuestionText(question): string {
   return String(question?.q || '').toLocaleLowerCase('tr').replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
 }
 
@@ -53,7 +53,7 @@ export async function runMistralShadowComparison(input: ShadowInput): Promise<Sh
       if (normalized) seen.add(normalized)
     }
     return { provider: 'mistral', model: response.model, expectedCount: input.expectedCount, deliveredCount: questions.length, structurallyValidCount: valid.length, duplicateCount, durationMs: response.durationMs, inputTokens: response.inputTokens, outputTokens: response.outputTokens }
-  } catch (error: any) {
+  } catch (error) {
     const safeCode = String(error?.message || 'UNKNOWN_ERROR').replace(/[^A-Z0-9_]/gi, '_').slice(0, 80)
     return { provider: 'mistral', model: process.env.MISTRAL_PRIMARY_MODEL || 'mistral-large-latest', expectedCount: input.expectedCount, deliveredCount: 0, structurallyValidCount: 0, duplicateCount: 0, durationMs: 0, inputTokens: 0, outputTokens: 0, errorCode: safeCode }
   }

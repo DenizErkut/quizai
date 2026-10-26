@@ -87,7 +87,7 @@ function PaytrProcessingScreen({ oid }: { oid: string }) {
   const { t: tr } = useT()
   const [status, setStatus] = useState<'pending' | 'active' | 'failed' | 'not_found'>('pending')
   const [attempts, setAttempts] = useState(0)
-  const supabase = createClient() as any
+  const supabase = createClient()
   const MAX_ATTEMPTS = 24 // ~24 × 2.5sn ≈ 60sn
 
   useEffect(() => {
@@ -194,7 +194,7 @@ function CheckoutContent() {
   const [appliedCode, setAppliedCode] = useState<{ code: string; discountRate: number; label: string } | null>(null)
   const [codeError, setCodeError] = useState('')
   const [codeChecking, setCodeChecking] = useState(false)
-  const supabase = createClient() as any
+  const supabase = createClient()
   const DISCOUNT_ERR = tr('İndirim bilgisi doğrulanamadı. Ödemeye geçmeden önce sayfayı yenileyin.')
   // Elle girilip uygulanan bir satıcı/kurum kodu varsa, kayıt anında profile
   // bağlanmış olan otomatik indirimin YERİNE geçer (bkz. app/api/paytr/checkout
@@ -311,7 +311,7 @@ function CheckoutContent() {
       if (!res.ok) throw new Error(data.error)
 
       setPaytrToken(data.token)
-    } catch (e: any) {
+    } catch (e) {
       setError(e.message || tr('Ödeme başlatılamadı.'))
     } finally {
       setLoading(false)

@@ -195,10 +195,10 @@ export default function TeacherAssignPage() {
       // preview modunda dogrudan assignment kaydedilmedi, sadece uretilen
       // icerik donuyor - once ogretmen onaylasin
       if (Array.isArray(data.items) && data.items.length > 1) {
-        setOeItems(data.items.map((item: any) => ({ scenario: item.scenario, question: item.question, rubric: (item.rubric || []).map((r: any) => ({ criterion: r.criterion, maxPoints: r.maxPoints, description: r.description || '' })) })))
+        setOeItems(data.items.map((item) => ({ scenario: item.scenario, question: item.question, rubric: (item.rubric || []).map((r) => ({ criterion: r.criterion, maxPoints: r.maxPoints, description: r.description || '' })) })))
       } else setOeItems(null)
       setOeScenario(data.scenario); setOeQuestion(data.question)
-      setOeRubric(data.rubric.map((r: any) => ({ criterion: r.criterion, maxPoints: r.maxPoints, description: r.description || '' })))
+      setOeRubric(data.rubric.map((r) => ({ criterion: r.criterion, maxPoints: r.maxPoints, description: r.description || '' })))
       setOeUsedMeb(!!data.usedMebSource)
       setOeGenerated(true)
     } catch (e) {
@@ -280,13 +280,13 @@ export default function TeacherAssignPage() {
       const html = openEndedStudentSheetHtml(items, { code, title, grade: gradeLabel(first.grade), subject: first.subject, topic: first.topic })
         + (withKey ? openEndedTeacherKeyHtml(items, { code }) : '')
       await printLearningDocument(title, `${first.classrooms?.name || ''} · ${group.length} soru`, html, { studentLine: false })
-    } catch (e: any) { setPrintMessage(e?.message || tr('Yazdırma görünümü açılamadı.')) }
+    } catch (e) { setPrintMessage(e?.message || tr('Yazdırma görünümü açılamadı.')) }
     finally { setPrintBusy('') }
   }
 
   // Quiz assignments store only topic/difficulty/count (each student gets freshly generated questions),
   // so a printable class copy is generated once here with the same quality pipeline.
-  async function printQuizAssignment(a: any, withKey: boolean) {
+  async function printQuizAssignment(a, withKey: boolean) {
     if (planLimited) { setPrintMessage(LOCKED_MESSAGE); return }
     setPrintBusy(`quiz-${a.id}`); setPrintMessage(tr('Basılı test hazırlanıyor… (30-90 saniye sürebilir)'))
     try {
@@ -312,7 +312,7 @@ export default function TeacherAssignPage() {
       const { printLearningDocument, questionPrintHtml, answerKeyHtml } = await import('@/lib/learning-print')
       await printLearningDocument(a.title, `${classroom?.name || ''} · ${data.questions.length} soru · Ad Soyad: ..............................`, questionPrintHtml(data.questions) + (withKey ? answerKeyHtml(data.questions) : ''))
       setPrintMessage('')
-    } catch (e: any) { setPrintMessage(e?.message || tr('Test hazırlanamadı.')) }
+    } catch (e) { setPrintMessage(e?.message || tr('Test hazırlanamadı.')) }
     finally { setPrintBusy('') }
   }
 
@@ -701,7 +701,7 @@ export default function TeacherAssignPage() {
               </div>
               )
             })}
-            {assignments.map((a: any) => {
+            {assignments.map((a) => {
               const isOverdue = a.due_date && new Date(a.due_date) < new Date()
               const completions = a.assignment_completions?.[0]?.count || 0
               return (

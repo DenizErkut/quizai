@@ -47,7 +47,7 @@ function pctColor(p: number) {
 export default function ExamPage() {
   const router = useRouter()
   const { t: tr, locale } = useT()
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   // Ekranlar
   const [screen, setScreen] = useState<Screen>('select')
@@ -486,7 +486,7 @@ export default function ExamPage() {
                 </div>
                 {fmt && (
                   <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                    {fmt.sections.slice(0, 4).map((s: any) => (
+                    {fmt.sections.slice(0, 4).map((s) => (
                       <span key={s.id} style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '99px', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text3)' }}>
                         {s.label} ({s.count})
                       </span>
@@ -541,7 +541,7 @@ export default function ExamPage() {
                     ? tr('Kısa önizleme · {n} dakika', { n: Math.round((formats[selectedExam]?.duration || 60) * 0.25) })
                     : selectedExam === 'AYT' ? tr('{track} · 80 soru · 180 dakika', { track: aytTrack })
                     : selectedExam === 'YDT' ? tr('{lang} · 80 soru · 120 dakika', { lang: tr(ydtLanguage) })
-                    : tr('{q} soru · {d} dakika', { q: formats[selectedExam]?.sections.reduce((a: number, s: any) => a + s.count, 0) ?? 0, d: formats[selectedExam]?.duration ?? 0 })
+                    : tr('{q} soru · {d} dakika', { q: formats[selectedExam]?.sections.reduce((a: number, s) => a + s.count, 0) ?? 0, d: formats[selectedExam]?.duration ?? 0 })
                   }
                 </div>
               </div>

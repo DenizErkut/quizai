@@ -314,7 +314,7 @@ export default function QuizQuestion({
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase' }}>{t('Kavram')}</div>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase' }}>{t('Tanım')}</div>
-                {(q.pairs || []).map((pair: any, i: number) => {
+                {(q.pairs || []).map((pair, i: number) => {
                   const userShuffledIdx = matchAnswer[i]
                   const isAnswered = chosen !== null && userShuffledIdx !== undefined
                   const isCorrect = isAnswered && shuffledIndexMap[userShuffledIdx] === i
@@ -338,7 +338,7 @@ export default function QuizQuestion({
               </div>
               {chosen === null && (
                 <button className="btn btn-primary"
-                  onClick={() => { const allMatched = q.pairs?.every((_: any, i: number) => matchAnswer[i] !== undefined); if (!allMatched) return; const correct = q.pairs?.every((_: any, i: number) => shuffledIndexMap[matchAnswer[i]] === i) ?? false; onSelectAnswer(correct ? 0 : -1) }}
+                  onClick={() => { const allMatched = q.pairs?.every((_, i: number) => matchAnswer[i] !== undefined); if (!allMatched) return; const correct = q.pairs?.every((_, i: number) => shuffledIndexMap[matchAnswer[i]] === i) ?? false; onSelectAnswer(correct ? 0 : -1) }}
                   disabled={Object.keys(matchAnswer).length < (q.pairs || []).length}
                   style={{ width: '100%', justifyContent: 'center' }}>
                   {t('Eşleştir 🔗')}
@@ -347,7 +347,7 @@ export default function QuizQuestion({
               {chosen !== null && (
                 <div style={{ marginTop: '10px', padding: '12px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: '13px' }}>
                   <strong style={{ color: 'var(--primary)', display: 'block', marginBottom: '6px' }}>{t('Doğru eşleşmeler:')}</strong>
-                  {(q.pairs || []).map((p: any, i: number) => (
+                  {(q.pairs || []).map((p, i: number) => (
                     <div key={i} style={{ marginTop: '3px', color: 'var(--text2)' }}>• <MathText text={p.left} /> → <MathText text={p.right} /></div>
                   ))}
                 </div>
@@ -390,7 +390,7 @@ export default function QuizQuestion({
           {q.type === 'multi_true_false' && (
             <div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {(q.statements || []).map((s: any, i: number) => {
+                {(q.statements || []).map((s, i: number) => {
                   const isAnswered = chosen !== null
                   const isCorrect = multiTFAnswer[i] === s.correct
                   return (
@@ -412,8 +412,8 @@ export default function QuizQuestion({
               </div>
               {chosen === null && (
                 <button className="btn btn-primary"
-                  onClick={() => { const correct = (q.statements || []).every((s: any, i: number) => multiTFAnswer[i] === s.correct); onSelectAnswer(correct ? 0 : -1) }}
-                  disabled={(q.statements || []).some((_: any, i: number) => multiTFAnswer[i] === undefined || multiTFAnswer[i] === null)}
+                  onClick={() => { const correct = (q.statements || []).every((s, i: number) => multiTFAnswer[i] === s.correct); onSelectAnswer(correct ? 0 : -1) }}
+                  disabled={(q.statements || []).some((_, i: number) => multiTFAnswer[i] === undefined || multiTFAnswer[i] === null)}
                   style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
                   {t('Onayla ✓')}
                 </button>
@@ -447,7 +447,7 @@ export default function QuizQuestion({
                       ))}</tr>
                     </thead>
                     <tbody>
-                      {td?.rows?.map((row: any, ri: number) => (
+                      {td?.rows?.map((row, ri: number) => (
                         <tr key={ri}>
                           {row.cells.map((cell: string, ci: number) => {
                             const isBlank = row.blanks?.includes(ci)

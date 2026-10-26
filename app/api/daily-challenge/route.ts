@@ -5,7 +5,7 @@ import { balanceAnswerPositions, questionBankKey } from '@/lib/question-bank'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!) as any
+const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -43,7 +43,7 @@ async function getProfile(userId: string) {
   return data || { grade: 'Ortaokul 6. sınıf', language: 'Türkçe' }
 }
 
-async function selectPersonalizedQuestions(userId: string, profile: any) {
+async function selectPersonalizedQuestions(userId: string, profile) {
   const gradeKey = questionBankKey(profile.grade || 'Ortaokul 6. sınıf')
   const languageKey = questionBankKey(profile.language || 'Türkçe')
   const gradeKeyAliases = questionBankKeyAliases(profile.grade || 'Ortaokul 6. sınıf')
@@ -59,11 +59,11 @@ async function selectPersonalizedQuestions(userId: string, profile: any) {
   if (error) throw error
 
   const priority = new Set<string>([
-    ...(mastery || []).filter((row: any) => Number(row.mastery_score) < 70).map((row: any) => questionBankKey(row.topic)),
-    ...(weakTopics || []).map((row: any) => questionBankKey(row.topic)),
+    ...(mastery || []).filter((row) => Number(row.mastery_score) < 70).map((row) => questionBankKey(row.topic)),
+    ...(weakTopics || []).map((row) => questionBankKey(row.topic)),
   ])
-  const prioritized = shuffled((bank || []).filter((row: any) => priority.has(row.topic_key)))
-  const other = shuffled((bank || []).filter((row: any) => !priority.has(row.topic_key)))
+  const prioritized = shuffled((bank || []).filter((row) => priority.has(row.topic_key)))
+  const other = shuffled((bank || []).filter((row) => !priority.has(row.topic_key)))
   const selected = [...prioritized.slice(0, 6), ...other].slice(0, 10)
   const focusTopic = mastery?.[0]?.topic || weakTopics?.[0]?.topic || `${profile.grade || 'öğrenci'} okul dersleri karma tekrar`
   return {
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
         questionType: 'multiple_choice',
         dailyChallenge: true,
         includeVisuals: false,
-        excludeQuestionTexts: questions.map((question: any) => question.q),
+        excludeQuestionTexts: questions.map((question) => question.q),
       }),
     })
     const generated = await generation.json().catch(() => ({}))
@@ -107,11 +107,11 @@ export async function GET(request: NextRequest) {
   }
   if (questions.length < 10) return NextResponse.json({ error: 'Günlük görev için 10 uygun soru hazırlanamadı.' }, { status: 503 })
   const finalQuestions = balanceAnswerPositions(shuffled(questions).slice(0, 10))
-  const topics = [...new Set(finalQuestions.map((question: any) => question.bankTopic).filter(Boolean))]
+  const topics = [...new Set(finalQuestions.map((question) => question.bankTopic).filter(Boolean))]
   const { data: challenge, error } = await db.from('daily_challenges').insert({
     user_id: user.id, date, topic: 'Günün 10 Dakikası · Karma', subject: 'Karma', grade_level: selection.gradeKey,
     questions: finalQuestions, question_type: 'mixed', completed: false, bank_question_count: bankQuestionCount,
-    generated_question_count: Math.max(0, finalQuestions.length - bankQuestionCount), focus_topics: [...new Set(finalQuestions.map((q: any) => q.bankTopic).filter(Boolean))],
+    generated_question_count: Math.max(0, finalQuestions.length - bankQuestionCount), focus_topics: [...new Set(finalQuestions.map((q) => q.bankTopic).filter(Boolean))],
   }).select('*').single()
   if (error) {
     const { data: raced } = await db.from('daily_challenges').select('*').eq('user_id', user.id).eq('date', date).maybeSingle()
@@ -136,11 +136,11 @@ export async function POST(request: NextRequest) {
   if (!challenge) return NextResponse.json({ error: 'Görev bulunamadı.' }, { status: 404 })
   if (challenge.completed) return NextResponse.json({ score: null, alreadyCompleted: true, streak: await getStreak(user.id) })
   const questions = Array.isArray(challenge.questions) ? challenge.questions : []
-  const normalized = questions.map((question: any, index: number) => ({
+  const normalized = questions.map((question, index: number) => ({
     userAns: Number(answers[index]?.userAns ?? -1),
     correct: Number(answers[index]?.userAns ?? -1) === Number(question.ans),
   }))
-  const score = normalized.filter((answer: any) => answer.correct).length
+  const score = normalized.filter((answer) => answer.correct).length
   const pct = questions.length ? Math.round(score / questions.length * 100) : 0
   const date = today()
   const profile = await getProfile(user.id)

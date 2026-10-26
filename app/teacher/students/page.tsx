@@ -45,7 +45,7 @@ function TeacherStudentsContent() {
       // URL'den gelen sınıf ID'si varsa onu seç
       const urlClassId = searchParams.get('class')
       const targetClass = urlClassId
-        ? cls.find((c: any) => c.id === urlClassId) || cls[0]
+        ? cls.find((c) => c.id === urlClassId) || cls[0]
         : cls[0]
       setSelectedClass(targetClass.id)
       await loadStudents(targetClass.id)
@@ -67,9 +67,9 @@ function TeacherStudentsContent() {
     // (isimler TR-PG'den, diğer alanlar Supabase'den)
     const profileMap: Record<string, any> = {}
     const [identities] = await Promise.all([
-      resolveIdentities(supabase, cs.map((c: any) => c.student_id)),
+      resolveIdentities(supabase, cs.map((c) => c.student_id)),
       Promise.all(
-        cs.map(async (c: any) => {
+        cs.map(async (c) => {
           const { data: p } = await supabase
             .from('profiles')
             .select('id, grade, school, monthly_test_count')
@@ -80,7 +80,7 @@ function TeacherStudentsContent() {
       ),
     ])
 
-    const merged = cs.map((c: any) => ({
+    const merged = cs.map((c) => ({
       ...c,
       profiles: { ...(profileMap[c.student_id] || {}), name: identities[c.student_id]?.full_name || tr('İsimsiz') },
     }))
@@ -88,7 +88,7 @@ function TeacherStudentsContent() {
     return merged
   }
 
-  async function loadSuggestions(t: any, classroom: any) {
+  async function loadSuggestions(t, classroom) {
     if (!classroom) { setSuggestedStudents([]); return }
 
     // Sınıftaki mevcut öğrencileri al
@@ -96,7 +96,7 @@ function TeacherStudentsContent() {
       .from('classroom_students')
       .select('student_id')
       .eq('classroom_id', classroom.id)
-    const existingIds = (existing ?? []).map((e: any) => e.student_id)
+    const existingIds = (existing ?? []).map((e) => e.student_id)
 
     // Aynı okul veya aynı sınıf seviyesindeki öğrencileri öner
     let query = supabase
@@ -115,15 +115,15 @@ function TeacherStudentsContent() {
 
     // Zaten sınıfta olanları filtrele
     const filtered = (candidates ?? []).filter(
-      (c: any) => !existingIds.includes(c.id)
+      (c) => !existingIds.includes(c.id)
     )
     // İsimleri TR-PG'den ekle
-    const candidateIdentities = await resolveIdentities(supabase, filtered.map((c: any) => c.id))
-    const withNames = filtered.map((c: any) => ({ ...c, name: candidateIdentities[c.id]?.full_name || tr('İsimsiz') }))
+    const candidateIdentities = await resolveIdentities(supabase, filtered.map((c) => c.id))
+    const withNames = filtered.map((c) => ({ ...c, name: candidateIdentities[c.id]?.full_name || tr('İsimsiz') }))
     setSuggestedStudents(withNames.slice(0, 8))
   }
 
-  async function selectClassroom(cls: any) {
+  async function selectClassroom(cls) {
     setSelectedClass(cls.id)
     const currentStudents = await loadStudents(cls.id)
     await loadSuggestions(teacher, cls)
@@ -301,7 +301,7 @@ function TeacherStudentsContent() {
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {students.map((s: any, i: number) => (
+                  {students.map((s, i: number) => (
                     <div key={s.student_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #082465, #1ECFB8)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>
@@ -335,7 +335,7 @@ function TeacherStudentsContent() {
                   {teacher.school ? tr('{school} okulundan öğrenciler', { school: teacher.school }) : tr('{grade}. sınıf seviyesinden öğrenciler', { grade: activeClass.grade })}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {suggestedStudents.map((s: any) => (
+                  {suggestedStudents.map((s) => (
                     <div key={s.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '10px', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(253,211,29,0.2)', border: '1.5px solid rgba(253,211,29,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#082465', fontWeight: 700, fontSize: '11px', flexShrink: 0 }}>

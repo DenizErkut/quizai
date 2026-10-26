@@ -24,13 +24,13 @@ const auditDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.
 
 // Matematik icerikli soru mu - varsa bagimsiz kontrol icin OpenAI'a yonlendirilir
 // (Claude'un kendi urettigini yine Claude'a kontrol ettirmek yerine)
-function isMathQuestion(q: any): boolean {
+function isMathQuestion(q): boolean {
   const text = `${q.q || ''} ${(q.opts || []).join(' ')}`
   return /[0-9]\s*[+\-*/=]\s*[0-9]|denklem|hesapla|çöz|eşitlik|kaçtır|toplam|fark|çarp|bölüm|equation|solve|calculate|basamak|okunuş|rakam/i.test(text)
 }
 
 // Soru tipine göre doğrulama prompt'u
-function buildVerifyPromptBase(q: any, lang: string): string {
+function buildVerifyPromptBase(q, lang: string): string {
   const type = q.type || 'multiple_choice'
   const base = `You are a strict educational content verifier. Verify this question for correctness and language consistency.\n\nExpected question language: ${lang}\n\nLANGUAGE RULE (MANDATORY): The question stem and answer options must be written in the expected language. Foreign proper names, formulas and short quoted examples are allowed, but a question written mainly in another language MUST return ok:false with reason \"language_mismatch\". The explanation may be Turkish for foreign-language courses.\n\nSELF-CONTAINMENT RULE (MANDATORY): If the question says a word is underlined/highlighted/emphasized, that exact target must be visibly marked inside the question with [square brackets]. Otherwise return ok:false with reason \"missing_visible_emphasis\".\n\n`
 
@@ -64,14 +64,14 @@ Respond ONLY with JSON: {"ok": true} or {"ok": false, "reason": "brief reason"}`
 
     case 'multi_true_false':
       return base + `Question: ${q.q}
-Statements: ${(q.statements || []).map((s: any, i: number) => `${i}: "${s.text}" → ${s.correct ? 'TRUE' : 'FALSE'}`).join('\n')}
+Statements: ${(q.statements || []).map((s, i: number) => `${i}: "${s.text}" → ${s.correct ? 'TRUE' : 'FALSE'}`).join('\n')}
 
 Verify each statement's true/false label is correct.
 Respond ONLY with JSON: {"ok": true} or {"ok": false, "reason": "which statements are wrong"}`
 
     case 'matching':
       return base + `Question: ${q.q}
-Pairs: ${(q.pairs || []).map((p: any) => `"${p.left}" → "${p.right}"`).join(' | ')}
+Pairs: ${(q.pairs || []).map((p) => `"${p.left}" → "${p.right}"`).join(' | ')}
 
 Are all pairs correctly matched?
 Respond ONLY with JSON: {"ok": true} or {"ok": false, "reason": "which pair is wrong"}`
@@ -91,7 +91,7 @@ Respond ONLY with JSON: {"ok": true} or {"ok": false, "reason": "correct order e
 
 type ObjectiveCandidate = { ref: string; objectiveCode: string; title: string; subject?: string; grade?: string }
 
-function buildVerifyPrompt(q: any, lang: string, objective?: ObjectiveCandidate | null): string {
+function buildVerifyPrompt(q, lang: string, objective?: ObjectiveCandidate | null): string {
   const difficulty = typeof q.difficulty === 'string' ? q.difficulty : ''
   const criteria = `${difficulty ? `\n\nDIFFICULTY CLAIM: "${difficulty}". Easy = one basic concept/at most one operation; normal = two connected reasoning steps or concept application; hard = multi-step reasoning, transfer to a new situation, or combined concepts. Larger numbers or longer wording alone do not make an item hard. Set difficultyMatches=true only if the actual cognitive work matches the claim.` : ''}${objective ? `\n\nCANONICAL LEARNING OUTCOME: [${objective.objectiveCode}] ${objective.title} (${objective.grade || ''} ${objective.subject || ''}). Does this exact question directly assess that outcome, not merely share a broad topic? Set objectiveMatches=true only for direct alignment.` : ''}`
   return buildVerifyPromptBase(q, lang) + criteria
@@ -117,7 +117,7 @@ async function verifyQuestionWithClaude(verifyPrompt: string): Promise<{ ok: boo
 }
 
 // Matematik için yerel hızlı kontrol (API çağrısı yapmadan)
-function quickMathCheck(q: any): boolean {
+function quickMathCheck(q): boolean {
   if (!q.q || !q.opts) return true
   const isMath = /[0-9]\s*[+\-*/=]\s*[0-9]|denklem|hesapla|çöz|solve|equation/i.test(q.q)
   if (!isMath) return true
@@ -156,7 +156,7 @@ function quickMathCheck(q: any): boolean {
 // — matematiksel olarak %100 güvenilir, AI'ın hesap hatası riski hiç yok.
 const BASAMAK_ADLARI = ['birler', 'onlar', 'yüzler', 'binler', 'on binler', 'yüz binler', 'milyonlar', 'on milyonlar', 'yüz milyonlar', 'milyarlar', 'on milyarlar', 'yüz milyarlar']
 
-function checkBasamakQuestion(q: any): { ok: boolean; gercekCevap: string } | null {
+function checkBasamakQuestion(q): { ok: boolean; gercekCevap: string } | null {
   const text = q.q || ''
   if (!/basamağ/i.test(text)) return null // basamak sorusu değil
 
@@ -212,13 +212,13 @@ export async function POST(req: NextRequest) {
       subject: typeof body.subject === 'string' ? body.subject : '', grade: String(grade || ''), topic: String(topic || ''),
     }) : []
     const exceptions: any[] = []
-    const teacherException = (q: any, reason: string) => exceptions.push({ ...q,objectiveMappingStatus:'review_required',objectiveReviewException:reason })
+    const teacherException = (q, reason: string) => exceptions.push({ ...q,objectiveMappingStatus:'review_required',objectiveReviewException:reason })
     if (!questions?.length) return NextResponse.json({ questions: [] })
 
     // Mixed tipte pahalı ikinci AI doğrulama yapılmaz; fakat tüm tipler merkezi
     // deterministik şema kontrolünden geçer.
     if (questionType === 'mixed' && !strictQualityPolicy) {
-      const accepted = questions.filter((question: any) => evaluateQuestionStructure(question).verdict === 'accept')
+      const accepted = questions.filter((question) => evaluateQuestionStructure(question).verdict === 'accept')
       const stats = { policyVersion: 'quality-engine-v1', original: questions.length, verified: accepted.length, rejected: questions.length - accepted.length, replacements: 0, final: accepted.length }
       await writeAgentDecisionAudit(auditDb, { actor_id: user.id, agent_name: agent, policy_version: 'question-verification-boundary-v1', input_summary: { question_count: questions.length, question_type: 'mixed' }, decision_summary: { verified: accepted.length, rejected: stats.rejected } })
       return NextResponse.json({ questions: accepted, stats })
@@ -242,7 +242,7 @@ export async function POST(req: NextRequest) {
     for (let i = 0; i < questions.length; i += BATCH) {
       const batch = questions.slice(i, i + BATCH)
 
-      await Promise.all(batch.map(async (q: any, bIdx: number) => {
+      await Promise.all(batch.map(async (q, bIdx: number) => {
         const idx = i + bIdx
         const reuseId = typeof q.bankQuestionId === 'string' && /^[0-9a-f-]{36}$/i.test(q.bankQuestionId) ? q.bankQuestionId : null
         const savedBank = reuseId ? await auditDb.from('question_bank').select('question,review_status,report_count,awaiting_expert_review').eq('id',reuseId).maybeSingle() : null
@@ -509,10 +509,10 @@ Return ONLY valid JSON:
         const rMatch = rText.replace(/```json|```/g, '').trim().match(/\{[\s\S]*\}/)
         if (rMatch) {
           const parsed = JSON.parse(rMatch[0])
-          const replacementCandidates = (parsed.questions || []).filter((q: any) =>
+          const replacementCandidates = (parsed.questions || []).filter((q) =>
             quickMathCheck(q) && evaluateQuestionStructure(q).verdict === 'accept'
           )
-          const checkedReplacements = await Promise.all(replacementCandidates.map(async (q: any) => ({
+          const checkedReplacements = await Promise.all(replacementCandidates.map(async (q) => ({
             question: q,
             review: await verifyQuestionWithMistral(buildVerifyPrompt(q, lang)),
           })))
@@ -543,7 +543,7 @@ Return ONLY valid JSON:
         ...(strictQualityPolicy ? { geminiSetReview } : {}),
       },
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('[verify-questions] error:', error?.message)
     return NextResponse.json({ error: 'Soru doğrulaması veya denetim kaydı tamamlanamadı.' }, { status: 503 })
   }

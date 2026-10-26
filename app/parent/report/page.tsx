@@ -46,7 +46,7 @@ function DetailReport({ childId, onBack }: { childId: string; onBack: () => void
   const { t: tr } = useT()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   useEffect(() => {
     async function load() {
@@ -108,7 +108,7 @@ function DetailReport({ childId, onBack }: { childId: string; onBack: () => void
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>{tr('Son Testler Trendi')}</div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: '5px', height: '60px' }}>
-            {stats.trend.map((t: any, i: number) => (
+            {stats.trend.map((t, i: number) => (
               <div key={i} title={`${t.topic}: %${t.pct}`} style={{ flex: 1 }}>
                 <div style={{ width: '100%', borderRadius: '3px 3px 0 0', height: `${Math.max(t.pct * 0.6, 3)}px`, background: pctColor(t.pct) }} />
               </div>
@@ -121,7 +121,7 @@ function DetailReport({ childId, onBack }: { childId: string; onBack: () => void
       {stats.topTopics.length > 0 && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>{tr('Çalışılan Konular')}</div>
-          {stats.topTopics.map((t: any, i: number) => (
+          {stats.topTopics.map((t, i: number) => (
             <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', padding: '6px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
               <div style={{ flex: 1, fontSize: '13px' }}>{tr(t.topic)}</div>
               <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{t.count}x</div>
@@ -135,7 +135,7 @@ function DetailReport({ childId, onBack }: { childId: string; onBack: () => void
       {weakTopics?.length > 0 && (
         <div className="card" style={{ borderLeft: '3px solid var(--red)' }}>
           <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>{tr('⚠️ Çalışması Gereken Konular')}</div>
-          {weakTopics.map((w: any, i: number) => (
+          {weakTopics.map((w, i: number) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
               <div style={{ flex: 1, fontSize: '13px' }}>{tr(w.topic)}</div>
               <div style={{ fontSize: '11px', color: 'var(--red)' }}>{tr('{n} yanlış', { n: w.wrong_count })}</div>
@@ -153,7 +153,7 @@ export default function ParentReportPage() {
   const [selectedChild, setSelectedChild] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   useEffect(() => {
     async function load() {
@@ -187,7 +187,7 @@ export default function ParentReportPage() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {children.map((c: any) => <StudentCard key={c.child_id} s={c} onClick={() => setSelectedChild(c.child_id)} />)}
+                {children.map((c) => <StudentCard key={c.child_id} s={c} onClick={() => setSelectedChild(c.child_id)} />)}
               </div>
             )}
           </>

@@ -86,7 +86,7 @@ async function fetchInstitutionNames(): Promise<Map<string, string>> {
     console.warn('⚠️  Kurum bilgisi okunamadı (kritik değil, boş bırakılacak):', error.message)
     return nameMap
   }
-  for (const row of (data || []) as any[]) {
+  for (const row of (data || []) as unknown[]) {
     const instName = row.institutions?.name
     if (instName) nameMap.set(row.user_id, instName)
   }
@@ -154,7 +154,7 @@ async function migrate() {
         [record.supabase_user_id, record.full_name, record.email, record.age, record.role, record.parent_email, record.institution_name, record.phone]
       )
       success++
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(`    ❌ ${p.id} (${p.name}) taşınamadı:`, e.message)
       failed++
     }

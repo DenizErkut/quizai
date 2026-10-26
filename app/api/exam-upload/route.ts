@@ -197,7 +197,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, ...result })
 
-  } catch (e: any) {
+  } catch (e) {
     console.error('[exam-upload]', e)
     const msg = e?.message || 'Bilinmeyen hata'
     return NextResponse.json({ error: msg }, { status: 500 })

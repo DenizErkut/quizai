@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 
-const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!) as any
+const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 export async function GET(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: 'Günlük görev verileri alınamadı.' }, { status: 500 })
 
   const all = rows || []
-  const completed = all.filter((row: any) => row.completed)
+  const completed = all.filter((row) => row.completed)
   const byUser = new Map<string, Set<string>>()
   for (const row of completed) {
     if (!byUser.has(row.user_id)) byUser.set(row.user_id, new Set())
@@ -40,14 +40,14 @@ export async function GET(req: NextRequest) {
       if (ordered.some(date => date > first && date <= d7.toISOString().slice(0, 10))) returnedD7++
     }
   }
-  const sum = (key: string) => all.reduce((total: number, row: any) => total + Number(row[key] || 0), 0)
+  const sum = (key: string) => all.reduce((total: number, row) => total + Number(row[key] || 0), 0)
   const streakRows = streaks || []
   return NextResponse.json({
     assigned: all.length, completed: completed.length, students: byUser.size,
     completion_rate: all.length ? completed.length / all.length : 0,
     d1_return_rate: eligibleD1 ? returnedD1 / eligibleD1 : null,
     d7_return_rate: eligibleD7 ? returnedD7 / eligibleD7 : null,
-    avg_current_streak: streakRows.length ? streakRows.reduce((s: number, r: any) => s + Number(r.current_streak || 0), 0) / streakRows.length : 0,
+    avg_current_streak: streakRows.length ? streakRows.reduce((s: number, r) => s + Number(r.current_streak || 0), 0) / streakRows.length : 0,
     avg_bank_questions: all.length ? sum('bank_question_count') / all.length : 0,
     avg_generated_questions: all.length ? sum('generated_question_count') / all.length : 0,
     window_days: 35,

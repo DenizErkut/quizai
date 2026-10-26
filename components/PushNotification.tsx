@@ -19,7 +19,7 @@ export default function PushNotificationToggle() {
   const [supported, setSupported] = useState(false)
   const [subscribed, setSubscribed] = useState(false)
   const [loading, setLoading] = useState(false)
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   useEffect(() => {
     if ('serviceWorker' in navigator && 'PushManager' in window) {

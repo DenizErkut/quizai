@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ className: null, summary: { totalStudents: 0, counts: { riskli: 0, gelistirilmeli: 0, yeterli: 0 }, students: [], topConcernTopics: [] }, insight: 'Henüz bir sınıfınız yok.' })
   }
 
-  const targetClassrooms = classroomId ? classrooms.filter((c: any) => c.id === classroomId) : classrooms
+  const targetClassrooms = classroomId ? classrooms.filter((c) => c.id === classroomId) : classrooms
   if (classroomId && !targetClassrooms.length) {
     return NextResponse.json({ error: 'Sınıf bulunamadı.' }, { status: 404 })
   }
@@ -55,13 +55,13 @@ export async function GET(req: NextRequest) {
   const { data: members } = await supabaseAdmin
     .from('classroom_students')
     .select('student_id')
-    .in('classroom_id', targetClassrooms.map((c: any) => c.id))
+    .in('classroom_id', targetClassrooms.map((c) => c.id))
 
-  const studentIds = [...new Set((members ?? []).map((m: any) => m.student_id))]
+  const studentIds = [...new Set((members ?? []).map((m) => m.student_id))]
   const identities = await getIdentitiesBySupabaseIds(studentIds)
   const studentNames: Record<string, string> = {}
   for (const [id, identity] of Object.entries(identities)) {
-    studentNames[id] = (identity as any)?.full_name || 'Öğrenci'
+    studentNames[id] = (identity)?.full_name || 'Öğrenci'
   }
 
   const summary = await computeClassRiskSummary(supabaseAdmin, studentIds, studentNames)

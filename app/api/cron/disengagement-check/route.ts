@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
       .in('id', childIds)
 
     const notifiedMap = new Map<string, string | null>()
-    for (const p of profiles || []) notifiedMap.set(p.id, (p as any).disengagement_notified_at)
+    for (const p of profiles || []) notifiedMap.set(p.id, (p).disengagement_notified_at)
 
     let checked = 0
     let flagged = 0
@@ -114,7 +114,7 @@ export async function GET(req: NextRequest) {
 
         let anySent = false
         for (const parentId of parentIds) {
-          const parentEmail = (parentIdentities as any)[parentId]?.email
+          const parentEmail = (parentIdentities)[parentId]?.email
           if (!parentEmail) continue
           const ok = await sendResendEmail(parentEmail, subject, html)
           if (ok) {
@@ -143,7 +143,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ checked, flagged, recovered })
-  } catch (e: any) {
+  } catch (e) {
     console.error('[disengagement-check] Hata:', e)
     return NextResponse.json({ error: e.message || 'Kontrol başarısız.' }, { status: 500 })
   }

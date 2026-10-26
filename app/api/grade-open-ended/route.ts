@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
 
     let graded
     try { graded = await gradeOpenEndedAnswer(session, studentAnswer, user.id) }
-    catch (gradingError: any) { return NextResponse.json({ error: gradingError?.message || 'Puanlama başarısız, tekrar dene.' }, { status: 500 }) }
+    catch (gradingError) { return NextResponse.json({ error: gradingError?.message || 'Puanlama başarısız, tekrar dene.' }, { status: 500 }) }
     const { criteriaResults, overallFeedback, totalEarned } = graded
 
     await supabase.from('open_ended_sessions').update({
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       totalEarned,
       totalPossible: session.total_possible,
     })
-  } catch (e: any) {
+  } catch (e) {
     console.error('[grade-open-ended]', e?.message)
     return NextResponse.json({ error: 'Bir hata oluştu, tekrar dene.' }, { status: 500 })
   }

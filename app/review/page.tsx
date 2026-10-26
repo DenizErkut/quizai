@@ -9,7 +9,7 @@ import { useT } from '@/lib/i18n/I18nProvider'
 export default function ReviewPage() {
   const router = useRouter()
   const { t } = useT()
-  const supabase = createClient() as any
+  const supabase = createClient()
   const [cards, setCards] = useState<any[]>([])
   const [current, setCurrent] = useState(0)
   const [showAnswer, setShowAnswer] = useState(false)

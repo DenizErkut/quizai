@@ -98,7 +98,7 @@ export default function NotificationsPage() {
       .channel(`notifications:${user.id}`)
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}`
-      }, (payload: any) => {
+      }, (payload) => {
         setNotifications(prev => [payload.new, ...prev])
       })
       .subscribe()

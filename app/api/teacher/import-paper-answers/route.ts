@@ -72,15 +72,15 @@ export async function POST(req: NextRequest) {
     if (body.action === 'transcribe') {
       const images = Array.isArray(body.images) ? body.images : []
       if (!images.length || images.length > MAX_IMAGES
-        || images.some((image: any) => !MEDIA_TYPES.has(image?.mediaType) || typeof image?.data !== 'string')
-        || images.reduce((sum: number, image: any) => sum + image.data.length, 0) > MAX_BASE64_CHARS) {
+        || images.some((image) => !MEDIA_TYPES.has(image?.mediaType) || typeof image?.data !== 'string')
+        || images.reduce((sum: number, image) => sum + image.data.length, 0) > MAX_BASE64_CHARS) {
         return NextResponse.json({ error: `1-${MAX_IMAGES} adet JPEG/PNG görsel yükleyin (toplam en fazla ~3 MB; fotoğraflar otomatik küçültülür).` }, { status: 400 })
       }
       const questionList = assignments.map((a, index) => `Soru ${index + 1}: ${String(a.question).slice(0, 220)}`).join('\n')
       const response = await anthropic.messages.create({
         model: CLAUDE_SONNET, ...SONNET_PARAMS, max_tokens: sonnetTokens(3500),
         messages: [{ role: 'user', content: [
-          ...images.map((image: any) => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: image.mediaType, data: image.data } })),
+          ...images.map((image) => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: image.mediaType, data: image.data } })),
           { type: 'text' as const, text: `Bu görseller bir öğrencinin ELLE doldurduğu açık uçlu soru kâğıdıdır. Kâğıtta ${assignments.length} soru var:\n${questionList}\n\nGÖREVİN YALNIZCA TRANSKRİPSİYON: her sorunun cevap alanına yazılanı AYNEN, öğrencinin yazdığı gibi kopyala. Yazım hatalarını düzeltme, eksik cümleyi tamamlama, yorum yapma, puanlama yapma. Okunamayan sözcüğü [okunamadı] yaz. Kesirleri a/b, çarpmayı × biçiminde yaz; sayıları ve rakamları (özellikle 2/3/7/1 gibi karışabilenleri) tek tek dikkatle oku, bir rakamdan emin değilsen onu yazıp hemen ardına [?] ekle (örn. 3[?]/4) ve note alanında belirt. Soru metnindeki sayılara göre tahmin ETME; kâğıtta gördüğünü yaz. Cevabı soru numarasına/alanına göre eşle; cevap yazılmamışsa text boş olsun. Kâğıtta yazan öğrenci adını ve "Ödev kodu" varsa onu da oku (yoksa null).\nSADECE JSON: {"studentName":null,"sheetCode":null,"answers":[{"question":1,"text":"...","legible":true,"note":""}]}` },
         ] }],
       })
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
       if (!parsed || !Array.isArray(parsed.answers)) return NextResponse.json({ error: 'Kâğıt okunamadı. Daha net ve düz bir fotoğrafla tekrar deneyin.' }, { status: 422 })
       const expectedCode = shortSheetCode(assignments[0].batch_id || assignments[0].id)
       const answers = assignments.map((a, index) => {
-        const found = parsed.answers.find((item: any) => Number(item?.question) === index + 1)
+        const found = parsed.answers.find((item) => Number(item?.question) === index + 1)
         return { index, assignmentId: a.id, text: String(found?.text || '').trim().slice(0, 4000), legible: found?.legible !== false, note: String(found?.note || '').slice(0, 200) }
       })
       const sheetCode = typeof parsed.sheetCode === 'string' ? parsed.sheetCode.trim().toUpperCase() : null
@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ error: 'Bilinmeyen işlem.' }, { status: 400 })
-  } catch (e: any) {
+  } catch (e) {
     return errorResponse('teacher/import-paper-answers', e, 'Bir hata oluştu, tekrar dene.')
   }
 }

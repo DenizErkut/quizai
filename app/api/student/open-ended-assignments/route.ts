@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     .select('classroom_id')
     .eq('student_id', user.id)
 
-  const classroomIds = (memberships ?? []).map((m: any) => m.classroom_id)
+  const classroomIds = (memberships ?? []).map((m) => m.classroom_id)
   if (classroomIds.length === 0) return NextResponse.json({ assignments: [] })
 
   const { data: assignments } = await supabase
@@ -40,9 +40,9 @@ export async function GET(req: NextRequest) {
     .eq('user_id', user.id)
     .not('assignment_id', 'is', null)
 
-  const doneMap = new Map((sessions ?? []).map((s: any) => [s.assignment_id, s]))
+  const doneMap = new Map((sessions ?? []).map((s) => [s.assignment_id, s]))
 
-  const result = assignments.map((a: any) => {
+  const result = assignments.map((a) => {
     const done = doneMap.get(a.id)
     return {
       ...a,
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
   // Tamamlanmamış (bekleyen) ödevler üstte, tamamlanmış olanlar altta —
   // her grup kendi içinde zaten created_at'e göre (en yeni önce) sıralı
   // kalıyor (Array.sort stabildir).
-  result.sort((a: any, b: any) => Number(a.completed) - Number(b.completed))
+  result.sort((a, b) => Number(a.completed) - Number(b.completed))
 
   return NextResponse.json({ assignments: result })
 }

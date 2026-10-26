@@ -18,6 +18,8 @@ const adminDb = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+import { filterRowsByUserScope, parseResourceScope, type ResourceScope } from '@/lib/location/resource-scope'
+
 async function getAdminUser() {
   const cookieStore = await cookies()
   const sb = createServerClient(
@@ -66,8 +68,9 @@ async function extractChunkAndSave(params: {
   fileUrl: string | null
   sourceType: string
   title: string; grade: string; subject: string; unit: string; level: string
+  scope: ResourceScope
 }) {
-  const { fileBytes, ext, fileUrl, sourceType, title, grade, subject, unit, level } = params
+  const { fileBytes, ext, fileUrl, sourceType, title, grade, subject, unit, level, scope } = params
   let rawText = params.rawTextInput || ''
   let extractEngine = 'none'
 
@@ -81,7 +84,7 @@ async function extractChunkAndSave(params: {
 
   const { data: resource, error: resErr } = await adminDb
     .from('meb_resources')
-    .insert({ title, grade, subject, unit, level, source_type: sourceType, file_url: fileUrl, raw_text: rawText })
+    .insert({ title, grade, subject, unit, level, source_type: sourceType, file_url: fileUrl, raw_text: rawText, country: scope.country, state: scope.state, city: scope.city })
     .select('id').single()
 
   if (resErr || !resource) {
@@ -113,9 +116,11 @@ async function extractChunkAndSave(params: {
 // Base64 PDF'i service role key ile Storage'a yükle ve işle
 async function processFromStorage(body: {
   storage_path: string; file_url: string;
-  title: string; grade: string; subject: string; unit: string; level: string
+  title: string; grade: string; subject: string; unit: string; level: string; country?: string; state?: string; city?: string
 }) {
   const { storage_path, file_url, title, grade, subject, unit, level } = body
+  const parsedScope = parseResourceScope(body)
+  if (parsedScope.ok === false) return NextResponse.json({ error: parsedScope.error }, { status: 400 })
 
   // Storage'dan dosyayı service role ile indir
   const { data: fileData, error: dlErr } = await adminDb.storage
@@ -131,7 +136,7 @@ async function processFromStorage(body: {
 
   return extractChunkAndSave({
     fileBytes: bytes, rawTextInput: '', ext, fileUrl: file_url, sourceType: 'pdf',
-    title, grade, subject, unit, level,
+    title, grade, subject, unit, level, scope: parsedScope.value,
   })
 }
 
@@ -161,6 +166,8 @@ export async function POST(req: NextRequest) {
     const unit = form.get('unit') as string
     const level = form.get('level') as string
     const rawTextInput = form.get('raw_text') as string | null
+    const parsedScope = parseResourceScope({ country: form.get('country'), state: form.get('state'), city: form.get('city') })
+    if (parsedScope.ok === false) return NextResponse.json({ error: parsedScope.error }, { status: 400 })
 
     if (!title || !grade || !subject || !unit || !level) {
       return NextResponse.json({ error: 'Tüm alanlar zorunlu' }, { status: 400 })
@@ -210,7 +217,7 @@ export async function POST(req: NextRequest) {
     return extractChunkAndSave({
       fileBytes: fileBytesForExtract, rawTextInput: rawText, ext: fileExt, fileUrl,
       sourceType: file ? 'pdf' : 'text',
-      title, grade, subject, unit, level,
+      title, grade, subject, unit, level, scope: parsedScope.value,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Beklenmeyen yükleme hatası'
@@ -252,7 +259,7 @@ export async function GET(req: NextRequest) {
     if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     const { data, error } = await adminDb
       .from('meb_resources')
-      .select('id, title, grade, subject, unit, level, source_type, file_url, created_at, raw_text')
+      .select('id, title, grade, subject, unit, level, source_type, file_url, created_at, raw_text, country, state, city')
       .eq('id', id).single()
     if (error || !data) return NextResponse.json({ error: 'Bulunamadı' }, { status: 404 })
     return NextResponse.json({ resource: { ...data, char_count: data.raw_text?.length || 0 } })
@@ -267,14 +274,26 @@ export async function GET(req: NextRequest) {
   const sortAsc = searchParams.get('sort') === 'asc'
   let query = adminDb
     .from('meb_resources')
-    .select('id, title, grade, subject, unit, level, source_type, created_at, text_preview, text_char_count')
+    .select('id, title, grade, subject, unit, level, source_type, created_at, text_preview, text_char_count, country, state, city')
     .order('created_at', { ascending: sortAsc })
 
   if (level) query = query.eq('level', level)
   if (subject) query = query.eq('subject', subject)
 
-  const { data, error } = await query
+  const { data: allRows, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Yönetici sekmeleri ?scope=tr|other|all ile kendi kapsamını ister; diğer herkes yalnızca kendi ülke/eyalet/şehrine uyan kaynakları görür.
+  const adminScope = searchParams.get('scope')
+  let data = allRows || []
+  if (adminScope === 'tr' || adminScope === 'other' || adminScope === 'all') {
+    if (!(await getAdminUser())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (adminScope === 'tr') data = data.filter(r => (r.country || 'TR') === 'TR')
+    else if (adminScope === 'other') data = data.filter(r => (r.country || 'TR') !== 'TR')
+  } else {
+    const { data: profile } = await adminDb.from('profiles').select('country,state,city').eq('id', user.id).maybeSingle()
+    data = filterRowsByUserScope(data, profile, r => r)
+  }
 
   // Tam kaynak metnini liste boyunca taşımadan yalnızca küçük özeti döndür.
   const resources = (data || []).map(r => ({
@@ -286,6 +305,9 @@ export async function GET(req: NextRequest) {
     level: r.level,
     source_type: r.source_type,
     created_at: r.created_at,
+    country: r.country || 'TR',
+    state: r.state,
+    city: r.city,
     preview: r.text_preview || '',
     char_count: r.text_char_count || 0,
   }))

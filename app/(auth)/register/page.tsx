@@ -380,7 +380,7 @@ function RegisterContent() {
         })
         setStep('teacher_info')
       }
-    } catch (e: any) {
+    } catch (e) {
       // Ne olursa olsun (ağ hatası, beklenmeyen exception...) ekran donmasın —
       // kullanıcı her zaman ya sonucu ya da anlaşılır bir hata mesajı görsün.
       console.error('[handleRegister] beklenmeyen hata:', e)
@@ -436,7 +436,7 @@ function RegisterContent() {
       // "Başvurunuz Alındı" ekranı göster (bkz. register/teacher/page.tsx'teki
       // aynı desen).
       setStep('teacher_done')
-    } catch (e: any) {
+    } catch (e) {
       console.error('[handleTeacherApply] beklenmeyen hata:', e)
       setError(t('Beklenmeyen bir hata oluştu ({msg}). Lütfen tekrar dene.', { msg: e?.message || t('bilinmeyen') }))
     } finally {

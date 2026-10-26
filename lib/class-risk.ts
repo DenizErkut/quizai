@@ -61,7 +61,7 @@ export async function computeClassRiskSummary(
     .in('user_id', studentIds)
 
   const byStudent = new Map<string, typeof rows>()
-  ;(rows ?? []).forEach((r: any) => {
+  ;(rows ?? []).forEach((r) => {
     if (!byStudent.has(r.user_id)) byStudent.set(r.user_id, [])
     byStudent.get(r.user_id)!.push(r)
   })

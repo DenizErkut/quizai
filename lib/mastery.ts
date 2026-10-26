@@ -90,7 +90,7 @@ export async function getTopicMastery(
     .maybeSingle()
 
   if (eventMastery) {
-    const row = eventMastery as any
+    const row = eventMastery
     const confidence: Confidence = row.confidence_score < 0.3
       ? 'düşük'
       : row.confidence_score < 0.65 ? 'orta' : 'yüksek'
@@ -123,7 +123,7 @@ export async function getTopicMastery(
     .ilike('topic', topic)
     .maybeSingle()
   if (!data) return null
-  return computeTopicMastery(data as any)
+  return computeTopicMastery(data)
 }
 
 export interface ErrorPatterns {

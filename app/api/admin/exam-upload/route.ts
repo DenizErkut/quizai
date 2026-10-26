@@ -16,6 +16,7 @@ import { questionBankKey } from '@/lib/question-bank'
 import { educationEvalGradeKey } from '@/lib/education-eval-grade'
 import { educationEvalSubjectKey } from '@/lib/education-eval-subject'
 import { requiresBookletVisual } from '@/lib/booklet-visual-gate'
+import { parseResourceScope, type ResourceScope } from '@/lib/location/resource-scope'
 import { matchVerifiedObjectiveCode, parseLearningObjectiveCodes } from '@/lib/learning-objective-codes'
 import { bookletDifficulty, isMixedSubject, mixedObjectiveReferences, placeMixedQuestion, validBookletQuestion, type CatalogObjective } from '@/lib/booklet-mixed'
 
@@ -106,9 +107,9 @@ async function embedText(text: string): Promise<number[] | null> {
 
 async function processExam(params: {
   title: string; exam_type: string; year: string; subject: string; answer_key: string; learning_objective_codes: string[]
-  rawText: string; fileUrl?: string; fileName?: string; source_type: 'anonymous' | 'teacher' | 'ai'; grade: string; subtopic: string; topic?: string; purpose: 'exam' | 'instant_test'; uploaded_by?: string
+  rawText: string; fileUrl?: string; fileName?: string; source_type: 'anonymous' | 'teacher' | 'ai'; grade: string; subtopic: string; topic?: string; purpose: 'exam' | 'instant_test'; uploaded_by?: string; scope: ResourceScope
 }) {
-  const { title, exam_type, year, subject, answer_key, learning_objective_codes, rawText, fileUrl, fileName, source_type, grade, subtopic, topic, purpose, uploaded_by } = params
+  const { title, exam_type, year, subject, answer_key, learning_objective_codes, rawText, fileUrl, fileName, source_type, grade, subtopic, topic, purpose, uploaded_by, scope } = params
 
   // A retry of an interrupted upload reuses the saved document, not a second
   // resource with the same questions. Never overwrite a different document.
@@ -130,6 +131,7 @@ async function processExam(params: {
     grade: grade || '',
     subtopic: subtopic || '', topic: topic || subtopic || '',
     learning_objective_codes,
+    country: scope.country, state: scope.state, city: scope.city,
     review_status: 'pending',
     uploaded_by: uploaded_by || null,
     file_name: fileName || null,
@@ -171,7 +173,7 @@ export async function GET(req: NextRequest) {
   if (id) {
     const { data, error } = await adminDb
       .from('exam_resources')
-      .select('id, title, exam_type, year, subject, answer_key, file_url, raw_text, purpose, source_type, reuse_policy, grade, topic, subtopic, learning_objective_codes, review_status, publication_evidence_paths, created_at')
+      .select('id, title, exam_type, year, subject, answer_key, file_url, raw_text, purpose, source_type, reuse_policy, grade, topic, subtopic, learning_objective_codes, review_status, publication_evidence_paths, created_at, country, state, city')
       .eq('id', id).single()
     if (error || !data) return NextResponse.json({ error: 'Bulunamadı' }, { status: 404 })
     const evidencePaths = Array.isArray(data.publication_evidence_paths) ? data.publication_evidence_paths : []
@@ -184,7 +186,7 @@ export async function GET(req: NextRequest) {
 
   let examQuery = adminDb
     .from('exam_resources')
-    .select('id, title, exam_type, year, subject, purpose, source_type, reuse_policy, grade, topic, subtopic, learning_objective_codes, review_status, publication_evidence_paths, created_at, file_url')
+    .select('id, title, exam_type, year, subject, purpose, source_type, reuse_policy, grade, topic, subtopic, learning_objective_codes, review_status, publication_evidence_paths, created_at, file_url, country, state, city')
     .order('exam_type', { ascending: true })
     .order('year', { ascending: false })
   if (purpose === 'instant_test' || purpose === 'exam') examQuery = examQuery.eq('purpose', purpose)
@@ -246,11 +248,11 @@ async function loadGradeObjectives(grade: string | null | undefined): Promise<Ca
   return (data || []).filter(item => educationEvalGradeKey(item.grade) === educationEvalGradeKey(grade)) as CatalogObjective[]
 }
 
-async function promoteExactQuestions(row: { id?: string; subject?: string | null; grade?: string | null; topic?: string | null; subtopic?: string | null; raw_text?: string | null; learning_objective_codes?: unknown }, sourceType: 'teacher' | 'ai', batch: string) {
+async function promoteExactQuestions(row: { id?: string; country?: string | null; state?: string | null; city?: string | null; subject?: string | null; grade?: string | null; topic?: string | null; subtopic?: string | null; raw_text?: string | null; learning_objective_codes?: unknown }, sourceType: 'teacher' | 'ai', batch: string) {
   const sourceLabel = sourceType === 'teacher' ? 'öğretmen imzalı' : 'yapay zekâ ile ayrıca hazırlanmış'
   const labels = bookletQuestionLabels(batch)
   // A question that points at a figure it does not contain waits for its figure instead of entering the pool.
-  const needsVisual = (q: any) => requiresBookletVisual(q) || phantomVisualIssue({ q: q.q, opts: q.opts }) === 'missing_visual'
+  const needsVisual = (q) => requiresBookletVisual(q) || phantomVisualIssue({ q: q.q, opts: q.opts }) === 'missing_visual'
   const mixed = isMixedSubject(row.subject)
   const gradeObjectives = mixed ? await loadGradeObjectives(row.grade) : []
   const objectiveByCode = new Map(gradeObjectives.map(objective => [objective.objective_code.toLocaleUpperCase('tr-TR'), objective]))
@@ -273,11 +275,11 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
     return parsed.questions
   }))
   const rawExtracted = extractedGroups.flat()
-  const extracted = rawExtracted.filter((q: any) => q && validBookletQuestion(q))
+  const extracted = rawExtracted.filter((q) => q && validBookletQuestion(q))
   // Every question that does not reach the pool is recorded with its reason (never blocks the import).
   const rejections: Array<{ number: number | null; text: string; stage: 'not_extracted' | 'invalid_shape' | 'validator'; reason: string }> = []
-  const numberOf = (q: any) => printedQuestionNumber(String(q?.q || ''), labels)
-  rawExtracted.filter((q: any) => !(q && validBookletQuestion(q))).forEach((q: any) =>
+  const numberOf = (q) => printedQuestionNumber(String(q?.q || ''), labels)
+  rawExtracted.filter((q) => !(q && validBookletQuestion(q))).forEach((q) =>
     rejections.push({ number: numberOf(q), text: String(q?.q || '').slice(0, 300), stage: 'invalid_shape', reason: 'Soru biçimi geçersiz: şık sayısı (4-5), cevap indeksi, gerekçe veya kısa cevap kuralı (tek cümle, tek cevap) sağlanmadı.' }))
   const seenNumbers = new Set(rawExtracted.map(numberOf).filter((n): n is number => n !== null))
   labels.filter(label => label.number !== null && !seenNumbers.has(label.number)).forEach(label => {
@@ -298,7 +300,7 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
   const validateItems = async (items: any[]) => {
     const text = await callOpenAI([
       { role: 'system', content: 'Sen bağımsız soru kalite denetçisisin. Soruları değiştirme. Yalnızca doğru cevabı kesin, seçenekleri benzersiz ve soru eksiksiz olan kayıtları onayla. type "short_answer" ise opts tek elemanlıdır ve yalnız referans cevaptır; tek seçenek olması kusur değildir, cevabın doğruluğunu ve sorunun eksiksizliğini değerlendir. "reason" alanın kararınla tutarlı olsun: gerekçen "doğru/onaylanabilir" diyorsa approved true yaz. JSON döndür.' },
-      { role: 'user', content: `${JSON.stringify({ questions: items.map((q: any, index: number) => ({ index, type: q.type === 'short_answer' ? 'short_answer' : 'multiple_choice', q: q.q, opts: q.opts, ans: q.ans, exp: q.exp })) })}\nYanıt şeması: {"results":[{"index":0,"approved":true,"reason":"..."}]}` },
+      { role: 'user', content: `${JSON.stringify({ questions: items.map((q, index: number) => ({ index, type: q.type === 'short_answer' ? 'short_answer' : 'multiple_choice', q: q.q, opts: q.opts, ans: q.ans, exp: q.exp })) })}\nYanıt şeması: {"results":[{"index":0,"approved":true,"reason":"..."}]}` },
     ], { model: process.env.OPENAI_VALIDATOR_MODEL || 'gpt-4.1-mini', max_tokens: 4000, json: true, timeoutMs: 25000, requireComplete: true, operation: `${sourceType}-booklet-validator` })
     const parsed = JSON.parse(text)
     if (!Array.isArray(parsed.results) || parsed.results.length !== items.length
@@ -321,15 +323,15 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
       else original.reason = `${original.reason || ''} | İkinci kontrol: ${verdict.reason || ''}`.slice(0, 480)
     })
   }
-  const approvedIndexes = new Set<number>((validation.results || []).filter((item: any) => item.approved === true).map((item: any) => Number(item.index)))
-  const questions = extracted.filter((q: any, index: number) => approvedIndexes.has(index) || needsVisual(q))
-  extracted.forEach((q: any, index: number) => {
+  const approvedIndexes = new Set<number>((validation.results || []).filter((item) => item.approved === true).map((item) => Number(item.index)))
+  const questions = extracted.filter((q, index: number) => approvedIndexes.has(index) || needsVisual(q))
+  extracted.forEach((q, index: number) => {
     if (approvedIndexes.has(index) || needsVisual(q)) return
-    const verdict = (validation.results || []).find((item: any) => Number(item.index) === index)
+    const verdict = (validation.results || []).find((item) => Number(item.index) === index)
     rejections.push({ number: numberOf(q), text: String(q.q || '').slice(0, 300), stage: 'validator', reason: `Bağımsız kalite denetçisi reddetti: ${String(verdict?.reason || 'gerekçe verilmedi')}` })
   })
   await recordRejections()
-  let rows = questions.map((q: any) => ({
+  let rows = questions.map((q) => ({
     fingerprint: createHash('sha256').update(`${q.q}|${q.opts.join('|')}`.toLocaleLowerCase('tr')).digest('hex'),
     subject_key: questionBankKey(row.subject || 'genel'),
     // `topic_key` is the booklet's selected parent unit so all extracted
@@ -338,11 +340,12 @@ async function promoteExactQuestions(row: { id?: string; subject?: string | null
     topic_key: questionBankKey(row.subtopic || row.topic || q.topic || 'genel'),
     grade_key: canonicalBookletGrade(row.grade || ''), language_key: 'tr', question_type: q.type === 'short_answer' ? 'short_answer' : 'multiple_choice', difficulty: q.difficulty === 'easy' ? 'kolay' : q.difficulty === 'very_hard' ? 'cok zor' : q.difficulty === 'hard' ? 'zor' : 'normal',
     question: { q: q.q, ...(printedQuestionNumber(q.q, labels) ? { sourceQuestionNumber: printedQuestionNumber(q.q, labels) } : {}), ...(q.type === 'short_answer' ? { type: 'short_answer' } : {}), opts: q.opts, ans: q.ans, exp: q.exp, requiresBookletVisual: needsVisual(q), objective: q.topic || row.subtopic || '', learningObjectiveCode: labels.some(label => label.codes.length) ? printedQuestionObjective(q.q, labels, verifiedCodes) : matchVerifiedObjectiveCode(q.objective_code, verifiedCodes), bookletObjectiveCodes: verifiedCodes, bookletTopic: row.subtopic || row.topic || '', bookletResourceId: row.id || null, subject: row.subject || 'Genel', sourcePolicy: sourceType === 'teacher' ? 'teacher_exact' : 'ai_exact' },
-    review_status: needsVisual(q) ? 'candidate' : 'approved', quality_score: needsVisual(q) ? 0 : 1, source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact', report_count: 0
+    review_status: needsVisual(q) ? 'candidate' : 'approved', quality_score: needsVisual(q) ? 0 : 1, source_engine: sourceType === 'teacher' ? 'teacher_booklet_exact' : 'ai_booklet_exact', report_count: 0,
+    country: row.country || 'TR', state: row.state || null, city: row.city || null
   }))
   if (mixed) {
     // Subject and unit come from the catalog objective; an unplaced question waits for review instead of entering the pool under a guessed subject.
-    rows = rows.map((item: any, index: number) => {
+    rows = rows.map((item, index: number) => {
       const source: any = questions[index]
       // The code printed in the question heading is more reliable than the extractor's pick.
       const printed = printedQuestionObjective(source.q, labels, verifiedCodes)
@@ -426,6 +429,7 @@ export async function POST(req: NextRequest) {
     let title = '', exam_type = 'LGS', year = '', subject = '', answer_key = '', source_type: 'anonymous' | 'teacher' | 'ai' = 'anonymous', grade = '', subtopic = '', topic = '', fileName = '', purpose: 'exam' | 'instant_test' = 'exam'
     let learning_objective_codes: string[] = []
     let rawText = '', fileUrl = ''
+    let scopeInput: { country?: unknown; state?: unknown; city?: unknown } = {}
 
     // JSON mod: storage_path ile (büyük dosya)
     if (contentType.includes('application/json')) {
@@ -435,6 +439,7 @@ export async function POST(req: NextRequest) {
       source_type = body.source_type === 'teacher' || body.source_type === 'ai' ? body.source_type : 'anonymous'; grade = body.grade || ''; subtopic = body.subtopic || ''; topic = body.topic || subtopic; fileName = body.file_name || ''
       learning_objective_codes = parseLearningObjectiveCodes(body.learningObjectiveCodes ?? body.learning_objective_codes)
       purpose = body.purpose === 'instant_test' ? 'instant_test' : 'exam'
+      scopeInput = { country: body.country, state: body.state, city: body.city }
 
       const { data: fileData, error: dlErr } = await adminDb.storage
         .from('meb-resources').download(body.storage_path)
@@ -469,6 +474,7 @@ export async function POST(req: NextRequest) {
       topic = form.get('topic') as string || subtopic
       learning_objective_codes = parseLearningObjectiveCodes(form.get('learningObjectiveCodes') || '')
       purpose = form.get('purpose') === 'instant_test' ? 'instant_test' : 'exam'
+      scopeInput = { country: form.get('country'), state: form.get('state'), city: form.get('city') }
       const file = form.get('file') as File | null
       fileName = file?.name || ''
 
@@ -494,6 +500,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const scope = parseResourceScope(scopeInput)
+    if (scope.ok === false) return NextResponse.json({ error: scope.error }, { status: 400 })
     if (purpose === 'instant_test') {
       if (!grade.trim() || !subject.trim()) {
         return NextResponse.json({ error: 'Anlık test kitapçığı için sınıf ve ders zorunludur.' }, { status: 400 })
@@ -507,12 +515,12 @@ export async function POST(req: NextRequest) {
     }
     if (!rawText) rawText = `[${exam_type} ${year} ${subject}]`
 
-    const result = await processExam({ title, exam_type, year, subject, answer_key, learning_objective_codes, rawText, fileUrl, fileName, source_type, grade, subtopic, topic, purpose, uploaded_by: user.id })
+    const result = await processExam({ title, exam_type, year, subject, answer_key, learning_objective_codes, rawText, fileUrl, fileName, source_type, grade, subtopic, topic, purpose, uploaded_by: user.id, scope: scope.value })
     if ('error' in result) return NextResponse.json({ error: result.error }, { status: 500 })
 
     return NextResponse.json({ success: true, ...result, promoted: 0, processingPending: true })
 
-  } catch (e: any) {
+  } catch (e) {
     console.error('[exam-upload]', e)
     const msg = e?.message || 'Bilinmeyen hata'
     return NextResponse.json({ error: msg }, { status: 500 })
@@ -600,7 +608,7 @@ async function attachFigure(resourceId: string, figure: PageFigure): Promise<Fig
 
 async function processNextBooklet(id: string) {
   const { data: row, error: resourceError } = await adminDb.from('exam_resources')
-    .select('id,source_type,purpose,review_status,subject,grade,topic,subtopic,raw_text,learning_objective_codes,file_url')
+    .select('id,source_type,purpose,review_status,subject,grade,topic,subtopic,raw_text,learning_objective_codes,file_url,country,state,city')
     .eq('id', id).maybeSingle()
   if (resourceError) throw resourceError
   if (!row || row.review_status === 'rejected') return NextResponse.json({ error: 'İşlenebilir kitapçık bulunamadı.' }, { status: 404 })

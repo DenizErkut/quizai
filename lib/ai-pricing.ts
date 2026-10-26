@@ -99,7 +99,7 @@ export interface AIUsageInput {
   requestId?: string | null
   occurredAt?: Date
   durationMs?: number
-  meta?: Record<string, any>
+  meta?: Record<string, unknown>
 }
 
 // Maliyeti USD olarak hesapla (token sayısı / 1e6 * fiyat)

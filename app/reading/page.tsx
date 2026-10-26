@@ -185,7 +185,7 @@ export default function ReadingPage() {
         setReadMode('full')
         setPhase('ready')
       }
-    } catch (e: any) {
+    } catch (e) {
       setUploadError(e.message || t('Dosya yüklenemedi.'))
     } finally {
       setUploading(false)
@@ -228,7 +228,7 @@ export default function ReadingPage() {
       if (sessionId) {
         supabase.from('reading_sessions').update({ total_chunks: data.summary_chunks.length }).eq('id', sessionId).then(() => {})
       }
-    } catch (e: any) {
+    } catch (e) {
       setSummarizeError(e.message || t('Özet üretilemedi, lütfen tekrar dene.'))
     } finally {
       setSummarizing(false)
@@ -333,7 +333,7 @@ export default function ReadingPage() {
         throw new Error(data?.error || `Beklenmeyen yanıt (status ${res.status})`)
       }
       setQuestions(data.questions)
-    } catch (e: any) {
+    } catch (e) {
       console.error('[reading] Dikkat sorusu alınamadı:', e?.message || e)
       if (retryLeft > 0) {
         questionRequestInFlight.current = false

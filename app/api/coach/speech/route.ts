@@ -4,7 +4,7 @@ import { isPaidCoachPlan } from '@/lib/coach-access'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
-const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!) as any
+const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 // 23 Eylül 2026 (16. güncelleme) — Deniz'in bildirdiği hata: "ikonları da
 // seslendiriyor, yapmasın." coach_messages.content, sohbet balonunda
@@ -40,7 +40,7 @@ function sanitizeForSpeech(raw: string): string {
 export async function POST(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
   if (!token) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
-  const auth = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { global: { headers: { Authorization: `Bearer ${token}` } } }) as any
+  const auth = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { global: { headers: { Authorization: `Bearer ${token}` } } })
   const { data: { user } } = await auth.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   const { data: profile } = await admin.from('profiles').select('plan').eq('id', user.id).maybeSingle()

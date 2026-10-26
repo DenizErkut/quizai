@@ -16,7 +16,7 @@ function authedUser(token: string) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { global: { headers: { Authorization: `Bearer ${token}` } } }
-  ) as any
+  )
   return supabase.auth.getUser()
 }
 
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   if (!identity) return NextResponse.json({ error: 'Kimlik bulunamadı.' }, { status: 404 })
 
   const body = await req.json().catch(() => ({}))
-  const types: string[] = Array.isArray(body?.types) ? body.types.filter((t: any) => typeof t === 'string') : []
+  const types: string[] = Array.isArray(body?.types) ? body.types.filter((t) => typeof t === 'string') : []
   if (types.length === 0) return NextResponse.json({ error: 'types (dizi) gerekli.' }, { status: 400 })
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'

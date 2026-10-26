@@ -15,7 +15,7 @@ function formatBytes(bytes: number) {
 }
 
 // Hata kodlarına göre kullanıcı dostu mesaj
-function friendlyError(err: any, t: (text: string, params?: Record<string, string | number>) => string): { title: string; detail: string; action?: { label: string; href: string } } {
+function friendlyError(err, t: (text: string, params?: Record<string, string | number>) => string): { title: string; detail: string; action?: { label: string; href: string } } {
   const code = err?.error || ''
   const msg = err?.message || err?.detail || ''
 
@@ -70,7 +70,7 @@ export default function PdfToolsPage() {
   } | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   function handleFile(f: File) {
     if (!f.name.toLowerCase().endsWith('.pdf')) {
@@ -156,7 +156,7 @@ export default function PdfToolsPage() {
         originalSize,
         compressedSize,
       })
-    } catch (e: any) {
+    } catch (e) {
       const isNetwork = e?.message?.includes('fetch') || e?.message?.includes('network') || e?.name === 'TypeError'
       setResult({
         success: false,

@@ -19,7 +19,7 @@ export default function InstitutionLoginPage() {
   const [resetEmail, setResetEmail] = useState('')
   const [resetSent, setResetSent] = useState(false)
   const [resetLoading, setResetLoading] = useState(false)
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   async function handleOAuth() {
     setOauthLoading(true)

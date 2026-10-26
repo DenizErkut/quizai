@@ -22,6 +22,7 @@ export default function SiteFooter() {
     { href: '/for-parents', label: 'Veliler İçin' },
     { href: '/for-teachers', label: 'Öğretmenler İçin' },
     { href: '/methodology', label: 'Metodoloji' },
+    { href: '/kaynaklar', label: 'Kaynaklar' },
     { href: '/faq', label: 'Sık Sorulan Sorular' },
     { href: '/ozel-kocluk', label: 'Özel Koçluk' },
     { href: '/pricing', label: 'Planlar' },

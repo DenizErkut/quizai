@@ -61,7 +61,7 @@ export default function ParentLoginPage() {
     }
 
     // Profilleri çek (grade/avatar Supabase'den, isim TR-PG'den)
-    const childIds = links.map((l: any) => l.child_id)
+    const childIds = links.map((l) => l.child_id)
     const profileMap: Record<string, any> = {}
     const [identities] = await Promise.all([
       resolveIdentities(supabase, childIds),
@@ -71,7 +71,7 @@ export default function ParentLoginPage() {
       })),
     ])
 
-    const childrenData = links.map((l: any) => ({
+    const childrenData = links.map((l) => ({
       child_id: l.child_id,
       nickname: l.nickname || identities[l.child_id]?.full_name || 'Cocuk',
       name: identities[l.child_id]?.full_name || 'Isimsiz',

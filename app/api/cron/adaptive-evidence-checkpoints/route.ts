@@ -8,7 +8,7 @@ function average(values: number[]) {
   return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length * 100) / 100 : null
 }
 
-async function measure(evaluation: any, checkpoint: 'day1' | 'day7') {
+async function measure(evaluation, checkpoint: 'day1' | 'day7') {
   const [{ data: mastery }, { data: sessions }] = await Promise.all([
     db.from('student_mastery').select('mastery_score,retention_score').eq('student_id', evaluation.student_id).gt('last_mastery_update', evaluation.observation_started_at).limit(100),
     // questions: misconception_catalog crossing için (bkz. measure()'ın altındaki
@@ -19,7 +19,7 @@ async function measure(evaluation: any, checkpoint: 'day1' | 'day7') {
   const completed = (sessions ?? []).filter(row => row.completed)
   if (checkpoint === 'day1' && completed.length < 1) return { skipped: 'not_enough_tests' }
   if (checkpoint === 'day7' && completed.length < 3) return { skipped: 'not_enough_tests' }
-  const durations = completed.map(row => Array.isArray(row.answers) ? row.answers.reduce((sum: number, answer: any) => sum + Math.max(0, Number(answer?.timeMs || 0)), 0) / 1000 : 0).filter(seconds => seconds > 0)
+  const durations = completed.map(row => Array.isArray(row.answers) ? row.answers.reduce((sum: number, answer) => sum + Math.max(0, Number(answer?.timeMs || 0)), 0) / 1000 : 0).filter(seconds => seconds > 0)
   const values = {
     mastery: average((mastery ?? []).map(row => Number(row.mastery_score)).filter(Number.isFinite)),
     retention: average((mastery ?? []).map(row => Number(row.retention_score)).filter(Number.isFinite)),
@@ -42,7 +42,7 @@ async function measure(evaluation: any, checkpoint: 'day1' | 'day7') {
       const { data: resolvedRows } = await db.from('student_misconceptions').select('status').eq('student_id', evaluation.student_id).in('misconception_id', baselineIds).eq('status', 'resolved')
       update.day7_misconceptions_resolved = (resolvedRows ?? []).length
     }
-    update.day7_misconception_interventions = completed.filter(row => Array.isArray(row.questions) && row.questions.some((q: any) => q?.adaptiveFocus === 'misconception')).length
+    update.day7_misconception_interventions = completed.filter(row => Array.isArray(row.questions) && row.questions.some((q) => q?.adaptiveFocus === 'misconception')).length
   }
   const { error } = await db.from('adaptive_learning_evaluations').update(update).eq('id', evaluation.id)
   return error ? { error: error.message } : { measured: true }

@@ -8,6 +8,8 @@ import {
   findContentStart,
 } from '@/lib/content-filters'
 import { isSameGradeSource } from '@/lib/meb-source-scope'
+import { filterRowsByUserScope, rowScope, userScopeOrDefault } from '@/lib/location/resource-scope'
+import { scopeApplies } from '@/lib/location/curriculum-scope'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -55,6 +57,10 @@ export async function POST(req: NextRequest) {
   try {
     const { topic, grade, subject, unit, level, limit = 4 } = await req.json()
 
+    // Kaynaklar konuma göre ayrılır: yalnızca kullanıcının ülke/eyalet/şehrine uyanlar kullanılır (konum yoksa Türkiye).
+    const { data: viewer } = await adminDb.from('profiles').select('country,state,city').eq('id', user.id).maybeSingle()
+    const viewerScope = userScopeOrDefault(viewer)
+
     // Embedding üret
     const embedding = await embedQuery(topic)
 
@@ -73,11 +79,12 @@ export async function POST(req: NextRequest) {
       if (chunks?.length) {
         // Semantic search bazen ön sayfa chunk'larını da (embedding'i
         // yanlışlıkla konuya yakın çıkabiliyor) döndürebiliyor — filtrele.
-        const cleanChunks = chunks.filter((c: any) => isSameGradeSource(grade, c.grade)
+        // RPC kaynağın konumunu döndürmez; eski/konumsuz parçalar Türkiye kaynağı sayılır.
+        const cleanChunks = chunks.filter((c) => scopeApplies(rowScope(c), viewerScope) && isSameGradeSource(grade, c.grade)
           && (!subject || !c.subject || normalizeTR(c.subject) === normalizeTR(subject))
           && !isNonContent(c.content || ''))
         if (cleanChunks.length > 0) {
-          context = cleanChunks.map((c: any, i: number) =>
+          context = cleanChunks.map((c, i: number) =>
             `[MEB Kaynak ${i + 1} - ${c.subject}/${c.unit}]\n${c.content}`
           ).join('\n\n---\n\n')
           console.log(`[meb-search] semantic: ${cleanChunks.length}/${chunks.length} chunks found for "${topic}" (${chunks.length - cleanChunks.length} ön sayfa olarak elendi)`)
@@ -87,11 +94,12 @@ export async function POST(req: NextRequest) {
 
     // meb_resources.raw_text'ten direkt ara (chunk'sız — disk IO tasarrufu)
     if (!context) {
-      const selectFields = 'title, subject, unit, grade, raw_text, health_flag'
+      const selectFields = 'title, subject, unit, grade, raw_text, health_flag, country, state, city'
       let exactQuery = adminDb.from('meb_resources').select(selectFields).limit(50)
       if (subject) exactQuery = exactQuery.ilike('subject', `%${subject}%`)
       if (unit) exactQuery = exactQuery.ilike('unit', `%${unit}%`)
-      const { data: exactResources } = await exactQuery
+      const { data: exactResourcesRaw } = await exactQuery
+      const exactResources = filterRowsByUserScope(exactResourcesRaw || [], viewer, r => r)
 
       // Kazanım kataloğu kanonik başlığı (örn. "Fizik Bilimi Ve Kariyer
       // Keşfi") kullanırken kaynak belgesi "1. Ünite: ..." taşıyabilir.
@@ -104,7 +112,7 @@ export async function POST(req: NextRequest) {
           .select(selectFields)
           .ilike('subject', `%${subject}%`)
           .limit(200)
-        allResources = subjectResources || []
+        allResources = filterRowsByUserScope(subjectResources || [], viewer, r => r)
       }
 
       if (allResources?.length) {
@@ -118,7 +126,7 @@ export async function POST(req: NextRequest) {
         // Never widen to another grade. Missing/unknown request grades or no
         // exact same-grade resource means this source path contributes nothing.
         const gradeFiltered = grade
-          ? allResources.filter((r: any) => isSameGradeSource(grade, r.grade)
+          ? allResources.filter((r) => isSameGradeSource(grade, r.grade)
             && (!subject || !r.subject || normalizeTR(r.subject) === normalizeTR(subject)))
           : []
 
@@ -131,16 +139,16 @@ export async function POST(req: NextRequest) {
         // olan kaynaklari, gercek anlatisal/orneklerle dolu icerik
         // varsa ELE. Yoksa (tek secenek buysa) yine kullan.
         // (isKazanimListesi artık lib/content-filters.ts'ten import ediliyor.)
-        const healthy = gradeFiltered.filter((r: any) => !r.health_flag)
+        const healthy = gradeFiltered.filter((r) => !r.health_flag)
         const healthyPool = healthy.length > 0 ? healthy : gradeFiltered
-        const narrative = healthyPool.filter((r: any) => !isKazanimListesi(r.raw_text || ''))
+        const narrative = healthyPool.filter((r) => !isKazanimListesi(r.raw_text || ''))
         const pool = narrative.length > 0 ? narrative : healthyPool
 
         // En zengin (en uzun) icerigi one al - daha cok ornek/hikaye/haber
         // demek, sorulari cesitlendirmek icin daha fazla malzeme demek
         const topicKey = normalizeTR(unit || topic)
         const resources = pool
-          .sort((a: any, b: any) => {
+          .sort((a, b) => {
             const aHaystack = normalizeTR(`${a.unit || ''} ${a.raw_text || ''}`)
             const bHaystack = normalizeTR(`${b.unit || ''} ${b.raw_text || ''}`)
             const aRelevant = topicKey && aHaystack.includes(topicKey) ? 1 : 0
@@ -149,7 +157,7 @@ export async function POST(req: NextRequest) {
           })
           .slice(0, 3)
 
-        context = resources.map((r: any, i: number) => {
+        context = resources.map((r, i: number) => {
           const raw = r.raw_text || ''
           // Dosyanın en başından (yazar listesi, telif, İçindekiler vb.
           // ön sayfalardan) değil, gerçek konu anlatımının başladığı
@@ -165,7 +173,7 @@ export async function POST(req: NextRequest) {
     if (subject || topic) {
       let examQ = adminDb
         .from('exam_chunks')
-        .select('content, subject, exam_type, year, grade')
+        .select('content, subject, exam_type, year, grade, exam_resources!inner(country, state, city)')
         .limit(12) // Madde 4: filtreden sonra 3'e ineceği için fazladan çek
 
       if (subject) examQ = examQ.ilike('subject', `%${subject}%`)
@@ -188,7 +196,8 @@ export async function POST(req: NextRequest) {
         // yorum. isNonContent/isKazanimListesi (anahtar kelime/yapısal
         // desenli, daha hedefli) olduğu gibi kalıyor.
         const examChunks = examChunksRaw
-          .filter((c: any) => {
+          .filter((c) => {
+            if (!scopeApplies(rowScope(Array.isArray(c.exam_resources) ? c.exam_resources[0] : c.exam_resources), viewerScope)) return false
             if (!isSameGradeSource(grade, c.grade)) return false
             const content = c.content || ''
             return !isNonContent(content) && !isKazanimListesi(content)
@@ -196,7 +205,7 @@ export async function POST(req: NextRequest) {
           .slice(0, 3)
 
         if (examChunks.length > 0) {
-          const examContext = examChunks.map((c: any, i: number) =>
+          const examContext = examChunks.map((c, i: number) =>
             `[Sınav Sorusu ${i + 1} - ${c.subject || ''} ${c.exam_type || ''} ${c.year || ''}]\n${c.content}`
           ).join('\n\n---\n\n')
           context = context ? context + '\n\n' + examContext : examContext
@@ -206,7 +215,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ context, found: context.length > 0 })
-  } catch (e: any) {
+  } catch (e) {
     console.error('[meb-search] error:', e.message)
     return NextResponse.json({ context: '', found: false })
   }

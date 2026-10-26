@@ -46,12 +46,12 @@ export default function StudentAssignmentsPage() {
       .select('*, assignments(title, topic)')
       .eq('student_id', user.id)
 
-    const completedIds = new Set((comp || []).map((c: any) => c.assignment_id))
+    const completedIds = new Set((comp || []).map((c) => c.assignment_id))
     const classNames = new Map(classes.map(classroom => [classroom.id, classroom.name]))
     const active = (asgn || []).map(assignment => ({
       ...assignment,
       classrooms: { name: classNames.get(assignment.classroom_id) || 'Sınıf' },
-    })).filter((a: any) => !completedIds.has(a.id))
+    })).filter((a) => !completedIds.has(a.id))
     const completed = (comp || [])
 
     setAssignments(active)
@@ -76,7 +76,7 @@ export default function StudentAssignmentsPage() {
         <div style={{ marginBottom: '1.5rem' }}>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)' }}>{t('📝 Ödevlerim')}</h1>
           <p style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '4px' }}>
-            {myClasses.length > 0 ? myClasses.map((c: any) => c?.name).filter(Boolean).join(', ') : t('Henüz bir sınıfa katılmadın')}
+            {myClasses.length > 0 ? myClasses.map((c) => c?.name).filter(Boolean).join(', ') : t('Henüz bir sınıfa katılmadın')}
           </p>
         </div>
 
@@ -114,7 +114,7 @@ export default function StudentAssignmentsPage() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {assignments.map((a: any) => (
+              {assignments.map((a) => (
                 <div key={a.id} className="card" style={{ borderLeft: `4px solid ${isOverdue(a.due_date) ? 'var(--red)' : 'var(--accent)'}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                     <div style={{ flex: 1 }}>
@@ -154,7 +154,7 @@ export default function StudentAssignmentsPage() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {completions.map((c: any) => (
+              {completions.map((c) => (
                 <div key={c.id} className="card" style={{ borderLeft: '4px solid var(--green)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary)' }}>{c.assignments?.title || t('Ödev')}</div>

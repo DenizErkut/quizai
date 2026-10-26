@@ -42,10 +42,10 @@ export async function buildInstitutionContext(userId: string): Promise<Instituti
 
   if (!members?.length) return { institutionId: instUser.institution_id, roster: [] }
 
-  const userIds = members.map((m: any) => m.user_id)
+  const userIds = members.map((m) => m.user_id)
   const identities = await getIdentitiesBySupabaseIds(userIds)
   const { data: profiles } = await supabaseAdmin.from('profiles').select('id, class_number, grade').in('id', userIds)
-  const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]))
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]))
 
   const roster: ReportStudentBase[] = userIds.map((uid: string) => ({
     id: uid,
@@ -76,10 +76,10 @@ export async function buildTeacherContext(userId: string, classroomId?: string |
   if (!classrooms?.length) return { teacherId: teacher.id, roster: [], classrooms: [] }
 
   // İstemciden gelen classroomId öğretmenin kendi sınıflarından biri olmalı (başka kurumun sınıfı reddedilir).
-  if (classroomId && !classrooms.some((c: any) => c.id === classroomId)) return null
+  if (classroomId && !classrooms.some((c) => c.id === classroomId)) return null
 
-  const classroomMap = new Map(classrooms.map((c: any) => [c.id, c.name]))
-  const classroomIds = classroomId ? [classroomId] : classrooms.map((c: any) => c.id)
+  const classroomMap = new Map(classrooms.map((c) => [c.id, c.name]))
+  const classroomIds = classroomId ? [classroomId] : classrooms.map((c) => c.id)
 
   const { data: members } = await supabaseAdmin
     .from('classroom_students').select('student_id, classroom_id')
@@ -87,12 +87,12 @@ export async function buildTeacherContext(userId: string, classroomId?: string |
 
   if (!members?.length) return { teacherId: teacher.id, roster: [], classrooms }
 
-  const userIds = [...new Set(members.map((m: any) => m.student_id))]
+  const userIds = [...new Set(members.map((m) => m.student_id))]
   const identities = await getIdentitiesBySupabaseIds(userIds)
   const { data: profiles } = await supabaseAdmin.from('profiles').select('id, class_number, grade').in('id', userIds)
-  const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]))
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]))
 
-  const roster: ReportStudentBase[] = members.map((m: any) => ({
+  const roster: ReportStudentBase[] = members.map((m) => ({
     id: m.student_id,
     fullName: identities[m.student_id]?.full_name ?? 'İsimsiz',
     schoolNo: profileMap.get(m.student_id)?.class_number ?? null,
@@ -117,11 +117,11 @@ export async function buildParentContext(userId: string): Promise<ParentContext>
     .from('parent_children').select('child_id, nickname').eq('parent_id', userId)
   if (!links?.length) return { roster: [] }
 
-  const childIds = links.map((l: any) => l.child_id)
-  const nicknameMap = new Map(links.map((l: any) => [l.child_id, l.nickname]))
+  const childIds = links.map((l) => l.child_id)
+  const nicknameMap = new Map(links.map((l) => [l.child_id, l.nickname]))
   const identities = await getIdentitiesBySupabaseIds(childIds)
   const { data: profiles } = await supabaseAdmin.from('profiles').select('id, class_number, grade').in('id', childIds)
-  const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]))
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]))
 
   const roster: ReportStudentBase[] = childIds.map((cid: string) => ({
     id: cid,

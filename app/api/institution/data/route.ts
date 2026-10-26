@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ institution, students: [], analytics: null })
   }
 
-  const userIds = members.map((m: any) => m.user_id)
+  const userIds = members.map((m) => m.user_id)
 
   // İsimler TR-PG'den toplu çekilir (grade/avatar Supabase'de kalır)
   const identities = await getIdentitiesBySupabaseIds(userIds)
@@ -67,11 +67,11 @@ export async function GET(req: NextRequest) {
         .limit(90),
     ])
     const sessions = sessionsRes.data ?? []
-    const avgPct = sessions.length ? Math.round(sessions.reduce((a: number, s: any) => a + s.pct, 0) / sessions.length) : null
+    const avgPct = sessions.length ? Math.round(sessions.reduce((a: number, s) => a + s.pct, 0) / sessions.length) : null
     const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
     const twoWeeksAgo = new Date(); twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
-    const weeklyTests = sessions.filter((s: any) => new Date(s.created_at) > weekAgo).length
-    const prevWeekTests = sessions.filter((s: any) => new Date(s.created_at) > twoWeeksAgo && new Date(s.created_at) <= weekAgo).length
+    const weeklyTests = sessions.filter((s) => new Date(s.created_at) > weekAgo).length
+    const prevWeekTests = sessions.filter((s) => new Date(s.created_at) > twoWeeksAgo && new Date(s.created_at) <= weekAgo).length
 
     // Konu zayıflıkları
     const topicMap: Record<string, { total: number; sumPct: number }> = {}
@@ -109,7 +109,7 @@ export async function GET(req: NextRequest) {
   const days14 = new Date(now); days14.setDate(days14.getDate() - 14)
 
   // Haftalık trend (son 8 hafta)
-  const allSessions = studentData.flatMap(s => s.sessions.map((sess: any) => ({ ...sess, userId: s.id })))
+  const allSessions = studentData.flatMap(s => s.sessions.map((sess) => ({ ...sess, userId: s.id })))
   const weeklyTrend: { week: string; tests: number; avgPct: number }[] = []
   for (let i = 7; i >= 0; i--) {
     const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - i * 7)

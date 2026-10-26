@@ -10,7 +10,7 @@ export default function ArchivePage() {
   const [sessions, setSessions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const supabase = createClient() as any
+  const supabase = createClient()
 
   useEffect(() => {
     async function load() {

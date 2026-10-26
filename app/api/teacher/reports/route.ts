@@ -42,12 +42,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ imports, selectedImportId: importId, students: [], subjectColumns: [], classrooms: [] })
   }
 
-  const classroomMap = new Map(classrooms.map((c: any) => [c.id, c.name]))
+  const classroomMap = new Map(classrooms.map((c) => [c.id, c.name]))
   const requestedClassroomId = req.nextUrl.searchParams.get('classroomId')
-  if (requestedClassroomId && !classrooms.some((c: any) => c.id === requestedClassroomId)) {
+  if (requestedClassroomId && !classrooms.some((c) => c.id === requestedClassroomId)) {
     return NextResponse.json({ error: 'Sınıf erişimi yok.' }, { status: 403 })
   }
-  const classroomIds = requestedClassroomId ? [requestedClassroomId] : classrooms.map((c: any) => c.id)
+  const classroomIds = requestedClassroomId ? [requestedClassroomId] : classrooms.map((c) => c.id)
 
   const { data: members } = await supabaseAdmin
     .from('classroom_students').select('student_id, classroom_id')
@@ -57,12 +57,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ imports, selectedImportId: importId, students: [], subjectColumns: [], classrooms })
   }
 
-  const userIds = [...new Set(members.map((m: any) => m.student_id))]
+  const userIds = [...new Set(members.map((m) => m.student_id))]
   const identities = await getIdentitiesBySupabaseIds(userIds)
   const { data: profiles } = await supabaseAdmin.from('profiles').select('id, class_number, grade').in('id', userIds)
-  const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]))
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]))
 
-  const fullRoster: ReportStudentBase[] = members.map((m: any) => ({
+  const fullRoster: ReportStudentBase[] = members.map((m) => ({
     id: m.student_id,
     fullName: identities[m.student_id]?.full_name ?? 'İsimsiz',
     schoolNo: profileMap.get(m.student_id)?.class_number ?? null,

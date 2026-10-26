@@ -32,7 +32,7 @@ export async function GET() {
   try {
     const result = await reconcileIdentities({ dryRun: true })
     return NextResponse.json(result)
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ error: e?.message || 'Tarama başarısız.' }, { status: 500 })
   }
 }
@@ -45,7 +45,7 @@ export async function POST() {
   try {
     const result = await reconcileIdentities({ dryRun: false })
     return NextResponse.json(result)
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ error: e?.message || 'Düzeltme başarısız.' }, { status: 500 })
   }
 }
