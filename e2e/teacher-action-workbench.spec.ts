@@ -90,7 +90,7 @@ test('English mobile view exposes read failures instead of an empty success stat
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/teacher')
   const panel = page.getByRole('region', { name: 'From insight to action' })
-  await expect(panel.getByText('Evidence and uncertainty')).toBeVisible()
+  await expect(panel.getByRole('heading', { name: 'Evidence and uncertainty', exact: true })).toBeVisible()
   const dismissCookies = page.getByRole('button', { name: 'Reject all', exact: true })
   if (await dismissCookies.isVisible()) await dismissCookies.click()
   await expect(panel.getByRole('combobox')).toHaveValue('pending')
