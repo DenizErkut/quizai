@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
       const yStr = yesterday.toISOString().split('T')[0]
       const last = existingStreak.last_activity_date
 
-      let updateData: any = {}
+      let updateData: unknown = {}
       if (last === today) {
         updateData = { total_points: (existingStreak.total_points || 0) + 5 }
       } else if (last === yStr) {

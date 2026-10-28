@@ -16,8 +16,8 @@ test('insan onaylı yeniden kullanımda sonradan eklenen görsel veya bağlam te
   assert.equal(finalizeContinuousReview({ ...reused,svg:'<svg />' }).objectiveMappingStatus,'review_required')
   assert.equal(finalizeContinuousReview({ ...reused,learningObjectiveRevisionId:'new' }).objectiveMappingStatus,'review_required')
 })
-function question(): Record<string,any> {
-  const q = { q:'40 ve 56 kg meyve eşit kasalara konulacak. En büyük kasa kaç kg?',type:'multiple_choice',opts:['4','8','10','12'],ans:1,exp:'En büyük ortak bölen 8 kg.',difficulty:'normal',learningObjectiveRef:'LO1' } as Record<string,any>
+function question(): Record<string,unknown> {
+  const q = { q:'40 ve 56 kg meyve eşit kasalara konulacak. En büyük kasa kaç kg?',type:'multiple_choice',opts:['4','8','10','12'],ans:1,exp:'En büyük ortak bölen 8 kg.',difficulty:'normal',learningObjectiveRef:'LO1' } as Record<string,unknown>
   q.objectiveProductionReview = createContinuousReview(q,objective,audits())
   return finalizeContinuousReview(applyCanonicalObjectiveMappings([q],[objective]).questions[0])
 }
@@ -62,7 +62,7 @@ test('kanonik yeniden eşleştirme değişmeyen AI ve insan onayını korur',() 
 })
 test('AI onaylı soru doğrudan kullanılabilir; istisna gölge terfisiyle onaylanamaz',async () => {
   let written: any[]=[]
-  const db={ from:()=>({ upsert:async (rows: any[],options:any)=>{ written=rows;assert.equal(options.ignoreDuplicates,true);return { error:null } } }) }
+  const db={ from:()=>({ upsert:async (rows: unknown[],options:any)=>{ written=rows;assert.equal(options.ignoreDuplicates,true);return { error:null } } }) }
   const dimensions={ subject:'Matematik',topic:'Ortak bölen',grade:'6. sınıf',language:'Türkçe',questionType:'mixed',difficulty:'normal' }
   await promoteQuestionsToBank(db,dimensions,[question()],{ engine:'gpt-4.1-mini' })
   assert.equal(written[0].review_status,'approved')

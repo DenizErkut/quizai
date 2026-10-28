@@ -46,6 +46,7 @@ import EducationEvalRunner from '@/components/admin/EducationEvalRunner'
 import ObjectiveMappingReview from '@/components/admin/ObjectiveMappingReview'
 import ObjectiveSourcesBrowser from '@/components/admin/ObjectiveSourcesBrowser'
 import QuestionBankSvgFit from '@/components/admin/QuestionBankSvgFit'
+import WrittenExamManager from '@/components/admin/WrittenExamManager'
 import PilotAccountSetup from '@/components/admin/PilotAccountSetup'
 
 interface User {
@@ -86,7 +87,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'country-sources' | 'objective-sources' | 'question-books' | 'exam-books' | 'question-bank' | 'objective-mapping' | 'education-eval' | 'curriculum' | 'learning-graph' | 'kvkk' | 'adaptive' | 'risk' | 'coaching' | 'coach-usage' | 'unit-economics'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'country-sources' | 'objective-sources' | 'question-books' | 'exam-books' | 'question-bank' | 'written-exam' | 'objective-mapping' | 'education-eval' | 'curriculum' | 'learning-graph' | 'kvkk' | 'adaptive' | 'risk' | 'coaching' | 'coach-usage' | 'unit-economics'>('users')
   const [identityMissing, setIdentityMissing] = useState<number | null>(null)
   const [identityScanning, setIdentityScanning] = useState(false)
   const [identityFixing, setIdentityFixing] = useState(false)
@@ -820,6 +821,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             { key: 'question-books', label: '📚 Soru Kitapçıkları' },
             { key: 'exam-books', label: '🎯 Sınav Kitapçıkları' },
             { key: 'question-bank', label: '📝 Soru Havuzu' },
+            { key: 'written-exam', label: '✍️ Yazılıya Hazırlanıyorum' },
             { key: 'objective-mapping', label: '🎯 Kazanım Eşleştirme' },
             { key: 'education-eval', label: '🧭 Education Eval' },
             { key: 'curriculum', label: '📋 Müfredat Yönetimi' },
@@ -1848,6 +1850,14 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         </div>
       )}
 
+      {tab === 'written-exam' && (
+        <div className="anim-up">
+          <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)', marginBottom: '1rem' }}>✍️ Yazılıya Hazırlanıyorum</h2>
+          <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1rem' }}>Sınıf, ders, dönem ve kaçıncı yazılı olduğunu seçip hazır soruları yükleyin. Öğrenciler bu soruları sırayla çözer; cevapları yapay zeka rubriğe göre puanlar. Yapay zeka soru üretmez.</p>
+          <WrittenExamManager />
+        </div>
+      )}
+
       {tab === 'kvkk' && (
         <div className="anim-up">
           <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)', marginBottom: '1rem' }}>🔐 KVKK Talep İşleme</h2>
@@ -2151,7 +2161,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
 
                 {Object.keys(healthScan.bySubject || {}).length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
-                    {Object.entries(healthScan.bySubject).sort((a: any, b: any) => b[1] - a[1]).map(([subj, cnt]: any) => (
+                    {Object.entries(healthScan.bySubject).sort((a: unknown, b: unknown) => b[1] - a[1]).map(([subj, cnt]: any) => (
                       <span key={subj} style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '99px', background: 'rgba(217,119,6,0.1)', color: '#d97706', fontWeight: 600 }}>
                         {subj}: {cnt}
                       </span>

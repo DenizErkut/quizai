@@ -16,8 +16,8 @@ type Session = {
   completed: boolean
   created_at: string
   question_type?: string
-  questions?: any[]
-  answers?: any[]
+  questions?: unknown[]
+  answers?: unknown[]
 }
 
 const QUESTION_TYPE_LABELS: Record<string, string> = {

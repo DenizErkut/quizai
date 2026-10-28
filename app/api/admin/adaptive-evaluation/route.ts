@@ -21,7 +21,7 @@ function computeCohortReport(rows: any[]) {
     const assigned = rows.filter(row => row.cohort === cohort)
     const completedRows = assigned.filter(row => row.day7_measured_at && row.day7_mastery != null)
     const day1 = assigned.filter(row => row.day1_measured_at)
-    const avgFrom = (source: any[], key: string) => { const values = source.map(row => Number(row[key])).filter(Number.isFinite); return values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length * 100) / 100 : null }
+    const avgFrom = (source: unknown[], key: string) => { const values = source.map(row => Number(row[key])).filter(Number.isFinite); return values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length * 100) / 100 : null }
     const gain = (followup: string, baseline: string) => avgFrom(completedRows, followup) !== null && avgFrom(completedRows, baseline) !== null ? Math.round((avgFrom(completedRows, followup)! - avgFrom(completedRows, baseline)!) * 100) / 100 : null
     return { cohort, assigned_sample: assigned.length, day1_sample: day1.length, completed_sample: completedRows.length, mastery_gain: gain('day7_mastery', 'baseline_mastery'), retention_gain: gain('day7_retention', 'baseline_retention'), pct_gain: gain('day7_pct', 'baseline_pct'), day1_retention: avgFrom(day1, 'day1_retention'), day7_retention: avgFrom(completedRows, 'day7_retention'), completion_rate: avgFrom(completedRows, 'day7_completion_rate'), avg_duration_seconds: avgFrom(completedRows, 'day7_avg_duration_seconds'), avg_test_count: avgFrom(completedRows, 'day7_test_count') }
   })
@@ -72,7 +72,7 @@ function computeCohortReport(rows: any[]) {
 // ve her değer için ayrı bir cohort raporu üretir. Segment alanı NULL olan
 // satırlar (migration öncesi eski kayıtlar) segmentli kırılıma girmez —
 // yine de üst-seviye (segmentsiz) rapora dahil kalırlar.
-function computeSegmentBreakdown(rows: any[], field: string) {
+function computeSegmentBreakdown(rows: unknown[], field: string) {
   const withSegment = rows.filter(row => row[field] != null)
   const values = [...new Set(withSegment.map(row => row[field]))].sort()
   return values.map(value => ({ segment_value: value, ...computeCohortReport(withSegment.filter(row => row[field] === value)) }))

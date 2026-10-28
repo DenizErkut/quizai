@@ -98,7 +98,7 @@ async function fetchQuizTopup(params: {
   existingTexts: string[]
   accessToken?: string
   adaptiveCandidateBatch?: boolean
-}): Promise<any[]> {
+}): Promise<unknown[]> {
   try {
     const res = await fetch('/api/generate-quiz', {
       method: 'POST',

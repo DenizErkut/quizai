@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
 
   const grade = profile?.grade || ''
   const gradeStr = gradeLabel(grade)
-  const links: Record<string, any> = {}
+  const links: Record<string, unknown> = {}
 
   for (const topic of (topics || []).slice(0, 5)) {
     if (!apiKey) {

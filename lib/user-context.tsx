@@ -80,7 +80,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       const role = profile?.role || 'student'
       setData({
         user,
-        profile: profile ? { ...profile, name: fullName } : (fullName ? { name: fullName } as any : null),
+        profile: profile ? { ...profile, name: fullName } : (fullName ? { name: fullName } as unknown : null),
         streak: streak?.current_streak || 0,
         unreadCount: unread || 0,
         isTeacher: !!teacher,

@@ -32,7 +32,7 @@ const WORDS_PER_CHUNK = 120      // ~ 45-60 saniyelik konuşma parçası
 const BUCKET = 'reading-uploads'
 
 // Gemini API helper (extract-file/route.ts ile aynı desen — taranmış PDF'ler için)
-async function callGemini(model: string, parts: any[]): Promise<string> {
+async function callGemini(model: string, parts: unknown[]): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY!
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
   const res = await fetch(url, {

@@ -250,7 +250,7 @@ export default function TeacherAssignPage() {
 
   // One card per batch of open-ended questions (a batch shares batch_id).
   const oeGroups: any[][] = []
-  const oeByBatch = new Map<string, any[]>()
+  const oeByBatch = new Map<string, unknown[]>()
   for (const a of openEndedAssignments) {
     if (a.batch_id) {
       const group = oeByBatch.get(a.batch_id)

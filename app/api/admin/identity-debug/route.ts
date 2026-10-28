@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
     identityError = e?.message || 'TR-PG sorgu hatası'
   }
 
-  let resolveMapResult: Record<string, any> = {}
+  let resolveMapResult: Record<string, unknown> = {}
   let resolveError: string | null = null
   try {
     resolveMapResult = await getIdentitiesBySupabaseIds([targetId])

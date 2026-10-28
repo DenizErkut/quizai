@@ -32,7 +32,7 @@ export default function LiveContent() {
   // bu durumu ayrı bir "bağlantı sorunu" ekranına ayırıyor.
   const [answerError, setAnswerError] = useState(false)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
-  const channelRef = useRef<any>(null)
+  const channelRef = useRef<unknown>(null)
   // Refs — polling/realtime callback'lerinde güncel değerlere erişmek için
   const liveQuizRef = useRef<any>(null)
   const screenRef = useRef<string>('join')
