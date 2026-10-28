@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { splitTextBlocks } from '@/lib/written-exam'
+import { compressImage } from '@/lib/image-compress'
 import { useT } from '@/lib/i18n/I18nProvider'
 
 type SetItem = { id: string; title: string; subject: string; term: number; examNumber: number; totalPoints: number; questionCount: number
@@ -41,13 +42,18 @@ export default function YaziliPage() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState('')
 
-  const [step, setStep] = useState<'list' | 'question' | 'feedback' | 'result'>('list')
+  const [step, setStep] = useState<'list' | 'question' | 'feedback' | 'result' | 'paper'>('list')
   const [attemptId, setAttemptId] = useState('')
   const [setTitle, setSetTitle] = useState('')
   const [rows, setRows] = useState<Row[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
   const [current, setCurrent] = useState<Current | null>(null)
   const [answer, setAnswer] = useState('')
+  const [paperSet, setPaperSet] = useState<SetItem | null>(null)
+  const [paperFiles, setPaperFiles] = useState<File[]>([])
+  const [paperAnswers, setPaperAnswers] = useState<Array<{ questionId: string; position: number; maxPoints: number; text: string; legible: boolean; note: string }> | null>(null)
+  const [paperInfo, setPaperInfo] = useState<{ expectedCode: string; sheetCode: string | null; codeMatches: boolean | null } | null>(null)
+  const [paperMessage, setPaperMessage] = useState('')
   const [feedback, setFeedback] = useState<{ criteriaResults: CriteriaResult[]; overallFeedback: string; totalEarned: number } | null>(null)
 
   async function call(path: string, init?: RequestInit) {
@@ -91,6 +97,45 @@ export default function YaziliPage() {
       if (data.attempt.status === 'completed') { setStep('result'); return }
       await openQuestion(data.attempt.id, data.questions)
     } catch { setError(t('Bağlantı hatası, tekrar dene.')) }
+    finally { setBusy('') }
+  }
+
+  async function printSet(item: SetItem) {
+    setBusy(`print-${item.id}`); setError('')
+    try {
+      const { ok, data } = await call('/api/student/written-exams', { method: 'POST', body: JSON.stringify({ action: 'sheet', setId: item.id }) })
+      if (!ok) { setError(data.error || t('Yazdırma görünümü açılamadı.')); return }
+      const [{ writtenExamStudentSheetHtml, writtenSheetCode }, { printLearningDocument }] = await Promise.all([import('@/lib/written-exam-print'), import('@/lib/learning-print')])
+      const meta = `${data.gradeNumber}. sınıf · ${data.subject} · ${data.term}. dönem · ${data.examNumber}. yazılı`
+      await printLearningDocument(data.title, meta, writtenExamStudentSheetHtml(data.questions, { code: writtenSheetCode(item.id), meta }))
+    } catch { setError(t('Yazdırma görünümü açılamadı.')) }
+    finally { setBusy('') }
+  }
+
+  function openPaper(item: SetItem) {
+    setPaperSet(item); setPaperFiles([]); setPaperAnswers(null); setPaperInfo(null); setPaperMessage(''); setError(''); setStep('paper')
+  }
+
+  async function readPaper() {
+    if (!paperSet || !paperFiles.length) return
+    setBusy('paper-read'); setPaperMessage(t('Kâğıt okunuyor… (20-60 saniye sürebilir)')); setError('')
+    try {
+      const images = await Promise.all(paperFiles.slice(0, 8).map(compressImage))
+      const { ok, data } = await call('/api/student/written-exams/paper', { method: 'POST', body: JSON.stringify({ action: 'transcribe', setId: paperSet.id, images }) })
+      if (!ok) { setError(data.error || t('Kâğıt okunamadı. Daha net ve düz bir fotoğrafla tekrar dene.')); setPaperMessage(''); return }
+      setPaperAnswers(data.answers); setPaperInfo({ expectedCode: data.expectedCode, sheetCode: data.sheetCode, codeMatches: data.codeMatches }); setPaperMessage('')
+    } catch { setError(t('Bağlantı hatası, tekrar dene.')); setPaperMessage('') }
+    finally { setBusy('') }
+  }
+
+  async function savePaper() {
+    if (!paperSet || !paperAnswers) return
+    setBusy('paper-save'); setPaperMessage(t('Cevapların puanlanıyor… (1-2 dakika sürebilir)')); setError('')
+    try {
+      const { ok, data } = await call('/api/student/written-exams/paper', { method: 'POST', body: JSON.stringify({ action: 'save', setId: paperSet.id, answers: paperAnswers.map(a => ({ questionId: a.questionId, text: a.text })) }) })
+      if (!ok) { setError(data.error || t('Puanlama başarısız.')); setPaperMessage(''); return }
+      setAttemptId(data.attemptId); setSetTitle(paperSet.title); setRows(data.questions); setSummary(data.summary); setPaperMessage(''); setStep('result'); await loadSets()
+    } catch { setError(t('Bağlantı hatası, tekrar dene.')); setPaperMessage('') }
     finally { setBusy('') }
   }
 
@@ -149,6 +194,8 @@ export default function YaziliPage() {
                   <div style={{ fontSize: '12.5px', color: 'var(--text2)' }}>{t('{term}. dönem · {exam}. yazılı', { term: item.term, exam: item.examNumber })} · {t('{n} soru · {p} puan', { n: item.questionCount, p: item.totalPoints })}</div>
                   {item.attempt?.status === 'completed' && <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#0a9e90', marginTop: '3px' }}>{t('Tamamlandı: {earned}/{total} puan', { earned: item.attempt.total_earned ?? 0, total: item.attempt.total_possible ?? item.totalPoints })}</div>}
                 </div>
+                <button className="btn btn-ghost" onClick={() => printSet(item)} disabled={!!busy}>{busy === `print-${item.id}` ? '⏳' : t('🖨️ Tüm soruları yazdır')}</button>
+                <button className="btn btn-ghost" onClick={() => openPaper(item)} disabled={!!busy}>{t('📷 Kâğıttan cevap yükle')}</button>
                 {item.attempt?.status === 'completed' ? (
                   <>
                     <button className="btn btn-ghost" onClick={() => start(item)} disabled={!!busy}>{t('Sonucu gör')}</button>
@@ -159,6 +206,34 @@ export default function YaziliPage() {
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {step === 'paper' && paperSet && (
+          <div className="card" style={{ padding: '1.25rem' }}>
+            <div style={{ fontWeight: 800, marginBottom: '6px' }}>{t('📷 Kâğıttan cevap yükle')} · {paperSet.subject}</div>
+            <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '10px' }}>{t('Yazdırdığın kâğıda elle yazdığın cevapların net, düz fotoğraflarını yükle (en fazla 8). Önce okunan metni kontrol edip düzeltebilir, sonra puanlatabilirsin.')}</p>
+            {!paperAnswers ? (
+              <>
+                <input type="file" accept="image/*" multiple onChange={e => setPaperFiles(Array.from(e.target.files || []))} />
+                <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }} onClick={readPaper} disabled={!paperFiles.length || busy === 'paper-read'}>{busy === 'paper-read' ? t('Okunuyor…') : t('Kâğıdı oku')}</button>
+              </>
+            ) : (
+              <>
+                {paperInfo?.codeMatches === false && <p role="alert" style={{ color: '#b45309', fontSize: '13px' }}>{t('Kâğıttaki kod ({found}) bu yazılıyla eşleşmiyor ({expected}). Doğru kâğıdı yüklediğinden emin ol.', { found: paperInfo.sheetCode || '', expected: paperInfo.expectedCode })}</p>}
+                <p style={{ fontSize: '13px', color: 'var(--text2)' }}>{t('Okunan cevapları kontrol et; yanlış okunanı düzelt.')}</p>
+                {paperAnswers.map((a, index) => (
+                  <div key={a.questionId} style={{ marginTop: '10px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700 }}>{t('Soru {n}', { n: a.position })} ({a.maxPoints}){!a.legible || a.note ? ` · ⚠️ ${a.note || t('okunması zor')}` : ''}</div>
+                    <textarea className="input" rows={4} value={a.text} style={{ width: '100%', borderRadius: '8px' }} placeholder={t('Kâğıtta bu soru için cevap yok')}
+                      onChange={e => setPaperAnswers(list => list ? list.map((x, i) => i === index ? { ...x, text: e.target.value } : x) : list)} />
+                  </div>
+                ))}
+                <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }} onClick={savePaper} disabled={busy === 'paper-save'}>{busy === 'paper-save' ? t('Puanlanıyor…') : t('Cevapları puanla')}</button>
+              </>
+            )}
+            {paperMessage && <p style={{ fontSize: '13px', color: 'var(--text2)', marginTop: '8px' }}>{paperMessage}</p>}
+            <button className="btn btn-ghost" style={{ marginTop: '10px' }} onClick={backToList} disabled={!!busy}>{t('Listeye dön')}</button>
           </div>
         )}
 
@@ -203,6 +278,12 @@ export default function YaziliPage() {
               <div key={row.questionId} className="card" style={{ padding: '0.9rem 1.1rem', marginBottom: '8px' }}>
                 <div style={{ fontWeight: 700, fontSize: '14px' }}>{t('Soru {n}', { n: row.position })}{row.title ? ` · ${row.title}` : ''} — {row.earned ?? 0}/{row.maxPoints}</div>
                 {row.overallFeedback && <div style={{ fontSize: '12.5px', color: 'var(--text2)', marginTop: '4px' }}><MathText text={row.overallFeedback} /></div>}
+                {row.criteriaResults && row.criteriaResults.length > 0 && (
+                  <details style={{ marginTop: '6px', fontSize: '12.5px' }}>
+                    <summary style={{ cursor: 'pointer', fontWeight: 700 }}>{t('Ölçüt ölçüt puanlar')}</summary>
+                    {row.criteriaResults.map((c, i) => <div key={i} style={{ marginTop: '4px' }}><strong><MathText text={c.criterion} /> — {c.earnedPoints}/{c.maxPoints}</strong><div style={{ color: 'var(--text2)' }}><MathText text={c.feedback} /></div></div>)}
+                  </details>
+                )}
               </div>
             ))}
             <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }} onClick={backToList}>{t('Listeye dön')}</button>

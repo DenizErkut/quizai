@@ -110,6 +110,24 @@ export default function WrittenExamManager() {
     await loadSets()
   }
 
+  async function printSet(set: SetRow, withKey: boolean) {
+    setBusy(true); setMessage('')
+    try {
+      const response = await fetch(`/api/admin/written-exam?id=${set.id}`, { headers: await authHeader(), cache: 'no-store' })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Set açılamadı.')
+      const items = (data.questions as Array<Record<string, unknown>>).map(q => ({
+        position: Number(q.position), title: String(q.title || ''), scenario: String(q.scenario || ''), question: String(q.question || ''),
+        maxPoints: Number(q.max_points) || 0, rubric: (q.rubric as Criterion[]) || [], answerKey: String(q.answer_key || ''),
+      }))
+      const [{ writtenExamStudentSheetHtml, writtenExamTeacherKeyHtml, writtenSheetCode }, { printLearningDocument }] = await Promise.all([import('@/lib/written-exam-print'), import('@/lib/learning-print')])
+      const code = writtenSheetCode(set.id)
+      const meta = `${set.grade_number}. sınıf · ${set.subject} · ${set.term}. dönem · ${set.exam_number}. yazılı`
+      await printLearningDocument(set.title, meta, writtenExamStudentSheetHtml(items, { code, meta }) + (withKey ? writtenExamTeacherKeyHtml(items, { code }) : ''))
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Yazdırma görünümü açılamadı.') }
+    finally { setBusy(false) }
+  }
+
   async function remove(set: SetRow) {
     if (!window.confirm(`"${set.title}" ve tüm öğrenci denemeleri silinsin mi?`)) return
     const response = await fetch('/api/admin/written-exam', { method: 'DELETE', headers: { ...(await authHeader()), 'Content-Type': 'application/json' }, body: JSON.stringify({ id: set.id }) })
@@ -136,6 +154,8 @@ export default function WrittenExamManager() {
                 </div>
                 <span style={{ fontSize: 12, fontWeight: 700, color: set.status === 'published' ? '#0a9e90' : 'var(--text2)' }}>{set.status === 'published' ? 'Yayında' : 'Taslak'}</span>
                 <button className="btn btn-ghost" onClick={() => openSet(set.id)} disabled={busy}>Düzenle</button>
+                <button className="btn btn-ghost" onClick={() => printSet(set, false)} disabled={busy}>🖨️ Yazdır</button>
+                <button className="btn btn-ghost" onClick={() => printSet(set, true)} disabled={busy}>🖨️ Anahtarlı</button>
                 <button className="btn btn-ghost" onClick={() => toggle(set)}>{set.status === 'published' ? 'Taslağa al' : 'Yayınla'}</button>
                 <button className="btn btn-ghost" onClick={() => remove(set)}>Sil</button>
               </div>

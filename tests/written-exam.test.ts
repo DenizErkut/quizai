@@ -55,3 +55,15 @@ test('splitTextBlocks leaves a single pipe line and plain text untouched', () =>
   assert.deepEqual(splitTextBlocks('a | b'), [{ type: 'text', text: 'a | b' }])
   assert.deepEqual(splitTextBlocks('düz metin'), [{ type: 'text', text: 'düz metin' }])
 })
+
+import { answerLinesFor, richPrintHtml, writtenExamStudentSheetHtml, writtenSheetCode } from '../lib/written-exam-print'
+
+test('print helpers: table html, lines and code', () => {
+  assert.match(richPrintHtml('Kart | Gezegen\nK | Venüs'), /<table class="wy-table">/)
+  assert.equal(answerLinesFor(1), 5)
+  assert.equal(answerLinesFor(100), 14)
+  assert.equal(writtenSheetCode('1234abcd-0000-4000-8000-000000000000'), '1234ABCD')
+  const html = writtenExamStudentSheetHtml([{ position: 1, title: '', scenario: '', question: 'Soru metni', maxPoints: 8 }], { code: 'ABCD1234', meta: '6. sınıf Fen' })
+  assert.match(html, /Soru 1/)
+  assert.match(html, /ABCD1234/)
+})
