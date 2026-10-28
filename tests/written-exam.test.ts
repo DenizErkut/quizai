@@ -41,3 +41,17 @@ test('summarizeResults treats unanswered as zero and caps at max', () => {
   const s = summarizeResults([{ questionId: 'a', maxPoints: 8, earned: 6 }, { questionId: 'b', maxPoints: 8, earned: null }, { questionId: 'c', maxPoints: 4, earned: 9 }])
   assert.deepEqual(s, { totalEarned: 10, totalPossible: 20, answered: 2, percent: 50 })
 })
+
+import { splitTextBlocks } from '../lib/written-exam'
+
+test('splitTextBlocks turns pipe-separated lines into a table', () => {
+  const blocks = splitTextBlocks('Giriş cümlesi.\nKart | Gezegen | Halka\nK | Venüs | Yok\nL | Satürn | Var\nSon cümle.')
+  assert.equal(blocks.length, 3)
+  assert.deepEqual(blocks[1], { type: 'table', rows: [['Kart', 'Gezegen', 'Halka'], ['K', 'Venüs', 'Yok'], ['L', 'Satürn', 'Var']] })
+  assert.deepEqual(blocks[0], { type: 'text', text: 'Giriş cümlesi.' })
+})
+
+test('splitTextBlocks leaves a single pipe line and plain text untouched', () => {
+  assert.deepEqual(splitTextBlocks('a | b'), [{ type: 'text', text: 'a | b' }])
+  assert.deepEqual(splitTextBlocks('düz metin'), [{ type: 'text', text: 'düz metin' }])
+})

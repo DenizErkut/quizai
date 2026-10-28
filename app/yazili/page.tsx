@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { splitTextBlocks } from '@/lib/written-exam'
 import { useT } from '@/lib/i18n/I18nProvider'
 
 type SetItem = { id: string; title: string; subject: string; term: number; examNumber: number; totalPoints: number; questionCount: number
@@ -13,6 +14,22 @@ type Row = { questionId: string; position: number; title: string; maxPoints: num
   criteriaResults?: CriteriaResult[]; overallFeedback?: string; studentAnswer?: string }
 type Summary = { totalEarned: number; totalPossible: number; answered: number; percent: number }
 type Current = { sessionId: string; position: number; title: string; scenario: string; question: string; maxPoints: number; questionId: string }
+
+// Satır sonlarını koruyan metin; "A | B | C" biçimli ardışık satırlar tablo olarak gösterilir.
+function RichText({ text, style }: { text: string; style?: React.CSSProperties }) {
+  return (
+    <>
+      {splitTextBlocks(text).map((block, index) => block.type === 'table' ? (
+        <div key={index} style={{ overflowX: 'auto', margin: '8px 0' }}>
+          <table style={{ borderCollapse: 'collapse', fontSize: '13.5px', minWidth: '60%' }}>
+            <thead><tr>{block.rows[0].map((cell, i) => <th key={i} style={{ border: '1px solid var(--border)', padding: '6px 10px', background: 'rgba(124,58,237,0.08)', textAlign: 'left' }}><MathText text={cell} /></th>)}</tr></thead>
+            <tbody>{block.rows.slice(1).map((row, r) => <tr key={r}>{row.map((cell, i) => <td key={i} style={{ border: '1px solid var(--border)', padding: '6px 10px' }}><MathText text={cell} /></td>)}</tr>)}</tbody>
+          </table>
+        </div>
+      ) : <p key={index} style={{ whiteSpace: 'pre-wrap', margin: '0 0 8px', ...style }}><MathText text={block.text} /></p>)}
+    </>
+  )
+}
 
 export default function YaziliPage() {
   const router = useRouter()
@@ -151,12 +168,12 @@ export default function YaziliPage() {
             <div style={{ height: '6px', borderRadius: '6px', background: 'var(--border)', marginBottom: '14px' }}><div style={{ height: '100%', width: `${Math.round((answeredCount / Math.max(1, rows.length)) * 100)}%`, borderRadius: '6px', background: '#7c3aed' }} /></div>
             <div className="card" style={{ padding: '1.25rem' }}>
               {current.title && <div style={{ fontWeight: 800, marginBottom: '8px' }}>{current.title} <span style={{ fontWeight: 600, color: 'var(--text2)', fontSize: '12px' }}>({current.maxPoints})</span></div>}
-              {current.scenario && <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7, whiteSpace: 'pre-wrap', marginBottom: '10px' }}><MathText text={current.scenario} /></p>}
-              <p style={{ fontSize: '15px', fontWeight: 600, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}><MathText text={current.question} /></p>
+              {current.scenario && <RichText text={current.scenario} style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7 }} />}
+              <RichText text={current.question} style={{ fontSize: '15px', fontWeight: 600, lineHeight: 1.6 }} />
             </div>
             {step === 'question' ? (
               <div style={{ marginTop: '12px' }}>
-                <textarea className="input" value={answer} onChange={e => setAnswer(e.target.value)} rows={9} placeholder={t('Cevabını buraya yaz…')} style={{ width: '100%' }} />
+                <textarea className="input" value={answer} onChange={e => setAnswer(e.target.value)} rows={9} placeholder={t('Cevabını buraya yaz…')} style={{ width: '100%', borderRadius: '8px' }} />
                 <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }} onClick={submit} disabled={busy === 'grade'}>{busy === 'grade' ? t('Puanlanıyor…') : t('Cevabı gönder')}</button>
               </div>
             ) : feedback && (
