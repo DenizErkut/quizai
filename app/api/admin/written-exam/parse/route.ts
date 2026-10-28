@@ -33,7 +33,7 @@ GÖREVİN soru ÜRETMEK DEĞİL; dosyadaki soruları, puanları ve cevap anahtar
 Her soru için şunları çıkar:
 - title: sorunun başlığı (ör. "Gözlem kartlarını gruplandırma")
 - objectiveCode: öğrenme çıktısı/kazanım kodu (ör. "FB.6.1.1."); yoksa ""
-- scenario: soruya ait ortak bağlam, tablo veya verilerin metni (öğrencinin soruyu çözmek için okuması gereken kısım). Tabloları satır satır düz metin olarak yaz. Yoksa ""
+- scenario: soruya ait ortak bağlam, tablo veya verilerin metni (öğrencinin soruyu çözmek için okuması gereken kısım). Tabloları her satır ayrı satır olacak biçimde, hücreleri " | " ile ayırarak yaz (ilk satır başlık; ör. "Kart | Gezegen | Halka"). Satırları boş satırla ayırma. Yoksa ""
 - question: alt maddeleriyle (a, b, c...) tam soru metni ve her alt maddenin puanı. scenario'da olan metni tekrar etme.
 - maxPoints: sorunun toplam puanı (tam sayı)
 - rubric: cevap anahtarından türetilmiş ölçütler. Her ölçüt tek bir puanlanabilir beklentidir: {"criterion": "a) kısa ad", "maxPoints": tam sayı, "description": "beklenen doğru yanıt ve puan dağılımı; kabul edilen eş değer yanıtlar"}. Ölçüt puanlarının TOPLAMI maxPoints'e EŞİT olmalı. Anahtarda alt madde puanları varsa onlara uy; "yön ve doğrultu ayrı ölçüt", "tutarlı hata tekrar cezalandırılmaz" gibi değerlendirme notlarını ilgili ölçütün description'ına işle.

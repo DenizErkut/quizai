@@ -111,3 +111,32 @@ export function summarizeResults(items: ItemResult[]): { totalEarned: number; to
   const totalEarned = items.reduce((sum, item) => sum + Math.min(item.maxPoints, Math.max(0, item.earned ?? 0)), 0)
   return { totalEarned, totalPossible, answered: items.filter(item => item.earned !== null).length, percent: totalPossible ? Math.round((totalEarned / totalPossible) * 100) : 0 }
 }
+
+export type TextBlock = { type: 'text'; text: string } | { type: 'table'; rows: string[][] }
+
+/**
+ * Soru metnindeki "Kart | Gezegen | Halka" biçimli ardışık satırları tabloya çevirmek için bloklara ayırır.
+ * En az iki ardışık satır ve satır başına en az iki hücre gerekir; hücre sayısı tutmayan satır tabloyu bitirir.
+ */
+export function splitTextBlocks(text: string): TextBlock[] {
+  const blocks: TextBlock[] = []
+  let buffer: string[] = []
+  let table: string[][] = []
+  const flushText = () => { if (buffer.length) { blocks.push({ type: 'text', text: buffer.join('\n') }); buffer = [] } }
+  const flushTable = () => {
+    if (table.length >= 2) { flushText(); blocks.push({ type: 'table', rows: table }) }
+    else for (const row of table) buffer.push(row.join(' | '))
+    table = []
+  }
+  for (const line of text.split('\n')) {
+    const cells = line.includes('|') ? line.split('|').map(cell => cell.trim()) : []
+    const isRow = cells.length >= 2 && cells.every(cell => cell.length > 0)
+    if (isRow && (table.length === 0 || table[0].length === cells.length)) { table.push(cells); continue }
+    flushTable()
+    if (isRow) { table.push(cells); continue }
+    buffer.push(line)
+  }
+  flushTable()
+  flushText()
+  return blocks
+}
