@@ -8,4 +8,6 @@ test('agent approval queue refuses anonymous reads and decision writes', async (
 
   expect(read.status()).toBe(403)
   expect(decision.status()).toBe(403)
+  const link = await request.post('/api/teacher/agent-approvals', { data: { id: 'test', cycleId: 'test' } })
+  expect(link.status()).toBe(403)
 })

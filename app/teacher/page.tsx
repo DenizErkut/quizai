@@ -252,10 +252,10 @@ export default function TeacherDashboard() {
         {/* DASHBOARD */}
         {activeTab === 'dashboard' && (
           <div>
+            <AgentApprovalQueue students={students} classrooms={classrooms} selectedClass={selectedClass} />
             <LearningInsights />
             <LearningGainPilot classrooms={classrooms} />
             <LearningRiskOverview endpoint="/api/teacher/learning-risk" title={tr('Sınıf erken uyarıları')} />
-            <AgentApprovalQueue />
             <div style={{ marginBottom: '1.5rem' }}>
               <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, color: 'var(--primary)' }}>
                 {tr('Hoş geldin, {name} 👋', { name: teacher?.name?.split(' ')[0] ?? '' })}
