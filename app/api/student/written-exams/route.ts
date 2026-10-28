@@ -5,28 +5,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { getAuthedUser } from '@/lib/report-context'
 import { filterRowsByUserScope } from '@/lib/location/resource-scope'
+import { accessibleSet, loadProfile as loadProfileFor, type SetRow } from '@/lib/written-exam-server'
 import { gradeNumberOf, summarizeResults } from '@/lib/written-exam'
 
 export const runtime = 'nodejs'
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-
-type SetRow = { id: string; title: string; grade_number: number; subject: string; term: number; exam_number: number; total_points: number; country: string; state: string | null; city: string | null }
-type Profile = { grade: string | null; country: string | null; state: string | null; city: string | null }
-
-async function loadProfile(userId: string): Promise<Profile> {
-  const { data } = await db.from('profiles').select('grade,country,state,city').eq('id', userId).maybeSingle()
-  return (data as Profile | null) || { grade: null, country: null, state: null, city: null }
-}
-
-// Öğrencinin sınıfına ve konumuna uyan, yayınlanmış set.
-async function accessibleSet(setId: string, profile: Profile): Promise<SetRow | null> {
-  const { data } = await db.from('written_exam_sets')
-    .select('id,title,grade_number,subject,term,exam_number,total_points,country,state,city').eq('id', setId).eq('status', 'published').maybeSingle()
-  const set = data as SetRow | null
-  if (!set) return null
-  if (set.grade_number !== gradeNumberOf(profile.grade)) return null
-  return filterRowsByUserScope([set], profile, row => row)[0] || null
-}
 
 type SessionRow = { id: string; total_earned: number | null; graded_at: string | null; criteria_results: unknown; overall_feedback: string | null; student_answer: string | null }
 
@@ -55,7 +38,7 @@ async function attemptState(attemptId: string) {
 export async function GET(req: NextRequest) {
   const user = await getAuthedUser(req)
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
-  const profile = await loadProfile(user.id)
+  const profile = await loadProfileFor(db, user.id)
   const attemptId = req.nextUrl.searchParams.get('attemptId')
   if (attemptId) {
     const state = await attemptState(attemptId)
@@ -88,11 +71,21 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
   const body = await req.json().catch(() => null) as { action?: string; setId?: string; attemptId?: string; questionId?: string; restart?: boolean } | null
   if (!body?.action) return NextResponse.json({ error: 'Geçersiz istek.' }, { status: 400 })
-  const profile = await loadProfile(user.id)
+  const profile = await loadProfileFor(db, user.id)
+
+  // Tüm soruları yazdırmak için: rubrik ve cevap anahtarı olmadan.
+  if (body.action === 'sheet') {
+    if (!body.setId) return NextResponse.json({ error: 'setId gerekli.' }, { status: 400 })
+    const set = await accessibleSet(db, body.setId, profile)
+    if (!set) return NextResponse.json({ error: 'Bu yazılı sana açık değil.' }, { status: 404 })
+    const { data: rows } = await db.from('written_exam_questions').select('position,title,scenario,question,max_points').eq('set_id', set.id).order('position')
+    return NextResponse.json({ title: set.title, subject: set.subject, gradeNumber: set.grade_number, term: set.term, examNumber: set.exam_number,
+      questions: (rows || []).map(row => ({ position: row.position, title: row.title, scenario: row.scenario, question: row.question, maxPoints: row.max_points })) })
+  }
 
   if (body.action === 'start') {
     if (!body.setId) return NextResponse.json({ error: 'setId gerekli.' }, { status: 400 })
-    const set = await accessibleSet(body.setId, profile)
+    const set = await accessibleSet(db, body.setId, profile)
     if (!set) return NextResponse.json({ error: 'Bu yazılı sana açık değil.' }, { status: 404 })
     const { data: open } = await db.from('written_exam_attempts').select('id,status').eq('user_id', user.id).eq('set_id', set.id).order('started_at', { ascending: false }).limit(1).maybeSingle()
     let attemptId = open && (open.status === 'in_progress' || !body.restart) ? open.id : null
