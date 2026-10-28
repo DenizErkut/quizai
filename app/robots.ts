@@ -18,6 +18,7 @@ export default function robots(): MetadataRoute.Robots {
           '/quiz/',
           '/exam/',
           '/acik-uclu/',
+          '/yazili/',
           '/checkout/',
           '/classes/',
           '/institution/',

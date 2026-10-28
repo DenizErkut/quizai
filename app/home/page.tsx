@@ -39,6 +39,14 @@ const CHOICES = [
     bg: 'linear-gradient(135deg, #6BC96B 0%, #3E8E3E 100%)',
   },
   {
+    href: '/yazili',
+    icon: '📝',
+    title: 'Yazılıya Hazırlanıyorum',
+    desc: 'Sınıfına uygun hazır yazılı soruları çöz, cevapların rubrikle puanlansın',
+    color: '#7c3aed',
+    bg: 'linear-gradient(135deg, #9b6dff 0%, #6d28d9 100%)',
+  },
+  {
     href: '/reading',
     icon: '🎧',
     title: 'Sesli Kitap',
