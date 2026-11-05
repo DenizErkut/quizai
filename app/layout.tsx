@@ -11,6 +11,7 @@ import ConsentGate from '@/components/ConsentGate'
 import CookieConsent from '@/components/CookieConsent'
 import LiveDataRefresh from '@/components/LiveDataRefresh'
 import LanguageFloating from '@/components/LanguageFloating'
+import IdentityGuard from '@/components/IdentityGuard'
 import { I18nProvider } from '@/lib/i18n/I18nProvider'
 
 export const metadata: Metadata = {
@@ -132,6 +133,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <UserProvider>
           <I18nProvider>
           <Navbar />
+          <IdentityGuard />
           <ThemeToggleFloating />
           <LanguageFloating />
           <div className="app-content">{children}</div>
