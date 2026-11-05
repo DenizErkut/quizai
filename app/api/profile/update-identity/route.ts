@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { getIdentityBySupabaseId, updateIdentity, createIdentity } from '@/lib/identity/client'
+import { normalizeTcKimlikNo, validateTcKimlikNo } from '@/lib/tc-kimlik'
 
 export const runtime = 'nodejs'
 
@@ -31,7 +32,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Geçersiz istek.' }, { status: 400 })
   }
 
-  const { fullName, age, phone, parentEmail, role } = body || {}
+  const { fullName, age, phone, parentEmail, role, nationalId } = body || {}
+  const tcValue = normalizeTcKimlikNo(nationalId)
+  if (nationalId !== undefined && nationalId !== null && nationalId !== '' && !validateTcKimlikNo(tcValue)) {
+    return NextResponse.json({ error: 'Geçerli bir T.C. Kimlik No girin.', field: 'nationalId' }, { status: 400 })
+  }
   if (role !== undefined && role !== null && !['student', 'parent', 'teacher'].includes(role)) {
     return NextResponse.json({ error: 'Geçersiz rol.' }, { status: 400 })
   }
@@ -66,6 +71,11 @@ export async function POST(req: NextRequest) {
       if (Object.keys(followUp).length > 0) await updateIdentity(user.id, followUp)
     } else {
       await updateIdentity(user.id, updates)
+    }
+    // T.C. Kimlik No ayrı yazılır: sütun henüz yoksa diğer alanların kaydı bozulmaz (değer günlüğe yazılmaz).
+    if (tcValue) {
+      try { await updateIdentity(user.id, { national_id: tcValue }) }
+      catch (e) { console.warn('[profile/update-identity] national_id yazılamadı (sütun yok olabilir):', (e as { code?: string })?.code || 'hata') }
     }
     return NextResponse.json({ success: true })
   } catch (e) {
