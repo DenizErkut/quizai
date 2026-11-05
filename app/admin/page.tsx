@@ -162,7 +162,7 @@ export default function AdminPage() {
   const mebUploadScope = tab === 'country-sources' ? mebScope : { country: 'TR', state: '', city: '' }
   const mebListScope = tab === 'country-sources' ? 'other' : 'tr'
 
-  const [instForm, setInstForm] = useState({ name: '', email: '', password: '', code: '', discount: '0', seller_id: '', country: '', state: '', city: '' })
+  const [instForm, setInstForm] = useState({ name: '', email: '', password: '', code: '', discount: '0', seller_id: '', country: '', state: '', city: '', tax_office: '', tax_number: '', company_title: '' })
   const [instSaving, setInstSaving] = useState(false)
   const [instError, setInstError] = useState('')
   const [instSuccess, setInstSuccess] = useState('')
@@ -535,6 +535,10 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
       setInstError('Ülke, eyalet/il ve şehir/ilçe zorunlu.')
       return
     }
+    if (!instForm.company_title.trim() || !instForm.tax_office.trim() || !/^\d{10}$/.test(instForm.tax_number.trim())) {
+      setInstError('Şirket ünvanı, vergi dairesi ve 10 haneli vergi numarası zorunlu.')
+      return
+    }
     setInstSaving(true); setInstError(''); setInstSuccess('')
 
     // 1. Auth hesabı oluştur
@@ -553,7 +557,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
 
     const createdCode = authData?.institution?.code || instForm.code
     setInstSuccess(`Kurum "${instForm.name}" oluşturuldu! Kod: ${createdCode}`)
-    setInstForm({ name: '', email: '', password: '', code: '', discount: '0', seller_id: '', country: '', state: '', city: '' })
+    setInstForm({ name: '', email: '', password: '', code: '', discount: '0', seller_id: '', country: '', state: '', city: '', tax_office: '', tax_number: '', company_title: '' })
     await fetchData()
     setInstSaving(false)
   }
@@ -1250,6 +1254,24 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             {/* Kurum oluştur formu */}
             <div className="card" style={{ marginBottom: '1.5rem' }}>
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>🏛️ Yeni Kurum Oluştur</div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Şirket Ünvanı *</label>
+                  <input className="input" placeholder="ABC Eğitim Hizmetleri A.Ş." value={instForm.company_title}
+                    onChange={e => setInstForm(p => ({ ...p, company_title: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Vergi Dairesi *</label>
+                  <input className="input" placeholder="Kadıköy" value={instForm.tax_office}
+                    onChange={e => setInstForm(p => ({ ...p, tax_office: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Vergi Numarası * (10 hane, girişte kullanılır)</label>
+                  <input className="input" inputMode="numeric" maxLength={10} placeholder="1234567890" value={instForm.tax_number}
+                    onChange={e => setInstForm(p => ({ ...p, tax_number: e.target.value.replace(/\D/g, '') }))} />
+                </div>
+              </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
                 <div>

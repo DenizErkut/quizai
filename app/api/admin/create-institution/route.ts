@@ -37,6 +37,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Kurum adı, e-posta ve şifre zorunlu.' }, { status: 400 })
   }
 
+  // Kurumsal müşteri: şirket ünvanı, vergi dairesi, vergi numarası zorunlu (vergi no kurum girişinde tanımlayıcıdır).
+  const companyTitle = typeof body.company_title === 'string' ? body.company_title.trim() : ''
+  const taxOffice = typeof body.tax_office === 'string' ? body.tax_office.trim() : ''
+  const taxNumber = typeof body.tax_number === 'string' ? body.tax_number.replace(/\s+/g, '') : ''
+  if (!companyTitle || !taxOffice || !/^\d{10}$/.test(taxNumber)) {
+    return NextResponse.json({ error: 'Şirket ünvanı, vergi dairesi ve 10 haneli vergi numarası zorunlu.' }, { status: 400 })
+  }
+  const { data: taxDup } = await supabaseAdmin.from('institutions').select('id').eq('tax_number', taxNumber).maybeSingle()
+  if (taxDup) return NextResponse.json({ error: 'Bu vergi numarası başka bir kurumda kayıtlı.' }, { status: 400 })
+
   // Konum: ülke, eyalet/il ve şehir/ilçe zorunlu (posta kodu/adres kurumlarda tutulmaz).
   const locationCheck = validateLocationDetails({ country: body.country, state: body.state, city: body.city })
   if (locationCheck.ok === false || !isKnownCountry(locationCheck.value.country)) {
@@ -101,6 +111,7 @@ export async function POST(req: NextRequest) {
       discount_rate: parseFloat(discount) || 0,
       seller_id: seller_id || null,
       country, state, city,
+      company_title: companyTitle, tax_office: taxOffice, tax_number: taxNumber,
       active: true,
     })
     .select()

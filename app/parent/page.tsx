@@ -229,7 +229,7 @@ function ParentContent() {
     setAdding(true); setAddError(''); setAddSuccess('')
     try {
     const { data: { session } } = await supabase.auth.getSession()
-    const response = await fetch('/api/parent/link-child', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ code: addCode.trim() }) })
+    const response = await fetch('/api/parent/link-child', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify(/^\d{11}$/.test(addCode.replace(/\s+/g, '')) ? { nationalId: addCode.replace(/\s+/g, '') } : { code: addCode.trim() }) })
     const result = await response.json()
     if (!response.ok) { setAddError(result.error || tr('Çocuk eklenemedi.')); return }
     setAddSuccess(tr('Çocuğunuz başarıyla eklendi!'))
@@ -806,11 +806,11 @@ function ParentContent() {
             <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>{tr('➕ Çocuk Ekle')}</h2>
             <div className="card">
               <p style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '14px', lineHeight: 1.6 }}>
-                {tr('Çocuğunuzdan Pratium profilindeki Veli Kodunu alın ve buraya girin. (Profil Düzenle → Veli Bağlantısı bölümünden bulabilirler)')}
+                {tr('Çocuğunuzun kayıtta girdiği T.C. Kimlik No ile ekleyebilirsiniz (öğrenci kaydında veli e-postası olarak sizin e-postanız girilmiş olmalı). Alternatif olarak Profil Düzenle → Veli Bağlantısı bölümündeki Veli Kodunu girin.')}
               </p>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input value={addCode} onChange={e => setAddCode(e.target.value)}
-                  placeholder={tr('8 haneli veli kodu')}
+                  placeholder={tr('Öğrencinin T.C. Kimlik No veya veli kodu')}
                   onKeyDown={e => e.key === 'Enter' && addChild()}
                   style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1.5px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-sans)', outline: 'none' }} />
                 <button onClick={addChild} disabled={adding || !addCode.trim()}

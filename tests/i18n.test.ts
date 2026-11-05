@@ -167,7 +167,7 @@ test('analysis entries are used by the analysis page', async () => {
 test('auth login entries are used by the role login pages', async () => {
   const { readFileSync } = await import('node:fs')
   const { authLoginEntries } = await import('../lib/i18n/entries/auth-login')
-  const source = ['student', 'parent', 'teacher', 'institution'].map(r => readFileSync(`app/(auth)/login/${r}/page.tsx`, 'utf8')).join('\n')
+  const source = ['', 'student/', 'parent/', 'teacher/', 'institution/'].map(r => readFileSync(`app/(auth)/login/${r}page.tsx`, 'utf8')).join('\n')
   const unused = authLoginEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
   assert.deepEqual(unused, [])
 })

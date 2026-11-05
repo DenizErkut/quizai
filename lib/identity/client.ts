@@ -69,6 +69,30 @@ export async function hasNationalId(supabaseUserId: string): Promise<boolean> {
   }
 }
 
+// T.C. Kimlik No ile giriş: eşleşen hesapların Supabase kimliklerini döner (değerin kendisi asla dışarı verilmez).
+// Numara benzersiz olmayabilir (aynı kişi birden çok hesap açmış olabilir) → en çok 5 aday.
+export async function findSupabaseIdsByNationalId(nationalId: string): Promise<string[]> {
+  try {
+    const { rows } = await trPool.query(`SELECT supabase_user_id FROM identities WHERE national_id = $1 LIMIT 5`, [nationalId])
+    return rows.map((r: { supabase_user_id: string }) => String(r.supabase_user_id))
+  } catch {
+    return []
+  }
+}
+
+// Veli ↔ öğrenci bağlama (T.C. ile): öğrencinin kayıtta girdiği T.C. ve veli e-postası birlikte eşleşmelidir.
+export async function findStudentForParentLink(nationalId: string, parentEmail: string): Promise<string | null> {
+  try {
+    const { rows } = await trPool.query(
+      `SELECT supabase_user_id FROM identities
+        WHERE national_id = $1 AND role = 'student' AND lower(parent_email) = lower($2) LIMIT 2`,
+      [nationalId, parentEmail])
+    return rows.length === 1 ? String(rows[0].supabase_user_id) : null
+  } catch {
+    return null
+  }
+}
+
 // Supabase user_id'den kimlik getir
 export async function getIdentityBySupabaseId(supabaseUserId: string): Promise<Identity | null> {
   const { rows } = await trPool.query(
