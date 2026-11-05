@@ -12,11 +12,13 @@ export async function GET(req: NextRequest) {
     supabaseAdmin.from('profiles').select('role,is_admin').eq('id', uid).maybeSingle(),
     supabaseAdmin.from('parent_children').select('id', { count: 'exact', head: true }).eq('parent_id', uid),
   ])
-  let path = '/home'
-  let note: string | null = null
-  if (iu) path = '/institution'
-  else if (teacher?.approved === true) path = '/teacher'
-  else if (teacher && teacher.approved !== true) { path = '/home'; note = 'teacher_pending' }
-  else if (profile?.role === 'parent' || (kids ?? 0) > 0) path = '/parent'
-  return NextResponse.json({ path, note })
+  // Bir hesap aynı anda hem onaylı öğretmen hem veli (ve kurum yöneticisi) olabilir.
+  const roles: string[] = []
+  if (iu) roles.push('institution')
+  if (teacher?.approved === true) roles.push('teacher')
+  if (profile?.role === 'parent' || (kids ?? 0) > 0) roles.push('parent')
+  const paths: Record<string, string> = { institution: '/institution', teacher: '/teacher', parent: '/parent' }
+  const note = teacher && teacher.approved !== true ? 'teacher_pending' : null
+  const path = roles.length ? paths[roles[0]] : '/home'
+  return NextResponse.json({ path, roles, note })
 }

@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { sanitizeFigureSvg, svgDataUri } from '@/lib/open-ended-scenarios'
 
 type Criterion = { criterion: string; maxPoints: number; description: string }
-type Example = { id: string; grade_number: number; subject: string; term: number; scenario_no: number; title: string; scenario: string; question: string; rubric: Criterion[]; status: string; source_note: string | null }
-type Form = { id: string; gradeNumber: number; subject: string; term: number; scenarioNo: number; title: string; scenario: string; question: string; rubric: Criterion[]; sourceNote: string }
+type Example = { id: string; grade_number: number; subject: string; term: number; scenario_no: number; title: string; scenario: string; question: string; rubric: Criterion[]; figure_svg?: string | null; status: string; source_note: string | null }
+type Form = { id: string; gradeNumber: number; subject: string; term: number; scenarioNo: number; title: string; scenario: string; question: string; rubric: Criterion[]; figureSvg: string; sourceNote: string }
 
 const field: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }
 const emptyForm = (over: Partial<Form> = {}): Form => ({
-  id: '', gradeNumber: 7, subject: '', term: 1, scenarioNo: 1, title: '', scenario: '', question: '', sourceNote: '',
+  id: '', gradeNumber: 7, subject: '', term: 1, scenarioNo: 1, title: '', scenario: '', question: '', figureSvg: '', sourceNote: '',
   rubric: [{ criterion: '', maxPoints: 50, description: '' }, { criterion: '', maxPoints: 50, description: '' }], ...over,
 })
 const total = (rubric: Criterion[]) => rubric.reduce((sum, item) => sum + (Number(item.maxPoints) || 0), 0)
@@ -21,6 +22,9 @@ export default function OpenEndedScenarioManager() {
   const [form, setForm] = useState<Form | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [pdfOpen, setPdfOpen] = useState(false)
+  const [pdfMeta, setPdfMeta] = useState({ gradeNumber: 7, subject: 'Matematik', term: 1, startNo: 1 })
+  const [pdfFile, setPdfFile] = useState<File | null>(null)
 
   const authHeader = async () => {
     const { data: { session } } = await createClient().auth.getSession()
@@ -74,6 +78,29 @@ export default function OpenEndedScenarioManager() {
     return used.length ? Math.max(...used) + 1 : 1
   }
 
+  // PDF'den ayıkla: dosyadaki senaryoları sırayla numaralayıp TASLAK olarak kaydeder; yönetici inceleyip yayınlar.
+  async function importPdf() {
+    if (!pdfFile) return
+    setBusy(true); setMessage('PDF okunuyor ve senaryolar ayıklanıyor (1-2 dk sürebilir)…')
+    try {
+      const body = new FormData(); body.append('file', pdfFile)
+      const response = await fetch('/api/admin/open-ended-scenarios/parse', { method: 'POST', headers: await authHeader(), body })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'PDF işlenemedi.')
+      let saved = 0
+      for (const [i, item] of (data.items as Array<{ title: string; scenario: string; question: string; rubric: Criterion[]; figureSvg?: string | null }>).entries()) {
+        const res = await fetch('/api/admin/open-ended-scenarios', {
+          method: 'POST', headers: { ...(await authHeader()), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...item, gradeNumber: pdfMeta.gradeNumber, subject: pdfMeta.subject, term: pdfMeta.term, scenarioNo: pdfMeta.startNo + i, sourceNote: `PDF: ${pdfFile.name}`, publish: false }),
+        })
+        if (res.ok) saved++
+      }
+      setMessage(`${saved} / ${data.items.length} senaryo taslak olarak kaydedildi. Gözden geçirip yayınlayın.${data.truncated ? ' (Dosya uzun: sonraki bölümler okunmadı.)' : ''}`)
+      setPdfOpen(false); setPdfFile(null); await load()
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'PDF işlenemedi.') }
+    finally { setBusy(false) }
+  }
+
   const patchRubric = (index: number, patch: Partial<Criterion>) => setForm(f => f && ({ ...f, rubric: f.rubric.map((c, i) => i === index ? { ...c, ...patch } : c) }))
 
   if (form) {
@@ -90,6 +117,13 @@ export default function OpenEndedScenarioManager() {
           <label style={{ fontSize: 12 }}>Başlık (opsiyonel)<input style={field} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></label>
           <label style={{ fontSize: 12 }}>Senaryo<textarea style={{ ...field, minHeight: 110 }} value={form.scenario} onChange={e => setForm({ ...form, scenario: e.target.value })} placeholder="Durum / senaryo metni" /></label>
           <label style={{ fontSize: 12 }}>Soru<textarea style={{ ...field, minHeight: 60 }} value={form.question} onChange={e => setForm({ ...form, question: e.target.value })} placeholder="Senaryoya dayanan açık uçlu soru" /></label>
+          <label style={{ fontSize: 12 }}>Şekil / görsel (SVG, opsiyonel — AI benzer şekil çizer)
+            <textarea style={{ ...field, minHeight: 70, fontFamily: 'monospace', fontSize: 11 }} value={form.figureSvg} onChange={e => setForm({ ...form, figureSvg: e.target.value })} placeholder="<svg viewBox='0 0 400 260' ...>...</svg>" />
+          </label>
+          {form.figureSvg.trim() && (sanitizeFigureSvg(form.figureSvg)
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={svgDataUri(sanitizeFigureSvg(form.figureSvg)!)} alt="Şekil önizleme" style={{ maxWidth: 360, background: '#fff', border: '1px solid var(--border)', borderRadius: 8 }} />
+            : <div style={{ fontSize: 12, color: '#c0392b' }}>SVG geçersiz veya çok büyük (en fazla 20.000 karakter).</div>)}
           <div style={{ fontSize: 12, fontWeight: 700, color: sum === 100 ? '#0a9e90' : '#c0392b' }}>Rubrik: {sum} / 100 puan</div>
           {form.rubric.map((c, i) => (
             <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
@@ -123,9 +157,22 @@ export default function OpenEndedScenarioManager() {
     <div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
         <button className="btn btn-primary" onClick={() => setForm(emptyForm({ gradeNumber: filterGrade || 7, term: filterTerm || 1 }))}>+ Yeni örnek senaryo</button>
+        <button className="btn btn-ghost" onClick={() => setPdfOpen(o => !o)}>📄 PDF yükle</button>
         <select style={{ ...field, width: 130 }} value={filterGrade} onChange={e => setFilterGrade(Number(e.target.value))}><option value={0}>Tüm sınıflar</option>{Array.from({ length: 12 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}. sınıf</option>)}</select>
         <select style={{ ...field, width: 130 }} value={filterTerm} onChange={e => setFilterTerm(Number(e.target.value))}><option value={0}>Tüm dönemler</option><option value={1}>1. dönem</option><option value={2}>2. dönem</option></select>
       </div>
+      {pdfOpen && (
+        <div className="card" style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+            <label style={{ fontSize: 12 }}>Sınıf<select style={field} value={pdfMeta.gradeNumber} onChange={e => setPdfMeta({ ...pdfMeta, gradeNumber: Number(e.target.value) })}>{Array.from({ length: 12 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}. sınıf</option>)}</select></label>
+            <label style={{ fontSize: 12 }}>Ders<input style={field} value={pdfMeta.subject} onChange={e => setPdfMeta({ ...pdfMeta, subject: e.target.value })} /></label>
+            <label style={{ fontSize: 12 }}>Dönem<select style={field} value={pdfMeta.term} onChange={e => setPdfMeta({ ...pdfMeta, term: Number(e.target.value) })}><option value={1}>1. dönem</option><option value={2}>2. dönem</option></select></label>
+            <label style={{ fontSize: 12 }}>İlk senaryo no<input style={field} type="number" min={1} max={99} value={pdfMeta.startNo} onChange={e => setPdfMeta({ ...pdfMeta, startNo: Number(e.target.value) })} /></label>
+          </div>
+          <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target.files?.[0] || null)} />
+          <div><button className="btn btn-primary" disabled={busy || !pdfFile} onClick={importPdf}>Senaryoları ayıkla ve taslak kaydet</button></div>
+        </div>
+      )}
       {message && <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 8 }}>{message}</p>}
       {groups.size === 0 && <p style={{ color: 'var(--text2)', fontSize: 13 }}>Henüz örnek senaryo yok.</p>}
       <div style={{ display: 'grid', gap: 10 }}>
@@ -136,7 +183,7 @@ export default function OpenEndedScenarioManager() {
               <div key={e.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid var(--border)', padding: '6px 0' }}>
                 <div style={{ flex: 1, minWidth: 220, fontSize: 13 }}>{e.title || e.scenario.slice(0, 90)}{!e.title && e.scenario.length > 90 ? '…' : ''}</div>
                 <span style={{ fontSize: 12, fontWeight: 700, color: e.status === 'published' ? '#0a9e90' : 'var(--text2)' }}>{e.status === 'published' ? 'Yayında' : 'Taslak'}</span>
-                <button className="btn btn-ghost" onClick={() => setForm({ id: e.id, gradeNumber: e.grade_number, subject: e.subject, term: e.term, scenarioNo: e.scenario_no, title: e.title, scenario: e.scenario, question: e.question, rubric: e.rubric, sourceNote: e.source_note || '' })}>Düzenle</button>
+                <button className="btn btn-ghost" onClick={() => setForm({ id: e.id, gradeNumber: e.grade_number, subject: e.subject, term: e.term, scenarioNo: e.scenario_no, title: e.title, scenario: e.scenario, question: e.question, rubric: e.rubric, figureSvg: e.figure_svg || '', sourceNote: e.source_note || '' })}>Düzenle</button>
                 <button className="btn btn-ghost" onClick={() => act('PATCH', e, e.status === 'published' ? 'draft' : 'published')}>{e.status === 'published' ? 'Taslağa al' : 'Yayınla'}</button>
                 <button className="btn btn-ghost" onClick={() => setForm(emptyForm({ gradeNumber: e.grade_number, subject: e.subject, term: e.term, scenarioNo: nextNumber(e.grade_number, e.subject, e.term) }))}>+ Sonraki senaryo</button>
                 <button className="btn btn-ghost" onClick={() => act('DELETE', e)}>Sil</button>

@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { useUser } from '@/lib/user-context'
 import { useT } from '@/lib/i18n/I18nProvider'
 import PanelLanguageSwitch from '@/components/PanelLanguageSwitch'
 import { SIDEBAR_WIDTH } from '@/components/StudentSidebar'
@@ -30,6 +32,14 @@ export default function PanelSidebar({ title, name, items, onSignOut, extraBotto
 }) {
   const { t } = useT()
   const [open, setOpen] = useState(false)
+  const pathname = usePathname()
+  const { isApprovedTeacher, isParent, isInstitution } = useUser()
+  // Çok rollü hesaplar (ör. öğretmen + veli) için paneller arası geçiş.
+  const switchLinks = [
+    isApprovedTeacher && !pathname.startsWith('/teacher') ? { href: '/teacher', label: '🎓 Öğretmen paneline geç' } : null,
+    isParent && !pathname.startsWith('/parent') ? { href: '/parent', label: '👨‍👩‍👧 Veli paneline geç' } : null,
+    isInstitution && !pathname.startsWith('/institution') ? { href: '/institution', label: '🏛️ Kurum paneline geç' } : null,
+  ].filter((x): x is { href: string; label: string } => !!x)
 
   useEffect(() => {
     document.body.classList.add('has-panel-sidebar')
@@ -95,6 +105,12 @@ export default function PanelSidebar({ title, name, items, onSignOut, extraBotto
               </div>
             )
           })}
+          {switchLinks.length > 0 && (<>
+            <div className="pn-sep" />
+            {switchLinks.map(l => { const { icon, text } = splitLabel(l.label); return (
+              <Link key={l.href} href={l.href} className="pn-link" onClick={() => setOpen(false)}><span className="pn-icon">{icon}</span><span>{t(l.label).replace(icon, '').trim() || text}</span></Link>
+            ) })}
+          </>)}
         </nav>
         <div style={{ padding: '8px 14px 16px', display: 'grid', gap: 8 }}>
           {extraBottom}

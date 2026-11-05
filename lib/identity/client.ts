@@ -80,6 +80,17 @@ export async function findSupabaseIdsByNationalId(nationalId: string): Promise<s
   }
 }
 
+// Telefon + şifre ile giriş: kayıtlı telefonun son 10 hanesi eşleşen hesaplar (en çok 5). Telefon numarası dışarı verilmez.
+export async function findSupabaseIdsByPhone(last10: string): Promise<string[]> {
+  try {
+    const { rows } = await trPool.query(
+      `SELECT supabase_user_id FROM identities WHERE phone IS NOT NULL AND right(regexp_replace(phone, '[^0-9]', '', 'g'), 10) = $1 LIMIT 5`, [last10])
+    return rows.map((r: { supabase_user_id: string }) => String(r.supabase_user_id))
+  } catch {
+    return []
+  }
+}
+
 // Veli ↔ öğrenci bağlama (T.C. ile): öğrencinin kayıtta girdiği T.C. ve veli e-postası birlikte eşleşmelidir.
 export async function findStudentForParentLink(nationalId: string, parentEmail: string): Promise<string | null> {
   try {
