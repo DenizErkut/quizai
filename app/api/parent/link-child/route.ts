@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, supabaseAdmin } from '@/lib/auth-middleware'
 import { checkRateLimit, rateLimitExceeded } from '@/lib/rate-limit'
-import { findStudentForParentLink } from '@/lib/identity/client'
+import { findStudentByNationalId, getIdentityBySupabaseId } from '@/lib/identity/client'
 import { validateTcKimlikNo, normalizeTcKimlikNo } from '@/lib/tc-kimlik'
 
 export async function POST(req: NextRequest) {
@@ -18,15 +18,30 @@ export async function POST(req: NextRequest) {
   const tc = normalizeTcKimlikNo(body?.nationalId)
   let child: { id: string; role: string } | null = null
   if (tc) {
-    // T.C. ile bağlama: öğrencinin kayıtta girdiği T.C. + veli e-postası, bu veli hesabının e-postasıyla eşleşmeli.
+    // T.C. ile bağlama: öğrenciye onay isteği gider; öğrenci onaylayınca takip başlar.
+    // Hesap sorgulamasını önlemek için eşleşme olsun olmasın aynı yanıt döner.
     if (!validateTcKimlikNo(tc)) return NextResponse.json({ error: 'Geçerli bir T.C. Kimlik No girin.' }, { status: 400 })
-    const parentEmail = auth.user.email || ''
-    const childId = parentEmail ? await findStudentForParentLink(tc, parentEmail) : null
-    if (childId) {
-      const { data } = await supabaseAdmin.from('profiles').select('id,role').eq('id', childId).maybeSingle()
-      child = data
+    const childId = await findStudentByNationalId(tc)
+    if (childId && childId !== auth.user.id) {
+      const { data: linked } = await supabaseAdmin.from('parent_children').select('id').eq('parent_id', auth.user.id).eq('child_id', childId).maybeSingle()
+      if (linked) return NextResponse.json({ error: 'Bu çocuk zaten listenizde.' }, { status: 409 })
+      const { data: existingReq } = await supabaseAdmin.from('parent_link_requests').select('id,status').eq('parent_id', auth.user.id).eq('child_id', childId).maybeSingle()
+      if (!existingReq || existingReq.status !== 'pending') {
+        const { error: reqErr } = existingReq
+          ? await supabaseAdmin.from('parent_link_requests').update({ status: 'pending', decided_at: null, created_at: new Date().toISOString() }).eq('id', existingReq.id)
+          : await supabaseAdmin.from('parent_link_requests').insert({ parent_id: auth.user.id, child_id: childId })
+        if (!reqErr) {
+          const parentName = (await getIdentityBySupabaseId(auth.user.id))?.full_name || 'Bir veli'
+          await supabaseAdmin.from('notifications').insert({
+            user_id: childId, type: 'system', read: false,
+            title: '👨‍👩‍👧 Veli takip isteği',
+            body: `${parentName} seni veli olarak takip etmek istiyor. Ana sayfadan onaylayabilir veya reddedebilirsin.`,
+            data: { href: '/home' },
+          })
+        }
+      }
     }
-    if (!child) return NextResponse.json({ error: 'Eşleşen öğrenci bulunamadı. Öğrencinin kayıtta bu T.C. Kimlik No ve sizin e-posta adresinizi (veli e-postası) girmiş olması gerekir; olmadı ise davet kodunu kullanın.' }, { status: 404 })
+    return NextResponse.json({ success: true, pending: true })
   } else {
     if (!/^[a-z0-9]{4,32}$/.test(code)) return NextResponse.json({ error: 'Geçerli bir T.C. Kimlik No veya davet kodu gerekli.' }, { status: 400 })
     const { data } = await supabaseAdmin.from('profiles').select('id,role').eq('parent_code', code).maybeSingle()

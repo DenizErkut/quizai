@@ -91,13 +91,10 @@ export async function findSupabaseIdsByPhone(last10: string): Promise<string[]> 
   }
 }
 
-// Veli ↔ öğrenci bağlama (T.C. ile): öğrencinin kayıtta girdiği T.C. ve veli e-postası birlikte eşleşmelidir.
-export async function findStudentForParentLink(nationalId: string, parentEmail: string): Promise<string | null> {
+// Veli ↔ öğrenci bağlama isteği (T.C. ile): tek bir öğrenci hesabıyla eşleşirse kimliğini döner (değer dışarı verilmez).
+export async function findStudentByNationalId(nationalId: string): Promise<string | null> {
   try {
-    const { rows } = await trPool.query(
-      `SELECT supabase_user_id FROM identities
-        WHERE national_id = $1 AND role = 'student' AND lower(parent_email) = lower($2) LIMIT 2`,
-      [nationalId, parentEmail])
+    const { rows } = await trPool.query(`SELECT supabase_user_id FROM identities WHERE national_id = $1 AND role = 'student' LIMIT 2`, [nationalId])
     return rows.length === 1 ? String(rows[0].supabase_user_id) : null
   } catch {
     return null

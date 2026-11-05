@@ -7,6 +7,7 @@ import { getAuthedUser } from '@/lib/report-context'
 import { extractPdfText } from '@/lib/pdf-extract'
 import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import { logAnthropicUsage } from '@/lib/ai-usage'
+import { figuresForPages } from '@/lib/booklet-figures'
 import { stripForeignScripts } from '@/lib/open-ended-grading'
 import { normalizeRubricTo100, sanitizeFigureSvg } from '@/lib/open-ended-scenarios'
 
@@ -64,7 +65,26 @@ ${text.slice(0, MAX_TEXT).replace(/"""/g, "'''")}
         figureSvg: sanitizeFigureSvg(r.figureSvg),
       }
     }).filter(i => i.scenario.length >= 10 && i.question.length >= 5 && i.rubric.length > 0)
-    return NextResponse.json({ items, truncated: text.length > MAX_TEXT })
+    // PDF'teki şekilleri (resim, çizim, tablo) soru numarasına göre otomatik kırp: 1., 2., 3. … sorular sırayla eşlenir.
+    const itemsWithImages: Array<(typeof items)[number] & { figureImage?: string | null }> = items
+    let imageCount = 0
+    try {
+      const known = new Set(items.map((_, i) => i + 1))
+      const result = await figuresForPages(new Uint8Array(pdfBytes), { fromPage: 0, pages: 40, lastQuestion: 0, knownNumbers: known })
+      const best = new Map<number, { data: Buffer; mime: string }>()
+      for (const figure of result.figures) {
+        const current = best.get(figure.questionNumber)
+        if (!current || figure.data.length > current.data.length) best.set(figure.questionNumber, { data: figure.data, mime: figure.mime })
+      }
+      for (const [number, figure] of best) {
+        const item = itemsWithImages[number - 1]
+        const dataUrl = `data:${figure.mime};base64,${figure.data.toString('base64')}`
+        if (item && dataUrl.length <= 900000) { item.figureImage = dataUrl; imageCount++ }
+      }
+    } catch (figureError) {
+      console.error('[open-ended-scenario-parse] şekil kırpma başarısız', figureError instanceof Error ? figureError.message : figureError)
+    }
+    return NextResponse.json({ items: itemsWithImages, truncated: text.length > MAX_TEXT, imageCount })
   } catch (error) {
     console.error('[open-ended-scenario-parse]', error instanceof Error ? error.message : error)
     return NextResponse.json({ error: 'Dosya yapılandırılamadı, tekrar deneyin.' }, { status: 500 })
