@@ -15,6 +15,7 @@ import { gradeLabel } from '@/lib/i18n/grade'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
 import PanelSidebar from '@/components/PanelSidebar'
+import PanelLanguageSwitch from '@/components/PanelLanguageSwitch'
 
 export default function TeacherDashboard() {
   const { t: tr, locale } = useT()
