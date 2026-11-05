@@ -3,7 +3,7 @@
  "app/(auth)/login/teacher/page.tsx": 1,
  "app/(auth)/register/page.tsx": 3,
  "app/(auth)/register/teacher/page.tsx": 3,
- "app/acik-uclu/page.tsx": 2,
+ "app/acik-uclu/page.tsx": 3,
  "app/admin/ab-tests/page.tsx": 3,
  "app/admin/ai-quality-test/page.tsx": 1,
  "app/admin/page.tsx": 18,

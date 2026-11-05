@@ -52,4 +52,5 @@ export const writtenExamEntries: Entry[] = [
   ['Test hakkı', 'Tests left', 'Verbleibende Tests', 'Tests restants', 'Tests restantes', 'الاختبارات المتبقية'],
   ['ÜYELİĞİNİ YÜKSELT', 'UPGRADE YOUR PLAN', 'PLAN UPGRADEN', 'PASSE AU PLAN SUPÉRIEUR', 'MEJORA TU PLAN', 'قم بترقية اشتراكك'],
   ['Menüyü aç', 'Open menu', 'Menü öffnen', 'Ouvrir le menu', 'Abrir menú', 'افتح القائمة'],
+  ['Şifremi değiştir', 'Change my password', 'Passwort ändern', 'Changer mon mot de passe', 'Cambiar mi contraseña', 'تغيير كلمة المرور'],
 ]
