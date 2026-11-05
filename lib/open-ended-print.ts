@@ -67,3 +67,21 @@ export function openEndedTeacherKeyHtml(items: PrintableOpenEnded[], options: { 
 ${items.map((item, index) => `<section class="oe-question"><h2>Soru ${index + 1}</h2><p>${printableMath(item.question)}</p>
 <table class="oe-rubric"><thead><tr><th>Kriter</th><th>Puan</th><th>Tam puan koşulu</th></tr></thead><tbody>${item.rubric.map(r => `<tr><td>${printableMath(r.criterion)}</td><td>${Number(r.maxPoints) || 0}</td><td>${printableMath(r.description || '')}</td></tr>`).join('')}</tbody></table></section>`).join('')}`
 }
+
+export const OE_QR_PREFIX = 'PRATIUM-OE:'
+
+export type ScenarioSheetItem = PrintableOpenEnded & { sessionId: string; qrDataUrl: string; position: number; total: number }
+
+/** Senaryo dökümü: her soru ayrı sayfa; öğrenci adı hazır, sağ üstte soruya özel QR (yüklemede sayfa bu QR'dan tanınır). */
+export function openEndedScenarioSheetHtml(items: ScenarioSheetItem[], options: { studentName: string; title: string; grade?: string | null }): string {
+  const lines = answerLineCount(options.grade)
+  const total = (item: PrintableOpenEnded) => item.rubric.reduce((sum, r) => sum + (Number(r.maxPoints) || 0), 0)
+  const name = options.studentName ? escapePrintText(options.studentName) : ''
+  return `${SHEET_STYLE}<style>.oe-sheet{break-after:page;position:relative}.oe-sheet:last-child{break-after:auto}.oe-qr{position:absolute;top:0;right:0;width:26mm;height:26mm}.oe-sheet .oe-header{margin-right:30mm}</style>
+${items.map(item => `<section class="oe-sheet"><img class="oe-qr" alt="QR" src="${escapePrintText(item.qrDataUrl)}">
+<div class="oe-header"><div class="oe-field">Ad Soyad: <strong>${name}</strong></div><div class="oe-field">No: </div><div class="oe-field">Sınıf / Şube: </div><div class="oe-field">Tarih: </div></div>
+<p class="oe-meta">${escapePrintText(options.title)} · Soru ${item.position}/${item.total} · Soru kodu: <strong>${escapePrintText(item.code || '')}</strong><br>Bu sayfayı yazdıktan sonra fotoğrafını çek/tara ve Pratium'da "Kâğıtları yükle" ile gönder. QR kodu kapatma.</p>
+<div class="oe-question"><h2>Soru ${item.position} <span style="font-weight:400;font-size:10pt">(${total(item)} puan)</span></h2>
+<div class="print-passage">${printableMath(item.scenario)}</div>${printFigure(item)}<p><strong>${printableMath(item.question)}</strong></p>${printTable(item)}
+<div class="oe-lines">${Array.from({ length: lines }, () => '<div class="oe-line"></div>').join('')}</div></div></section>`).join('')}`
+}

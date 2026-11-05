@@ -239,7 +239,7 @@ test('notifications entries are used by the notifications page', async () => {
 test('open-ended entries are used by the open-ended page', async () => {
   const { readFileSync } = await import('node:fs')
   const { openEndedEntries } = await import('../lib/i18n/entries/open-ended')
-  const source = readFileSync('app/acik-uclu/page.tsx', 'utf8')
+  const source = readFileSync('app/acik-uclu/page.tsx', 'utf8') + readFileSync('components/student/OpenEndedPaperUpload.tsx', 'utf8')
   const unused = openEndedEntries.map(e => e[0]).filter(key => !source.includes(key.replace(/'/g, "\\'")) && !source.includes(key))
   assert.deepEqual(unused, [])
 })
