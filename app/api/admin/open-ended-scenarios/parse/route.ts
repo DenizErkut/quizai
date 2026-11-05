@@ -46,7 +46,7 @@ DOSYA METNİ:
 ${text.slice(0, MAX_TEXT).replace(/"""/g, "'''")}
 """`
   try {
-    const response = await anthropic.messages.create({ model: CLAUDE_SONNET, ...SONNET_PARAMS, max_tokens: sonnetTokens(24000), messages: [{ role: 'user', content: [{ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBytes.toString('base64') } }, { type: 'text', text: prompt }] }] })
+    const response = await anthropic.messages.stream({ model: CLAUDE_SONNET, ...SONNET_PARAMS, max_tokens: sonnetTokens(24000), messages: [{ role: 'user', content: [{ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBytes.toString('base64') } }, { type: 'text', text: prompt }] }] }).finalMessage()
     await logAnthropicUsage('open-ended-scenario-parse', CLAUDE_SONNET, response, { userId: user.id })
     const json = responseText(response).match(/\{[\s\S]*\}/)?.[0]
     if (!json) return NextResponse.json({ error: 'Yapay zeka yanıtı okunamadı, tekrar deneyin.' }, { status: 502 })
