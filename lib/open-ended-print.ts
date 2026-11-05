@@ -2,11 +2,15 @@
 // teacher copy with the scoring rubric. The sheet code lets the teacher match scanned papers to
 // the assignment later (see the paper-import flow).
 import { escapePrintText, printableMath } from './learning-print'
+import { parseAnswerTable, svgDataUri } from './open-ended-scenarios'
 
 export type PrintableOpenEnded = {
   scenario: string
   question: string
   rubric: Array<{ criterion: string; maxPoints: number; description?: string }>
+  figureSvg?: string | null
+  answerTable?: string | null
+  code?: string
 }
 
 export function answerLineCount(grade: string | null | undefined): number {
@@ -28,6 +32,19 @@ const SHEET_STYLE = `<style>
 .oe-page-break{break-before:page}
 </style>`
 
+function printFigure(item: PrintableOpenEnded): string {
+  return item.figureSvg ? `<p style="text-align:center"><img alt="" style="max-width:100%;max-height:70mm" src="${escapePrintText(svgDataUri(item.figureSvg))}"></p>` : ''
+}
+
+/** Doldurulacak tablo: boş hücreler çizgili kutu olarak basılır. */
+function printTable(item: PrintableOpenEnded): string {
+  const table = parseAnswerTable(item.answerTable)
+  if (!table) return ''
+  const th = (cell: string) => `<th style="border:1px solid #444;padding:4pt 6pt;background:#eee;text-align:left">${printableMath(cell)}</th>`
+  const td = (cell: string, first: boolean) => `<td style="border:1px solid #444;padding:${cell ? '4pt 6pt' : '10pt 6pt'};${first ? 'font-weight:700' : ''}">${cell ? printableMath(cell) : ''}</td>`
+  return `<table style="border-collapse:collapse;width:100%;margin:6pt 0 10pt;font-size:10.5pt"><thead><tr>${table.headers.map(th).join('')}</tr></thead><tbody>${table.rows.map(row => `<tr>${row.map((cell, i) => td(cell, i === 0)).join('')}</tr>`).join('')}</tbody></table>`
+}
+
 export function shortSheetCode(batchOrAssignmentId: string): string {
   return batchOrAssignmentId.replace(/-/g, '').slice(0, 8).toUpperCase()
 }
@@ -40,8 +57,8 @@ export function openEndedStudentSheetHtml(items: PrintableOpenEnded[], options: 
   return `${SHEET_STYLE}<div class="oe-header"><div class="oe-field">Ad Soyad: </div><div class="oe-field">No: </div><div class="oe-field">Sınıf / Şube: </div><div class="oe-field">Tarih: </div></div>
 <p class="oe-meta">${meta}${meta ? ' · ' : ''}Ödev kodu: <strong>${escapePrintText(options.code)}</strong> · Her soruyu ilgili alana, soru numarasını belirterek yazınız.</p>
 ${items.map((item, index) => `<section class="oe-question"><h2>Soru ${index + 1} <span style="font-weight:400;font-size:10pt">(${total(item)} puan)</span></h2>
-<div class="print-passage">${printableMath(item.scenario)}</div><p><strong>${printableMath(item.question)}</strong></p>
-<div class="oe-lines">${Array.from({ length: lines }, () => '<div class="oe-line"></div>').join('')}</div></section>`).join('')}`
+<div class="print-passage">${printableMath(item.scenario)}</div>${printFigure(item)}<p><strong>${printableMath(item.question)}</strong></p>${printTable(item)}
+${item.code ? `<p class="oe-meta">Soru kodu: <strong>${escapePrintText(item.code)}</strong></p>` : ''}<div class="oe-lines">${Array.from({ length: lines }, () => '<div class="oe-line"></div>').join('')}</div></section>`).join('')}`
 }
 
 /** Teacher copy: question, rubric and expected criteria. */
