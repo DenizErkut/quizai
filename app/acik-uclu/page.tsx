@@ -351,22 +351,32 @@ export default function AcikUcluPage() {
         {/* Senaryo kartları: dönem + senaryo numarası */}
         {step === 'setup' && (
           <div style={{ marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
-              <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--primary)' }}>{t('Senaryolar')}</div>
-              {[...new Set(scenarioCards.map(card => card.subject))].length > 1 && (
-                <>
-                  <button className={`btn btn-sm ${!scenarioSubject ? 'btn-primary' : ''}`} onClick={() => setScenarioSubject('')}>{t('Tüm dersler')}</button>
-                  {[...new Set(scenarioCards.map(card => card.subject))].map(name => (
-                    <button key={name} className={`btn btn-sm ${scenarioSubject === name ? 'btn-primary' : ''}`} onClick={() => setScenarioSubject(name)}>{name}</button>
-                  ))}
-                </>
-              )}
-            </div>
+            <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--primary)', marginBottom: '10px' }}>{t('Ders seç')}</div>
+            {(() => {
+              const subjects = [...new Set(scenarioCards.map(card => card.subject))]
+              const chosen = scenarioSubject || (subjects.length === 1 ? subjects[0] : '')
+              return subjects.length > 0 && (
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
+                  {subjects.map(name => {
+                    const count = scenarioCards.filter(card => card.subject === name).length
+                    return (
+                      <button key={name} type="button" onClick={() => setScenarioSubject(name)} aria-pressed={chosen === name}
+                        style={{ padding: '12px 18px', borderRadius: '14px', border: `2px solid ${chosen === name ? 'var(--accent)' : 'var(--border)'}`, background: chosen === name ? 'var(--accent-bg)' : 'var(--bg)', color: 'var(--primary)', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-sans)' }}>
+                        <div style={{ fontWeight: 800, fontSize: '15px' }}>{name}</div>
+                        <div style={{ fontSize: '11.5px', color: 'var(--text2)', marginTop: '2px' }}>{t('{n} senaryo', { n: count })}</div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })()}
             {scenarioCards.length === 0 ? (
               <div className="card" style={{ padding: '1rem', fontSize: '13px', color: 'var(--text2)' }}>{t('Bu sınıf için henüz senaryo yüklenmedi. Aşağıdaki serbest pratiği kullanabilirsin.')}</div>
+            ) : !scenarioSubject && [...new Set(scenarioCards.map(c => c.subject))].length > 1 ? (
+              <div className="card" style={{ padding: '1rem', fontSize: '13px', color: 'var(--text2)' }}>{t('Senaryoları görmek için önce bir ders seç.')}</div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
-                {scenarioCards.filter(card => !scenarioSubject || card.subject === scenarioSubject).map(card => {
+                {scenarioCards.filter(card => card.subject === (scenarioSubject || ([...new Set(scenarioCards.map(c => c.subject))].length === 1 ? scenarioCards[0].subject : '__none'))).map(card => {
                   const key = `${card.subject}|${card.term}|${card.scenarioNo}`
                   return (
                     <div key={key} className="card" style={{ padding: '1rem 1.1rem', display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--bg2, var(--bg))' }}>
@@ -378,7 +388,7 @@ export default function AcikUcluPage() {
                           : card.attempts ? t('Çözüldü · en yüksek {score}/{total}', { score: card.bestScore ?? 0, total: card.total }) : t('Henüz çözülmedi')}
                       </div>
                       <button className="btn btn-primary" style={{ marginTop: 'auto', justifyContent: 'center' }} onClick={() => startScenario(card, card.nextIndex || 0)} disabled={!!startingScenario}>
-                        {startingScenario === key ? t('Senaryo hazırlanıyor…') : (card.questionCount || 0) > 1 && (card.solvedQuestions || 0) > 0 && (card.nextIndex || 0) > 0 ? t('Devam et →') : card.attempts ? t('Tekrar çöz') : t('Başla →')}
+                        {startingScenario === key ? t('Senaryo hazırlanıyor…') : (card.questionCount || 0) > 1 ? ((card.solvedQuestions || 0) === 0 ? t('Başla →') : (card.solvedQuestions || 0) < (card.questionCount || 0) ? t('Devam et →') : t('Tekrar çöz')) : card.attempts ? t('Tekrar çöz') : t('Başla →')}
                       </button>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button className="btn btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => printScenario(card)} disabled={!!printingKey || !!startingScenario}>{printingKey === key ? '⏳' : t('🖨️ Yazdır')}</button>
