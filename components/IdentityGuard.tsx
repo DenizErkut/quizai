@@ -35,11 +35,11 @@ export default function IdentityGuard() {
   }
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="profile-prompt-title" style={{ position: 'fixed', inset: 0, zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'rgba(10,20,16,.55)' }}>
-      <div className="card" style={{ maxWidth: 420, width: '100%', padding: '1.5rem', textAlign: 'center' }}>
+      <div className="card" style={{ maxWidth: 420, width: '100%', padding: '1.5rem', textAlign: 'center', animation: 'none', opacity: 1 }}>
         <div style={{ fontSize: 40, marginBottom: 8 }}>📝</div>
         <h2 id="profile-prompt-title" style={{ fontSize: 19, fontWeight: 800, marginBottom: 8, color: 'var(--primary)' }}>{t('Lütfen profilinizi tamamlayınız')}</h2>
         <p style={{ fontSize: 14, color: 'var(--text2)', lineHeight: 1.6, marginBottom: 16 }}>{t('Kaydınız tamamlanmamış görünüyor. Ad soyad, sınıf, konum ve T.C. Kimlik No bilgilerinizi profil sayfasından girmeniz gerekiyor.')}</p>
-        <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={confirm}>{t('Tamam')}</button>
+        <button autoFocus onClick={confirm} style={{ width: '100%', padding: '12px 16px', border: 0, borderRadius: 12, background: '#df5c3f', color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>{t('Tamam')}</button>
       </div>
     </div>
   )
