@@ -17,8 +17,8 @@ export async function GET(req: NextRequest) {
     if (!data) return NextResponse.json({ error: 'Soru bulunamadı.' }, { status: 404 })
     return NextResponse.json({ session: data })
   }
-  const since = new Date(Date.now() - 60 * 24 * 3600_000).toISOString()
+  const since = new Date(Date.now() - 365 * 24 * 3600_000).toISOString()
   const { data } = await db.from('open_ended_sessions').select('id,subject,topic,question_index,total_earned,total_possible,graded_at,source,created_at')
-    .eq('user_id', user.id).not('question_index', 'is', null).gte('created_at', since).order('created_at', { ascending: false }).limit(80)
+    .eq('user_id', user.id).not('question_index', 'is', null).gte('created_at', since).order('created_at', { ascending: false }).limit(400)
   return NextResponse.json({ sessions: data || [] })
 }

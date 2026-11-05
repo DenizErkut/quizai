@@ -79,4 +79,6 @@ export const openEndedEntries: Entry[] = [
   ['Okunanları kontrol ettim, hepsini puanla ({n})', 'I checked the texts, grade all ({n})', 'Ich habe die Texte geprüft, alle bewerten ({n})', 'J’ai vérifié les textes, tout noter ({n})', 'He revisado los textos, calificar todo ({n})', 'راجعت النصوص، قيّم الكل ({n})'],
   ['{n} senaryo', '{n} scenario(s)', '{n} Szenario(s)', '{n} scénario(s)', '{n} escenario(s)', '{n} سيناريو'],
   ['Senaryoları görmek için önce bir ders seç.', 'Choose a subject first to see its scenarios.', 'Wähle zuerst ein Fach, um die Szenarien zu sehen.', 'Choisis d’abord une matière pour voir ses scénarios.', 'Elige primero una asignatura para ver sus escenarios.', 'اختر مادة أولًا لعرض سيناريوهاتها.'],
+  ['Ortalama not', 'Average grade', 'Durchschnittsnote', 'Note moyenne', 'Nota media', 'المعدل'],
+  ['Genel ortalama', 'Overall average', 'Gesamtdurchschnitt', 'Moyenne générale', 'Promedio general', 'المعدل العام'],
 ]

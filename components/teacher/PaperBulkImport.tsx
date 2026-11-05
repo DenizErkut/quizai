@@ -113,7 +113,7 @@ export default function PaperBulkImport({ group, onClose }: { group: Assignment[
     if (status === 409 && !replace) { patch(entry.studentId, { status: 'read', conflict: true, message: data?.error || t('Bu öğrenci bu ödevi zaten tamamlamış.') }); return }
     if (!ok) { patch(entry.studentId, { status: 'error', message: data?.error || t('Kaydedilemedi.') }); return }
     const results = data.results as Array<{ totalEarned: number; totalPossible: number }>
-    patch(entry.studentId, { status: 'saved', conflict: false, message: '', score: `${results.reduce((s, r) => s + r.totalEarned, 0)} / ${results.reduce((s, r) => s + r.totalPossible, 0)}` })
+    patch(entry.studentId, { status: 'saved', conflict: false, message: '', score: (() => { const e = results.reduce((s, r) => s + r.totalEarned, 0), p = results.reduce((s, r) => s + r.totalPossible, 0); return `${e} / ${p} (${t('ort.')} ${p > 0 ? Math.round((e / p) * 1000) / 10 : 0})` })() })
   }
 
   async function saveAll() {

@@ -106,4 +106,5 @@ export const teacherAssignEntries: Entry[] = [
   ['kontrol bekliyor', 'awaiting review', 'wartet auf Prüfung', 'en attente de vérification', 'pendiente de revisión', 'بانتظار المراجعة'],
   ['Üzerine yaz ve puanla', 'Overwrite and grade', 'Überschreiben und bewerten', 'Écraser et noter', 'Sobrescribir y calificar', 'استبدال وتقييم'],
   ['Bu öğrenci bu ödevi zaten tamamlamış.', 'This student has already completed this assignment.', 'Dieser Schüler hat diese Aufgabe bereits abgeschlossen.', 'Cet élève a déjà terminé ce devoir.', 'Este estudiante ya completó esta tarea.', 'أكمل هذا الطالب هذا الواجب بالفعل.'],
+  ['ort.', 'avg.', 'Ø', 'moy.', 'prom.', 'المعدل'],
 ]

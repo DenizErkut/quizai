@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import PaperAnswerImport from '@/components/teacher/PaperAnswerImport'
 import PaperBulkImport from '@/components/teacher/PaperBulkImport'
 import QRCode from 'qrcode'
+import type { ScenarioSheetItem } from '@/lib/open-ended-print'
 import { useTeacherEntitlement, LOCKED_MESSAGE } from '@/components/teacher/useTeacherEntitlement'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
@@ -23,6 +24,8 @@ const DIFFICULTIES = [
   { value: 'zor', label: 'Zor' },
   { value: 'cok zor', label: 'Çok Zor' },
 ]
+
+type OeClassRow = { id: string; classroom_id: string; batch_id?: string | null; title: string; grade: string; scenario: string; question: string; rubric?: Array<{ criterion: string; maxPoints: number; description?: string }>; classrooms?: { name?: string } }
 
 export default function TeacherAssignPage() {
   const { t: tr, locale } = useT()
@@ -270,7 +273,7 @@ export default function TeacherAssignPage() {
   }
 
   // Sınıf dökümü: her öğrenci için ad/numara hazır, her soru ayrı sayfa, QR = öğrenci + soru (toplu tarama için).
-  async function printOpenEndedClass(group: any[]) {
+  async function printOpenEndedClass(group: OeClassRow[]) {
     if (planLimited) { setPrintMessage(LOCKED_MESSAGE); return }
     const first = group[0]
     setPrintBusy(`oe-${first.id}`); setPrintMessage('')
@@ -278,13 +281,13 @@ export default function TeacherAssignPage() {
       const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/teacher/students-roster', { headers: { Authorization: `Bearer ${session?.access_token}` } })
       const roster = await res.json().catch(() => null)
-      const students = (roster?.students || []).filter((student: any) => student.classroomId === first.classroom_id)
+      const students = ((roster?.students || []) as Array<{ id: string; fullName: string; schoolNo: string | null; classroomId?: string }>).filter(student => student.classroomId === first.classroom_id)
       if (!students.length) { setPrintMessage(tr('Bu sınıfta öğrenci yok.')); return }
       const { openEndedScenarioSheetHtml, teacherQrPayload, shortSheetCode } = await import('@/lib/open-ended-print')
       const { printLearningDocument } = await import('@/lib/learning-print')
       const title = baseTitle(first.title)
       const code = shortSheetCode(first.batch_id || first.id)
-      const pages: any[] = []
+      const pages: ScenarioSheetItem[] = []
       for (const student of students) {
         for (const [index, a] of group.entries()) {
           pages.push({
