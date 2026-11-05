@@ -12,6 +12,7 @@ interface UserData {
     referral_code: string | null
     avatar_url: string | null
     role: string | null
+    grade?: string | null
   } | null
   streak: number
   unreadCount: number
@@ -64,7 +65,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         { count: unread },
         identityRes,
       ] = await Promise.all([
-        supabase.from('profiles').select('plan,monthly_test_count,language,referral_code,avatar_url,role').eq('id', user.id).maybeSingle(),
+        supabase.from('profiles').select('plan,monthly_test_count,language,referral_code,avatar_url,role,grade').eq('id', user.id).maybeSingle(),
         supabase.from('streaks').select('current_streak').eq('user_id', user.id).maybeSingle(),
         supabase.from('teachers').select('approved').eq('user_id', user.id).maybeSingle(),
         supabase.from('parent_children').select('id', { count: 'exact', head: true }).eq('parent_id', user.id),

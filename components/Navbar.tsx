@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/user-context'
 import LightbulbIcon from '@/components/LightbulbIcon'
+import StudentSidebar, { SIDEBAR_TOGGLE_EVENT } from '@/components/StudentSidebar'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { LOCALES, localeFromLanguage } from '@/lib/i18n/core'
 
@@ -83,6 +84,16 @@ export default function Navbar() {
 
   useEffect(() => { setShowMenu(false); setShowLang(false) }, [pathname])
 
+  // Öğrenci yan menüsü: öğretmen/veli/kurum olmayan, menünün gizli olmadığı sayfalarda açık.
+  const shellOn = !!profile && !!pathname
+    && profile.teacher_approved !== true && !(profile.is_parent === true || profile.role === 'parent') && profile.role !== 'institution_admin'
+    && !['/institution', '/teacher', '/parent'].some(prefix => pathname.startsWith(prefix))
+    && !['/login', '/register', '/profile', '/'].includes(pathname)
+  useEffect(() => {
+    document.body.classList.toggle('has-student-sidebar', shellOn)
+    return () => document.body.classList.remove('has-student-sidebar')
+  }, [shellOn])
+
   useEffect(() => {
     const stored = localStorage.getItem('pratium-theme')
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -156,6 +167,7 @@ export default function Navbar() {
         @media (max-width: 768px) { .nav-spacer { height: 58px; } }
       `}</style>
       <div className="nav-spacer" />
+      {shellOn && <StudentSidebar profile={{ name: profile.name, avatar_url: profile.avatar_url, plan: profile.plan, grade: profile.grade }} streak={streak} testsLeft={testsLeft} onSignOut={handleSignOut} />}
 
       {/* ── MOBILE TOP BAR ── */}
       <div className="mobile-only" style={{
@@ -165,7 +177,13 @@ export default function Navbar() {
         padding: '0 14px',
         boxShadow: '0 2px 12px rgba(8,36,101,0.3)',
       }}>
-        <Link href="/home" style={{ flexShrink: 0 }}>
+        {shellOn && (
+          <button aria-label={t('Menüyü aç')} onClick={() => window.dispatchEvent(new Event(SIDEBAR_TOGGLE_EVENT))}
+            style={{ width: 38, height: 38, borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: 8 }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+          </button>
+        )}
+        <Link href="/home" style={{ flexShrink: 0, marginRight: 'auto' }}>
           <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '28px', filter: 'brightness(0) invert(1)' }} />
         </Link>
 
@@ -340,9 +358,9 @@ export default function Navbar() {
             <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '68px', width: 'auto' }} />
           </Link>
 
-          {/* Ana nav linkleri — sadece Test | Günlük | Sıralama */}
+          {/* Ana nav linkleri — öğrencide yan menüye taşındı */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-            {NAV_LINKS.map(item => (
+            {(shellOn ? [] : NAV_LINKS).map(item => (
               <Link key={item.href} href={item.href} style={{
                 padding: '8px 18px', borderRadius: '8px', fontSize: '15px',
                 fontWeight: 600, whiteSpace: 'nowrap', transition: 'all 0.15s',
