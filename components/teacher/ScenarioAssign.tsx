@@ -14,6 +14,7 @@ export default function ScenarioAssign({ classrooms, onCreated }: { classrooms: 
   const [classroomId, setClassroomId] = useState(classrooms[0]?.id || '')
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [needsGrade, setNeedsGrade] = useState(false)
+  const [gradeNumber, setGradeNumber] = useState(0)   // 0: sınıf kaydından/adından otomatik; >0: öğretmenin seçtiği düzey
   const [subject, setSubject] = useState('')
   const [pick, setPick] = useState('')
   const [title, setTitle] = useState('')
@@ -29,12 +30,12 @@ export default function ScenarioAssign({ classrooms, onCreated }: { classrooms: 
   useEffect(() => {
     if (!classroomId) return
     ;(async () => {
-      const res = await fetch(`/api/teacher/assign-scenario?classroom_id=${classroomId}`, { headers: await headers(), cache: 'no-store' })
+      const res = await fetch(`/api/teacher/assign-scenario?classroom_id=${classroomId}${gradeNumber ? `&grade_number=${gradeNumber}` : ''}`, { headers: await headers(), cache: 'no-store' })
       const json = await res.json().catch(() => ({}))
       setScenarios(json.scenarios || []); setNeedsGrade(!!json.needsGrade)
     })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [classroomId])
+  }, [classroomId, gradeNumber])
 
   const subjects = [...new Set(scenarios.map(s => s.subject))]
   const options = scenarios.filter(s => s.subject === subject)
@@ -44,7 +45,7 @@ export default function ScenarioAssign({ classrooms, onCreated }: { classrooms: 
     if (!chosen) { setError(t('Ders ve senaryo seçin.')); return }
     setBusy(true); setError('')
     try {
-      const res = await fetch('/api/teacher/assign-scenario', { method: 'POST', headers: await headers(), body: JSON.stringify({ classroom_id: classroomId, subject: chosen.subject, term: chosen.term, scenarioNo: chosen.scenarioNo, title, due_date: due || undefined }) })
+      const res = await fetch('/api/teacher/assign-scenario', { method: 'POST', headers: await headers(), body: JSON.stringify({ classroom_id: classroomId, subject: chosen.subject, term: chosen.term, scenarioNo: chosen.scenarioNo, title, due_date: due || undefined, grade_number: gradeNumber || undefined }) })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) { setError(json.error || t('Ödev kaydedilemedi.')); return }
       onCreated(json.assignments || [])
@@ -56,10 +57,17 @@ export default function ScenarioAssign({ classrooms, onCreated }: { classrooms: 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6, margin: 0 }}>{t('Yöneticinin yüklediği senaryo serisi sınıfa atanır: senaryodaki tüm sorular, şekilleri ve doldurulacak tablolarıyla birlikte ödev olur.')}</p>
       {error && <div style={{ padding: '10px 12px', background: 'var(--red-bg)', borderRadius: 4, fontSize: 13, color: 'var(--red)' }}>{error}</div>}
-      <select value={classroomId} onChange={e => { setClassroomId(e.target.value); setSubject(''); setPick(''); setScenarios([]); setNeedsGrade(false) }} style={field} aria-label={t('Sınıf')}>
+      <select value={classroomId} onChange={e => { setClassroomId(e.target.value); setGradeNumber(0); setSubject(''); setPick(''); setScenarios([]); setNeedsGrade(false) }} style={field} aria-label={t('Sınıf')}>
         {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
       </select>
-      {needsGrade && <div style={{ fontSize: 12, color: 'var(--red)' }}>{t('Bu sınıfın seviyesi (sınıf düzeyi) tanımlı değil.')}</div>}
+      {(needsGrade || gradeNumber > 0) && (
+        <label style={{ fontSize: 12, display: 'block' }}>{needsGrade ? t('Bu sınıfın seviyesi (sınıf düzeyi) tanımlı değil.') : t('Sınıf düzeyi')}
+          <select value={gradeNumber} onChange={e => setGradeNumber(Number(e.target.value))} style={field} aria-label={t('Sınıf düzeyi')}>
+            <option value={0}>{t('Sınıf düzeyi seç…')}</option>
+            {Array.from({ length: 12 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}. {t('sınıf')}</option>)}
+          </select>
+        </label>
+      )}
       <select value={subject} onChange={e => { setSubject(e.target.value); setPick('') }} style={field} aria-label={t('Ders seç')}>
         <option value="">{subjects.length ? t('Ders seç…') : t('Bu seviye için yayınlanmış senaryo yok')}</option>
         {subjects.map(name => <option key={name} value={name}>{name}</option>)}
