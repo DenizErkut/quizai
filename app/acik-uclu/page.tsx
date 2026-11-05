@@ -8,7 +8,9 @@ import { useVoiceTutor } from '@/lib/use-voice-tutor'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
 import { svgDataUri, parseAnswerTable, serializeTableAnswer } from '@/lib/open-ended-scenarios'
-import { compressImage } from '@/lib/image-compress'
+import OpenEndedPaperUpload from '@/components/student/OpenEndedPaperUpload'
+import { resolveOwnIdentity } from '@/lib/identity/resolve-client'
+import QRCode from 'qrcode'
 
 interface RubricItem { criterion: string; maxPoints: number; description: string }
 interface CriteriaResult { criterion: string; maxPoints: number; earnedPoints: number; feedback: string }
@@ -65,13 +67,6 @@ export default function AcikUcluPage() {
   const [printingKey, setPrintingKey] = useState('')
   const [printMessage, setPrintMessage] = useState('')
   const [paperOpen, setPaperOpen] = useState(false)
-  const [paperTarget, setPaperTarget] = useState('')
-  const [paperFilter, setPaperFilter] = useState<{ subject: string; topic: string } | null>(null)
-  const [paperFiles, setPaperFiles] = useState<File[]>([])
-  const [paperText, setPaperText] = useState<string | null>(null)
-  const [paperBusy, setPaperBusy] = useState('')
-  const [paperMessage, setPaperMessage] = useState('')
-  const [paperResult, setPaperResult] = useState<{ earned: number; total: number; feedback: string } | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -170,7 +165,7 @@ export default function AcikUcluPage() {
     try {
       const headers = await authHeaders()
       const recent = Date.now() - 7 * 24 * 3600_000
-      const items: Array<{ scenario: string; question: string; rubric: RubricItem[]; figureSvg?: string | null; answerTable?: string | null; code: string }> = []
+      const items: Array<{ scenario: string; question: string; rubric: RubricItem[]; figureSvg?: string | null; answerTable?: string | null; code: string; sessionId: string }> = []
       for (let i = 0; i < total; i++) {
         setPrintMessage(t('Soru {n}/{total} hazırlanıyor…', { n: i + 1, total }))
         const existing = mySessions.find(s => s.subject.toLocaleLowerCase('tr') === card.subject.toLocaleLowerCase('tr') && s.topic === label && s.question_index === i && !s.graded_at && new Date(s.created_at).getTime() > recent)
@@ -179,7 +174,7 @@ export default function AcikUcluPage() {
           const json = await res.json()
           if (res.ok && json.session) {
             const row = json.session
-            items.push({ scenario: row.scenario, question: row.question, rubric: row.rubric, figureSvg: row.figure_svg, answerTable: row.answer_table, code: row.id.replace(/-/g, '').slice(0, 8).toUpperCase() })
+            items.push({ scenario: row.scenario, question: row.question, rubric: row.rubric, figureSvg: row.figure_svg, answerTable: row.answer_table, code: row.id.replace(/-/g, '').slice(0, 8).toUpperCase(), sessionId: row.id })
             continue
           }
         }
@@ -189,45 +184,18 @@ export default function AcikUcluPage() {
           setError(json.error === 'daily_limit_reached' ? t('Günlük test hakkın doldu.') : json.error === 'monthly_limit_reached' ? t('Aylık test hakkın doldu.') : json.error || t('Soru açılamadı.'))
           return
         }
-        items.push({ scenario: json.scenario, question: json.question, rubric: json.rubric, figureSvg: json.figureSvg, answerTable: json.answerTable, code: String(json.sessionId).replace(/-/g, '').slice(0, 8).toUpperCase() })
+        items.push({ scenario: json.scenario, question: json.question, rubric: json.rubric, figureSvg: json.figureSvg, answerTable: json.answerTable, code: String(json.sessionId).replace(/-/g, '').slice(0, 8).toUpperCase(), sessionId: String(json.sessionId) })
       }
-      const [{ openEndedStudentSheetHtml, shortSheetCode }, { printLearningDocument }] = await Promise.all([import('@/lib/open-ended-print'), import('@/lib/learning-print')])
+      const [{ openEndedScenarioSheetHtml, OE_QR_PREFIX }, { printLearningDocument }, own] = await Promise.all([import('@/lib/open-ended-print'), import('@/lib/learning-print'), resolveOwnIdentity(supabase)])
       const title = `${card.subject} · ${label}`
-      await printLearningDocument(title, t('Açık Uçlu Sorular'), openEndedStudentSheetHtml(items, { code: shortSheetCode(items[0].code), title, subject: card.subject, topic: label }))
+      const sheetItems = await Promise.all(items.map(async (item, index) => ({
+        ...item, position: index + 1, total: items.length,
+        qrDataUrl: await QRCode.toDataURL(`${OE_QR_PREFIX}${item.sessionId}`, { width: 240, margin: 1 }),
+      })))
+      await printLearningDocument(title, t('Açık Uçlu Sorular'), openEndedScenarioSheetHtml(sheetItems, { studentName: own?.full_name || '', title }))
       await loadMySessions()
     } catch { setError(t('Yazdırma görünümü açılamadı.')) }
     finally { setPrintingKey(''); setPrintMessage('') }
-  }
-
-  function openPaper(target: { sessionId?: string; filter?: { subject: string; topic: string } }) {
-    setPaperOpen(true); setPaperTarget(target.sessionId || ''); setPaperFilter(target.filter || null)
-    setPaperFiles([]); setPaperText(null); setPaperMessage(''); setPaperResult(null); setError('')
-  }
-
-  async function readPaper() {
-    if (!paperTarget || !paperFiles.length) return
-    setPaperBusy('read'); setPaperMessage(t('Kâğıt okunuyor… (20-60 saniye sürebilir)'))
-    try {
-      const images = await Promise.all(paperFiles.slice(0, 6).map(compressImage))
-      const res = await fetch('/api/open-ended/paper', { method: 'POST', headers: await authHeaders(), body: JSON.stringify({ action: 'transcribe', sessionId: paperTarget, images }) })
-      const json = await res.json()
-      if (!res.ok) { setPaperMessage(json.error || t('Kâğıt okunamadı. Daha net ve düz bir fotoğrafla tekrar dene.')); return }
-      setPaperText(json.text || ''); setPaperMessage(json.legible === false ? t('Bazı yerler okunamadı; lütfen metni kontrol edip düzelt.') : '')
-    } catch { setPaperMessage(t('Bağlantı hatası, tekrar dene.')) }
-    finally { setPaperBusy('') }
-  }
-
-  async function savePaper() {
-    if (!paperTarget || paperText === null) return
-    setPaperBusy('save'); setPaperMessage(t('Cevapların puanlanıyor… (1-2 dakika sürebilir)'))
-    try {
-      const res = await fetch('/api/open-ended/paper', { method: 'POST', headers: await authHeaders(), body: JSON.stringify({ action: 'save', sessionId: paperTarget, text: paperText }) })
-      const json = await res.json()
-      if (!res.ok) { setPaperMessage(json.error || t('Puanlama başarısız.')); return }
-      setPaperResult({ earned: json.totalEarned, total: json.totalPossible, feedback: json.overallFeedback || '' }); setPaperMessage('')
-      await Promise.all([loadMySessions(), loadScenarios()])
-    } catch { setPaperMessage(t('Bağlantı hatası, tekrar dene.')) }
-    finally { setPaperBusy('') }
   }
 
   async function loadAssigned() {
@@ -414,7 +382,7 @@ export default function AcikUcluPage() {
                       </button>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button className="btn btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => printScenario(card)} disabled={!!printingKey || !!startingScenario}>{printingKey === key ? '⏳' : t('🖨️ Yazdır')}</button>
-                        <button className="btn btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => openPaper({ filter: { subject: card.subject, topic: `${card.term}. dönem ${card.scenarioNo}. senaryo` } })}>{t('📷 Kâğıttan yükle')}</button>
+                        <button className="btn btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setPaperOpen(true)}>{t('📷 Kâğıtları yükle')}</button>
                       </div>
                       {printingKey === key && printMessage && <div style={{ fontSize: 11, color: 'var(--text2)' }}>{printMessage}</div>}
                     </div>
@@ -644,6 +612,7 @@ export default function AcikUcluPage() {
       <aside className="oe-side" aria-label={t('Çözülenler')}>
         <div className="card" style={{ padding: '12px 14px' }}>
           <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--primary)', marginBottom: 8 }}>{t('Çözülenler')}</div>
+          <button className="btn btn-primary btn-sm" style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }} onClick={() => setPaperOpen(true)}>{t('📷 Kâğıtları yükle')}</button>
           {mySessions.length === 0 ? (
             <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.5 }}>{t('Başladığın senaryo soruları burada listelenir.')}</div>
           ) : (
@@ -657,7 +626,6 @@ export default function AcikUcluPage() {
                   {!item.graded_at && (
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button className="btn btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => openSession(item.id)}>{t('Çöz')}</button>
-                      <button className="btn btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => openPaper({ sessionId: item.id })}>{t('📷 Yükle')}</button>
                     </div>
                   )}
                 </div>
@@ -668,49 +636,7 @@ export default function AcikUcluPage() {
       </aside>
       </div>
 
-      {paperOpen && (
-        <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(10,20,16,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => !paperBusy && setPaperOpen(false)}>
-          <div className="card" style={{ width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto', padding: '1.25rem' }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontWeight: 800, marginBottom: 8 }}>{t('📷 Kâğıttan cevap yükle')}</div>
-            {paperResult ? (
-              <>
-                <p style={{ fontSize: 15, fontWeight: 700, color: '#0a9e90' }}>{t('Puan')}: {paperResult.earned}/{paperResult.total}</p>
-                {paperResult.feedback && <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6 }}>{paperResult.feedback}</p>}
-                <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 10 }} onClick={() => setPaperOpen(false)}>{t('Kapat')}</button>
-              </>
-            ) : (
-              <>
-                {(() => {
-                  const options = mySessions.filter(item => !item.graded_at && (!paperFilter || (item.topic === paperFilter.topic && item.subject.toLocaleLowerCase('tr') === paperFilter.subject.toLocaleLowerCase('tr'))))
-                  return (
-                    <label style={{ fontSize: 12, display: 'block', marginBottom: 10 }}>{t('Hangi soru?')}
-                      <select className="input" value={paperTarget} onChange={e => setPaperTarget(e.target.value)} disabled={!!paperBusy || paperText !== null}>
-                        <option value="">{options.length ? t('Soru seç…') : t('Önce 🖨️ Yazdır ile soruları hazırla')}</option>
-                        {options.map(item => <option key={item.id} value={item.id}>{item.subject} · {item.topic} · {t('Soru {n}', { n: item.question_index + 1 })}</option>)}
-                      </select>
-                    </label>
-                  )
-                })()}
-                {paperText === null ? (
-                  <>
-                    <input type="file" accept="image/*" multiple onChange={e => setPaperFiles(Array.from(e.target.files || []))} />
-                    <p style={{ fontSize: 11.5, color: 'var(--text3)', margin: '6px 0 0' }}>{t('Fotoğraf çek veya taranmış görseli (JPEG/PNG) seç. Düz ve iyi ışıklı olsun.')}</p>
-                    <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 10 }} onClick={readPaper} disabled={!paperTarget || !paperFiles.length || !!paperBusy}>{paperBusy === 'read' ? t('Okunuyor…') : t('Kâğıdı oku')}</button>
-                  </>
-                ) : (
-                  <>
-                    <p style={{ fontSize: 12, color: 'var(--text2)' }}>{t('Okunan cevabı kontrol et, gerekirse düzelt.')}</p>
-                    <textarea className="input" rows={8} value={paperText} onChange={e => setPaperText(e.target.value)} />
-                    <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 10 }} onClick={savePaper} disabled={!!paperBusy}>{paperBusy === 'save' ? t('Puanlanıyor…') : t('Cevabı puanla')}</button>
-                  </>
-                )}
-                {paperMessage && <p style={{ fontSize: 12.5, color: 'var(--text2)', marginTop: 8 }}>{paperMessage}</p>}
-                {!paperBusy && <button className="btn" style={{ width: '100%', justifyContent: 'center', marginTop: 8 }} onClick={() => setPaperOpen(false)}>{t('Vazgeç')}</button>}
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {paperOpen && <OpenEndedPaperUpload sessions={mySessions} onClose={() => setPaperOpen(false)} onSaved={() => { void loadMySessions(); void loadScenarios() }} />}
     </main>
   )
 }
