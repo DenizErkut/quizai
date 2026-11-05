@@ -48,6 +48,7 @@ export interface OwnIdentity {
   phone: string | null
   parent_email: string | null
   institution_name: string | null
+  national_id_set?: boolean
 }
 
 // Oturum sahibinin KENDİ kimlik kaydını (yaş, telefon dahil) getirir.

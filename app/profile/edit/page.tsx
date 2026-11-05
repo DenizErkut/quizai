@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { resolveOwnIdentity } from '@/lib/identity/resolve-client'
+import { tcKimlikRequired, validateTcKimlikNo, normalizeTcKimlikNo } from '@/lib/tc-kimlik'
 import DepartmentSelect, { resolveDepartmentValue } from '@/components/DepartmentSelect'
 import { UNIVERSITY_DEPARTMENTS, OTHER_DEPARTMENT_VALUE } from '@/lib/university-departments'
 import ContentIssueReporter from '@/components/ContentIssueReporter'
@@ -53,6 +54,9 @@ export default function ProfileEditPage() {
 
   const [name, setName] = useState('')
   const [age, setAge] = useState('')
+  const [nationalId, setNationalId] = useState('')
+  const [nationalIdSet, setNationalIdSet] = useState(false)
+  const [accountRole, setAccountRole] = useState('student')
   const [gender, setGender] = useState('')
   const [grade, setGrade] = useState('')
   const [department, setDepartment] = useState('')
@@ -104,6 +108,8 @@ export default function ProfileEditPage() {
         const own = await resolveOwnIdentity(supabase)
         setName(own?.full_name || '')
         setAge(own?.age != null ? String(own.age) : '')
+        setNationalIdSet(own?.national_id_set === true)
+        setAccountRole(data.role || 'student')
         setGender(data.gender || '')
         setGrade(data.grade || '')
         // Kayıtlı bölüm listedeki bir seçenekse doğrudan seçili gösterilir;
@@ -184,6 +190,8 @@ export default function ProfileEditPage() {
     if (isUniversity && !resolvedDepartment) { setError(tr('Bölüm seçimi zorunlu.')); return }
     const locCheck = validateLocationDetails(loc)
     if (locCheck.ok === false) { setError(tr(locCheck.field === 'postal' ? 'Geçerli bir posta kodu girin.' : 'Ülke, eyalet/il ve şehir/ilçe zorunludur.')); return }
+    const tcNeeded = !nationalIdSet && tcKimlikRequired(accountRole, loc.country)
+    if (tcNeeded && !validateTcKimlikNo(nationalId)) { setError(tr('Geçerli bir T.C. Kimlik No girin (11 haneli).')); return }
     setError(''); setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
@@ -196,6 +204,8 @@ export default function ProfileEditPage() {
       body: JSON.stringify({
         fullName: name.trim(),
         age: age.trim() ? parseInt(age, 10) : null,
+        nationalId: tcNeeded ? normalizeTcKimlikNo(nationalId) : undefined,
+        role: accountRole === 'student' || accountRole === 'parent' || accountRole === 'teacher' ? accountRole : undefined,
       }),
     })
     if (!idRes.ok) { setError(tr('İsim/yaş kaydedilemedi. Lütfen tekrar deneyin.')); setSaving(false); return }
@@ -308,6 +318,18 @@ export default function ProfileEditPage() {
 
           <label className="field-label">{tr('E-posta')}</label>
           <input className="input" value={email} disabled style={{ opacity: 0.5, cursor: 'not-allowed' }} />
+
+          {tcKimlikRequired(accountRole, loc.country) && (
+            <>
+              <label className="field-label">{tr('T.C. Kimlik No *')}</label>
+              {nationalIdSet ? (
+                <input className="input" value={tr('Kayıtlı ✓')} disabled style={{ opacity: 0.6, cursor: 'not-allowed' }} />
+              ) : (
+                <input className="input" inputMode="numeric" autoComplete="off" maxLength={11} placeholder={tr('11 haneli T.C. Kimlik No')}
+                  value={nationalId} onChange={e => setNationalId(e.target.value.replace(/\D/g, '').slice(0, 11))} />
+              )}
+            </>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>

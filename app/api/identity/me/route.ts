@@ -10,7 +10,7 @@
 // hiç kimsenin kaydına asla erişemez.
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
-import { getIdentityBySupabaseId } from '@/lib/identity/client'
+import { getIdentityBySupabaseId, hasNationalId } from '@/lib/identity/client'
 
 export const runtime = 'nodejs'
 
@@ -40,6 +40,7 @@ export async function GET(req: NextRequest) {
         phone: identity.phone,
         parent_email: identity.parent_email,
         institution_name: identity.institution_name,
+        national_id_set: await hasNationalId(user.id),
       },
     })
   } catch (e) {

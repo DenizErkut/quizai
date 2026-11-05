@@ -59,6 +59,16 @@ function withoutSensitive<T extends { national_id?: unknown }>(row: T): T {
   return rest as T
 }
 
+// T.C. Kimlik No kayıtlı mı? (Değerin kendisi asla okunmaz; sütun yoksa false.)
+export async function hasNationalId(supabaseUserId: string): Promise<boolean> {
+  try {
+    const { rows } = await trPool.query(`SELECT national_id IS NOT NULL AS has FROM identities WHERE supabase_user_id = $1`, [supabaseUserId])
+    return rows[0]?.has === true
+  } catch {
+    return false
+  }
+}
+
 // Supabase user_id'den kimlik getir
 export async function getIdentityBySupabaseId(supabaseUserId: string): Promise<Identity | null> {
   const { rows } = await trPool.query(

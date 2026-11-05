@@ -53,4 +53,8 @@ export const writtenExamEntries: Entry[] = [
   ['ÜYELİĞİNİ YÜKSELT', 'UPGRADE YOUR PLAN', 'PLAN UPGRADEN', 'PASSE AU PLAN SUPÉRIEUR', 'MEJORA TU PLAN', 'قم بترقية اشتراكك'],
   ['Menüyü aç', 'Open menu', 'Menü öffnen', 'Ouvrir le menu', 'Abrir menú', 'افتح القائمة'],
   ['Şifremi değiştir', 'Change my password', 'Passwort ändern', 'Changer mon mot de passe', 'Cambiar mi contraseña', 'تغيير كلمة المرور'],
+  ['Lütfen profilinizi tamamlayınız', 'Please complete your profile', 'Bitte vervollständige dein Profil', 'Merci de compléter ton profil', 'Por favor, completa tu perfil', 'يرجى إكمال ملفك الشخصي'],
+  ['Kaydınız tamamlanmamış görünüyor. Ad soyad, sınıf, konum ve T.C. Kimlik No bilgilerinizi profil sayfasından girmeniz gerekiyor.', 'Your registration looks incomplete. Please enter your full name, grade, location and T.C. Kimlik No on the profile page.', 'Deine Registrierung scheint unvollständig. Bitte gib Name, Klasse, Standort und T.C. Kimlik No auf der Profilseite ein.', 'Ton inscription semble incomplète. Saisis ton nom, ta classe, ta localisation et ton T.C. Kimlik No sur la page de profil.', 'Tu registro parece incompleto. Introduce tu nombre, curso, ubicación y T.C. Kimlik No en la página de perfil.', 'يبدو أن تسجيلك غير مكتمل. أدخل اسمك وصفّك وموقعك ورقم T.C. Kimlik في صفحة الملف الشخصي.'],
+  ['Kayıtlı ✓', 'On file ✓', 'Hinterlegt ✓', 'Enregistré ✓', 'Registrado ✓', 'مسجَّل ✓'],
+  ['Tamam', 'OK', 'OK', 'OK', 'Aceptar', 'حسنًا'],
 ]

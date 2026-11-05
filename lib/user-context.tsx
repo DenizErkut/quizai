@@ -20,6 +20,8 @@ interface UserData {
   isApprovedTeacher: boolean
   isParent: boolean
   isInstitution: boolean
+  /** Kayıt tamamlanmamış: TR-PG'de kimlik yok, sınıf seçilmemiş öğrenci profili (ör. onay bağlantısı başka tarayıcıda açıldı). */
+  identityMissing: boolean
   loading: boolean
 }
 
@@ -41,6 +43,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     isApprovedTeacher: false,
     isParent: false,
     isInstitution: false,
+    identityMissing: false,
     loading: true,
   })
 
@@ -74,11 +77,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
           method: 'POST',
           headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ ids: [user.id] }),
-        }).then(r => r.ok ? r.json() : { identities: {} }).catch(() => ({ identities: {} })),
+        }).then(async r => r.ok ? { ...(await r.json()), resolveOk: true } : { identities: {}, resolveOk: false }).catch(() => ({ identities: {}, resolveOk: false })),
       ])
 
       const fullName = identityRes?.identities?.[user.id]?.full_name || ''
       const role = profile?.role || 'student'
+      // Yalnızca kimlik servisi başarıyla yanıt verip kaydı BULAMADIĞINDA işaretlenir (servis kesintisinde kimseyi yönlendirmez).
+      const identityMissing = !!identityRes?.resolveOk && !identityRes?.identities?.[user.id] && !!profile && !profile.grade && role === 'student'
       setData({
         user,
         profile: profile ? { ...profile, name: fullName } : (fullName ? { name: fullName } as unknown : null),
@@ -88,6 +93,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         isApprovedTeacher: teacher?.approved === true,
         isParent: (parentCount || 0) > 0,
         isInstitution: role === 'institution',
+        identityMissing,
         loading: false,
       })
     } catch {
