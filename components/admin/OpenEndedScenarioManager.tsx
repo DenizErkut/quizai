@@ -109,7 +109,7 @@ export default function OpenEndedScenarioManager() {
     return (
       <div style={{ display: 'grid', gap: 10 }}>
         <div className="card" style={{ display: 'grid', gap: 10 }}>
-          {!form.id && <div><button className="btn btn-primary" onClick={() => { setForm(null); setPdfOpen(true) }}>📄 PDF'den yükle (tüm senaryoları otomatik ayıkla)</button></div>}
+          {!form.id && <div><button className="btn btn-primary" onClick={() => { setForm(null); setPdfOpen(true) }}>📄 PDF&apos;den yükle (tüm senaryoları otomatik ayıkla)</button></div>}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
             <label style={{ fontSize: 12 }}>Sınıf<select style={field} value={form.gradeNumber} onChange={e => setForm({ ...form, gradeNumber: Number(e.target.value) })}>{Array.from({ length: 12 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}. sınıf</option>)}</select></label>
             <label style={{ fontSize: 12 }}>Ders<input style={field} list="oe-subjects-form" value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} placeholder="Ders seçin veya yazın" /><datalist id="oe-subjects-form">{subjectOptionsForGrade(form.gradeNumber).map(name => <option key={name} value={name} />)}</datalist></label>
@@ -166,7 +166,7 @@ export default function OpenEndedScenarioManager() {
     <div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
         <button className="btn btn-primary" onClick={() => setForm(emptyForm({ gradeNumber: filterGrade || 7, term: filterTerm || 1 }))}>+ Yeni örnek senaryo</button>
-        <button className="btn btn-primary" onClick={() => setPdfOpen(o => !o)}>📄 PDF'den yükle (senaryo + şekil)</button>
+        <button className="btn btn-primary" onClick={() => setPdfOpen(o => !o)}>📄 PDF&apos;den yükle (senaryo + şekil)</button>
         <select style={{ ...field, width: 130 }} value={filterGrade} onChange={e => setFilterGrade(Number(e.target.value))}><option value={0}>Tüm sınıflar</option>{Array.from({ length: 12 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}. sınıf</option>)}</select>
         <select style={{ ...field, width: 130 }} value={filterTerm} onChange={e => setFilterTerm(Number(e.target.value))}><option value={0}>Tüm dönemler</option><option value={1}>1. dönem</option><option value={2}>2. dönem</option></select>
       </div>
