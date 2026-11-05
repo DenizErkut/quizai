@@ -11,6 +11,7 @@
 // kaydını TAMAMLAMAK. Veri bulunamazsa (farklı cihaz/tarayıcıdan onay,
 // localStorage temizlenmiş vb.) kısa bir "profilini tamamla" formu
 // gösterilir — kullanıcı kaybolmaz, veri kaybı yerine zarif bozulma olur.
+import { tcKimlikRequired, validateTcKimlikNo, normalizeTcKimlikNo } from '@/lib/tc-kimlik'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -77,6 +78,7 @@ export default function CompleteProfilePage() {
   const [fbInstitutionName, setFbInstitutionName] = useState('') // öğrenci: kurum kaydından otomatik
   const [fbParentEmail, setFbParentEmail] = useState('')
   const [fbPhone, setFbPhone] = useState('')
+  const [fbNationalId, setFbNationalId] = useState('')
   const [fbLoc, setFbLoc] = useState<LocationDetails>(EMPTY_LOCATION_DETAILS)
   const [fbKvkkAydinlatma, setFbKvkkAydinlatma] = useState(false)
   const [fbKvkkAcikRiza, setFbKvkkAcikRiza] = useState(false)
@@ -153,6 +155,8 @@ export default function CompleteProfilePage() {
         kvkkAydinlatma: pending.kvkkAydinlatma,
         kvkkAcikRiza: pending.kvkkAcikRiza,
         veliOnayi: pending.veliOnayi,
+        nationalId: pending.nationalId || undefined,
+        country: pending.role === 'student' ? pending.country : undefined,
       }),
     })
     if (!idRes.ok) {
@@ -279,6 +283,8 @@ export default function CompleteProfilePage() {
 
   async function handleFallbackSubmit() {
     if (!fbName.trim()) { setFbError(tr('Ad soyad zorunludur.')); return }
+    const fbTcNeeded = tcKimlikRequired(fbRole, fbLoc.country)
+    if (fbTcNeeded && !validateTcKimlikNo(fbNationalId)) { setFbError(tr('Geçerli bir T.C. Kimlik No girin (11 haneli).')); return }
     if (!fbKvkkAydinlatma) { setFbError(tr('KVKK Aydınlatma Metnini onaylamalısın.')); return }
     if (!fbKvkkAcikRiza) { setFbError(tr('Açık rıza vermelisin.')); return }
     if (fbRole === 'student') {
@@ -313,6 +319,8 @@ export default function CompleteProfilePage() {
           role: fbRole,
           parentEmail: fbRole === 'student' ? (fbParentEmail.trim() || undefined) : undefined,
           institutionName: fbRole === 'student' ? (fbInstitutionName || undefined) : undefined,
+          nationalId: fbTcNeeded ? normalizeTcKimlikNo(fbNationalId) : undefined,
+          country: fbRole === 'student' ? fbLoc.country : undefined,
           kvkkAydinlatma: fbKvkkAydinlatma, kvkkAcikRiza: fbKvkkAcikRiza, veliOnayi: fbVeliOnayi,
         }),
       })
@@ -488,6 +496,14 @@ export default function CompleteProfilePage() {
         <div className="card">
           <label className="field-label">{tr('Ad Soyad *')}</label>
           <input className="input" value={fbName} onChange={e => setFbName(e.target.value)} placeholder="Ahmet Yılmaz" />
+
+          {tcKimlikRequired(fbRole, fbLoc.country) && (
+            <>
+              <label className="field-label">{tr('T.C. Kimlik No *')}</label>
+              <input className="input" inputMode="numeric" autoComplete="off" maxLength={11} placeholder={tr('11 haneli T.C. Kimlik No')}
+                value={fbNationalId} onChange={e => setFbNationalId(e.target.value.replace(/\D/g, '').slice(0, 11))} />
+            </>
+          )}
 
           {fbRole === 'student' && (
             <>

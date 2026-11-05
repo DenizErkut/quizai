@@ -7,7 +7,8 @@
 // oluşturabilir (userId istemciden alınmaz, token'dan gelir).
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
-import { createIdentity, getIdentityBySupabaseId, recordConsent, CURRENT_CONSENT_VERSIONS } from '@/lib/identity/client'
+import { createIdentity, getIdentityBySupabaseId, recordConsent, updateIdentity, CURRENT_CONSENT_VERSIONS } from '@/lib/identity/client'
+import { normalizeTcKimlikNo, tcKimlikRequired, validateTcKimlikNo } from '@/lib/tc-kimlik'
 
 export const runtime = 'nodejs'
 
@@ -38,6 +39,7 @@ export async function POST(req: NextRequest) {
     fullName, age, role,
     parentEmail, institutionName,
     kvkkAydinlatma, kvkkAcikRiza, veliOnayi,
+    nationalId, country,
   } = body || {}
 
   if (!fullName || !role) {
@@ -46,6 +48,13 @@ export async function POST(req: NextRequest) {
   // Kullanıcı kendine yönetici/kurum rolü veremez; yalnızca kayıt rolleri kabul edilir.
   if (typeof fullName !== 'string' || fullName.length > 200 || !['student', 'parent', 'teacher'].includes(role)) {
     return NextResponse.json({ error: 'Geçersiz parametre.' }, { status: 400 })
+  }
+
+  // T.C. Kimlik No: Türkiye'deki herkes için zorunlu (yurt dışındaki öğrenciler hariç). Değer günlüğe/hata iletisine ASLA yazılmaz.
+  const tcRequired = tcKimlikRequired(role, typeof country === 'string' ? country : '')
+  const tcValue = normalizeTcKimlikNo(nationalId)
+  if (tcRequired && !validateTcKimlikNo(tcValue)) {
+    return NextResponse.json({ error: 'Geçerli bir T.C. Kimlik No girin.', field: 'nationalId' }, { status: 400 })
   }
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
@@ -78,6 +87,13 @@ export async function POST(req: NextRequest) {
       if (numericAge != null && numericAge < 18 && veliOnayi !== undefined) {
         await recordConsent({ identityId: identity.id, consentType: 'veli_onayi', version: CURRENT_CONSENT_VERSIONS.veli_onayi, granted: !!veliOnayi, ipAddress: ip })
       }
+    }
+
+    // T.C. Kimlik No ayrı bir güncellemeyle yazılır: TR-PG'de sütun henüz yoksa (docs/TR-PG-tc-kimlik-no.sql uygulanmadan)
+    // kayıt bozulmaz, yalnızca uyarı düşülür (konum alanlarındaki yaklaşımla aynı).
+    if (tcValue && validateTcKimlikNo(tcValue)) {
+      try { await updateIdentity(user.id, { national_id: tcValue }) }
+      catch (e) { console.warn('[auth/create-identity] national_id yazılamadı (sütun yok olabilir):', (e as { code?: string })?.code || 'hata') }
     }
 
     return NextResponse.json({ success: true, identityId: identity.id })

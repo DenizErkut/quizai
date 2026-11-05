@@ -39,6 +39,8 @@ export interface PendingRegistration {
   institutionCode?: string
   parentEmail?: string
   phone?: string
+  // T.C. Kimlik No: onay e-postasını bekleme süresince (en çok 48 saat) yalnızca bu tarayıcıda durur, kullanılınca silinir.
+  nationalId?: string
   country?: string
   state?: string
   city?: string

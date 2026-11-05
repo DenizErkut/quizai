@@ -92,3 +92,10 @@ AI sağlayıcılarına **ad, e-posta ve kullanıcı kimliği gönderilmediği** 
 2. Zamanlanmış temizlik işi: 12 aylık `ai_usage_logs` kullanıcı kimliği kaldırma, `error_reports`/`coaching_leads`/`coach_conversations` süre sonu silme.
 3. Hesap silme operatör akışını yönetici panelinde adım adım hale getirme.
 4. `avatars` için imzalı URL.
+
+## 8. Ek (5 Kasım 2026): T.C. Kimlik No
+
+- **Ne:** Kayıtta T.C. Kimlik No zorunlu (yurt dışındaki öğrenciler hariç). Biçim ve sağlama basamakları uygulamada doğrulanır; kimlik kaydı NVİ ile eşleştirilmez.
+- **Nerede:** Yalnızca TR-PG `identities.national_id` (betik: `docs/TR-PG-tc-kimlik-no.sql`, VPS'te elle çalıştırılır). Supabase'e, günlüklere ve hiçbir API yanıtına yazılmaz; okuma fonksiyonları sütunu çıkarır. Yalnızca kullanıcının kendi veri dışa aktarımında görünür.
+- **Geçici:** E-posta onayı beklenirken kayıt verisiyle birlikte kullanıcının tarayıcısında (localStorage) en çok 48 saat durur ve kullanılınca silinir.
+- **Sizde:** Aydınlatma Metni'ne T.C. Kimlik No'nun işlenme amacı, hukuki sebebi ve saklama süresi eklenmeli; veri minimizasyonu ilkesi (kimlik numarasının gerçekten gerekli olduğu amaç) hukukçunuzca değerlendirilmeli.
