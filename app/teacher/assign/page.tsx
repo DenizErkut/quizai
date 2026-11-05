@@ -732,12 +732,11 @@ export default function TeacherAssignPage() {
                       <button className="btn btn-sm" disabled={busy} onClick={() => void printOpenEndedGroup(group, true)}>{tr('👩‍🏫 Puanlama anahtarıyla')}</button>
                       <button className="btn btn-sm" onClick={() => setImportGroup(importGroup === `res-${a.batch_id || a.id}` ? '' : `res-${a.batch_id || a.id}`)}>{tr('📊 Sınıf sonuçları')}</button>
                       <button className="btn btn-sm" disabled={busy} onClick={() => void printOpenEndedClass(group)}>{tr('🖨️ Sınıf dökümü (ad + QR)')}</button>
-                      <button className="btn btn-sm" onClick={() => planLimited ? setPrintMessage(LOCKED_MESSAGE) : setImportGroup(importGroup === `bulk-${a.batch_id || a.id}` ? '' : `bulk-${a.batch_id || a.id}`)}>{tr('📷 Toplu tarama yükle')}</button>
-                      <button className="btn btn-sm" onClick={() => planLimited ? setPrintMessage(LOCKED_MESSAGE) : setImportGroup(importGroup === (a.batch_id || a.id) ? '' : (a.batch_id || a.id))}>{tr('📥 Kâğıt cevapları aktar')}</button>
+                      <button className="btn btn-sm" onClick={() => planLimited ? setPrintMessage(LOCKED_MESSAGE) : setImportGroup(importGroup === `bulk-${a.batch_id || a.id}` ? '' : `bulk-${a.batch_id || a.id}`)}>{tr('📥 Kâğıt cevapları aktar')}</button>
                     </div>
                     {importGroup === (a.batch_id || a.id) && <PaperAnswerImport group={group} onClose={() => setImportGroup('')} />}
                     {importGroup === `res-${a.batch_id || a.id}` && <OpenEndedResults groupId={a.batch_id || a.id} onClose={() => setImportGroup('')} />}
-                    {importGroup === `bulk-${a.batch_id || a.id}` && <PaperBulkImport group={group} onClose={() => setImportGroup('')} />}
+                    {importGroup === `bulk-${a.batch_id || a.id}` && <PaperBulkImport group={group} onClose={() => setImportGroup('')} onSingle={() => setImportGroup(a.batch_id || a.id)} />}
                   </div>
                   <button onClick={() => deleteOeGroup(group)}
                     style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '7px', border: '1px solid rgba(220,38,38,0.25)', background: 'transparent', color: 'var(--red)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
