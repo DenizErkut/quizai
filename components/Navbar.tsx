@@ -445,6 +445,8 @@ export default function Navbar() {
             </div>
 
             {/* Avatar + plan rozeti + Dropdown */}
+            {/* Öğrencide profil menüsü yan menüde (Profilim); yüzen grupta yalnızca ampul, bildirim ve dil kalır. */}
+            {!shellOn && (
             <div style={{ position: 'relative' }}>
               {/* Gümüş / Altın / Platin küçük rozet */}
               {planBadge && (
@@ -557,6 +559,7 @@ export default function Navbar() {
                 </>
               )}
             </div>
+            )}
           </div>
         </div>
       </nav>

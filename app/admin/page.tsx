@@ -48,6 +48,7 @@ import ObjectiveSourcesBrowser from '@/components/admin/ObjectiveSourcesBrowser'
 import QuestionBankSvgFit from '@/components/admin/QuestionBankSvgFit'
 import PanelSidebar from '@/components/PanelSidebar'
 import WrittenExamManager from '@/components/admin/WrittenExamManager'
+import OpenEndedScenarioManager from '@/components/admin/OpenEndedScenarioManager'
 import PilotAccountSetup from '@/components/admin/PilotAccountSetup'
 
 interface User {
@@ -88,7 +89,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'country-sources' | 'objective-sources' | 'question-books' | 'exam-books' | 'question-bank' | 'written-exam' | 'objective-mapping' | 'education-eval' | 'curriculum' | 'learning-graph' | 'kvkk' | 'adaptive' | 'risk' | 'coaching' | 'coach-usage' | 'unit-economics'>('users')
+  const [tab, setTab] = useState<'users' | 'stats' | 'errors' | 'teachers' | 'institutions' | 'sellers' | 'meb' | 'country-sources' | 'objective-sources' | 'question-books' | 'exam-books' | 'question-bank' | 'written-exam' | 'open-ended-scenarios' | 'objective-mapping' | 'education-eval' | 'curriculum' | 'learning-graph' | 'kvkk' | 'adaptive' | 'risk' | 'coaching' | 'coach-usage' | 'unit-economics'>('users')
   const [identityMissing, setIdentityMissing] = useState<number | null>(null)
   const [identityScanning, setIdentityScanning] = useState(false)
   const [identityFixing, setIdentityFixing] = useState(false)
@@ -827,6 +828,7 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
             { key: 'exam-books', label: '🎯 Sınav Kitapçıkları', group: 'icerik' },
             { key: 'question-bank', label: '📝 Soru Havuzu', group: 'icerik' },
             { key: 'written-exam', label: '✍️ Yazılıya Hazırlanıyorum', group: 'icerik' },
+            { key: 'open-ended-scenarios', label: '🧩 Açık Uçlu Senaryolar', group: 'icerik' },
             { key: 'curriculum', label: '📋 Müfredat Yönetimi', group: 'kalite' },
             { key: 'objective-mapping', label: '🎯 Kazanım Eşleştirme', group: 'kalite' },
             { key: 'learning-graph', label: '🕸️ Learning Graph', group: 'kalite' },
@@ -1839,6 +1841,14 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1rem' }}>Anlık testlerde kullanılacak soruları inceleyin, düzenleyin ve yeniden onaya gönderin.</p>
           <QuestionBankSvgFit />
           <QuestionBankEditor />
+        </div>
+      )}
+
+      {tab === 'open-ended-scenarios' && (
+        <div className="anim-up">
+          <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)', marginBottom: '1rem' }}>🧩 Açık Uçlu Senaryolar</h2>
+          <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1rem' }}>Sınıf, ders, dönem ve senaryo numarası (1, 2, 3…) için örnek senaryo + soru + rubrik yükleyin. Öğrenci o senaryoyu seçince yapay zeka bu örneklere benzer yeni bir senaryo üretir ve cevabı rubriğe göre puanlar.</p>
+          <OpenEndedScenarioManager />
         </div>
       )}
 

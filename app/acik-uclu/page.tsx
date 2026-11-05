@@ -45,6 +45,12 @@ export default function AcikUcluPage() {
   const [assignedLoading, setAssignedLoading] = useState(true)
   const [startingId, setStartingId] = useState('')
 
+  // Yöneticinin örneklerine dayanan senaryo kartları (dönem + senaryo no)
+  type ScenarioCard = { subject: string; term: number; scenarioNo: number; label: string; attempts: number; bestScore: number | null; total: number }
+  const [scenarioCards, setScenarioCards] = useState<ScenarioCard[]>([])
+  const [scenarioSubject, setScenarioSubject] = useState('')
+  const [startingScenario, setStartingScenario] = useState('')
+
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -64,7 +70,45 @@ export default function AcikUcluPage() {
     }
     load()
     loadAssigned()
+    loadScenarios()
   }, [])
+
+  async function loadScenarios() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/open-ended/scenarios', { headers: { Authorization: `Bearer ${session?.access_token}` }, cache: 'no-store' })
+      const json = await res.json()
+      setScenarioCards(json.cards || [])
+    } catch (e) {
+      console.error('[loadScenarios]', e)
+    }
+  }
+
+  async function startScenario(card: ScenarioCard) {
+    const key = `${card.subject}|${card.term}|${card.scenarioNo}`
+    setStartingScenario(key); setError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/generate-open-ended', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ subject: card.subject, term: card.term, scenarioNo: card.scenarioNo }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setError(json.error === 'daily_limit_reached' ? t('Günlük test hakkın doldu.') :
+                  json.error === 'monthly_limit_reached' ? t('Aylık test hakkın doldu.') :
+                  json.error || t('Soru üretilemedi.'))
+        return
+      }
+      setSessionId(json.sessionId); setScenario(json.scenario); setQuestion(json.question); setRubric(json.rubric)
+      setTotalPossible(json.totalPossible); setAnswer(''); setStep('question')
+    } catch {
+      setError(t('Bağlantı hatası, tekrar dene.'))
+    } finally {
+      setStartingScenario('')
+    }
+  }
 
   async function loadAssigned() {
     setAssignedLoading(true)
@@ -196,7 +240,55 @@ export default function AcikUcluPage() {
         </div>
       </div>
 
-      <div style={{ maxWidth: '640px', margin: '0 auto', padding: '1.5rem 1.25rem' }}>
+      <div style={{ maxWidth: step === 'setup' ? '960px' : '640px', margin: '0 auto', padding: '1.5rem 1.25rem' }}>
+        {step === 'setup' && (
+          <div className="card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1.25rem', display: 'flex', gap: '16px', alignItems: 'center' }}>
+            <div style={{ fontSize: '44px', lineHeight: 1 }}>🧑‍🏫</div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--primary)', marginBottom: '4px' }}>{t('Açık uçlu senaryo sorularıyla yazılı simülasyonuna hazır mısın?')}</div>
+              <div style={{ fontSize: '13.5px', color: 'var(--text2)', lineHeight: 1.6 }}>{t('Bir senaryo seç; yapay zeka sana o senaryonun benzeri yeni bir soru hazırlasın, cevabını rubrike göre puanlasın.')}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Senaryo kartları: dönem + senaryo numarası */}
+        {step === 'setup' && (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
+              <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--primary)' }}>{t('Senaryolar')}</div>
+              {[...new Set(scenarioCards.map(card => card.subject))].length > 1 && (
+                <>
+                  <button className={`btn btn-sm ${!scenarioSubject ? 'btn-primary' : ''}`} onClick={() => setScenarioSubject('')}>{t('Tüm dersler')}</button>
+                  {[...new Set(scenarioCards.map(card => card.subject))].map(name => (
+                    <button key={name} className={`btn btn-sm ${scenarioSubject === name ? 'btn-primary' : ''}`} onClick={() => setScenarioSubject(name)}>{name}</button>
+                  ))}
+                </>
+              )}
+            </div>
+            {scenarioCards.length === 0 ? (
+              <div className="card" style={{ padding: '1rem', fontSize: '13px', color: 'var(--text2)' }}>{t('Bu sınıf için henüz senaryo yüklenmedi. Aşağıdaki serbest pratiği kullanabilirsin.')}</div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
+                {scenarioCards.filter(card => !scenarioSubject || card.subject === scenarioSubject).map(card => {
+                  const key = `${card.subject}|${card.term}|${card.scenarioNo}`
+                  return (
+                    <div key={key} className="card" style={{ padding: '1rem 1.1rem', display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--bg2, var(--bg))' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)' }}>{card.subject}</div>
+                      <div style={{ fontSize: '17px', fontWeight: 800, color: 'var(--primary)' }}>{t('{term}. Dönem {no}. Senaryo', { term: card.term, no: card.scenarioNo })}</div>
+                      <div style={{ fontSize: '12px', color: card.attempts ? '#0a9e90' : 'var(--text3)', fontWeight: 600 }}>
+                        {card.attempts ? t('Çözüldü · en yüksek {score}/{total}', { score: card.bestScore ?? 0, total: card.total }) : t('Henüz çözülmedi')}
+                      </div>
+                      <button className="btn btn-primary" style={{ marginTop: 'auto', justifyContent: 'center' }} onClick={() => startScenario(card)} disabled={!!startingScenario}>
+                        {startingScenario === key ? t('Senaryo hazırlanıyor…') : card.attempts ? t('Tekrar çöz') : t('Başla →')}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {error && (
           <div style={{ marginBottom: '1rem', padding: '10px 14px', borderRadius: '10px', background: 'var(--red-bg)', color: 'var(--red)', fontSize: '13px' }}>
             {error}

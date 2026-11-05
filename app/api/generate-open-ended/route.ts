@@ -13,6 +13,8 @@ import { pickMeasuredQuizEngine } from '@/lib/ai-gateway/measured-quiz-router'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { checkMinorConsentBlock } from '@/lib/identity/client'
 import { gradeKeyFromProfile, isSelectableOpenEndedTopic, loadOpenEndedCatalog } from '@/lib/open-ended-practice-catalog'
+import { exampleBlock, pickExamples, scenarioLabel, type ScenarioRubricItem } from '@/lib/open-ended-scenarios'
+import { gradeNumberOf } from '@/lib/written-exam'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -79,7 +81,7 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('plan, monthly_test_count, daily_test_count, daily_test_date, grade')
+      .select('plan, monthly_test_count, daily_test_count, daily_test_date, grade, country')
       .eq('id', user.id)
       .single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
@@ -108,16 +110,33 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const subject = typeof body?.subject === 'string' ? body.subject.trim() : ''
-    const topic = typeof body?.topic === 'string' ? body.topic.trim() : ''
+    // Senaryo kartı modu: yöneticinin yüklediği örneklere benzer yeni bir senaryo (dönem + senaryo numarası ile).
+    const scenarioTerm = Number(body?.term)
+    const scenarioNo = Number(body?.scenarioNo)
+    const scenarioMode = (scenarioTerm === 1 || scenarioTerm === 2) && Number.isInteger(scenarioNo) && scenarioNo >= 1 && scenarioNo <= 99
+    const topic = scenarioMode ? scenarioLabel(scenarioTerm, scenarioNo) : (typeof body?.topic === 'string' ? body.topic.trim() : '')
     if (!subject || !topic) {
       return NextResponse.json({ error: 'Ders ve konu zorunlu.' }, { status: 400 })
     }
 
     const grade = profile.grade || 'ortaokul 6. sınıf'
     const level = getLevel(grade)
-    const available = await loadOpenEndedCatalog(supabase, gradeKeyFromProfile(grade))
-    if (!isSelectableOpenEndedTopic(available, subject, topic)) {
-      return NextResponse.json({ error: 'Seçilen ders/konu bu sınıfın açık uçlu pratik kataloğunda aktif değil.' }, { status: 400 })
+    let examplesText = ''
+    if (scenarioMode) {
+      const gradeNumber = gradeNumberOf(grade)
+      const country = String((profile as { country?: string | null }).country || 'TR').toUpperCase()
+      const { data: found } = gradeNumber
+        ? await supabase.from('open_ended_scenario_examples').select('scenario,question,rubric')
+          .eq('status', 'published').eq('grade_number', gradeNumber).eq('country', country).eq('term', scenarioTerm).eq('scenario_no', scenarioNo)
+          .ilike('subject', subject.replace(/[\\%_]/g, '\\$&')).limit(30)
+        : { data: null }
+      if (!found?.length) return NextResponse.json({ error: 'Bu senaryo için henüz örnek yüklenmemiş.' }, { status: 404 })
+      examplesText = exampleBlock(pickExamples(found as Array<{ scenario: string; question: string; rubric: ScenarioRubricItem[] }>, 3))
+    } else {
+      const available = await loadOpenEndedCatalog(supabase, gradeKeyFromProfile(grade))
+      if (!isSelectableOpenEndedTopic(available, subject, topic)) {
+        return NextResponse.json({ error: 'Seçilen ders/konu bu sınıfın açık uçlu pratik kataloğunda aktif değil.' }, { status: 400 })
+      }
     }
 
     const prompt = `Sen MEB Ölçme, Değerlendirme ve Sınav Hizmetleri Genel Müdürlüğü tarzında soru hazırlayan bir uzmansın.
@@ -136,9 +155,9 @@ YAŞA UYGUN CEVAP STANDARDI — ZORUNLU:
 
 Seviye: ${level} (${grade})
 Ders: ${subject}
-Konu: ${topic}${turkishOpenEndedPrompt(subject, topic)}
+${scenarioMode ? `Bölüm: ${topic}
 
-Yukarıdaki konuya uygun, ${grade} seviyesine uygun zorlukta, gerçek bir MEB ortak sınav sorusu gibi bir senaryo+soru+rubrik hazırla.
+Aşağıda bu bölüm için hazırlanmış ÖRNEK senaryolar var. Bu örneklerin ölçtüğü beceriyi/kazanımı ölçen, aynı biçim ve zorlukta ama FARKLI bağlam, isim ve verilerle YENİ bir senaryo+soru+rubrik hazırla. Örneği kelimesi kelimesine KOPYALAMA; örnekteki puanlama mantığını ve rubrik yapısını koru.\n\n${examplesText}` : `Konu: ${topic}${turkishOpenEndedPrompt(subject, topic)}\n\nYukarıdaki konuya uygun, ${grade} seviyesine uygun zorlukta, gerçek bir MEB ortak sınav sorusu gibi bir senaryo+soru+rubrik hazırla.`}
 
 ${isForeignLanguageSubject(subject) ? `ÖNEMLİ (DİL): Bu bir YABANCI DİL dersi sorusu (${subject}) — gerçek bir ${subject} sınavında olduğu gibi davran. SENARYOYU ve SORUYU TAMAMEN "${subject}" DİLİNDE yaz (Türkçe DEĞİL) — öğrenci o dilde okuduğunu anlayıp yine o dilde cevap verecek, bu yüzden Türkçe tek cümle bile olmamalı senaryo/soru metninde. "${topic}" konusundaki hedef dil yapısının kullanılmasını gerektiren bir soru kur. SADECE rubrikteki "criterion" (kriter adı) ve "description" (açıklama) alanlarını TÜRKÇE yaz — bunlar öğretmenin/velinin okuyacağı değerlendirme ölçütleridir, ama açıklamalarda öğrencinin "${subject}" dilinde doğru yazıp yazmadığının değerlendirileceği net olsun.` : `ÖNEMLİ: Tüm metinleri SADECE TÜRKÇE yaz. Başka hiçbir dilden (İngilizce, Korece, Çince vb.) tek bir kelime bile kullanma.`}
 

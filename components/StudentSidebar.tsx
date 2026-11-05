@@ -84,6 +84,8 @@ const GROUPS: Group[] = [
       { href: '/referral', label: 'Davet et & kazan', icon: 'gift' },
       { href: '/pricing', label: 'Planlar', icon: 'diamond' },
       { href: '/profile/edit', label: 'Profilim', icon: 'user' },
+      { href: '/auth/reset-password', label: 'Şifremi değiştir', icon: 'user' },
+      { href: '/apply-teacher', label: 'Öğretmenlik Başvurusu', icon: 'classes' },
     ],
   },
 ]
