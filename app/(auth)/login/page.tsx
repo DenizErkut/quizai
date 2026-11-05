@@ -1,10 +1,11 @@
 'use client'
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { safeNextPath } from '@/lib/safe-next'
+import QRCode from 'qrcode'
 
 function LoginPageContent() {
   const { t } = useT()
@@ -17,6 +18,10 @@ function LoginPageContent() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState<string | null>(null)
+  const [tab, setTab] = useState<'email' | 'phone'>('email')
+  const [qrOpen, setQrOpen] = useState(false)
+  const [qrImg, setQrImg] = useState('')
+  const [qrExpired, setQrExpired] = useState(false)
   const [resetMode, setResetMode] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [resetSent, setResetSent] = useState(false)
@@ -40,7 +45,7 @@ function LoginPageContent() {
     try {
       const res = await fetch('/api/auth/login-identifier', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: email.trim(), password: pass }),
+        body: JSON.stringify({ identifier: email.trim(), password: pass, mode: tab === 'phone' ? 'phone' : 'id' }),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok || !j.access_token) { setError(res.status === 429 ? t('Çok fazla deneme. Lütfen daha sonra tekrar deneyin.') : t('Kimlik bilgileri veya şifre hatalı.')); setLoading(false); return }
@@ -49,6 +54,35 @@ function LoginPageContent() {
       await goLanding(j.access_token)
     } catch { setError(t('Bir hata oluştu. Lütfen tekrar deneyin.')); setLoading(false) }
   }
+
+  // QR ile giriş: ekranda QR göster; oturum açık cihaz onaylayınca belirteçle giriş yap.
+  useEffect(() => {
+    if (!qrOpen) return
+    let stop = false
+    let timer: ReturnType<typeof setTimeout>
+    ;(async () => {
+      setQrExpired(false); setQrImg('')
+      const created = await fetch('/api/auth/qr', { method: 'POST' }).then(r => r.json()).catch(() => null)
+      if (!created?.id || stop) return
+      setQrImg(await QRCode.toDataURL(`${window.location.origin}/auth/qr?id=${created.id}`, { width: 220, margin: 1 }))
+      const started = Date.now()
+      const poll = async () => {
+        if (stop) return
+        if (Date.now() - started > 175000) { setQrExpired(true); return }
+        const r = await fetch(`/api/auth/qr?id=${created.id}&secret=${created.secret}`, { cache: 'no-store' }).then(x => x.json()).catch(() => null)
+        if (r?.status === 'approved' && r.token_hash) {
+          const { data, error: err } = await supabase.auth.verifyOtp({ token_hash: r.token_hash, type: 'magiclink' })
+          if (!err && data.session) { await goLanding(data.session.access_token); return }
+          setQrExpired(true); return
+        }
+        if (r?.status === 'expired' || r?.status === 'invalid') { setQrExpired(true); return }
+        timer = setTimeout(poll, 2000)
+      }
+      timer = setTimeout(poll, 2000)
+    })()
+    return () => { stop = true; clearTimeout(timer) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qrOpen])
 
   async function handleOAuth(provider: 'google' | 'apple') {
     setOauthLoading(provider)
@@ -156,8 +190,18 @@ function LoginPageContent() {
 
               <div className="divider">{t('VEYA')}</div>
 
-              <label className="field-label">{t('E-posta, T.C. Kimlik No veya Vergi No')}</label>
-              <input className="input" type="text" autoComplete="username" placeholder="ornek@mail.com"
+              <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+                {(['email', 'phone'] as const).map(k => (
+                  <button key={k} type="button" onClick={() => { setTab(k); setEmail(''); setError('') }}
+                    style={{ flex: 1, padding: '10px 8px', borderRadius: 10, border: '1.5px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700,
+                      background: tab === k ? 'var(--accent-bg)' : 'var(--bg)', color: tab === k ? 'var(--accent)' : 'var(--text2)' }}>
+                    {k === 'email' ? t('E-Posta ile Giriş') : t('Telefon ile Giriş')}
+                  </button>
+                ))}
+              </div>
+
+              <label className="field-label">{tab === 'phone' ? t('Telefon numarası') : t('E-posta, T.C. Kimlik No, Vergi No veya Kullanıcı Kodu')}</label>
+              <input className="input" type={tab === 'phone' ? 'tel' : 'text'} autoComplete={tab === 'phone' ? 'tel' : 'username'} placeholder={tab === 'phone' ? '05xx xxx xx xx' : 'ornek@mail.com'}
                 value={email} onChange={e => setEmail(e.target.value)} />
 
               <label className="field-label">{t('Şifre')}</label>
@@ -180,6 +224,23 @@ function LoginPageContent() {
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--accent)', marginTop: '0.75rem', fontFamily: 'var(--font-sans)', display: 'block', width: '100%', textAlign: 'center' }}>
                 {t('Şifremi unuttum')}
               </button>
+
+              <button className="btn" onClick={() => setQrOpen(o => !o)} style={{ width: '100%', justifyContent: 'center', marginTop: '0.75rem' }}>
+                ▦ {t('QR Kod ile Giriş Yap')}
+              </button>
+              {qrOpen && (
+                <div style={{ textAlign: 'center', marginTop: 12 }}>
+                  {qrExpired ? (
+                    <button className="btn" onClick={() => { setQrOpen(false); setTimeout(() => setQrOpen(true), 0) }}>{t('QR kodun süresi doldu — yenile')}</button>
+                  ) : qrImg ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={qrImg} alt="QR" width={200} height={200} style={{ background: '#fff', padding: 8, borderRadius: 12 }} />
+                      <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 8, lineHeight: 1.6 }}>{t('Telefonunda Pratium’a giriş yapmışken kamerayla bu kodu okut ve onayla.')}</p>
+                    </>
+                  ) : <span className="spinner" />}
+                </div>
+              )}
 
               <p style={{ textAlign: 'center', fontSize: '13px', color: 'var(--text3)', marginTop: '1.25rem' }}>
                 {t('Hesabın yok mu?')}{' '}

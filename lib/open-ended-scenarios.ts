@@ -57,3 +57,13 @@ export function pickExamples<T>(examples: T[], count: number, random: () => numb
   }
   return pool.slice(0, count)
 }
+
+/** Ölçüt puanlarını toplamı tam 100 olacak şekilde ölçekler (PDF'den ayıklanan rubrikler için). */
+export function normalizeRubricTo100(rubric: ScenarioRubricItem[]): ScenarioRubricItem[] {
+  const sum = rubric.reduce((s, r) => s + r.maxPoints, 0)
+  if (!rubric.length || sum <= 0) return rubric
+  const scaled = rubric.map(r => ({ ...r, maxPoints: Math.max(1, Math.round((r.maxPoints / sum) * 100)) }))
+  const diff = SCENARIO_RUBRIC_TOTAL - scaled.reduce((s, r) => s + r.maxPoints, 0)
+  scaled[scaled.length - 1].maxPoints = Math.max(1, scaled[scaled.length - 1].maxPoints + diff)
+  return scaled
+}

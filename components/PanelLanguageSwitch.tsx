@@ -8,7 +8,7 @@ import { LOCALES } from '@/lib/i18n/core'
 export default function PanelLanguageSwitch() {
   const { locale, setLocale } = useT()
   const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState<{ top: number; left?: number; right?: number }>({ top: 0 })
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; left?: number; right?: number }>({ top: 0 })
   const buttonRef = useRef<HTMLButtonElement>(null)
   const active = LOCALES.find(l => l.code === locale) || LOCALES[0]
 
@@ -16,7 +16,10 @@ export default function PanelLanguageSwitch() {
     if (!open && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect()
       const rtl = document.documentElement.dir === 'rtl'
-      setPos(rtl ? { top: rect.bottom + 6, left: Math.max(8, rect.left) } : { top: rect.bottom + 6, right: Math.max(8, window.innerWidth - rect.right) })
+      // Altta yeterli yer yoksa (ör. sol menünün altındaki düğme) menü yukarı doğru açılır.
+      const menuHeight = LOCALES.length * 36 + 16
+      const vertical = rect.bottom + 6 + menuHeight > window.innerHeight ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }
+      setPos(rtl ? { ...vertical, left: Math.max(8, rect.left) } : { ...vertical, right: Math.max(8, window.innerWidth - rect.right) })
     }
     setOpen(o => !o)
   }
@@ -30,7 +33,7 @@ export default function PanelLanguageSwitch() {
       {open && (
         <>
           <div style={{ position: 'fixed', inset: 0, zIndex: 9998 }} onClick={() => setOpen(false)} />
-          <div style={{ position: 'fixed', zIndex: 9999, top: pos.top, left: pos.left, right: pos.right, minWidth: 160, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: 'var(--shadow)', padding: 4 }}>
+          <div style={{ position: 'fixed', zIndex: 9999, top: pos.top, bottom: pos.bottom, left: pos.left, right: pos.right, minWidth: 160, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: 'var(--shadow)', padding: 4 }}>
             {LOCALES.map(l => (
               <button key={l.code} type="button" onClick={() => { setOpen(false); void setLocale(l.code) }}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', borderRadius: 8, border: 'none', background: l.code === locale ? 'rgba(30,207,184,0.12)' : 'transparent', color: 'var(--text)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: l.code === locale ? 600 : 400, textAlign: 'start' }}>

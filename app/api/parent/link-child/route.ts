@@ -8,7 +8,9 @@ export async function POST(req: NextRequest) {
   const auth = await requireAuth(req)
   if (auth.error) return auth.error
   const { data: parent } = await supabaseAdmin.from('profiles').select('role').eq('id', auth.user.id).maybeSingle()
-  if (parent?.role !== 'parent') return NextResponse.json({ error: 'Veli hesabı gerekli.' }, { status: 403 })
+  // Veli paneline zaten bağlı çocuğu olan hesaplar da (rolü 'parent' olmasa bile) çocuk ekleyebilir.
+  const { count: existingKids } = await supabaseAdmin.from('parent_children').select('id', { count: 'exact', head: true }).eq('parent_id', auth.user.id)
+  if (parent?.role !== 'parent' && (existingKids ?? 0) === 0) return NextResponse.json({ error: 'Veli hesabı gerekli.' }, { status: 403 })
   const limit = await checkRateLimit(auth.user.id, { endpoint: 'parent-link-child', limit: 10 })
   if (!limit.allowed) return rateLimitExceeded(limit)
   const body = await req.json().catch(() => null)

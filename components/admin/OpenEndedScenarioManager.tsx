@@ -21,6 +21,9 @@ export default function OpenEndedScenarioManager() {
   const [form, setForm] = useState<Form | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [pdfOpen, setPdfOpen] = useState(false)
+  const [pdfMeta, setPdfMeta] = useState({ gradeNumber: 7, subject: 'Matematik', term: 1, startNo: 1 })
+  const [pdfFile, setPdfFile] = useState<File | null>(null)
 
   const authHeader = async () => {
     const { data: { session } } = await createClient().auth.getSession()
@@ -74,6 +77,29 @@ export default function OpenEndedScenarioManager() {
     return used.length ? Math.max(...used) + 1 : 1
   }
 
+  // PDF'den ayıkla: dosyadaki senaryoları sırayla numaralayıp TASLAK olarak kaydeder; yönetici inceleyip yayınlar.
+  async function importPdf() {
+    if (!pdfFile) return
+    setBusy(true); setMessage('PDF okunuyor ve senaryolar ayıklanıyor (1-2 dk sürebilir)…')
+    try {
+      const body = new FormData(); body.append('file', pdfFile)
+      const response = await fetch('/api/admin/open-ended-scenarios/parse', { method: 'POST', headers: await authHeader(), body })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'PDF işlenemedi.')
+      let saved = 0
+      for (const [i, item] of (data.items as Array<{ title: string; scenario: string; question: string; rubric: Criterion[] }>).entries()) {
+        const res = await fetch('/api/admin/open-ended-scenarios', {
+          method: 'POST', headers: { ...(await authHeader()), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...item, gradeNumber: pdfMeta.gradeNumber, subject: pdfMeta.subject, term: pdfMeta.term, scenarioNo: pdfMeta.startNo + i, sourceNote: `PDF: ${pdfFile.name}`, publish: false }),
+        })
+        if (res.ok) saved++
+      }
+      setMessage(`${saved} / ${data.items.length} senaryo taslak olarak kaydedildi. Gözden geçirip yayınlayın.${data.truncated ? ' (Dosya uzun: sonraki bölümler okunmadı.)' : ''}`)
+      setPdfOpen(false); setPdfFile(null); await load()
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'PDF işlenemedi.') }
+    finally { setBusy(false) }
+  }
+
   const patchRubric = (index: number, patch: Partial<Criterion>) => setForm(f => f && ({ ...f, rubric: f.rubric.map((c, i) => i === index ? { ...c, ...patch } : c) }))
 
   if (form) {
@@ -123,9 +149,22 @@ export default function OpenEndedScenarioManager() {
     <div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
         <button className="btn btn-primary" onClick={() => setForm(emptyForm({ gradeNumber: filterGrade || 7, term: filterTerm || 1 }))}>+ Yeni örnek senaryo</button>
+        <button className="btn btn-ghost" onClick={() => setPdfOpen(o => !o)}>📄 PDF yükle</button>
         <select style={{ ...field, width: 130 }} value={filterGrade} onChange={e => setFilterGrade(Number(e.target.value))}><option value={0}>Tüm sınıflar</option>{Array.from({ length: 12 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}. sınıf</option>)}</select>
         <select style={{ ...field, width: 130 }} value={filterTerm} onChange={e => setFilterTerm(Number(e.target.value))}><option value={0}>Tüm dönemler</option><option value={1}>1. dönem</option><option value={2}>2. dönem</option></select>
       </div>
+      {pdfOpen && (
+        <div className="card" style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+            <label style={{ fontSize: 12 }}>Sınıf<select style={field} value={pdfMeta.gradeNumber} onChange={e => setPdfMeta({ ...pdfMeta, gradeNumber: Number(e.target.value) })}>{Array.from({ length: 12 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}. sınıf</option>)}</select></label>
+            <label style={{ fontSize: 12 }}>Ders<input style={field} value={pdfMeta.subject} onChange={e => setPdfMeta({ ...pdfMeta, subject: e.target.value })} /></label>
+            <label style={{ fontSize: 12 }}>Dönem<select style={field} value={pdfMeta.term} onChange={e => setPdfMeta({ ...pdfMeta, term: Number(e.target.value) })}><option value={1}>1. dönem</option><option value={2}>2. dönem</option></select></label>
+            <label style={{ fontSize: 12 }}>İlk senaryo no<input style={field} type="number" min={1} max={99} value={pdfMeta.startNo} onChange={e => setPdfMeta({ ...pdfMeta, startNo: Number(e.target.value) })} /></label>
+          </div>
+          <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target.files?.[0] || null)} />
+          <div><button className="btn btn-primary" disabled={busy || !pdfFile} onClick={importPdf}>Senaryoları ayıkla ve taslak kaydet</button></div>
+        </div>
+      )}
       {message && <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 8 }}>{message}</p>}
       {groups.size === 0 && <p style={{ color: 'var(--text2)', fontSize: 13 }}>Henüz örnek senaryo yok.</p>}
       <div style={{ display: 'grid', gap: 10 }}>

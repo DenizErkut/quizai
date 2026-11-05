@@ -3,7 +3,7 @@
 // Bilinmeyen/yanlış kimlik her durumda aynı genel hatayı verir (hesap sorgulamasını önlemek için).
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
-import { findSupabaseIdsByNationalId } from '@/lib/identity/client'
+import { findSupabaseIdsByNationalId, findSupabaseIdsByPhone } from '@/lib/identity/client'
 import { validateTcKimlikNo, normalizeTcKimlikNo } from '@/lib/tc-kimlik'
 import { checkRateLimit } from '@/lib/rate-limit'
 
@@ -12,7 +12,11 @@ export const runtime = 'nodejs'
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 const GENERIC = { error: 'Kimlik bilgileri veya şifre hatalı.' }
 
-async function candidateIds(identifier: string): Promise<{ ids: string[]; email?: string }> {
+async function candidateIds(identifier: string, mode: string): Promise<{ ids: string[]; email?: string }> {
+  if (mode === 'phone') {
+    const d = identifier.replace(/\D/g, '')
+    return { ids: d.length >= 10 ? await findSupabaseIdsByPhone(d.slice(-10)) : [] }
+  }
   if (identifier.includes('@')) return { ids: [], email: identifier.toLowerCase() }
   const digits = identifier.replace(/\s+/g, '')
   if (/^\d{11}$/.test(digits) && validateTcKimlikNo(normalizeTcKimlikNo(digits))) {
@@ -24,6 +28,11 @@ async function candidateIds(identifier: string): Promise<{ ids: string[]; email?
     const { data: iu } = await admin.from('institution_users').select('user_id').eq('institution_id', inst.id).eq('role', 'admin').limit(3)
     return { ids: (iu || []).map(r => r.user_id as string) }
   }
+  // Kullanıcı kodu: öğrencinin Pratium kodu (veli kodu). Şifre yine gerekir.
+  if (/^[a-z0-9]{4,32}$/i.test(identifier)) {
+    const { data } = await admin.from('profiles').select('id').eq('parent_code', identifier.toLowerCase()).limit(2)
+    return { ids: (data || []).map(r => r.id as string) }
+  }
   return { ids: [] }
 }
 
@@ -33,7 +42,8 @@ export async function POST(req: NextRequest) {
   const password = typeof body?.password === 'string' ? body.password.slice(0, 200) : ''
   if (!identifier || !password) return NextResponse.json({ error: 'Kimlik ve şifre gerekli.' }, { status: 400 })
 
-  const { ids, email } = await candidateIds(identifier)
+  const mode = body?.mode === 'phone' ? 'phone' : 'id'
+  const { ids, email } = await candidateIds(identifier, mode)
   const emails: string[] = email ? [email] : []
   for (const id of ids.slice(0, 5)) {
     const rl = await checkRateLimit(id, { endpoint: 'login-identifier', limit: 30 })
