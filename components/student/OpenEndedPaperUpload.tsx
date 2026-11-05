@@ -113,7 +113,7 @@ export default function OpenEndedPaperUpload({ sessions, onClose, onSaved }: { s
               </select>
             )}
             {g.status === 'read' && g.text !== null && (
-              <textarea className="input" rows={6} style={{ marginTop: 6 }} value={g.text} onChange={e => patch(g.key, { text: e.target.value })} />
+              <textarea className="input" rows={6} style={{ marginTop: 6, borderRadius: 4 }} value={g.text} onChange={e => patch(g.key, { text: e.target.value })} />
             )}
             {g.status === 'saved' && <p style={{ margin: '6px 0 0', fontWeight: 700, color: '#0a9e90' }}>{t('Puan')}: {g.score}</p>}
             {g.message && <p style={{ margin: '6px 0 0', fontSize: 12, color: g.status === 'error' ? '#b42318' : 'var(--text2)', lineHeight: 1.5 }}>{g.message}</p>}

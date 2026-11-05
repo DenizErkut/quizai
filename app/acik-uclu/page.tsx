@@ -64,6 +64,9 @@ export default function AcikUcluPage() {
   // "Çözülenler": senaryo serisinden çıkan tüm sorular + yazdırma + kâğıttan cevap yükleme
   type MySession = { id: string; subject: string; topic: string; question_index: number; total_earned: number | null; total_possible: number | null; graded_at: string | null; created_at: string }
   const [mySessions, setMySessions] = useState<MySession[]>([])
+  type Detail = { id: string; subject: string; topic: string; question_index: number; question: string; scenario: string; rubric: RubricItem[]; student_answer: string | null; criteria_results: CriteriaResult[] | null; overall_feedback: string | null; total_earned: number | null; total_possible: number | null; answer_table: string | null }
+  const [detail, setDetail] = useState<Detail | null>(null)
+  const [detailTab, setDetailTab] = useState<'mine' | 'expected'>('mine')
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
   const [printingKey, setPrintingKey] = useState('')
   const [printMessage, setPrintMessage] = useState('')
@@ -140,6 +143,14 @@ export default function AcikUcluPage() {
       const res = await fetch('/api/open-ended/sessions', { headers: await authHeaders(), cache: 'no-store' })
       if (res.ok) setMySessions((await res.json()).sessions || [])
     } catch { /* panel boş kalır */ }
+  }
+
+  // Çözülmüş sorunun ayrıntısı: verdiğin yanıt / en olası (beklenen) yanıtlar sekmeleri.
+  async function openDetail(id: string) {
+    const res = await fetch(`/api/open-ended/sessions?id=${id}`, { headers: await authHeaders(), cache: 'no-store' })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok || !json.session) { setError(json.error || t('Soru açılamadı.')); return }
+    setDetail(json.session); setDetailTab('mine')
   }
 
   // Çözülmemiş bir soruyu çevrim içi çözmeye devam et.
@@ -567,7 +578,7 @@ export default function AcikUcluPage() {
               })()}
               <textarea className="input" rows={tableText ? 3 : 8} value={answer} onChange={e => setAnswer(e.target.value)}
                 placeholder={tableText ? t('Açıklaman varsa yaz (isteğe bağlı)…') : t('Kendi cümlelerinle, düşüncelerini gerekçelendirerek yaz…')}
-                style={{ marginTop: '8px', marginBottom: '4px', resize: 'vertical', borderRadius: '12px' }} />
+                style={{ marginTop: '8px', marginBottom: '4px', resize: 'vertical', borderRadius: '4px' }} />
               <div style={{ fontSize: '11px', color: answer.trim().length >= 50 ? 'var(--green)' : 'var(--text3)', marginBottom: '1rem', textAlign: 'right' }}>
                 {t('{n} / 50 karakter', { n: answer.trim().length })} {answer.trim().length >= 50 ? '✓' : ''}
               </div>
@@ -699,7 +710,11 @@ export default function AcikUcluPage() {
                         <div style={{ borderTop: '1px solid var(--border)', padding: '6px 10px', display: 'grid', gap: 6 }}>
                           {items.map(item => (
                             <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, background: item.id === sessionId && step !== 'setup' ? 'var(--accent-bg)' : 'transparent', borderRadius: 6, padding: '2px 4px' }}>
-                              <span style={{ flex: 1 }}>{t('Soru {n}', { n: item.question_index + 1 })} · {item.graded_at ? <b style={{ color: '#0a9e90' }}>{item.total_earned ?? 0}/{item.total_possible ?? 100}</b> : <span style={{ color: 'var(--text3)' }}>{t('Çözülmedi')}</span>}</span>
+                              {item.graded_at ? (
+                                <button type="button" onClick={() => openDetail(item.id)} style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12, color: 'inherit' }}>
+                                  {t('Soru {n}', { n: item.question_index + 1 })} · <b style={{ color: '#0a9e90' }}>{item.total_earned ?? 0}/{item.total_possible ?? 100}</b> <span style={{ color: 'var(--text3)' }}>›</span>
+                                </button>
+                              ) : <span style={{ flex: 1 }}>{t('Soru {n}', { n: item.question_index + 1 })} · <span style={{ color: 'var(--text3)' }}>{t('Çözülmedi')}</span></span>}
                               {!item.graded_at && <button className="btn btn-sm" onClick={() => openSession(item.id)}>{t('Çöz')}</button>}
                             </div>
                           ))}
@@ -715,6 +730,46 @@ export default function AcikUcluPage() {
       </aside>
       </div>
 
+      {detail && (
+        <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(10,20,16,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setDetail(null)}>
+          <div className="card" style={{ width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', padding: '1.25rem', borderRadius: 6 }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 700 }}>{detail.subject} · {detail.topic} · {t('Soru {n}', { n: detail.question_index + 1 })}</div>
+            <p style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.6, margin: '6px 0 12px' }}><MathText text={detail.question} /></p>
+            <div role="tablist" style={{ display: 'flex', borderBottom: '2px solid var(--border)', marginBottom: 12 }}>
+              {(['mine', 'expected'] as const).map(tab => (
+                <button key={tab} role="tab" aria-selected={detailTab === tab} onClick={() => setDetailTab(tab)}
+                  style={{ padding: '8px 14px', background: 'none', border: 'none', borderBottom: `3px solid ${detailTab === tab ? 'var(--accent)' : 'transparent'}`, marginBottom: -2, cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 13, color: detailTab === tab ? 'var(--accent)' : 'var(--text2)' }}>
+                  {tab === 'mine' ? t('Verdiğin yanıt') : t('En olası yanıtlar')}
+                </button>
+              ))}
+            </div>
+            {detailTab === 'mine' ? (
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: '#0a9e90', marginBottom: 8 }}>{detail.total_earned ?? 0} / {detail.total_possible ?? 100}</div>
+                <div style={{ whiteSpace: 'pre-wrap', fontSize: 13.5, lineHeight: 1.7, background: 'var(--bg2, var(--bg))', border: '1px solid var(--border)', borderRadius: 4, padding: '10px 12px' }}>{detail.student_answer?.trim() || t('Cevap bulunamadı')}</div>
+                {detail.overall_feedback && <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6, marginTop: 10 }}>{detail.overall_feedback}</p>}
+                {(detail.criteria_results || []).map((c, i) => (
+                  <div key={i} style={{ borderTop: '1px solid var(--border)', padding: '8px 0', fontSize: 12.5 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}><span>{c.criterion}</span><span style={{ color: '#0a9e90' }}>{c.earnedPoints}/{c.maxPoints}</span></div>
+                    {c.feedback && <div style={{ color: 'var(--text2)', marginTop: 2, lineHeight: 1.5 }}>{c.feedback}</div>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div>
+                <p style={{ fontSize: 12, color: 'var(--text3)', margin: '0 0 8px' }}>{t('Tam puan için beklenen yanıt unsurları:')}</p>
+                {(detail.rubric || []).map((c, i) => (
+                  <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 4, padding: '8px 10px', marginBottom: 8, fontSize: 13 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}><span>{c.criterion}</span><span style={{ color: 'var(--accent)' }}>{c.maxPoints} {t('puan')}</span></div>
+                    {c.description && <div style={{ color: 'var(--text2)', marginTop: 3, lineHeight: 1.6 }}><MathText text={c.description} /></div>}
+                  </div>
+                ))}
+              </div>
+            )}
+            <button className="btn" style={{ width: '100%', justifyContent: 'center', marginTop: 10 }} onClick={() => setDetail(null)}>{t('Kapat')}</button>
+          </div>
+        </div>
+      )}
       {paperOpen && <OpenEndedPaperUpload sessions={mySessions} onClose={() => setPaperOpen(false)} onSaved={() => { void loadMySessions(); void loadScenarios() }} />}
     </main>
   )
