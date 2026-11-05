@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
       question: existing.question,
       rubric: existing.rubric,
       totalPossible: existing.total_possible,
+      figureSvg: existing.figure_svg ?? null, figureImage: existing.figure_image ?? null, answerTable: existing.answer_table ?? null,
     })
   }
 
@@ -74,6 +75,7 @@ export async function POST(req: NextRequest) {
       question: assignment.question,
       rubric: assignment.rubric,
       total_possible: totalPossible,
+      figure_svg: assignment.figure_svg ?? null, figure_image: assignment.figure_image ?? null, answer_table: assignment.answer_table ?? null,
     })
     .select('id')
     .single()
@@ -89,5 +91,6 @@ export async function POST(req: NextRequest) {
     question: assignment.question,
     rubric: assignment.rubric,
     totalPossible,
+    figureSvg: assignment.figure_svg ?? null, figureImage: assignment.figure_image ?? null, answerTable: assignment.answer_table ?? null,
   })
 }

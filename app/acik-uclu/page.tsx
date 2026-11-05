@@ -33,6 +33,7 @@ export default function AcikUcluPage() {
   const [sessionId, setSessionId] = useState('')
   const [scenario, setScenario] = useState('')
   const [figureSvg, setFigureSvg] = useState<string | null>(null)
+  const [figureImage, setFigureImage] = useState<string | null>(null)
   const [currentCard, setCurrentCard] = useState<ScenarioCard | null>(null)
   const [qIndex, setQIndex] = useState(0)
   const [qTotal, setQTotal] = useState(1)
@@ -123,7 +124,7 @@ export default function AcikUcluPage() {
                   json.error || t('Soru üretilemedi.'))
         return
       }
-      setCurrentCard(card); setQIndex(json.questionIndex || 0); setQTotal(json.questionTotal || 1); setSessionId(json.sessionId); setScenario(json.scenario); setFigureSvg(json.figureSvg || null); setTableText(json.answerTable || null); setTableValues([]); setQuestion(json.question); setRubric(json.rubric)
+      setCurrentCard(card); setQIndex(json.questionIndex || 0); setQTotal(json.questionTotal || 1); setSessionId(json.sessionId); setScenario(json.scenario); setFigureSvg(json.figureSvg || null); setFigureImage(null); setTableText(json.answerTable || null); setTableValues([]); setQuestion(json.question); setRubric(json.rubric)
       setTotalPossible(json.totalPossible); setAnswer(''); setStep('question'); void loadMySessions()
     } catch {
       setError(t('Bağlantı hatası, tekrar dene.'))
@@ -163,7 +164,7 @@ export default function AcikUcluPage() {
     if (row.graded_at) return
     const card = scenarioCards.find(c => c.subject.toLocaleLowerCase('tr') === String(row.subject).toLocaleLowerCase('tr') && row.topic === `${c.term}. dönem ${c.scenarioNo}. senaryo`) || null
     setCurrentCard(card); setQIndex(row.question_index || 0); setQTotal(card?.questionCount || 1)
-    setSessionId(row.id); setScenario(row.scenario); setFigureSvg(row.figure_svg || null); setTableText(row.answer_table || null); setTableValues([])
+    setSessionId(row.id); setScenario(row.scenario); setFigureSvg(row.figure_svg || null); setFigureImage(row.figure_image || null); setTableText(row.answer_table || null); setTableValues([])
     setQuestion(row.question); setRubric(row.rubric); setTotalPossible(row.total_possible); setAnswer(''); setStep('question')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -238,7 +239,7 @@ export default function AcikUcluPage() {
       const json = await res.json()
       if (!res.ok) { setError(json.error || t('Ödev başlatılamadı.')); return }
       setSessionId(json.sessionId)
-      setScenario(json.scenario); setFigureSvg(null); setTableText(null); setCurrentCard(null); setQTotal(1); setQIndex(0)
+      setScenario(json.scenario); setFigureSvg(json.figureSvg || null); setFigureImage(json.figureImage || null); setTableText(json.answerTable || null); setTableValues([]); setCurrentCard(null); setQTotal(1); setQIndex(0)
       setQuestion(json.question)
       setRubric(json.rubric)
       setTotalPossible(json.totalPossible)
@@ -274,7 +275,7 @@ export default function AcikUcluPage() {
         return
       }
       setSessionId(json.sessionId)
-      setScenario(json.scenario); setFigureSvg(null); setTableText(null); setCurrentCard(null); setQTotal(1); setQIndex(0)
+      setScenario(json.scenario); setFigureSvg(json.figureSvg || null); setFigureImage(json.figureImage || null); setTableText(json.answerTable || null); setTableValues([]); setCurrentCard(null); setQTotal(1); setQIndex(0)
       setQuestion(json.question)
       setRubric(json.rubric)
       setTotalPossible(json.totalPossible)
@@ -512,6 +513,10 @@ export default function AcikUcluPage() {
             <div className="card" style={{ padding: '1.25rem', marginBottom: '1rem', borderLeft: '3px solid #3E8E3E' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, color: '#3E8E3E', marginBottom: '6px', textTransform: 'uppercase' }}>{t('Senaryo')}{currentCard && qTotal > 1 ? ` · ${t('Soru {n}/{total}', { n: qIndex + 1, total: qTotal })}` : ''}</div>
               <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7, whiteSpace: 'pre-line' }}><MathText text={scenario} /></p>
+              {figureImage && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={figureImage} alt={t('Senaryo şekli')} style={{ display: 'block', margin: '12px auto 0', maxWidth: '100%', width: 460, background: '#fff', borderRadius: 4, border: '1px solid var(--border)' }} />
+              )}
               {figureSvg && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={svgDataUri(figureSvg)} alt={t('Senaryo şekli')} style={{ display: 'block', margin: '12px auto 0', maxWidth: '100%', width: 420, background: '#fff', borderRadius: 10, border: '1px solid var(--border)' }} />

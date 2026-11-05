@@ -9,6 +9,7 @@ export type PrintableOpenEnded = {
   question: string
   rubric: Array<{ criterion: string; maxPoints: number; description?: string }>
   figureSvg?: string | null
+  figureImage?: string | null
   answerTable?: string | null
   code?: string
 }
@@ -33,6 +34,7 @@ const SHEET_STYLE = `<style>
 </style>`
 
 function printFigure(item: PrintableOpenEnded): string {
+  if (item.figureImage && /^data:image\/(png|jpeg);base64,/.test(item.figureImage)) return `<p style="text-align:center"><img alt="" style="max-width:100%;max-height:80mm" src="${escapePrintText(item.figureImage)}"></p>`
   return item.figureSvg ? `<p style="text-align:center"><img alt="" style="max-width:100%;max-height:70mm" src="${escapePrintText(svgDataUri(item.figureSvg))}"></p>` : ''
 }
 

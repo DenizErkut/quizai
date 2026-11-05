@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import PaperAnswerImport from '@/components/teacher/PaperAnswerImport'
 import PaperBulkImport from '@/components/teacher/PaperBulkImport'
+import ScenarioAssign from '@/components/teacher/ScenarioAssign'
+import OpenEndedResults from '@/components/teacher/OpenEndedResults'
 import QRCode from 'qrcode'
 import type { ScenarioSheetItem } from '@/lib/open-ended-print'
 import { useTeacherEntitlement, LOCKED_MESSAGE } from '@/components/teacher/useTeacherEntitlement'
@@ -25,7 +27,7 @@ const DIFFICULTIES = [
   { value: 'cok zor', label: 'Çok Zor' },
 ]
 
-type OeClassRow = { id: string; classroom_id: string; batch_id?: string | null; title: string; grade: string; scenario: string; question: string; rubric?: Array<{ criterion: string; maxPoints: number; description?: string }>; classrooms?: { name?: string } }
+type OeClassRow = { figure_svg?: string | null; figure_image?: string | null; answer_table?: string | null; id: string; classroom_id: string; batch_id?: string | null; title: string; grade: string; scenario: string; question: string; rubric?: Array<{ criterion: string; maxPoints: number; description?: string }>; classrooms?: { name?: string } }
 
 export default function TeacherAssignPage() {
   const { t: tr, locale } = useT()
@@ -39,7 +41,7 @@ export default function TeacherAssignPage() {
   const [fileError, setFileError] = useState('')
   const [fileLoading, setFileLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [assignmentType, setAssignmentType] = useState<'quiz' | 'open_ended'>('quiz')
+  const [assignmentType, setAssignmentType] = useState<'quiz' | 'open_ended' | 'scenario'>('quiz')
   const [form, setForm] = useState({
     classroom_id: '',
     title: '',
@@ -292,6 +294,7 @@ export default function TeacherAssignPage() {
         for (const [index, a] of group.entries()) {
           pages.push({
             scenario: a.scenario, question: a.question, rubric: a.rubric || [], sessionId: a.id, position: index + 1, total: group.length, code,
+            figureSvg: a.figure_svg, figureImage: a.figure_image, answerTable: a.answer_table,
             studentName: student.fullName, schoolNo: student.schoolNo,
             qrDataUrl: await QRCode.toDataURL(teacherQrPayload(student.id, a.id), { width: 260, margin: 1 }),
           })
@@ -382,6 +385,7 @@ export default function TeacherAssignPage() {
               {[
                 { value: 'quiz', label: tr('📝 Test / Quiz') },
                 { value: 'open_ended', label: tr('💬 Açık Uçlu Soru') },
+                { value: 'scenario', label: tr('🧩 Senaryodan Ata') },
               ].map(opt => (
                 <button key={opt.value} onClick={() => { setAssignmentType(opt.value as any); resetOeForm() }}
                   style={{ flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid', fontFamily: 'var(--font-sans)',
@@ -394,7 +398,9 @@ export default function TeacherAssignPage() {
               ))}
             </div>
 
-            {assignmentType === 'open_ended' ? (
+            {assignmentType === 'scenario' ? (
+              <ScenarioAssign classrooms={classrooms} onCreated={created => { setOpenEndedAssignments(prev => [...(created as any[]), ...prev]); setShowForm(false) }} />
+            ) : assignmentType === 'open_ended' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {oeError && <div style={{ padding: '10px 12px', background: 'var(--red-bg)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)' }}>{oeError}</div>}
 
@@ -724,11 +730,13 @@ export default function TeacherAssignPage() {
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
                       <button className="btn btn-sm" disabled={busy} onClick={() => void printOpenEndedGroup(group, false)}>{tr('🖨️ Öğrenci formu (PDF)')}</button>
                       <button className="btn btn-sm" disabled={busy} onClick={() => void printOpenEndedGroup(group, true)}>{tr('👩‍🏫 Puanlama anahtarıyla')}</button>
+                      <button className="btn btn-sm" onClick={() => setImportGroup(importGroup === `res-${a.batch_id || a.id}` ? '' : `res-${a.batch_id || a.id}`)}>{tr('📊 Sınıf sonuçları')}</button>
                       <button className="btn btn-sm" disabled={busy} onClick={() => void printOpenEndedClass(group)}>{tr('🖨️ Sınıf dökümü (ad + QR)')}</button>
                       <button className="btn btn-sm" onClick={() => planLimited ? setPrintMessage(LOCKED_MESSAGE) : setImportGroup(importGroup === `bulk-${a.batch_id || a.id}` ? '' : `bulk-${a.batch_id || a.id}`)}>{tr('📷 Toplu tarama yükle')}</button>
                       <button className="btn btn-sm" onClick={() => planLimited ? setPrintMessage(LOCKED_MESSAGE) : setImportGroup(importGroup === (a.batch_id || a.id) ? '' : (a.batch_id || a.id))}>{tr('📥 Kâğıt cevapları aktar')}</button>
                     </div>
                     {importGroup === (a.batch_id || a.id) && <PaperAnswerImport group={group} onClose={() => setImportGroup('')} />}
+                    {importGroup === `res-${a.batch_id || a.id}` && <OpenEndedResults groupId={a.batch_id || a.id} onClose={() => setImportGroup('')} />}
                     {importGroup === `bulk-${a.batch_id || a.id}` && <PaperBulkImport group={group} onClose={() => setImportGroup('')} />}
                   </div>
                   <button onClick={() => deleteOeGroup(group)}
