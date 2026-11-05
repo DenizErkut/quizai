@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { sanitizeFigureSvg, svgDataUri } from '@/lib/open-ended-scenarios'
-import { subjectOptionsForGrade } from '@/lib/subject-options'
+import SubjectSelect from '@/components/admin/SubjectSelect'
 
 type Criterion = { criterion: string; maxPoints: number; description: string }
 type Example = { id: string; grade_number: number; subject: string; term: number; scenario_no: number; title: string; scenario: string; question: string; rubric: Criterion[]; figure_svg?: string | null; figure_image?: string | null; status: string; source_note: string | null }
@@ -112,7 +112,7 @@ export default function OpenEndedScenarioManager() {
           {!form.id && <div><button className="btn btn-primary" onClick={() => { setForm(null); setPdfOpen(true) }}>📄 PDF&apos;den yükle (tüm senaryoları otomatik ayıkla)</button></div>}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
             <label style={{ fontSize: 12 }}>Sınıf<select style={field} value={form.gradeNumber} onChange={e => setForm({ ...form, gradeNumber: Number(e.target.value) })}>{Array.from({ length: 12 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}. sınıf</option>)}</select></label>
-            <label style={{ fontSize: 12 }}>Ders<input style={field} list="oe-subjects-form" value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} placeholder="Ders seçin veya yazın" /><datalist id="oe-subjects-form">{subjectOptionsForGrade(form.gradeNumber).map(name => <option key={name} value={name} />)}</datalist></label>
+            <label style={{ fontSize: 12 }}>Ders<SubjectSelect gradeNumber={form.gradeNumber} value={form.subject} onChange={subject => setForm({ ...form, subject })} /></label>
             <label style={{ fontSize: 12 }}>Dönem<select style={field} value={form.term} onChange={e => setForm({ ...form, term: Number(e.target.value) })}><option value={1}>1. dönem</option><option value={2}>2. dönem</option></select></label>
             <label style={{ fontSize: 12 }}>Senaryo no<input style={field} type="number" min={1} max={99} value={form.scenarioNo} onChange={e => setForm({ ...form, scenarioNo: Number(e.target.value) })} /></label>
           </div>
@@ -174,7 +174,7 @@ export default function OpenEndedScenarioManager() {
         <div className="card" style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
             <label style={{ fontSize: 12 }}>Sınıf<select style={field} value={pdfMeta.gradeNumber} onChange={e => setPdfMeta({ ...pdfMeta, gradeNumber: Number(e.target.value) })}>{Array.from({ length: 12 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}. sınıf</option>)}</select></label>
-            <label style={{ fontSize: 12 }}>Ders<input style={field} list="oe-subjects-pdf" value={pdfMeta.subject} onChange={e => setPdfMeta({ ...pdfMeta, subject: e.target.value })} placeholder="Ders seçin veya yazın" /><datalist id="oe-subjects-pdf">{subjectOptionsForGrade(pdfMeta.gradeNumber).map(name => <option key={name} value={name} />)}</datalist></label>
+            <label style={{ fontSize: 12 }}>Ders<SubjectSelect gradeNumber={pdfMeta.gradeNumber} value={pdfMeta.subject} onChange={subject => setPdfMeta({ ...pdfMeta, subject })} /></label>
             <label style={{ fontSize: 12 }}>Dönem<select style={field} value={pdfMeta.term} onChange={e => setPdfMeta({ ...pdfMeta, term: Number(e.target.value) })}><option value={1}>1. dönem</option><option value={2}>2. dönem</option></select></label>
             <label style={{ fontSize: 12 }}>İlk senaryo no<input style={field} type="number" min={1} max={99} value={pdfMeta.startNo} onChange={e => setPdfMeta({ ...pdfMeta, startNo: Number(e.target.value) })} /></label>
           </div>
