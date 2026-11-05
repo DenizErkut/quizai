@@ -4,7 +4,7 @@ import { gradeNumberOf } from './written-exam'
 export type ScenarioRubricItem = { criterion: string; maxPoints: number; description: string }
 export type ScenarioExampleInput = {
   gradeNumber: number; subject: string; term: number; scenarioNo: number
-  title: string; scenario: string; question: string; rubric: ScenarioRubricItem[]; figureSvg?: string | null
+  title: string; scenario: string; question: string; rubric: ScenarioRubricItem[]; figureSvg?: string | null; figureImage?: string | null
 }
 export const SCENARIO_RUBRIC_TOTAL = 100
 
@@ -38,7 +38,7 @@ export function validateScenarioExample(input: Record<string, unknown>):
   }
   const total = rubric.reduce((sum, item) => sum + item.maxPoints, 0)
   if (total !== SCENARIO_RUBRIC_TOTAL) return { ok: false, error: `Rubrik toplamı ${SCENARIO_RUBRIC_TOTAL} olmalı (şu an ${total}).` }
-  return { ok: true, value: { gradeNumber, subject, term, scenarioNo, title: clean(input.title, 200), scenario, question, rubric, figureSvg: sanitizeFigureSvg(input.figureSvg) } }
+  return { ok: true, value: { gradeNumber, subject, term, scenarioNo, title: clean(input.title, 200), scenario, question, rubric, figureSvg: sanitizeFigureSvg(input.figureSvg), figureImage: sanitizeFigureImage(input.figureImage) } }
 }
 
 /** Yönetici örneklerini yapay zeka istemine koyar: örneği kopyalamak değil, aynı beceriyi ölçen yeni bir senaryo yazmak istenir. */
@@ -106,4 +106,10 @@ export function sanitizeFigureSvg(input: unknown): string | null {
 
 export function svgDataUri(svg: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+}
+
+/** PDF'ten kırpılan şekil görseli: yalnızca PNG/JPEG data URL ve en çok 900.000 karakter. */
+export function sanitizeFigureImage(input: unknown): string | null {
+  if (typeof input !== 'string') return null
+  return /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+=*$/.test(input) && input.length <= 900000 ? input : null
 }

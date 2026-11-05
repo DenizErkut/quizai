@@ -16,7 +16,7 @@ async function requireAdmin(req: NextRequest) {
   return { user }
 }
 
-const COLUMNS = 'id,grade_number,subject,term,scenario_no,title,scenario,question,rubric,figure_svg,country,status,source_note,created_at,updated_at'
+const COLUMNS = 'id,grade_number,subject,term,scenario_no,title,scenario,question,rubric,figure_svg,figure_image,country,status,source_note,created_at,updated_at'
 
 export async function GET(req: NextRequest) {
   const access = await requireAdmin(req)
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   const v = checked.value
   const fields = {
     grade_number: v.gradeNumber, subject: v.subject, term: v.term, scenario_no: v.scenarioNo, title: v.title,
-    scenario: v.scenario, question: v.question, rubric: v.rubric, figure_svg: v.figureSvg || null, country: scope.value.country,
+    scenario: v.scenario, question: v.question, rubric: v.rubric, figure_svg: v.figureSvg || null, figure_image: v.figureImage || null, country: scope.value.country,
     status: body.publish ? 'published' : 'draft', source_note: (body.sourceNote || '').trim().slice(0, 500) || null,
     updated_at: new Date().toISOString(),
   }
