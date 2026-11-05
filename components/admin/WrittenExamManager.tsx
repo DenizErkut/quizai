@@ -1,6 +1,6 @@
 'use client'
 
-import { subjectOptionsForGrade } from '@/lib/subject-options'
+import SubjectSelect from '@/components/admin/SubjectSelect'
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import LocationSelect from '@/components/LocationSelect'
@@ -172,7 +172,7 @@ export default function WrittenExamManager() {
       <div className="card" style={{ display: 'grid', gap: 10 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
           <label style={{ fontSize: 12 }}>Sınıf<select style={field} value={gradeNumber} onChange={e => setGradeNumber(Number(e.target.value))}>{Array.from({ length: 12 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}. sınıf</option>)}</select></label>
-          <label style={{ fontSize: 12 }}>Ders<input style={field} list="we-subjects" value={subject} onChange={e => setSubject(e.target.value)} placeholder="Ders seçin veya yazın" /><datalist id="we-subjects">{subjectOptionsForGrade(gradeNumber).map(name => <option key={name} value={name} />)}</datalist></label>
+          <label style={{ fontSize: 12 }}>Ders<SubjectSelect gradeNumber={gradeNumber} value={subject} onChange={setSubject} /></label>
           <label style={{ fontSize: 12 }}>Dönem<select style={field} value={term} onChange={e => setTerm(Number(e.target.value))}><option value={1}>1. dönem</option><option value={2}>2. dönem</option></select></label>
           <label style={{ fontSize: 12 }}>Kaçıncı yazılı<select style={field} value={examNumber} onChange={e => setExamNumber(Number(e.target.value))}>{[1, 2, 3, 4].map(n => <option key={n} value={n}>{n}. yazılı</option>)}</select></label>
         </div>

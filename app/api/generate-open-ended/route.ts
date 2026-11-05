@@ -13,7 +13,7 @@ import { pickMeasuredQuizEngine } from '@/lib/ai-gateway/measured-quiz-router'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { checkMinorConsentBlock } from '@/lib/identity/client'
 import { gradeKeyFromProfile, isSelectableOpenEndedTopic, loadOpenEndedCatalog } from '@/lib/open-ended-practice-catalog'
-import { exampleBlock, pickExamples, scenarioLabel, sanitizeFigureSvg, type ScenarioRubricItem } from '@/lib/open-ended-scenarios'
+import { exampleBlock, pickExamples, scenarioLabel, sanitizeFigureSvg, sanitizeAnswerTable, type ScenarioRubricItem } from '@/lib/open-ended-scenarios'
 import { gradeNumberOf } from '@/lib/written-exam'
 
 const supabase = createClient(
@@ -123,17 +123,19 @@ export async function POST(req: NextRequest) {
     const level = getLevel(grade)
     let examplesText = ''
     let wantFigure = false
+    let wantTable = false
     if (scenarioMode) {
       const gradeNumber = gradeNumberOf(grade)
       const country = String((profile as { country?: string | null }).country || 'TR').toUpperCase()
       const { data: found } = gradeNumber
-        ? await supabase.from('open_ended_scenario_examples').select('scenario,question,rubric,figure_svg')
+        ? await supabase.from('open_ended_scenario_examples').select('scenario,question,rubric,figure_svg,answer_table')
           .eq('status', 'published').eq('grade_number', gradeNumber).eq('country', country).eq('term', scenarioTerm).eq('scenario_no', scenarioNo)
           .ilike('subject', subject.replace(/[\\%_]/g, '\\$&')).limit(30)
         : { data: null }
       if (!found?.length) return NextResponse.json({ error: 'Bu senaryo için henüz örnek yüklenmemiş.' }, { status: 404 })
-      const picked = pickExamples(found as Array<{ scenario: string; question: string; rubric: ScenarioRubricItem[]; figure_svg?: string | null }>, 3)
-      wantFigure = picked.some(example => !!example.figure_svg)
+      const picked = pickExamples(found as Array<{ scenario: string; question: string; rubric: ScenarioRubricItem[]; figure_svg?: string | null; answer_table?: string | null }>, 3)
+      wantTable = picked.some(example => !!example.answer_table)
+      wantFigure = !wantTable && picked.some(example => !!example.figure_svg)
       examplesText = exampleBlock(picked)
     } else {
       const available = await loadOpenEndedCatalog(supabase, gradeKeyFromProfile(grade))
@@ -168,6 +170,7 @@ SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir açıklama eklem
 {
   "scenario": "Senaryo/durum metni (2-4 cümle, ${isForeignLanguageSubject(subject) ? subject : 'Türkçe'})",
   "question": "Senaryoya dayanan açık uçlu soru (${isForeignLanguageSubject(subject) ? subject : 'Türkçe'})",
+  ${wantTable ? '"table": "Örnekteki doldurulacak tablonun YENİ verilerle hazırlanmış hâli: satır başına bir satır, hücreler | ile; ilk satır başlıklar, ilk sütun satır adları; öğrencinin dolduracağı hücreler BOŞ. Senaryo metnine tabloyu tekrar yazma; soru bu tabloyu doldurmayı istemeli, rubrik doğru hücre değerlerini ölçmeli",' : ''}
   ${wantFigure ? '"figureSvg": "Örnekteki şekil türünde, YENİ verilerle çizilmiş sade SVG (viewBox=\\"0 0 400 260\\", yalnızca path/rect/circle/line/polygon/text, Türkçe etiketler, 5000 karakteri geçmesin, beyaz arka plan). Soru şekle dayanmalı; senaryo metni şekildeki tüm verileri de içermeli",' : ''}
   "rubric": [
     { "criterion": "Kriter adı (kısa, Türkçe)", "maxPoints": 30, "description": "${grade} öğrencisinin basit cümlelerle karşılayabileceği tek ve somut tam puan koşulu (1 cümle, Türkçe)" }
@@ -187,7 +190,7 @@ Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
       const result = await generateWithRoutedProvider(openEndedDecision, {
         systemPrompt: '',
         userPrompt: prompt,
-        maxTokens: wantFigure ? 4500 : 1500,
+        maxTokens: wantFigure || wantTable ? 4500 : 1500,
         operationTag: `generate-open-ended:${openEndedDecision.genEngineTag}`,
         userId: user.id,
       })
@@ -197,7 +200,7 @@ Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
       if (openEndedDecision.engine === 'claude-sonnet' || openEndedDecision.engine === 'claude-haiku') throw primaryError
       const fallback = await generateWithRoutedProvider(
         { engine: 'claude-sonnet', experimentVariant: null, genEngineTag: 'claude-sonnet-fallback' },
-        { systemPrompt: '', userPrompt: prompt, maxTokens: wantFigure ? 4500 : 1500, operationTag: 'generate-open-ended:fallback-claude', userId: user.id }
+        { systemPrompt: '', userPrompt: prompt, maxTokens: wantFigure || wantTable ? 4500 : 1500, operationTag: 'generate-open-ended:fallback-claude', userId: user.id }
       )
       text = fallback.text
     }
@@ -243,6 +246,7 @@ Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
         scenario: parsed.scenario,
         question: parsed.question,
         rubric: parsed.rubric,
+        answer_table: wantTable ? sanitizeAnswerTable((parsed as { table?: unknown }).table) : null,
         figure_svg: wantFigure ? sanitizeFigureSvg((parsed as { figureSvg?: unknown }).figureSvg) : null,
         total_possible: totalPossible,
       })
@@ -263,6 +267,7 @@ Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
       scenario: parsed.scenario,
       question: parsed.question,
       rubric: parsed.rubric,
+      answerTable: wantTable ? sanitizeAnswerTable((parsed as { table?: unknown }).table) : null,
       figureSvg: wantFigure ? sanitizeFigureSvg((parsed as { figureSvg?: unknown }).figureSvg) : null,
       totalPossible,
     })

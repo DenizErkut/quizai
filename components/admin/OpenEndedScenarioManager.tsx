@@ -3,15 +3,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { sanitizeFigureSvg, svgDataUri } from '@/lib/open-ended-scenarios'
-import { subjectOptionsForGrade } from '@/lib/subject-options'
+import SubjectSelect from '@/components/admin/SubjectSelect'
 
 type Criterion = { criterion: string; maxPoints: number; description: string }
-type Example = { id: string; grade_number: number; subject: string; term: number; scenario_no: number; title: string; scenario: string; question: string; rubric: Criterion[]; figure_svg?: string | null; figure_image?: string | null; status: string; source_note: string | null }
-type Form = { id: string; gradeNumber: number; subject: string; term: number; scenarioNo: number; title: string; scenario: string; question: string; rubric: Criterion[]; figureSvg: string; figureImage: string; sourceNote: string }
+type Example = { id: string; grade_number: number; subject: string; term: number; scenario_no: number; title: string; scenario: string; question: string; rubric: Criterion[]; figure_svg?: string | null; figure_image?: string | null; answer_table?: string | null; status: string; source_note: string | null }
+type Form = { id: string; gradeNumber: number; subject: string; term: number; scenarioNo: number; title: string; scenario: string; question: string; rubric: Criterion[]; figureSvg: string; figureImage: string; answerTable: string; sourceNote: string }
 
 const field: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }
 const emptyForm = (over: Partial<Form> = {}): Form => ({
-  id: '', gradeNumber: 7, subject: '', term: 1, scenarioNo: 1, title: '', scenario: '', question: '', figureSvg: '', figureImage: '', sourceNote: '',
+  id: '', gradeNumber: 7, subject: '', term: 1, scenarioNo: 1, title: '', scenario: '', question: '', figureSvg: '', figureImage: '', answerTable: '', sourceNote: '',
   rubric: [{ criterion: '', maxPoints: 50, description: '' }, { criterion: '', maxPoints: 50, description: '' }], ...over,
 })
 const total = (rubric: Criterion[]) => rubric.reduce((sum, item) => sum + (Number(item.maxPoints) || 0), 0)
@@ -89,7 +89,7 @@ export default function OpenEndedScenarioManager() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'PDF işlenemedi.')
       let saved = 0
-      for (const [i, item] of (data.items as Array<{ title: string; scenario: string; question: string; rubric: Criterion[]; figureSvg?: string | null; figureImage?: string | null }>).entries()) {
+      for (const [i, item] of (data.items as Array<{ title: string; scenario: string; question: string; rubric: Criterion[]; figureSvg?: string | null; figureImage?: string | null; answerTable?: string | null }>).entries()) {
         const res = await fetch('/api/admin/open-ended-scenarios', {
           method: 'POST', headers: { ...(await authHeader()), 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...item, gradeNumber: pdfMeta.gradeNumber, subject: pdfMeta.subject, term: pdfMeta.term, scenarioNo: pdfMeta.startNo + i, sourceNote: `PDF: ${pdfFile.name}`, publish: false }),
@@ -112,13 +112,16 @@ export default function OpenEndedScenarioManager() {
           {!form.id && <div><button className="btn btn-primary" onClick={() => { setForm(null); setPdfOpen(true) }}>📄 PDF&apos;den yükle (tüm senaryoları otomatik ayıkla)</button></div>}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
             <label style={{ fontSize: 12 }}>Sınıf<select style={field} value={form.gradeNumber} onChange={e => setForm({ ...form, gradeNumber: Number(e.target.value) })}>{Array.from({ length: 12 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}. sınıf</option>)}</select></label>
-            <label style={{ fontSize: 12 }}>Ders<input style={field} list="oe-subjects-form" value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} placeholder="Ders seçin veya yazın" /><datalist id="oe-subjects-form">{subjectOptionsForGrade(form.gradeNumber).map(name => <option key={name} value={name} />)}</datalist></label>
+            <label style={{ fontSize: 12 }}>Ders<SubjectSelect gradeNumber={form.gradeNumber} value={form.subject} onChange={subject => setForm({ ...form, subject })} /></label>
             <label style={{ fontSize: 12 }}>Dönem<select style={field} value={form.term} onChange={e => setForm({ ...form, term: Number(e.target.value) })}><option value={1}>1. dönem</option><option value={2}>2. dönem</option></select></label>
             <label style={{ fontSize: 12 }}>Senaryo no<input style={field} type="number" min={1} max={99} value={form.scenarioNo} onChange={e => setForm({ ...form, scenarioNo: Number(e.target.value) })} /></label>
           </div>
           <label style={{ fontSize: 12 }}>Başlık (opsiyonel)<input style={field} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></label>
           <label style={{ fontSize: 12 }}>Senaryo<textarea style={{ ...field, minHeight: 110 }} value={form.scenario} onChange={e => setForm({ ...form, scenario: e.target.value })} placeholder="Durum / senaryo metni" /></label>
           <label style={{ fontSize: 12 }}>Soru<textarea style={{ ...field, minHeight: 60 }} value={form.question} onChange={e => setForm({ ...form, question: e.target.value })} placeholder="Senaryoya dayanan açık uçlu soru" /></label>
+          <label style={{ fontSize: 12 }}>Doldurulacak tablo (opsiyonel — satır başına bir satır, hücreler | ile; öğrencinin dolduracağı hücreleri boş bırakın)
+            <textarea style={{ ...field, minHeight: 90, fontFamily: 'monospace', fontSize: 12 }} value={form.answerTable} onChange={e => setForm({ ...form, answerTable: e.target.value })} placeholder={'Taşıma Aracı | Karada Kullanılma | İçinde Yolcu | Elektrikle Çalışma\nBisiklet | | |\nOtobüs | | |'} />
+          </label>
           <label style={{ fontSize: 12 }}>Şekil / görsel (SVG, opsiyonel — AI benzer şekil çizer)
             <textarea style={{ ...field, minHeight: 70, fontFamily: 'monospace', fontSize: 11 }} value={form.figureSvg} onChange={e => setForm({ ...form, figureSvg: e.target.value })} placeholder="<svg viewBox='0 0 400 260' ...>...</svg>" />
           </label>
@@ -174,7 +177,7 @@ export default function OpenEndedScenarioManager() {
         <div className="card" style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
             <label style={{ fontSize: 12 }}>Sınıf<select style={field} value={pdfMeta.gradeNumber} onChange={e => setPdfMeta({ ...pdfMeta, gradeNumber: Number(e.target.value) })}>{Array.from({ length: 12 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}. sınıf</option>)}</select></label>
-            <label style={{ fontSize: 12 }}>Ders<input style={field} list="oe-subjects-pdf" value={pdfMeta.subject} onChange={e => setPdfMeta({ ...pdfMeta, subject: e.target.value })} placeholder="Ders seçin veya yazın" /><datalist id="oe-subjects-pdf">{subjectOptionsForGrade(pdfMeta.gradeNumber).map(name => <option key={name} value={name} />)}</datalist></label>
+            <label style={{ fontSize: 12 }}>Ders<SubjectSelect gradeNumber={pdfMeta.gradeNumber} value={pdfMeta.subject} onChange={subject => setPdfMeta({ ...pdfMeta, subject })} /></label>
             <label style={{ fontSize: 12 }}>Dönem<select style={field} value={pdfMeta.term} onChange={e => setPdfMeta({ ...pdfMeta, term: Number(e.target.value) })}><option value={1}>1. dönem</option><option value={2}>2. dönem</option></select></label>
             <label style={{ fontSize: 12 }}>İlk senaryo no<input style={field} type="number" min={1} max={99} value={pdfMeta.startNo} onChange={e => setPdfMeta({ ...pdfMeta, startNo: Number(e.target.value) })} /></label>
           </div>
@@ -192,7 +195,7 @@ export default function OpenEndedScenarioManager() {
               <div key={e.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid var(--border)', padding: '6px 0' }}>
                 <div style={{ flex: 1, minWidth: 220, fontSize: 13 }}>{e.title || e.scenario.slice(0, 90)}{!e.title && e.scenario.length > 90 ? '…' : ''}</div>
                 <span style={{ fontSize: 12, fontWeight: 700, color: e.status === 'published' ? '#0a9e90' : 'var(--text2)' }}>{e.status === 'published' ? 'Yayında' : 'Taslak'}</span>
-                <button className="btn btn-ghost" onClick={() => setForm({ id: e.id, gradeNumber: e.grade_number, subject: e.subject, term: e.term, scenarioNo: e.scenario_no, title: e.title, scenario: e.scenario, question: e.question, rubric: e.rubric, figureSvg: e.figure_svg || '', figureImage: e.figure_image || '', sourceNote: e.source_note || '' })}>Düzenle</button>
+                <button className="btn btn-ghost" onClick={() => setForm({ id: e.id, gradeNumber: e.grade_number, subject: e.subject, term: e.term, scenarioNo: e.scenario_no, title: e.title, scenario: e.scenario, question: e.question, rubric: e.rubric, figureSvg: e.figure_svg || '', figureImage: e.figure_image || '', answerTable: e.answer_table || '', sourceNote: e.source_note || '' })}>Düzenle</button>
                 <button className="btn btn-ghost" onClick={() => act('PATCH', e, e.status === 'published' ? 'draft' : 'published')}>{e.status === 'published' ? 'Taslağa al' : 'Yayınla'}</button>
                 <button className="btn btn-ghost" onClick={() => setForm(emptyForm({ gradeNumber: e.grade_number, subject: e.subject, term: e.term, scenarioNo: nextNumber(e.grade_number, e.subject, e.term) }))}>+ Sonraki senaryo</button>
                 <button className="btn btn-ghost" onClick={() => act('DELETE', e)}>Sil</button>
