@@ -58,4 +58,8 @@ export const openEndedEntries: Entry[] = [
   ['Senaryo şekli', 'Scenario figure', 'Szenario-Abbildung', 'Figure du scénario', 'Figura del escenario', 'شكل السيناريو'],
   ['Tablodaki tüm boşlukları doldur.', 'Fill in all the blanks in the table.', 'Fülle alle Lücken in der Tabelle aus.', 'Remplis toutes les cases vides du tableau.', 'Rellena todos los espacios en blanco de la tabla.', 'املأ جميع الفراغات في الجدول.'],
   ['Açıklaman varsa yaz (isteğe bağlı)…', 'Write your explanation if you have one (optional)…', 'Schreibe deine Erklärung, falls vorhanden (optional)…', 'Écris ton explication si tu en as une (facultatif)…', 'Escribe tu explicación si la tienes (opcional)…', 'اكتب شرحك إن وجد (اختياري)…'],
+  ['Sonraki soru ({n}/{total}) →', 'Next question ({n}/{total}) →', 'Nächste Frage ({n}/{total}) →', 'Question suivante ({n}/{total}) →', 'Siguiente pregunta ({n}/{total}) →', 'السؤال التالي ({n}/{total}) ←'],
+  ['Senaryo tamamlandı — başka soru çöz', 'Scenario complete — solve another question', 'Szenario abgeschlossen – weitere Frage lösen', 'Scénario terminé — résoudre une autre question', 'Escenario completado: resolver otra pregunta', 'اكتمل السيناريو — حل سؤالًا آخر'],
+  ['Soru {n}/{total}', 'Question {n}/{total}', 'Frage {n}/{total}', 'Question {n}/{total}', 'Pregunta {n}/{total}', 'السؤال {n}/{total}'],
+  ['{n} soru', '{n} questions', '{n} Fragen', '{n} questions', '{n} preguntas', '{n} أسئلة'],
 ]

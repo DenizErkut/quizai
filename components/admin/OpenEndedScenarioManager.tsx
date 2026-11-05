@@ -6,7 +6,7 @@ import { sanitizeFigureSvg, svgDataUri } from '@/lib/open-ended-scenarios'
 import SubjectSelect from '@/components/admin/SubjectSelect'
 
 type Criterion = { criterion: string; maxPoints: number; description: string }
-type Example = { id: string; grade_number: number; subject: string; term: number; scenario_no: number; title: string; scenario: string; question: string; rubric: Criterion[]; figure_svg?: string | null; figure_image?: string | null; answer_table?: string | null; status: string; source_note: string | null }
+type Example = { id: string; grade_number: number; subject: string; term: number; scenario_no: number; title: string; scenario: string; question: string; rubric: Criterion[]; figure_svg?: string | null; seq?: number; figure_image?: string | null; answer_table?: string | null; status: string; source_note: string | null }
 type Form = { id: string; gradeNumber: number; subject: string; term: number; scenarioNo: number; title: string; scenario: string; question: string; rubric: Criterion[]; figureSvg: string; figureImage: string; answerTable: string; sourceNote: string }
 
 const field: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }
@@ -92,7 +92,7 @@ export default function OpenEndedScenarioManager() {
       for (const [i, item] of (data.items as Array<{ title: string; scenario: string; question: string; rubric: Criterion[]; figureSvg?: string | null; figureImage?: string | null; answerTable?: string | null }>).entries()) {
         const res = await fetch('/api/admin/open-ended-scenarios', {
           method: 'POST', headers: { ...(await authHeader()), 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...item, gradeNumber: pdfMeta.gradeNumber, subject: pdfMeta.subject, term: pdfMeta.term, scenarioNo: pdfMeta.startNo + i, sourceNote: `PDF: ${pdfFile.name}`, publish: false }),
+          body: JSON.stringify({ ...item, gradeNumber: pdfMeta.gradeNumber, subject: pdfMeta.subject, term: pdfMeta.term, scenarioNo: pdfMeta.startNo, sourceNote: `PDF: ${pdfFile.name}`, publish: false }),
         })
         if (res.ok) saved++
       }
@@ -179,7 +179,7 @@ export default function OpenEndedScenarioManager() {
             <label style={{ fontSize: 12 }}>Sınıf<select style={field} value={pdfMeta.gradeNumber} onChange={e => setPdfMeta({ ...pdfMeta, gradeNumber: Number(e.target.value) })}>{Array.from({ length: 12 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}. sınıf</option>)}</select></label>
             <label style={{ fontSize: 12 }}>Ders<SubjectSelect gradeNumber={pdfMeta.gradeNumber} value={pdfMeta.subject} onChange={subject => setPdfMeta({ ...pdfMeta, subject })} /></label>
             <label style={{ fontSize: 12 }}>Dönem<select style={field} value={pdfMeta.term} onChange={e => setPdfMeta({ ...pdfMeta, term: Number(e.target.value) })}><option value={1}>1. dönem</option><option value={2}>2. dönem</option></select></label>
-            <label style={{ fontSize: 12 }}>İlk senaryo no<input style={field} type="number" min={1} max={99} value={pdfMeta.startNo} onChange={e => setPdfMeta({ ...pdfMeta, startNo: Number(e.target.value) })} /></label>
+            <label style={{ fontSize: 12 }}>Senaryo no (PDF&apos;teki tüm sorular bu senaryoya eklenir)<input style={field} type="number" min={1} max={99} value={pdfMeta.startNo} onChange={e => setPdfMeta({ ...pdfMeta, startNo: Number(e.target.value) })} /></label>
           </div>
           <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target.files?.[0] || null)} />
           <div><button className="btn btn-primary" disabled={busy || !pdfFile} onClick={importPdf}>Senaryoları ayıkla ve taslak kaydet</button></div>
@@ -190,10 +190,10 @@ export default function OpenEndedScenarioManager() {
       <div style={{ display: 'grid', gap: 10 }}>
         {[...groups.entries()].map(([key, list]) => (
           <div key={key} className="card" style={{ padding: '10px 14px' }}>
-            <div style={{ fontWeight: 800, marginBottom: 6 }}>{key} <span style={{ fontWeight: 500, fontSize: 12, color: 'var(--text2)' }}>({list.length} örnek)</span></div>
+            <div style={{ fontWeight: 800, marginBottom: 6 }}>{key} <span style={{ fontWeight: 500, fontSize: 12, color: 'var(--text2)' }}>({list.length} soru)</span></div>
             {list.map(e => (
               <div key={e.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid var(--border)', padding: '6px 0' }}>
-                <div style={{ flex: 1, minWidth: 220, fontSize: 13 }}>{e.title || e.scenario.slice(0, 90)}{!e.title && e.scenario.length > 90 ? '…' : ''}</div>
+                <div style={{ flex: 1, minWidth: 220, fontSize: 13 }}><b>{e.seq || 1}.</b> {e.title || e.scenario.slice(0, 90)}{!e.title && e.scenario.length > 90 ? '…' : ''}</div>
                 <span style={{ fontSize: 12, fontWeight: 700, color: e.status === 'published' ? '#0a9e90' : 'var(--text2)' }}>{e.status === 'published' ? 'Yayında' : 'Taslak'}</span>
                 <button className="btn btn-ghost" onClick={() => setForm({ id: e.id, gradeNumber: e.grade_number, subject: e.subject, term: e.term, scenarioNo: e.scenario_no, title: e.title, scenario: e.scenario, question: e.question, rubric: e.rubric, figureSvg: e.figure_svg || '', figureImage: e.figure_image || '', answerTable: e.answer_table || '', sourceNote: e.source_note || '' })}>Düzenle</button>
                 <button className="btn btn-ghost" onClick={() => act('PATCH', e, e.status === 'published' ? 'draft' : 'published')}>{e.status === 'published' ? 'Taslağa al' : 'Yayınla'}</button>

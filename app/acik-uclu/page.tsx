@@ -30,6 +30,9 @@ export default function AcikUcluPage() {
   const [sessionId, setSessionId] = useState('')
   const [scenario, setScenario] = useState('')
   const [figureSvg, setFigureSvg] = useState<string | null>(null)
+  const [currentCard, setCurrentCard] = useState<ScenarioCard | null>(null)
+  const [qIndex, setQIndex] = useState(0)
+  const [qTotal, setQTotal] = useState(1)
   const [tableText, setTableText] = useState<string | null>(null)
   const [tableValues, setTableValues] = useState<string[][]>([])
   const [question, setQuestion] = useState('')
@@ -50,7 +53,7 @@ export default function AcikUcluPage() {
   const [startingId, setStartingId] = useState('')
 
   // Yöneticinin örneklerine dayanan senaryo kartları (dönem + senaryo no)
-  type ScenarioCard = { subject: string; term: number; scenarioNo: number; label: string; attempts: number; bestScore: number | null; total: number }
+  type ScenarioCard = { questionCount?: number; subject: string; term: number; scenarioNo: number; label: string; attempts: number; bestScore: number | null; total: number }
   const [scenarioCards, setScenarioCards] = useState<ScenarioCard[]>([])
   const [scenarioSubject, setScenarioSubject] = useState('')
   const [startingScenario, setStartingScenario] = useState('')
@@ -88,7 +91,7 @@ export default function AcikUcluPage() {
     }
   }
 
-  async function startScenario(card: ScenarioCard) {
+  async function startScenario(card: ScenarioCard, index = 0) {
     const key = `${card.subject}|${card.term}|${card.scenarioNo}`
     setStartingScenario(key); setError('')
     try {
@@ -96,7 +99,7 @@ export default function AcikUcluPage() {
       const res = await fetch('/api/generate-open-ended', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ subject: card.subject, term: card.term, scenarioNo: card.scenarioNo }),
+        body: JSON.stringify({ subject: card.subject, term: card.term, scenarioNo: card.scenarioNo, questionIndex: index }),
       })
       const json = await res.json()
       if (!res.ok) {
@@ -105,7 +108,7 @@ export default function AcikUcluPage() {
                   json.error || t('Soru üretilemedi.'))
         return
       }
-      setSessionId(json.sessionId); setScenario(json.scenario); setFigureSvg(json.figureSvg || null); setTableText(json.answerTable || null); setTableValues([]); setQuestion(json.question); setRubric(json.rubric)
+      setCurrentCard(card); setQIndex(json.questionIndex || 0); setQTotal(json.questionTotal || 1); setSessionId(json.sessionId); setScenario(json.scenario); setFigureSvg(json.figureSvg || null); setTableText(json.answerTable || null); setTableValues([]); setQuestion(json.question); setRubric(json.rubric)
       setTotalPossible(json.totalPossible); setAnswer(''); setStep('question')
     } catch {
       setError(t('Bağlantı hatası, tekrar dene.'))
@@ -142,7 +145,7 @@ export default function AcikUcluPage() {
       const json = await res.json()
       if (!res.ok) { setError(json.error || t('Ödev başlatılamadı.')); return }
       setSessionId(json.sessionId)
-      setScenario(json.scenario); setFigureSvg(null); setTableText(null)
+      setScenario(json.scenario); setFigureSvg(null); setTableText(null); setCurrentCard(null); setQTotal(1); setQIndex(0)
       setQuestion(json.question)
       setRubric(json.rubric)
       setTotalPossible(json.totalPossible)
@@ -178,7 +181,7 @@ export default function AcikUcluPage() {
         return
       }
       setSessionId(json.sessionId)
-      setScenario(json.scenario); setFigureSvg(null); setTableText(null)
+      setScenario(json.scenario); setFigureSvg(null); setTableText(null); setCurrentCard(null); setQTotal(1); setQIndex(0)
       setQuestion(json.question)
       setRubric(json.rubric)
       setTotalPossible(json.totalPossible)
@@ -286,7 +289,7 @@ export default function AcikUcluPage() {
                       <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)' }}>{card.subject}</div>
                       <div style={{ fontSize: '17px', fontWeight: 800, color: 'var(--primary)' }}>{t('{term}. Dönem {no}. Senaryo', { term: card.term, no: card.scenarioNo })}</div>
                       <div style={{ fontSize: '12px', color: card.attempts ? '#0a9e90' : 'var(--text3)', fontWeight: 600 }}>
-                        {card.attempts ? t('Çözüldü · en yüksek {score}/{total}', { score: card.bestScore ?? 0, total: card.total }) : t('Henüz çözülmedi')}
+                        {(card.questionCount || 0) > 1 ? `${t('{n} soru', { n: card.questionCount })} · ` : ''}{card.attempts ? t('Çözüldü · en yüksek {score}/{total}', { score: card.bestScore ?? 0, total: card.total }) : t('Henüz çözülmedi')}
                       </div>
                       <button className="btn btn-primary" style={{ marginTop: 'auto', justifyContent: 'center' }} onClick={() => startScenario(card)} disabled={!!startingScenario}>
                         {startingScenario === key ? t('Senaryo hazırlanıyor…') : card.attempts ? t('Tekrar çöz') : t('Başla →')}
@@ -394,7 +397,7 @@ export default function AcikUcluPage() {
         {step === 'question' && (
           <div>
             <div className="card" style={{ padding: '1.25rem', marginBottom: '1rem', borderLeft: '3px solid #3E8E3E' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: '#3E8E3E', marginBottom: '6px', textTransform: 'uppercase' }}>{t('Senaryo')}</div>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#3E8E3E', marginBottom: '6px', textTransform: 'uppercase' }}>{t('Senaryo')}{currentCard && qTotal > 1 ? ` · ${t('Soru {n}/{total}', { n: qIndex + 1, total: qTotal })}` : ''}</div>
               <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7, whiteSpace: 'pre-line' }}><MathText text={scenario} /></p>
               {figureSvg && (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -503,8 +506,14 @@ export default function AcikUcluPage() {
               </div>
             ))}
 
-            <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }} onClick={newQuestion}>
-              {t('Yeni Soru Çöz')}
+            {currentCard && qIndex + 1 < qTotal && (
+              <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }} disabled={!!startingScenario}
+                onClick={() => startScenario(currentCard, qIndex + 1)}>
+                {startingScenario ? t('Senaryo hazırlanıyor…') : t('Sonraki soru ({n}/{total}) →', { n: qIndex + 2, total: qTotal })}
+              </button>
+            )}
+            <button className={currentCard && qIndex + 1 < qTotal ? 'btn' : 'btn btn-primary'} style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }} onClick={newQuestion}>
+              {currentCard && qIndex + 1 >= qTotal && qTotal > 1 ? t('Senaryo tamamlandı — başka soru çöz') : t('Yeni Soru Çöz')}
             </button>
           </div>
         )}

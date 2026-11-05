@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     cards: list.map(card => {
       const mine = (sessions || []).filter(s => s.topic === scenarioLabel(card.term, card.scenarioNo) && s.subject.toLocaleLowerCase('tr') === card.subject.toLocaleLowerCase('tr'))
       const best = mine.reduce((max, s) => Math.max(max, Number(s.total_earned) || 0), 0)
-      return { ...card, label: scenarioLabel(card.term, card.scenarioNo), attempts: mine.length, bestScore: mine.length ? best : null, total: mine[0]?.total_possible ?? 100 }
+      return { ...card, questionCount: card.exampleCount, label: scenarioLabel(card.term, card.scenarioNo), attempts: mine.length, bestScore: mine.length ? best : null, total: mine[0]?.total_possible ?? 100 }
     }),
   })
 }
