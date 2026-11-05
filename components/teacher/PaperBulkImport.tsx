@@ -147,7 +147,7 @@ export default function PaperBulkImport({ group, onClose }: { group: Assignment[
           {entry.answers && entry.status !== 'saved' && entry.answers.map((a, i) => (
             <div key={a.assignmentId} style={{ marginTop: 6 }}>
               <div style={{ fontSize: 12, fontWeight: 600 }}>{t('Soru {n}', { n: i + 1 })}: {group[i]?.question.slice(0, 120)}</div>
-              <textarea value={a.text} rows={3} style={{ width: '100%' }} aria-label={t('Soru {n} cevabı', { n: i + 1 })}
+              <textarea value={a.text} rows={3} style={{ width: '100%', borderRadius: 4 }} aria-label={t('Soru {n} cevabı', { n: i + 1 })}
                 onChange={e => setEntries(list => list.map(x => x.studentId === entry.studentId && x.answers ? { ...x, answers: x.answers.map((y, j) => j === i ? { ...y, text: e.target.value } : y) } : x))} />
               {(!a.legible || a.note) && <div style={{ fontSize: 11, color: 'var(--amber, #b45309)' }}>⚠️ {a.note || t('Bazı kısımlar zor okundu; kontrol edin.')}</div>}
               {!a.text.trim() && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{t('Cevap bulunamadı — 0 puan verilir.')}</div>}
