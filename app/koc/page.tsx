@@ -15,6 +15,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/i18n/I18nProvider'
+import VoiceMicButton from '@/components/VoiceMicButton'
+import { matchVoiceCommand } from '@/lib/voice-commands'
 
 interface CoachAction {
   type: 'start_practice'
@@ -38,6 +40,7 @@ export default function PratiumKocPage() {
   const supabase = createClient() as any
   const [messages, setMessages] = useState<CoachMessage[]>([])
   const [input, setInput] = useState('')
+  const [voiceNote, setVoiceNote] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
@@ -144,8 +147,18 @@ export default function PratiumKocPage() {
     router.push(`/quiz?${params.toString()}`)
   }
 
-  async function send() {
-    const text = input.trim()
+  // Öğrencinin konuşması: önce sesli komut mu diye bakılır (sayfa aç, sesi durdur…), değilse koça gönderilir.
+  function handleVoice(spoken: string) {
+    const command = matchVoiceCommand(spoken)
+    if (command?.type === 'navigate') { setError(''); setVoiceNote(`${t('Açılıyor')}: ${t(command.label)}`); router.push(command.href); return }
+    if (command?.type === 'stop') { audioRef.current?.pause(); setSpeakingId(null); setVoiceNote(t('Ses durduruldu.')); return }
+    if (command?.type === 'repeat') { const last = [...messages].reverse().find(m => m.role === 'assistant' && m.id); if (last?.id) void speak(last.id); return }
+    if (command?.type === 'clear') { setInput(''); return }
+    void send(spoken)
+  }
+
+  async function send(override?: string) {
+    const text = (override ?? input).trim()
     if (!text || sending) return
     setInput('')
     setError('')
@@ -268,6 +281,7 @@ export default function PratiumKocPage() {
 
       <div style={{ maxWidth: '640px', width: '100%', margin: '0 auto', padding: '0 1.25rem', boxSizing: 'border-box', fontSize: '10.5px', color: 'var(--text3)' }}>
         {t('🔊 Koç sesi yapay zekâ tarafından üretilir.')}
+        {voiceNote && <span role="status" style={{ marginLeft: 8, color: 'var(--accent)' }}>{voiceNote}</span>}
       </div>
       <form
         onSubmit={e => { e.preventDefault(); send() }}
@@ -280,6 +294,7 @@ export default function PratiumKocPage() {
           disabled={loading || sending}
           style={{ flex: 1, padding: '10px 14px', borderRadius: '12px', border: '1.5px solid var(--border)', fontSize: '14px', background: 'var(--bg)', color: 'var(--text)' }}
         />
+        <VoiceMicButton onTranscript={handleVoice} disabled={loading || sending} size={42} />
         <button type="submit" className="btn btn-primary" disabled={loading || sending || !input.trim()}>{t('Gönder')}</button>
       </form>
     </main>
