@@ -35,7 +35,19 @@ export default function AIChatBot({ isGuest = false }: Props) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [unread, setUnread] = useState(0)
-  const [bubbleDismissed, setBubbleDismissed] = useState(false)
+  const [bubbleDismissed, setBubbleDismissedState] = useState(false)
+  // Karşılama balonu tarayıcı oturumunda bir kez gösterilir; her sayfada yeniden çıkıp menünün yanını kalabalıklaştırmasın.
+  const setBubbleDismissed = (value: boolean) => {
+    setBubbleDismissedState(value)
+    if (value) { try { sessionStorage.setItem('prati_bubble_seen', '1') } catch { /* gizli sekme */ } }
+  }
+  useEffect(() => {
+    let seen = false
+    try { seen = sessionStorage.getItem('prati_bubble_seen') === '1' } catch { /* gizli sekme */ }
+    if (!seen) { try { sessionStorage.setItem('prati_bubble_seen', '1') } catch { /* gizli sekme */ } return }
+    const timer = window.setTimeout(() => setBubbleDismissedState(true), 0)
+    return () => window.clearTimeout(timer)
+  }, [])
   const bottomRef = useRef<HTMLDivElement>(null)
   const { pos, style: dragStyle, hidden, hide, show, fabRect, elRef, wasDragged, dragHandlers } =
     useDraggableMascot('prati_mascot', 84)

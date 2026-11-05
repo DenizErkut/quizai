@@ -113,9 +113,11 @@ export default function StudentSidebar({ profile, streak, testsLeft, onSignOut }
   return (
     <>
       <style>{`
-        .ss-root{position:fixed;top:90px;left:0;bottom:0;width:${SIDEBAR_WIDTH}px;z-index:1100;display:flex;flex-direction:column;background:#29483d;color:#fff;overflow-y:auto;overscroll-behavior:contain;box-shadow:4px 0 24px rgba(20,40,32,.18);scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent}
+        .ss-logo{display:block;padding:14px 20px 0}
+        .ss-root{position:fixed;top:0;left:0;bottom:0;width:${SIDEBAR_WIDTH}px;z-index:1100;display:flex;flex-direction:column;background:#29483d;color:#fff;overflow-y:auto;overscroll-behavior:contain;box-shadow:4px 0 24px rgba(20,40,32,.18);scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent}
         .ss-scrim{display:none}
         @media (max-width:768px){
+          .ss-logo{display:none}
           .ss-root{top:58px;transform:translateX(-102%);transition:transform .22s ease;width:min(86vw,${SIDEBAR_WIDTH + 24}px)}
           .ss-root.open{transform:none}
           .ss-scrim.open{display:block;position:fixed;inset:58px 0 0 0;z-index:1090;background:rgba(10,20,16,.5)}
@@ -131,6 +133,7 @@ export default function StudentSidebar({ profile, streak, testsLeft, onSignOut }
       `}</style>
       <div className={`ss-scrim${open ? ' open' : ''}`} onClick={() => setOpen(false)} />
       <aside className={`ss-root${open ? ' open' : ''}`} aria-label={t('Öğrenci menüsü')}>
+        <Link href="/home" className="ss-logo"><img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: 56, width: 'auto', filter: 'brightness(0) invert(1)' }} /></Link>
         <Link href="/profile/edit" style={{ display: 'block', textDecoration: 'none', color: 'inherit', padding: '14px 18px 10px', textAlign: 'center' }}>
           <div style={{ width: 76, height: 76, borderRadius: '50%', margin: '0 auto 8px', overflow: 'hidden', background: '#f2b94b', color: '#29483d', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 26, border: '3px solid rgba(255,255,255,.85)' }}>
             {profile.avatar_url ? <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (profile.name || '?').slice(0, 2).toUpperCase()}
