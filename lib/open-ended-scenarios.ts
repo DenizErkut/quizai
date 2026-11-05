@@ -145,3 +145,19 @@ export function serializeTableAnswer(table: AnswerTable, values: string[][]): st
   })
   return `Tablo cevabı:\n${lines.join('\n')}`
 }
+
+/**
+ * Yedek: model tabloyu senaryo metnine "A | B | C. Satır | ... | ...." biçiminde gömmüşse ayıklar.
+ * Dönen scenario, tablo satırları çıkarılmış metindir; table, doldurulabilir tablo metnidir.
+ */
+export function extractInlineTable(scenario: string): { scenario: string; table: string } | null {
+  if (!scenario.includes('|')) return null
+  const sentences = scenario.split(/(?<=\.)\s+(?=[A-ZÇĞİÖŞÜ0-9])/u)
+  const rowIndexes = sentences.map((sentence, i) => sentence.includes('|') ? i : -1).filter(i => i >= 0)
+  if (rowIndexes.length < 2) return null
+  const rows = rowIndexes.map(i => sentences[i].replace(/\.$/, ''))
+  const table = rows.map(row => row.split('|').map(cell => cell.trim()).map(cell => /^(\.{2,}|…+)$/.test(cell) ? '' : cell).join(' | ')).join('\n')
+  if (!parseAnswerTable(table)) return null
+  const rest = sentences.filter((_, i) => !rowIndexes.includes(i)).join(' ').trim()
+  return { scenario: rest || scenario, table }
+}

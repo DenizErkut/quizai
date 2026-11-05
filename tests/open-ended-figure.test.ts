@@ -33,3 +33,15 @@ test('answer table: needs a header, a blank cell and at least two columns', () =
   assert.equal(parseAnswerTable('A | B\nx | y'), null)
   assert.equal(parseAnswerTable('A\nx'), null)
 })
+
+import { extractInlineTable } from '../lib/open-ended-scenarios'
+
+test('inline table pulled out of scenario text', () => {
+  const result = extractInlineTable('Aşağıdaki tabloda bilgiler verilmiştir. Tablo 1: Özellikler. Teknoloji | Yörünge | Astronot. Yapay Uydu | ... | .... Uzay İstasyonu | ... | ....')
+  assert.ok(result)
+  const parsed = parseAnswerTable(result!.table)
+  assert.deepEqual(parsed!.headers, ['Teknoloji', 'Yörünge', 'Astronot'])
+  assert.deepEqual(parsed!.rows, [['Yapay Uydu', '', ''], ['Uzay İstasyonu', '', '']])
+  assert.ok(!result!.scenario.includes('|'))
+  assert.ok(result!.scenario.includes('Tablo 1'))
+})

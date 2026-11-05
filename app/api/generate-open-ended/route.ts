@@ -91,7 +91,33 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     // Senaryo serisinde 2. ve sonraki sorular aynı "test hakkı"nın devamıdır: yeniden kota düşmez.
     const questionIndex = Math.max(0, Math.floor(Number(body?.questionIndex) || 0))
-    const isFollowUp = questionIndex > 0
+    // Devam sorusu yalnızca kullanıcı aynı senaryonun bir önceki sorusunu son 24 saatte başlatmışsa kota düşmez (indeks uydurarak bedava soru alınamaz).
+    let isFollowUp = false
+    if (questionIndex > 0) {
+      const sinceIso = new Date(Date.now() - 24 * 3600_000).toISOString()
+      const { data: previous } = await supabase.from('open_ended_sessions').select('id').eq('user_id', user.id)
+        .eq('topic', scenarioLabel(Number(body?.term), Number(body?.scenarioNo))).ilike('subject', String(body?.subject || '').trim().replace(/[\\%_]/g, '\\$&'))
+        .eq('question_index', questionIndex - 1).gte('created_at', sinceIso).limit(1)
+      isFollowUp = !!previous?.length
+    }
+    // Aynı soru son 24 saatte üretilmiş ve henüz çözülmemişse yeniden üretme: aynı soruyu döndür (devam / yazdırılmış kâğıt tutarlı kalır, AI maliyeti ve hak düşmez).
+    {
+      const reuseTerm = Number(body?.term), reuseNo = Number(body?.scenarioNo)
+      if ((reuseTerm === 1 || reuseTerm === 2) && Number.isInteger(reuseNo) && reuseNo >= 1 && reuseNo <= 99 && typeof body?.subject === 'string') {
+        const sinceIso = new Date(Date.now() - 24 * 3600_000).toISOString()
+        const { data: open } = await supabase.from('open_ended_sessions').select('id,scenario,question,rubric,figure_svg,answer_table,total_possible')
+          .eq('user_id', user.id).eq('topic', scenarioLabel(reuseTerm, reuseNo)).ilike('subject', body.subject.trim().replace(/[\\%_]/g, '\\$&'))
+          .eq('question_index', questionIndex).is('graded_at', null).gte('created_at', sinceIso).order('created_at', { ascending: false }).limit(1).maybeSingle()
+        if (open) {
+          const gradeNumber = gradeNumberOf(profile.grade || '')
+          const country = String((profile as { country?: string | null }).country || 'TR').toUpperCase()
+          const { count } = gradeNumber
+            ? await supabase.from('open_ended_scenario_examples').select('id', { count: 'exact', head: true }).eq('status', 'published').eq('grade_number', gradeNumber).eq('country', country).eq('term', reuseTerm).eq('scenario_no', reuseNo).ilike('subject', body.subject.trim().replace(/[\\%_]/g, '\\$&'))
+            : { count: 1 }
+          return NextResponse.json({ sessionId: open.id, questionIndex, questionTotal: count || 1, scenario: open.scenario, question: open.question, rubric: open.rubric, figureSvg: open.figure_svg, answerTable: open.answer_table, totalPossible: open.total_possible, reused: true })
+        }
+      }
+    }
     const plan = profile.plan || 'free'
     const today = new Date().toISOString().split('T')[0]
     const dailyCount = profile.daily_test_date === today ? (profile.daily_test_count || 0) : 0
@@ -250,6 +276,7 @@ Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
         grade,
         subject: subject.trim(),
         topic: topic.trim(),
+        question_index: scenarioMode ? questionIndex : null,
         scenario: parsed.scenario,
         question: parsed.question,
         rubric: parsed.rubric,

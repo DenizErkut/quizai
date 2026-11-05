@@ -9,7 +9,7 @@ import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { figuresForPages } from '@/lib/booklet-figures'
 import { stripForeignScripts } from '@/lib/open-ended-grading'
-import { normalizeRubricTo100, sanitizeFigureSvg, sanitizeAnswerTable } from '@/lib/open-ended-scenarios'
+import { normalizeRubricTo100, sanitizeFigureSvg, sanitizeAnswerTable, extractInlineTable } from '@/lib/open-ended-scenarios'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -58,13 +58,20 @@ ${text.slice(0, MAX_TEXT).replace(/"""/g, "'''")}
         maxPoints: Math.max(1, Math.round(Number(c.maxPoints) || 1)),
         description: stripForeignScripts(String(c.description || '').slice(0, 800)),
       })).filter(c => c.criterion)
+      let scenarioText = stripForeignScripts(String(r.scenario || '').slice(0, 4000))
+      let answerTable = sanitizeAnswerTable(r.answerTable)
+      if (!answerTable) {
+        // Yedek: tablo senaryo metnine gömülü geldiyse ayıkla.
+        const inline = extractInlineTable(scenarioText)
+        if (inline) { answerTable = inline.table; scenarioText = inline.scenario }
+      }
       return {
         title: stripForeignScripts(String(r.title || '').slice(0, 200)),
-        scenario: stripForeignScripts(String(r.scenario || '').slice(0, 4000)),
+        scenario: scenarioText,
         question: stripForeignScripts(String(r.question || '').slice(0, 2000)),
         rubric: normalizeRubricTo100(rubric),
         figureSvg: sanitizeFigureSvg(r.figureSvg),
-        answerTable: sanitizeAnswerTable(r.answerTable),
+        answerTable,
       }
     }).filter(i => i.scenario.length >= 10 && i.question.length >= 5 && i.rubric.length > 0)
     // PDF'teki şekilleri (resim, çizim, tablo) soru numarasına göre otomatik kırp: 1., 2., 3. … sorular sırayla eşlenir.
