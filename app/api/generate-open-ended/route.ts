@@ -88,10 +88,14 @@ export async function POST(req: NextRequest) {
 
     // Ayni gunluk/aylik kota mantigi (bir acik uclu soru = bir 'test' hakki)
     // — Premium ve Unlimited planlarda HİÇBİR sınır yok.
+    const body = await req.json()
+    // Senaryo serisinde 2. ve sonraki sorular aynı "test hakkı"nın devamıdır: yeniden kota düşmez.
+    const questionIndex = Math.max(0, Math.floor(Number(body?.questionIndex) || 0))
+    const isFollowUp = questionIndex > 0
     const plan = profile.plan || 'free'
     const today = new Date().toISOString().split('T')[0]
     const dailyCount = profile.daily_test_date === today ? (profile.daily_test_count || 0) : 0
-    if (plan !== 'premium' && plan !== 'unlimited') {
+    if (plan !== 'premium' && plan !== 'unlimited' && !isFollowUp) {
       // 6 Eylül 2026 — bkz. generate-quiz/route.ts'teki aynı düzeltmenin notu:
       // eski `?? 10` varsayılanı, plan tablosunda YER ALMAYAN her durumda
       // (ör. yeni 'none' kullanıcıları) yanlışlıkla 10 hak veriyordu. Artık
@@ -108,7 +112,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const body = await req.json()
     const subject = typeof body?.subject === 'string' ? body.subject.trim() : ''
     // Senaryo kartı modu: yöneticinin yüklediği örneklere benzer yeni bir senaryo (dönem + senaryo numarası ile).
     const scenarioTerm = Number(body?.term)
@@ -124,16 +127,20 @@ export async function POST(req: NextRequest) {
     let examplesText = ''
     let wantFigure = false
     let wantTable = false
+    let questionTotal = 1
     if (scenarioMode) {
       const gradeNumber = gradeNumberOf(grade)
       const country = String((profile as { country?: string | null }).country || 'TR').toUpperCase()
       const { data: found } = gradeNumber
         ? await supabase.from('open_ended_scenario_examples').select('scenario,question,rubric,figure_svg,answer_table')
           .eq('status', 'published').eq('grade_number', gradeNumber).eq('country', country).eq('term', scenarioTerm).eq('scenario_no', scenarioNo)
-          .ilike('subject', subject.replace(/[\\%_]/g, '\\$&')).limit(30)
+          .ilike('subject', subject.replace(/[\\%_]/g, '\\$&')).order('seq').order('created_at').limit(60)
         : { data: null }
       if (!found?.length) return NextResponse.json({ error: 'Bu senaryo için henüz örnek yüklenmemiş.' }, { status: 404 })
-      const picked = pickExamples(found as Array<{ scenario: string; question: string; rubric: ScenarioRubricItem[]; figure_svg?: string | null; answer_table?: string | null }>, 3)
+      // Soru serisi: öğrenciye sırayla, her soru ilgili örneğe benzer yeni bir soru olarak gelir.
+      questionTotal = found.length
+      if (questionIndex >= found.length) return NextResponse.json({ error: 'Bu senaryoda başka soru yok.' }, { status: 400 })
+      const picked = [found[questionIndex]] as Array<{ scenario: string; question: string; rubric: ScenarioRubricItem[]; figure_svg?: string | null; answer_table?: string | null }>
       wantTable = picked.some(example => !!example.answer_table)
       wantFigure = !wantTable && picked.some(example => !!example.figure_svg)
       examplesText = exampleBlock(picked)
@@ -256,7 +263,7 @@ Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
     if (insErr || !sessionRow) return NextResponse.json({ error: 'Kaydedilemedi.' }, { status: 500 })
 
     // Kota artir (ayni gunluk test hakki havuzu)
-    await supabase.from('profiles').update({
+    if (!isFollowUp) await supabase.from('profiles').update({
       monthly_test_count: (profile.monthly_test_count || 0) + 1,
       daily_test_count: dailyCount + 1,
       daily_test_date: today,
@@ -264,6 +271,8 @@ Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
 
     return NextResponse.json({
       sessionId: sessionRow.id,
+      questionIndex,
+      questionTotal,
       scenario: parsed.scenario,
       question: parsed.question,
       rubric: parsed.rubric,

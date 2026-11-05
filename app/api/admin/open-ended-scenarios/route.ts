@@ -16,7 +16,7 @@ async function requireAdmin(req: NextRequest) {
   return { user }
 }
 
-const COLUMNS = 'id,grade_number,subject,term,scenario_no,title,scenario,question,rubric,figure_svg,figure_image,answer_table,country,status,source_note,created_at,updated_at'
+const COLUMNS = 'id,grade_number,subject,term,scenario_no,title,scenario,question,rubric,figure_svg,figure_image,answer_table,seq,country,status,source_note,created_at,updated_at'
 
 export async function GET(req: NextRequest) {
   const access = await requireAdmin(req)
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   if (subject) query = query.ilike('subject', subject.replace(/[\\%_]/g, '\\$&'))
   const term = Number(params.get('term'))
   if (term === 1 || term === 2) query = query.eq('term', term)
-  const { data, error } = await query.order('grade_number').order('subject').order('term').order('scenario_no').order('created_at').limit(500)
+  const { data, error } = await query.order('grade_number').order('subject').order('term').order('scenario_no').order('seq').order('created_at').limit(500)
   if (error) return NextResponse.json({ error: 'Örnekler okunamadı.' }, { status: 500 })
   return NextResponse.json({ examples: data || [] })
 }
@@ -56,7 +56,9 @@ export async function POST(req: NextRequest) {
     if (error) return NextResponse.json({ error: 'Örnek güncellenemedi.' }, { status: 500 })
     return NextResponse.json({ id: body.id, status: fields.status })
   }
-  const { data, error } = await db.from('open_ended_scenario_examples').insert({ ...fields, created_by: access.user.id }).select('id').single()
+  // Yeni soru, aynı senaryonun (sınıf+ders+dönem+no) sonuna eklenir.
+  const { data: last } = await db.from('open_ended_scenario_examples').select('seq').eq('grade_number', v.gradeNumber).eq('country', scope.value.country).eq('term', v.term).eq('scenario_no', v.scenarioNo).ilike('subject', v.subject.replace(/[\\%_]/g, '\\$&')).order('seq', { ascending: false }).limit(1).maybeSingle()
+  const { data, error } = await db.from('open_ended_scenario_examples').insert({ ...fields, seq: (last?.seq ?? 0) + 1, created_by: access.user.id }).select('id').single()
   if (error || !data) return NextResponse.json({ error: 'Örnek kaydedilemedi.' }, { status: 500 })
   return NextResponse.json({ id: data.id, status: fields.status })
 }
