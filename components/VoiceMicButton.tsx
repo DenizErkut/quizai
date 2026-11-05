@@ -11,14 +11,13 @@ const CONSENT_KEY = 'pratium_voice_consent_v1'
 export default function VoiceMicButton({ onTranscript, disabled, size = 40, round = false }: { onTranscript: (text: string) => void; disabled?: boolean; size?: number; round?: boolean }) {
   const { t } = useT()
   const [listening, setListening] = useState(false)
-  const [consent, setConsent] = useState(false)
+  const [consent, setConsent] = useState(() => { try { return typeof window !== 'undefined' && window.localStorage.getItem(CONSENT_KEY) === '1' } catch { return false } })
   const [asking, setAsking] = useState(false)
   const [error, setError] = useState('')
   const recognitionRef = useRef<Recognition | null>(null)
   const callbackRef = useRef(onTranscript)
   useEffect(() => { callbackRef.current = onTranscript }, [onTranscript])
   useEffect(() => {
-    try { setConsent(window.localStorage.getItem(CONSENT_KEY) === '1') } catch { /* gizli sekme */ }
     return () => recognitionRef.current?.abort()
   }, [])
 
