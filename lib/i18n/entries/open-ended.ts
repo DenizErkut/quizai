@@ -55,4 +55,5 @@ export const openEndedEntries: Entry[] = [
   ['{term}. Dönem {no}. Senaryo', 'Term {term} · Scenario {no}', '{term}. Halbjahr · Szenario {no}', 'Semestre {term} · Scénario {no}', 'Trimestre {term} · Escenario {no}', 'الفصل {term} · السيناريو {no}'],
   ['Çözüldü · en yüksek {score}/{total}', 'Solved · best {score}/{total}', 'Gelöst · beste {score}/{total}', 'Résolu · meilleur {score}/{total}', 'Resuelto · mejor {score}/{total}', 'تم الحل · الأعلى {score}/{total}'],
   ['Henüz çözülmedi', 'Not solved yet', 'Noch nicht gelöst', 'Pas encore résolu', 'Aún no resuelto', 'لم يُحل بعد'],
+  ['Senaryo şekli', 'Scenario figure', 'Szenario-Abbildung', 'Figure du scénario', 'Figura del escenario', 'شكل السيناريو'],
 ]

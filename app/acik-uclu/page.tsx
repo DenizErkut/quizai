@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useVoiceTutor } from '@/lib/use-voice-tutor'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
+import { svgDataUri } from '@/lib/open-ended-scenarios'
 
 interface RubricItem { criterion: string; maxPoints: number; description: string }
 interface CriteriaResult { criterion: string; maxPoints: number; earnedPoints: number; feedback: string }
@@ -28,6 +29,7 @@ export default function AcikUcluPage() {
 
   const [sessionId, setSessionId] = useState('')
   const [scenario, setScenario] = useState('')
+  const [figureSvg, setFigureSvg] = useState<string | null>(null)
   const [question, setQuestion] = useState('')
   const [rubric, setRubric] = useState<RubricItem[]>([])
   const [totalPossible, setTotalPossible] = useState(0)
@@ -101,7 +103,7 @@ export default function AcikUcluPage() {
                   json.error || t('Soru üretilemedi.'))
         return
       }
-      setSessionId(json.sessionId); setScenario(json.scenario); setQuestion(json.question); setRubric(json.rubric)
+      setSessionId(json.sessionId); setScenario(json.scenario); setFigureSvg(json.figureSvg || null); setQuestion(json.question); setRubric(json.rubric)
       setTotalPossible(json.totalPossible); setAnswer(''); setStep('question')
     } catch {
       setError(t('Bağlantı hatası, tekrar dene.'))
@@ -386,6 +388,10 @@ export default function AcikUcluPage() {
             <div className="card" style={{ padding: '1.25rem', marginBottom: '1rem', borderLeft: '3px solid #3E8E3E' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, color: '#3E8E3E', marginBottom: '6px', textTransform: 'uppercase' }}>{t('Senaryo')}</div>
               <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7 }}><MathText text={scenario} /></p>
+              {figureSvg && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={svgDataUri(figureSvg)} alt={t('Senaryo şekli')} style={{ display: 'block', margin: '12px auto 0', maxWidth: '100%', width: 420, background: '#fff', borderRadius: 10, border: '1px solid var(--border)' }} />
+              )}
             </div>
             <div className="card" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', marginBottom: '6px', textTransform: 'uppercase' }}>{t('Soru‖açık uçlu')}</div>

@@ -19,6 +19,7 @@ function LoginPageContent() {
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState<string | null>(null)
   const [tab, setTab] = useState<'email' | 'phone'>('email')
+  const [choices, setChoices] = useState<string[] | null>(null)
   const [qrOpen, setQrOpen] = useState(false)
   const [qrImg, setQrImg] = useState('')
   const [qrExpired, setQrExpired] = useState(false)
@@ -35,6 +36,7 @@ function LoginPageContent() {
     try {
       const r = await fetch('/api/auth/landing', { headers: { Authorization: `Bearer ${token}` } })
       const j = await r.json()
+      if (Array.isArray(j.roles) && j.roles.length > 1) { setLoading(false); setChoices(j.roles); return }
       router.push(typeof j.path === 'string' && j.path.startsWith('/') ? j.path : '/home')
     } catch { router.push('/home') }
   }
@@ -106,6 +108,20 @@ function LoginPageContent() {
     setResetLoading(false)
     if (err) { setError(t('Bir hata oluştu. Lütfen tekrar deneyin.')); return }
     setResetSent(true)
+  }
+
+  if (choices) {
+    const labels: Record<string, string> = { teacher: '🎓 Öğretmen Paneli', parent: '👨‍👩‍👧 Veli Paneli', institution: '🏛️ Kurum Paneli' }
+    const paths: Record<string, string> = { teacher: '/teacher', parent: '/parent', institution: '/institution' }
+    return (
+      <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'var(--bg)' }}>
+        <div className="card" style={{ width: '100%', maxWidth: 400, display: 'grid', gap: 10 }}>
+          <h1 className="serif" style={{ fontSize: 22 }}>{t('Hangi hesapla devam etmek istersin?')}</h1>
+          <p style={{ fontSize: 13, color: 'var(--text2)' }}>{t('Hesabın birden fazla role sahip. İstediğin zaman sol menüden diğer panele geçebilirsin.')}</p>
+          {choices.map(r => <Link key={r} href={paths[r]} className="btn btn-primary" style={{ justifyContent: 'center' }}>{t(labels[r])}</Link>)}
+        </div>
+      </main>
+    )
   }
 
   return (
