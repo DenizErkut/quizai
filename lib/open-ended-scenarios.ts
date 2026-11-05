@@ -4,7 +4,7 @@ import { gradeNumberOf } from './written-exam'
 export type ScenarioRubricItem = { criterion: string; maxPoints: number; description: string }
 export type ScenarioExampleInput = {
   gradeNumber: number; subject: string; term: number; scenarioNo: number
-  title: string; scenario: string; question: string; rubric: ScenarioRubricItem[]; figureSvg?: string | null; figureImage?: string | null
+  title: string; scenario: string; question: string; rubric: ScenarioRubricItem[]; figureSvg?: string | null; figureImage?: string | null; answerTable?: string | null
 }
 export const SCENARIO_RUBRIC_TOTAL = 100
 
@@ -38,14 +38,14 @@ export function validateScenarioExample(input: Record<string, unknown>):
   }
   const total = rubric.reduce((sum, item) => sum + item.maxPoints, 0)
   if (total !== SCENARIO_RUBRIC_TOTAL) return { ok: false, error: `Rubrik toplamı ${SCENARIO_RUBRIC_TOTAL} olmalı (şu an ${total}).` }
-  return { ok: true, value: { gradeNumber, subject, term, scenarioNo, title: clean(input.title, 200), scenario, question, rubric, figureSvg: sanitizeFigureSvg(input.figureSvg), figureImage: sanitizeFigureImage(input.figureImage) } }
+  return { ok: true, value: { gradeNumber, subject, term, scenarioNo, title: clean(input.title, 200), scenario, question, rubric, figureSvg: sanitizeFigureSvg(input.figureSvg), figureImage: sanitizeFigureImage(input.figureImage), answerTable: sanitizeAnswerTable(input.answerTable) } }
 }
 
 /** Yönetici örneklerini yapay zeka istemine koyar: örneği kopyalamak değil, aynı beceriyi ölçen yeni bir senaryo yazmak istenir. */
-export function exampleBlock(examples: Array<{ scenario: string; question: string; rubric: ScenarioRubricItem[]; figure_svg?: string | null }>): string {
+export function exampleBlock(examples: Array<{ scenario: string; question: string; rubric: ScenarioRubricItem[]; figure_svg?: string | null; answer_table?: string | null }>): string {
   return examples.map((example, index) => `ÖRNEK ${index + 1}:
 Senaryo: ${example.scenario}
-Soru: ${example.question}${example.figure_svg ? `\nŞekil (SVG): ${example.figure_svg}` : ''}
+Soru: ${example.question}${example.answer_table ? `\nDoldurulacak tablo (boş hücreleri öğrenci doldurur):\n${example.answer_table}` : ''}${example.figure_svg ? `\nŞekil (SVG): ${example.figure_svg}` : ''}
 Rubrik: ${example.rubric.map(item => `${item.criterion} (${item.maxPoints} puan): ${item.description}`).join(' | ')}`).join('\n\n')
 }
 
@@ -112,4 +112,36 @@ export function svgDataUri(svg: string): string {
 export function sanitizeFigureImage(input: unknown): string | null {
   if (typeof input !== 'string') return null
   return /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+=*$/.test(input) && input.length <= 900000 ? input : null
+}
+
+export type AnswerTable = { headers: string[]; rows: string[][] }
+const BLANK = /^(?:\.{2,}|…+|_+|\?+|-+|—+)$/
+
+/** "Başlık | Başlık\nSatır | | " biçimini tabloya çevirir; boş (ya da ... gibi) hücre öğrencinin dolduracağı hücredir. */
+export function parseAnswerTable(text: unknown): AnswerTable | null {
+  if (typeof text !== 'string') return null
+  const lines = text.replace(/\r/g, '').split('\n').map(line => line.trim()).filter(Boolean)
+  if (lines.length < 2 || lines.length > 15) return null
+  const cells = lines.map(line => line.replace(/^\||\|$/g, '').split('|').map(cell => { const value = cell.trim().slice(0, 80); return BLANK.test(value) ? '' : value }))
+  const width = cells[0].length
+  if (width < 2 || width > 8) return null
+  const rows = cells.slice(1).map(row => Array.from({ length: width }, (_, i) => row[i] ?? ''))
+  if (!rows.some(row => row.some(cell => cell === ''))) return null
+  return { headers: cells[0], rows }
+}
+
+export function sanitizeAnswerTable(input: unknown): string | null {
+  if (typeof input !== 'string') return null
+  const text = input.replace(/\r/g, '').trim().slice(0, 3000)
+  return parseAnswerTable(text) ? text : null
+}
+
+/** Öğrencinin doldurduğu tabloyu puanlayıcıya giden düz metne çevirir. */
+export function serializeTableAnswer(table: AnswerTable, values: string[][]): string {
+  const lines: string[] = []
+  table.rows.forEach((row, r) => {
+    const parts = row.map((cell, c) => c === 0 ? '' : `${table.headers[c]}: ${cell !== '' ? cell : (values[r]?.[c] || '(boş)').trim()}`).filter(Boolean)
+    lines.push(`${row[0] || `Satır ${r + 1}`} → ${parts.join('; ')}`)
+  })
+  return `Tablo cevabı:\n${lines.join('\n')}`
 }

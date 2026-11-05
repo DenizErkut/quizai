@@ -9,7 +9,7 @@ import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { figuresForPages } from '@/lib/booklet-figures'
 import { stripForeignScripts } from '@/lib/open-ended-grading'
-import { normalizeRubricTo100, sanitizeFigureSvg } from '@/lib/open-ended-scenarios'
+import { normalizeRubricTo100, sanitizeFigureSvg, sanitizeAnswerTable } from '@/lib/open-ended-scenarios'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -18,7 +18,7 @@ const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPAB
 const anthropic = new Anthropic()
 const MAX_TEXT = 60000
 
-type RawItem = { title?: unknown; scenario?: unknown; question?: unknown; rubric?: unknown; figureSvg?: unknown }
+type RawItem = { title?: unknown; scenario?: unknown; question?: unknown; rubric?: unknown; figureSvg?: unknown; answerTable?: unknown }
 
 export async function POST(req: NextRequest) {
   const user = await getAuthedUser(req)
@@ -38,8 +38,9 @@ export async function POST(req: NextRequest) {
   const prompt = `Aşağıda ortak yazılı/sınav örnekleri içeren bir dosyanın metni var. İçindeki SENARYO tabanlı açık uçlu soruları OLDUĞU GİBİ ayıkla; yeni soru UYDURMA.
 Her biri için: title (kısa başlık), scenario (öğrencinin okuyacağı durum/bağlam metni; tablo varsa satırları " | " ile yaz), question (senaryoya dayanan soru, alt maddeleriyle), rubric (cevap anahtarı/puanlama bölümünden ölçütler: {"criterion","maxPoints","description"}; anahtar yoksa soru ve alt madde puanlarından makul ölçütler kur). Puanlar sorunun kendi puanıdır; sistem sonra toplamı 100'e ölçekler.
 Sorulardaki ŞEKİL/GÖRSEL/TABLO varsa (ekteki PDF'e bak), figureSvg alanına o şeklin sade, düz, beyaz arka planlı bir SVG yeniden çizimini koy: viewBox="0 0 400 260" gibi, yalnızca path/rect/circle/line/polygon/text etiketleri, metinler Türkçe ve taşmayan (font-size 12-14), 6000 karakteri geçmesin. Şekil yoksa "" bırak. Şekli uydurma; PDF'deki şekli sadık biçimde yeniden çiz.
+Soru, öğrencinin bir TABLOYU doldurmasını istiyorsa (ör. VAR/YOK yazınız, boşlukları doldurunuz) tabloyu answerTable alanına yaz: satır başına bir satır, hücreler " | " ile; ilk satır sütun başlıkları, ilk sütun satır adları; öğrencinin dolduracağı hücreleri BOŞ bırak. Bu durumda tabloyu scenario metnine tekrar yazma. Doldurulacak tablo yoksa "" bırak.
 Kapak, yönerge ve genel notları soru sayma.
-SADECE şu JSON'u döndür: {"items":[{"title":"","scenario":"","question":"","rubric":[{"criterion":"","maxPoints":5,"description":""}],"figureSvg":""}]}
+SADECE şu JSON'u döndür: {"items":[{"title":"","scenario":"","question":"","rubric":[{"criterion":"","maxPoints":5,"description":""}],"figureSvg":"","answerTable":""}]}
 
 DOSYA METNİ:
 """
@@ -63,6 +64,7 @@ ${text.slice(0, MAX_TEXT).replace(/"""/g, "'''")}
         question: stripForeignScripts(String(r.question || '').slice(0, 2000)),
         rubric: normalizeRubricTo100(rubric),
         figureSvg: sanitizeFigureSvg(r.figureSvg),
+        answerTable: sanitizeAnswerTable(r.answerTable),
       }
     }).filter(i => i.scenario.length >= 10 && i.question.length >= 5 && i.rubric.length > 0)
     // PDF'teki şekilleri (resim, çizim, tablo) soru numarasına göre otomatik kırp: 1., 2., 3. … sorular sırayla eşlenir.

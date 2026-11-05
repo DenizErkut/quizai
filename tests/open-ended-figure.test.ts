@@ -16,3 +16,20 @@ test('figure svg rejects non-svg and oversized input', () => {
   assert.equal(sanitizeFigureSvg(null), null)
   assert.equal(sanitizeFigureSvg(`<svg>${'a'.repeat(21000)}</svg>`), null)
 })
+
+import { parseAnswerTable, serializeTableAnswer } from '../lib/open-ended-scenarios'
+
+test('answer table: blank cells are fillable and the answer serializes per row', () => {
+  const table = parseAnswerTable('Araç | Karada | Yolcu\nBisiklet | ... |\nOtobüs |  | ')
+  assert.ok(table)
+  assert.deepEqual(table!.headers, ['Araç', 'Karada', 'Yolcu'])
+  assert.deepEqual(table!.rows[0], ['Bisiklet', '', ''])
+  const text = serializeTableAnswer(table!, [['', 'VAR', 'YOK'], ['', 'VAR', 'VAR']])
+  assert.ok(text.includes('Bisiklet → Karada: VAR; Yolcu: YOK'))
+})
+
+test('answer table: needs a header, a blank cell and at least two columns', () => {
+  assert.equal(parseAnswerTable('Tek satır | x'), null)
+  assert.equal(parseAnswerTable('A | B\nx | y'), null)
+  assert.equal(parseAnswerTable('A\nx'), null)
+})

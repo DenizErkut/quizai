@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useVoiceTutor } from '@/lib/use-voice-tutor'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
-import { svgDataUri } from '@/lib/open-ended-scenarios'
+import { svgDataUri, parseAnswerTable, serializeTableAnswer } from '@/lib/open-ended-scenarios'
 
 interface RubricItem { criterion: string; maxPoints: number; description: string }
 interface CriteriaResult { criterion: string; maxPoints: number; earnedPoints: number; feedback: string }
@@ -30,6 +30,8 @@ export default function AcikUcluPage() {
   const [sessionId, setSessionId] = useState('')
   const [scenario, setScenario] = useState('')
   const [figureSvg, setFigureSvg] = useState<string | null>(null)
+  const [tableText, setTableText] = useState<string | null>(null)
+  const [tableValues, setTableValues] = useState<string[][]>([])
   const [question, setQuestion] = useState('')
   const [rubric, setRubric] = useState<RubricItem[]>([])
   const [totalPossible, setTotalPossible] = useState(0)
@@ -103,7 +105,7 @@ export default function AcikUcluPage() {
                   json.error || t('Soru üretilemedi.'))
         return
       }
-      setSessionId(json.sessionId); setScenario(json.scenario); setFigureSvg(json.figureSvg || null); setQuestion(json.question); setRubric(json.rubric)
+      setSessionId(json.sessionId); setScenario(json.scenario); setFigureSvg(json.figureSvg || null); setTableText(json.answerTable || null); setTableValues([]); setQuestion(json.question); setRubric(json.rubric)
       setTotalPossible(json.totalPossible); setAnswer(''); setStep('question')
     } catch {
       setError(t('Bağlantı hatası, tekrar dene.'))
@@ -140,7 +142,7 @@ export default function AcikUcluPage() {
       const json = await res.json()
       if (!res.ok) { setError(json.error || t('Ödev başlatılamadı.')); return }
       setSessionId(json.sessionId)
-      setScenario(json.scenario)
+      setScenario(json.scenario); setFigureSvg(null); setTableText(null)
       setQuestion(json.question)
       setRubric(json.rubric)
       setTotalPossible(json.totalPossible)
@@ -176,7 +178,7 @@ export default function AcikUcluPage() {
         return
       }
       setSessionId(json.sessionId)
-      setScenario(json.scenario)
+      setScenario(json.scenario); setFigureSvg(null); setTableText(null)
       setQuestion(json.question)
       setRubric(json.rubric)
       setTotalPossible(json.totalPossible)
@@ -189,9 +191,15 @@ export default function AcikUcluPage() {
   }
 
   async function submitAnswer() {
+    const table = tableText ? parseAnswerTable(tableText) : null
+    if (table) {
+      const missing = table.rows.some((row, r) => row.some((cell, c) => cell === '' && !(tableValues[r]?.[c] || '').trim()))
+      if (missing) { setError(t('Tablodaki tüm boşlukları doldur.')); return }
+    }
+    const finalAnswer = table ? `${serializeTableAnswer(table, tableValues)}${answer.trim() ? `\nAçıklama: ${answer.trim()}` : ''}` : answer
     const trimmed = answer.trim()
-    if (!trimmed) { setError(t('Cevabını yazmadan gönderemezsin.')); return }
-    if (trimmed.length < 50) { setError(t('Cevabın çok kısa — en az 50 karakter yazmalısın (şu an {n}).', { n: trimmed.length })); return }
+    if (!table && !trimmed) { setError(t('Cevabını yazmadan gönderemezsin.')); return }
+    if (!table && trimmed.length < 50) { setError(t('Cevabın çok kısa — en az 50 karakter yazmalısın (şu an {n}).', { n: trimmed.length })); return }
     setGrading(true)
     setError('')
     try {
@@ -199,7 +207,7 @@ export default function AcikUcluPage() {
       const res = await fetch('/api/grade-open-ended', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ sessionId, studentAnswer: answer }),
+        body: JSON.stringify({ sessionId, studentAnswer: finalAnswer }),
       })
       const json = await res.json()
       if (!res.ok) { setError(json.error || t('Puanlama başarısız.')); setGrading(false); return }
@@ -387,7 +395,7 @@ export default function AcikUcluPage() {
           <div>
             <div className="card" style={{ padding: '1.25rem', marginBottom: '1rem', borderLeft: '3px solid #3E8E3E' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, color: '#3E8E3E', marginBottom: '6px', textTransform: 'uppercase' }}>{t('Senaryo')}</div>
-              <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7 }}><MathText text={scenario} /></p>
+              <p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7, whiteSpace: 'pre-line' }}><MathText text={scenario} /></p>
               {figureSvg && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={svgDataUri(figureSvg)} alt={t('Senaryo şekli')} style={{ display: 'block', margin: '12px auto 0', maxWidth: '100%', width: 420, background: '#fff', borderRadius: 10, border: '1px solid var(--border)' }} />
@@ -431,8 +439,29 @@ export default function AcikUcluPage() {
                 )}
                 {voice.error && <div role="status" style={{ color: '#b42318', fontSize: '10px', marginTop: '6px' }}>{voice.error}</div>}
               </div>
-              <textarea className="input" rows={8} value={answer} onChange={e => setAnswer(e.target.value)}
-                placeholder={t('Kendi cümlelerinle, düşüncelerini gerekçelendirerek yaz…')}
+              {tableText && parseAnswerTable(tableText) && (() => {
+                const table = parseAnswerTable(tableText)!
+                return (
+                  <div style={{ overflowX: 'auto', margin: '10px 0' }}>
+                    <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 13 }}>
+                      <thead><tr>{table.headers.map((h, c) => <th key={c} style={{ border: '1px solid var(--border)', padding: '8px', background: 'var(--accent-bg)', textAlign: 'left' }}>{h}</th>)}</tr></thead>
+                      <tbody>{table.rows.map((row, r) => (
+                        <tr key={r}>{row.map((cell, c) => (
+                          <td key={c} style={{ border: '1px solid var(--border)', padding: cell === '' ? 4 : 8, fontWeight: c === 0 ? 700 : 400 }}>
+                            {cell !== '' ? cell : (
+                              <input className="input" style={{ width: '100%', minWidth: 70, padding: '6px 8px' }} value={tableValues[r]?.[c] || ''}
+                                aria-label={`${row[0]} – ${table.headers[c]}`}
+                                onChange={e => setTableValues(prev => { const next = prev.map(line => [...line]); next[r] = next[r] || []; next[r][c] = e.target.value; return next })} />
+                            )}
+                          </td>
+                        ))}</tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                )
+              })()}
+              <textarea className="input" rows={tableText ? 3 : 8} value={answer} onChange={e => setAnswer(e.target.value)}
+                placeholder={tableText ? t('Açıklaman varsa yaz (isteğe bağlı)…') : t('Kendi cümlelerinle, düşüncelerini gerekçelendirerek yaz…')}
                 style={{ marginTop: '8px', marginBottom: '4px', resize: 'vertical', borderRadius: '12px' }} />
               <div style={{ fontSize: '11px', color: answer.trim().length >= 50 ? 'var(--green)' : 'var(--text3)', marginBottom: '1rem', textAlign: 'right' }}>
                 {t('{n} / 50 karakter', { n: answer.trim().length })} {answer.trim().length >= 50 ? '✓' : ''}

@@ -56,4 +56,6 @@ export const openEndedEntries: Entry[] = [
   ['Çözüldü · en yüksek {score}/{total}', 'Solved · best {score}/{total}', 'Gelöst · beste {score}/{total}', 'Résolu · meilleur {score}/{total}', 'Resuelto · mejor {score}/{total}', 'تم الحل · الأعلى {score}/{total}'],
   ['Henüz çözülmedi', 'Not solved yet', 'Noch nicht gelöst', 'Pas encore résolu', 'Aún no resuelto', 'لم يُحل بعد'],
   ['Senaryo şekli', 'Scenario figure', 'Szenario-Abbildung', 'Figure du scénario', 'Figura del escenario', 'شكل السيناريو'],
+  ['Tablodaki tüm boşlukları doldur.', 'Fill in all the blanks in the table.', 'Fülle alle Lücken in der Tabelle aus.', 'Remplis toutes les cases vides du tableau.', 'Rellena todos los espacios en blanco de la tabla.', 'املأ جميع الفراغات في الجدول.'],
+  ['Açıklaman varsa yaz (isteğe bağlı)…', 'Write your explanation if you have one (optional)…', 'Schreibe deine Erklärung, falls vorhanden (optional)…', 'Écris ton explication si tu en as une (facultatif)…', 'Escribe tu explicación si la tienes (opcional)…', 'اكتب شرحك إن وجد (اختياري)…'],
 ]
