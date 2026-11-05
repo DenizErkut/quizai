@@ -34,4 +34,5 @@ export const teacherStudentsEntries: Entry[] = [
   ['Öğrenciyi sınıftan çıkar', 'Remove student from class', 'Schüler aus der Klasse entfernen', 'Retirer l’élève de la classe', 'Quitar al estudiante de la clase', 'إزالة الطالب من الصف'],
   ['Öğrenci sınıftan çıkarılamadı.', 'The student could not be removed from the class.', 'Der Schüler konnte nicht aus der Klasse entfernt werden.', 'L’élève n’a pas pu être retiré de la classe.', 'No se pudo quitar al estudiante de la clase.', 'تعذّرت إزالة الطالب من الصف.'],
   ['Öğrenci bu sınıflarda kayıtlı değil.', 'The student is not enrolled in these classes.', 'Der Schüler ist in diesen Klassen nicht eingetragen.', 'L’élève n’est pas inscrit dans ces classes.', 'El estudiante no está inscrito en estas clases.', 'الطالب غير مسجّل في هذه الصفوف.'],
+  ['✏️ Sınıfı düzenle', '✏️ Edit class', '✏️ Klasse bearbeiten', '✏️ Modifier la classe', '✏️ Editar clase', '✏️ تعديل الصف'],
 ]

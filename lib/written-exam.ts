@@ -26,6 +26,11 @@ export function rubricTotal(rubric: Array<{ maxPoints: number }>): number {
 /** Sınıf etiketinden ("6. sınıf", "6") sayı çıkarır; geçersizse null. */
 export function gradeNumberOf(value: unknown): number | null {
   if (typeof value === 'number') return Number.isInteger(value) && value >= 1 && value <= 12 ? value : null
+  // Sınıf kayıtları çoğunlukla yalnızca rakam olarak saklanır ("7"); "7. sınıf" biçimi de geçerlidir.
+  if (typeof value === 'string' && /^\s*\d{1,2}\s*\.?\s*$/.test(value)) {
+    const bare = Number(value.replace(/\D/g, ''))
+    return bare >= 1 && bare <= 12 ? bare : null
+  }
   const parsed = extractGradeNumber(typeof value === 'string' ? value : '')
   return parsed && parsed >= 1 && parsed <= 12 ? parsed : null
 }

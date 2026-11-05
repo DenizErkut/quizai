@@ -17,6 +17,8 @@ function TeacherStudentsContent() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+  const [editing, setEditing] = useState<{ name: string; grade: string; subject: string } | null>(null)
+  const [savingEdit, setSavingEdit] = useState(false)
   const [addingStudent, setAddingStudent] = useState<string | null>(null)
   const [copiedCode, setCopiedCode] = useState(false)
   const [newClass, setNewClass] = useState({ name: '', grade: '', subject: '' })
@@ -190,6 +192,17 @@ function TeacherStudentsContent() {
     }
   }
 
+  // Daha önce kaydedilmiş sınıfın adı / seviyesi / dersi düzeltilir.
+  async function saveClassroomEdit() {
+    if (!editing || !selectedClass || !editing.name.trim() || !editing.grade) return
+    setSavingEdit(true)
+    const { data, error } = await supabase.from('classrooms').update({ name: editing.name.trim(), grade: editing.grade, subject: editing.subject.trim() }).eq('id', selectedClass).select().single()
+    setSavingEdit(false)
+    if (error || !data) { alert(tr('Hata: {msg}', { msg: error?.message || tr('Bilinmeyen hata') })); return }
+    setClassrooms(prev => prev.map(c => c.id === data.id ? { ...c, ...data } : c))
+    setEditing(null)
+  }
+
   async function deleteClassroom(id: string) {
     if (!confirm(tr('Bu sınıfı silmek istediğine emin misin?'))) return
     await supabase.from('classrooms').delete().eq('id', id)
@@ -285,11 +298,31 @@ function TeacherStudentsContent() {
                     {' · '}{tr('{n} öğrenci', { n: students.length })}
                   </div>
                 </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => setEditing({ name: activeClass.name || '', grade: String(activeClass.grade || ''), subject: activeClass.subject || '' })}
+                  style={{ fontSize: '12px', padding: '5px 10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                  {tr('✏️ Sınıfı düzenle')}
+                </button>
                 <button onClick={() => deleteClassroom(activeClass.id)}
                   style={{ fontSize: '12px', padding: '5px 10px', borderRadius: '8px', border: '1px solid rgba(220,38,38,0.3)', background: 'var(--red-bg)', color: 'var(--red)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
                   {tr('Sınıfı sil')}
                 </button>
+                </div>
               </div>
+              {editing && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem', padding: 12, border: '1px solid var(--border)', borderRadius: 6 }}>
+                  <input value={editing.name} onChange={e => setEditing(p => p && ({ ...p, name: e.target.value }))} placeholder={tr('Sınıf adı (örn: 6-D Matematik)')} style={inputStyle} />
+                  <select value={editing.grade} onChange={e => setEditing(p => p && ({ ...p, grade: e.target.value }))} style={inputStyle}>
+                    <option value="">{tr('Sınıf seviyesi seç')}</option>
+                    {['1','2','3','4','5','6','7','8','9','10','11','12'].map(g => <option key={g} value={g}>{tr('{g}. Sınıf', { g })}</option>)}
+                  </select>
+                  <input value={editing.subject} onChange={e => setEditing(p => p && ({ ...p, subject: e.target.value }))} placeholder={tr('Ders (isteğe bağlı)')} style={inputStyle} />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn btn-primary" onClick={() => void saveClassroomEdit()} disabled={savingEdit || !editing.name.trim() || !editing.grade}>{savingEdit ? tr('Kaydediliyor…') : tr('Kaydet')}</button>
+                    <button className="btn" onClick={() => setEditing(null)} disabled={savingEdit}>{tr('Vazgeç')}</button>
+                  </div>
+                </div>
+              )}
 
               {students.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text3)' }}>

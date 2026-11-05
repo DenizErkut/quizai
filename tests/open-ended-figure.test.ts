@@ -55,3 +55,15 @@ test('teacher class-sheet QR carries student and assignment ids and nothing else
   assert.equal(parseTeacherQr(`PRATIUM-OEA:${student}:x`), null)
   assert.equal(parseTeacherQr(null), null)
 })
+
+import { gradeNumberOf } from '../lib/written-exam'
+
+test('grade number parses bare digits as stored in classrooms and the "7. sınıf" forms', () => {
+  assert.equal(gradeNumberOf('7'), 7)
+  assert.equal(gradeNumberOf(' 12 '), 12)
+  assert.equal(gradeNumberOf('7. sınıf'), 7)
+  assert.equal(gradeNumberOf('ortaokul 6. sınıf'), 6)
+  assert.equal(gradeNumberOf('13'), null)
+  assert.equal(gradeNumberOf('0'), null)
+  assert.equal(gradeNumberOf(''), null)
+})
