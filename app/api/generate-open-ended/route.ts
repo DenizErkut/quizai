@@ -100,6 +100,24 @@ export async function POST(req: NextRequest) {
         .eq('question_index', questionIndex - 1).gte('created_at', sinceIso).limit(1)
       isFollowUp = !!previous?.length
     }
+    // Aynı soru son 24 saatte üretilmiş ve henüz çözülmemişse yeniden üretme: aynı soruyu döndür (devam / yazdırılmış kâğıt tutarlı kalır, AI maliyeti ve hak düşmez).
+    {
+      const reuseTerm = Number(body?.term), reuseNo = Number(body?.scenarioNo)
+      if ((reuseTerm === 1 || reuseTerm === 2) && Number.isInteger(reuseNo) && reuseNo >= 1 && reuseNo <= 99 && typeof body?.subject === 'string') {
+        const sinceIso = new Date(Date.now() - 24 * 3600_000).toISOString()
+        const { data: open } = await supabase.from('open_ended_sessions').select('id,scenario,question,rubric,figure_svg,answer_table,total_possible')
+          .eq('user_id', user.id).eq('topic', scenarioLabel(reuseTerm, reuseNo)).ilike('subject', body.subject.trim().replace(/[\\%_]/g, '\\$&'))
+          .eq('question_index', questionIndex).is('graded_at', null).gte('created_at', sinceIso).order('created_at', { ascending: false }).limit(1).maybeSingle()
+        if (open) {
+          const gradeNumber = gradeNumberOf(profile.grade || '')
+          const country = String((profile as { country?: string | null }).country || 'TR').toUpperCase()
+          const { count } = gradeNumber
+            ? await supabase.from('open_ended_scenario_examples').select('id', { count: 'exact', head: true }).eq('status', 'published').eq('grade_number', gradeNumber).eq('country', country).eq('term', reuseTerm).eq('scenario_no', reuseNo).ilike('subject', body.subject.trim().replace(/[\\%_]/g, '\\$&'))
+            : { count: 1 }
+          return NextResponse.json({ sessionId: open.id, questionIndex, questionTotal: count || 1, scenario: open.scenario, question: open.question, rubric: open.rubric, figureSvg: open.figure_svg, answerTable: open.answer_table, totalPossible: open.total_possible, reused: true })
+        }
+      }
+    }
     const plan = profile.plan || 'free'
     const today = new Date().toISOString().split('T')[0]
     const dailyCount = profile.daily_test_date === today ? (profile.daily_test_count || 0) : 0
