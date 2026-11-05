@@ -14,7 +14,7 @@ import LearningGainPilot from '@/components/teacher/LearningGainPilot'
 import { gradeLabel } from '@/lib/i18n/grade'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
-import PanelLanguageSwitch from '@/components/PanelLanguageSwitch'
+import PanelSidebar from '@/components/PanelSidebar'
 
 export default function TeacherDashboard() {
   const { t: tr, locale } = useT()
@@ -195,53 +195,25 @@ export default function TeacherDashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      {/* Öğretmen Navbar */}
-      <nav style={{ background: '#29483d', padding: '0 1.5rem', height: '68px', display: 'flex', alignItems: 'center', gap: '12px', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 8px 24px rgba(41,72,61,0.15)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-          <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '32px', filter: 'brightness(0) invert(1)' }} />
-          <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.2)' }} />
-          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap' }}>
-            🎓 {teacher?.name || tr('Öğretmen')}
-          </span>
-        </div>
-        <div className="nav-scroll-x" style={{ display: 'flex', gap: '4px', alignItems: 'center', flex: 1, minWidth: 0 }}>
-          {[
-            { key: 'dashboard', label: tr('📊 Dashboard') },
-            { key: 'students', label: tr('👥 Öğrenciler') },
-            { key: 'invite', label: tr('🔗 DAVET KODU') },
-            { key: 'assign', label: tr('📝 Ödev Ata') },
-            { key: 'performance', label: tr('📈 Analiz') },
-            { key: 'notify', label: tr('🔔 Bildirim') },
-            { key: 'report', label: tr('🔧 Hata Bildir') },
-            { key: 'institutions', label: tr('🏢 Kurumlar') },
-            { key: 'reports', label: tr('📋 RAPORLAR'), href: '/teacher/reports' },
-            { key: 'import', label: tr('📥 Not İçe Aktar'), href: '/teacher/import-grades' },
-            { key: 'live', label: tr('🎯 Canlı Test'), href: '/teacher/live' },
-          ].map(t => (
-            (t as any).href ? (
-              <Link key={t.key} href={(t as any).href}
-                style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap', flexShrink: 0,
-                  background: 'rgba(255,255,255,0.1)', color: '#fff', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', border: '1px solid rgba(255,255,255,0.2)' }}>
-                {t.label}
-              </Link>
-            ) : (
-              <button key={t.key} onClick={() => setActiveTab(t.key as any)}
-                style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0,
-                  background: activeTab === t.key ? 'rgba(255,255,255,0.15)' : 'transparent',
-                  color: activeTab === t.key ? '#fff' : 'rgba(255,255,255,0.6)',
-                }}>
-                {t.label}
-              </button>
-            )
-          ))}
-          <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.2)', margin: '0 4px', flexShrink: 0 }} />
-          <PanelLanguageSwitch />
-          <button onClick={() => { supabase.auth.signOut(); router.push('/login') }}
-            style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-            {tr('Çıkış')}
-          </button>
-        </div>
-      </nav>
+      {/* Öğretmen sol menüsü */}
+      <PanelSidebar
+        title={tr('🎓 Öğretmen Paneli')}
+        name={teacher?.name || tr('Öğretmen')}
+        onSignOut={() => { supabase.auth.signOut(); router.push('/login') }}
+        items={[
+          { key: 'dashboard', label: tr('📊 Dashboard'), group: 'a' },
+          { key: 'students', label: tr('👥 Öğrenciler'), group: 'a' },
+          { key: 'invite', label: tr('🔗 DAVET KODU'), group: 'a' },
+          { key: 'assign', label: tr('📝 Ödev Ata'), group: 'b' },
+          { key: 'live', label: tr('🎯 Canlı Test'), href: '/teacher/live', group: 'b' },
+          { key: 'performance', label: tr('📈 Analiz'), group: 'c' },
+          { key: 'reports', label: tr('📋 RAPORLAR'), href: '/teacher/reports', group: 'c' },
+          { key: 'import', label: tr('📥 Not İçe Aktar'), href: '/teacher/import-grades', group: 'c' },
+          { key: 'notify', label: tr('🔔 Bildirim'), group: 'd' },
+          { key: 'institutions', label: tr('🏢 Kurumlar'), group: 'd' },
+          { key: 'report', label: tr('🔧 Hata Bildir'), group: 'd' },
+        ].map(item => ({ ...item, active: !('href' in item) && activeTab === item.key, onClick: () => setActiveTab(item.key as typeof activeTab) }))}
+      />
 
       <div style={{ maxWidth: '960px', margin: '0 auto', padding: '1.5rem', paddingBottom: '5rem' }}>
 

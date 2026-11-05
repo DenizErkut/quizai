@@ -9,7 +9,7 @@ import { LOCALES } from '@/lib/i18n/core'
 
 // Pages where the main Navbar is hidden for signed-in users (see Navbar). The panel dashboards themselves
 // embed PanelLanguageSwitch in their own navbar; their sub-pages have no navbar, so the floating picker covers them.
-const PANEL_DASHBOARDS = ['/teacher', '/parent', '/institution']
+const PANEL_DASHBOARDS = ['/teacher', '/parent', '/institution', '/admin']
 const NAVBAR_HIDDEN = ['/login', '/register', '/profile', '/']
 
 export default function LanguageFloating() {
@@ -17,7 +17,7 @@ export default function LanguageFloating() {
   const { locale, setLocale } = useT()
   const pathname = usePathname() || ''
   const [open, setOpen] = useState(false)
-  const inPanel = PANEL_DASHBOARDS.some(base => pathname === base || pathname.startsWith(base + '/'))
+  const inPanel = PANEL_DASHBOARDS.some(base => pathname === base || (base !== '/admin' && pathname.startsWith(base + '/')))
   const panelDashboard = PANEL_DASHBOARDS.includes(pathname)
   const navbarHidden = inPanel || NAVBAR_HIDDEN.includes(pathname)
   if (loading || panelDashboard) return null

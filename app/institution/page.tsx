@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
 import LocationSelect from '@/components/LocationSelect'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import GradeImportWizard from '@/components/GradeImportWizard'
@@ -12,7 +11,7 @@ import InstitutionTeachers from '@/components/institution/InstitutionTeachers'
 import { gradeLabel } from '@/lib/i18n/grade'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
-import PanelLanguageSwitch from '@/components/PanelLanguageSwitch'
+import PanelSidebar from '@/components/PanelSidebar'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Cell
@@ -254,34 +253,16 @@ export default function InstitutionPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      {/* Navbar */}
-      <nav style={{ background: '#29483d', padding: '0 1.5rem', height: '68px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100, gap: '12px', boxShadow: '0 8px 24px rgba(41,72,61,0.15)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-          <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '28px', filter: 'brightness(0) invert(1)' }} />
-          <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.2)' }} />
-          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 500 }}>🏛️ {institution?.name}</span>
-        </div>
-        <div className="nav-scroll-x" style={{ display: 'flex', gap: '4px', alignItems: 'center', flex: 1, minWidth: 0 }}>
-          {TABS.map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key as any)}
-              style={{ padding: '6px 10px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s',
-                background: activeTab === t.key ? 'rgba(255,255,255,0.15)' : 'transparent',
-                color: activeTab === t.key ? '#fff' : 'rgba(255,255,255,0.6)',
-              }}>
-              {t.label}
-            </button>
-          ))}
-          <Link href="/institution/integrations"
-            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', fontSize: '12px', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
-            {tr('🔌 Entegrasyonlar')}
-          </Link>
-          <PanelLanguageSwitch />
-          <button onClick={() => { supabase.auth.signOut(); router.push('/login') }}
-            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', marginLeft: '4px', whiteSpace: 'nowrap', flexShrink: 0 }}>
-            {tr('Çıkış')}
-          </button>
-        </div>
-      </nav>
+      {/* Kurum sol menüsü */}
+      <PanelSidebar
+        title={tr('🏛️ Kurum Paneli')}
+        name={institution?.name}
+        onSignOut={() => { supabase.auth.signOut(); router.push('/login') }}
+        items={[
+          ...TABS.map(item => ({ key: item.key, label: item.label, active: activeTab === item.key, onClick: () => setActiveTab(item.key as typeof activeTab), group: 'tabs' })),
+          { key: 'integrations', label: tr('🔌 Entegrasyonlar'), href: '/institution/integrations', group: 'other' },
+        ]}
+      />
 
       <div style={{ maxWidth: '960px', margin: '0 auto', padding: '1.5rem', paddingBottom: '5rem' }}>
 
