@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { savePendingRegistration } from '@/lib/pending-registration'
 import { translateAuthError } from '@/lib/auth-error-messages'
+import { tcKimlikRequired, validateTcKimlikNo, normalizeTcKimlikNo } from '@/lib/tc-kimlik'
 import DepartmentSelect, { resolveDepartmentValue } from '@/components/DepartmentSelect'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { languageFromLocale } from '@/lib/i18n/core'
@@ -100,6 +101,7 @@ function RegisterContent() {
   const [sellerId, setSellerId] = useState('') // ?satici=KOD ile geldiyse çözümlenen satıcı ID'si
   const [parentEmail, setParentEmail] = useState('')
   const [studentPhone, setStudentPhone] = useState('')
+  const [nationalId, setNationalId] = useState('')
   const [loc, setLoc] = useState<LocationDetails>(EMPTY_LOCATION_DETAILS)
   const [kvkkAydinlatma, setKvkkAydinlatma] = useState(false)
   const [kvkkAcikRiza, setKvkkAcikRiza] = useState(false)
@@ -170,6 +172,8 @@ function RegisterContent() {
     if (!surname.trim()) { setError(t('Soyad zorunludur.')); return }
     if (!email.trim()) { setError(t('E-posta zorunludur.')); return }
     if (pass.length < 6) { setError(t('Şifre en az 6 karakter olmalıdır.')); return }
+    const tcNeeded = !!selectedRole && tcKimlikRequired(selectedRole, loc.country)
+    if (tcNeeded && !validateTcKimlikNo(nationalId)) { setError(t('Geçerli bir T.C. Kimlik No girin (11 haneli).')); return }
     if (!kvkkAydinlatma) { setError(t('KVKK Aydınlatma Metnini okuduğunuzu onaylamalısınız.')); return }
     if (!kvkkAcikRiza) { setError(t('Yapay zeka destekli analiz için açık rıza vermelisiniz.')); return }
     if (selectedRole === 'student' && age && parseInt(age) < 18 && !veliOnayi) { setError(t('18 yaş altı kayıtlar için veli onayı beyanı gereklidir.')); return }
@@ -266,6 +270,7 @@ function RegisterContent() {
           department: selectedRole === 'student' ? (resolveDepartmentValue(department, departmentOther) || undefined) : undefined,
           institutionCode: institutionCode.trim(),
           parentEmail: parentEmail.trim(), phone: studentPhone.trim(),
+          nationalId: tcNeeded ? normalizeTcKimlikNo(nationalId) : undefined,
           ...(selectedRole === 'student' ? { country: loc.country, state: loc.state, city: loc.city, postalCode: loc.postalCode, addressLine: loc.addressLine } : {}),
           sellerId: sellerId || undefined,
           kvkkAydinlatma, kvkkAcikRiza, veliOnayi,
@@ -283,6 +288,8 @@ function RegisterContent() {
           role: selectedRole,
           parentEmail: parentEmail.trim() || undefined,
           institutionName: institutionName || undefined,
+          nationalId: tcNeeded ? normalizeTcKimlikNo(nationalId) : undefined,
+          country: selectedRole === 'student' ? loc.country : undefined,
           kvkkAydinlatma, kvkkAcikRiza, veliOnayi,
         }),
       })
@@ -768,6 +775,17 @@ function RegisterContent() {
           <label className="field-label">{t('E-posta *')}</label>
           <input className="input" type="email" placeholder="ornek@mail.com"
             value={email} onChange={e => setEmail(e.target.value)} />
+
+          {selectedRole && tcKimlikRequired(selectedRole, loc.country) && (
+            <>
+              <label className="field-label">{t('T.C. Kimlik No *')}</label>
+              <input className="input" inputMode="numeric" autoComplete="off" maxLength={11} placeholder={t('11 haneli T.C. Kimlik No')}
+                value={nationalId} onChange={e => setNationalId(e.target.value.replace(/\D/g, '').slice(0, 11))} />
+              <div style={{ fontSize: '11.5px', color: 'var(--text3)', margin: '-4px 0 10px' }}>
+                {t('Kimlik doğrulama için istenir; yalnızca Türkiye’deki güvenli kimlik veritabanında saklanır, kimseyle paylaşılmaz.')}
+              </div>
+            </>
+          )}
 
           <label className="field-label">{t('Şifre *')}</label>
           <input className="input" type="password" placeholder={t('En az 6 karakter')}

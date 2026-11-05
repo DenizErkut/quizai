@@ -27,6 +27,9 @@ export interface Identity {
   // Konum ayrıntıları (docs/TR-PG-konum-alanlari.sql uygulanmadan sütunlar olmayabilir)
   postal_code?: string | null
   address_line?: string | null
+  // T.C. Kimlik No (docs/TR-PG-tc-kimlik-no.sql). Okuma fonksiyonları bu alanı HİÇBİR ZAMAN döndürmez (aşağıdaki withoutSensitive);
+  // yalnızca kullanıcının kendi veri dışa aktarımında (exportIdentityData) görünür.
+  national_id?: string | null
   created_at: string
   updated_at: string
 }
@@ -50,13 +53,19 @@ export async function createIdentity(params: {
   return rows[0]
 }
 
+// Kimlik satırlarını API yanıtlarına/günlüklere sızdırmamak için hassas alanları çıkarır.
+function withoutSensitive<T extends { national_id?: unknown }>(row: T): T {
+  const { national_id: _removed, ...rest } = row
+  return rest as T
+}
+
 // Supabase user_id'den kimlik getir
 export async function getIdentityBySupabaseId(supabaseUserId: string): Promise<Identity | null> {
   const { rows } = await trPool.query(
     `SELECT * FROM identities WHERE supabase_user_id = $1`,
     [supabaseUserId]
   )
-  return rows[0] ?? null
+  return rows[0] ? withoutSensitive(rows[0] as Identity) : null
 }
 
 // Birden çok Supabase user_id için toplu kimlik getir (sınıf listesi, sıralama, vb.)
@@ -71,7 +80,7 @@ export async function getIdentitiesBySupabaseIds(supabaseUserIds: string[]): Pro
   )
   const map: Record<string, Identity> = {}
   for (const row of rows as Identity[]) {
-    map[row.supabase_user_id] = row
+    map[row.supabase_user_id] = withoutSensitive(row)
   }
   return map
 }
@@ -87,7 +96,7 @@ export async function listAllIdentitySupabaseIds(): Promise<Set<string>> {
 
 
 // Yalnızca bu sütunlar güncellenebilir: sütun adları SQL'e katıldığı için anahtarlar ASLA kullanıcı girdisinden gelmemeli.
-const UPDATABLE_IDENTITY_FIELDS = new Set(['full_name', 'email', 'age', 'role', 'parent_email', 'parent_verified', 'institution_name', 'phone', 'postal_code', 'address_line'])
+const UPDATABLE_IDENTITY_FIELDS = new Set(['full_name', 'email', 'age', 'role', 'parent_email', 'parent_verified', 'institution_name', 'phone', 'postal_code', 'address_line', 'national_id'])
 
 export async function updateIdentity(supabaseUserId: string, updates: Partial<Identity>): Promise<void> {
   const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'supabase_user_id')
@@ -223,8 +232,15 @@ export async function exportIdentityData(supabaseUserId: string) {
     trPool.query(`SELECT * FROM kvkk_requests WHERE identity_id = $1`, [identity.id]),
   ])
 
+  // Kullanıcının KENDİ T.C. Kimlik No'su, kendi veri dışa aktarımında yer alır (sütun yoksa sessizce atlanır).
+  let nationalId: string | null = null
+  try {
+    const { rows } = await trPool.query(`SELECT national_id FROM identities WHERE supabase_user_id = $1`, [supabaseUserId])
+    nationalId = rows[0]?.national_id ?? null
+  } catch { /* sütun henüz yok */ }
+
   return {
-    identity,
+    identity: nationalId ? { ...identity, national_id: nationalId } : identity,
     consent_records: consents.rows,
     kvkk_requests: kvkkReqs.rows,
   }
