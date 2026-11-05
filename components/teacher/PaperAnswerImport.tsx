@@ -150,7 +150,7 @@ export default function PaperAnswerImport({ group, onClose }: { group: Assignmen
         {answers.map((item, index) => (
           <div key={item.assignmentId}>
             <div style={{ fontSize: 12, fontWeight: 600 }}>{t('Soru {n}', { n: index + 1 })}: {group[index]?.question.slice(0, 140)}</div>
-            <textarea value={item.text} rows={4} onChange={event => setAnswers(prev => prev && prev.map(x => x.index === index ? { ...x, text: event.target.value } : x))} style={{ width: '100%' }} aria-label={t('Soru {n} cevabı', { n: index + 1 })} />
+            <textarea value={item.text} rows={4} onChange={event => setAnswers(prev => prev && prev.map(x => x.index === index ? { ...x, text: event.target.value } : x))} style={{ width: '100%', borderRadius: 4 }} aria-label={t('Soru {n} cevabı', { n: index + 1 })} />
             {(!item.legible || item.note) && <div style={{ fontSize: 11, color: 'var(--amber, #b45309)' }}>⚠️ {item.note || t('Bazı kısımlar zor okundu; kontrol edin.')}</div>}
             {!item.text.trim() && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{t('Cevap bulunamadı — 0 puan verilir.')}</div>}
           </div>

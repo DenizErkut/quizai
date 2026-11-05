@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id')
   if (id) {
     if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ error: 'Geçersiz istek.' }, { status: 400 })
-    const { data } = await db.from('open_ended_sessions').select('id,subject,topic,question_index,scenario,question,rubric,figure_svg,answer_table,total_possible,total_earned,graded_at,source,created_at,student_answer,criteria_results,overall_feedback')
+    const { data } = await db.from('open_ended_sessions').select('id,subject,topic,question_index,scenario,question,rubric,figure_svg,figure_image,answer_table,total_possible,total_earned,graded_at,source,created_at,student_answer,criteria_results,overall_feedback')
       .eq('id', id).eq('user_id', user.id).maybeSingle()
     if (!data) return NextResponse.json({ error: 'Soru bulunamadı.' }, { status: 404 })
     return NextResponse.json({ session: data })
