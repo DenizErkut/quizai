@@ -164,9 +164,10 @@ export default function Navbar() {
     <>
       <style>{`
         .nav-spacer { height: 90px; }
+        @media (min-width: 769px) { .nav-spacer-shell { height: 0; } }
         @media (max-width: 768px) { .nav-spacer { height: 58px; } }
       `}</style>
-      <div className="nav-spacer" />
+      <div className={shellOn ? 'nav-spacer nav-spacer-shell' : 'nav-spacer'} />
       {shellOn && <StudentSidebar profile={{ name: profile.name, avatar_url: profile.avatar_url, plan: profile.plan, grade: profile.grade }} streak={streak} testsLeft={testsLeft} onSignOut={handleSignOut} />}
 
       {/* ── MOBILE TOP BAR ── */}
@@ -343,7 +344,12 @@ export default function Navbar() {
       </div>
 
       {/* ── DESKTOP NAV ── */}
-      <nav className="desktop-only" style={{
+      <nav className="desktop-only" style={shellOn ? {
+        // Öğrenci: tam genişlikli çubuk yok; araçlar sağ üstte küçük yüzen bir grupta.
+        position: 'fixed', top: 14, right: 18, height: 'auto', padding: '4px 10px',
+        background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 999, boxShadow: 'var(--shadow)',
+        display: 'flex', alignItems: 'center', zIndex: 1000,
+      } : {
         position: 'fixed', top: 0, left: 0, right: 0, height: '90px',
         background: 'rgba(255,250,244,0.94)',
         borderBottom: '1px solid #e8dcd0',
@@ -351,12 +357,14 @@ export default function Navbar() {
         backdropFilter: 'blur(16px)',
         display: 'flex', alignItems: 'center', zIndex: 1000,
       }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%', padding: '0 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+        <div style={shellOn ? { display: 'flex', alignItems: 'center', gap: '8px' } : { maxWidth: '1200px', margin: '0 auto', width: '100%', padding: '0 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
 
-          {/* Logo */}
-          <Link href="/home" style={{ flexShrink: 0 }}>
-            <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '68px', width: 'auto' }} />
-          </Link>
+          {/* Logo (öğrencide yan menünün başında) */}
+          {!shellOn && (
+            <Link href="/home" style={{ flexShrink: 0 }}>
+              <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '68px', width: 'auto' }} />
+            </Link>
+          )}
 
           {/* Ana nav linkleri — öğrencide yan menüye taşındı */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>

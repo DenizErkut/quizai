@@ -550,3 +550,6 @@ textarea { border-radius: var(--radius); resize: vertical; padding: 12px 16px; }
   body.has-student-sidebar .app-content { margin-left: 288px; }
   body.has-student-sidebar { --chat-left: 312px; }
 }
+@media (min-width: 769px) {
+  body.has-student-sidebar .cookie-reopen { left: auto; right: 16px; }
+}
