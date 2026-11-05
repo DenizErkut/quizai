@@ -15,7 +15,7 @@ import { analyzeStudyDuration, StudyDurationInsight } from '@/lib/study-duration
 import { useT } from '@/lib/i18n/I18nProvider'
 import { gradeLabel } from '@/lib/i18n/grade'
 import { intlLocale } from '@/lib/i18n/core'
-import PanelLanguageSwitch from '@/components/PanelLanguageSwitch'
+import PanelSidebar from '@/components/PanelSidebar'
 
 // lib/parent-risk-alert.ts'teki AYNI eşik (35) — o dosyayı buraya import
 // ETMİYORUZ bilerek: server-only bir zincire bağlanıyor (identity/client.ts
@@ -283,50 +283,27 @@ function ParentContent() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      {/* Veli Navbar */}
-      <nav style={{ background: '#29483d', padding: '0 1.5rem', height: '68px', display: 'flex', alignItems: 'center', gap: '12px', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 8px 24px rgba(41,72,61,0.15)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-          <img src="/pratium-logo-new.svg" alt="Pratium" style={{ height: '32px', filter: 'brightness(0) invert(1)' }} />
-          <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.2)' }} />
-          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap' }}>{tr('👨‍👩‍👧 Veli Paneli')}</span>
-        </div>
-        <div className="nav-scroll-x" style={{ display: 'flex', gap: '4px', alignItems: 'center', flex: 1, minWidth: 0 }}>
-          {[
-            { key: 'dashboard', label: tr('📊 Durum') },
-            { key: 'trend', label: tr('📈 Trend') },
-            { key: 'weekly-growth', label: tr('📊 Haftalık Gelişim') },
-            { key: 'mastery', label: tr('🧠 Ustalık & Uyarılar') },
-            { key: 'archive', label: tr('📦 Arşiv') },
-            { key: 'leaderboard', label: tr('🏆 Sıralama') },
-            { key: 'reports', label: tr('📋 RAPORLAR') },
-            { key: 'add', label: tr('➕ Çocuk Ekle') },
-          ].map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key as any)}
-              style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0,
-                background: activeTab === t.key ? 'rgba(255,255,255,0.15)' : 'transparent',
-                color: activeTab === t.key ? '#fff' : 'rgba(255,255,255,0.6)',
-              }}>
-              {t.label}
-            </button>
-          ))}
-          <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.2)', margin: '0 4px', flexShrink: 0 }} />
-          {/* Bildirim zili — /notifications zaten vardı, navbar'dan hiç bağlanmıyordu */}
-          <button onClick={() => router.push('/notifications')} title={tr('Bildirimler')}
-            style={{ position: 'relative', padding: '6px 10px', borderRadius: '8px', border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.7)', fontSize: '15px', cursor: 'pointer', flexShrink: 0 }}>
-            🔔
-            {unreadNotifications > 0 && (
-              <span style={{ position: 'absolute', top: '2px', right: '2px', minWidth: '15px', height: '15px', padding: '0 3px', borderRadius: '999px', background: 'var(--red)', color: '#fff', fontSize: '9px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
-                {unreadNotifications > 9 ? '9+' : unreadNotifications}
-              </span>
-            )}
+      {/* Veli sol menüsü */}
+      <PanelSidebar
+        title={tr('👨‍👩‍👧 Veli Paneli')}
+        onSignOut={() => { supabase.auth.signOut(); router.push('/login') }}
+        extraBottom={(
+          <button onClick={() => router.push('/notifications')} className="pn-link" style={{ margin: 0, width: '100%', background: 'rgba(255,255,255,.07)' }}>
+            <span className="pn-icon">🔔</span><span>{tr('Bildirimler')}</span>
+            {unreadNotifications > 0 && <span className="pn-badge">{unreadNotifications > 9 ? '9+' : unreadNotifications}</span>}
           </button>
-          <PanelLanguageSwitch />
-          <button onClick={() => { supabase.auth.signOut(); router.push('/login') }}
-            style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-            {tr('Çıkış')}
-          </button>
-        </div>
-      </nav>
+        )}
+        items={[
+          { key: 'dashboard', label: tr('📊 Durum') },
+          { key: 'trend', label: tr('📈 Trend') },
+          { key: 'weekly-growth', label: tr('📊 Haftalık Gelişim') },
+          { key: 'mastery', label: tr('🧠 Ustalık & Uyarılar') },
+          { key: 'archive', label: tr('📦 Arşiv') },
+          { key: 'leaderboard', label: tr('🏆 Sıralama') },
+          { key: 'reports', label: tr('📋 RAPORLAR') },
+          { key: 'add', label: tr('➕ Çocuk Ekle') },
+        ].map(item => ({ ...item, active: activeTab === item.key, onClick: () => setActiveTab(item.key as typeof activeTab) }))}
+      />
 
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1.5rem', paddingBottom: '5rem' }}>
 

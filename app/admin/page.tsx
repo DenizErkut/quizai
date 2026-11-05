@@ -46,6 +46,7 @@ import EducationEvalRunner from '@/components/admin/EducationEvalRunner'
 import ObjectiveMappingReview from '@/components/admin/ObjectiveMappingReview'
 import ObjectiveSourcesBrowser from '@/components/admin/ObjectiveSourcesBrowser'
 import QuestionBankSvgFit from '@/components/admin/QuestionBankSvgFit'
+import PanelSidebar from '@/components/PanelSidebar'
 import WrittenExamManager from '@/components/admin/WrittenExamManager'
 import PilotAccountSetup from '@/components/admin/PilotAccountSetup'
 
@@ -805,45 +806,36 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
           </div>
         </div>
 
-        {/* Tab */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '1.5rem' }}>
-          {([
-            { key: 'users', label: '👥 Kullanıcılar' },
-            { key: 'unit-economics', label: '💰 Birim Ekonomisi' },
-            { key: 'stats', label: '📊 İstatistikler' },
-            { key: 'errors', label: `⚠️ Hata Bildirimleri${pendingCount > 0 ? ` (${pendingCount})` : ''}` },
-            { key: 'teachers', label: `🎓 Öğretmen Başvuruları${pendingTeachers > 0 ? ` (${pendingTeachers})` : ''}` },
-            { key: 'institutions', label: '🏛️ Kurumlar' },
-            { key: 'sellers', label: '🤝 Satıcılar' },
-            { key: 'meb', label: '📚 MEB Kaynakları' },
-            { key: 'country-sources', label: '🌍 Ülke Kaynakları' },
-            { key: 'objective-sources', label: '📖 Kazanım Kaynakları' },
-            { key: 'question-books', label: '📚 Soru Kitapçıkları' },
-            { key: 'exam-books', label: '🎯 Sınav Kitapçıkları' },
-            { key: 'question-bank', label: '📝 Soru Havuzu' },
-            { key: 'written-exam', label: '✍️ Yazılıya Hazırlanıyorum' },
-            { key: 'objective-mapping', label: '🎯 Kazanım Eşleştirme' },
-            { key: 'education-eval', label: '🧭 Education Eval' },
-            { key: 'curriculum', label: '📋 Müfredat Yönetimi' },
-            { key: 'learning-graph', label: '🕸️ Learning Graph' },
-            { key: 'kvkk', label: '🔐 KVKK Talepleri' },
-            { key: 'adaptive', label: '🧪 Adaptive Pilot' },
-            { key: 'risk', label: '⚠️ Erken Uyarılar' },
-            { key: 'coaching', label: '🎯 Özel Koçluk Talepleri' },
-            { key: 'coach-usage', label: '🎓 Koç Kullanımı' },
-          ] as const).map(t => (
-            <button key={t.key} className={`btn btn-sm ${tab === t.key ? 'btn-primary' : ''}`}
-              onClick={() => setTab(t.key)}
-              style={{
-                flexShrink: 0, whiteSpace: 'nowrap',
-                ...(tab !== t.key && t.key === 'errors' && pendingCount > 0 ? { borderColor: 'var(--red)', color: 'var(--red)' } :
-                tab !== t.key && t.key === 'teachers' && pendingTeachers > 0 ? { borderColor: '#fdd31d', color: '#082465' } :
-                {})
-              }}>
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {/* Yönetim sol menüsü */}
+        <PanelSidebar
+          title="Yönetim"
+          onSignOut={() => { supabase.auth.signOut(); router.push('/login') }}
+          items={([
+            { key: 'users', label: '👥 Kullanıcılar', group: 'genel' },
+            { key: 'stats', label: '📊 İstatistikler', group: 'genel' },
+            { key: 'unit-economics', label: '💰 Birim Ekonomisi', group: 'genel' },
+            { key: 'errors', label: `⚠️ Hata Bildirimleri${pendingCount > 0 ? ` (${pendingCount})` : ''}`, group: 'genel' },
+            { key: 'teachers', label: `🎓 Öğretmen Başvuruları${pendingTeachers > 0 ? ` (${pendingTeachers})` : ''}`, group: 'hesaplar' },
+            { key: 'institutions', label: '🏛️ Kurumlar', group: 'hesaplar' },
+            { key: 'sellers', label: '🤝 Satıcılar', group: 'hesaplar' },
+            { key: 'coaching', label: '🎯 Özel Koçluk Talepleri', group: 'hesaplar' },
+            { key: 'coach-usage', label: '🎓 Koç Kullanımı', group: 'hesaplar' },
+            { key: 'meb', label: '📚 MEB Kaynakları', group: 'icerik' },
+            { key: 'country-sources', label: '🌍 Ülke Kaynakları', group: 'icerik' },
+            { key: 'objective-sources', label: '📖 Kazanım Kaynakları', group: 'icerik' },
+            { key: 'question-books', label: '📚 Soru Kitapçıkları', group: 'icerik' },
+            { key: 'exam-books', label: '🎯 Sınav Kitapçıkları', group: 'icerik' },
+            { key: 'question-bank', label: '📝 Soru Havuzu', group: 'icerik' },
+            { key: 'written-exam', label: '✍️ Yazılıya Hazırlanıyorum', group: 'icerik' },
+            { key: 'curriculum', label: '📋 Müfredat Yönetimi', group: 'kalite' },
+            { key: 'objective-mapping', label: '🎯 Kazanım Eşleştirme', group: 'kalite' },
+            { key: 'learning-graph', label: '🕸️ Learning Graph', group: 'kalite' },
+            { key: 'education-eval', label: '🧭 Education Eval', group: 'kalite' },
+            { key: 'adaptive', label: '🧪 Adaptive Pilot', group: 'kalite' },
+            { key: 'risk', label: '⚠️ Erken Uyarılar', group: 'kalite' },
+            { key: 'kvkk', label: '🔐 KVKK Talepleri', group: 'kalite' },
+          ] as const).map(item => ({ ...item, active: tab === item.key, onClick: () => setTab(item.key) }))}
+        />
 
         {tab === 'objective-mapping' && <ObjectiveMappingReview />}
         {tab === 'objective-sources' && <ObjectiveSourcesBrowser />}

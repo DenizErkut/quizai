@@ -88,7 +88,7 @@ export default function Navbar() {
   const shellOn = !!profile && !!pathname
     && profile.teacher_approved !== true && !(profile.is_parent === true || profile.role === 'parent') && profile.role !== 'institution_admin'
     && !['/institution', '/teacher', '/parent'].some(prefix => pathname.startsWith(prefix))
-    && !['/login', '/register', '/profile', '/'].includes(pathname)
+    && !['/login', '/register', '/profile', '/', '/admin'].includes(pathname)
   useEffect(() => {
     document.body.classList.toggle('has-student-sidebar', shellOn)
     return () => document.body.classList.remove('has-student-sidebar')
@@ -122,6 +122,7 @@ export default function Navbar() {
   }
 
   if (!profile) return null
+  if (pathname === '/admin') return null // yönetim paneli kendi sol menüsünü taşır
   if (pathname?.startsWith('/institution')) return null
   if (pathname?.startsWith('/teacher')) return null
   if (pathname?.startsWith('/parent')) return null

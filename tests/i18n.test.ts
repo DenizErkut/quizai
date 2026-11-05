@@ -316,13 +316,11 @@ for (const [name, entriesFile, exportName, files] of [
 
 test('teacher, parent and institution dashboards embed the language switch', async () => {
   const { readFileSync } = await import('node:fs')
+  // Panels use the shared sidebar, which carries the language switch right above the sign-out button.
+  const sidebar = readFileSync('components/PanelSidebar.tsx', 'utf8')
+  assert.ok(sidebar.indexOf('<PanelLanguageSwitch />') > 0 && sidebar.indexOf('<PanelLanguageSwitch />') < sidebar.indexOf("{t('Çıkış')}"))
   for (const file of ['app/teacher/page.tsx', 'app/parent/page.tsx', 'app/institution/page.tsx']) {
-    const source = readFileSync(file, 'utf8')
-    // It must sit inside the dark panel navbar, right before the sign-out button (not only on the approval screen).
-    const navStart = source.indexOf('<nav ')
-    const signOut = source.indexOf("{tr('Çıkış')}", navStart)
-    const switchAt = source.lastIndexOf('<PanelLanguageSwitch />', signOut)
-    assert.ok(navStart >= 0 && signOut > navStart && switchAt > navStart, file)
+    assert.match(readFileSync(file, 'utf8'), /<PanelSidebar\b/, file)
   }
 })
 
