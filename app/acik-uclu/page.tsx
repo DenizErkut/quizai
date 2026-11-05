@@ -64,6 +64,7 @@ export default function AcikUcluPage() {
   // "Çözülenler": senaryo serisinden çıkan tüm sorular + yazdırma + kâğıttan cevap yükleme
   type MySession = { id: string; subject: string; topic: string; question_index: number; total_earned: number | null; total_possible: number | null; graded_at: string | null; created_at: string }
   const [mySessions, setMySessions] = useState<MySession[]>([])
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
   const [printingKey, setPrintingKey] = useState('')
   const [printMessage, setPrintMessage] = useState('')
   const [paperOpen, setPaperOpen] = useState(false)
@@ -627,19 +628,43 @@ export default function AcikUcluPage() {
             <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.5 }}>{t('Başladığın senaryo soruları burada listelenir.')}</div>
           ) : (
             <div style={{ display: 'grid', gap: 8 }}>
-              {mySessions.map(item => (
-                <div key={item.id} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '8px 10px', background: item.id === sessionId && step !== 'setup' ? 'var(--accent-bg)' : 'transparent' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700 }}>{item.subject} · {item.topic}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text2)', margin: '2px 0 6px' }}>
-                    {t('Soru {n}', { n: item.question_index + 1 })} · {item.graded_at ? <b style={{ color: '#0a9e90' }}>{item.total_earned ?? 0}/{item.total_possible ?? 100}</b> : <span style={{ color: 'var(--text3)' }}>{t('Çözülmedi')}</span>}
-                  </div>
-                  {!item.graded_at && (
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button className="btn btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => openSession(item.id)}>{t('Çöz')}</button>
+              {(() => {
+                // Ders · dönem · senaryo başına tek satır; her sorunun en son denemesi gösterilir.
+                const groups = new Map<string, { subject: string; topic: string; items: MySession[] }>()
+                for (const item of mySessions) {
+                  const key = `${item.subject.toLocaleLowerCase('tr')}|${item.topic}`
+                  const group = groups.get(key) || { subject: item.subject, topic: item.topic, items: [] }
+                  if (!group.items.some(other => other.question_index === item.question_index)) group.items.push(item)   // liste en yeniden eskiye: ilk görülen en yenidir
+                  groups.set(key, group)
+                }
+                return [...groups.entries()].map(([key, group]) => {
+                  const items = [...group.items].sort((x, y) => x.question_index - y.question_index)
+                  const solved = items.filter(item => item.graded_at).length
+                  const expanded = !!openGroups[key]
+                  return (
+                    <div key={key} style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+                      <button type="button" aria-expanded={expanded} onClick={() => setOpenGroups(prev => ({ ...prev, [key]: !prev[key] }))}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-sans)', color: 'inherit' }}>
+                        <span style={{ flex: 1 }}>
+                          <span style={{ display: 'block', fontSize: 12.5, fontWeight: 800 }}>{group.subject} · {group.topic}</span>
+                          <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text2)', marginTop: 2 }}>{t('{n} soru', { n: items.length })} · {solved > 0 ? t('{n} soru çözüldü', { n: solved }) : t('Çözülmedi')}</span>
+                        </span>
+                        <span aria-hidden style={{ fontSize: 11, color: 'var(--text3)' }}>{expanded ? '▲' : '▼'}</span>
+                      </button>
+                      {expanded && (
+                        <div style={{ borderTop: '1px solid var(--border)', padding: '6px 10px', display: 'grid', gap: 6 }}>
+                          {items.map(item => (
+                            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, background: item.id === sessionId && step !== 'setup' ? 'var(--accent-bg)' : 'transparent', borderRadius: 6, padding: '2px 4px' }}>
+                              <span style={{ flex: 1 }}>{t('Soru {n}', { n: item.question_index + 1 })} · {item.graded_at ? <b style={{ color: '#0a9e90' }}>{item.total_earned ?? 0}/{item.total_possible ?? 100}</b> : <span style={{ color: 'var(--text3)' }}>{t('Çözülmedi')}</span>}</span>
+                              {!item.graded_at && <button className="btn btn-sm" onClick={() => openSession(item.id)}>{t('Çöz')}</button>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              ))}
+                  )
+                })
+              })()}
             </div>
           )}
         </div>
