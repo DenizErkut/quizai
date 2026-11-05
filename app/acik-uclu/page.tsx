@@ -619,6 +619,50 @@ export default function AcikUcluPage() {
             </button>
           </div>
         )}
+
+        {/* Notlarım: soru bazında puanlar ve ders · dönem · senaryo başına ortalama not (kullanıcı bazında) */}
+        {(() => {
+          type Row = { subject: string; topic: string; questions: Map<number, { earned: number; total: number }> }
+          const groups = new Map<string, Row>()
+          for (const item of mySessions) {
+            if (!item.graded_at) continue
+            const key = `${item.subject.toLocaleLowerCase('tr')}|${item.topic}`
+            const row = groups.get(key) || { subject: item.subject, topic: item.topic, questions: new Map() }
+            if (!row.questions.has(item.question_index)) row.questions.set(item.question_index, { earned: Number(item.total_earned) || 0, total: Number(item.total_possible) || 100 })   // liste en yeniden eskiye: ilk görülen en son puanlanandır
+            groups.set(key, row)
+          }
+          if (groups.size === 0) return null
+          const percent = (earned: number, total: number) => total > 0 ? Math.round((earned / total) * 1000) / 10 : 0
+          let allEarned = 0, allTotal = 0, allCount = 0
+          const rows = [...groups.values()].map(group => {
+            const list = [...group.questions.entries()].sort((a, b) => a[0] - b[0])
+            const earned = list.reduce((sum, [, q]) => sum + q.earned, 0), total = list.reduce((sum, [, q]) => sum + q.total, 0)
+            allEarned += earned; allTotal += total; allCount += list.length
+            return { group, list, avg: percent(earned, total) }
+          })
+          return (
+            <div className="card" style={{ padding: '1.1rem 1.25rem', marginTop: '1.25rem' }}>
+              <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--primary)', marginBottom: 10 }}>{t('Notlarım')}</div>
+              {rows.map(({ group, list, avg }) => (
+                <div key={`${group.subject}|${group.topic}`} style={{ borderTop: '1px solid var(--border)', padding: '10px 0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', fontSize: 13, fontWeight: 700 }}>
+                    <span>{group.subject} · {group.topic}</span>
+                    <span style={{ color: '#0a9e90' }}>{t('Ortalama not')}: {avg}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                    {list.map(([index, q]) => (
+                      <span key={index} style={{ fontSize: 11.5, border: '1px solid var(--border)', borderRadius: 8, padding: '3px 8px' }}>{t('Soru {n}', { n: index + 1 })}: <b>{q.earned}/{q.total}</b></span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div style={{ borderTop: '2px solid var(--border)', paddingTop: 10, marginTop: 4, display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 800 }}>
+                <span>{t('Genel ortalama')} <span style={{ fontWeight: 500, fontSize: 12, color: 'var(--text2)' }}>({t('{n} soru çözüldü', { n: allCount })})</span></span>
+                <span style={{ color: '#0a9e90' }}>{percent(allEarned, allTotal)} / 100</span>
+              </div>
+            </div>
+          )
+        })()}
       </div>
       <aside className="oe-side" aria-label={t('Çözülenler')}>
         <div className="card" style={{ padding: '12px 14px' }}>

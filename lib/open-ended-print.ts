@@ -70,7 +70,15 @@ ${items.map((item, index) => `<section class="oe-question"><h2>Soru ${index + 1}
 
 export const OE_QR_PREFIX = 'PRATIUM-OE:'
 
-export type ScenarioSheetItem = PrintableOpenEnded & { sessionId: string; qrDataUrl: string; position: number; total: number }
+export type ScenarioSheetItem = PrintableOpenEnded & { sessionId: string; qrDataUrl: string; position: number; total: number; studentName?: string; schoolNo?: string | null }
+
+/** Öğretmen sınıf dökümü QR'ı: öğrenci + ödev (soru) eşleştirmesi. Yalnızca dahili kimlikler taşır (ad, T.C. vb. yok). */
+export const OEA_QR_PREFIX = 'PRATIUM-OEA:'
+export function teacherQrPayload(studentId: string, assignmentId: string): string { return `${OEA_QR_PREFIX}${studentId}:${assignmentId}` }
+export function parseTeacherQr(text: string | null | undefined): { studentId: string; assignmentId: string } | null {
+  const match = /^PRATIUM-OEA:([0-9a-f-]{36}):([0-9a-f-]{36})$/i.exec(text || '')
+  return match ? { studentId: match[1], assignmentId: match[2] } : null
+}
 
 /** Senaryo dökümü: her soru ayrı sayfa; öğrenci adı hazır, sağ üstte soruya özel QR (yüklemede sayfa bu QR'dan tanınır). */
 export function openEndedScenarioSheetHtml(items: ScenarioSheetItem[], options: { studentName: string; title: string; grade?: string | null }): string {
@@ -79,7 +87,7 @@ export function openEndedScenarioSheetHtml(items: ScenarioSheetItem[], options: 
   const name = options.studentName ? escapePrintText(options.studentName) : ''
   return `${SHEET_STYLE}<style>.oe-sheet{break-after:page;position:relative}.oe-sheet:last-child{break-after:auto}.oe-qr{position:absolute;top:0;right:0;width:26mm;height:26mm}.oe-sheet .oe-header{margin-right:30mm}</style>
 ${items.map(item => `<section class="oe-sheet"><img class="oe-qr" alt="QR" src="${escapePrintText(item.qrDataUrl)}">
-<div class="oe-header"><div class="oe-field">Ad Soyad: <strong>${name}</strong></div><div class="oe-field">No: </div><div class="oe-field">Sınıf / Şube: </div><div class="oe-field">Tarih: </div></div>
+<div class="oe-header"><div class="oe-field">Ad Soyad: <strong>${item.studentName ? escapePrintText(item.studentName) : name}</strong></div><div class="oe-field">No: ${item.schoolNo ? `<strong>${escapePrintText(item.schoolNo)}</strong>` : ''}</div><div class="oe-field">Sınıf / Şube: </div><div class="oe-field">Tarih: </div></div>
 <p class="oe-meta">${escapePrintText(options.title)} · Soru ${item.position}/${item.total} · Soru kodu: <strong>${escapePrintText(item.code || '')}</strong><br>Bu sayfayı yazdıktan sonra fotoğrafını çek/tara ve Pratium'da "Kâğıtları yükle" ile gönder. QR kodu kapatma.</p>
 <div class="oe-question"><h2>Soru ${item.position} <span style="font-weight:400;font-size:10pt">(${total(item)} puan)</span></h2>
 <div class="print-passage">${printableMath(item.scenario)}</div>${printFigure(item)}<p><strong>${printableMath(item.question)}</strong></p>${printTable(item)}
