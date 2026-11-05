@@ -132,7 +132,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
 
       {!hidden && open && (
         <div style={{
-          position: 'fixed', bottom: '108px', left: '24px', zIndex: 9998,
+          position: 'fixed', bottom: '108px', left: 'var(--chat-left, 24px)', zIndex: 9998,
           width: '370px', maxWidth: 'calc(100vw - 32px)',
           background: '#fff', borderRadius: '20px',
           boxShadow: '0 20px 60px rgba(8,36,101,0.18)',
@@ -289,7 +289,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
         <div
           onClick={() => { setOpen(true); setUnread(0) }}
           style={{
-            position: 'fixed', bottom: '108px', left: '24px', zIndex: 9998,
+            position: 'fixed', bottom: '108px', left: 'var(--chat-left, 24px)', zIndex: 9998,
             maxWidth: '230px',
             background: '#fff',
             borderRadius: '18px 18px 18px 4px',
@@ -416,7 +416,7 @@ export default function AIChatBot({ isGuest = false }: Props) {
            ekran görüntüsü). Asistan artık sol-altta, Koç sağ-altta (bkz.
            CoachMascot.tsx — orası değişmedi). */
         .prati-launcher-wrap, .prati-launcher-restore {
-          position: fixed; bottom: 24px; left: 24px; z-index: 9999;
+          position: fixed; bottom: 24px; left: var(--chat-left, 24px); z-index: 9999;
         }
         .prati-launcher:not(.is-open)::before,
         .prati-launcher:not(.is-open)::after {

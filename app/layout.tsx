@@ -134,7 +134,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Navbar />
           <ThemeToggleFloating />
           <LanguageFloating />
-          {children}
+          <div className="app-content">{children}</div>
           {/* Madde 7: sözleşme/rıza versiyonu değiştiğinde yeniden-onay modalı */}
           <ConsentGate />
           <CookieConsent />
