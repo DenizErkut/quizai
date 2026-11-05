@@ -29,13 +29,17 @@ export async function GET(req: NextRequest) {
   const list = [...cards.values()].sort((a, b) => a.subject.localeCompare(b.subject, 'tr') || a.term - b.term || a.scenarioNo - b.scenarioNo)
   // Öğrencinin bu kartlardaki geçmişi: çözülen deneme sayısı ve en yüksek puan.
   const { data: sessions } = list.length
-    ? await db.from('open_ended_sessions').select('subject,topic,total_earned,total_possible').eq('user_id', user.id).not('graded_at', 'is', null).in('topic', [...new Set(list.map(card => scenarioLabel(card.term, card.scenarioNo)))])
-    : { data: [] as Array<{ subject: string; topic: string; total_earned: number | null; total_possible: number | null }> }
+    ? await db.from('open_ended_sessions').select('subject,topic,total_earned,total_possible,question_index').eq('user_id', user.id).not('graded_at', 'is', null).in('topic', [...new Set(list.map(card => scenarioLabel(card.term, card.scenarioNo)))])
+    : { data: [] as Array<{ subject: string; topic: string; total_earned: number | null; total_possible: number | null; question_index: number | null }> }
   return NextResponse.json({
     cards: list.map(card => {
       const mine = (sessions || []).filter(s => s.topic === scenarioLabel(card.term, card.scenarioNo) && s.subject.toLocaleLowerCase('tr') === card.subject.toLocaleLowerCase('tr'))
       const best = mine.reduce((max, s) => Math.max(max, Number(s.total_earned) || 0), 0)
-      return { ...card, questionCount: card.exampleCount, label: scenarioLabel(card.term, card.scenarioNo), attempts: mine.length, bestScore: mine.length ? best : null, total: mine[0]?.total_possible ?? 100 }
+      // Çözülen soru sayısı: bu senaryonun farklı soru sıralarından en az biri puanlanmış olanlar.
+      const solved = new Set(mine.map(s => s.question_index).filter((n): n is number => typeof n === 'number'))
+      let nextIndex = 0
+      while (solved.has(nextIndex) && nextIndex < card.exampleCount) nextIndex++
+      return { ...card, questionCount: card.exampleCount, solvedQuestions: Math.min(solved.size, card.exampleCount), nextIndex: nextIndex >= card.exampleCount ? 0 : nextIndex, label: scenarioLabel(card.term, card.scenarioNo), attempts: mine.length, bestScore: mine.length ? best : null, total: mine[0]?.total_possible ?? 100 }
     }),
   })
 }

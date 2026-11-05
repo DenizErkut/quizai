@@ -91,7 +91,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     // Senaryo serisinde 2. ve sonraki sorular aynı "test hakkı"nın devamıdır: yeniden kota düşmez.
     const questionIndex = Math.max(0, Math.floor(Number(body?.questionIndex) || 0))
-    const isFollowUp = questionIndex > 0
+    // Devam sorusu yalnızca kullanıcı aynı senaryonun bir önceki sorusunu son 24 saatte başlatmışsa kota düşmez (indeks uydurarak bedava soru alınamaz).
+    let isFollowUp = false
+    if (questionIndex > 0) {
+      const sinceIso = new Date(Date.now() - 24 * 3600_000).toISOString()
+      const { data: previous } = await supabase.from('open_ended_sessions').select('id').eq('user_id', user.id)
+        .eq('topic', scenarioLabel(Number(body?.term), Number(body?.scenarioNo))).ilike('subject', String(body?.subject || '').trim().replace(/[\\%_]/g, '\\$&'))
+        .eq('question_index', questionIndex - 1).gte('created_at', sinceIso).limit(1)
+      isFollowUp = !!previous?.length
+    }
     const plan = profile.plan || 'free'
     const today = new Date().toISOString().split('T')[0]
     const dailyCount = profile.daily_test_date === today ? (profile.daily_test_count || 0) : 0
@@ -250,6 +258,7 @@ Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
         grade,
         subject: subject.trim(),
         topic: topic.trim(),
+        question_index: scenarioMode ? questionIndex : null,
         scenario: parsed.scenario,
         question: parsed.question,
         rubric: parsed.rubric,

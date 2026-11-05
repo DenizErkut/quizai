@@ -62,4 +62,5 @@ export const openEndedEntries: Entry[] = [
   ['Senaryo tamamlandı — başka soru çöz', 'Scenario complete — solve another question', 'Szenario abgeschlossen – weitere Frage lösen', 'Scénario terminé — résoudre une autre question', 'Escenario completado: resolver otra pregunta', 'اكتمل السيناريو — حل سؤالًا آخر'],
   ['Soru {n}/{total}', 'Question {n}/{total}', 'Frage {n}/{total}', 'Question {n}/{total}', 'Pregunta {n}/{total}', 'السؤال {n}/{total}'],
   ['{n} soru', '{n} questions', '{n} Fragen', '{n} questions', '{n} preguntas', '{n} أسئلة'],
+  ['{n} soru çözüldü', '{n} solved', '{n} gelöst', '{n} résolue(s)', '{n} resuelta(s)', 'تم حل {n}'],
 ]

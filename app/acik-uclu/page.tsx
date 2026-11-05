@@ -53,7 +53,7 @@ export default function AcikUcluPage() {
   const [startingId, setStartingId] = useState('')
 
   // Yöneticinin örneklerine dayanan senaryo kartları (dönem + senaryo no)
-  type ScenarioCard = { questionCount?: number; subject: string; term: number; scenarioNo: number; label: string; attempts: number; bestScore: number | null; total: number }
+  type ScenarioCard = { questionCount?: number; solvedQuestions?: number; nextIndex?: number; subject: string; term: number; scenarioNo: number; label: string; attempts: number; bestScore: number | null; total: number }
   const [scenarioCards, setScenarioCards] = useState<ScenarioCard[]>([])
   const [scenarioSubject, setScenarioSubject] = useState('')
   const [startingScenario, setStartingScenario] = useState('')
@@ -289,10 +289,12 @@ export default function AcikUcluPage() {
                       <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)' }}>{card.subject}</div>
                       <div style={{ fontSize: '17px', fontWeight: 800, color: 'var(--primary)' }}>{t('{term}. Dönem {no}. Senaryo', { term: card.term, no: card.scenarioNo })}</div>
                       <div style={{ fontSize: '12px', color: card.attempts ? '#0a9e90' : 'var(--text3)', fontWeight: 600 }}>
-                        {(card.questionCount || 0) > 1 ? `${t('{n} soru', { n: card.questionCount })} · ` : ''}{card.attempts ? t('Çözüldü · en yüksek {score}/{total}', { score: card.bestScore ?? 0, total: card.total }) : t('Henüz çözülmedi')}
+                        {(card.questionCount || 0) > 1
+                          ? `${t('{n} soru', { n: card.questionCount })} : ${(card.solvedQuestions || 0) > 0 ? t('{n} soru çözüldü', { n: card.solvedQuestions }) : t('Henüz çözülmedi')}`
+                          : card.attempts ? t('Çözüldü · en yüksek {score}/{total}', { score: card.bestScore ?? 0, total: card.total }) : t('Henüz çözülmedi')}
                       </div>
-                      <button className="btn btn-primary" style={{ marginTop: 'auto', justifyContent: 'center' }} onClick={() => startScenario(card)} disabled={!!startingScenario}>
-                        {startingScenario === key ? t('Senaryo hazırlanıyor…') : card.attempts ? t('Tekrar çöz') : t('Başla →')}
+                      <button className="btn btn-primary" style={{ marginTop: 'auto', justifyContent: 'center' }} onClick={() => startScenario(card, card.nextIndex || 0)} disabled={!!startingScenario}>
+                        {startingScenario === key ? t('Senaryo hazırlanıyor…') : (card.questionCount || 0) > 1 && (card.solvedQuestions || 0) > 0 && (card.nextIndex || 0) > 0 ? t('Devam et →') : card.attempts ? t('Tekrar çöz') : t('Başla →')}
                       </button>
                     </div>
                   )
