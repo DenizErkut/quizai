@@ -3,6 +3,8 @@ import LearningMessage from '@/components/LearningMessage'
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useVoiceTutor } from '@/lib/use-voice-tutor'
+import { matchVoiceCommand } from '@/lib/voice-commands'
+import { useRouter } from 'next/navigation'
 import { useT } from '@/lib/i18n/I18nProvider'
 
 interface Question {
@@ -33,8 +35,15 @@ export default function ChatAssistant({ topic, language, questions, answers }: P
   const wrongQuestions = questions.filter((_, i) => !answers[i]?.correct)
   const score = answers.filter(a => a.correct).length
   const pct = Math.round((score / questions.length) * 100)
+  const router = useRouter()
   const voice = useVoiceTutor(
-    text => void send(text),
+    text => {
+      const command = matchVoiceCommand(text)
+      if (command?.type === 'navigate') { router.push(command.href); return }
+      if (command?.type === 'stop') { window.speechSynthesis?.cancel(); return }
+      if (command?.type === 'clear') { setInput(''); return }
+      void send(text)
+    },
     metric => {
       const supabase = createClient()
       void supabase.auth.getSession().then(({ data: { session } }: { data: { session: VoiceSession } }) => fetch('/api/voice-tutor/telemetry', {

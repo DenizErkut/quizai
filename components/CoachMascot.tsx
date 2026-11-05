@@ -98,6 +98,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@/lib/user-context'
 import { useT } from '@/lib/i18n/I18nProvider'
+import VoiceMicButton from '@/components/VoiceMicButton'
+import { matchVoiceCommand } from '@/lib/voice-commands'
 import { createClient } from '@/lib/supabase/client'
 import { isPaidCoachPlan } from '@/lib/coach-access'
 import { useDraggableMascot } from '@/lib/useDraggableMascot'
@@ -235,8 +237,18 @@ export default function CoachMascot() {
     router.push(`/quiz?${params.toString()}`)
   }
 
-  async function send() {
-    const text = input.trim()
+  // Öğrencinin konuşması: sesli komut (sayfa aç, sesi durdur…) ya da koça soru.
+  function handleVoice(spoken: string) {
+    const command = matchVoiceCommand(spoken)
+    if (command?.type === 'navigate') { router.push(command.href); setOpen(false); return }
+    if (command?.type === 'stop') { audioRef.current?.pause(); setSpeakingId(null); return }
+    if (command?.type === 'repeat') { const last = [...messages].reverse().find(m => m.role === 'assistant' && m.id); if (last?.id) void speak(last.id); return }
+    if (command?.type === 'clear') { setInput(''); return }
+    void send(spoken)
+  }
+
+  async function send(override?: string) {
+    const text = (override ?? input).trim()
     if (!text || sending) return
     setInput('')
     setChatError('')
@@ -514,6 +526,7 @@ export default function CoachMascot() {
                       onFocus={e => (e.target.style.borderColor = '#a855f7')}
                       onBlur={e => (e.target.style.borderColor = '#e2e8f0')}
                     />
+                    <VoiceMicButton onTranscript={handleVoice} disabled={chatLoading || sending} size={38} round />
                     <button type="submit" disabled={chatLoading || sending || !input.trim()} style={{
                       width: 38, height: 38, borderRadius: '50%',
                       background: input.trim() ? 'linear-gradient(135deg, #6d28d9, #a855f7)' : '#e2e8f0',
