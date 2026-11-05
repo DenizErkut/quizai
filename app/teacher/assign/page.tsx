@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import PaperAnswerImport from '@/components/teacher/PaperAnswerImport'
+import PaperBulkImport from '@/components/teacher/PaperBulkImport'
+import QRCode from 'qrcode'
 import { useTeacherEntitlement, LOCKED_MESSAGE } from '@/components/teacher/useTeacherEntitlement'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
@@ -265,6 +267,36 @@ export default function TeacherAssignPage() {
     const ids = group.map(a => a.id)
     await supabase.from('open_ended_assignments').delete().in('id', ids)
     setOpenEndedAssignments(prev => prev.filter(a => !ids.includes(a.id)))
+  }
+
+  // Sınıf dökümü: her öğrenci için ad/numara hazır, her soru ayrı sayfa, QR = öğrenci + soru (toplu tarama için).
+  async function printOpenEndedClass(group: any[]) {
+    if (planLimited) { setPrintMessage(LOCKED_MESSAGE); return }
+    const first = group[0]
+    setPrintBusy(`oe-${first.id}`); setPrintMessage('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/teacher/students-roster', { headers: { Authorization: `Bearer ${session?.access_token}` } })
+      const roster = await res.json().catch(() => null)
+      const students = (roster?.students || []).filter((student: any) => student.classroomId === first.classroom_id)
+      if (!students.length) { setPrintMessage(tr('Bu sınıfta öğrenci yok.')); return }
+      const { openEndedScenarioSheetHtml, teacherQrPayload, shortSheetCode } = await import('@/lib/open-ended-print')
+      const { printLearningDocument } = await import('@/lib/learning-print')
+      const title = baseTitle(first.title)
+      const code = shortSheetCode(first.batch_id || first.id)
+      const pages: any[] = []
+      for (const student of students) {
+        for (const [index, a] of group.entries()) {
+          pages.push({
+            scenario: a.scenario, question: a.question, rubric: a.rubric || [], sessionId: a.id, position: index + 1, total: group.length, code,
+            studentName: student.fullName, schoolNo: student.schoolNo,
+            qrDataUrl: await QRCode.toDataURL(teacherQrPayload(student.id, a.id), { width: 260, margin: 1 }),
+          })
+        }
+      }
+      await printLearningDocument(title, `${first.classrooms?.name || ''} · ${students.length} öğrenci × ${group.length} soru`, openEndedScenarioSheetHtml(pages, { studentName: '', title, grade: gradeLabel(first.grade) }), { studentLine: false })
+    } catch (e) { setPrintMessage(e?.message || tr('Yazdırma görünümü açılamadı.')) }
+    finally { setPrintBusy('') }
   }
 
   async function printOpenEndedGroup(group: any[], withKey: boolean) {
@@ -689,9 +721,12 @@ export default function TeacherAssignPage() {
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
                       <button className="btn btn-sm" disabled={busy} onClick={() => void printOpenEndedGroup(group, false)}>{tr('🖨️ Öğrenci formu (PDF)')}</button>
                       <button className="btn btn-sm" disabled={busy} onClick={() => void printOpenEndedGroup(group, true)}>{tr('👩‍🏫 Puanlama anahtarıyla')}</button>
+                      <button className="btn btn-sm" disabled={busy} onClick={() => void printOpenEndedClass(group)}>{tr('🖨️ Sınıf dökümü (ad + QR)')}</button>
+                      <button className="btn btn-sm" onClick={() => planLimited ? setPrintMessage(LOCKED_MESSAGE) : setImportGroup(importGroup === `bulk-${a.batch_id || a.id}` ? '' : `bulk-${a.batch_id || a.id}`)}>{tr('📷 Toplu tarama yükle')}</button>
                       <button className="btn btn-sm" onClick={() => planLimited ? setPrintMessage(LOCKED_MESSAGE) : setImportGroup(importGroup === (a.batch_id || a.id) ? '' : (a.batch_id || a.id))}>{tr('📥 Kâğıt cevapları aktar')}</button>
                     </div>
                     {importGroup === (a.batch_id || a.id) && <PaperAnswerImport group={group} onClose={() => setImportGroup('')} />}
+                    {importGroup === `bulk-${a.batch_id || a.id}` && <PaperBulkImport group={group} onClose={() => setImportGroup('')} />}
                   </div>
                   <button onClick={() => deleteOeGroup(group)}
                     style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '7px', border: '1px solid rgba(220,38,38,0.25)', background: 'transparent', color: 'var(--red)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>

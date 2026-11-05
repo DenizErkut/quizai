@@ -45,3 +45,13 @@ test('inline table pulled out of scenario text', () => {
   assert.ok(!result!.scenario.includes('|'))
   assert.ok(result!.scenario.includes('Tablo 1'))
 })
+
+import { teacherQrPayload, parseTeacherQr } from '../lib/open-ended-print'
+
+test('teacher class-sheet QR carries student and assignment ids and nothing else', () => {
+  const student = '123e4567-e89b-42d3-a456-426614174000', assignment = '987e6543-e21b-42d3-a456-426614174999'
+  assert.deepEqual(parseTeacherQr(teacherQrPayload(student, assignment)), { studentId: student, assignmentId: assignment })
+  assert.equal(parseTeacherQr('PRATIUM-OE:' + student), null)
+  assert.equal(parseTeacherQr(`PRATIUM-OEA:${student}:x`), null)
+  assert.equal(parseTeacherQr(null), null)
+})
