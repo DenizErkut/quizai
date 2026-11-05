@@ -399,7 +399,7 @@ export default function TeacherAssignPage() {
             </div>
 
             {assignmentType === 'scenario' ? (
-              <ScenarioAssign classrooms={classrooms} onCreated={created => { setOpenEndedAssignments(prev => [...(created as any[]), ...prev]); setShowForm(false) }} />
+              <ScenarioAssign classrooms={classrooms} onCreated={created => { setOpenEndedAssignments(prev => [...(created as typeof prev), ...prev]); setShowForm(false) }} />
             ) : assignmentType === 'open_ended' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {oeError && <div style={{ padding: '10px 12px', background: 'var(--red-bg)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)' }}>{oeError}</div>}

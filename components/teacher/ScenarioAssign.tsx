@@ -27,7 +27,6 @@ export default function ScenarioAssign({ classrooms, onCreated }: { classrooms: 
   }
 
   useEffect(() => {
-    setSubject(''); setPick(''); setScenarios([]); setNeedsGrade(false)
     if (!classroomId) return
     ;(async () => {
       const res = await fetch(`/api/teacher/assign-scenario?classroom_id=${classroomId}`, { headers: await headers(), cache: 'no-store' })
@@ -57,7 +56,7 @@ export default function ScenarioAssign({ classrooms, onCreated }: { classrooms: 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6, margin: 0 }}>{t('Yöneticinin yüklediği senaryo serisi sınıfa atanır: senaryodaki tüm sorular, şekilleri ve doldurulacak tablolarıyla birlikte ödev olur.')}</p>
       {error && <div style={{ padding: '10px 12px', background: 'var(--red-bg)', borderRadius: 4, fontSize: 13, color: 'var(--red)' }}>{error}</div>}
-      <select value={classroomId} onChange={e => setClassroomId(e.target.value)} style={field} aria-label={t('Sınıf')}>
+      <select value={classroomId} onChange={e => { setClassroomId(e.target.value); setSubject(''); setPick(''); setScenarios([]); setNeedsGrade(false) }} style={field} aria-label={t('Sınıf')}>
         {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
       </select>
       {needsGrade && <div style={{ fontSize: 12, color: 'var(--red)' }}>{t('Bu sınıfın seviyesi (sınıf düzeyi) tanımlı değil.')}</div>}
