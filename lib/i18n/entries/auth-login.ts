@@ -62,4 +62,5 @@ export const authLoginEntries: Entry[] = [
   ['🎓 Öğretmen paneline geç', '🎓 Switch to teacher panel', '🎓 Zum Lehrer-Panel wechseln', '🎓 Passer à l’espace enseignant', '🎓 Cambiar al panel de profesor', '🎓 التبديل إلى لوحة المعلم'],
   ['👨‍👩‍👧 Veli paneline geç', '👨‍👩‍👧 Switch to parent panel', '👨‍👩‍👧 Zum Eltern-Panel wechseln', '👨‍👩‍👧 Passer à l’espace parent', '👨‍👩‍👧 Cambiar al panel de padres', '👨‍👩‍👧 التبديل إلى لوحة ولي الأمر'],
   ['🏛️ Kurum paneline geç', '🏛️ Switch to institution panel', '🏛️ Zum Institutions-Panel wechseln', '🏛️ Passer à l’espace établissement', '🏛️ Cambiar al panel de institución', '🏛️ التبديل إلى لوحة المؤسسة'],
+  ['Kimlik bilgileri veya şifre hatalı ya da çok fazla deneme yapıldı. Biraz sonra tekrar dene.', 'Incorrect credentials or password, or too many attempts. Try again shortly.', 'Zugangsdaten oder Passwort falsch bzw. zu viele Versuche. Versuche es gleich noch einmal.', 'Identifiants ou mot de passe incorrects, ou trop de tentatives. Réessaie dans un instant.', 'Credenciales o contraseña incorrectas, o demasiados intentos. Inténtalo en un momento.', 'بيانات الدخول أو كلمة المرور غير صحيحة أو محاولات كثيرة. حاول بعد قليل.'],
 ]

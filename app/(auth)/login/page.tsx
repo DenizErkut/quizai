@@ -45,12 +45,20 @@ function LoginPageContent() {
     if (!email.trim() || !pass) { setError(t('Kimlik ve şifre gerekli.')); return }
     setError(''); setLoading(true)
     try {
+      const typed = email.trim()
+      if (tab !== 'phone' && typed.includes('@')) {
+        // E-posta: doğrudan Supabase'e (kullanıcının kendi IP'siyle; sunucu IP'sine yığılmaz).
+        const { data, error: err } = await supabase.auth.signInWithPassword({ email: typed, password: pass })
+        if (err || !data.session) { setError(t('Kimlik bilgileri veya şifre hatalı.')); setLoading(false); return }
+        await goLanding(data.session.access_token)
+        return
+      }
       const res = await fetch('/api/auth/login-identifier', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: email.trim(), password: pass, mode: tab === 'phone' ? 'phone' : 'id' }),
+        body: JSON.stringify({ identifier: typed, password: pass, mode: tab === 'phone' ? 'phone' : 'id' }),
       })
       const j = await res.json().catch(() => ({}))
-      if (!res.ok || !j.access_token) { setError(res.status === 429 ? t('Çok fazla deneme. Lütfen daha sonra tekrar deneyin.') : t('Kimlik bilgileri veya şifre hatalı.')); setLoading(false); return }
+      if (!res.ok || !j.access_token) { setError(res.status === 429 ? t('Çok fazla deneme. Lütfen daha sonra tekrar deneyin.') : t('Kimlik bilgileri veya şifre hatalı ya da çok fazla deneme yapıldı. Biraz sonra tekrar dene.')); setLoading(false); return }
       const { error: err } = await supabase.auth.setSession({ access_token: j.access_token, refresh_token: j.refresh_token })
       if (err) { setError(t('Kimlik bilgileri veya şifre hatalı.')); setLoading(false); return }
       await goLanding(j.access_token)
