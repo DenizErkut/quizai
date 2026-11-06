@@ -99,7 +99,7 @@ import { useRouter } from 'next/navigation'
 import { useUser } from '@/lib/user-context'
 import { useT } from '@/lib/i18n/I18nProvider'
 import VoiceMicButton from '@/components/VoiceMicButton'
-import { primeAudio } from '@/lib/coach-audio'
+import { primeAudio, loadAudio, bindAudio } from '@/lib/coach-audio'
 import { matchVoiceCommand } from '@/lib/voice-commands'
 import { createClient } from '@/lib/supabase/client'
 import { isPaidCoachPlan } from '@/lib/coach-access'
@@ -299,14 +299,13 @@ export default function CoachMascot() {
           setSpeakingId(null); setChatError(info?.error || t('Koçun sesi şu anda hazırlanamadı.')); return
         }
         const url = URL.createObjectURL(await response.blob())
-        audio.pause()
         if (urlRef.current) URL.revokeObjectURL(urlRef.current)
         urlRef.current = url
-        audio.src = url
         loadedIdRef.current = messageId
+        loadAudio(audio, url, { onEnded: () => setSpeakingId(null), onError: () => { setSpeakingId(null); setChatError(t('Ses oynatılamadı.')) } })
+      } else {
+        bindAudio(audio, { onEnded: () => setSpeakingId(null), onError: () => { setSpeakingId(null); setChatError(t('Ses oynatılamadı.')) } })
       }
-      audio.onended = () => setSpeakingId(null)
-      audio.onerror = () => { setSpeakingId(null); setChatError(t('Ses oynatılamadı.')) }
       await audio.play()
     } catch (cause) {
       setSpeakingId(null)

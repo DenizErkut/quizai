@@ -17,3 +17,16 @@ export function primeAudio(ref: MutableRefObject<HTMLAudioElement | null>): HTML
   void audio.play().catch(() => undefined)
   return audio
 }
+
+/** İndirilen sesi kilidi açılmış öğeye verir ve olay işleyicilerini bağlar. */
+export function loadAudio(audio: HTMLAudioElement, url: string, handlers: { onEnded: () => void; onError: () => void }): void {
+  audio.pause()
+  audio.src = url
+  audio.onended = handlers.onEnded
+  audio.onerror = handlers.onError
+}
+
+export function bindAudio(audio: HTMLAudioElement, handlers: { onEnded: () => void; onError: () => void }): void {
+  audio.onended = handlers.onEnded
+  audio.onerror = handlers.onError
+}
