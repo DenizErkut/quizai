@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-type RecognitionEvent = { results: ArrayLike<{ 0: { transcript: string } }> }
+type RecognitionEvent = { results: ArrayLike<{ 0: { transcript: string; confidence?: number }; isFinal?: boolean }> }
 type RecognitionErrorEvent = { error: string }
 type Recognition = {
   lang: string
@@ -10,6 +10,8 @@ type Recognition = {
   interimResults: boolean
   maxAlternatives: number
   onstart: (() => void) | null
+  onaudiostart?: (() => void) | null
+  onspeechstart?: (() => void) | null
   onend: (() => void) | null
   onerror: ((event: RecognitionErrorEvent) => void) | null
   onresult: ((event: RecognitionEvent) => void) | null
