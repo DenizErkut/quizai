@@ -244,6 +244,8 @@ export default function CoachMascot() {
     if (command?.type === 'stop') { audioRef.current?.pause(); setSpeakingId(null); return }
     if (command?.type === 'repeat') { const last = [...messages].reverse().find(m => m.role === 'assistant' && m.id); if (last?.id) void speak(last.id); return }
     if (command?.type === 'clear') { setInput(''); return }
+    // Kısa (1-2 kelime) duyulan metin yanlış anlaşılmış olabilir: göndermeden kutuya yazılır, kullanıcı tamamlayıp gönderir.
+    if (spoken.trim().split(/\s+/).length < 3) { setInput(prev => `${prev ? `${prev} ` : ''}${spoken}`.trim()); return }
     void send(spoken)
   }
 
