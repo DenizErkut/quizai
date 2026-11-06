@@ -16,6 +16,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/i18n/I18nProvider'
 import VoiceMicButton from '@/components/VoiceMicButton'
+import { primeAudio, loadAudio, bindAudio } from '@/lib/coach-audio'
 import { matchVoiceCommand } from '@/lib/voice-commands'
 
 interface CoachAction {
@@ -48,6 +49,8 @@ export default function PratiumKocPage() {
   const [speakingId, setSpeakingId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const loadedIdRef = useRef<string | null>(null)
+  const urlRef = useRef<string | null>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -58,24 +61,37 @@ export default function PratiumKocPage() {
   async function speak(messageId?: string) {
     if (!messageId) return
     if (speakingId === messageId) { audioRef.current?.pause(); setSpeakingId(null); return }
+    // Dokunuş anında (await'ten önce) <audio> öğesinin kilidi açılır — iPhone'da ses ancak böyle çalar.
+    const prepared = loadedIdRef.current === messageId && audioRef.current?.src && !audioRef.current.src.startsWith('data:')
+    const audio = prepared ? audioRef.current! : primeAudio(audioRef)
     setError('')
     setSpeakingId(messageId)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const response = await fetch('/api/coach/speech', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ messageId }),
-      })
-      if (!response.ok) throw new Error('speech_failed')
-      const url = URL.createObjectURL(await response.blob())
-      audioRef.current?.pause()
-      const audio = new Audio(url)
-      audioRef.current = audio
-      audio.onended = () => { URL.revokeObjectURL(url); setSpeakingId(null) }
-      audio.onerror = () => { URL.revokeObjectURL(url); setSpeakingId(null); setError(t('Ses oynatılamadı.')) }
+      if (!prepared) {
+        const { data: { session } } = await supabase.auth.getSession()
+        const response = await fetch('/api/coach/speech', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ messageId }),
+        })
+        if (!response.ok) {
+          const info = await response.json().catch(() => null)
+          setSpeakingId(null); setError(info?.error || t('Koçun sesi şu anda hazırlanamadı.')); return
+        }
+        const url = URL.createObjectURL(await response.blob())
+        if (urlRef.current) URL.revokeObjectURL(urlRef.current)
+        urlRef.current = url
+        loadedIdRef.current = messageId
+        loadAudio(audio, url, { onEnded: () => setSpeakingId(null), onError: () => { setSpeakingId(null); setError(t('Ses oynatılamadı.')) } })
+      } else {
+        bindAudio(audio, { onEnded: () => setSpeakingId(null), onError: () => { setSpeakingId(null); setError(t('Ses oynatılamadı.')) } })
+      }
       await audio.play()
-    } catch { setSpeakingId(null); setError(t('Koçun sesi şu anda hazırlanamadı.')) }
+    } catch (cause) {
+      setSpeakingId(null)
+      // Ses hazır ama tarayıcı oynatmayı engellediyse: bir sonraki dokunuşta yeniden indirmeden çalınır.
+      setError(cause instanceof DOMException && cause.name === 'NotAllowedError' ? t('Ses hazır ama tarayıcı oynatmayı engelledi. “Koçu dinle”ye bir kez daha dokun.') : t('Koçun sesi şu anda hazırlanamadı.'))
+    }
   }
 
   useEffect(() => {
