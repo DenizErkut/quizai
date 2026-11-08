@@ -8,6 +8,7 @@ import { gateTeacherFeature } from '@/lib/teacher-access'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { logAnthropicUsage } from '@/lib/ai-usage'
+import { hasOptions } from '@/lib/quiz-print'
 
 export const maxDuration = 120
 export const runtime = 'nodejs'
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
         || images.reduce((sum, image) => sum + image.data.length, 0) > MAX_BASE64_CHARS) {
         return NextResponse.json({ error: '1-3 adet JPEG/PNG görsel yükleyin.' }, { status: 400 })
       }
-      const optionCounts = questions.map((question, index) => `${index + 1}: ${Array.isArray(question.opts) ? Math.min(question.opts.length, LETTERS.length) : 0} şık`).join(', ')
+      const optionCounts = questions.map((question, index) => `${index + 1}: ${hasOptions(question) ? Math.min((question.opts as string[]).length, LETTERS.length) : 0} şık`).join(', ')
       const response = await anthropic.messages.create({
         model: CLAUDE_SONNET, ...SONNET_PARAMS, max_tokens: sonnetTokens(2000),
         messages: [{ role: 'user', content: [
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
         const item = found.find(entry => Number(entry?.question) === index + 1)
         const letter = typeof item?.choice === 'string' ? item.choice.trim().toUpperCase() : ''
         const choice = LETTERS.indexOf(letter)
-        const max = Array.isArray(question.opts) ? Math.min(question.opts.length, LETTERS.length) : 0
+        const max = hasOptions(question) ? Math.min((question.opts as string[]).length, LETTERS.length) : 0
         return { index, choice: choice >= 0 && choice < max ? choice : -1, uncertain: item?.uncertain === true || (letter !== '' && (choice < 0 || choice >= max)) }
       })
       return NextResponse.json({ answers })
@@ -77,11 +78,12 @@ export async function POST(req: NextRequest) {
       const choices: number[] = Array.isArray(body.choices) ? body.choices.map((value: unknown) => Number.isInteger(value) ? Number(value) : -1) : []
       const answers = questions.map((question, index) => {
         const userAns = choices[index] ?? -1
-        const scoreable = Array.isArray(question.opts) && typeof question.ans === 'number'
+        const scoreable = hasOptions(question) && typeof question.ans === 'number'
         return { userAns, correct: scoreable && userAns === question.ans }
       })
       const score = answers.filter(answer => answer.correct).length
-      const pct = Math.round((score / questions.length) * 100)
+      const scoreableCount = Math.max(1, questions.filter(question => hasOptions(question) && typeof question.ans === 'number').length)
+      const pct = Math.round((score / scoreableCount) * 100)
       const sessionId = crypto.randomUUID()
       const { error: sessionError } = await supabase.from('quiz_sessions').insert({
         id: sessionId, user_id: body.student_id, topic: assignment.topic, grade: assignment.grade || null, language: 'tr',
@@ -101,7 +103,7 @@ export async function POST(req: NextRequest) {
         answers: enriched, completed_at: new Date().toISOString(),
       }, { onConflict: 'assignment_id,student_id' })
       if (completionError) { console.error('[import-quiz-paper] tamamlama', completionError.message); return NextResponse.json({ error: 'Ödev tamamlama kaydı yazılamadı.' }, { status: 500 }) }
-      return NextResponse.json({ score, total: questions.length, pct })
+      return NextResponse.json({ score, total: scoreableCount, pct })
     }
 
     return NextResponse.json({ error: 'Geçersiz işlem.' }, { status: 400 })

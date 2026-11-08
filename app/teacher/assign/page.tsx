@@ -416,7 +416,7 @@ export default function TeacherAssignPage() {
       if (Array.isArray(a.pool_questions) && a.pool_questions.length) {
         const { printLearningDocument, questionPrintHtml, answerKeyHtml } = await import('@/lib/learning-print')
         const classroomName = classrooms.find(c => c.id === a.classroom_id)?.name || ''
-        await printLearningDocument(a.title, `${classroomName} · ${a.pool_questions.length} soru · Ad Soyad: ..............................`, questionPrintHtml(a.pool_questions) + (withKey ? answerKeyHtml(a.pool_questions) : ''))
+        await printLearningDocument(a.title, `${classroomName} · ${a.pool_questions.length} soru`, questionPrintHtml(a.pool_questions) + (withKey ? answerKeyHtml(a.pool_questions) : ''))
         setPrintMessage('')
         return
       }
@@ -440,7 +440,7 @@ export default function TeacherAssignPage() {
         return
       }
       const { printLearningDocument, questionPrintHtml, answerKeyHtml } = await import('@/lib/learning-print')
-      await printLearningDocument(a.title, `${classroom?.name || ''} · ${data.questions.length} soru · Ad Soyad: ..............................`, questionPrintHtml(data.questions) + (withKey ? answerKeyHtml(data.questions) : ''))
+      await printLearningDocument(a.title, `${classroom?.name || ''} · ${data.questions.length} soru`, questionPrintHtml(data.questions) + (withKey ? answerKeyHtml(data.questions) : ''))
       setPrintMessage('')
     } catch (e) { setPrintMessage(e?.message || tr('Test hazırlanamadı.')) }
     finally { setPrintBusy('') }

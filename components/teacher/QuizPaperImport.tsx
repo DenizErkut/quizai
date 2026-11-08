@@ -4,9 +4,9 @@ import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { compressImage } from '@/lib/image-compress'
 import { decodeQrFromFile } from '@/lib/qr-decode'
-import { parseQuizQr } from '@/lib/quiz-print'
+import { parseQuizQr, hasOptions } from '@/lib/quiz-print'
 
-type QuizQuestion = { q?: string; opts?: string[]; ans?: number }
+type QuizQuestion = { q?: string; opts?: string[]; ans?: number; type?: string }
 type Assignment = { id: string; classroom_id: string; title: string; pool_questions?: QuizQuestion[] }
 type Student = { id: string; schoolNo: string | null; fullName: string; classroomId?: string }
 type Image = { mediaType: 'image/jpeg'; data: string }
@@ -146,7 +146,7 @@ export default function QuizPaperImport({ assignment, onClose }: { assignment: A
           )}
           {entry.answers && entry.status !== 'saved' && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 6, marginTop: 6 }}>
-              {entry.answers.map((a, i) => (
+              {entry.answers.map((a, i) => !hasOptions(questions[i] || {}) ? null : (
                 <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: a.uncertain ? 'var(--amber, #b45309)' : 'inherit' }}>
                   <b>{i + 1}.</b>
                   <select value={a.choice} aria-label={t('Soru {n} cevabı', { n: i + 1 })}
