@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { turkishOpenEndedPrompt } from '@/lib/turkish-question-rules'
 import { gateTeacherFeature, recordTeacherUsage } from '@/lib/teacher-access'
+import { addToAusPool } from '@/lib/aus-pool'
 export const maxDuration = 60
 export const runtime = 'nodejs'
 import { generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
@@ -259,6 +260,7 @@ export async function POST(req: NextRequest) {
         console.error('[create-open-ended] toplu kayıt hatası:', batchError)
         return NextResponse.json({ error: 'Ödevler kaydedilemedi.' }, { status: 500 })
       }
+      for (const row of createdBatch) await addToAusPool(supabase, { source: 'teacher_assignment', sourceRef: row.id, grade: row.grade, subject: row.subject, topic: row.topic, scenario: row.scenario, question: row.question, rubric: row.rubric })
       return NextResponse.json({ assignments: createdBatch })
     }
 
@@ -353,6 +355,7 @@ Bu içerik, belirtilen seviyedeki öğrencilere gösterilmeye uygun mu? Sadece �
       return NextResponse.json({ error: 'Ödev kaydedilemedi.' }, { status: 500 })
     }
 
+    await addToAusPool(supabase, { source: 'teacher_assignment', sourceRef: created.id, grade: created.grade, subject: created.subject, topic: created.topic, scenario: created.scenario, question: created.question, rubric: created.rubric })
     return NextResponse.json({ assignment: created })
   } catch (e) {
     console.error('[create-open-ended]', e?.message)

@@ -207,6 +207,7 @@ export default function TeacherDashboard() {
           { key: 'invite', label: tr('🔗 DAVET KODU'), group: 'a' },
           { key: 'assign', label: tr('📝 Ödev Ata'), group: 'b' },
           { key: 'live', label: tr('🎯 Canlı Test'), href: '/teacher/live', group: 'b' },
+          { key: 'aus-pool', label: tr('🧩 AUS soruları'), href: '/teacher/aus-pool', group: 'b' },
           { key: 'performance', label: tr('📈 Analiz'), group: 'c' },
           { key: 'reports', label: tr('📋 RAPORLAR'), href: '/teacher/reports', group: 'c' },
           { key: 'import', label: tr('📥 Not İçe Aktar'), href: '/teacher/import-grades', group: 'c' },
