@@ -244,7 +244,7 @@ test('open-ended grading accepts age-appropriate concise student language', () =
   expect(generate).toContain('Ortaokul için 1-3 kısa ve açık cümle')
   expect(teacher).toContain('YAŞA UYGUN CEVAP STANDARDI — ZORUNLU')
   expect(grade).toContain('YAŞA UYGUN PUANLAMA KURALI — EN ÖNCELİKLİ KURAL')
-  expect(grade).toContain("gradeKey.includes('lise') ? 20 : 12")
+  expect(grade).toContain("gradeKey.includes('ilkokul') ? 8 : 10")
   expect(grade).not.toContain('en az 50 karakter olmalı')
   expect(grade).toContain('teknik sözcükleri birebir kullanma şartı arama')
 })
