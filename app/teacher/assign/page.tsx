@@ -674,6 +674,7 @@ export default function TeacherAssignPage() {
                 {tr('📚 Soruları havuzdan çek')}
                 <span style={{ fontWeight: 400, fontSize: '11px', color: 'var(--text3)' }}>{tr('Onaylı soru havuzundan gelir, yapay zeka kullanılmaz')}</span>
               </label>
+              <div style={{ fontSize: '11px', color: 'var(--text3)', lineHeight: 1.5 }}>{tr('👁️ Görsel kuralı zorunludur: sayısal derslerde en az %30 (yeni nesil %50), sözel derslerde yaklaşık %10 soru gerçek görsel içerir. Havuzda yeterli görselli soru yoksa ödev oluşturulmaz.')}</div>
               {quizPoolError && <div role="alert" style={{ padding: '10px 12px', background: 'var(--red-bg)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)' }}>{quizPoolError}</div>}
               <div style={{ marginTop: '6px' }}>
                 <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>
