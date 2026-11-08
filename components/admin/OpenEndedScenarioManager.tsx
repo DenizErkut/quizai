@@ -23,6 +23,7 @@ export default function OpenEndedScenarioManager() {
   const [form, setForm] = useState<Form | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
   const [pdfOpen, setPdfOpen] = useState(false)
   const [pdfMeta, setPdfMeta] = useState({ gradeNumber: 7, subject: 'Matematik', term: 1, startNo: 1 })
   const [pdfFile, setPdfFile] = useState<File | null>(null)
@@ -190,8 +191,12 @@ export default function OpenEndedScenarioManager() {
       <div style={{ display: 'grid', gap: 10 }}>
         {[...groups.entries()].map(([key, list]) => (
           <div key={key} className="card" style={{ padding: '10px 14px' }}>
-            <div style={{ fontWeight: 800, marginBottom: 6 }}>{key} <span style={{ fontWeight: 500, fontSize: 12, color: 'var(--text2)' }}>({list.length} soru)</span></div>
-            {list.map(e => (
+            <button type="button" aria-expanded={!!openGroups[key]} onClick={() => setOpenGroups(prev => ({ ...prev, [key]: !prev[key] }))}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: '4px 0', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-sans)', color: 'inherit' }}>
+              <span style={{ flex: 1, fontWeight: 800 }}>{key} <span style={{ fontWeight: 500, fontSize: 12, color: 'var(--text2)' }}>({list.length} soru · {list.filter(e => e.status === 'published').length} yayında)</span></span>
+              <span aria-hidden style={{ fontSize: 12, color: 'var(--text3)' }}>{openGroups[key] ? '▲' : '▼'}</span>
+            </button>
+            {openGroups[key] && list.map(e => (
               <div key={e.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid var(--border)', padding: '6px 0' }}>
                 <div style={{ flex: 1, minWidth: 220, fontSize: 13 }}><b>{e.seq || 1}.</b> {e.title || e.scenario.slice(0, 90)}{!e.title && e.scenario.length > 90 ? '…' : ''}</div>
                 <span style={{ fontSize: 12, fontWeight: 700, color: e.status === 'published' ? '#0a9e90' : 'var(--text2)' }}>{e.status === 'published' ? 'Yayında' : 'Taslak'}</span>
