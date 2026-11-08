@@ -56,6 +56,7 @@ export default function AcikUcluPage() {
   const [assignedList, setAssignedList] = useState<any[]>([])
   const [assignedLoading, setAssignedLoading] = useState(true)
   const [assignedOpen, setAssignedOpen] = useState(false)
+  const [doneOpen, setDoneOpen] = useState(false)
   const [startingId, setStartingId] = useState('')
 
   // Yöneticinin örneklerine dayanan senaryo kartları (dönem + senaryo no)
@@ -487,10 +488,12 @@ export default function AcikUcluPage() {
         {/* Daha önce çözülmüş (tamamlanmış) AUS ödevleri — Serbest Pratik'in ALTINDA */}
         {step === 'setup' && !assignedLoading && assignedList.some((a) => a.completed) && (
           <div style={{ marginTop: '1.25rem' }}>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text2)', marginBottom: '8px' }}>
-              {t('✅ Tamamlanan Ödevler')}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button type="button" aria-expanded={doneOpen} onClick={() => setDoneOpen(o => !o)}
+              style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', padding: '12px 16px', marginBottom: '8px', borderRadius: '10px', border: 'none', background: 'var(--green)', color: '#fff', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: '14px', fontWeight: 800, textAlign: 'left', boxShadow: '0 3px 10px rgba(22,163,74,.35)' }}>
+              <span>{t('✅ Tamamlanan Ödevler')} ({assignedList.filter((a) => a.completed).length})</span>
+              <span aria-hidden="true">{doneOpen ? '▲' : '▼'}</span>
+            </button>
+            {doneOpen && <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {assignedList.filter((a) => a.completed).map((a) => (
                 <div key={a.id} className="card" style={{ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', borderLeft: '3px solid var(--green)' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -506,7 +509,7 @@ export default function AcikUcluPage() {
                   </div>
                 </div>
               ))}
-            </div>
+            </div>}
           </div>
         )}
 
