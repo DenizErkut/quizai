@@ -4,6 +4,7 @@ import type { Entry } from './types'
 export const studentSchoolEntries: Entry[] = [
   ['📝 Ödevlerim', '📝 My homework', '📝 Meine Hausaufgaben', '📝 Mes devoirs', '📝 Mis tareas', '📝 واجباتي'],
   ['Henüz bir sınıfa katılmadın', 'You haven’t joined a class yet', 'Du bist noch keiner Klasse beigetreten', 'Tu n’as pas encore rejoint de classe', 'Todavía no te has unido a ninguna clase', 'لم تنضم إلى أي صف بعد'],
+  ['Otomatik (adaptif)', 'Automatic (adaptive)', 'Automatisch (adaptiv)', 'Automatique (adaptatif)', 'Automático (adaptativo)', 'تلقائي (تكيّفي)'],
   ['📋 Aktif Ödevler ({n})', '📋 Active homework ({n})', '📋 Aktive Hausaufgaben ({n})', '📋 Devoirs en cours ({n})', '📋 Tareas activas ({n})', '📋 الواجبات النشطة ({n})'],
   ['✅ Tamamlananlar ({n})', '✅ Completed ({n})', '✅ Abgeschlossen ({n})', '✅ Terminés ({n})', '✅ Completadas ({n})', '✅ المكتملة ({n})'],
   ['Aktif ödevin yok!', 'You have no active homework!', 'Du hast keine aktiven Hausaufgaben!', 'Tu n’as aucun devoir en cours !', '¡No tienes tareas activas!', 'ليس لديك واجبات نشطة!'],

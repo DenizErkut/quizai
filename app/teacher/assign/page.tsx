@@ -21,6 +21,7 @@ function gradeLabel(grade: string | null | undefined): string {
 }
 
 const DIFFICULTIES = [
+  { value: 'adaptive', label: '🎯 Otomatik (adaptif): %10 kolay · %60 normal · %20 zor · %10 çok zor' },
   { value: 'kolay', label: 'Kolay' },
   { value: 'normal', label: 'Normal' },
   { value: 'zor', label: 'Zor' },
@@ -47,7 +48,7 @@ export default function TeacherAssignPage() {
     title: '',
     topic: '',
     grade: '',
-    difficulty: 'normal',
+    difficulty: 'adaptive',
     question_count: 10,
     due_date: '',
     question_type: 'multiple_choice',
@@ -155,7 +156,7 @@ export default function TeacherAssignPage() {
       const poolRes = await fetch('/api/teacher/quiz-pool', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ grade: form.grade, topic: form.topic.trim(), count: form.question_count, questionType: form.question_type }),
+        body: JSON.stringify({ grade: form.grade, topic: form.topic.trim(), count: form.question_count, questionType: form.question_type, difficulty: form.difficulty }),
       })
       const poolData = await poolRes.json().catch(() => null)
       if (!poolRes.ok || !Array.isArray(poolData?.questions)) { setQuizPoolError(poolData?.error || tr('Havuzdan soru getirilemedi.')); setSaving(false); return }
@@ -171,22 +172,29 @@ export default function TeacherAssignPage() {
       finalTopic = assignFileContent.slice(0, 3000)
     }
 
-    const { data } = await supabase.from('assignments').insert({
+    const { data, error: insertError } = await supabase.from('assignments').insert({
       classroom_id: form.classroom_id,
       teacher_id: teacher.id,
       title: form.title.trim(),
       topic: finalTopic,
       grade: form.grade,
       difficulty: form.difficulty,
+      question_type: form.question_type,
+      source_type: form.source_type,
       question_count: poolQuestions ? poolQuestions.length : form.question_count,
       due_date: form.due_date || null,
       ...(poolQuestions ? { pool_questions: poolQuestions } : {}),
-    }).select('*, classrooms(name)').single()
+    }).select('*, classrooms(name), assignment_completions(count)').single()
 
     setSaving(false)
+    if (insertError || !data) {
+      console.error('[createAssignment]', insertError)
+      setQuizPoolError(tr('Ödev kaydedilemedi: {msg}', { msg: insertError?.message || tr('bilinmeyen hata') }))
+      return
+    }
     setShowForm(false)
     setForm(p => ({ ...p, title: '', topic: '', due_date: '' }))
-    if (data) setAssignments(prev => [data, ...prev])
+    setAssignments(prev => [data, ...prev])
   }
 
   async function deleteAssignment(id: string) {

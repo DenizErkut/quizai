@@ -36,7 +36,7 @@ export default function StudentAssignmentsPage() {
     // Assignments for my classrooms
     const { data: asgn } = await supabase
       .from('assignments')
-      .select('*')
+      .select('id, classroom_id, title, topic, grade, difficulty, question_count, question_type, due_date, created_at')
       .in('classroom_id', classroomIds)
       .order('created_at', { ascending: false })
 
@@ -123,7 +123,7 @@ export default function StudentAssignmentsPage() {
                         <span>📚 {a.topic}</span>
                         <span>🏫 {a.classrooms?.name}</span>
                         <span>{t('❓ {n} soru', { n: a.question_count })}</span>
-                        <span>⚡ {({ kolay: t('Kolay'), normal: t('Normal'), zor: t('Zor'), 'cok zor': t('Çok Zor') } as Record<string, string>)[a.difficulty] || a.difficulty}</span>
+                        <span>⚡ {({ kolay: t('Kolay'), normal: t('Normal'), zor: t('Zor'), 'cok zor': t('Çok Zor'), adaptive: t('Otomatik (adaptif)') } as Record<string, string>)[a.difficulty] || a.difficulty}</span>
                         <span>{t(({'multiple_choice':'🔤 Çoktan Seçmeli','fill_blank':'✏️ Boşluk Doldurma','true_false':'✓✗ D/Y','multi_true_false':'📋✓✗ Çoklu D/Y','table_fill':'🗂️ Tablo Doldurma','matching':'🔗 Eşleştirme','ordering':'📋 Sıralama','short_answer':'💬 Kısa Cevap','mixed':'🎲 Karma'} as any)[a.question_type] || '🔤 Çoktan Seçmeli')}</span>
                         {a.due_date && (
                           <span style={{ color: isOverdue(a.due_date) ? 'var(--red)' : 'var(--text3)', fontWeight: isOverdue(a.due_date) ? 700 : 400 }}>
@@ -134,7 +134,7 @@ export default function StudentAssignmentsPage() {
                     </div>
                   </div>
                   <Link
-                    href={`/quiz?assignment=${a.id}&topic=${encodeURIComponent(a.topic)}&count=${a.question_count}&difficulty=${a.difficulty}&type=${a.question_type || 'multiple_choice'}`}
+                    href={`/quiz?assignment=${a.id}&topic=${encodeURIComponent(a.topic)}&count=${a.question_count}&difficulty=${a.difficulty === 'adaptive' ? 'normal' : a.difficulty}&type=${a.question_type || 'multiple_choice'}`}
                     className="btn btn-primary"
                     style={{ width: '100%', justifyContent: 'center', display: 'flex' }}>
                     {t('⚡ Ödevi Çöz')}
