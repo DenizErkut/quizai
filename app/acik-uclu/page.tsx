@@ -298,7 +298,7 @@ export default function AcikUcluPage() {
     const finalAnswer = table ? `${serializeTableAnswer(table, tableValues)}${answer.trim() ? `\nAçıklama: ${answer.trim()}` : ''}` : answer
     const trimmed = answer.trim()
     if (!table && !trimmed) { setError(t('Cevabını yazmadan gönderemezsin.')); return }
-    if (!table && trimmed.length < 50) { setError(t('Cevabın çok kısa — en az 50 karakter yazmalısın (şu an {n}).', { n: trimmed.length })); return }
+    if (!table && trimmed.length < 10) { setError(t('Cevabın çok kısa — en az 10 karakter yazmalısın (şu an {n}).', { n: trimmed.length })); return }
     setGrading(true)
     setError('')
     try {
@@ -590,8 +590,8 @@ export default function AcikUcluPage() {
               <textarea className="input" rows={tableText ? 3 : 8} value={answer} onChange={e => setAnswer(e.target.value)}
                 placeholder={tableText ? t('Açıklaman varsa yaz (isteğe bağlı)…') : t('Kendi cümlelerinle, düşüncelerini gerekçelendirerek yaz…')}
                 style={{ marginTop: '8px', marginBottom: '4px', resize: 'vertical', borderRadius: '4px' }} />
-              <div style={{ fontSize: '11px', color: answer.trim().length >= 50 ? 'var(--green)' : 'var(--text3)', marginBottom: '1rem', textAlign: 'right' }}>
-                {t('{n} / 50 karakter', { n: answer.trim().length })} {answer.trim().length >= 50 ? '✓' : ''}
+              <div style={{ fontSize: '11px', color: answer.trim().length >= 10 ? 'var(--green)' : 'var(--text3)', marginBottom: '1rem', textAlign: 'right' }}>
+                {t('{n} / 10 karakter', { n: answer.trim().length })} {answer.trim().length >= 10 ? '✓' : ''}
               </div>
               <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}
                 onClick={submitAnswer} disabled={grading}>

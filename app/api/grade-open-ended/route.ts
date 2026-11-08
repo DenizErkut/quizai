@@ -42,11 +42,11 @@ export async function POST(req: NextRequest) {
 
     if (fetchErr || !session) return NextResponse.json({ error: 'Soru bulunamadı.' }, { status: 404 })
 
-    // Ortaokul öğrencisinin tek ve doğru bir cümlesini sırf 50 karakteri
+    // Ortaokul öğrencisinin tek ve doğru bir cümlesini sırf birkaç karakteri
     // geçmediği için reddetme. Alt sınır yalnızca boş/anlamsız gönderimleri
     // ayırır; asıl yeterlilik aşağıdaki yaşa uygun rubrikle değerlendirilir.
     const gradeKey = String(session.grade || '').toLocaleLowerCase('tr')
-    const minimumAnswerLength = gradeKey.includes('ilkokul') ? 8 : gradeKey.includes('lise') ? 20 : 12
+    const minimumAnswerLength = gradeKey.includes('ilkokul') ? 8 : 10
     if (studentAnswer.trim().length < minimumAnswerLength) {
       return NextResponse.json({ error: `Cevabını biraz daha açık yazmalısın — en az ${minimumAnswerLength} karakter olmalı.` }, { status: 400 })
     }
