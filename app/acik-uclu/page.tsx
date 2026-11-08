@@ -55,6 +55,7 @@ export default function AcikUcluPage() {
   // Öğretmen tarafından atanmış açık uçlu ödevler
   const [assignedList, setAssignedList] = useState<any[]>([])
   const [assignedLoading, setAssignedLoading] = useState(true)
+  const [assignedOpen, setAssignedOpen] = useState(false)
   const [startingId, setStartingId] = useState('')
 
   // Yöneticinin örneklerine dayanan senaryo kartları (dönem + senaryo no)
@@ -425,10 +426,12 @@ export default function AcikUcluPage() {
         {/* Öğretmen tarafından atanmış, HENÜZ ÇÖZÜLMEMİŞ ödevler */}
         {step === 'setup' && !assignedLoading && assignedList.some((a) => !a.completed) && (
           <div style={{ marginBottom: '1.25rem' }}>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>
-              {t('📋 Sana Atanan Ödevler')}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button type="button" aria-expanded={assignedOpen} onClick={() => setAssignedOpen(o => !o)}
+              style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 8px', fontFamily: 'var(--font-sans)', fontSize: '13px', fontWeight: 700, color: 'var(--primary)', textAlign: 'left' }}>
+              <span>{t('📋 Sana Atanan Ödevler')} ({assignedList.filter((a) => !a.completed).length})</span>
+              <span aria-hidden="true">{assignedOpen ? '▲' : '▼'}</span>
+            </button>
+            {assignedOpen && <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {assignedList.filter((a) => !a.completed).map((a) => {
                 const isOverdue = a.due_date && new Date(a.due_date) < new Date()
                 return (
@@ -448,7 +451,7 @@ export default function AcikUcluPage() {
                   </div>
                 )
               })}
-            </div>
+            </div>}
           </div>
         )}
 
