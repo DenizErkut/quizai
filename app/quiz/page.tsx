@@ -482,6 +482,7 @@ function QuizPageContent() {
             questionType: qtype,
             subject: selectedSubject || undefined,
             unit: topicDecoded || undefined,
+            assignmentId: asgId,
           }),
         })
         const data = await res.json()
