@@ -73,6 +73,8 @@ export default function TeacherAssignPage() {
   const [oeUsedMeb, setOeUsedMeb] = useState(false) // uretim gercek MEB kaynagina mi dayandi
   const [oeCount, setOeCount] = useState(1) // ayni konuda kac farkli soru uretilecek
   const [oeItems, setOeItems] = useState<{ scenario: string; question: string; rubric: { criterion: string; maxPoints: number; description: string }[]; figureSvg?: string | null; answerTable?: string | null }[] | null>(null)
+  const [quizPool, setQuizPool] = useState(false) // test/quiz soruları onaylı soru bankasından çekilsin
+  const [quizPoolError, setQuizPoolError] = useState('')
   const [oePool, setOePool] = useState(false) // sorular onaylı soru havuzundan çekilsin
   const [oePoolNote, setOePoolNote] = useState('')
   const [oeExtra, setOeExtra] = useState<{ figureSvg: string | null; answerTable: string | null }>({ figureSvg: null, answerTable: null })
@@ -142,7 +144,23 @@ export default function TeacherAssignPage() {
 
   async function createAssignment() {
     if (!form.classroom_id || !form.title.trim() || !form.topic.trim()) return
+    setQuizPoolError('')
     setSaving(true)
+
+    // Havuzdan çek: sorular onaylı soru bankasından seçilip ödevde dondurulur (yapay zekâ kullanılmaz).
+    let poolQuestions: unknown[] | null = null
+    if (quizPool) {
+      if (!form.grade) { setQuizPoolError(tr('Havuzdan çekmek için sınıf seviyesini seçmelisin.')); setSaving(false); return }
+      const { data: { session } } = await supabase.auth.getSession()
+      const poolRes = await fetch('/api/teacher/quiz-pool', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ grade: form.grade, topic: form.topic.trim(), count: form.question_count, questionType: form.question_type }),
+      })
+      const poolData = await poolRes.json().catch(() => null)
+      if (!poolRes.ok || !Array.isArray(poolData?.questions)) { setQuizPoolError(poolData?.error || tr('Havuzdan soru getirilemedi.')); setSaving(false); return }
+      poolQuestions = poolData.questions
+    }
 
     // PDF/dosya içeriği varsa konuya ekle
     let finalTopic = form.topic.trim()
@@ -160,8 +178,9 @@ export default function TeacherAssignPage() {
       topic: finalTopic,
       grade: form.grade,
       difficulty: form.difficulty,
-      question_count: form.question_count,
+      question_count: poolQuestions ? poolQuestions.length : form.question_count,
       due_date: form.due_date || null,
+      ...(poolQuestions ? { pool_questions: poolQuestions } : {}),
     }).select('*, classrooms(name)').single()
 
     setSaving(false)
@@ -581,6 +600,12 @@ export default function TeacherAssignPage() {
                 onChange={e => setForm(p => ({ ...p, title: e.target.value }))} style={inputStyle} />
               <input placeholder={tr('Konu (AI buna göre soru üretir)')} value={form.topic}
                 onChange={e => setForm(p => ({ ...p, topic: e.target.value }))} style={inputStyle} />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 700, color: 'var(--primary)', cursor: 'pointer', padding: '10px 12px', border: `1.5px solid ${quizPool ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '10px', background: quizPool ? 'var(--accent-bg)' : 'transparent' }}>
+                <input type="checkbox" checked={quizPool} onChange={e => setQuizPool(e.target.checked)} style={{ width: 18, height: 18 }} />
+                {tr('📚 Soruları havuzdan çek')}
+                <span style={{ fontWeight: 400, fontSize: '11px', color: 'var(--text3)' }}>{tr('Onaylı soru havuzundan gelir, yapay zeka kullanılmaz')}</span>
+              </label>
+              {quizPoolError && <div role="alert" style={{ padding: '10px 12px', background: 'var(--red-bg)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)' }}>{quizPoolError}</div>}
               <div style={{ marginTop: '6px' }}>
                 <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>
                   {tr('Veya dosyadan soru üret (PDF, DOCX, JPG, PNG)')}

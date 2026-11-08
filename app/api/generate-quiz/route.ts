@@ -1591,6 +1591,28 @@ export async function POST(req: NextRequest) {
     // kullanıcı ve oturumla atomik olmayan bir sonradan eşleştirmeye ihtiyaç duymaz.
     usageSessionId = continueSessionId ? undefined : crypto.randomUUID()
 
+    // Öğretmenin "soruları havuzdan çek" ile dondurduğu ödev: sorular yapay zekâ üretimi olmadan, ödevdeki sabit setten gelir.
+    const poolAssignmentId = typeof body?.assignmentId === 'string' && /^[0-9a-f-]{36}$/i.test(body.assignmentId) ? body.assignmentId : ''
+    if (poolAssignmentId && !continueSessionId && usageSessionId) {
+      const { data: poolAssignment } = await supabase.from('assignments').select('id, classroom_id, topic, question_type, pool_questions').eq('id', poolAssignmentId).maybeSingle()
+      const poolQuestions = Array.isArray(poolAssignment?.pool_questions) ? poolAssignment.pool_questions : []
+      if (poolAssignment && poolQuestions.length > 0) {
+        const { data: member } = await supabase.from('classroom_students').select('student_id').eq('classroom_id', poolAssignment.classroom_id).eq('student_id', user.id).maybeSingle()
+        if (member) {
+          const { data: poolSession, error: poolSessionError } = await supabase.from('quiz_sessions').insert({
+            id: usageSessionId, user_id: user.id, topic: poolAssignment.topic, grade: profile.grade || null, language: 'tr',
+            question_count: poolQuestions.length, questions: poolQuestions, answers: [], score: 0, completed: false,
+            question_type: poolAssignment.question_type || 'mixed', gen_engine: 'assignment-pool-v1', gen_request_id: usageRequestId,
+          }).select('id').maybeSingle()
+          if (!poolSessionError && poolSession?.id) {
+            await supabase.from('profiles').update({ monthly_test_count: (profile.monthly_test_count || 0) + 1 }).eq('id', user.id)
+            return NextResponse.json({ questions: poolQuestions, sessionId: poolSession.id, resolvedDifficulty: difficulty, source: 'assignment-pool' })
+          }
+          console.warn(`[assignment-pool] session insert failed code=${poolSessionError?.code || 'unknown'}`)
+        }
+      }
+    }
+
     const grade = productionTestGrade(profile.grade || 'ortaokul 6. sinif', body.grade, forceProviderTest !== null || teacherPrint)
 
     if (!fileContent && !isInCurriculum(topic, plan, grade)) {
