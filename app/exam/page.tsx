@@ -6,6 +6,8 @@ import PageHeader from '@/components/PageHeader'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { languageFromLocale } from '@/lib/i18n/core'
+import { gradeNumberOf } from '@/lib/written-exam'
+import { examKeysForGrade } from '@/lib/exam-visibility'
 
 // ─── TIPLER ──────────────────────────────────────────────────────────────────
 interface Question {
@@ -408,6 +410,7 @@ export default function ExamPage() {
   }
 
   // SINAV SEÇİM
+  const visibleExamKeys = examKeysForGrade(gradeNumberOf(profile?.grade), Object.keys(EXAM_META))
   if (screen === 'select') return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: '80px' }}>
       <PageHeader title="Sınav Simülasyonu" subtitle="Gerçek sınav formatında pratik yap" icon="🎯" color="#6366f1" backHref="/quiz" backLabel="Teste dön" />
@@ -461,9 +464,14 @@ export default function ExamPage() {
           })()}
         </div>
 
+        {visibleExamKeys.length === 0 && (
+          <div className="card" style={{ padding: '1.25rem', textAlign: 'center', fontSize: '13px', color: 'var(--text2)' }}>
+            {tr('Sınav simülasyonları 6. sınıftan itibaren (LGS) ve 10. sınıftan itibaren (TYT, AYT, YDT) açılır.')}
+          </div>
+        )}
         {/* Sınav kartları — Gümüş'te seçilebilir; sunucu demo/1 soru sınırını zorunlu tutar. */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: '12px' }}>
-          {Object.entries(EXAM_META).map(([key, meta]) => {
+          {Object.entries(EXAM_META).filter(([key]) => visibleExamKeys.includes(key)).map(([key, meta]) => {
             const fmt = formats[key]
             const isSelected = selectedExam === key
             return (

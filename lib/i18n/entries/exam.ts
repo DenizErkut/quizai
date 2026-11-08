@@ -25,6 +25,7 @@ export const examEntries: Entry[] = [
   ['Gerçek soru sayısı ve süre', 'Real number of questions and duration', 'Echte Fragenanzahl und Dauer', 'Nombre de questions et durée réels', 'Número de preguntas y duración reales', 'العدد الحقيقي للأسئلة والمدة'],
   ['Tam sınav için bir plana geçmen gerekir', 'You need a plan for the full exam', 'Für die vollständige Prüfung brauchst du einen Tarif', 'Il te faut une offre pour l’examen complet', 'Necesitas un plan para el examen completo', 'تحتاج إلى باقة للامتحان الكامل'],
   ['+{n} bölüm', '+{n} sections', '+{n} Abschnitte', '+{n} sections', '+{n} secciones', '+{n} أقسام'],
+  ['Sınav simülasyonları 6. sınıftan itibaren (LGS) ve 10. sınıftan itibaren (TYT, AYT, YDT) açılır.', 'Exam simulations open from grade 6 (LGS) and from grade 10 (TYT, AYT, YDT).', 'Prüfungssimulationen sind ab Klasse 6 (LGS) und ab Klasse 10 (TYT, AYT, YDT) verfügbar.', 'Les simulations d’examen s’ouvrent à partir de la 6e année (LGS) et de la 10e année (TYT, AYT, YDT).', 'Los simulacros de examen se abren desde 6.º (LGS) y desde 10.º (TYT, AYT, YDT).', 'تُفتح محاكاة الامتحانات من الصف السادس (LGS) ومن الصف العاشر (TYT وAYT وYDT).'],
   ['AYT puan alanını seç', 'Choose the AYT score track', 'Wähle den AYT-Punktbereich', 'Choisis la filière de points AYT', 'Elige el área de puntuación de AYT', 'اختر مسار درجات AYT'],
   ['Sayısal', 'Quantitative', 'Quantitativ', 'Quantitatif', 'Cuantitativo', 'الكمي'],
   ['Eşit Ağırlık', 'Equal weight', 'Gleichgewichtet', 'Poids égal', 'Peso igual', 'الأوزان المتساوية'],
