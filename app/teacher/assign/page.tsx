@@ -390,7 +390,7 @@ export default function TeacherAssignPage() {
 
   // Basılı sınıf dökümü ve kâğıt aktarımı için ödevin SABİT soru seti gerekir: havuzdan çekilen ödevde zaten vardır;
   // diğerlerinde ilk basımda bir kez üretilir ve ödeve kaydedilir (öğrenciler de aynı seti çözer, kâğıtla çevrim içi aynı sorulara dayanır).
-  async function ensureQuizSet(a): Promise<any[] | null> {
+  async function ensureQuizSet(a): Promise<Array<Record<string, unknown>> | null> {
     if (Array.isArray(a.pool_questions) && a.pool_questions.length) return a.pool_questions
     const completionCount = a.assignment_completions?.[0]?.count || 0
     if (completionCount > 0 && !confirm(tr('Bu ödevi bazı öğrenciler zaten çözdü. Basılı döküm için soru seti sabitlenecek; devam edilsin mi?'))) return null
