@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   const { data: teacher } = await db.from('teachers').select('id, approved').eq('user_id', user.id).maybeSingle()
   if (!teacher?.approved) return NextResponse.json({ error: 'Onaylı öğretmen hesabı gerekir.' }, { status: 403 })
 
-  const body = await req.json().catch(() => null) as { grade?: string; topic?: string; count?: number; questionType?: string; difficulty?: string } | null
+  const body = await req.json().catch(() => null) as { grade?: string; topic?: string; count?: number; questionType?: string; questionTypes?: string[]; difficulty?: string } | null
   const gradeNo = String(body?.grade || '').match(/\d{1,2}/)?.[0]
   const topic = String(body?.topic || '').trim()
   const count = Math.min(30, Math.max(1, Math.trunc(Number(body?.count) || 10)))
@@ -25,18 +25,20 @@ export async function POST(req: NextRequest) {
   const tokens = questionBankKey(topic).split(' ').filter(word => word.length >= 4).map(word => word.slice(0, Math.max(4, word.length - 2)))
   if (!tokens.length) return NextResponse.json({ error: 'Konu en az 4 harfli bir sözcük içermeli.' }, { status: 400 })
 
-  let request = db.from('question_bank').select('id, question, topic_key, subject_key, difficulty')
+  const request = db.from('question_bank').select('id, question, topic_key, subject_key, difficulty')
     .eq('review_status', 'approved').eq('report_count', 0)
     .or(`grade_key.ilike.* ${gradeNo} sinif,grade_key.ilike.${gradeNo} sinif,grade_key.ilike.${gradeNo} sınıf,grade_key.ilike.* ${gradeNo} sınıf`)
     .or(tokens.map(word => `topic_key.ilike.*${word.replace(/[*%,()]/g, '')}*`).join(','))
     .limit(400)
-  const requestedType = String(body?.questionType || '')
   const requestedDifficulty = String(body?.difficulty || '')
-  if (requestedType && requestedType !== 'mixed') request = request.eq('question_type', requestedType)
+  // Soru tipleri: çoklu seçim (karma) ya da tek tip; 'mixed' = filtre yok. Sıralama ödevlerde kullanılmaz.
+  const ALLOWED_TYPES = ['multiple_choice', 'multi_true_false', 'table_fill', 'matching', 'fill_blank', 'true_false', 'short_answer']
+  const typeSet = new Set((Array.isArray(body?.questionTypes) && body.questionTypes.length ? body.questionTypes : [String(body?.questionType || '')]).filter(type => ALLOWED_TYPES.includes(type)))
   const { data, error } = await request
   if (error) return NextResponse.json({ error: 'Havuz okunamadı.' }, { status: 500 })
 
-  const usable = (data || []).filter(row => row.question && typeof row.question === 'object' && (row.question as { q?: unknown }).q)
+  const typeOf = (row: { question?: unknown }) => String((row.question as { type?: string } | null)?.type || 'multiple_choice')
+  const usable = (data || []).filter(row => row.question && typeof row.question === 'object' && (row.question as { q?: unknown }).q && typeOf(row) !== 'ordering' && (!typeSet.size || typeSet.has(typeOf(row))))
   const shuffle = <T,>(list: T[]) => list.map(row => [Math.random(), row] as const).sort((a, b) => a[0] - b[0]).map(item => item[1])
   // Zorluk: 'adaptive' → %10 kolay, %60 normal, %20 zor, %10 çok zor (eksik kalan düzeyler yakın düzeylerle tamamlanır); diğerleri → seçilen düzey önce.
   const LEVELS = ['kolay', 'normal', 'zor', 'cok zor']
@@ -57,10 +59,18 @@ export async function POST(req: NextRequest) {
     }, { status: 422 })
   }
   const pickByMix = (rows: typeof usable, n: number) => {
-    const byLevel = new Map<string, typeof usable>(LEVELS.map(level => [level, shuffle(rows.filter(row => String(row.difficulty || 'normal') === level))]))
+    // Seçilen tipler dengeli dağılsın: her düzeyin satırları tipler arasında sırayla dizilir.
+    const interleave = (list: typeof usable) => {
+      const queues = new Map<string, typeof usable>()
+      for (const row of shuffle(list)) queues.set(typeOf(row), [...(queues.get(typeOf(row)) || []), row])
+      const out: typeof usable = []
+      for (let more = true; more;) { more = false; for (const queue of queues.values()) { const item = queue.shift(); if (item) { out.push(item); more = true } } }
+      return out
+    }
+    const byLevel = new Map<string, typeof usable>(LEVELS.map(level => [level, interleave(rows.filter(row => String(row.difficulty || 'normal') === level))]))
     const out: typeof usable = []
     if (Object.keys(mix).length) for (const level of LEVELS) out.push(...(byLevel.get(level) || []).splice(0, Math.round((mix[level] || 0) * n)))
-    const rest = shuffle(LEVELS.flatMap(level => byLevel.get(level) || []))
+    const rest = interleave(LEVELS.flatMap(level => byLevel.get(level) || []))
     return [...out, ...rest].slice(0, n)
   }
   const chosenVisual = pickByMix(visualRows, visualTarget)

@@ -21,6 +21,33 @@ function gradeLabel(grade: string | null | undefined): string {
   return `${n <= 4 ? 'ilkokul' : n <= 8 ? 'ortaokul' : 'lise'} ${n}. sınıf`
 }
 
+// Ödevde seçilebilen soru tipleri (sıralama hariç); "Karma" hepsini seçer.
+const ASSIGN_QUESTION_TYPES = ['multiple_choice', 'multi_true_false', 'table_fill', 'matching', 'fill_blank', 'true_false', 'short_answer']
+const questionTypeField = (types: string[]) => types.length === 1 ? types[0] : 'mixed'
+
+// Birden fazla tip seçildiğinde (yapay zekâ üretimi) her tip için ayrı üretilip birleştirilir; soru seti ödevde sabitlenir.
+async function generateTypedQuizSet(token: string | undefined, params: { topic: string; fileContent?: string; title: string; subject?: string; grade: string; difficulty: string; count: number; types: string[] }): Promise<{ questions?: Array<Record<string, unknown>>; error?: string }> {
+  const perType = params.types.map((_, index) => Math.floor(params.count / params.types.length) + (index < params.count % params.types.length ? 1 : 0)).filter(Boolean)
+  const types = params.types.slice(0, perType.length)
+  const results = await Promise.all(types.map(async (type, index) => {
+    const res = await fetch('/api/generate-quiz', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        teacherPrint: true, topic: params.fileContent ? params.title : params.topic, ...(params.fileContent ? { fileContent: params.fileContent } : {}),
+        subject: params.subject, grade: params.grade, difficulty: params.difficulty === 'adaptive' ? 'normal' : params.difficulty,
+        questionCount: perType[index], questionType: type, includeVisuals: true, language: 'tr',
+      }),
+    })
+    const data = await res.json().catch(() => null)
+    return res.ok && Array.isArray(data?.questions) ? { questions: data.questions as Array<Record<string, unknown>> } : { error: String(data?.message || data?.error || 'Test hazırlanamadı.') }
+  }))
+  const failed = results.find(result => result.error)
+  if (failed) return { error: failed.error }
+  const questions = results.flatMap(result => result.questions || [])
+  return questions.length ? { questions: questions.map(q => [Math.random(), q] as const).sort((a, b) => a[0] - b[0]).map(item => item[1]) } : { error: 'Test hazırlanamadı.' }
+}
+
 const DIFFICULTIES = [
   { value: 'adaptive', label: '🎯 Otomatik (adaptif): %10 kolay · %60 normal · %20 zor · %10 çok zor' },
   { value: 'kolay', label: 'Kolay' },
@@ -53,6 +80,7 @@ export default function TeacherAssignPage() {
     question_count: 10,
     due_date: '',
     question_type: 'multiple_choice',
+    question_types: ['multiple_choice'] as string[], // çoklu seçim (karma); sıralama ödevlerde kullanılmaz
     source_type: 'generate', // 'generate' | 'from_file' | 'similar'
   })
 
@@ -158,7 +186,7 @@ export default function TeacherAssignPage() {
       const poolRes = await fetch('/api/teacher/quiz-pool', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ grade: form.grade, topic: form.topic.trim(), count: form.question_count, questionType: form.question_type, difficulty: form.difficulty }),
+        body: JSON.stringify({ grade: form.grade, topic: form.topic.trim(), count: form.question_count, questionType: questionTypeField(form.question_types), questionTypes: form.question_types, difficulty: form.difficulty }),
       })
       const poolData = await poolRes.json().catch(() => null)
       if (!poolRes.ok || !Array.isArray(poolData?.questions)) { setQuizPoolError(poolData?.error || tr('Havuzdan soru getirilemedi.')); setSaving(false); return }
@@ -174,6 +202,20 @@ export default function TeacherAssignPage() {
       finalTopic = assignFileContent.slice(0, 3000)
     }
 
+    // Karma (çoklu tip) yapay zekâ ödevi: seçilen tiplerin tamamı için soru seti şimdi üretilip ödevde sabitlenir.
+    if (!poolQuestions && form.question_types.length > 1) {
+      setQuizPoolError(tr('Seçilen soru tipleri için sorular hazırlanıyor… (30-90 saniye sürebilir)'))
+      const { data: { session } } = await supabase.auth.getSession()
+      const classroom = classrooms.find(c => c.id === form.classroom_id)
+      const generated = await generateTypedQuizSet(session?.access_token, {
+        topic: form.topic.trim(), fileContent: finalTopic.length > 200 ? finalTopic : undefined, title: form.title.trim(), subject: classroom?.subject || undefined,
+        grade: gradeLabel(form.grade || classroom?.grade), difficulty: form.difficulty, count: form.question_count, types: form.question_types,
+      })
+      if (!generated.questions) { setQuizPoolError(generated.error || tr('Test hazırlanamadı.')); setSaving(false); return }
+      poolQuestions = generated.questions
+      setQuizPoolError('')
+    }
+
     const { data, error: insertError } = await supabase.from('assignments').insert({
       classroom_id: form.classroom_id,
       teacher_id: teacher.id,
@@ -181,7 +223,8 @@ export default function TeacherAssignPage() {
       topic: finalTopic,
       grade: form.grade,
       difficulty: form.difficulty,
-      question_type: form.question_type,
+      question_type: questionTypeField(form.question_types),
+      ...(form.question_types.length > 1 ? { question_types: form.question_types } : {}),
       source_type: form.source_type,
       question_count: poolQuestions ? poolQuestions.length : form.question_count,
       due_date: form.due_date || null,
@@ -369,6 +412,13 @@ export default function TeacherAssignPage() {
     if (planLimited) { setPrintMessage(LOCKED_MESSAGE); return }
     setPrintBusy(`quiz-${a.id}`); setPrintMessage(tr('Basılı test hazırlanıyor… (30-90 saniye sürebilir)'))
     try {
+      if (Array.isArray(a.pool_questions) && a.pool_questions.length) {
+        const { printLearningDocument, questionPrintHtml, answerKeyHtml } = await import('@/lib/learning-print')
+        const classroomName = classrooms.find(c => c.id === a.classroom_id)?.name || ''
+        await printLearningDocument(a.title, `${classroomName} · ${a.pool_questions.length} soru · Ad Soyad: ..............................`, questionPrintHtml(a.pool_questions) + (withKey ? answerKeyHtml(a.pool_questions) : ''))
+        setPrintMessage('')
+        return
+      }
       const classroom = classrooms.find(c => c.id === a.classroom_id)
       const topicText = String(a.topic || '')
       const fromFile = topicText.length > 200
@@ -405,6 +455,14 @@ export default function TeacherAssignPage() {
     const topicText = String(a.topic || '')
     const fromFile = topicText.length > 200
     const { data: { session } } = await supabase.auth.getSession()
+    if (Array.isArray(a.question_types) && a.question_types.length > 1) {
+      const generated = await generateTypedQuizSet(session?.access_token, { topic: topicText, fileContent: fromFile ? topicText : undefined, title: a.title, subject: classroom?.subject || undefined, grade: gradeLabel(a.grade || classroom?.grade), difficulty: a.difficulty || 'normal', count: Math.min(Number(a.question_count) || 10, 30), types: a.question_types })
+      if (!generated.questions) { setPrintMessage(generated.error || tr('Test hazırlanamadı.')); return null }
+      const { error: typedError } = await supabase.from('assignments').update({ pool_questions: generated.questions, question_count: generated.questions.length }).eq('id', a.id)
+      if (typedError) { setPrintMessage(tr('Soru seti kaydedilemedi: {msg}', { msg: typedError.message })); return null }
+      setAssignments(prev => prev.map(x => x.id === a.id ? { ...x, pool_questions: generated.questions, question_count: generated.questions.length } : x))
+      return generated.questions
+    }
     const res = await fetch('/api/generate-quiz', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
@@ -751,21 +809,31 @@ export default function TeacherAssignPage() {
                     { value: 'multi_true_false', label: tr('📋✓✗ Çoklu D/Y'), maarif: true },
                     { value: 'table_fill', label: tr('🗂️ Tablo Doldurma'), maarif: true },
                     { value: 'matching', label: tr('🔗 Eşleştirme'), maarif: false },
-                    { value: 'ordering', label: tr('📋 Sıralama'), maarif: false },
                     { value: 'short_answer', label: tr('💬 Kısa Cevap'), maarif: false },
                     { value: 'mixed', label: tr('🎲 Karma Sorular'), maarif: false },
-                  ].map(t => (
-                    <button key={t.value} onClick={() => setForm(p => ({ ...p, question_type: t.value }))}
+                  ].map(t => {
+                    const isMixed = t.value === 'mixed'
+                    const selected = isMixed ? form.question_types.length === ASSIGN_QUESTION_TYPES.length : form.question_types.includes(t.value)
+                    return (
+                    <button key={t.value} type="button" aria-pressed={selected}
+                      onClick={() => setForm(p => {
+                        if (isMixed) return { ...p, question_types: p.question_types.length === ASSIGN_QUESTION_TYPES.length ? ['multiple_choice'] : [...ASSIGN_QUESTION_TYPES], question_type: questionTypeField(p.question_types.length === ASSIGN_QUESTION_TYPES.length ? ['multiple_choice'] : [...ASSIGN_QUESTION_TYPES]) }
+                        const next = p.question_types.includes(t.value) ? p.question_types.filter(type => type !== t.value) : [...p.question_types, t.value]
+                        const types = next.length ? next : p.question_types
+                        return { ...p, question_types: types, question_type: questionTypeField(types) }
+                      })}
                       style={{ padding: '6px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', fontFamily: 'var(--font-sans)', textAlign: 'center', position: 'relative',
-                        background: form.question_type === t.value ? 'rgba(8,36,101,0.08)' : t.maarif ? 'rgba(91,76,245,0.03)' : 'var(--bg2)',
-                        borderColor: form.question_type === t.value ? 'rgba(8,36,101,0.3)' : t.maarif ? 'rgba(91,76,245,0.25)' : 'var(--border)',
-                        color: form.question_type === t.value ? 'var(--primary)' : 'var(--text3)',
+                        background: selected ? 'rgba(8,36,101,0.08)' : t.maarif ? 'rgba(91,76,245,0.03)' : 'var(--bg2)',
+                        borderColor: selected ? 'rgba(8,36,101,0.3)' : t.maarif ? 'rgba(91,76,245,0.25)' : 'var(--border)',
+                        color: selected ? 'var(--primary)' : 'var(--text3)',
                       }}>
                       {t.maarif && <span style={{ position: 'absolute', top: '2px', right: '4px', fontSize: '7px', color: '#5b4cf5', fontWeight: 800 }}>MM</span>}
-                      {t.label}
+                      {selected ? '✓ ' : ''}{t.label}
                     </button>
-                  ))}
+                    )
+                  })}
                 </div>
+                <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '6px' }}>{tr('Birden fazla tip seçebilirsin; "Karma Sorular" hepsini seçer (sıralama ödevlerde kullanılmaz).')}</div>
               </div>
 
               {/* Dosya kaynağı seçimi */}
