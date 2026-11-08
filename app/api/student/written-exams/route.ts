@@ -17,7 +17,7 @@ async function attemptState(attemptId: string) {
   const { data: attempt } = await db.from('written_exam_attempts').select('id,user_id,set_id,status,total_earned,total_possible').eq('id', attemptId).maybeSingle()
   if (!attempt) return null
   const [{ data: questions }, { data: items }] = await Promise.all([
-    db.from('written_exam_questions').select('id,position,title,max_points').eq('set_id', attempt.set_id).order('position'),
+    db.from('written_exam_questions').select('id,position,title,max_points,question,rubric,answer_key').eq('set_id', attempt.set_id).order('position'),
     db.from('written_exam_attempt_items').select('question_id,session_id').eq('attempt_id', attemptId),
   ])
   const sessionIds = (items || []).map(item => item.session_id)
@@ -30,7 +30,9 @@ async function attemptState(attemptId: string) {
     const session = sessionByQuestion.get(question.id)
     const graded = !!session?.graded_at
     return { questionId: question.id, position: question.position, title: question.title, maxPoints: question.max_points, graded, earned: graded ? (session?.total_earned ?? 0) : null,
-      criteriaResults: graded ? session?.criteria_results : undefined, overallFeedback: graded ? session?.overall_feedback : undefined, studentAnswer: graded ? session?.student_answer : undefined }
+      criteriaResults: graded ? session?.criteria_results : undefined, overallFeedback: graded ? session?.overall_feedback : undefined, studentAnswer: graded ? session?.student_answer : undefined,
+      // Beklenen yanıt yalnızca soru puanlandıktan SONRA gösterilir.
+      question: graded ? question.question : undefined, rubric: graded ? question.rubric : undefined, answerKey: graded ? (question.answer_key || '') : undefined }
   })
   return { attempt, rows, summary: summarizeResults(rows.map(row => ({ questionId: row.questionId, maxPoints: row.maxPoints, earned: row.earned }))) }
 }

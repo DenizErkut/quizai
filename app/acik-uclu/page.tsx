@@ -9,6 +9,7 @@ import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
 import { svgDataUri, parseAnswerTable, serializeTableAnswer } from '@/lib/open-ended-scenarios'
 import OpenEndedPaperUpload from '@/components/student/OpenEndedPaperUpload'
+import AnswerSections from '@/components/AnswerSections'
 import { resolveOwnIdentity } from '@/lib/identity/resolve-client'
 import QRCode from 'qrcode'
 
@@ -67,7 +68,6 @@ export default function AcikUcluPage() {
   const [mySessions, setMySessions] = useState<MySession[]>([])
   type Detail = { id: string; subject: string; topic: string; question_index: number; question: string; scenario: string; rubric: RubricItem[]; student_answer: string | null; criteria_results: CriteriaResult[] | null; overall_feedback: string | null; total_earned: number | null; total_possible: number | null; answer_table: string | null }
   const [detail, setDetail] = useState<Detail | null>(null)
-  const [detailTab, setDetailTab] = useState<'mine' | 'expected'>('mine')
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
   const [printingKey, setPrintingKey] = useState('')
   const [printMessage, setPrintMessage] = useState('')
@@ -151,7 +151,7 @@ export default function AcikUcluPage() {
     const res = await fetch(`/api/open-ended/sessions?id=${id}`, { headers: await authHeaders(), cache: 'no-store' })
     const json = await res.json().catch(() => ({}))
     if (!res.ok || !json.session) { setError(json.error || t('Soru açılamadı.')); return }
-    setDetail(json.session); setDetailTab('mine')
+    setDetail(json.session)
   }
 
   // Çözülmemiş bir soruyu çevrim içi çözmeye devam et.
@@ -740,37 +740,32 @@ export default function AcikUcluPage() {
           <div className="card" style={{ width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', padding: '1.25rem', borderRadius: 6 }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 700 }}>{detail.subject} · {detail.topic} · {t('Soru {n}', { n: detail.question_index + 1 })}</div>
             <p style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.6, margin: '6px 0 12px' }}><MathText text={detail.question} /></p>
-            <div role="tablist" style={{ display: 'flex', borderBottom: '2px solid var(--border)', marginBottom: 12 }}>
-              {(['mine', 'expected'] as const).map(tab => (
-                <button key={tab} role="tab" aria-selected={detailTab === tab} onClick={() => setDetailTab(tab)}
-                  style={{ padding: '8px 14px', background: 'none', border: 'none', borderBottom: `3px solid ${detailTab === tab ? 'var(--accent)' : 'transparent'}`, marginBottom: -2, cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 13, color: detailTab === tab ? 'var(--accent)' : 'var(--text2)' }}>
-                  {tab === 'mine' ? t('Verdiğin yanıt') : t('En olası yanıtlar')}
-                </button>
-              ))}
-            </div>
-            {detailTab === 'mine' ? (
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: '#0a9e90', marginBottom: 8 }}>{detail.total_earned ?? 0} / {detail.total_possible ?? 100}</div>
-                <div style={{ whiteSpace: 'pre-wrap', fontSize: 13.5, lineHeight: 1.7, background: 'var(--bg2, var(--bg))', border: '1px solid var(--border)', borderRadius: 4, padding: '10px 12px' }}>{detail.student_answer?.trim() || t('Cevap bulunamadı')}</div>
-                {detail.overall_feedback && <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6, marginTop: 10 }}>{detail.overall_feedback}</p>}
-                {(detail.criteria_results || []).map((c, i) => (
-                  <div key={i} style={{ borderTop: '1px solid var(--border)', padding: '8px 0', fontSize: 12.5 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}><span>{c.criterion}</span><span style={{ color: '#0a9e90' }}>{c.earnedPoints}/{c.maxPoints}</span></div>
-                    {c.feedback && <div style={{ color: 'var(--text2)', marginTop: 2, lineHeight: 1.5 }}>{c.feedback}</div>}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div>
-                <p style={{ fontSize: 12, color: 'var(--text3)', margin: '0 0 8px' }}>{t('Tam puan için beklenen yanıt unsurları:')}</p>
-                {(detail.rubric || []).map((c, i) => (
-                  <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 4, padding: '8px 10px', marginBottom: 8, fontSize: 13 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}><span>{c.criterion}</span><span style={{ color: 'var(--accent)' }}>{c.maxPoints} {t('puan')}</span></div>
-                    {c.description && <div style={{ color: 'var(--text2)', marginTop: 3, lineHeight: 1.6 }}><MathText text={c.description} /></div>}
-                  </div>
-                ))}
-              </div>
-            )}
+            <AnswerSections sections={[
+              { key: 'mine', label: t('Verilen yanıt'), content: (
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#0a9e90', marginBottom: 8 }}>{detail.total_earned ?? 0} / {detail.total_possible ?? 100}</div>
+                  <div style={{ whiteSpace: 'pre-wrap', fontSize: 13.5, lineHeight: 1.7, background: 'var(--bg2, var(--bg))', border: '1px solid var(--border)', borderRadius: 4, padding: '10px 12px' }}>{detail.student_answer?.trim() || t('Cevap bulunamadı')}</div>
+                  {detail.overall_feedback && <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6, marginTop: 10 }}>{detail.overall_feedback}</p>}
+                  {(detail.criteria_results || []).map((c, i) => (
+                    <div key={i} style={{ borderTop: '1px solid var(--border)', padding: '8px 0', fontSize: 12.5 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}><span>{c.criterion}</span><span style={{ color: '#0a9e90' }}>{c.earnedPoints}/{c.maxPoints}</span></div>
+                      {c.feedback && <div style={{ color: 'var(--text2)', marginTop: 2, lineHeight: 1.5 }}>{c.feedback}</div>}
+                    </div>
+                  ))}
+                </div>
+              ) },
+              { key: 'expected', label: t('Verilmesi gereken en olası yanıt'), content: (
+                <div>
+                  <p style={{ fontSize: 12, color: 'var(--text3)', margin: '0 0 8px' }}>{t('Tam puan için beklenen yanıt unsurları:')}</p>
+                  {(detail.rubric || []).map((c, i) => (
+                    <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 4, padding: '8px 10px', marginBottom: 8, fontSize: 13 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}><span>{c.criterion}</span><span style={{ color: 'var(--accent)' }}>{c.maxPoints} {t('puan')}</span></div>
+                      {c.description && <div style={{ color: 'var(--text2)', marginTop: 3, lineHeight: 1.6 }}><MathText text={c.description} /></div>}
+                    </div>
+                  ))}
+                </div>
+              ) },
+            ]} />
             <button className="btn" style={{ width: '100%', justifyContent: 'center', marginTop: 10 }} onClick={() => setDetail(null)}>{t('Kapat')}</button>
           </div>
         </div>

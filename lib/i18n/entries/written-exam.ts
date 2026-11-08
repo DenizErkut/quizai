@@ -68,4 +68,6 @@ export const writtenExamEntries: Entry[] = [
   ['Şimdi konuş…', 'Speak now…', 'Jetzt sprechen…', 'Parle maintenant…', 'Habla ahora…', 'تحدّث الآن…'],
   ['Mikrofon hazırlanıyor, bekle…', 'Microphone getting ready, wait…', 'Mikrofon wird vorbereitet, bitte warten…', 'Le micro se prépare, patiente…', 'Preparando el micrófono, espera…', 'جارٍ تجهيز الميكروفون، انتظر…'],
   ['Ses hazır ama tarayıcı oynatmayı engelledi. “Koçu dinle”ye bir kez daha dokun.', 'The audio is ready but the browser blocked playback. Tap “Listen to coach” once more.', 'Der Ton ist bereit, aber der Browser hat die Wiedergabe blockiert. Tippe noch einmal auf „Coach anhören“.', 'Le son est prêt mais le navigateur a bloqué la lecture. Touche « Écouter le coach » une fois de plus.', 'El audio está listo pero el navegador bloqueó la reproducción. Toca «Escuchar al coach» una vez más.', 'الصوت جاهز لكن المتصفح منع التشغيل. المس «الاستماع إلى المدرب» مرة أخرى.'],
+  ['Verilmesi gereken en olası yanıt', 'Most likely expected answer', 'Wahrscheinlichste erwartete Antwort', 'Réponse attendue la plus probable', 'Respuesta esperada más probable', 'الإجابة المتوقعة الأكثر احتمالًا'],
+  ['Öğrencinin verdiği yanıt', 'Student’s given answer', 'Antwort des Schülers', 'Réponse donnée par l’élève', 'Respuesta dada por el estudiante', 'إجابة الطالب المقدَّمة'],
 ]
