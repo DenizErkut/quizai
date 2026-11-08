@@ -204,7 +204,7 @@ SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir açıklama eklem
 {
   "scenario": "Senaryo/durum metni (2-4 cümle, ${isForeignLanguageSubject(subject) ? subject : 'Türkçe'})",
   "question": "Senaryoya dayanan açık uçlu soru (${isForeignLanguageSubject(subject) ? subject : 'Türkçe'})",
-  ${wantTable ? '"table": "Örnekteki doldurulacak tablonun YENİ verilerle hazırlanmış hâli: satır başına bir satır, hücreler | ile; ilk satır başlıklar, ilk sütun satır adları; öğrencinin dolduracağı hücreler BOŞ. Senaryo metnine tabloyu tekrar yazma; soru bu tabloyu doldurmayı istemeli, rubrik doğru hücre değerlerini ölçmeli",' : ''}
+  ${wantTable ? '"table": "Örnekteki doldurulacak tablonun YENİ verilerle hazırlanmış hâli: satır başına bir satır, hücreler | ile; ilk satır başlıklar, ilk sütun satır adları; öğrencinin dolduracağı hücreler BOŞ. Senaryo metnine boş tabloyu tekrar yazma AMA öğrencinin tabloyu doldurmak için ihtiyaç duyduğu TÜM verileri (ör. her varlığın değer aralıkları, ölçümler, kurallar) senaryo metnine açıkça yaz; senaryoda bu veriler yoksa soru çözülemez. Soru bu tabloyu doldurmayı istemeli, rubrik doğru hücre değerlerini ölçmeli",' : ''}
   ${wantFigure ? '"figureSvg": "Örnekteki şekil türünde, YENİ verilerle çizilmiş sade SVG (viewBox=\\"0 0 400 260\\", yalnızca path/rect/circle/line/polygon/text, Türkçe etiketler, 5000 karakteri geçmesin, beyaz arka plan). Soru şekle dayanmalı; senaryo metni şekildeki tüm verileri de içermeli",' : ''}
   "rubric": [
     { "criterion": "Kriter adı (kısa, Türkçe)", "maxPoints": 30, "description": "${grade} öğrencisinin basit cümlelerle karşılayabileceği tek ve somut tam puan koşulu (1 cümle, Türkçe)" }
