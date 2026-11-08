@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { turkishOpenEndedPrompt } from '@/lib/turkish-question-rules'
 import { gateTeacherFeature, recordTeacherUsage } from '@/lib/teacher-access'
 import { addToAusPool } from '@/lib/aus-pool'
+import { sanitizeFigureSvg, sanitizeAnswerTable } from '@/lib/open-ended-scenarios'
 export const maxDuration = 60
 export const runtime = 'nodejs'
 import { generateWithRoutedProvider } from '@/lib/ai-gateway/quiz-provider-router'
@@ -178,6 +179,30 @@ async function generateWithAI(subject: string, topic: string, grade: string, ori
   return { ...items[0], items, usedMebSource: !!mebContext }
 }
 
+// Soru havuzundan (öğretmen/admin onaylı AUS soruları) rastgele soru seçer; yapay zeka kullanmaz, kota harcamaz.
+async function pickFromPool(subject: string, topic: string, grade: string, count: number) {
+  const { data } = await supabase.from('open_ended_question_pool')
+    .select('id,grade,subject,topic,scenario,question,rubric,figure_svg,answer_table')
+    .eq('status', 'approved').ilike('subject', subject.trim()).limit(500)
+  const gradeNo = String(grade || '').match(/\d{1,2}/)?.[0]
+  const rows = (data || []).filter(row => !gradeNo || !row.grade || new RegExp(`(^|\\D)${gradeNo}(\\D|$)`).test(String(row.grade)))
+  const tokens = topic.toLocaleLowerCase('tr').split(/[^\p{L}\p{N}]+/u).filter(word => word.length >= 4)
+  const matches = (row: { topic?: string | null; scenario?: string | null; question?: string | null }) => {
+    if (!tokens.length) return true
+    const haystack = `${row.topic || ''} ${row.scenario || ''} ${row.question || ''}`.toLocaleLowerCase('tr')
+    return tokens.some(word => haystack.includes(word.slice(0, Math.max(4, word.length - 2))))
+  }
+  const shuffle = <T,>(list: T[]) => list.map(x => [Math.random(), x] as const).sort((a, b) => a[0] - b[0]).map(x => x[1])
+  const topical = shuffle(rows.filter(matches))
+  const others = shuffle(rows.filter(row => !matches(row)))
+  const picked = [...topical, ...others].slice(0, count)
+  const items = picked.filter(row => Array.isArray(row.rubric) && row.rubric.length > 0).map(row => ({
+    scenario: row.scenario, question: row.question, rubric: row.rubric,
+    figureSvg: row.figure_svg || null, answerTable: row.answer_table || null,
+  }))
+  return { items, topicMatched: Math.min(topical.length, items.length) }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('Authorization')
@@ -196,6 +221,13 @@ export async function POST(req: NextRequest) {
       grade?: string; subject?: string; topic?: string; due_date?: string; preview?: boolean
     }
     const questionCount = Math.min(5, Math.max(1, Math.trunc(Number((body).count) || 1)))
+
+    if (mode === 'ai' && preview && (body as { fromPool?: boolean }).fromPool) {
+      if (!subject?.trim()) return NextResponse.json({ error: 'Havuzdan çekmek için ders seçmelisin.' }, { status: 400 })
+      const { items, topicMatched } = await pickFromPool(subject, topic || '', grade || '', questionCount)
+      if (!items.length) return NextResponse.json({ error: 'Bu ders ve sınıf için havuzda onaylı soru yok. Soru havuzunda onaylanmış soru sayısı arttıkça burada görünür.' }, { status: 404 })
+      return NextResponse.json({ ...items[0], items, fromPool: true, topicMatched })
+    }
 
     if (mode === 'ai') {
       const blocked = await gateTeacherFeature(user.id, 'ai_generation')
@@ -239,6 +271,7 @@ export async function POST(req: NextRequest) {
         rubric: (Array.isArray(item?.rubric) ? item.rubric : []).map((r) => ({
           criterion: String(r?.criterion || '').trim(), maxPoints: Number(r?.maxPoints) || 0, description: String(r?.description || '').trim(),
         })).filter((r) => r.criterion && r.maxPoints > 0),
+        figure_svg: sanitizeFigureSvg(item?.figureSvg), answer_table: sanitizeAnswerTable(item?.answerTable),
       }))
       const bad = items.findIndex(item => !item.scenario || !item.question || item.rubric.length === 0)
       if (bad >= 0) return NextResponse.json({ error: `Soru ${bad + 1}: senaryo, soru ve en az bir puanlama kriteri zorunlu.` }, { status: 400 })
@@ -249,11 +282,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Soru ${failed + 1} MEB uygunluk kontrolünden geçemedi: ${checks[failed]?.reason || 'Uygun bulunmadı.'} Lütfen düzenleyip tekrar dene.` }, { status: 422 })
       }
       const batchId = crypto.randomUUID()
-      const createdVia = (body).created_via === 'ai' ? 'ai' : 'manual'
+      const createdVia = (body).created_via === 'ai' ? 'ai' : (body).created_via === 'pool' ? 'pool' : 'manual'
       const { data: createdBatch, error: batchError } = await supabase.from('open_ended_assignments').insert(items.map((item, index) => ({
         teacher_id: teacherRow.id, classroom_id, title: `${title.trim()} — Soru ${index + 1}/${items.length}`,
         grade: grade || null, subject: subject?.trim() || null, topic: topic?.trim() || null,
-        scenario: item.scenario, question: item.question, rubric: item.rubric, created_via: createdVia,
+        scenario: item.scenario, question: item.question, rubric: item.rubric, figure_svg: item.figure_svg, answer_table: item.answer_table, created_via: createdVia,
         due_date: due_date || null, verified: true, batch_id: batchId, batch_index: index,
       }))).select('*, classrooms(name)')
       if (batchError || !createdBatch) {
@@ -267,7 +300,9 @@ export async function POST(req: NextRequest) {
     let scenario = ''
     let question = ''
     let rubric: { criterion: string; maxPoints: number; description?: string }[] = []
-    let createdVia = mode
+    let createdVia: string = mode
+    let figureSvg: string | null = null
+    let answerTable: string | null = null
 
     if (mode === 'ai') {
       // Doğrudan (önizlemesiz) AI üretimi — nadiren kullanılır, ama API
@@ -292,6 +327,7 @@ export async function POST(req: NextRequest) {
       }
       scenario = b.scenario.trim()
       question = b.question.trim()
+      figureSvg = sanitizeFigureSvg(b.figureSvg); answerTable = sanitizeAnswerTable(b.answerTable)
       rubric = b.rubric.map((r) => ({
         criterion: (r.criterion || '').trim(),
         maxPoints: Number(r.maxPoints) || 0,
@@ -303,7 +339,7 @@ export async function POST(req: NextRequest) {
       // Frontend, AI-üretimli-ama-onaylanmış içerik için de 'manual' yolunu
       // kullanıyor; asıl kaynağı ayırt etmek istersen body.created_via
       // opsiyonel olarak gönderilebilir.
-      createdVia = (b.created_via === 'ai' ? 'ai' : 'manual')
+      createdVia = (b.created_via === 'ai' ? 'ai' : b.created_via === 'pool' ? 'pool' : 'manual')
     } else {
       return NextResponse.json({ error: "mode 'ai' veya 'manual' olmalı." }, { status: 400 })
     }
@@ -343,6 +379,7 @@ Bu içerik, belirtilen seviyedeki öğrencilere gösterilmeye uygun mu? Sadece �
         scenario,
         question,
         rubric,
+        figure_svg: figureSvg, answer_table: answerTable,
         created_via: createdVia,
         due_date: due_date || null,
         verified: true,
