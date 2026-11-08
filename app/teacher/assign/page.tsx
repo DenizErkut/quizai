@@ -197,6 +197,8 @@ export default function TeacherAssignPage() {
     setShowForm(false)
     setForm(p => ({ ...p, title: '', topic: '', due_date: '' }))
     setAssignments(prev => [data, ...prev])
+    setPrintMessage(tr('✓ Ödev oluşturuldu ve listenin en üstüne eklendi.'))
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   async function deleteAssignment(id: string) {
@@ -299,6 +301,11 @@ export default function TeacherAssignPage() {
     } else oeGroups.push([a])
   }
   oeGroups.forEach(group => group.sort((x, y) => (x.batch_index ?? 0) - (y.batch_index ?? 0)))
+  // Test ve açık uçlu ödevler tek listede, en yeni en üstte (yeni oluşturulan ödev aşağıda kalmasın).
+  const listRank = new Map<string, number>(
+    [...oeGroups.map(group => ({ key: `oe-${group[0].batch_id || group[0].id}`, at: Math.max(...group.map(item => new Date(item.created_at || 0).getTime())) })),
+      ...assignments.map(item => ({ key: `quiz-${item.id}`, at: new Date(item.created_at || 0).getTime() }))]
+      .sort((x, y) => y.at - x.at).map((entry, index) => [entry.key, index] as [string, number]))
   const baseTitle = (title: string) => String(title || '').replace(/ — Soru \d+\/\d+$/, '')
 
   async function deleteOeGroup(group: any[]) {
@@ -667,6 +674,7 @@ export default function TeacherAssignPage() {
                 {tr('📚 Soruları havuzdan çek')}
                 <span style={{ fontWeight: 400, fontSize: '11px', color: 'var(--text3)' }}>{tr('Onaylı soru havuzundan gelir, yapay zeka kullanılmaz')}</span>
               </label>
+              <div style={{ fontSize: '11px', color: 'var(--text3)', lineHeight: 1.5 }}>{tr('👁️ Görsel kuralı zorunludur: sayısal derslerde en az %30 (yeni nesil %50), sözel derslerde yaklaşık %10 soru gerçek görsel içerir. Havuzda yeterli görselli soru yoksa ödev oluşturulmaz.')}</div>
               {quizPoolError && <div role="alert" style={{ padding: '10px 12px', background: 'var(--red-bg)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)' }}>{quizPoolError}</div>}
               <div style={{ marginTop: '6px' }}>
                 <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>
@@ -810,7 +818,7 @@ export default function TeacherAssignPage() {
               const a = group[0]
               const busy = printBusy === `oe-${a.id}`
               return (
-              <div key={`oe-${a.batch_id || a.id}`} className="card" style={{ padding: '14px 16px', borderLeft: '3px solid #6366f1' }}>
+              <div key={`oe-${a.batch_id || a.id}`} className="card" style={{ padding: '14px 16px', borderLeft: '3px solid #6366f1', order: listRank.get(`oe-${a.batch_id || a.id}`) ?? 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '5px' }}>{group.length > 1 ? baseTitle(a.title) : a.title}</div>
@@ -848,7 +856,7 @@ export default function TeacherAssignPage() {
               const isOverdue = a.due_date && new Date(a.due_date) < new Date()
               const completions = a.assignment_completions?.[0]?.count || 0
               return (
-                <div key={a.id} className="card" style={{ padding: '14px 16px' }}>
+                <div key={a.id} className="card" style={{ padding: '14px 16px', order: listRank.get(`quiz-${a.id}`) ?? 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '5px' }}>{a.title}</div>
