@@ -7,6 +7,7 @@ import PaperAnswerImport from '@/components/teacher/PaperAnswerImport'
 import PaperBulkImport from '@/components/teacher/PaperBulkImport'
 import ScenarioAssign from '@/components/teacher/ScenarioAssign'
 import OpenEndedResults from '@/components/teacher/OpenEndedResults'
+import QuizPaperImport from '@/components/teacher/QuizPaperImport'
 import QRCode from 'qrcode'
 import type { ScenarioSheetItem } from '@/lib/open-ended-print'
 import { useTeacherEntitlement, LOCKED_MESSAGE } from '@/components/teacher/useTeacherEntitlement'
@@ -21,6 +22,7 @@ function gradeLabel(grade: string | null | undefined): string {
 }
 
 const DIFFICULTIES = [
+  { value: 'adaptive', label: '🎯 Otomatik (adaptif): %10 kolay · %60 normal · %20 zor · %10 çok zor' },
   { value: 'kolay', label: 'Kolay' },
   { value: 'normal', label: 'Normal' },
   { value: 'zor', label: 'Zor' },
@@ -47,7 +49,7 @@ export default function TeacherAssignPage() {
     title: '',
     topic: '',
     grade: '',
-    difficulty: 'normal',
+    difficulty: 'adaptive',
     question_count: 10,
     due_date: '',
     question_type: 'multiple_choice',
@@ -73,6 +75,7 @@ export default function TeacherAssignPage() {
   const [oeUsedMeb, setOeUsedMeb] = useState(false) // uretim gercek MEB kaynagina mi dayandi
   const [oeCount, setOeCount] = useState(1) // ayni konuda kac farkli soru uretilecek
   const [oeItems, setOeItems] = useState<{ scenario: string; question: string; rubric: { criterion: string; maxPoints: number; description: string }[]; figureSvg?: string | null; answerTable?: string | null }[] | null>(null)
+  const [quizImportId, setQuizImportId] = useState('') // optik kâğıt aktarma paneli açık olan test ödevi
   const [quizPool, setQuizPool] = useState(false) // test/quiz soruları onaylı soru bankasından çekilsin
   const [quizPoolError, setQuizPoolError] = useState('')
   const [oePool, setOePool] = useState(false) // sorular onaylı soru havuzundan çekilsin
@@ -155,7 +158,7 @@ export default function TeacherAssignPage() {
       const poolRes = await fetch('/api/teacher/quiz-pool', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ grade: form.grade, topic: form.topic.trim(), count: form.question_count, questionType: form.question_type }),
+        body: JSON.stringify({ grade: form.grade, topic: form.topic.trim(), count: form.question_count, questionType: form.question_type, difficulty: form.difficulty }),
       })
       const poolData = await poolRes.json().catch(() => null)
       if (!poolRes.ok || !Array.isArray(poolData?.questions)) { setQuizPoolError(poolData?.error || tr('Havuzdan soru getirilemedi.')); setSaving(false); return }
@@ -171,22 +174,29 @@ export default function TeacherAssignPage() {
       finalTopic = assignFileContent.slice(0, 3000)
     }
 
-    const { data } = await supabase.from('assignments').insert({
+    const { data, error: insertError } = await supabase.from('assignments').insert({
       classroom_id: form.classroom_id,
       teacher_id: teacher.id,
       title: form.title.trim(),
       topic: finalTopic,
       grade: form.grade,
       difficulty: form.difficulty,
+      question_type: form.question_type,
+      source_type: form.source_type,
       question_count: poolQuestions ? poolQuestions.length : form.question_count,
       due_date: form.due_date || null,
       ...(poolQuestions ? { pool_questions: poolQuestions } : {}),
-    }).select('*, classrooms(name)').single()
+    }).select('*, classrooms(name), assignment_completions(count)').single()
 
     setSaving(false)
+    if (insertError || !data) {
+      console.error('[createAssignment]', insertError)
+      setQuizPoolError(tr('Ödev kaydedilemedi: {msg}', { msg: insertError?.message || tr('bilinmeyen hata') }))
+      return
+    }
     setShowForm(false)
     setForm(p => ({ ...p, title: '', topic: '', due_date: '' }))
-    if (data) setAssignments(prev => [data, ...prev])
+    setAssignments(prev => [data, ...prev])
   }
 
   async function deleteAssignment(id: string) {
@@ -362,7 +372,7 @@ export default function TeacherAssignPage() {
         body: JSON.stringify({
           teacherPrint: true, topic: fromFile ? a.title : topicText, ...(fromFile ? { fileContent: topicText } : {}),
           subject: classroom?.subject || undefined, grade: gradeLabel(a.grade || classroom?.grade),
-          difficulty: a.difficulty || 'normal', questionCount: Math.min(Number(a.question_count) || 10, 30),
+          difficulty: a.difficulty === 'adaptive' ? 'normal' : (a.difficulty || 'normal'), questionCount: Math.min(Number(a.question_count) || 10, 30),
           questionType: a.question_type || 'mixed', includeVisuals: true, language: 'tr',
         }),
       })
@@ -375,6 +385,58 @@ export default function TeacherAssignPage() {
       await printLearningDocument(a.title, `${classroom?.name || ''} · ${data.questions.length} soru · Ad Soyad: ..............................`, questionPrintHtml(data.questions) + (withKey ? answerKeyHtml(data.questions) : ''))
       setPrintMessage('')
     } catch (e) { setPrintMessage(e?.message || tr('Test hazırlanamadı.')) }
+    finally { setPrintBusy('') }
+  }
+
+  // Basılı sınıf dökümü ve kâğıt aktarımı için ödevin SABİT soru seti gerekir: havuzdan çekilen ödevde zaten vardır;
+  // diğerlerinde ilk basımda bir kez üretilir ve ödeve kaydedilir (öğrenciler de aynı seti çözer, kâğıtla çevrim içi aynı sorulara dayanır).
+  async function ensureQuizSet(a): Promise<Array<Record<string, unknown>> | null> {
+    if (Array.isArray(a.pool_questions) && a.pool_questions.length) return a.pool_questions
+    const completionCount = a.assignment_completions?.[0]?.count || 0
+    if (completionCount > 0 && !confirm(tr('Bu ödevi bazı öğrenciler zaten çözdü. Basılı döküm için soru seti sabitlenecek; devam edilsin mi?'))) return null
+    const classroom = classrooms.find(c => c.id === a.classroom_id)
+    const topicText = String(a.topic || '')
+    const fromFile = topicText.length > 200
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/generate-quiz', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({
+        teacherPrint: true, topic: fromFile ? a.title : topicText, ...(fromFile ? { fileContent: topicText } : {}),
+        subject: classroom?.subject || undefined, grade: gradeLabel(a.grade || classroom?.grade),
+        difficulty: a.difficulty === 'adaptive' ? 'normal' : (a.difficulty || 'normal'), questionCount: Math.min(Number(a.question_count) || 10, 30),
+        questionType: a.question_type || 'mixed', includeVisuals: true, language: 'tr',
+      }),
+    })
+    const data = await res.json().catch(() => null)
+    if (!res.ok || !Array.isArray(data?.questions) || !data.questions.length) { setPrintMessage(data?.message || data?.error || tr('Test hazırlanamadı.')); return null }
+    const { error } = await supabase.from('assignments').update({ pool_questions: data.questions, question_count: data.questions.length }).eq('id', a.id)
+    if (error) { setPrintMessage(tr('Soru seti kaydedilemedi: {msg}', { msg: error.message })); return null }
+    setAssignments(prev => prev.map(x => x.id === a.id ? { ...x, pool_questions: data.questions, question_count: data.questions.length } : x))
+    return data.questions
+  }
+
+  // Sınıf dökümü: her öğrenci için QR'lı optik cevap kâğıdı + soru kitapçığı (QR: öğrenci + ödev kimliği).
+  async function printQuizClass(a, withKey: boolean) {
+    if (planLimited) { setPrintMessage(LOCKED_MESSAGE); return }
+    setPrintBusy(`quizclass-${a.id}`); setPrintMessage(tr('Basılı döküm hazırlanıyor… (soru seti yoksa 30-90 saniye sürebilir)'))
+    try {
+      const questions = await ensureQuizSet(a)
+      if (!questions) return
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/teacher/students-roster', { headers: { Authorization: `Bearer ${session?.access_token}` } })
+      const roster = await res.json().catch(() => null)
+      const students = ((roster?.students || []) as Array<{ id: string; fullName: string; schoolNo: string | null; classroomId?: string }>).filter(student => student.classroomId === a.classroom_id)
+      if (!students.length) { setPrintMessage(tr('Bu sınıfta öğrenci yok.')); return }
+      const { quizClassSheetsHtml, quizAnswerKeyHtml, quizQrPayload } = await import('@/lib/quiz-print')
+      const { printLearningDocument } = await import('@/lib/learning-print')
+      const code = String(a.id).replace(/-/g, '').slice(0, 8).toUpperCase()
+      const classroomName = classrooms.find(c => c.id === a.classroom_id)?.name || ''
+      const sheets = await Promise.all(students.map(async student => ({ name: student.fullName, schoolNo: student.schoolNo, qrDataUrl: await QRCode.toDataURL(quizQrPayload(student.id, a.id), { width: 260, margin: 1 }) })))
+      const html = quizClassSheetsHtml(questions, sheets, { title: a.title, classroom: classroomName, code }) + (withKey ? quizAnswerKeyHtml(questions, { title: a.title, code }) : '')
+      await printLearningDocument(a.title, `${classroomName} · ${students.length} öğrenci × ${questions.length} soru`, html, { studentLine: false })
+      setPrintMessage('')
+    } catch (e) { setPrintMessage(e?.message || tr('Yazdırma görünümü açılamadı.')) }
     finally { setPrintBusy('') }
   }
 
@@ -805,7 +867,10 @@ export default function TeacherAssignPage() {
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
                         <button className="btn btn-sm" disabled={printBusy === `quiz-${a.id}`} onClick={() => void printQuizAssignment(a, false)}>{tr('🖨️ Basılı test (PDF)')}</button>
                         <button className="btn btn-sm" disabled={printBusy === `quiz-${a.id}`} onClick={() => void printQuizAssignment(a, true)}>{tr('👩‍🏫 Cevap anahtarıyla')}</button>
+                        <button className="btn btn-sm" disabled={printBusy === `quizclass-${a.id}`} onClick={() => void printQuizClass(a, true)}>{tr('🖨️ Sınıf dökümü (optik + QR)')}</button>
+                        <button className="btn btn-sm" onClick={() => planLimited ? setPrintMessage(LOCKED_MESSAGE) : (Array.isArray(a.pool_questions) && a.pool_questions.length ? setQuizImportId(quizImportId === a.id ? '' : a.id) : setPrintMessage(tr('Önce "Sınıf dökümü (optik + QR)" ile soru setini oluşturup basın; sonra cevap kâğıtlarını buradan aktarabilirsiniz.')))}>{tr('📥 Kâğıt cevapları aktar')}</button>
                       </div>
+                      {quizImportId === a.id && <QuizPaperImport assignment={a} onClose={() => setQuizImportId('')} />}
                     </div>
                     <button onClick={() => deleteAssignment(a.id)}
                       style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '7px', border: '1px solid rgba(220,38,38,0.25)', background: 'transparent', color: 'var(--red)', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0, marginLeft: '10px' }}>
