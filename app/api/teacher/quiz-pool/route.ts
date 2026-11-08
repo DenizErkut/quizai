@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   const tokens = questionBankKey(topic).split(' ').filter(word => word.length >= 4).map(word => word.slice(0, Math.max(4, word.length - 2)))
   if (!tokens.length) return NextResponse.json({ error: 'Konu en az 4 harfli bir sözcük içermeli.' }, { status: 400 })
 
-  let request = db.from('question_bank').select('id, question, topic_key, subject_key, difficulty')
+  const request = db.from('question_bank').select('id, question, topic_key, subject_key, difficulty')
     .eq('review_status', 'approved').eq('report_count', 0)
     .or(`grade_key.ilike.* ${gradeNo} sinif,grade_key.ilike.${gradeNo} sinif,grade_key.ilike.${gradeNo} sınıf,grade_key.ilike.* ${gradeNo} sınıf`)
     .or(tokens.map(word => `topic_key.ilike.*${word.replace(/[*%,()]/g, '')}*`).join(','))
