@@ -72,7 +72,10 @@ export default function TeacherAssignPage() {
   const [oeGenerated, setOeGenerated] = useState(false) // AI ile üretildi mi (önizleme aşaması)
   const [oeUsedMeb, setOeUsedMeb] = useState(false) // uretim gercek MEB kaynagina mi dayandi
   const [oeCount, setOeCount] = useState(1) // ayni konuda kac farkli soru uretilecek
-  const [oeItems, setOeItems] = useState<{ scenario: string; question: string; rubric: { criterion: string; maxPoints: number; description: string }[] }[] | null>(null)
+  const [oeItems, setOeItems] = useState<{ scenario: string; question: string; rubric: { criterion: string; maxPoints: number; description: string }[]; figureSvg?: string | null; answerTable?: string | null }[] | null>(null)
+  const [oePool, setOePool] = useState(false) // sorular onaylı soru havuzundan çekilsin
+  const [oePoolNote, setOePoolNote] = useState('')
+  const [oeExtra, setOeExtra] = useState<{ figureSvg: string | null; answerTable: string | null }>({ figureSvg: null, answerTable: null })
   const [printBusy, setPrintBusy] = useState('')
   const [printMessage, setPrintMessage] = useState('')
   const { limited: planLimited } = useTeacherEntitlement()
@@ -184,26 +187,28 @@ export default function TeacherAssignPage() {
       { criterion: '', maxPoints: 25, description: '' },
     ])
     setOeGenerated(false); setOeUsedMeb(false); setOeError('')
-    setOeCount(1); setOeItems(null)
+    setOeCount(1); setOeItems(null); setOePool(false); setOePoolNote(''); setOeExtra({ figureSvg: null, answerTable: null })
   }
 
   async function generateOeWithAI() {
-    if (!oeForm.subject.trim() || !oeForm.topic.trim()) { setOeError(tr('Ders ve konu zorunlu.')); return }
-    setOeError(''); setOeGenerating(true)
+    if (oePool ? !oeForm.subject.trim() : (!oeForm.subject.trim() || !oeForm.topic.trim())) { setOeError(oePool ? tr('Havuzdan çekmek için ders seçmelisin.') : tr('Ders ve konu zorunlu.')); return }
+    setOeError(''); setOePoolNote(''); setOeGenerating(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/teacher/create-open-ended', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ mode: 'ai', preview: true, count: oeCount, ...oeForm }),
+        body: JSON.stringify({ mode: 'ai', preview: true, count: oeCount, fromPool: oePool, ...oeForm }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) { setOeError(data?.error || tr('Soru üretilemedi.')); return }
       // preview modunda dogrudan assignment kaydedilmedi, sadece uretilen
       // icerik donuyor - once ogretmen onaylasin
       if (Array.isArray(data.items) && data.items.length > 1) {
-        setOeItems(data.items.map((item) => ({ scenario: item.scenario, question: item.question, rubric: (item.rubric || []).map((r) => ({ criterion: r.criterion, maxPoints: r.maxPoints, description: r.description || '' })) })))
+        setOeItems(data.items.map((item) => ({ figureSvg: item.figureSvg || null, answerTable: item.answerTable || null, scenario: item.scenario, question: item.question, rubric: (item.rubric || []).map((r) => ({ criterion: r.criterion, maxPoints: r.maxPoints, description: r.description || '' })) })))
       } else setOeItems(null)
+      setOeExtra({ figureSvg: data.figureSvg || null, answerTable: data.answerTable || null })
+      if (data.fromPool) setOePoolNote(data.topicMatched >= data.items.length ? tr('📚 {n} soru havuzdan getirildi.', { n: data.items.length }) : tr('📚 {n} soru havuzdan getirildi; bunların {m} tanesi konuya uygun, kalanı aynı dersten.', { n: data.items.length, m: data.topicMatched }))
       setOeScenario(data.scenario); setOeQuestion(data.question)
       setOeRubric(data.rubric.map((r) => ({ criterion: r.criterion, maxPoints: r.maxPoints, description: r.description || '' })))
       setOeUsedMeb(!!data.usedMebSource)
@@ -231,9 +236,9 @@ export default function TeacherAssignPage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
         body: JSON.stringify({
           mode: 'manual', // hem AI-onaylanmis hem manuel icerik ayni sekilde kalici kaydedilir
-          created_via: oeGenerated ? 'ai' : 'manual',
+          created_via: oePool && oeGenerated ? 'pool' : oeGenerated ? 'ai' : 'manual',
           ...oeForm,
-          ...(oeItems && oeItems.length > 1 ? { items: oeItems } : { scenario: oeScenario, question: oeQuestion, rubric: validRubric }),
+          ...(oeItems && oeItems.length > 1 ? { items: oeItems } : { scenario: oeScenario, question: oeQuestion, rubric: validRubric, figureSvg: oeExtra.figureSvg, answerTable: oeExtra.answerTable }),
         }),
       })
       const data = await res.json().catch(() => null)
@@ -449,8 +454,13 @@ export default function TeacherAssignPage() {
 
                     {oeMethod === 'ai' && !oeGenerated && (
                       <>
-                        <input placeholder={tr('Konu (örn: Su döngüsü ve buharlaşma)')} value={oeForm.topic}
+                        <input placeholder={oePool ? tr('Konu (isteğe bağlı — havuzda bu konuya uyanlar öne alınır)') : tr('Konu (örn: Su döngüsü ve buharlaşma)')} value={oeForm.topic}
                           onChange={e => setOeForm(p => ({ ...p, topic: e.target.value }))} style={inputStyle} />
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 700, color: 'var(--primary)', cursor: 'pointer', padding: '10px 12px', border: `1.5px solid ${oePool ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '10px', background: oePool ? 'var(--accent-bg)' : 'transparent' }}>
+                          <input type="checkbox" checked={oePool} onChange={e => setOePool(e.target.checked)} style={{ width: 18, height: 18 }} />
+                          {tr('📚 Soruları havuzdan çek')}
+                          <span style={{ fontWeight: 400, fontSize: '11px', color: 'var(--text3)' }}>{tr('Onaylı AUS sorularından gelir, yapay zeka kullanılmaz')}</span>
+                        </label>
                         <div>
                           <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>{tr('Soru sayısı (aynı konuda farklı açık uçlu sorular)')}</label>
                           <select value={oeCount} onChange={e => setOeCount(Number(e.target.value))} style={inputStyle}>
@@ -459,13 +469,14 @@ export default function TeacherAssignPage() {
                         </div>
                         <button className="btn btn-primary" onClick={generateOeWithAI} disabled={oeGenerating}
                           style={{ justifyContent: 'center', opacity: oeGenerating ? 0.6 : 1 }}>
-                          {oeGenerating ? tr('✨ Üretiliyor...') : tr('🤖 Yapay Zeka ile Oluştur')}
+                          {oeGenerating ? tr('✨ Üretiliyor...') : oePool ? tr('📚 Havuzdan Getir') : tr('🤖 Yapay Zeka ile Oluştur')}
                         </button>
                       </>
                     )}
 
                     {oeMethod === 'ai' && oeGenerated && oeItems && oeItems.length > 1 && (
                       <>
+                        {oePoolNote && <div style={{ fontSize: '11px', color: 'var(--text2)' }}>{oePoolNote}</div>}
                         <div style={{ fontSize: '11px', color: 'var(--green)', fontWeight: 600 }}>{tr('✓ {n} farklı soru üretildi — göndermeden önce düzenleyebilir veya silebilirsin', { n: oeItems.length })}</div>
                         {oeItems.map((item, index) => (
                           <div key={index} style={{ border: '1px solid var(--border)', borderRadius: '12px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -720,7 +731,7 @@ export default function TeacherAssignPage() {
                       <span>{tr('💬 Açık Uçlu')}{group.length > 1 ? ` · ${tr('{n} soru', { n: group.length })}` : ''}</span>
                       {a.subject && <span>📚 {tr(a.subject)}</span>}
                       <span>🏫 {a.classrooms?.name}</span>
-                      <span>{a.created_via === 'ai' ? tr('🤖 AI ile') : tr('✍️ Manuel')}</span>
+                      <span>{a.created_via === 'ai' ? tr('🤖 AI ile') : a.created_via === 'pool' ? tr('📚 Havuzdan') : tr('✍️ Manuel')}</span>
                       {a.due_date && (
                         <span style={{ color: new Date(a.due_date) < new Date() ? 'var(--red)' : 'var(--text3)' }}>
                           🕐 {new Date(a.due_date).toLocaleDateString(intlLocale(locale))}
