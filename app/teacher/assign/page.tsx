@@ -106,6 +106,7 @@ export default function TeacherAssignPage() {
   const [quizImportId, setQuizImportId] = useState('') // optik kâğıt aktarma paneli açık olan test ödevi
   const [quizPool, setQuizPool] = useState(false) // test/quiz soruları onaylı soru bankasından çekilsin
   const [quizPoolError, setQuizPoolError] = useState('')
+  const [quizPoolVisualFail, setQuizPoolVisualFail] = useState(false) // havuzda görsel kuralı için yeterli görselli soru yok
   const [oePool, setOePool] = useState(false) // sorular onaylı soru havuzundan çekilsin
   const [oePoolNote, setOePoolNote] = useState('')
   const [oeExtra, setOeExtra] = useState<{ figureSvg: string | null; answerTable: string | null }>({ figureSvg: null, answerTable: null })
@@ -173,14 +174,14 @@ export default function TeacherAssignPage() {
     return data.content || ''
   }
 
-  async function createAssignment() {
+  async function createAssignment(skipPool = false) {
     if (!form.classroom_id || !form.title.trim() || !form.topic.trim()) return
-    setQuizPoolError('')
+    setQuizPoolError(''); setQuizPoolVisualFail(false)
     setSaving(true)
 
     // Havuzdan çek: sorular onaylı soru bankasından seçilip ödevde dondurulur (yapay zekâ kullanılmaz).
     let poolQuestions: unknown[] | null = null
-    if (quizPool) {
+    if (quizPool && !skipPool) {
       if (!form.grade) { setQuizPoolError(tr('Havuzdan çekmek için sınıf seviyesini seçmelisin.')); setSaving(false); return }
       const { data: { session } } = await supabase.auth.getSession()
       const poolRes = await fetch('/api/teacher/quiz-pool', {
@@ -189,7 +190,7 @@ export default function TeacherAssignPage() {
         body: JSON.stringify({ grade: form.grade, topic: form.topic.trim(), count: form.question_count, questionType: questionTypeField(form.question_types), questionTypes: form.question_types, difficulty: form.difficulty }),
       })
       const poolData = await poolRes.json().catch(() => null)
-      if (!poolRes.ok || !Array.isArray(poolData?.questions)) { setQuizPoolError(poolData?.error || tr('Havuzdan soru getirilemedi.')); setSaving(false); return }
+      if (!poolRes.ok || !Array.isArray(poolData?.questions)) { setQuizPoolError(poolData?.error || tr('Havuzdan soru getirilemedi.')); setQuizPoolVisualFail(poolRes.status === 422 && typeof poolData?.visualRequired === 'number'); setSaving(false); return }
       poolQuestions = poolData.questions
     }
 
@@ -734,6 +735,11 @@ export default function TeacherAssignPage() {
               </label>
               <div style={{ fontSize: '11px', color: 'var(--text3)', lineHeight: 1.5 }}>{tr('👁️ Görsel kuralı zorunludur: sayısal derslerde en az %30 (yeni nesil %50), sözel derslerde yaklaşık %10 soru gerçek görsel içerir. Havuzda yeterli görselli soru yoksa ödev oluşturulmaz.')}</div>
               {quizPoolError && <div role="alert" style={{ padding: '10px 12px', background: 'var(--red-bg)', borderRadius: '9px', fontSize: '13px', color: 'var(--red)' }}>{quizPoolError}</div>}
+              {quizPoolVisualFail && !saving && (
+                <button type="button" className="btn" style={{ justifyContent: 'center' }} onClick={() => { setQuizPool(false); void createAssignment(true) }}>
+                  {tr('🤖 Havuzu kapat, yapay zekâ görselli sorularla oluştursun')}
+                </button>
+              )}
               <div style={{ marginTop: '6px' }}>
                 <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>
                   {tr('Veya dosyadan soru üret (PDF, DOCX, JPG, PNG)')}
@@ -860,7 +866,7 @@ export default function TeacherAssignPage() {
               )}
 
               <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                <button className="btn btn-primary" onClick={createAssignment}
+                <button className="btn btn-primary" onClick={() => void createAssignment()}
                   disabled={saving || !form.title.trim() || !form.topic.trim()}
                   style={{ flex: 1, justifyContent: 'center', opacity: saving ? 0.6 : 1 }}>
                   {saving ? tr('Kaydediliyor...') : tr('Ödevi Oluştur')}
