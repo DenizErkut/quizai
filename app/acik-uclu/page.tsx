@@ -428,7 +428,7 @@ export default function AcikUcluPage() {
         {step === 'setup' && !assignedLoading && assignedList.some((a) => !a.completed) && (
           <div style={{ marginBottom: '1.25rem' }}>
             <button type="button" aria-expanded={assignedOpen} onClick={() => setAssignedOpen(o => !o)}
-              style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 8px', fontFamily: 'var(--font-sans)', fontSize: '13px', fontWeight: 700, color: 'var(--primary)', textAlign: 'left' }}>
+              style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', padding: '12px 16px', marginBottom: '8px', borderRadius: '10px', border: 'none', background: '#fdba8c', color: '#7c2d12', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: '14px', fontWeight: 800, textAlign: 'left', boxShadow: '0 3px 10px rgba(251,146,60,.30)' }}>
               <span>{t('📋 Sana Atanan Ödevler')} ({assignedList.filter((a) => !a.completed).length})</span>
               <span aria-hidden="true">{assignedOpen ? '▲' : '▼'}</span>
             </button>
