@@ -25,7 +25,7 @@ const MAX_BASE64_CHARS = 5_000_000
 const MEDIA_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const GRADE_CHUNK = 4
 
-type QuestionRow = { id: string; position: number; title: string; scenario: string; question: string; max_points: number; rubric: RubricCriterion[] }
+type QuestionRow = { id: string; position: number; title: string; scenario: string; question: string; max_points: number; rubric: RubricCriterion[]; answer_key: string | null }
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     const profile = await loadProfile(db, user.id)
     const set = await accessibleSet(db, body.setId, profile)
     if (!set) return NextResponse.json({ error: 'Bu yazılı sana açık değil.' }, { status: 404 })
-    const { data: questionData } = await db.from('written_exam_questions').select('id,position,title,scenario,question,max_points,rubric').eq('set_id', set.id).order('position')
+    const { data: questionData } = await db.from('written_exam_questions').select('id,position,title,scenario,question,max_points,rubric,answer_key').eq('set_id', set.id).order('position')
     const questions = (questionData || []) as QuestionRow[]
     if (!questions.length) return NextResponse.json({ error: 'Bu yazılıda soru yok.' }, { status: 404 })
 
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
       const submitted = new Map((Array.isArray(body.answers) ? body.answers : []).map(item => [String(item.questionId), String(item.text || '').trim().slice(0, 4000)]))
       const { data: attempt, error: attemptError } = await db.from('written_exam_attempts').insert({ user_id: user.id, set_id: set.id, total_possible: set.total_points }).select('id').single()
       if (attemptError || !attempt) return NextResponse.json({ error: 'Deneme kaydedilemedi.' }, { status: 500 })
-      const results: Array<{ questionId: string; position: number; title: string; maxPoints: number; graded: true; earned: number; studentAnswer: string; criteriaResults: unknown; overallFeedback: string }> = []
+      const results: Array<{ questionId: string; position: number; title: string; maxPoints: number; graded: true; earned: number; studentAnswer: string; criteriaResults: unknown; overallFeedback: string; question: string; rubric: RubricCriterion[]; answerKey: string }> = []
       for (let start = 0; start < questions.length; start += GRADE_CHUNK) {
         const chunk = questions.slice(start, start + GRADE_CHUNK)
         results.push(...await Promise.all(chunk.map(async q => {
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
           if (error || !row) throw new Error(`Soru ${q.position} kaydedilemedi.`)
           const { error: linkError } = await db.from('written_exam_attempt_items').insert({ attempt_id: attempt.id, question_id: q.id, session_id: row.id })
           if (linkError) throw new Error(`Soru ${q.position} bağlanamadı.`)
-          return { questionId: q.id, position: q.position, title: q.title, maxPoints: q.max_points, graded: true as const, earned: graded.totalEarned, studentAnswer: answer, criteriaResults: graded.criteriaResults, overallFeedback: graded.overallFeedback }
+          return { questionId: q.id, position: q.position, title: q.title, maxPoints: q.max_points, graded: true as const, earned: graded.totalEarned, studentAnswer: answer, criteriaResults: graded.criteriaResults, overallFeedback: graded.overallFeedback, question: q.question, rubric: q.rubric, answerKey: q.answer_key || '' }
         })))
       }
       const summary = summarizeResults(results.map(r => ({ questionId: r.questionId, maxPoints: r.maxPoints, earned: r.earned })))

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/i18n/I18nProvider'
 import MathText from '@/components/MathText'
+import AnswerSections from '@/components/AnswerSections'
 
 type Assignment = { id: string; question: string; rubric: Array<{ criterion: string; maxPoints: number; description?: string }> }
 type Session = { id: string; user_id: string; assignment_id: string; total_earned: number | null; total_possible: number | null; student_answer: string | null; criteria_results: Array<{ criterion: string; maxPoints: number; earnedPoints: number; feedback: string }> | null; overall_feedback: string | null; source: string }
@@ -20,7 +21,6 @@ export default function OpenEndedResults({ groupId, onClose }: { groupId: string
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [detail, setDetail] = useState<{ student: Student; index: number } | null>(null)
-  const [tab, setTab] = useState<'mine' | 'expected'>('mine')
 
   useEffect(() => {
     (async () => {
@@ -80,7 +80,7 @@ export default function OpenEndedResults({ groupId, onClose }: { groupId: string
                   <td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{student.schoolNo ? `${student.schoolNo} — ` : ''}{student.fullName}</td>
                   {scored.map((s, i) => (
                     <td key={i} style={td}>
-                      {s ? <button type="button" onClick={() => { setDetail({ student, index: i }); setTab('mine') }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12.5, fontWeight: 700, color: '#0a9e90', textDecoration: 'underline' }}>{s.total_earned ?? 0}/{s.total_possible ?? 100}</button> : <span style={{ color: 'var(--text3)' }}>–</span>}
+                      {s ? <button type="button" onClick={() => { setDetail({ student, index: i }) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12.5, fontWeight: 700, color: '#0a9e90', textDecoration: 'underline' }}>{s.total_earned ?? 0}/{s.total_possible ?? 100}</button> : <span style={{ color: 'var(--text3)' }}>–</span>}
                     </td>
                   ))}
                   <td style={{ ...td, fontWeight: 800 }}>{avg === null ? '–' : avg}</td>
@@ -101,37 +101,32 @@ export default function OpenEndedResults({ groupId, onClose }: { groupId: string
           <div className="card" style={{ width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', padding: '1.25rem', borderRadius: 6 }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 700 }}>{detail.student.fullName} · {t('Soru {n}', { n: detail.index + 1 })}</div>
             <p style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.6, margin: '6px 0 12px' }}><MathText text={dAssignment.question} /></p>
-            <div role="tablist" style={{ display: 'flex', borderBottom: '2px solid var(--border)', marginBottom: 12 }}>
-              {(['mine', 'expected'] as const).map(k => (
-                <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
-                  style={{ padding: '8px 14px', background: 'none', border: 'none', borderBottom: `3px solid ${tab === k ? 'var(--accent)' : 'transparent'}`, marginBottom: -2, cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 13, color: tab === k ? 'var(--accent)' : 'var(--text2)' }}>
-                  {k === 'mine' ? t('Öğrencinin yanıtı') : t('En olası yanıtlar')}
-                </button>
-              ))}
-            </div>
-            {tab === 'mine' ? (
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: '#0a9e90', marginBottom: 8 }}>{dSession?.total_earned ?? 0} / {dSession?.total_possible ?? 100}{dSession?.source === 'paper' ? ` · ${t('kâğıttan aktarıldı')}` : ''}</div>
-                <div style={{ whiteSpace: 'pre-wrap', fontSize: 13.5, lineHeight: 1.7, background: 'var(--bg2, var(--bg))', border: '1px solid var(--border)', borderRadius: 4, padding: '10px 12px' }}>{dSession?.student_answer?.trim() || t('Cevap bulunamadı')}</div>
-                {dSession?.overall_feedback && <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6, marginTop: 10 }}>{dSession.overall_feedback}</p>}
-                {(dSession?.criteria_results || []).map((c, i) => (
-                  <div key={i} style={{ borderTop: '1px solid var(--border)', padding: '8px 0', fontSize: 12.5 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}><span>{c.criterion}</span><span style={{ color: '#0a9e90' }}>{c.earnedPoints}/{c.maxPoints}</span></div>
-                    {c.feedback && <div style={{ color: 'var(--text2)', marginTop: 2, lineHeight: 1.5 }}>{c.feedback}</div>}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div>
-                <p style={{ fontSize: 12, color: 'var(--text3)', margin: '0 0 8px' }}>{t('Tam puan için beklenen yanıt unsurları:')}</p>
-                {dAssignment.rubric.map((c, i) => (
-                  <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 4, padding: '8px 10px', marginBottom: 8, fontSize: 13 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}><span>{c.criterion}</span><span style={{ color: 'var(--accent)' }}>{c.maxPoints} {t('puan')}</span></div>
-                    {c.description && <div style={{ color: 'var(--text2)', marginTop: 3, lineHeight: 1.6 }}><MathText text={c.description} /></div>}
-                  </div>
-                ))}
-              </div>
-            )}
+            <AnswerSections sections={[
+              { key: 'mine', label: t('Öğrencinin verdiği yanıt'), content: (
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#0a9e90', marginBottom: 8 }}>{dSession?.total_earned ?? 0} / {dSession?.total_possible ?? 100}{dSession?.source === 'paper' ? ` · ${t('kâğıttan aktarıldı')}` : ''}</div>
+                  <div style={{ whiteSpace: 'pre-wrap', fontSize: 13.5, lineHeight: 1.7, background: 'var(--bg2, var(--bg))', border: '1px solid var(--border)', borderRadius: 4, padding: '10px 12px' }}>{dSession?.student_answer?.trim() || t('Cevap bulunamadı')}</div>
+                  {dSession?.overall_feedback && <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6, marginTop: 10 }}>{dSession.overall_feedback}</p>}
+                  {(dSession?.criteria_results || []).map((c, i) => (
+                    <div key={i} style={{ borderTop: '1px solid var(--border)', padding: '8px 0', fontSize: 12.5 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}><span>{c.criterion}</span><span style={{ color: '#0a9e90' }}>{c.earnedPoints}/{c.maxPoints}</span></div>
+                      {c.feedback && <div style={{ color: 'var(--text2)', marginTop: 2, lineHeight: 1.5 }}>{c.feedback}</div>}
+                    </div>
+                  ))}
+                </div>
+              ) },
+              { key: 'expected', label: t('Verilmesi gereken en olası yanıt'), content: (
+                <div>
+                  <p style={{ fontSize: 12, color: 'var(--text3)', margin: '0 0 8px' }}>{t('Tam puan için beklenen yanıt unsurları:')}</p>
+                  {dAssignment.rubric.map((c, i) => (
+                    <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 4, padding: '8px 10px', marginBottom: 8, fontSize: 13 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}><span>{c.criterion}</span><span style={{ color: 'var(--accent)' }}>{c.maxPoints} {t('puan')}</span></div>
+                      {c.description && <div style={{ color: 'var(--text2)', marginTop: 3, lineHeight: 1.6 }}><MathText text={c.description} /></div>}
+                    </div>
+                  ))}
+                </div>
+              ) },
+            ]} />
             <button className="btn" style={{ width: '100%', justifyContent: 'center', marginTop: 10 }} onClick={() => setDetail(null)}>{t('Kapat')}</button>
           </div>
         </div>

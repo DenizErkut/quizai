@@ -38,6 +38,7 @@ import OpenEndedCatalogManager from '@/components/admin/OpenEndedCatalogManager'
 import CurriculumCoverage from '@/components/admin/CurriculumCoverage'
 import UnitEconomics from '@/components/admin/UnitEconomics'
 import QuestionBankEditor from '@/components/QuestionBankEditor'
+import AusQuestionPool from '@/components/AusQuestionPool'
 import DailyHabitMetrics from '@/components/admin/DailyHabitMetrics'
 import EducationAISafetyScorecard from '@/components/admin/EducationAISafetyScorecard'
 import ProviderObservability from '@/components/admin/ProviderObservability'
@@ -162,6 +163,7 @@ export default function AdminPage() {
   const mebUploadScope = tab === 'country-sources' ? mebScope : { country: 'TR', state: '', city: '' }
   const mebListScope = tab === 'country-sources' ? 'other' : 'tr'
 
+  const [qbTab, setQbTab] = useState<'bank' | 'aus'>('bank')
   const [instForm, setInstForm] = useState({ name: '', email: '', password: '', code: '', discount: '0', seller_id: '', country: '', state: '', city: '', tax_office: '', tax_number: '', company_title: '' })
   const [instSaving, setInstSaving] = useState(false)
   const [instError, setInstError] = useState('')
@@ -1861,8 +1863,14 @@ if (!instForm.name.trim() || !instForm.email.trim() || !instForm.password) {
         <div className="anim-up">
           <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)', marginBottom: '1rem' }}>📝 Soru Havuzu</h2>
           <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '1rem' }}>Anlık testlerde kullanılacak soruları inceleyin, düzenleyin ve yeniden onaya gönderin.</p>
-          <QuestionBankSvgFit />
-          <QuestionBankEditor />
+          <div style={{ display: 'flex', gap: 8, marginBottom: '1rem' }}>
+            <button className={`btn btn-sm ${qbTab === 'bank' ? 'btn-primary' : ''}`} onClick={() => setQbTab('bank')}>📝 Soru havuzu</button>
+            <button className={`btn btn-sm ${qbTab === 'aus' ? 'btn-primary' : ''}`} onClick={() => setQbTab('aus')}>🧩 AUS soruları</button>
+          </div>
+          {qbTab === 'aus' ? <AusQuestionPool /> : (<>
+            <QuestionBankSvgFit />
+            <QuestionBankEditor />
+          </>)}
         </div>
       )}
 

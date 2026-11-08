@@ -81,8 +81,6 @@ export const openEndedEntries: Entry[] = [
   ['Senaryoları görmek için önce bir ders seç.', 'Choose a subject first to see its scenarios.', 'Wähle zuerst ein Fach, um die Szenarien zu sehen.', 'Choisis d’abord une matière pour voir ses scénarios.', 'Elige primero una asignatura para ver sus escenarios.', 'اختر مادة أولًا لعرض سيناريوهاتها.'],
   ['Ortalama not', 'Average grade', 'Durchschnittsnote', 'Note moyenne', 'Nota media', 'المعدل'],
   ['Genel ortalama', 'Overall average', 'Gesamtdurchschnitt', 'Moyenne générale', 'Promedio general', 'المعدل العام'],
-  ['Verdiğin yanıt', 'Your answer', 'Deine Antwort', 'Ta réponse', 'Tu respuesta', 'إجابتك'],
-  ['En olası yanıtlar', 'Most likely answers', 'Wahrscheinlichste Antworten', 'Réponses les plus probables', 'Respuestas más probables', 'أكثر الإجابات احتمالًا'],
   ['Cevap bulunamadı', 'No answer found', 'Keine Antwort gefunden', 'Aucune réponse trouvée', 'No se encontró respuesta', 'لم يتم العثور على إجابة'],
   ['Tam puan için beklenen yanıt unsurları:', 'Answer elements expected for full marks:', 'Für volle Punktzahl erwartete Antwortelemente:', 'Éléments de réponse attendus pour la note maximale :', 'Elementos de respuesta esperados para la puntuación máxima:', 'عناصر الإجابة المتوقعة للدرجة الكاملة:'],
 ]

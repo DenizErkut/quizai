@@ -116,7 +116,6 @@ export const teacherAssignEntries: Entry[] = [
   ['📊 Sınıf sonuçları', '📊 Class results', '📊 Klassenergebnisse', '📊 Résultats de la classe', '📊 Resultados de la clase', '📊 نتائج الصف'],
   ['Sonuçlar alınamadı.', 'Results could not be loaded.', 'Ergebnisse konnten nicht geladen werden.', 'Impossible de charger les résultats.', 'No se pudieron cargar los resultados.', 'تعذّر تحميل النتائج.'],
   ['Sınıf ortalaması', 'Class average', 'Klassendurchschnitt', 'Moyenne de la classe', 'Promedio de la clase', 'متوسط الصف'],
-  ['Öğrencinin yanıtı', 'Student’s answer', 'Antwort des Schülers', 'Réponse de l’élève', 'Respuesta del estudiante', 'إجابة الطالب'],
   ['kâğıttan aktarıldı', 'imported from paper', 'vom Papier importiert', 'importé depuis le papier', 'importado desde papel', 'مستورد من الورق'],
   ['Sınıf düzeyi', 'Grade level', 'Klassenstufe', 'Niveau de classe', 'Nivel de clase', 'مستوى الصف'],
   ['Sınıf düzeyi seç…', 'Select grade level…', 'Klassenstufe wählen…', 'Choisis le niveau…', 'Elige el nivel…', 'اختر مستوى الصف…'],

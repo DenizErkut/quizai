@@ -7,12 +7,14 @@ import { createClient } from '@/lib/supabase/client'
 import { splitTextBlocks } from '@/lib/written-exam'
 import { compressImage } from '@/lib/image-compress'
 import { useT } from '@/lib/i18n/I18nProvider'
+import AnswerSections from '@/components/AnswerSections'
 
 type SetItem = { id: string; title: string; subject: string; term: number; examNumber: number; totalPoints: number; questionCount: number
   attempt: { id: string; status: string; total_earned: number | null; total_possible: number | null } | null }
 type CriteriaResult = { criterion: string; maxPoints: number; earnedPoints: number; feedback: string }
 type Row = { questionId: string; position: number; title: string; maxPoints: number; graded: boolean; earned: number | null
-  criteriaResults?: CriteriaResult[]; overallFeedback?: string; studentAnswer?: string }
+  criteriaResults?: CriteriaResult[]; overallFeedback?: string; studentAnswer?: string
+  question?: string; rubric?: Array<{ criterion: string; maxPoints: number; description?: string }>; answerKey?: string }
 type Summary = { totalEarned: number; totalPossible: number; answered: number; percent: number }
 type Current = { sessionId: string; position: number; title: string; scenario: string; question: string; maxPoints: number; questionId: string }
 
@@ -46,6 +48,7 @@ export default function YaziliPage() {
   const [attemptId, setAttemptId] = useState('')
   const [setTitle, setSetTitle] = useState('')
   const [rows, setRows] = useState<Row[]>([])
+  const [detailRow, setDetailRow] = useState<Row | null>(null)
   const [summary, setSummary] = useState<Summary | null>(null)
   const [current, setCurrent] = useState<Current | null>(null)
   const [answer, setAnswer] = useState('')
@@ -275,17 +278,42 @@ export default function YaziliPage() {
               <div style={{ fontSize: '13px', color: 'var(--text2)' }}>{t('Başarı: %{percent}', { percent: summary.percent })}</div>
             </div>
             {rows.map(row => (
-              <div key={row.questionId} className="card" style={{ padding: '0.9rem 1.1rem', marginBottom: '8px' }}>
-                <div style={{ fontWeight: 700, fontSize: '14px' }}>{t('Soru {n}', { n: row.position })}{row.title ? ` · ${row.title}` : ''} — {row.earned ?? 0}/{row.maxPoints}</div>
-                {row.overallFeedback && <div style={{ fontSize: '12.5px', color: 'var(--text2)', marginTop: '4px' }}><MathText text={row.overallFeedback} /></div>}
-                {row.criteriaResults && row.criteriaResults.length > 0 && (
-                  <details style={{ marginTop: '6px', fontSize: '12.5px' }}>
-                    <summary style={{ cursor: 'pointer', fontWeight: 700 }}>{t('Ölçüt ölçüt puanlar')}</summary>
-                    {row.criteriaResults.map((c, i) => <div key={i} style={{ marginTop: '4px' }}><strong><MathText text={c.criterion} /> — {c.earnedPoints}/{c.maxPoints}</strong><div style={{ color: 'var(--text2)' }}><MathText text={c.feedback} /></div></div>)}
-                  </details>
-                )}
-              </div>
+              <button key={row.questionId} type="button" className="card" onClick={() => setDetailRow(row)}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '0.9rem 1.1rem', marginBottom: '8px', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-sans)', color: 'inherit' }}>
+                <span style={{ flex: 1, fontWeight: 700, fontSize: '14px' }}>{t('Soru {n}', { n: row.position })}{row.title ? ` · ${row.title}` : ''} — {row.earned ?? 0}/{row.maxPoints}</span>
+                <span aria-hidden style={{ fontSize: 12, color: 'var(--text3)' }}>›</span>
+              </button>
             ))}
+            {detailRow && (
+              <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(10,20,16,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setDetailRow(null)}>
+                <div className="card" style={{ width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', padding: '1.25rem', borderRadius: 6 }} onClick={e => e.stopPropagation()}>
+                  <div style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 700 }}>{t('Soru {n}', { n: detailRow.position })}{detailRow.title ? ` · ${detailRow.title}` : ''} — {detailRow.earned ?? 0}/{detailRow.maxPoints}</div>
+                  {detailRow.question && <p style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.6, margin: '6px 0 12px' }}><MathText text={detailRow.question} /></p>}
+                  <AnswerSections sections={[
+                    { key: 'mine', label: t('Verilen yanıt'), content: (
+                      <div>
+                        <div style={{ whiteSpace: 'pre-wrap', fontSize: 13.5, lineHeight: 1.7, background: 'var(--bg2, var(--bg))', border: '1px solid var(--border)', borderRadius: 4, padding: '10px 12px' }}>{detailRow.studentAnswer?.trim() || t('Cevap bulunamadı')}</div>
+                        {detailRow.overallFeedback && <div style={{ fontSize: '12.5px', color: 'var(--text2)', marginTop: '8px' }}><MathText text={detailRow.overallFeedback} /></div>}
+                        {(detailRow.criteriaResults || []).map((c, i) => <div key={i} style={{ marginTop: '6px', fontSize: '12.5px' }}><strong><MathText text={c.criterion} /> — {c.earnedPoints}/{c.maxPoints}</strong><div style={{ color: 'var(--text2)' }}><MathText text={c.feedback} /></div></div>)}
+                      </div>
+                    ) },
+                    { key: 'expected', label: t('Verilmesi gereken en olası yanıt'), content: (
+                      <div>
+                        {detailRow.answerKey?.trim() && <div style={{ whiteSpace: 'pre-wrap', fontSize: 13.5, lineHeight: 1.7, background: 'var(--bg2, var(--bg))', border: '1px solid var(--border)', borderRadius: 4, padding: '10px 12px', marginBottom: 10 }}><MathText text={detailRow.answerKey} /></div>}
+                        <p style={{ fontSize: 12, color: 'var(--text3)', margin: '0 0 6px' }}>{t('Tam puan için beklenen yanıt unsurları:')}</p>
+                        {(detailRow.rubric || []).map((c, i) => (
+                          <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 4, padding: '8px 10px', marginBottom: 6, fontSize: 13 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}><span><MathText text={c.criterion} /></span><span style={{ color: 'var(--accent)' }}>{c.maxPoints} {t('puan')}</span></div>
+                            {c.description && <div style={{ color: 'var(--text2)', marginTop: 3, lineHeight: 1.6 }}><MathText text={c.description} /></div>}
+                          </div>
+                        ))}
+                      </div>
+                    ) },
+                  ]} />
+                  <button className="btn" style={{ width: '100%', justifyContent: 'center', marginTop: 10 }} onClick={() => setDetailRow(null)}>{t('Kapat')}</button>
+                </div>
+              </div>
+            )}
             <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }} onClick={backToList}>{t('Listeye dön')}</button>
           </div>
         )}

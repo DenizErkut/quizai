@@ -15,6 +15,7 @@ import { checkMinorConsentBlock } from '@/lib/identity/client'
 import { gradeKeyFromProfile, isSelectableOpenEndedTopic, loadOpenEndedCatalog } from '@/lib/open-ended-practice-catalog'
 import { exampleBlock, pickExamples, scenarioLabel, sanitizeFigureSvg, sanitizeAnswerTable, type ScenarioRubricItem } from '@/lib/open-ended-scenarios'
 import { gradeNumberOf } from '@/lib/written-exam'
+import { addToAusPool } from '@/lib/aus-pool'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -288,6 +289,9 @@ Rubrikteki maxPoints toplamı MUTLAKA 100 olmalı. 3 veya 4 kriter kullan.`
       .single()
 
     if (insErr || !sessionRow) return NextResponse.json({ error: 'Kaydedilemedi.' }, { status: 500 })
+    // Üretilen soru AUS havuzuna (bekleyen) alınır; inceleme yönetici/öğretmen tarafından yapılır.
+    await addToAusPool(supabase, { source: 'student_ai', sourceRef: sessionRow.id, grade, subject: subject.trim(), topic: topic.trim(), scenario: parsed.scenario, question: parsed.question, rubric: parsed.rubric,
+      figureSvg: wantFigure ? sanitizeFigureSvg((parsed as { figureSvg?: unknown }).figureSvg) : null, answerTable: wantTable ? sanitizeAnswerTable((parsed as { table?: unknown }).table) : null })
 
     // Kota artir (ayni gunluk test hakki havuzu)
     if (!isFollowUp) await supabase.from('profiles').update({
