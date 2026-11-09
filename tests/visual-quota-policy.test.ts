@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { bankVisualTarget, visualProfileForSubject, visualQuotaFor } from '../lib/visual-quota-policy'
+import { bankVisualTarget, isGeometryRequest, visualProfileForSubject, visualQuotaFor, visualRatioFor } from '../lib/visual-quota-policy'
 import { visualAttemptCount, requiredVisualCount } from '../lib/quiz-generation-policy'
 
 test('numeric subjects keep the 30% rule; verbal subjects are loosened', () => {
@@ -34,4 +34,17 @@ test('bank selection targets: numeric 30% (50% for yeni nesil, at least 1), verb
   assert.deepEqual([5, 10].map(count => bankVisualTarget('Fen Bilimleri', count, true)), [3, 5])
   assert.deepEqual([5, 10, 20].map(count => bankVisualTarget('Edebiyat', count, false)), [0, 1, 2])
   assert.equal(bankVisualTarget('Edebiyat', 10, true), 1)           // yeni nesil does not raise the verbal target
+})
+
+test('geometri soruları için görsel oranı %90', () => {
+  assert.equal(isGeometryRequest('Geometri', ''), true)
+  assert.equal(isGeometryRequest('Matematik', 'Geometrik şekiller'), true)
+  assert.equal(isGeometryRequest('Matematik', 'Üçgenler'), true)
+  assert.equal(isGeometryRequest('Matematik', 'Denklemler'), false)
+  assert.equal(isGeometryRequest('Tarih', 'Osmanlı'), false)
+  assert.equal(visualRatioFor('Matematik', 'Çember ve daire'), 0.9)
+  assert.equal(visualRatioFor('Matematik', 'Denklemler'), 0.3)
+  assert.deepEqual([5, 10, 20].map(count => bankVisualTarget('Matematik', count, false, 'Geometrik şekiller')), [5, 9, 18])
+  assert.deepEqual([5, 10].map(count => visualQuotaFor('Matematik', count, 'Üçgenler').required), [5, 9])
+  assert.deepEqual([5, 10].map(count => visualQuotaFor('Matematik', count, 'Denklemler').required), [2, 3])
 })

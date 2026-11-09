@@ -51,7 +51,7 @@ import { phantomVisualIssue, salvageLeakedSvg } from '@/lib/phantom-visual'
 import { fitSvgText } from '@/lib/svg-text-fit'
 import { filterRowsByUserScope } from '@/lib/location/resource-scope'
 import { isSameGradeSource } from '@/lib/meb-source-scope'
-import { visualProfileForSubject, visualQuotaFor, VERBAL_VISUAL_RATIO } from '@/lib/visual-quota-policy'
+import { visualProfileForSubject, visualQuotaFor, isGeometryRequest, GEOMETRY_VISUAL_RATIO, VERBAL_VISUAL_RATIO } from '@/lib/visual-quota-policy'
 import { internalOrigin } from '@/lib/internal-origin'
 
 const anthropic = new Anthropic()
@@ -335,6 +335,10 @@ function visualFormatGuidance(category: string | null): string {
 
 function visualPedagogyInstruction(topic: string, count: number, subject?: string): string {
   const formatHint = visualFormatGuidance(detectVisualCategory(topic))
+  if (isGeometryRequest(subject, topic)) {
+    const geometryMinimum = Math.max(1, Math.ceil(count * GEOMETRY_VISUAL_RATIO))
+    return `\n\nGEOMETRİ GÖRSEL KURALI (ZORUNLU): Geometri sorularında en az ${geometryMinimum}/${count} soru, öğrencinin üzerinde ölçüm/açı/kenar/alan okuyarak çözeceği gerçek bir SVG şekil (üçgen, dörtgen, çember, bileşik şekil, cisim açınımı vb.) içermelidir. Şekildeki tüm etiketler, ölçüler ve açılar soru metniyle birebir aynı olmalı ve şekil cevabı göstermemelidir; şekil olmadan çözülemeyen sorular kur. Satır satır sayı dizen veri tablosu şekil sayılmaz (en fazla ${Math.max(0, Math.floor(count * 0.1))} soru tablo içerebilir). Şekilsiz kalacak en fazla ${count - geometryMinimum} soru kavramsal muhakeme sorusu olabilir. ŞEKİL ÜSLUBU (örnek yazılı sınav kitapçıklarındaki gibi): beyaz zeminli, temiz çizgili şekiller; köşeler kalın büyük harflerle (A, B, C…), açılar ve uzunluklar şekil üzerinde ölçüsüyle yazılı, dik açılar kare işaretli. Tercih edilecek sahneler: çemberde kesen/kiriş/teğet ve açı ölçüleri, ortak teğetli çemberler, dik üçgende yükseklik/açıortay/kenar uzunluğu, ölçüleri verilmiş dikdörtgen/küp/prizma kutular ve hacim karşılaştırması, birim küplerle kurulmuş yapılar, daire dilimleri ve kesirli taralı şekiller. Her soruda şekil ile soru metni birbirini tamamlamalı; ölçüler hem metinde hem şekilde tutarlı olmalı. ${formatHint} gibi somut bir sahne kullan; aynı şekli tekrar etme.`
+  }
   if (visualProfileForSubject(subject) === 'verbal') {
     // Sözel dersler: görsel zorunlu değil, fırsat odaklı (sayısal derslerdeki %30 kuralı burada uygulanmaz).
     const ceiling = Math.max(1, Math.ceil(count * Math.max(VERBAL_VISUAL_RATIO, 0.2)))
@@ -2737,7 +2741,7 @@ export async function POST(req: NextRequest) {
     // yanlıştı: tek kabul edilen yedek soruda ceil(1*0.30)=1 olup kota
     // fiilen %100'e çıkıyordu. Mevcut oturumdaki görselleri de say ve yalnız
     // birleşik testin %30 hedefinde eksik kalan kadar görsel iste.
-    const visualQuota = visualQuotaFor(subject, safeQCount)
+    const visualQuota = visualQuotaFor(subject, safeQCount, topic)
     let batchVisualMinimum = visualQuota.required
     // The cumulative adaptive correction below is only meaningful for subjects that have a required minimum.
     if (visualQuota.profile === 'numeric' && adaptiveCandidateBatch && continueSessionId) {
@@ -2750,7 +2754,7 @@ export async function POST(req: NextRequest) {
       if (visualContextSession && Array.isArray(visualContextSession.questions)) {
         const existingQuestions = visualContextSession.questions as Array<Record<string, unknown>>
         const existingVisualCount = existingQuestions.filter(question => hasVisualQuota([question], 1)).length
-        const combinedMinimum = requiredVisualCount(existingQuestions.length + safeQCount)
+        const combinedMinimum = requiredVisualCount(existingQuestions.length + safeQCount, visualQuota.ratio)
         batchVisualMinimum = Math.max(0, combinedMinimum - existingVisualCount)
         console.log(`[generate-quiz] adaptive_visual_quota existing=${existingVisualCount}/${existingQuestions.length} batch_required=${batchVisualMinimum}/${safeQCount} combined_required=${combinedMinimum}`)
       }
@@ -2759,7 +2763,7 @@ export async function POST(req: NextRequest) {
     const REQUEST_HARD_DEADLINE_MS = 112000 // 120sn'den DB yazımı/response için pay bırak
     const visualBudgetMs = REQUEST_HARD_DEADLINE_MS - (Date.now() - requestStartTime)
     const quotaVisualIndexes = (visualQuota.profile === 'verbal' ? visualQuota.attempts > 0 : batchVisualMinimum > 0)
-      ? visualQuestionIndexes(questions, visualCategory, safeQCount, visualQuota.profile === 'verbal' ? visualQuota.attempts : undefined)
+      ? visualQuestionIndexes(questions, visualCategory, safeQCount, visualQuota.attempts)
       : []
     // Every question that points at "the figure" needs one, whatever the quota says; those left without a
     // figure are dropped below instead of reaching a student as an unanswerable question.
