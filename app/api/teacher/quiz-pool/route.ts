@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   for (const row of usable) subjectCounts.set(String(row.subject_key || ''), (subjectCounts.get(String(row.subject_key || '')) || 0) + 1)
   const subject = [...subjectCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || ''
   const newGeneration = /yeni nesil|beceri temelli|yorum gerektiren|gercek yasam|gunluk hayat/.test(questionBankKey(topic))
-  const visualTarget = Math.min(count, usable.length) > 0 ? bankVisualTarget(subject, Math.min(count, usable.length), newGeneration) : 0
+  const visualTarget = Math.min(count, usable.length) > 0 ? bankVisualTarget(subject, Math.min(count, usable.length), newGeneration, topic) : 0
   const visualRows = usable.filter(row => hasRealVisualAsset(row.question as Parameters<typeof hasRealVisualAsset>[0]))
   if (visualRows.length < visualTarget) {
     return NextResponse.json({

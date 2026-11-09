@@ -93,7 +93,7 @@ function isNewGenerationTopic(topic: string): boolean {
 
 function selectWithVisualQuota(rows: any[], count: number, topic: string, subject?: string | null): any[] {
   // Numeric subjects: 30% (50% for "yeni nesil"); verbal subjects: about 10%, possibly none (see visual-quota-policy).
-  const target = bankVisualTarget(subject, count, isNewGenerationTopic(topic))
+  const target = bankVisualTarget(subject, count, isNewGenerationTopic(topic), topic)
   const exactRows = shuffled(rows.filter(row => ['teacher_exact', 'ai_exact'].includes(row.question?.sourcePolicy))).slice(0, count)
   const chosen = new Set(exactRows.map(row => row.id))
   const exactVisualCount = exactRows.filter(row => hasRealVisualAsset(row.question)).length
