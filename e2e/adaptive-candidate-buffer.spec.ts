@@ -18,7 +18,7 @@ test('quality gate accepts a verified seventy-percent subset without relaxing ob
   expect(route).toContain('minimumVerifiedQuestionCount(safeQCount)')
   expect(route).toContain('verifiedCandidateCount < minimumVerifiedCount')
   expect(route).toContain('adaptiveCandidateBatch && questions.length > 0')
-  expect(route).toContain('combinedMinimum = requiredVisualCount(existingQuestions.length + safeQCount)')
+  expect(route).toContain('combinedMinimum = requiredVisualCount(existingQuestions.length + safeQCount, visualQuota.ratio)')
   expect(route).toContain('batchVisualMinimum = Math.max(0, combinedMinimum - existingVisualCount)')
 })
 
