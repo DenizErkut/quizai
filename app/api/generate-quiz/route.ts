@@ -436,7 +436,8 @@ CRITICAL SVG RULES:
 - Add a short title at top (MAX 40 characters, font-size 14, text-anchor="middle" at x=200). Never copy the whole question as the title.
 - LAYOUT: every <text> must stay fully inside x=10..390 and y=14..270. Keep each label under 28 characters.
 - Labels must not overlap each other, the shape lines or the points: put a label at least 14px away from lines and from other labels, and never write two labels on the same spot. Use one label per object (no duplicate names such as "AB" plus "M" at the same point).
-- NO JavaScript, NO external resources, NO foreignObject
+- NO JavaScript, NO external resources, NO foreignObject, NO <image> tags
+- PHOTO-LIKE SCENES (celestial bodies, people, objects, rooms): never try to draw a realistic photo. Draw a simplified flat-colour, clearly recognisable schematic illustration (simple circles/ellipses/polygons, at most two <linearGradient>/<radialGradient> with fill="url(#id)" referencing local ids). If the question compares several pictures, lay them out as 2-3 side-by-side panels labelled I, II, III inside the same 400x280 canvas (each panel about 120px wide; keep every label inside the canvas). Arrows (force, movement) and labels required by the question must be drawn exactly as the question states.
 - Return ONLY the SVG code, nothing else, starting with <svg
 - CORRECT ANSWER (DO NOT SHOW THIS IN SVG): "${correctAnswer}"
 - Every object, number, unit, label and relationship MUST come from this exact QUESTION. Never substitute another scenario, equation, person, animal, product or dataset.

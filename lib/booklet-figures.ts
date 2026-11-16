@@ -109,11 +109,42 @@ export function clampCrop(crop: Box, box: Box, texts: PageText[]): Box {
 }
 
 export type PageFigure = { questionNumber: number; data: Buffer; mime: 'image/png' | 'image/jpeg'; width: number; height: number }
-export type FigurePageResult = { pageCount: number; lastQuestion: number; figures: PageFigure[] }
+export type FigurePageResult = { pageCount: number; lastQuestion: number; figures: PageFigure[]; tooLarge: number[] }
 
 const SCALE = 2
+/** Kırpılan şekil dosyasının en büyük boyutu: base64 hâli FIGURE_IMAGE_MAX_CHARS (900.000) karakteri aşmamalı. */
+const MAX_FIGURE_BYTES = 640_000
+// Bu başlıklar sorulardan sonra gelen bölümlerin (cevap anahtarı, kazanım tablosu…) başlangıcıdır; soru şekli sayılmaz.
+const END_OF_QUESTIONS = /^\s*(?:cevap\s+anahtar[ıi]|soru\s*-\s*kazan[ıi]m\s+e[sş]le[sş]tirme\s+tablosu|kazan[ıi]m\s+e[sş]le[sş]tirme\s+tablosu|puanlama\s+(?:anahtar[ıi]|k[ıi]lavuzu)|değerlendirme\s+ölçeği)\s*:?\s*$/iu
+
+type CanvasLike = { width: number; height: number; getContext(type: '2d'): any; toBuffer(mime: 'image/png'): Buffer; toBuffer(mime: 'image/jpeg', quality?: number): Buffer }
+
+/**
+ * Şekli kabul sınırına sığacak biçimde kodlar: önce PNG (çizim/tablo için keskin), fotoğraf ve renkli illüstrasyonlarda
+ * boyut aşılırsa JPEG kalite basamakları, gerekirse küçültme. Hiçbir şekil sessizce atılmaz; yalnızca en küçük
+ * denemede de sığmazsa null döner.
+ */
+export function encodeFigureWithinLimit(source: CanvasLike, createCanvas: (w: number, h: number) => CanvasLike, maxBytes = MAX_FIGURE_BYTES): { data: Buffer; mime: 'image/png' | 'image/jpeg'; width: number; height: number } | null {
+  const png = source.toBuffer('image/png')
+  if (png.length <= maxBytes) return { data: png, mime: 'image/png', width: source.width, height: source.height }
+  for (const factor of [1, 0.85, 0.7, 0.55, 0.42]) {
+    let canvas = source
+    if (factor < 1) {
+      canvas = createCanvas(Math.max(1, Math.round(source.width * factor)), Math.max(1, Math.round(source.height * factor)))
+      const ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.drawImage(source, 0, 0, source.width, source.height, 0, 0, canvas.width, canvas.height)
+    }
+    for (const quality of [85, 75, 65, 55]) {
+      const jpeg = canvas.toBuffer('image/jpeg', quality)
+      if (jpeg.length <= maxBytes) return { data: jpeg, mime: 'image/jpeg', width: canvas.width, height: canvas.height }
+    }
+  }
+  return null
+}
 // "6. Sınıf | …" page footers are not question starts.
 const MARKER = /^\s*(?:[Ss][Oo][Rr][Uu]\s*)?(\d{1,4})\s*(?:\||[.)])(?!\s*[Ss][ıiIİ]n[ıiIİ]f)/u
+// "SORU 4 (15 puan)" / "Soru 4" başlığı: ayraç yok, numaradan sonra boşluk, parantez ya da satır sonu gelir.
+const WORD_MARKER = /^\s*[Ss][Oo][Rr][Uu]\s*(\d{1,4})(?![\d.)|])(?=\s|\(|:|-|–|$)/u
 
 export async function figuresForPages(
   pdf: Uint8Array,
@@ -129,7 +160,9 @@ export async function figuresForPages(
   const standardFontDataUrl = path.join(process.cwd(), 'node_modules/pdfjs-dist/standard_fonts/') 
   const doc = await pdfjs.getDocument({ data: new Uint8Array(pdf), standardFontDataUrl, useSystemFonts: false, isEvalSupported: false, verbosity: 0 }).promise
   const figures: PageFigure[] = []
+  const tooLarge: number[] = []
   let last = options.lastQuestion
+  let ended = false
   try {
     const end = Math.min(doc.numPages, options.fromPage + options.pages)
     for (let pageIndex = options.fromPage; pageIndex < end; pageIndex++) {
@@ -151,10 +184,15 @@ export async function figuresForPages(
       }
       const candidates: Marker[] = []
       for (const text of texts) {
-        const match = MARKER.exec(text.str)
+        const match = MARKER.exec(text.str) || WORD_MARKER.exec(text.str)
         if (match && text.box.left < width * 0.2) candidates.push({ n: Number(match[1]), top: text.box.top, x: text.box.left })
       }
-      const markers = acceptMarkers(candidates, options.knownNumbers, last)
+      let markers = acceptMarkers(candidates, options.knownNumbers, last)
+      // Cevap anahtarı / kazanım tablosu bölümü başlayınca sonraki alan soru şekli sayılmaz.
+      const endText = texts.filter(text => END_OF_QUESTIONS.test(text.str.toLocaleLowerCase('tr'))).sort((a, b) => a.box.top - b.box.top)[0]
+      const endTop = endText ? endText.box.top : Infinity
+      if (ended) { page.cleanup(); continue }
+      markers = markers.filter(marker => marker.top < endTop)
 
       // Page with text masked out, to find what is not text.
       const image = ctx.getImageData(0, 0, width, height)
@@ -168,9 +206,10 @@ export async function figuresForPages(
 
       const headerFooter = height * 0.05
       const regions: Array<{ n: number; top: number; bottom: number }> = []
-      if (last > 0 && (!markers.length || markers[0].top - headerFooter > 20)) regions.push({ n: last, top: headerFooter, bottom: markers.length ? markers[0].top : height - headerFooter })
-      markers.forEach((marker, i) => regions.push({ n: marker.n, top: marker.top, bottom: markers[i + 1] ? markers[i + 1].top : height - headerFooter }))
+      if (last > 0 && (!markers.length || markers[0].top - headerFooter > 20)) regions.push({ n: last, top: headerFooter, bottom: markers.length ? markers[0].top : Math.min(endTop, height - headerFooter) })
+      markers.forEach((marker, i) => regions.push({ n: marker.n, top: marker.top, bottom: markers[i + 1] ? markers[i + 1].top : Math.min(endTop, height - headerFooter) }))
       if (markers.length) last = markers[markers.length - 1].n
+      if (Number.isFinite(endTop)) { ended = true; for (const region of regions) region.bottom = Math.min(region.bottom, endTop - 4) }
 
       for (const region of regions) {
         const top = Math.max(Math.floor(region.top), Math.floor(headerFooter)), bottom = Math.min(Math.floor(region.bottom), Math.floor(height - headerFooter))
@@ -189,14 +228,14 @@ export async function figuresForPages(
         const outCtx = out.getContext('2d')
         outCtx.fillStyle = '#fff'; outCtx.fillRect(0, 0, out.width, out.height)
         outCtx.drawImage(canvas, left, cropTop, cropW, cropH, 0, 0, out.width, out.height)
-        let data = out.toBuffer('image/png'), mime: 'image/png' | 'image/jpeg' = 'image/png'
-        if (data.length > 1_800_000) { data = out.toBuffer('image/jpeg', 80); mime = 'image/jpeg' }
-        if (data.length > 1_900_000) continue
-        figures.push({ questionNumber: region.n, data, mime, width: out.width, height: out.height })
+        const encoded = encodeFigureWithinLimit(out as unknown as CanvasLike, (w, h) => createCanvas(w, h) as unknown as CanvasLike)
+        if (!encoded) { tooLarge.push(region.n); continue }
+        const { data, mime } = encoded
+        figures.push({ questionNumber: region.n, data, mime, width: encoded.width, height: encoded.height })
       }
       page.cleanup()
     }
-    return { pageCount: doc.numPages, lastQuestion: last, figures }
+    return { pageCount: doc.numPages, lastQuestion: last, figures, tooLarge }
   } finally {
     await doc.destroy()
   }

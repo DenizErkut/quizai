@@ -8,13 +8,14 @@ test('figure svg keeps drawing tags and strips scripts, handlers and links', () 
   assert.ok(out!.includes('<rect'))
   assert.ok(out!.includes('<text'))
   assert.ok(out!.includes('xmlns='))
-  for (const bad of ['script', 'onload', 'onclick', 'javascript', 'foreignObject', 'url(', '<a']) assert.ok(!out!.includes(bad), bad)
+  for (const bad of ['script', 'onload', 'onclick', 'javascript', 'foreignObject', '<a']) assert.ok(!out!.includes(bad), bad)
+  assert.ok(out!.includes('url(#a)'), 'yalnızca sayfa içi url(#kimlik) referansı korunur')
 })
 
 test('figure svg rejects non-svg and oversized input', () => {
   assert.equal(sanitizeFigureSvg('<div>x</div>'), null)
   assert.equal(sanitizeFigureSvg(null), null)
-  assert.equal(sanitizeFigureSvg(`<svg>${'a'.repeat(21000)}</svg>`), null)
+  assert.equal(sanitizeFigureSvg(`<svg>${'a'.repeat(41000)}</svg>`), null)
 })
 
 import { parseAnswerTable, serializeTableAnswer } from '../lib/open-ended-scenarios'
@@ -66,4 +67,20 @@ test('grade number parses bare digits as stored in classrooms and the "7. sını
   assert.equal(gradeNumberOf('13'), null)
   assert.equal(gradeNumberOf('0'), null)
   assert.equal(gradeNumberOf(''), null)
+})
+
+test('figure svg: gradyanlar kabul edilir, harici url() ve dış kaynaklar kaldırılır', () => {
+  const out = sanitizeFigureSvg('<svg viewBox="0 0 600 220"><defs><radialGradient id="g"><stop offset="0" stop-color="#fc0"/><stop offset="1" stop-color="#f60"/></radialGradient></defs><circle cx="100" cy="100" r="60" fill="url(#g)"/><rect width="10" height="10" fill="url(http://evil.example/x.svg#a)"/><image href="http://evil.example/x.png"/></svg>')
+  assert.ok(out)
+  assert.ok(out!.includes('<radialGradient id="g">'))
+  assert.ok(out!.includes('<stop '))
+  assert.ok(out!.includes('fill="url(#g)"'))
+  assert.ok(!out!.includes('evil.example'))
+  assert.ok(!out!.includes('<image'))
+})
+
+test('figure svg: 12000 karakterlik panelli çizim kabul edilir', () => {
+  const body = Array.from({ length: 200 }, (_, i) => `<circle cx="${i}" cy="${i}" r="3" fill="#abc"/>`).join('')
+  const out = sanitizeFigureSvg(`<svg viewBox="0 0 600 220">${body}</svg>`)
+  assert.ok(out && out.length > 8000)
 })
