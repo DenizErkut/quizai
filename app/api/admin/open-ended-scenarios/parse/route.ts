@@ -9,7 +9,7 @@ import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/
 import { logAnthropicUsage } from '@/lib/ai-usage'
 import { figuresForPages } from '@/lib/booklet-figures'
 import { stripForeignScripts } from '@/lib/open-ended-grading'
-import { normalizeRubricTo100, sanitizeFigureSvg, sanitizeAnswerTable, extractInlineTable } from '@/lib/open-ended-scenarios'
+import { normalizeRubricTo100, sanitizeFigureSvg, sanitizeAnswerTable, extractInlineTable, FIGURE_IMAGE_MAX_CHARS } from '@/lib/open-ended-scenarios'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   const prompt = `Aşağıda ortak yazılı/sınav örnekleri içeren bir dosyanın metni var. İçindeki SENARYO tabanlı açık uçlu soruları OLDUĞU GİBİ ayıkla; yeni soru UYDURMA.
 Her biri için: title (kısa başlık), scenario (öğrencinin okuyacağı durum/bağlam metni; tablo varsa satırları " | " ile yaz), question (senaryoya dayanan soru, alt maddeleriyle), rubric (cevap anahtarı/puanlama bölümünden ölçütler: {"criterion","maxPoints","description"}; anahtar yoksa soru ve alt madde puanlarından makul ölçütler kur). Puanlar sorunun kendi puanıdır; sistem sonra toplamı 100'e ölçekler.
-Sorulardaki ŞEKİL/GÖRSEL/TABLO varsa (ekteki PDF'e bak), figureSvg alanına o şeklin sade, düz, beyaz arka planlı bir SVG yeniden çizimini koy: viewBox="0 0 400 260" gibi, yalnızca path/rect/circle/line/polygon/text etiketleri, metinler Türkçe ve taşmayan (font-size 12-14), 6000 karakteri geçmesin. Şekil yoksa "" bırak. Şekli uydurma; PDF'deki şekli sadık biçimde yeniden çiz.
+Sorulardaki ŞEKİL/GÖRSEL/TABLO varsa (ekteki PDF'e bak), figureSvg alanına o şeklin sade, düz, beyaz arka planlı bir SVG yeniden çizimini koy: viewBox="0 0 400 260" gibi (yan yana birden çok panel varsa "0 0 600 220"), path/rect/circle/ellipse/line/polygon/text etiketleri (gradyan için linearGradient/radialGradient+stop ve fill="url(#kimlik)" serbest), metinler Türkçe ve taşmayan (font-size 12-14), 12000 karakteri geçmesin. FOTOĞRAF veya detaylı illüstrasyon ise (gök cisimleri, kişi/eşya sahneleri) gerçekçi çizmeye çalışma: düz renkli, sade ve tanınabilir bir şematik çizim yap; panellerin numaralarını (I, II, III), okları, ölçü ve etiketleri aynen koru. Şekil yoksa "" bırak. Şekli uydurma; PDF'deki şekli sadık biçimde yeniden çiz.
 Soru, öğrencinin bir TABLOYU doldurmasını istiyorsa (ör. VAR/YOK yazınız, boşlukları doldurunuz) tabloyu answerTable alanına yaz: satır başına bir satır, hücreler " | " ile; ilk satır sütun başlıkları, ilk sütun satır adları; öğrencinin dolduracağı hücreleri BOŞ bırak. Bu durumda tabloyu scenario metnine tekrar yazma. Doldurulacak tablo yoksa "" bırak.
 Kapak, yönerge ve genel notları soru sayma.
 SADECE şu JSON'u döndür: {"items":[{"title":"","scenario":"","question":"","rubric":[{"criterion":"","maxPoints":5,"description":""}],"figureSvg":"","answerTable":""}]}
@@ -77,6 +77,7 @@ ${text.slice(0, MAX_TEXT).replace(/"""/g, "'''")}
     // PDF'teki şekilleri (resim, çizim, tablo) soru numarasına göre otomatik kırp: 1., 2., 3. … sorular sırayla eşlenir.
     const itemsWithImages: Array<(typeof items)[number] & { figureImage?: string | null }> = items
     let imageCount = 0
+    const imageDropped: number[] = [] // şekli bulunup kabul sınırına sığmayan sorular (yönetici uyarılır)
     try {
       const known = new Set(items.map((_, i) => i + 1))
       const result = await figuresForPages(new Uint8Array(pdfBytes), { fromPage: 0, pages: 40, lastQuestion: 0, knownNumbers: known })
@@ -85,15 +86,16 @@ ${text.slice(0, MAX_TEXT).replace(/"""/g, "'''")}
         const current = best.get(figure.questionNumber)
         if (!current || figure.data.length > current.data.length) best.set(figure.questionNumber, { data: figure.data, mime: figure.mime })
       }
+      for (const number of result.tooLarge) if (!best.has(number)) imageDropped.push(number)
       for (const [number, figure] of best) {
         const item = itemsWithImages[number - 1]
         const dataUrl = `data:${figure.mime};base64,${figure.data.toString('base64')}`
-        if (item && dataUrl.length <= 900000) { item.figureImage = dataUrl; imageCount++ }
+        if (item && dataUrl.length <= FIGURE_IMAGE_MAX_CHARS) { item.figureImage = dataUrl; imageCount++ } else if (item) imageDropped.push(number)
       }
     } catch (figureError) {
       console.error('[open-ended-scenario-parse] şekil kırpma başarısız', figureError instanceof Error ? figureError.message : figureError)
     }
-    return NextResponse.json({ items: itemsWithImages, truncated: text.length > MAX_TEXT, imageCount })
+    return NextResponse.json({ items: itemsWithImages, truncated: text.length > MAX_TEXT, imageCount, imageDropped: [...new Set(imageDropped)].sort((a, b) => a - b) })
   } catch (error) {
     console.error('[open-ended-scenario-parse]', error instanceof Error ? error.message : error)
     return NextResponse.json({ error: 'Dosya yapılandırılamadı, tekrar deneyin.' }, { status: 500 })

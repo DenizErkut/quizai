@@ -68,7 +68,9 @@ export function normalizeRubricTo100(rubric: ScenarioRubricItem[]): ScenarioRubr
   return scaled
 }
 
-const SVG_ALLOWED_TAGS = new Set(['svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'text', 'tspan', 'defs', 'marker', 'title', 'desc'])
+// Gradyan/kırpma etiketleri: fotoğraf benzeri (güneş, galaksi, kişi illüstrasyonu) sade çizimlerde kullanılır; yalnızca sayfa içi (#kimlik) referansı kabul edilir.
+const SVG_ALLOWED_TAGS = new Set(['svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'text', 'tspan', 'defs', 'marker', 'title', 'desc', 'lineargradient', 'radialgradient', 'stop', 'clippath'])
+export const FIGURE_SVG_MAX_CHARS = 40000
 
 /**
  * Yapay zekâdan ya da yöneticiden gelen SVG'yi güvenli hâle getirir: yalnızca çizim etiketleri kalır;
@@ -78,7 +80,7 @@ const SVG_ALLOWED_TAGS = new Set(['svg', 'g', 'path', 'rect', 'circle', 'ellipse
 export function sanitizeFigureSvg(input: unknown): string | null {
   if (typeof input !== 'string') return null
   const raw = input.trim()
-  if (!raw || raw.length > 20000) return null
+  if (!raw || raw.length > FIGURE_SVG_MAX_CHARS) return null
   const start = raw.search(/<svg[\s>]/i)
   const end = raw.lastIndexOf('</svg>')
   if (start < 0 || end < 0) return null
@@ -86,14 +88,16 @@ export function sanitizeFigureSvg(input: unknown): string | null {
   const out = body
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<\/?\s*([a-zA-Z][\w:-]*)([^>]*)>/g, (full, tag: string, attrs: string) => {
-      const name = tag.toLowerCase()
-      if (!SVG_ALLOWED_TAGS.has(name)) return ''
+      const lowered = tag.toLowerCase()
+      if (!SVG_ALLOWED_TAGS.has(lowered)) return ''
+      const name = ({ lineargradient: 'linearGradient', radialgradient: 'radialGradient', clippath: 'clipPath' } as Record<string, string>)[lowered] || lowered
       if (full.startsWith('</')) return `</${name}>`
       const kept = attrs.replace(/\s+([a-zA-Z_:][\w:.-]*)\s*=\s*("[^"]*"|'[^']*')/g, (_m: string, attr: string, value: string) => {
         const lower = attr.toLowerCase()
         const val = value.slice(1, -1)
         if (lower.startsWith('on') || lower === 'style' || lower === 'href' || lower === 'xlink:href') return ''
-        if (/javascript:|url\s*\(|data:|expression\(/i.test(val)) return ''
+        // url(#kimlik) (gradyan/kırpma) serbest; harici url(), javascript:, data: ve expression() kaldırılır.
+        if (/javascript:|data:|expression\(/i.test(val) || /url\s*\((?!\s*['"]?#[\w-]+['"]?\s*\))/i.test(val)) return ''
         return ` ${attr}=${value}`
       }).replace(/\s*\/\s*$/, '')
       const selfClose = /\/\s*>$/.test(full) ? ' /' : ''
@@ -108,10 +112,11 @@ export function svgDataUri(svg: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
 }
 
-/** PDF'ten kırpılan şekil görseli: yalnızca PNG/JPEG data URL ve en çok 900.000 karakter. */
+/** PDF'ten kırpılan şekil görseli: yalnızca PNG/JPEG data URL ve en çok FIGURE_IMAGE_MAX_CHARS karakter. */
+export const FIGURE_IMAGE_MAX_CHARS = 900000
 export function sanitizeFigureImage(input: unknown): string | null {
   if (typeof input !== 'string') return null
-  return /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+=*$/.test(input) && input.length <= 900000 ? input : null
+  return /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+=*$/.test(input) && input.length <= FIGURE_IMAGE_MAX_CHARS ? input : null
 }
 
 export type AnswerTable = { headers: string[]; rows: string[][] }

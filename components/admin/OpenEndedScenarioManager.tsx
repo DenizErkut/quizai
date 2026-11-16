@@ -97,7 +97,7 @@ export default function OpenEndedScenarioManager() {
         })
         if (res.ok) saved++
       }
-      setMessage(`${saved} / ${data.items.length} senaryo taslak olarak kaydedildi. ${data.imageCount ? ` ${data.imageCount} şekil PDF'ten otomatik kırpıldı.` : ''} Gözden geçirip yayınlayın.${data.truncated ? ' (Dosya uzun: sonraki bölümler okunmadı.)' : ''}`)
+      setMessage(`${saved} / ${data.items.length} senaryo taslak olarak kaydedildi. ${data.imageCount ? ` ${data.imageCount} şekil PDF'ten otomatik kırpıldı.` : ''}${Array.isArray(data.imageDropped) && data.imageDropped.length ? ` ⚠️ ${data.imageDropped.join(', ')}. sorunun şekli çok büyük olduğu için eklenemedi; ilgili soruyu düzenleyip şekli elle ekleyin.` : ''} Gözden geçirip yayınlayın.${data.truncated ? ' (Dosya uzun: sonraki bölümler okunmadı.)' : ''}`)
       setPdfOpen(false); setPdfFile(null); await load()
     } catch (error) { setMessage(error instanceof Error ? error.message : 'PDF işlenemedi.') }
     finally { setBusy(false) }
