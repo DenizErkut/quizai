@@ -117,7 +117,8 @@ const MAX_FIGURE_BYTES = 640_000
 // Bu başlıklar sorulardan sonra gelen bölümlerin (cevap anahtarı, kazanım tablosu…) başlangıcıdır; soru şekli sayılmaz.
 const END_OF_QUESTIONS = /^\s*(?:cevap\s+anahtar[ıi]|soru\s*-\s*kazan[ıi]m\s+e[sş]le[sş]tirme\s+tablosu|kazan[ıi]m\s+e[sş]le[sş]tirme\s+tablosu|puanlama\s+(?:anahtar[ıi]|k[ıi]lavuzu)|değerlendirme\s+ölçeği)\s*:?\s*$/iu
 
-type CanvasLike = { width: number; height: number; getContext(type: '2d'): any; toBuffer(mime: 'image/png'): Buffer; toBuffer(mime: 'image/jpeg', quality?: number): Buffer }
+type Ctx2d = { fillStyle: unknown; fillRect(x: number, y: number, w: number, h: number): void; drawImage(image: unknown, sx: number, sy: number, sw: number, sh: number, dx: number, dy: number, dw: number, dh: number): void }
+type CanvasLike = { width: number; height: number; getContext(type: '2d'): Ctx2d; toBuffer(mime: 'image/png'): Buffer; toBuffer(mime: 'image/jpeg', quality?: number): Buffer }
 
 /**
  * Şekli kabul sınırına sığacak biçimde kodlar: önce PNG (çizim/tablo için keskin), fotoğraf ve renkli illüstrasyonlarda
