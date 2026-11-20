@@ -10,6 +10,8 @@ type GtagWindow = Window & { dataLayer?: unknown[]; gtag?: (...args: unknown[]) 
 export function prepareGoogleTag(win: GtagWindow = window as GtagWindow): void {
   win.dataLayer = win.dataLayer || []
   if (!win.gtag) {
+    // Google'ın gtag komutları dataLayer'a dizi değil `arguments` nesnesi olarak itilmelidir; rest parametre bunu bozar.
+    // eslint-disable-next-line prefer-rest-params
     win.gtag = function gtag() { win.dataLayer!.push(arguments) }
     win.gtag('consent', 'default', { analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied', wait_for_update: 500 })
   }
