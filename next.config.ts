@@ -5,12 +5,12 @@ import type { NextConfig } from 'next'
 // satırları olarak birikir. Bir hafta ihlal görülmediğinde `Content-Security-Policy`e çevrilebilir.
 const cspReportOnly = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
-  "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com",
+  "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com https://www.googletagmanager.com https://*.google-analytics.com",
   "media-src 'self' blob: https://*.supabase.co",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com",
   "frame-src 'self' https://www.paytr.com",
   "form-action 'self' https://www.paytr.com",
   "frame-ancestors 'self'",
