@@ -34,6 +34,11 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }]
   },
+  // www.pratium.com ve pratium.com aynı sayfaları sunuyordu; Search Console'da "kullanıcı tarafından seçilen standart sayfa olmadan kopya"
+  // olarak görünüyordu. Tek adres: sitemap, robots ve yapılandırılmış veri apex alan adını (https://pratium.com) kullanır.
+  async redirects() {
+    return [{ source: '/:path*', has: [{ type: 'host', value: 'www.pratium.com' }], destination: 'https://pratium.com/:path*', permanent: true }]
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: '25mb',

@@ -16,6 +16,7 @@ import IdentityGuard from '@/components/IdentityGuard'
 import { I18nProvider } from '@/lib/i18n/I18nProvider'
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://pratium.com'),
   title: 'Pratium — Öğren. Test Et. Geliş.',
   description: 'Sınıfına ve konuna göre AI destekli anlık test platformu. Günlük test, kişisel analiz ve gelişim planı.',
   manifest: '/manifest.json',
