@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
   if (body.action === 'open') {
     if (state.attempt.status !== 'in_progress') return NextResponse.json({ error: 'Bu deneme tamamlandı.' }, { status: 409 })
     if (!body.questionId) return NextResponse.json({ error: 'questionId gerekli.' }, { status: 400 })
-    const { data: question } = await db.from('written_exam_questions').select('id,set_id,position,title,objective_code,scenario,question,max_points,rubric').eq('id', body.questionId).eq('set_id', state.attempt.set_id).maybeSingle()
+    const { data: question } = await db.from('written_exam_questions').select('id,set_id,position,title,objective_code,scenario,question,max_points,rubric,figure_svg,figure_image').eq('id', body.questionId).eq('set_id', state.attempt.set_id).maybeSingle()
     if (!question) return NextResponse.json({ error: 'Soru bulunamadı.' }, { status: 404 })
     const done = state.rows.find(row => row.questionId === question.id)
     if (done?.graded) return NextResponse.json({ error: 'Bu soru zaten cevaplandı.', result: done }, { status: 409 })
@@ -119,13 +119,14 @@ export async function POST(req: NextRequest) {
       const { data: session, error } = await db.from('open_ended_sessions').insert({
         user_id: user.id, grade: profile.grade, subject: set?.subject || '', topic: question.title || set?.title || '',
         scenario: question.scenario || '', question: question.question, rubric: question.rubric, total_possible: question.max_points,
+        figure_svg: question.figure_svg || null, figure_image: question.figure_image || null,
       }).select('id').single()
       if (error || !session) return NextResponse.json({ error: 'Soru açılamadı.' }, { status: 500 })
       const { error: linkError } = await db.from('written_exam_attempt_items').insert({ attempt_id: body.attemptId, question_id: question.id, session_id: session.id })
       if (linkError) return NextResponse.json({ error: 'Soru açılamadı.' }, { status: 500 })
       sessionId = session.id
     }
-    return NextResponse.json({ sessionId, position: question.position, title: question.title, objectiveCode: question.objective_code, scenario: question.scenario, question: question.question, maxPoints: question.max_points })
+    return NextResponse.json({ sessionId, position: question.position, title: question.title, objectiveCode: question.objective_code, scenario: question.scenario, question: question.question, maxPoints: question.max_points, figureSvg: question.figure_svg || null, figureImage: question.figure_image || null })
   }
 
   if (body.action === 'finish') {

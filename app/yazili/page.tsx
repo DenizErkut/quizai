@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { splitTextBlocks } from '@/lib/written-exam'
+import { splitTextBlocks, stripMissingFigureNote } from '@/lib/written-exam'
+import { svgDataUri } from '@/lib/open-ended-scenarios'
 import { compressImage } from '@/lib/image-compress'
 import { useT } from '@/lib/i18n/I18nProvider'
 import AnswerSections from '@/components/AnswerSections'
@@ -16,7 +17,7 @@ type Row = { questionId: string; position: number; title: string; maxPoints: num
   criteriaResults?: CriteriaResult[]; overallFeedback?: string; studentAnswer?: string
   question?: string; rubric?: Array<{ criterion: string; maxPoints: number; description?: string }>; answerKey?: string }
 type Summary = { totalEarned: number; totalPossible: number; answered: number; percent: number }
-type Current = { sessionId: string; position: number; title: string; scenario: string; question: string; maxPoints: number; questionId: string }
+type Current = { sessionId: string; position: number; title: string; scenario: string; question: string; maxPoints: number; questionId: string; figureSvg?: string | null; figureImage?: string | null }
 
 // Satır sonlarını koruyan metin; "A | B | C" biçimli ardışık satırlar tablo olarak gösterilir.
 function RichText({ text, style }: { text: string; style?: React.CSSProperties }) {
@@ -246,7 +247,11 @@ export default function YaziliPage() {
             <div style={{ height: '6px', borderRadius: '6px', background: 'var(--border)', marginBottom: '14px' }}><div style={{ height: '100%', width: `${Math.round((answeredCount / Math.max(1, rows.length)) * 100)}%`, borderRadius: '6px', background: '#7c3aed' }} /></div>
             <div className="card" style={{ padding: '1.25rem' }}>
               {current.title && <div style={{ fontWeight: 800, marginBottom: '8px' }}>{current.title} <span style={{ fontWeight: 600, color: 'var(--text2)', fontSize: '12px' }}>({current.maxPoints})</span></div>}
-              {current.scenario && <RichText text={current.scenario} style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7 }} />}
+              {current.scenario && <RichText text={current.figureSvg || current.figureImage ? stripMissingFigureNote(current.scenario) : current.scenario} style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7 }} />}
+              {(current.figureSvg || current.figureImage) && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={current.figureImage || svgDataUri(current.figureSvg as string)} alt={t('Soru görseli')} style={{ maxWidth: '100%', height: 'auto', borderRadius: 8, margin: '6px 0 10px', background: '#fff' }} />
+              )}
               <RichText text={current.question} style={{ fontSize: '15px', fontWeight: 600, lineHeight: 1.6 }} />
             </div>
             {step === 'question' ? (

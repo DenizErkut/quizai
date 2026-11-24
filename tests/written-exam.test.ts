@@ -67,3 +67,18 @@ test('print helpers: table html, lines and code', () => {
   assert.match(html, /Soru 1/)
   assert.match(html, /ABCD1234/)
 })
+
+import { stripMissingFigureNote } from '../lib/written-exam'
+
+test('stripMissingFigureNote eksik görsel notunu temizler', () => {
+  assert.equal(stripMissingFigureNote('Tabloya bakın. (Görsel metinde yer almamaktadır; şekil PDF\'te) Soru'), 'Tabloya bakın. Soru')
+  assert.equal(stripMissingFigureNote('Normal metin'), 'Normal metin')
+})
+
+test('validateQuestions geçerli PNG şeklini korur, geçersizi atar', () => {
+  const base = { title: 'S', question: 'Soru metni', maxPoints: 5, rubric: [{ criterion: 'a)', maxPoints: 5, description: 'd' }] }
+  const good = validateQuestions([{ ...base, figureImage: 'data:image/png;base64,AAAA' }])
+  assert.ok(good.ok && good.questions[0].figureImage?.startsWith('data:image/png'))
+  const bad = validateQuestions([{ ...base, figureImage: 'javascript:alert(1)' }])
+  assert.ok(bad.ok && !bad.questions[0].figureImage)
+})
