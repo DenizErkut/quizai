@@ -127,7 +127,7 @@ test('measured router uses operational cost and volume metrics in shadow mode wi
   const usage = readFileSync(join(process.cwd(), 'lib/ai-usage.ts'), 'utf8')
   const observationApi = readFileSync(join(process.cwd(), 'app/api/admin/provider-observability/route.ts'), 'utf8')
   expect(providerRouter).toContain('routerRecommendedEngine: decision.recommendedEngine || decision.engine')
-  expect(usage).toContain('meta: { outcome: 'success', ...(u.meta || {}) }')
+  expect(usage).toContain("meta: { outcome: 'success', ...(u.meta || {}) }")
   expect(observationApi).toContain('routerShadow: [...routerShadow.values()]')
   expect(live).toContain('await pickMeasuredQuizEngine')
   expect(exam).toContain('await pickMeasuredQuizEngine')
