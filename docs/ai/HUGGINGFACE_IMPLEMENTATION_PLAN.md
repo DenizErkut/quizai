@@ -46,7 +46,7 @@ Efor: S ≈ ≤ 1 gün · M ≈ 2–5 gün · L ≈ 1–3 hafta (tek geliştiric
 | Madde | Durum |
 |---|---|
 | P1-1 Benchmark çalıştırıcısı | **Kodlandı** (`lib/ai-benchmark/metrics.ts`, `scripts/ai-benchmark/run.mjs`, 3 sentetik tohum küme: matematik, JSON uyumu, yinelenen soru). Yalnız `--mock` ile doğrulandı; gerçek model ölçümü yok. Altın veri setleri (kazanım, açık uçlu, yanılgı) **henüz yok**. |
-| P1-2 Model doğrulama kartları | **Araç ve süreç hazır** (`scripts/ai-benchmark/verify-model-card.mjs`, `docs/ai/models/README.md`). Kartlar üretilmedi: bu ortam Hub'a erişemiyor. |
+| P1-2 Model doğrulama kartları | **Tamamlandı (teknik kısım)**: Hub erişimi açıldıktan sonra 27 model için kart üretildi (`docs/ai/models/*.json`); bulgular `HUGGINGFACE_MODEL_COMPARISON.md` §0'da. Hukuk onayı (`humanApproval`) hâlâ boş. Önemli bulgular: bge-m3'te safetensors yok, PaddleOCR-VL uzak kod ister, Qwen3.8-Flash-Next/2.4T lisansı "other". |
 | P1-3 Embedding çevrimdışı ölçüm | **Beklemede**: altın kazanım eşleşmeleri `question_bank`'ta yok (tablo `objective_code` taşımıyor); kaynak tablo belirlenmeli; ücretli/anahtarlı embedding erişimi (G3) gerekir. |
 | P1-4 Tier 0 genişletmeleri | **Canlıda** (`lib/answer-equivalence.ts` → `check-answer`; kapatma `AI_TIER0_EXT=off`). `lib/text-similarity.ts` (MinHash) hazır, henüz hiçbir rotaya bağlı değil. CAS tipi ifade doğrulama ve `verify-math` değişimi yapılmadı (`verifyMathWithOpenAI` kodda **kullanılmıyor**). |
 | P1-5 OpenAI-uyumlu adapter | **Kodlandı, karanlık** (`lib/ai-gateway/adapters/openai-compatible.ts`; `AIProvider` genişletildi; `registerModelPrice`). Hiçbir rota çağırmıyor. |

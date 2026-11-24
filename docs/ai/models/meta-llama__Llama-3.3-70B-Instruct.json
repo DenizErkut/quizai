@@ -1,0 +1,29 @@
+{
+  "id": "meta-llama/Llama-3.3-70B-Instruct",
+  "sha": "6f6073b423013f6a7d4d9f39144961bfbfbc386b",
+  "license": "llama3.3",
+  "licenseName": null,
+  "gated": "manual",
+  "lastModified": "2024-12-21T18:28:01.000Z",
+  "languages": [
+    "en",
+    "fr",
+    "it",
+    "pt",
+    "hi",
+    "es",
+    "th",
+    "de"
+  ],
+  "pipeline": "text-generation",
+  "hasSafetensors": true,
+  "hasPickleWeights": true,
+  "hasLicenseFile": true,
+  "needsRemoteCode": false,
+  "warnings": [
+    "KAPILI_MODEL: kabul kaydı arşivle (ör. Llama)",
+    "PICKLE_AĞIRLIK_VAR: yalnız safetensors dosyalarını kullan"
+  ],
+  "verifiedAt": "2026-11-24T17:48:15.670Z",
+  "humanApproval": null
+}

@@ -1,6 +1,6 @@
 # Model Doğrulama Kartları (P1-2)
 
-Her aday model üretime girmeden önce bu klasörde bir kart (`<org>__<model>.json` + gerekirse `.md`) taşımalıdır. Kart, `scripts/ai-benchmark/verify-model-card.mjs` ile **huggingface.co'ya erişimi olan bir ortamda** üretilir (bu çalışma ortamı Hub'a erişemedi; script ağsız `--from-file` ile sınandı, gerçek Hub'a karşı denenmedi).
+Her aday model üretime girmeden önce bu klasörde bir kart (`<org>__<model>.json` + gerekirse `.md`) taşımalıdır. Kart, `scripts/ai-benchmark/verify-model-card.mjs` ile **huggingface.co'ya erişimi olan bir ortamda** üretilir (Node'un `fetch`'i proxy'yi kullanması için `NODE_USE_ENV_PROXY=1` ve `NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt` ortam değişkenleri gerekir; script 24 Kasım 2026'da gerçek Hub'a karşı çalıştırıldı).
 
 ```
 node scripts/ai-benchmark/verify-model-card.mjs BAAI/bge-m3 --out docs/ai/models

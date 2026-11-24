@@ -1,0 +1,17 @@
+{
+  "id": "Qwen/Qwen3-Embedding-8B",
+  "sha": "1d8ad4ca9b3dd8059ad90a75d4983776a23d44af",
+  "license": "apache-2.0",
+  "licenseName": null,
+  "gated": false,
+  "lastModified": "2025-07-07T09:02:21.000Z",
+  "languages": [],
+  "pipeline": "feature-extraction",
+  "hasSafetensors": true,
+  "hasPickleWeights": false,
+  "hasLicenseFile": true,
+  "needsRemoteCode": false,
+  "warnings": [],
+  "verifiedAt": "2026-11-24T17:48:05.634Z",
+  "humanApproval": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "Qwen/Qwen3-Reranker-0.6B",
+  "sha": "e61197ed45024b0ed8a2d74b80b4d909f1255473",
+  "license": "apache-2.0",
+  "licenseName": null,
+  "gated": false,
+  "lastModified": "2026-04-16T08:55:59.000Z",
+  "languages": [],
+  "pipeline": "text-ranking",
+  "hasSafetensors": true,
+  "hasPickleWeights": false,
+  "hasLicenseFile": false,
+  "needsRemoteCode": false,
+  "warnings": [
+    "LICENSE_DOSYASI_YOK"
+  ],
+  "verifiedAt": "2026-11-24T17:48:45.334Z",
+  "humanApproval": null
+}

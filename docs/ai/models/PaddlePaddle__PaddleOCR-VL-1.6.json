@@ -1,0 +1,23 @@
+{
+  "id": "PaddlePaddle/PaddleOCR-VL-1.6",
+  "sha": "132c45f52c0a26ed5a6b2f6bd8e3985794cc27dd",
+  "license": "apache-2.0",
+  "licenseName": null,
+  "gated": false,
+  "lastModified": "2026-11-06T16:34:18.000Z",
+  "languages": [
+    "en",
+    "zh",
+    "multilingual"
+  ],
+  "pipeline": "image-text-to-text",
+  "hasSafetensors": true,
+  "hasPickleWeights": false,
+  "hasLicenseFile": true,
+  "needsRemoteCode": true,
+  "warnings": [
+    "UZAK_KOD_GEREKİYOR: trust_remote_code=False ile çalışmaz"
+  ],
+  "verifiedAt": "2026-11-24T17:48:13.411Z",
+  "humanApproval": null
+}

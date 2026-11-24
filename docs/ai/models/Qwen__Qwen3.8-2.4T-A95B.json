@@ -1,0 +1,17 @@
+{
+  "id": "Qwen/Qwen3.8-2.4T-A95B",
+  "sha": "4f885e51d6bbfee5866446d56d3f96f336c39723",
+  "license": "other",
+  "licenseName": "qwen3.8-max",
+  "gated": false,
+  "lastModified": "2026-11-07T04:46:47.000Z",
+  "languages": [],
+  "pipeline": "text-generation",
+  "hasSafetensors": true,
+  "hasPickleWeights": false,
+  "hasLicenseFile": true,
+  "needsRemoteCode": false,
+  "warnings": [],
+  "verifiedAt": "2026-11-24T17:48:43.962Z",
+  "humanApproval": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "google/gemma-4-12B-it",
+  "sha": "43c9d014b231474fa7212dbb48a762566c2b255d",
+  "license": "apache-2.0",
+  "licenseName": null,
+  "gated": false,
+  "lastModified": "2026-10-30T15:47:58.000Z",
+  "languages": [],
+  "pipeline": "any-to-any",
+  "hasSafetensors": true,
+  "hasPickleWeights": false,
+  "hasLicenseFile": false,
+  "needsRemoteCode": false,
+  "warnings": [
+    "LICENSE_DOSYASI_YOK"
+  ],
+  "verifiedAt": "2026-11-24T17:48:08.762Z",
+  "humanApproval": null
+}

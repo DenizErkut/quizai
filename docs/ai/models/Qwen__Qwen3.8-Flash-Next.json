@@ -1,0 +1,19 @@
+{
+  "id": "Qwen/Qwen3.8-Flash-Next",
+  "sha": "812d96e10a0dd82b69d749e68693698cf6c36daa",
+  "license": "other",
+  "licenseName": "qwen-community-1.0",
+  "gated": "auto",
+  "lastModified": "2026-11-07T04:42:40.000Z",
+  "languages": [],
+  "pipeline": "image-text-to-text",
+  "hasSafetensors": true,
+  "hasPickleWeights": false,
+  "hasLicenseFile": true,
+  "needsRemoteCode": false,
+  "warnings": [
+    "KAPILI_MODEL: kabul kaydı arşivle (ör. Llama)"
+  ],
+  "verifiedAt": "2026-11-24T17:48:43.252Z",
+  "humanApproval": null
+}
