@@ -203,7 +203,7 @@ export default function WrittenExamManager() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input type="file" accept=".pdf,.txt,.md" onChange={e => setFile(e.target.files?.[0] || null)} />
           <button className="btn btn-ghost" onClick={parseFile} disabled={busy || !file}>Dosyadan soruları ayıkla</button>
-          <button className="btn btn-ghost" onClick={fetchFigures} disabled={busy || !file || !questions.length}>PDF'den şekilleri getir</button>
+          <button className="btn btn-ghost" onClick={fetchFigures} disabled={busy || !file || !questions.length}>PDF&apos;den şekilleri getir</button>
           <span style={{ fontSize: 12, color: 'var(--text2)' }}>Öğrenci sayfaları + öğretmen cevap anahtarı aynı dosyada olmalı. Yapay zeka soru üretmez, yalnızca ayıklar.</span>
         </div>
       </div>
