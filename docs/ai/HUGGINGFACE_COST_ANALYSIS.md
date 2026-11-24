@@ -80,7 +80,7 @@ Bu kalemler Hugging Face'ten bağımsız olup **hemen** uygulanabilir; ölçülm
 
 | Kalem | Dayanak | Tahmini etki |
 |---|---|---|
-| Claude Sonnet 4.5 → 5.5 geçişi **tamamlanmış** (4.5 son kullanım 9 Eki; 30 Kas'ta kapanıyor) — geçmiş kayıtlardaki fark tasarruf nedeni | 2.026 çağrı sonnet-4-5 = 28,67 USD; sonnet-5-5 fiyatı `ai-pricing.ts`'e göre 2/10 USD (4.5: 3/15) | Birim fiyat %33 düşük; ancak `lib/claude-models.ts` Sonnet 5.5'in aynı metin için ≈ %30 daha fazla token ürettiğini söylüyor → net tasarruf ≈ %13 (**tahmin**, ölçülmeli) |
+| Claude Sonnet 4.5 → 5.5 geçişi **büyük ölçüde tamamlanmış** (4.5 son kullanım 9 Eki; tek kalıntı yönetici `education-eval/run/route.ts:199`; 4.5 30 Kas'ta kapanıyor) — geçmiş kayıtlardaki fark tasarruf nedeni | 2.026 çağrı sonnet-4-5 = 28,67 USD; sonnet-5-5 fiyatı `ai-pricing.ts`'e göre 2/10 USD (4.5: 3/15) | Birim fiyat %33 düşük; ancak `lib/claude-models.ts` Sonnet 5.5'in aynı metin için ≈ %30 daha fazla token ürettiğini söylüyor → net tasarruf ≈ %13 (**tahmin**, ölçülmeli) |
 | Anthropic `cache_control`'ün `generate-quiz` dışındaki statik istemlere yayılması | Yalnız `generate-quiz`'de var; OpenAI otomatik cache 6,26 M token tasarruf etmiş | Statik istem payına bağlı; **tahmin ≤ %10–20** (ölçülmeli) |
 | Gemini hata zincirinde devre kesici | `outcome` kaydı olan 137 Gemini çağrısının hepsi `provider_error` | Boşa harcanan çağrı tasarrufu (tutarı küçük, ama gecikmeyi kısaltır) |
 | `question_bank` yeniden kullanımı (5.774 kayıt) | Üretim yerine bankadan sunma | Üretimin bir bölümü sıfır maliyet |

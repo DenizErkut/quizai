@@ -35,9 +35,11 @@ Efor: S ≈ ≤ 1 gün · M ≈ 2–5 gün · L ≈ 1–3 hafta (tek geliştiric
 * **Kabul:** 7 gün içinde yeni satırların ≥ %99'unda `duration_ms` ve `meta.outcome` dolu; tüketilen maliyet toplamı değişmez.
 * **Geri alma:** commit revert; yalnız günlük alanı olduğundan kullanıcıyı etkilemez.
 
-### P0-3 · Sonnet 4.5 kapanış denetimi (30 Kasım) — **doğrulandı, işlem gerekmiyor**
-* **Durum:** `ai_usage_logs`'ta `claude-sonnet-4-5*` son kullanım 9 Ekim 2026; son 14 günde 0 satır. Kodda (fiyat tablosu dışında) 4.5 modeli geçmiyor. Fiyat kaydı geçmiş satırlar için kalmalı.
-* **Geri alma / acil durum:** `ANTHROPIC_PREMIUM_MODEL` ortam değişkeni.
+### P0-3 · Sonnet 4.5 kapanış denetimi (30 Kasım) — **1 kalıntı bulundu**
+* **Öncelik:** P0 (tarihli) · **Değer:** Yönetici değerlendirme koşusunun 30 Kasım'dan sonra hata vermesini önler. **Efor:** S · **Bağımlılık:** G1.
+* **Bulgu:** Üretim günlüğünde `claude-sonnet-4-5*` son kullanım 9 Ekim 2026 (son 14 günde 0 satır); ancak `app/api/admin/education-eval/run/route.ts:199` Claude yolunda hâlâ `'claude-sonnet-4-5'` sabit adını kullanıyor (yalnız yönetici MEB değerlendirme koşusu; öğrenci akışı etkilenmez).
+* **İş:** Bu satırı `CLAUDE_SONNET` sabitine bağla (`lib/claude-models.ts`).
+* **Kabul:** `grep -rn "sonnet-4-5" app lib` yalnız `ai-pricing.ts` (geçmiş fiyat) döndürür; tip/test kapıları yeşil. **Geri alma:** commit revert.
 
 ## P1 — Düşük riskli ilk değer (çevrimdışı/gölge)
 
