@@ -1,0 +1,19 @@
+{
+  "id": "Qwen/Qwen3-Embedding-0.6B",
+  "sha": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+  "license": "apache-2.0",
+  "licenseName": null,
+  "gated": false,
+  "lastModified": "2026-04-20T02:45:58.000Z",
+  "languages": [],
+  "pipeline": "feature-extraction",
+  "hasSafetensors": true,
+  "hasPickleWeights": false,
+  "hasLicenseFile": false,
+  "needsRemoteCode": false,
+  "warnings": [
+    "LICENSE_DOSYASI_YOK"
+  ],
+  "verifiedAt": "2026-11-24T17:48:04.119Z",
+  "humanApproval": null
+}

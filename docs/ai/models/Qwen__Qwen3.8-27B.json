@@ -1,0 +1,17 @@
+{
+  "id": "Qwen/Qwen3.8-27B",
+  "sha": "37561816e66b5b9153b1b64c10968c18c1e6f4a0",
+  "license": "apache-2.0",
+  "licenseName": null,
+  "gated": false,
+  "lastModified": "2026-11-07T04:42:17.000Z",
+  "languages": [],
+  "pipeline": "image-text-to-text",
+  "hasSafetensors": true,
+  "hasPickleWeights": false,
+  "hasLicenseFile": true,
+  "needsRemoteCode": false,
+  "warnings": [],
+  "verifiedAt": "2026-11-24T17:48:42.450Z",
+  "humanApproval": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "Qwen/Qwen3-VL-8B-Instruct",
+  "sha": "0c351dd01ed87e9c1b53cbc748cba10e6187ff3b",
+  "license": "apache-2.0",
+  "licenseName": null,
+  "gated": false,
+  "lastModified": "2025-10-15T16:16:59.000Z",
+  "languages": [],
+  "pipeline": "image-text-to-text",
+  "hasSafetensors": true,
+  "hasPickleWeights": false,
+  "hasLicenseFile": false,
+  "needsRemoteCode": false,
+  "warnings": [
+    "LICENSE_DOSYASI_YOK"
+  ],
+  "verifiedAt": "2026-11-24T17:48:14.821Z",
+  "humanApproval": null
+}

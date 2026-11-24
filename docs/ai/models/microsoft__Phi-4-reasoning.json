@@ -1,0 +1,19 @@
+{
+  "id": "microsoft/Phi-4-reasoning",
+  "sha": "1de18ec97600877ce63dbf60c73b998da99f0195",
+  "license": "mit",
+  "licenseName": null,
+  "gated": false,
+  "lastModified": "2025-11-24T16:57:55.000Z",
+  "languages": [
+    "en"
+  ],
+  "pipeline": "text-generation",
+  "hasSafetensors": true,
+  "hasPickleWeights": false,
+  "hasLicenseFile": true,
+  "needsRemoteCode": false,
+  "warnings": [],
+  "verifiedAt": "2026-11-24T17:48:11.914Z",
+  "humanApproval": null
+}

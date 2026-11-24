@@ -11,6 +11,38 @@ Tarih: 24 Kasım 2026. **Bu belge bir ön eleme listesidir, model seçimi değil
 
 Model sürümleri hızla değişir. "Resmî kaynaktan doğrulandı" demek için her aday için `revision` (commit SHA) sabitlenip LICENSE dosyasıyla birlikte arşivlenmelidir (`HUGGINGFACE_SECURITY.md`).
 
+## 0. Hub'dan doğrudan doğrulama (24 Kasım 2026) — bu bölüm aşağıdaki ◻ işaretlerinin yerine geçer
+
+Hub erişimi açıldıktan sonra `scripts/ai-benchmark/verify-model-card.mjs` ile **Hub API'sinden** (`huggingface.co/api/models/<id>`) okunmuş değerler; ham kartlar `docs/ai/models/*.json` dosyalarındadır (commit SHA'ları orada). Bağlam penceresi `config.json` → `max_position_embeddings`'ten; dil sayısı model kartı README'sinden alınmıştır. **Bunlar kalite ölçümü değildir.**
+
+| Model | Lisans (Hub etiketi) | Safetensors | Uzak kod | Bağlam | Diller (kart) | Son güncelleme | Not |
+|---|---|---|---|---|---|---|---|
+| `BAAI/bge-m3` | MIT | **YOK** (yalnız `pytorch_model.bin` + `onnx/model.onnx`) | hayır | 8.194 | çok dilli (kart listesi yok) | 2024-07-03 | **Kural 4 (yalnız safetensors) ile çelişir** → ya ONNX kullanılır ya da güvenilir bir safetensors dönüşümü kendi hesabımıza yapılır (hash'li) |
+| `intfloat/multilingual-e5-large-instruct` | MIT | var | hayır | 514 | 94 dil, **tr var** | 2025-07-10 | 0,6 B parametre; kısa bağlam |
+| `Qwen/Qwen3-Embedding-0.6B / 4B / 8B` | Apache-2.0 | var | hayır | 32.768 / 40.960 / – | – | 2026-04 / 2025-06 / 2025-07 | 8B'de LICENSE dosyası var |
+| `BAAI/bge-reranker-v2-m3` | Apache-2.0 | var | hayır | – | – | 2024-06-24 | Yeniden sıralama (kazanım eşleme) adayı |
+| `Qwen/Qwen3-Reranker-0.6B` | Apache-2.0 | var | hayır | – | – | 2026-04-16 | Aynı amaç |
+| `Qwen/Qwen3-8B`, `Qwen3-235B-A22B` | Apache-2.0 | var | hayır | 40.960 | "100+ dil" (kart) | 2025-07-26 | **Eski nesil**: daha yeni Qwen sürümleri var (aşağıda) |
+| `Qwen/Qwen3.5-9B` | Apache-2.0 | var | hayır | 262.144 | – | 2026-03-02 | Çok modlu (görsel+metin) |
+| `Qwen/Qwen3.6-27B`, `Qwen3.6-35B-A3B` | Apache-2.0 | var | hayır | – | – | 2026-11 | Çok modlu |
+| `Qwen/Qwen3.8-27B` | Apache-2.0 | var | hayır | 262.144 | – | 2026-11-07 | 27,8 B, çok modlu; Groq'ta önizleme olarak listelenen model |
+| `Qwen/Qwen3.8-Flash-Next`, `Qwen3.8-2.4T-A95B` | **"other"** (özel lisans) | var | hayır | 262.144 | – | 2026-11-07 | **Lisans metni incelenmeden kullanılamaz (G6)** |
+| `google/gemma-4-E4B-it` / `12B-it` / `26B-A4B-it` / `31B-it` | Apache-2.0 | var | hayır | 131.072 / 262.144 / – / 262.144 | **140+ dilde ön eğitim, 35+ dilde hazır destek** (kart) | 2026-07 → 2026-11 | Çok modlu; kart: belge/PDF ayrıştırma, çok dilli OCR, el yazısı tanıma; ASR yalnız E2B/E4B/12B |
+| `mistralai/Mistral-Small-3.2-24B-Instruct-2506` | Apache-2.0 | var | hayır | 131.072 | 24 dil listesi, **tr var** | 2025-12-22 | |
+| `mistralai/Mistral-Small-4-119B-2603` | Apache-2.0 | var | hayır | – | – | 2026-11-24 | 119 B; çok büyük |
+| `microsoft/Phi-4-reasoning` | MIT | var | hayır | 32.768 | 1 dil (en) | 2025-11-24 | **Kart tek dil (İngilizce) listeliyor** → Türkçe soru çözümünde zayıf olabilir; yalnız matematik doğrulaması için düşünülmeli |
+| `openai/whisper-large-v3-turbo` | MIT | var | hayır | – | 99 dil, **tr var** | 2024-10-04 | 0,8 B |
+| `PaddlePaddle/PaddleOCR-VL` / `-1.6` | Apache-2.0 | var | **EVET (custom_code)** | – | – | 2026-11-06 | **`trust_remote_code=False` kuralıyla çelişir** → yerel olarak vLLM/Transformers'ın yerel desteği doğrulanmadıkça kullanılmaz |
+| `Qwen/Qwen3-VL-8B-Instruct` | Apache-2.0 | var | hayır | – | – | 2025-10-15 | OCR/görsel soru adayı |
+| `meta-llama/Llama-3.3-70B-Instruct` | `llama3.3` (özel) | var (+pickle) | hayır | – | – | 2024-12-21 | **Kapılı (`gated=manual`)**; onay + AUP; G6 |
+
+### Bu doğrulamanın değiştirdiği kararlar
+1. **Aday listesi yenilendi.** Raporlardaki Qwen3/Gemma 4 odağına ek olarak **Qwen3.5/3.6/3.8** ve **Gemma 4 12B** vardır; hepsi Apache-2.0'dır (Qwen3.8-Flash-Next ve 2.4T hariç). Eski Qwen3 modelleri karşılaştırma tabanı olarak kalsın, ölçümde yeni nesil modeller öncelikli olsun.
+2. **Gemma 4, Türkçe/çok modlu işlerin ilk adayıdır:** Apache-2.0, 140+ dil, 256K bağlam, görsel + OCR + el yazısı + (E4B/12B'de) ses. Bu, hem görsel soru analizi hem kâğıt aktarımı hem STT için tek model ailesi anlamına gelebilir — **ölçülmeden iddia edilmez**.
+3. **bge-m3 üretime doğrudan alınamaz** (safetensors yok). Seçenekler: (a) `onnx/model.onnx` (`onnx` formatı pickle değildir, ancak çalışma zamanı bağımlılığı onnxruntime), (b) dönüşümü kendimiz yapıp SHA sabitlemek, (c) `intfloat/multilingual-e5-large-instruct` (MIT, safetensors) veya `Qwen3-Embedding-0.6B` ile başlamak.
+4. **PaddleOCR-VL ve Phi-4-reasoning (Türkçe için)** mevcut güvenlik kuralları/kart verisi nedeniyle ilk dalgadan çıkarıldı.
+5. **Hâlâ doğrulanamayanlar:** modellerin Türkçe başarımı, JSON uyumu, hallucination (hepsi benchmark gerektirir); Hugging Face Inference Providers'ın güncel fiyatı/model kapsamı; `Qwen3` embedding'lerinin Türkçe geri çağırma performansı.
+
 ## 1. Aday ailelerin doğrulanmış lisans/erişim bilgisi
 
 | Aile / model | Lisans | Durum | Kaynak |

@@ -1,0 +1,21 @@
+{
+  "id": "BAAI/bge-m3",
+  "sha": "5617a9f61b028005a4858fdac845db406aefb181",
+  "license": "mit",
+  "licenseName": null,
+  "gated": false,
+  "lastModified": "2024-07-03T14:50:10.000Z",
+  "languages": [],
+  "pipeline": "sentence-similarity",
+  "hasSafetensors": false,
+  "hasPickleWeights": true,
+  "hasLicenseFile": false,
+  "needsRemoteCode": false,
+  "warnings": [
+    "SAFETENSORS_YOK: üretime alma",
+    "PICKLE_AĞIRLIK_VAR: yalnız safetensors dosyalarını kullan",
+    "LICENSE_DOSYASI_YOK"
+  ],
+  "verifiedAt": "2026-11-24T17:48:02.580Z",
+  "humanApproval": null
+}

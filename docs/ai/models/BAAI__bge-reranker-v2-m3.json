@@ -1,0 +1,21 @@
+{
+  "id": "BAAI/bge-reranker-v2-m3",
+  "sha": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+  "license": "apache-2.0",
+  "licenseName": null,
+  "gated": false,
+  "lastModified": "2024-06-24T14:08:45.000Z",
+  "languages": [
+    "multilingual"
+  ],
+  "pipeline": "text-classification",
+  "hasSafetensors": true,
+  "hasPickleWeights": false,
+  "hasLicenseFile": false,
+  "needsRemoteCode": false,
+  "warnings": [
+    "LICENSE_DOSYASI_YOK"
+  ],
+  "verifiedAt": "2026-11-24T17:48:44.686Z",
+  "humanApproval": null
+}
