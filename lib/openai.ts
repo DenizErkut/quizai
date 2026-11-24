@@ -45,6 +45,17 @@ async function callOpenAI(messages: {role: string, content: unknown}[], options:
   // süre kaydediliyor.
   const startedAt = Date.now()
   let res: Response
+  // 24 Kasım 2026 (P0-2): başarısız çağrılar da kaydedilir. Ölçümlü router zaten kendi hatasını yazıyorsa
+  // (meta.routingPolicyVersion) çift sayılmaması için burada yazılmaz.
+  const logFailure = (error: unknown) => {
+    if (options.meta?.routingPolicyVersion) return
+    const e = error as { name?: string; status?: number } | null
+    void logOpenAIUsage(options.operation || 'openai', model, null, {
+      userId: options.userId, quizSessionId: options.quizSessionId, requestId: options.requestId,
+      durationMs: Date.now() - startedAt,
+      meta: { ...(options.meta || {}), outcome: 'error', errorType: e?.name || 'UnknownError', status: e?.status ?? null },
+    })
+  }
   try {
     res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -61,10 +72,16 @@ async function callOpenAI(messages: {role: string, content: unknown}[], options:
       }),
       signal: controller.signal,
     })
+  } catch (error) {
+    logFailure(error)
+    throw error
   } finally {
     if (timeout) clearTimeout(timeout)
   }
-  if (!res.ok) throw new Error(`OpenAI ${res.status}: ${await res.text()}`)
+  if (!res.ok) {
+    logFailure({ name: 'OpenAIHttpError', status: res.status })
+    throw new Error(`OpenAI ${res.status}: ${await res.text()}`)
+  }
   const data = await res.json()
   const durationMs = Date.now() - startedAt
   // Gerçek token tüketimini logla (best-effort, ana akışı bozmaz)

@@ -16,6 +16,7 @@
 //  - Sağlayıcı-agnostik: Anthropic, OpenAI ve Gemini usage formatlarını
 //    normalize eden yardımcılar içerir.
 
+import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server-create-client'
 
 import { computeCostUsd, priceFor, type AIUsageInput } from './ai-pricing'
@@ -23,6 +24,49 @@ import { computeCostUsd, priceFor, type AIUsageInput } from './ai-pricing'
 export { computeCostUsd, type AIUsageInput }
 
 const warnedUnpriced = new Set<string>()
+
+// ── Anthropic süre ve hata ölçümü (24 Kasım 2026, AI altyapı planı P0-2) ──
+// ~35 çağrı noktasında Anthropic süresi hiç ölçülmüyordu (ai_usage_logs.duration_ms boştu) ve başarısız çağrılar
+// kaydedilmiyordu. Çağrı noktalarına dokunmadan, SDK'nın messages.create'ini bir kez sarıyoruz: süre yanıt kimliğiyle
+// saklanır (logAnthropicUsage okur), hata ise `anthropic-call-failed` satırı olarak yazılır. Davranış değişmez:
+// orijinal promise aynen döner; ölçüm yalnızca yan etkidir ve asla fırlatmaz.
+const ANTHROPIC_DURATIONS = new Map<string, number>()
+const ANTHROPIC_TIMING_FLAG = Symbol.for('pratium.anthropic.timing.v1')
+type MessagesProto = { create?: (...args: unknown[]) => PromiseLike<unknown> } & Record<symbol, unknown>
+
+function installAnthropicTiming(): void {
+  try {
+    const proto = (Anthropic as unknown as { Messages?: { prototype: MessagesProto } }).Messages?.prototype
+    if (!proto || proto[ANTHROPIC_TIMING_FLAG] || typeof proto.create !== 'function') return
+    const original = proto.create
+    proto.create = function patchedCreate(this: unknown, ...args: unknown[]) {
+      const startedAt = Date.now()
+      const pending = original.apply(this, args)
+      try {
+        pending.then(
+          (message) => {
+            const id = (message as { id?: unknown } | null)?.id
+            if (typeof id === 'string') {
+              ANTHROPIC_DURATIONS.set(id, Date.now() - startedAt)
+              if (ANTHROPIC_DURATIONS.size > 500) ANTHROPIC_DURATIONS.delete(ANTHROPIC_DURATIONS.keys().next().value as string)
+            }
+          },
+          (error) => {
+            const model = String((args[0] as { model?: unknown } | undefined)?.model || 'unknown')
+            const e = error as { name?: string; status?: number } | null
+            void logAIUsage({
+              operation: 'anthropic-call-failed', provider: 'anthropic', model, inputTokens: 0, outputTokens: 0,
+              durationMs: Date.now() - startedAt, meta: { outcome: 'error', errorType: e?.name || 'UnknownError', status: e?.status ?? null },
+            })
+          },
+        )
+      } catch { /* ölçüm asla çağrıyı bozmaz */ }
+      return pending
+    }
+    proto[ANTHROPIC_TIMING_FLAG] = true
+  } catch { /* SDK yapısı değişirse ölçüm sessizce devre dışı kalır */ }
+}
+installAnthropicTiming()
 
 // Ana loglama fonksiyonu. Hem console'a (Vercel logları) hem DB'ye yazar.
 // DB yazımı best-effort'tur; hata olursa yutulur ve sadece console'a düşer.
@@ -63,7 +107,7 @@ export async function logAIUsage(u: AIUsageInput): Promise<void> {
       request_id: u.requestId || null,
       pricing_version: pricingVersion,
       duration_ms: u.durationMs ?? null,
-      meta: u.meta || null,
+      meta: { outcome: 'success', ...(u.meta || {}) },
     })
     if (error) console.warn(`[ai-usage] DB log başarısız (yutuldu): ${error.message}`)
   } catch (e) {
@@ -83,9 +127,12 @@ export function logAnthropicUsage(
   extra?: Partial<AIUsageInput>
 ): Promise<void> {
   const usage = response?.usage || {}
+  const measuredDuration = typeof response?.id === 'string' ? ANTHROPIC_DURATIONS.get(response.id) : undefined
+  if (measuredDuration !== undefined) ANTHROPIC_DURATIONS.delete(response.id)
   return logAIUsage({
     operation,
     provider: 'anthropic',
+    durationMs: measuredDuration,
     model,
     inputTokens: usage.input_tokens || 0,
     outputTokens: usage.output_tokens || 0,

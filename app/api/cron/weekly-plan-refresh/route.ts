@@ -12,7 +12,6 @@
 //      generator.ts, computeAutonomousGoals).
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
-import { getIdentitiesBySupabaseIds } from '@/lib/identity/client'
 import { generateStudyPlan } from '@/lib/study-plan-generator'
 import { isCronAuthorized } from '@/lib/cron-auth'
 
@@ -69,13 +68,11 @@ export async function GET(req: NextRequest) {
   const { data: profiles } = await supabaseAdmin
     .from('profiles').select('id, grade, language').in('id', toRegenerate)
   const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]))
-  const identities = await getIdentitiesBySupabaseIds(toRegenerate)
 
   let generated = 0, failed = 0
   for (const uid of toRegenerate) {
     try {
       const prof = profileMap.get(uid)
-      const identity = (identities)[uid]
       // Faz 7 (sürekli öğrenme döngüsü): önceki planın hedef anlık
       // görüntüsü varsa, "geçen hafta bu konulara odaklandın, sonuç
       // şöyleydi" bağlamı yeni plana otomatik ekleniyor.
@@ -83,7 +80,6 @@ export async function GET(req: NextRequest) {
       const result = await generateStudyPlan(supabaseAdmin, uid, {
         grade: prof?.grade,
         language: prof?.language,
-        displayName: identity?.full_name,
         previousGoals,
       })
       if (!result) { failed++; continue }
