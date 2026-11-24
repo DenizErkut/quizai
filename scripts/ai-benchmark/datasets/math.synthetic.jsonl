@@ -1,0 +1,20 @@
+{"id": "math-01", "category": "math", "scorer": "number", "prompt": "16 × 29 + 9 işleminin sonucu kaçtır? Yalnızca sayıyı yaz.", "expected": 473}
+{"id": "math-02", "category": "math", "scorer": "number", "prompt": "(16 + 18) × 5 işleminin sonucu kaçtır? Yalnızca sayıyı yaz.", "expected": 170}
+{"id": "math-03", "category": "math", "scorer": "number", "prompt": "Kenarı 7 cm olan karenin çevresi kaç cm'dir? Yalnızca sayıyı yaz.", "expected": 28}
+{"id": "math-04", "category": "math", "scorer": "number", "prompt": "88 ÷ 4 işleminin sonucu kaçtır? Yalnızca sayıyı yaz.", "expected": 22}
+{"id": "math-05", "category": "math", "scorer": "number", "prompt": "5 × 16 + 6 işleminin sonucu kaçtır? Yalnızca sayıyı yaz.", "expected": 86}
+{"id": "math-06", "category": "math", "scorer": "number", "prompt": "(6 + 4) × 2 işleminin sonucu kaçtır? Yalnızca sayıyı yaz.", "expected": 20}
+{"id": "math-07", "category": "math", "scorer": "number", "prompt": "Kenarı 21 cm olan karenin çevresi kaç cm'dir? Yalnızca sayıyı yaz.", "expected": 84}
+{"id": "math-08", "category": "math", "scorer": "number", "prompt": "88 ÷ 4 işleminin sonucu kaçtır? Yalnızca sayıyı yaz.", "expected": 22}
+{"id": "math-09", "category": "math", "scorer": "number", "prompt": "21 × 2 + 3 işleminin sonucu kaçtır? Yalnızca sayıyı yaz.", "expected": 45}
+{"id": "math-10", "category": "math", "scorer": "number", "prompt": "(3 + 3) × 5 işleminin sonucu kaçtır? Yalnızca sayıyı yaz.", "expected": 30}
+{"id": "math-11", "category": "math", "scorer": "number", "prompt": "Kenarı 30 cm olan karenin çevresi kaç cm'dir? Yalnızca sayıyı yaz.", "expected": 120}
+{"id": "math-12", "category": "math", "scorer": "number", "prompt": "182 ÷ 7 işleminin sonucu kaçtır? Yalnızca sayıyı yaz.", "expected": 26}
+{"id": "math-13", "category": "math", "scorer": "number", "prompt": "16 × 20 + 5 işleminin sonucu kaçtır? Yalnızca sayıyı yaz.", "expected": 325}
+{"id": "math-14", "category": "math", "scorer": "number", "prompt": "(18 + 9) × 6 işleminin sonucu kaçtır? Yalnızca sayıyı yaz.", "expected": 162}
+{"id": "math-15", "category": "math", "scorer": "number", "prompt": "Kenarı 17 cm olan karenin çevresi kaç cm'dir? Yalnızca sayıyı yaz.", "expected": 68}
+{"id": "math-16", "category": "math", "scorer": "number", "prompt": "96 ÷ 6 işleminin sonucu kaçtır? Yalnızca sayıyı yaz.", "expected": 16}
+{"id": "math-17", "category": "math", "scorer": "number", "prompt": "15 × 19 + 3 işleminin sonucu kaçtır? Yalnızca sayıyı yaz.", "expected": 288}
+{"id": "math-18", "category": "math", "scorer": "number", "prompt": "(24 + 10) × 7 işleminin sonucu kaçtır? Yalnızca sayıyı yaz.", "expected": 238}
+{"id": "math-19", "category": "math", "scorer": "number", "prompt": "Kenarı 26 cm olan karenin çevresi kaç cm'dir? Yalnızca sayıyı yaz.", "expected": 104}
+{"id": "math-20", "category": "math", "scorer": "number", "prompt": "6 ÷ 3 işleminin sonucu kaçtır? Yalnızca sayıyı yaz.", "expected": 2}

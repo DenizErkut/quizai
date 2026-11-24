@@ -1,4 +1,4 @@
-export type AIProvider = 'deterministic' | 'approved_content' | 'mistral' | 'openai' | 'anthropic' | 'google'
+export type AIProvider = 'deterministic' | 'approved_content' | 'mistral' | 'openai' | 'anthropic' | 'google' | 'huggingface' | 'together' | 'groq' | 'selfhosted'
 
 export type IntelligenceTask =
   | 'quiz_generation'

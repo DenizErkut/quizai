@@ -1,3 +1,4 @@
+import { compareAnswers } from '@/lib/answer-equivalence'
 import { CLAUDE_SONNET, SONNET_PARAMS, responseText, sonnetTokens } from '@/lib/claude-models'
 import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 30
@@ -57,6 +58,13 @@ export async function POST(req: NextRequest) {
     // Tam eşleşme kontrolü (case-insensitive, trim)
     if (normCorrect === normUser) {
       return NextResponse.json({ correct: true })
+    }
+
+    // Tier 0 (AI altyapı planı P1-4): sayı/kesir/birim/Türkçe harf denkliği AI'sız çözülür; kapatma: AI_TIER0_EXT=off
+    if (process.env.AI_TIER0_EXT !== 'off') {
+      const equivalence = compareAnswers(String(correctAnswer), String(userAnswer))
+      if (equivalence === 'equal') return NextResponse.json({ correct: true })
+      if (equivalence === 'different') return NextResponse.json({ correct: false })
     }
 
     // Kısa cevap (≤3 kelime) — AI'sız direkt karşılaştır, partial match yok
