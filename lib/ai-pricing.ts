@@ -74,6 +74,13 @@ const PRICE_VERSIONS: Record<string, string> = {
   'mistral-small-latest': 'mistral-small-official-2026-10',
 }
 
+// Çalışma zamanında fiyat kaydı (P1-5): HF/Together/Groq/self-host modelleri için fiyatlar kodda sabitlenmez; yapılandırmadan
+// (ör. AI_EXTRA_PRICES_JSON) ve "kaynak+tarih" sürümüyle eklenir. Kayıtsız model maliyeti 0 loglanır ve uyarı verir.
+export function registerModelPrice(model: string, price: Price, version: string): void {
+  PRICES[model] = price
+  PRICE_VERSIONS[model] = version
+}
+
 // Fiyat listesinde olmayan bir model gelirse maliyeti 0 loglanır ama token
 // yine kaydedilir (sonradan fiyat eklenip yeniden hesaplanabilir).
 export function priceFor(model: string, occurredAt: Date): { price: Price; version: string } | null {
@@ -88,7 +95,7 @@ export function priceFor(model: string, occurredAt: Date): { price: Price; versi
 
 export interface AIUsageInput {
   operation: string            // 'generate-quiz', 'verify-questions:gpt4o' vb.
-  provider: 'anthropic' | 'openai' | 'google' | 'mistral'
+  provider: 'anthropic' | 'openai' | 'google' | 'mistral' | 'huggingface' | 'together' | 'groq' | 'selfhosted'
   model: string
   inputTokens: number
   outputTokens: number

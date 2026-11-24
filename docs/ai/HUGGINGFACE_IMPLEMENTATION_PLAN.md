@@ -41,6 +41,18 @@ Efor: S ≈ ≤ 1 gün · M ≈ 2–5 gün · L ≈ 1–3 hafta (tek geliştiric
 * **İş:** Bu satırı `CLAUDE_SONNET` sabitine bağla (`lib/claude-models.ts`).
 * **Kabul:** `grep -rn "sonnet-4-5" app lib` yalnız `ai-pricing.ts` (geçmiş fiyat) döndürür; tip/test kapıları yeşil. **Geri alma:** commit revert.
 
+## P1 durum özeti (24 Kasım 2026)
+
+| Madde | Durum |
+|---|---|
+| P1-1 Benchmark çalıştırıcısı | **Kodlandı** (`lib/ai-benchmark/metrics.ts`, `scripts/ai-benchmark/run.mjs`, 3 sentetik tohum küme: matematik, JSON uyumu, yinelenen soru). Yalnız `--mock` ile doğrulandı; gerçek model ölçümü yok. Altın veri setleri (kazanım, açık uçlu, yanılgı) **henüz yok**. |
+| P1-2 Model doğrulama kartları | **Araç ve süreç hazır** (`scripts/ai-benchmark/verify-model-card.mjs`, `docs/ai/models/README.md`). Kartlar üretilmedi: bu ortam Hub'a erişemiyor. |
+| P1-3 Embedding çevrimdışı ölçüm | **Beklemede**: altın kazanım eşleşmeleri `question_bank`'ta yok (tablo `objective_code` taşımıyor); kaynak tablo belirlenmeli; ücretli/anahtarlı embedding erişimi (G3) gerekir. |
+| P1-4 Tier 0 genişletmeleri | **Canlıda** (`lib/answer-equivalence.ts` → `check-answer`; kapatma `AI_TIER0_EXT=off`). `lib/text-similarity.ts` (MinHash) hazır, henüz hiçbir rotaya bağlı değil. CAS tipi ifade doğrulama ve `verify-math` değişimi yapılmadı (`verifyMathWithOpenAI` kodda **kullanılmıyor**). |
+| P1-5 OpenAI-uyumlu adapter | **Kodlandı, karanlık** (`lib/ai-gateway/adapters/openai-compatible.ts`; `AIProvider` genişletildi; `registerModelPrice`). Hiçbir rota çağırmıyor. |
+| P1-6 Dayanıklılık | **Kitaplık hazır** (`lib/ai-gateway/resilience.ts`: retry+jitter, devre kesici). Mevcut üretim çağrılarına **bağlanmadı** (P2-4 ile). |
+| P1-7 Sağlayıcı veri politikası defteri | **Şablon** (`docs/ai/PROVIDER_REGISTRY.md`); hukuk/sözleşme teyidi bekliyor (G6). |
+
 ## P1 — Düşük riskli ilk değer (çevrimdışı/gölge)
 
 ### P1-1 · Benchmark çalıştırıcısı ve altın veri setleri
