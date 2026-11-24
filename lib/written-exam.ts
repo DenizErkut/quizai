@@ -1,6 +1,7 @@
 // "Yazılıya Hazırlanıyorum": yönetici yüklediği hazır açık uçlu soru setleri ve öğrenci akışı için ortak türler/doğrulama.
 // Yapay zeka bu akışta soru üretmez; yalnızca yüklenen metni yapılandırır ve cevapları rubriğe göre puanlar.
 import { extractGradeNumber } from './subject-map-grade'
+import { sanitizeFigureImage, sanitizeFigureSvg } from './open-ended-scenarios'
 
 export type RubricCriterion = { criterion: string; maxPoints: number; description: string }
 export type WrittenQuestionDraft = {
@@ -12,12 +13,19 @@ export type WrittenQuestionDraft = {
   maxPoints: number
   rubric: RubricCriterion[]
   answerKey: string
+  figureSvg?: string | null
+  figureImage?: string | null
 }
 export type SetSlot = { gradeNumber: number; subject: string; term: number; examNumber: number }
 
 export const TERM_LABELS: Record<number, string> = { 1: '1. dönem', 2: '2. dönem' }
 export const MAX_QUESTIONS = 40
 const clean = (value: unknown, max: number) => (typeof value === 'string' ? value.replace(/\r/g, '').trim().slice(0, max) : '')
+
+/** PDF'te şekil yer almadığı için konulan "(Görsel metinde yer almamaktadır …)" notunu, soruya şekil eklendiğinde kaldırır. */
+export function stripMissingFigureNote(text: string): string {
+  return text.replace(/\(\s*Görsel\s+metinde\s+yer\s+almamaktadır[^)]*\)\s*/giu, '').replace(/[ \t]{2,}/g, ' ').trim()
+}
 
 export function rubricTotal(rubric: Array<{ maxPoints: number }>): number {
   return rubric.reduce((sum, item) => sum + (Number(item.maxPoints) || 0), 0)
@@ -81,6 +89,8 @@ export function validateQuestions(raw: unknown): { ok: true; questions: WrittenQ
       maxPoints,
       rubric,
       answerKey: clean(item?.answerKey, 4000),
+      figureSvg: sanitizeFigureSvg(item?.figureSvg),
+      figureImage: sanitizeFigureImage(item?.figureImage),
     })
   }
   return { ok: true, questions, totalPoints: questions.reduce((sum, q) => sum + q.maxPoints, 0) }

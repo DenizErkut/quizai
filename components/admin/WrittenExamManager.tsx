@@ -5,9 +5,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import LocationSelect from '@/components/LocationSelect'
 import type { LocationValue } from '@/lib/location/validate'
+import { svgDataUri } from '@/lib/open-ended-scenarios'
 
 type Criterion = { criterion: string; maxPoints: number; description: string }
-type Question = { title: string; objectiveCode: string; scenario: string; question: string; maxPoints: number; rubric: Criterion[]; answerKey: string }
+type Question = { title: string; objectiveCode: string; scenario: string; question: string; maxPoints: number; rubric: Criterion[]; answerKey: string; figureSvg?: string | null; figureImage?: string | null }
 type SetRow = { id: string; title: string; grade_number: number; subject: string; term: number; exam_number: number; country: string; state: string | null; city: string | null; status: string; total_points: number; question_count: number }
 
 const emptyQuestion = (): Question => ({ title: '', objectiveCode: '', scenario: '', question: '', maxPoints: 8, rubric: [{ criterion: 'a)', maxPoints: 8, description: '' }], answerKey: '' })
@@ -68,6 +69,7 @@ export default function WrittenExamManager() {
       setQuestions((data.questions as Array<Record<string, unknown>>).map(q => ({
         title: String(q.title || ''), objectiveCode: String(q.objective_code || ''), scenario: String(q.scenario || ''), question: String(q.question || ''),
         maxPoints: Number(q.max_points) || 0, rubric: (q.rubric as Criterion[]) || [], answerKey: String(q.answer_key || ''),
+        figureSvg: q.figure_svg ? String(q.figure_svg) : null, figureImage: q.figure_image ? String(q.figure_image) : null,
       })))
       setEditing(true)
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Set açılamadı.') }
@@ -83,9 +85,28 @@ export default function WrittenExamManager() {
       const response = await fetch('/api/admin/written-exam/parse', { method: 'POST', headers: await authHeader(), body: form })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Dosya işlenemedi.')
-      setQuestions(data.questions); setWarnings(data.warnings || [])
-      setMessage(`${data.questions.length} soru ayıklandı. Kaydetmeden önce her soruyu ve rubriği kontrol edin.`)
+      setQuestions(data.questions)
+      const dropped: number[] = Array.isArray(data.imageDropped) ? data.imageDropped : []
+      setWarnings([...(data.warnings || []), ...(dropped.length ? [`Şu sorulardaki şekiller çok büyük olduğu için eklenemedi: ${dropped.join(', ')}. Elle ekleyin veya sorudan çıkarın.`] : [])])
+      setMessage(`${data.questions.length} soru ayıklandı${data.imageCount ? `, ${data.imageCount} soruya şekil eklendi` : ''}. Kaydetmeden önce her soruyu, şekli ve rubriği kontrol edin.`)
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Dosya işlenemedi.') }
+    finally { setBusy(false) }
+  }
+
+  // Mevcut sorulara PDF'teki şekilleri ekler (yapay zekâ çağrılmaz; metin/rubrik değişmez).
+  async function fetchFigures() {
+    if (!file || !questions.length) { setMessage('Önce set için PDF dosyasını seçin.'); return }
+    setBusy(true); setMessage('PDF içindeki şekiller okunuyor…')
+    try {
+      const form = new FormData()
+      form.append('file', file); form.append('figuresOnly', '1'); form.append('count', String(questions.length))
+      const response = await fetch('/api/admin/written-exam/parse', { method: 'POST', headers: await authHeader(), body: form })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Şekiller alınamadı.')
+      const found = new Map<number, string>((data.figures as Array<{ number: number; figureImage: string }>).map(f => [f.number, f.figureImage]))
+      setQuestions(list => list.map((q, i) => found.has(i + 1) ? { ...q, figureImage: found.get(i + 1) as string, figureSvg: null } : q))
+      setMessage(`${found.size} soruya şekil eklendi. Kaydet'e basarak onaylayın.`)
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Şekiller alınamadı.') }
     finally { setBusy(false) }
   }
 
@@ -182,6 +203,7 @@ export default function WrittenExamManager() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input type="file" accept=".pdf,.txt,.md" onChange={e => setFile(e.target.files?.[0] || null)} />
           <button className="btn btn-ghost" onClick={parseFile} disabled={busy || !file}>Dosyadan soruları ayıkla</button>
+          <button className="btn btn-ghost" onClick={fetchFigures} disabled={busy || !file || !questions.length}>PDF'den şekilleri getir</button>
           <span style={{ fontSize: 12, color: 'var(--text2)' }}>Öğrenci sayfaları + öğretmen cevap anahtarı aynı dosyada olmalı. Yapay zeka soru üretmez, yalnızca ayıklar.</span>
         </div>
       </div>
@@ -201,6 +223,13 @@ export default function WrittenExamManager() {
               <button className="btn btn-ghost" onClick={() => setQuestions(list => list.filter((_, i) => i !== qi))}>Sil</button>
             </div>
             <textarea style={{ ...field, minHeight: 50 }} value={q.scenario} onChange={e => patchQuestion(qi, { scenario: e.target.value })} placeholder="Ortak bağlam / tablo (varsa)" />
+            {(q.figureImage || q.figureSvg) && (
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={q.figureImage || svgDataUri(q.figureSvg as string)} alt={`${qi + 1}. soru şekli`} style={{ maxWidth: 360, maxHeight: 220, border: '1px solid var(--border)', borderRadius: 6, background: '#fff' }} />
+                <button className="btn btn-ghost" onClick={() => patchQuestion(qi, { figureImage: null, figureSvg: null })}>Görseli kaldır</button>
+              </div>
+            )}
             <textarea style={{ ...field, minHeight: 80 }} value={q.question} onChange={e => patchQuestion(qi, { question: e.target.value })} placeholder="Soru metni (a, b, c alt maddeleriyle)" />
             <div style={{ fontSize: 12, fontWeight: 700, color: sum === Number(q.maxPoints) ? '#0a9e90' : '#c0392b' }}>Rubrik: {sum} / {q.maxPoints} puan</div>
             {q.rubric.map((c, ci) => (

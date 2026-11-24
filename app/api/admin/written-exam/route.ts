@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   if (id) {
     const [{ data: set }, { data: questions }] = await Promise.all([
       db.from('written_exam_sets').select(SET_COLUMNS).eq('id', id).maybeSingle(),
-      db.from('written_exam_questions').select('position,title,objective_code,scenario,question,max_points,rubric,answer_key').eq('set_id', id).order('position'),
+      db.from('written_exam_questions').select('position,title,objective_code,scenario,question,max_points,rubric,answer_key,figure_svg,figure_image').eq('set_id', id).order('position'),
     ])
     if (!set) return NextResponse.json({ error: 'Set bulunamadı.' }, { status: 404 })
     return NextResponse.json({ set, questions: questions || [] })
@@ -90,6 +90,7 @@ export async function POST(req: NextRequest) {
   const rows = checked.questions.map(q => ({
     set_id: setId, position: q.position, title: q.title, objective_code: q.objectiveCode || null, scenario: q.scenario,
     question: q.question, max_points: q.maxPoints, rubric: q.rubric, answer_key: q.answerKey,
+    figure_svg: q.figureSvg || null, figure_image: q.figureImage || null,
   }))
   const { error: insertError } = await db.from('written_exam_questions').insert(rows)
   if (insertError) {
