@@ -9,6 +9,7 @@ import { logAnthropicUsage } from '@/lib/ai-usage'
 import { inspectTutorInput, inspectTutorOutput } from '@/lib/tutor-safety'
 import { requireAgentCapability, requireOwnStudentScope, writeAgentDecisionAudit } from '@/lib/agent-security-policy'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { maskPii } from '@/lib/ai-gateway/pii-guard'
 
 const client = new Anthropic()
 type TutorQuestion = { q: string; opts: string[]; ans: number; exp?: string; userAns?: number }
@@ -149,7 +150,7 @@ SOKRATİK ÖĞRETİM KURALLARI (interaktif sohbette geçerli — tek seferlik an
       system: systemPrompt + approvalBoundary,
       messages: safeMessages.map(m => ({
         role: m.role,
-        content: m.content,
+        content: m.role === 'user' ? maskPii(m.content) : m.content,
       })),
     })
 

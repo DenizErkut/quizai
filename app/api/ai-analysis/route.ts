@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
 import Anthropic from '@anthropic-ai/sdk'
 import { logAnthropicUsage } from '@/lib/ai-usage'
-import { getIdentityBySupabaseId } from '@/lib/identity/client'
 import { checkRateLimit, rateLimitExceeded } from '@/lib/rate-limit'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
@@ -24,8 +23,6 @@ export async function POST(req: NextRequest) {
   { const limit = await checkRateLimit(user.id, { endpoint: 'ai-analysis', limit: 30 }); if (!limit.allowed) return rateLimitExceeded(limit) }
 
   const { data: profile } = await supabase.from('profiles').select('grade,language').eq('id', user.id).single()
-  const identity = await getIdentityBySupabaseId(user.id)
-  const displayName = identity?.full_name ?? 'Öğrenci'
   const body = await req.json()
   const { weakTopics } = body
 
@@ -34,7 +31,7 @@ export async function POST(req: NextRequest) {
     max_tokens: sonnetTokens(1000),
     messages: [{
       role: 'user',
-      content: `Sen bir eğitim koçusun. ${displayName} adlı ${profile?.grade} öğrencisi için analiz yap.
+      content: `Sen bir eğitim koçusun. ${profile?.grade} seviyesindeki bir öğrenci için analiz yap.
 
 Zayıf konular: ${weakTopics}
 

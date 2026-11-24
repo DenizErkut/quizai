@@ -155,7 +155,7 @@ export async function evaluatePreviousGoals(
 export async function generateStudyPlan(
   supabase: SupabaseClient,
   userId: string,
-  opts: { grade?: string; language?: string; displayName?: string; previousGoals?: AutonomousGoal[] }
+  opts: { grade?: string; language?: string; previousGoals?: AutonomousGoal[] }
 ): Promise<GeneratedPlanResult | null> {
   const goals = await computeAutonomousGoals(supabase, userId)
 
@@ -206,7 +206,7 @@ export async function generateStudyPlan(
     max_tokens: sonnetTokens(1500),
     messages: [{
       role: 'user',
-      content: `Sen bir egitim kocusun. ${opts.displayName || 'Öğrenci'} icin 4 haftalik kisisel calisma plani olustur.
+      content: `Sen bir egitim kocusun. Bir ogrenci icin 4 haftalik kisisel calisma plani olustur.
 Profil: ${opts.grade || ''}
 Ortalama basari: %${avgPct}
 Toplam test: ${sessions?.length || 0}

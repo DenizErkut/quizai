@@ -5,6 +5,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server-create-client'
 import { isProviderConfigured } from '@/lib/ai-gateway'
+import { CLAUDE_SONNET } from '@/lib/claude-models'
 import { generateWithRoutedProvider, pickQuizEngine, type ForceProvider } from '@/lib/ai-gateway/quiz-provider-router'
 import { createBlindEvalPrompt, hasCompleteEvalRating, preferredEvalRun, isCompleteBenchmark, parseBlindEvalAnswer, shouldUnblindResults, toBlindQuestion } from '@/lib/education-eval-runner'
 
@@ -196,7 +197,7 @@ export async function POST(req: NextRequest) {
         const { data: usage } = await db.from('ai_usage_logs').select('input_tokens,output_tokens,cost_usd')
           .eq('request_id', requestId).order('created_at', { ascending: false }).limit(1).maybeSingle()
         const row = { run_id: run.id, benchmark_item_id: next.id, provider_key: provider.key, blind_label: blindLabel,
-          model: decision.engine === 'gpt-4.1-mini' ? 'gpt-4.1-mini' : decision.engine === 'mistral' ? (process.env.MISTRAL_PRIMARY_MODEL || 'mistral-large-latest') : decision.engine === 'claude-haiku' ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5',
+          model: decision.engine === 'gpt-4.1-mini' ? 'gpt-4.1-mini' : decision.engine === 'mistral' ? (process.env.MISTRAL_PRIMARY_MODEL || 'mistral-large-latest') : decision.engine === 'claude-haiku' ? 'claude-haiku-4-5-20251001' : CLAUDE_SONNET,
           status: 'completed', answer_index: answer?.answerIndex ?? null,
           is_correct: answer ? answer.answerIndex === Number(next.answer_key.answerIndex) : false,
           explanation: answer?.explanation || (response.text || '').slice(0, 2000),

@@ -5,7 +5,6 @@ import { gateTeacherFeature } from '@/lib/teacher-access'
 import { createClient } from '@/lib/supabase/server-create-client'
 import Anthropic from '@anthropic-ai/sdk'
 import { logAnthropicUsage } from '@/lib/ai-usage'
-import { getIdentityBySupabaseId } from '@/lib/identity/client'
 import { requireAgentCapability, requireAssignedStudentScope, writeAgentDecisionAudit } from '@/lib/agent-security-policy'
 
 const supabaseAdmin = createClient(
@@ -101,7 +100,6 @@ export async function POST(req: NextRequest) {
     .select('grade')
     .eq('id', student_id)
     .maybeSingle()
-  const studentIdentity = await getIdentityBySupabaseId(student_id)
 
   // Ödev bilgisi
   const { data: assignment } = await supabaseAdmin
@@ -140,7 +138,6 @@ export async function POST(req: NextRequest) {
   const prompt = `Sen deneyimli bir Türk eğitim uzmanısın. Bir öğrencinin ödev sonucunu analiz edeceksin.
 
 ## Öğrenci Bilgisi
-Ad: ${studentIdentity?.full_name ?? 'Bilinmiyor'}
 Sınıf: ${profile?.grade ?? 'Bilinmiyor'}
 
 ## Ödev Bilgisi

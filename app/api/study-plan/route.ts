@@ -5,7 +5,6 @@
 // lib/study-plan-generator.ts üzerinden paylaşılıyor.
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server-create-client'
-import { getIdentityBySupabaseId } from '@/lib/identity/client'
 import { generateStudyPlan } from '@/lib/study-plan-generator'
 
 export const maxDuration = 60
@@ -26,8 +25,6 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
   const { data: profile } = await supabase.from('profiles').select('grade,language').eq('id', user.id).single()
-  const identity = await getIdentityBySupabaseId(user.id)
-  const displayName = identity?.full_name ?? 'Öğrenci'
 
   // Sürekli öğrenme döngüsü (Faz 7): varsa BİR ÖNCEKİ planın hedef anlık
   // görüntüsünü çek -- yeni plan "geçen hafta bu konulara odaklandın,
@@ -52,7 +49,6 @@ export async function POST(req: NextRequest) {
   const result = await generateStudyPlan(supabase, user.id, {
     grade: profile?.grade,
     language: uiLanguage || profile?.language,
-    displayName,
     previousGoals: previousPlan?.goals_snapshot || undefined,
   })
 
