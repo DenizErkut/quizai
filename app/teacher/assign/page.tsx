@@ -28,6 +28,12 @@ function subjectOptionsFor(grade: string | null | undefined): string[] {
   return n ? Object.keys(getSubjectsForGrade(`${n}. sınıf`)) : []
 }
 
+// Seçilen ders listede yoksa (sınıf/seviye değişti) boşa düşer; sınıfın tek dersi listedeyse varsayılan olur.
+function resolveSubject(selected: string, options: string[], classroomSubject?: string | null): string {
+  if (selected && options.includes(selected)) return selected
+  return classroomSubject && options.includes(classroomSubject) ? classroomSubject : ''
+}
+
 // Ödevde seçilebilen soru tipleri (sıralama hariç); "Karma" hepsini seçer.
 const ASSIGN_QUESTION_TYPES = ['multiple_choice', 'multi_true_false', 'table_fill', 'matching', 'fill_blank', 'true_false', 'short_answer']
 const questionTypeField = (types: string[]) => types.length === 1 ? types[0] : 'mixed'
@@ -184,7 +190,9 @@ export default function TeacherAssignPage() {
 
   async function createAssignment(skipPool = false) {
     if (!form.classroom_id || !form.title.trim() || !form.topic.trim()) return
-    if (!form.subject) { setQuizPoolError(tr('Önce ders seçmelisin.')); return }
+    const quizClassroomNow = classrooms.find(c => c.id === form.classroom_id)
+    const chosenSubject = resolveSubject(form.subject, subjectOptionsFor(form.grade || quizClassroomNow?.grade), quizClassroomNow?.subject)
+    if (!chosenSubject) { setQuizPoolError(tr('Önce ders seçmelisin.')); return }
     setQuizPoolError(''); setQuizPoolVisualFail(false)
     setSaving(true)
 
@@ -218,7 +226,7 @@ export default function TeacherAssignPage() {
       const { data: { session } } = await supabase.auth.getSession()
       const classroom = classrooms.find(c => c.id === form.classroom_id)
       const generated = await generateTypedQuizSet(session?.access_token, {
-        topic: form.topic.trim(), fileContent: finalTopic.length > 200 ? finalTopic : undefined, title: form.title.trim(), subject: form.subject,
+        topic: form.topic.trim(), fileContent: finalTopic.length > 200 ? finalTopic : undefined, title: form.title.trim(), subject: chosenSubject,
         grade: gradeLabel(form.grade || classroom?.grade), difficulty: form.difficulty, count: form.question_count, types: form.question_types,
       })
       if (!generated.questions) { setQuizPoolError(generated.error || tr('Test hazırlanamadı.')); setSaving(false); return }
@@ -231,7 +239,7 @@ export default function TeacherAssignPage() {
       teacher_id: teacher.id,
       title: form.title.trim(),
       topic: finalTopic,
-      subject: form.subject,
+      subject: chosenSubject,
       grade: form.grade,
       difficulty: form.difficulty,
       question_type: questionTypeField(form.question_types),
@@ -516,14 +524,10 @@ export default function TeacherAssignPage() {
     finally { setPrintBusy('') }
   }
 
-  // Test formunun ders listesi: seçili sınıf seviyesine (yoksa sınıfın seviyesine) göre; sınıfın tek dersi listede varsa varsayılan olarak seçilir.
+  // Test formunun ders listesi: seçili sınıf seviyesine (yoksa sınıfın seviyesine) göre.
   const quizClassroom = classrooms.find(c => c.id === form.classroom_id)
   const quizSubjectOptions = subjectOptionsFor(form.grade || quizClassroom?.grade)
-  useEffect(() => {
-    if (form.subject && !quizSubjectOptions.includes(form.subject)) setForm(p => ({ ...p, subject: '' }))
-    else if (!form.subject && quizClassroom?.subject && quizSubjectOptions.includes(quizClassroom.subject)) setForm(p => ({ ...p, subject: quizClassroom.subject }))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.classroom_id, form.grade, form.subject, quizSubjectOptions.join('|')])
+  const quizSubject = resolveSubject(form.subject, quizSubjectOptions, quizClassroom?.subject)
 
   const rubricTotal = oeRubric.reduce((s, r) => s + (Number(r.maxPoints) || 0), 0)
 
@@ -747,7 +751,7 @@ export default function TeacherAssignPage() {
               </select>
               <input placeholder={tr('Ödev başlığı (örn: Hücre Bölünmesi Testi)')} value={form.title}
                 onChange={e => setForm(p => ({ ...p, title: e.target.value }))} style={inputStyle} />
-              <select aria-label={tr('Ders seç')} value={form.subject} onChange={e => setForm(p => ({ ...p, subject: e.target.value }))} style={inputStyle}>
+              <select aria-label={tr('Ders seç')} value={quizSubject} onChange={e => setForm(p => ({ ...p, subject: e.target.value }))} style={inputStyle}>
                 <option value="">{tr('Ders seç')}</option>
                 {quizSubjectOptions.map(name => <option key={name} value={name}>{tr(name)}</option>)}
               </select>
