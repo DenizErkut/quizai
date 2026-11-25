@@ -417,6 +417,8 @@ function QuizPageContent() {
     if (asgId && asgTopic) {
       setAssignmentId(asgId)
       setCustomTopic(decodeURIComponent(asgTopic))
+      const asgSubject = searchParams.get('subject')
+      if (asgSubject) setSelectedSubject(decodeURIComponent(asgSubject)) // öğretmenin ödev için seçtiği ders
       if (asgCount) setQCount(parseInt(asgCount))
       if (asgDiff) setDifficulty(asgDiff)
       if (asgType) setQuestionType(asgType as QuestionType)
@@ -480,7 +482,7 @@ function QuizPageContent() {
             difficulty: diff,
             language: lang,
             questionType: qtype,
-            subject: selectedSubject || undefined,
+            subject: (searchParams.get('subject') ? decodeURIComponent(searchParams.get('subject') as string) : selectedSubject) || undefined,
             unit: topicDecoded || undefined,
             assignmentId: asgId,
           }),

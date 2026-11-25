@@ -13,12 +13,25 @@ import type { ScenarioSheetItem } from '@/lib/open-ended-print'
 import { useTeacherEntitlement, LOCKED_MESSAGE } from '@/components/teacher/useTeacherEntitlement'
 import { useT } from '@/lib/i18n/I18nProvider'
 import { intlLocale } from '@/lib/i18n/core'
+import { getSubjectsForGrade } from '@/lib/subject-map-grade'
 
 // '6' -> 'ortaokul 6. sınıf' (the test generator expects the school-level form).
 function gradeLabel(grade: string | null | undefined): string {
   const n = Number(String(grade || '').match(/\d{1,2}/)?.[0])
   if (!n) return String(grade || '')
   return `${n <= 4 ? 'ilkokul' : n <= 8 ? 'ortaokul' : 'lise'} ${n}. sınıf`
+}
+
+// Sınıfın dersleri: öğretmen ders adı yazmaz, sınıf seviyesine ait müfredat derslerinden seçer ('7' veya '7. sınıf' -> Türkçe, Matematik, ...).
+function subjectOptionsFor(grade: string | null | undefined): string[] {
+  const n = Number(String(grade || '').match(/\d{1,2}/)?.[0])
+  return n ? Object.keys(getSubjectsForGrade(`${n}. sınıf`)) : []
+}
+
+// Seçilen ders listede yoksa (sınıf/seviye değişti) boşa düşer; sınıfın tek dersi listedeyse varsayılan olur.
+function resolveSubject(selected: string, options: string[], classroomSubject?: string | null): string {
+  if (selected && options.includes(selected)) return selected
+  return classroomSubject && options.includes(classroomSubject) ? classroomSubject : ''
 }
 
 // Ödevde seçilebilen soru tipleri (sıralama hariç); "Karma" hepsini seçer.
@@ -75,6 +88,7 @@ export default function TeacherAssignPage() {
     classroom_id: '',
     title: '',
     topic: '',
+    subject: '',
     grade: '',
     difficulty: 'adaptive',
     question_count: 10,
@@ -176,6 +190,9 @@ export default function TeacherAssignPage() {
 
   async function createAssignment(skipPool = false) {
     if (!form.classroom_id || !form.title.trim() || !form.topic.trim()) return
+    const quizClassroomNow = classrooms.find(c => c.id === form.classroom_id)
+    const chosenSubject = resolveSubject(form.subject, subjectOptionsFor(form.grade || quizClassroomNow?.grade), quizClassroomNow?.subject)
+    if (!chosenSubject) { setQuizPoolError(tr('Önce ders seçmelisin.')); return }
     setQuizPoolError(''); setQuizPoolVisualFail(false)
     setSaving(true)
 
@@ -209,7 +226,7 @@ export default function TeacherAssignPage() {
       const { data: { session } } = await supabase.auth.getSession()
       const classroom = classrooms.find(c => c.id === form.classroom_id)
       const generated = await generateTypedQuizSet(session?.access_token, {
-        topic: form.topic.trim(), fileContent: finalTopic.length > 200 ? finalTopic : undefined, title: form.title.trim(), subject: classroom?.subject || undefined,
+        topic: form.topic.trim(), fileContent: finalTopic.length > 200 ? finalTopic : undefined, title: form.title.trim(), subject: chosenSubject,
         grade: gradeLabel(form.grade || classroom?.grade), difficulty: form.difficulty, count: form.question_count, types: form.question_types,
       })
       if (!generated.questions) { setQuizPoolError(generated.error || tr('Test hazırlanamadı.')); setSaving(false); return }
@@ -222,6 +239,7 @@ export default function TeacherAssignPage() {
       teacher_id: teacher.id,
       title: form.title.trim(),
       topic: finalTopic,
+      subject: chosenSubject,
       grade: form.grade,
       difficulty: form.difficulty,
       question_type: questionTypeField(form.question_types),
@@ -409,14 +427,14 @@ export default function TeacherAssignPage() {
 
   // Quiz assignments store only topic/difficulty/count (each student gets freshly generated questions),
   // so a printable class copy is generated once here with the same quality pipeline.
-  async function printQuizAssignment(a, withKey: boolean) {
+  async function printQuizAssignment(a, withKey: boolean, withObjectives = false) {
     if (planLimited) { setPrintMessage(LOCKED_MESSAGE); return }
     setPrintBusy(`quiz-${a.id}`); setPrintMessage(tr('Basılı test hazırlanıyor… (30-90 saniye sürebilir)'))
     try {
       if (Array.isArray(a.pool_questions) && a.pool_questions.length) {
         const { printLearningDocument, questionPrintHtml, answerKeyHtml } = await import('@/lib/learning-print')
         const classroomName = classrooms.find(c => c.id === a.classroom_id)?.name || ''
-        await printLearningDocument(a.title, `${classroomName} · ${a.pool_questions.length} soru`, questionPrintHtml(a.pool_questions) + (withKey ? answerKeyHtml(a.pool_questions) : ''))
+        await printLearningDocument(a.title, `${classroomName} · ${a.pool_questions.length} soru`, questionPrintHtml(a.pool_questions, { withObjectives }) + (withKey ? answerKeyHtml(a.pool_questions) : ''))
         setPrintMessage('')
         return
       }
@@ -429,7 +447,7 @@ export default function TeacherAssignPage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
         body: JSON.stringify({
           teacherPrint: true, topic: fromFile ? a.title : topicText, ...(fromFile ? { fileContent: topicText } : {}),
-          subject: classroom?.subject || undefined, grade: gradeLabel(a.grade || classroom?.grade),
+          subject: a.subject || classroom?.subject || undefined, grade: gradeLabel(a.grade || classroom?.grade),
           difficulty: a.difficulty === 'adaptive' ? 'normal' : (a.difficulty || 'normal'), questionCount: Math.min(Number(a.question_count) || 10, 30),
           questionType: a.question_type || 'mixed', includeVisuals: true, language: 'tr',
         }),
@@ -440,7 +458,7 @@ export default function TeacherAssignPage() {
         return
       }
       const { printLearningDocument, questionPrintHtml, answerKeyHtml } = await import('@/lib/learning-print')
-      await printLearningDocument(a.title, `${classroom?.name || ''} · ${data.questions.length} soru`, questionPrintHtml(data.questions) + (withKey ? answerKeyHtml(data.questions) : ''))
+      await printLearningDocument(a.title, `${classroom?.name || ''} · ${data.questions.length} soru`, questionPrintHtml(data.questions, { withObjectives }) + (withKey ? answerKeyHtml(data.questions) : ''))
       setPrintMessage('')
     } catch (e) { setPrintMessage(e?.message || tr('Test hazırlanamadı.')) }
     finally { setPrintBusy('') }
@@ -457,7 +475,7 @@ export default function TeacherAssignPage() {
     const fromFile = topicText.length > 200
     const { data: { session } } = await supabase.auth.getSession()
     if (Array.isArray(a.question_types) && a.question_types.length > 1) {
-      const generated = await generateTypedQuizSet(session?.access_token, { topic: topicText, fileContent: fromFile ? topicText : undefined, title: a.title, subject: classroom?.subject || undefined, grade: gradeLabel(a.grade || classroom?.grade), difficulty: a.difficulty || 'normal', count: Math.min(Number(a.question_count) || 10, 30), types: a.question_types })
+      const generated = await generateTypedQuizSet(session?.access_token, { topic: topicText, fileContent: fromFile ? topicText : undefined, title: a.title, subject: a.subject || classroom?.subject || undefined, grade: gradeLabel(a.grade || classroom?.grade), difficulty: a.difficulty || 'normal', count: Math.min(Number(a.question_count) || 10, 30), types: a.question_types })
       if (!generated.questions) { setPrintMessage(generated.error || tr('Test hazırlanamadı.')); return null }
       const { error: typedError } = await supabase.from('assignments').update({ pool_questions: generated.questions, question_count: generated.questions.length }).eq('id', a.id)
       if (typedError) { setPrintMessage(tr('Soru seti kaydedilemedi: {msg}', { msg: typedError.message })); return null }
@@ -469,7 +487,7 @@ export default function TeacherAssignPage() {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
       body: JSON.stringify({
         teacherPrint: true, topic: fromFile ? a.title : topicText, ...(fromFile ? { fileContent: topicText } : {}),
-        subject: classroom?.subject || undefined, grade: gradeLabel(a.grade || classroom?.grade),
+        subject: a.subject || classroom?.subject || undefined, grade: gradeLabel(a.grade || classroom?.grade),
         difficulty: a.difficulty === 'adaptive' ? 'normal' : (a.difficulty || 'normal'), questionCount: Math.min(Number(a.question_count) || 10, 30),
         questionType: a.question_type || 'mixed', includeVisuals: true, language: 'tr',
       }),
@@ -505,6 +523,11 @@ export default function TeacherAssignPage() {
     } catch (e) { setPrintMessage(e?.message || tr('Yazdırma görünümü açılamadı.')) }
     finally { setPrintBusy('') }
   }
+
+  // Test formunun ders listesi: seçili sınıf seviyesine (yoksa sınıfın seviyesine) göre.
+  const quizClassroom = classrooms.find(c => c.id === form.classroom_id)
+  const quizSubjectOptions = subjectOptionsFor(form.grade || quizClassroom?.grade)
+  const quizSubject = resolveSubject(form.subject, quizSubjectOptions, quizClassroom?.subject)
 
   const rubricTotal = oeRubric.reduce((s, r) => s + (Number(r.maxPoints) || 0), 0)
 
@@ -590,8 +613,10 @@ export default function TeacherAssignPage() {
                         <option value="">{tr('Sınıf seviyesi')}</option>
                         {['5','6','7','8','9','10','11','12'].map(g => <option key={g} value={g}>{tr('{g}. Sınıf', { g })}</option>)}
                       </select>
-                      <input placeholder={tr('Ders (örn: Fen Bilimleri)')} value={oeForm.subject}
-                        onChange={e => setOeForm(p => ({ ...p, subject: e.target.value }))} style={inputStyle} />
+                      <select aria-label={tr('Ders seç')} value={oeForm.subject} onChange={e => setOeForm(p => ({ ...p, subject: e.target.value }))} style={inputStyle}>
+                        <option value="">{tr('Ders seç')}</option>
+                        {subjectOptionsFor(oeForm.grade || classrooms.find(c => c.id === oeForm.classroom_id)?.grade).map(name => <option key={name} value={name}>{tr(name)}</option>)}
+                      </select>
                     </div>
                     <div>
                       <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '5px' }}>{tr('Son tarih (isteğe bağlı)')}</label>
@@ -726,6 +751,10 @@ export default function TeacherAssignPage() {
               </select>
               <input placeholder={tr('Ödev başlığı (örn: Hücre Bölünmesi Testi)')} value={form.title}
                 onChange={e => setForm(p => ({ ...p, title: e.target.value }))} style={inputStyle} />
+              <select aria-label={tr('Ders seç')} value={quizSubject} onChange={e => setForm(p => ({ ...p, subject: e.target.value }))} style={inputStyle}>
+                <option value="">{tr('Ders seç')}</option>
+                {quizSubjectOptions.map(name => <option key={name} value={name}>{tr(name)}</option>)}
+              </select>
               <input placeholder={tr('Konu (AI buna göre soru üretir)')} value={form.topic}
                 onChange={e => setForm(p => ({ ...p, topic: e.target.value }))} style={inputStyle} />
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 700, color: 'var(--primary)', cursor: 'pointer', padding: '10px 12px', border: `1.5px solid ${quizPool ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '10px', background: quizPool ? 'var(--accent-bg)' : 'transparent' }}>
@@ -935,6 +964,7 @@ export default function TeacherAssignPage() {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '5px' }}>{a.title}</div>
                       <div style={{ fontSize: '12px', color: 'var(--text3)', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {a.subject && <span>📖 {tr(a.subject)}</span>}
                         <span>📚 {a.topic}</span>
                         <span>🏫 {a.classrooms?.name}</span>
                         <span>{tr('❓ {n} soru', { n: a.question_count })}</span>
@@ -949,6 +979,7 @@ export default function TeacherAssignPage() {
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
                         <button className="btn btn-sm" disabled={printBusy === `quiz-${a.id}`} onClick={() => void printQuizAssignment(a, false)}>{tr('🖨️ Basılı test (PDF)')}</button>
                         <button className="btn btn-sm" disabled={printBusy === `quiz-${a.id}`} onClick={() => void printQuizAssignment(a, true)}>{tr('👩‍🏫 Cevap anahtarıyla')}</button>
+                        <button className="btn btn-sm" disabled={printBusy === `quiz-${a.id}`} onClick={() => void printQuizAssignment(a, true, true)}>{tr('🎯 Kazanımlı döküman')}</button>
                         <button className="btn btn-sm" disabled={printBusy === `quizclass-${a.id}`} onClick={() => void printQuizClass(a, true)}>{tr('🖨️ Sınıf dökümü (optik + QR)')}</button>
                         <button className="btn btn-sm" onClick={() => planLimited ? setPrintMessage(LOCKED_MESSAGE) : (Array.isArray(a.pool_questions) && a.pool_questions.length ? setQuizImportId(quizImportId === a.id ? '' : a.id) : setPrintMessage(tr('Önce "Sınıf dökümü (optik + QR)" ile soru setini oluşturup basın; sonra cevap kâğıtlarını buradan aktarabilirsiniz.')))}>{tr('📥 Kâğıt cevapları aktar')}</button>
                       </div>

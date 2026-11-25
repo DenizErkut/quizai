@@ -36,7 +36,7 @@ export default function StudentAssignmentsPage() {
     // Assignments for my classrooms
     const { data: asgn } = await supabase
       .from('assignments')
-      .select('id, classroom_id, title, topic, grade, difficulty, question_count, question_type, due_date, created_at')
+      .select('id, classroom_id, title, topic, subject, grade, difficulty, question_count, question_type, due_date, created_at')
       .in('classroom_id', classroomIds)
       .order('created_at', { ascending: false })
 
@@ -134,7 +134,7 @@ export default function StudentAssignmentsPage() {
                     </div>
                   </div>
                   <Link
-                    href={`/quiz?assignment=${a.id}&topic=${encodeURIComponent(a.topic)}&count=${a.question_count}&difficulty=${a.difficulty === 'adaptive' ? 'normal' : a.difficulty}&type=${a.question_type || 'multiple_choice'}`}
+                    href={`/quiz?assignment=${a.id}&topic=${encodeURIComponent(a.topic)}${a.subject ? `&subject=${encodeURIComponent(a.subject)}` : ''}&count=${a.question_count}&difficulty=${a.difficulty === 'adaptive' ? 'normal' : a.difficulty}&type=${a.question_type || 'multiple_choice'}`}
                     className="btn btn-primary"
                     style={{ width: '100%', justifyContent: 'center', display: 'flex' }}>
                     {t('⚡ Ödevi Çöz')}

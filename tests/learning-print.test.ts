@@ -43,3 +43,22 @@ test('answer key covers the common question types', () => {
   assert.equal(answerKeyText({ type: 'ordering', items: ['a', 'b', 'c'], correctOrder: [2, 0, 1] }), 'c → a → b')
   assert.match(answerKeyHtml([{ opts: ['a', 'b'], ans: 0 }]), /Cevap anahtarı[\s\S]*A\) a/)
 })
+
+import { looksLikeObjectiveList } from '../lib/learning-print'
+
+const OBJECTIVES = 'MAT.7.4.1. Eş küplerle oluşturulan yapılar\na) ...\n\nMAT.7.4.2. Dikdörtgenler prizmasının yüzey alanı\nb) ...\n\nMAT.7.4.3. Hacim'
+
+test('kitapçığa MEB kazanım listesi basılmaz; "kazanımlı döküman"da basılır ve kod eklenir', () => {
+  const question = { q: 'Soru metni', opts: ['a', 'b'], passage: OBJECTIVES, passageKind: 'meb' as const, learningObjectiveCode: 'MAT.7.4.2' }
+  assert.equal(looksLikeObjectiveList(OBJECTIVES), true)
+  assert.equal(questionPrintHtml([question]).includes('MAT.7.4.1'), false)
+  assert.equal(questionPrintHtml([{ ...question, passageKind: undefined }]).includes('MAT.7.4.1'), false) // eski kayıt: biçimden anlaşılır
+  const withObjectives = questionPrintHtml([question], { withObjectives: true })
+  assert.ok(withObjectives.includes('MAT.7.4.1') && withObjectives.includes('Kazanım: MAT.7.4.2'))
+})
+
+test('kullanıcının dosya metni (soru için gerekli) varsayılanda da basılır', () => {
+  const html = questionPrintHtml([{ q: 'Metne göre ...', passage: 'Ali okula gitti. Hava yağmurluydu.', passageKind: 'file' as const }])
+  assert.ok(html.includes('Ali okula gitti'))
+  assert.equal(looksLikeObjectiveList('Ali okula gitti.'), false)
+})
