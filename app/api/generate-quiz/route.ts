@@ -1267,22 +1267,42 @@ async function generateProviderQuestionBatch(args: {
       requestId: args.requestId,
     })
   } else if (batch.provider === 'mistral') {
-    const adapter = new MistralAdapter()
-    if (!adapter.isConfigured()) throw new Error('Mistral is not configured for normal-difficulty generation')
-    const response = await adapter.execute({
-      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: rolePrompt }],
-      maxTokens: roleBatchMaxTokens(batch.count),
-      json: true,
-      timeoutMs: 45000,
-    }, {
-      task: 'quiz_generation',
-      userId: args.userId,
-      sessionId: args.sessionId,
-      requestId: args.requestId,
-      operationTag: 'generate-quiz:role-mistral-normal',
-      shadow: false,
-    })
-    raw = response.content
+    // Mistral parçası başarısız olursa (yapılandırma yok, HTTP/zaman aşımı, bozuk/boş çıktı) aynı NORMAL zorluk grubu OpenAI ile üretilir;
+    // böylece tek bir sağlayıcının arızası testi eksik bırakmaz (24-25 Kasım 2026: Mistral her çağrıda 3000 token sınırına dayanıyordu).
+    try {
+      const adapter = new MistralAdapter()
+      if (!adapter.isConfigured()) throw new Error('Mistral is not configured for normal-difficulty generation')
+      const response = await adapter.execute({
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: rolePrompt }],
+        maxTokens: roleBatchMaxTokens(batch.count),
+        json: true,
+        timeoutMs: 45000,
+      }, {
+        task: 'quiz_generation',
+        userId: args.userId,
+        sessionId: args.sessionId,
+        requestId: args.requestId,
+        operationTag: 'generate-quiz:role-mistral-normal',
+        shadow: false,
+      })
+      raw = response.content
+      if (extractProviderQuestions(raw).length === 0) throw new Error('Mistral returned no parseable questions')
+    } catch (mistralError) {
+      console.warn(`[generate-quiz] mistral role batch failed, falling back to openai: ${mistralError instanceof Error ? mistralError.message : 'unknown'}`)
+      raw = await callOpenAI([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: rolePrompt },
+      ], {
+        model: 'gpt-4.1-mini',
+        max_tokens: roleBatchMaxTokens(batch.count),
+        json: true,
+        timeoutMs: 45000,
+        operation: 'generate-quiz:role-openai-mistral-fallback',
+        userId: args.userId,
+        quizSessionId: args.sessionId,
+        requestId: args.requestId,
+      })
+    }
   } else {
     const timeoutMs = Math.max(20000, 100000 - (Date.now() - args.requestStartTime))
     const response = await anthropic.messages.create({

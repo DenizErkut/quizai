@@ -1,5 +1,6 @@
 import { splitMistralUsage } from '@/lib/mistral-usage'
 import { logAIUsage } from '@/lib/ai-usage'
+import { mistralContentToText } from '@/lib/mistral-content'
 import type { AIProviderAdapter, IntelligenceRequestContext } from '../contracts'
 
 export type MistralContentPart =
@@ -64,6 +65,6 @@ export class MistralAdapter implements AIProviderAdapter<MistralChatRequest, Mis
       requestId: context.requestId,
       meta: { policyVersion: 'multi-ai-gateway-v3-p0', shadow: context.shadow !== false, ...(context.meta || {}) },
     })
-    return { content: data?.choices?.[0]?.message?.content || '', model, inputTokens, outputTokens, durationMs }
+    return { content: mistralContentToText(data?.choices?.[0]?.message?.content), model, inputTokens, outputTokens, durationMs }
   }
 }
