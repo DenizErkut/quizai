@@ -12,6 +12,9 @@ export function printableMath(text: string): string {
 
 type PrintableQuestion = {
   svg?: string | null; correctAnswerText?: string; q?: string; question?: string; opts?: string[]; passage?: string; type?: string
+  /** 'meb' = MEB kaynak/kazanım metni (kitapçığa varsayılan basılmaz); 'file' = kullanıcının dosyası (soru için gerekli, basılır). */
+  passageKind?: 'meb' | 'file'
+  learningObjectiveCode?: string | null
   pairs?: { left: string; right: string }[]; items?: string[]; statements?: { text: string }[]
   tableData?: { headers: string[]; rows: { cells: string[]; blanks?: number[] }[] }
 }
@@ -22,15 +25,27 @@ export function printableFigure(svg: string | null | undefined): string {
   return `<p><img alt="Soru görseli" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}" style="max-width:100%;max-height:70mm"></p>`
 }
 
-export function questionPrintHtml(questions: PrintableQuestion[]): string {
-  return questions.map((question, index) => {
+/** MEB kaynak metni çoğu zaman "MAT.7.4.1. …" gibi kazanım listesidir; kitapçık sayfalarına basılmaz. */
+export function looksLikeObjectiveList(text: string | undefined): boolean {
+  return typeof text === 'string' && (text.match(/(?:^|\n)\s*[A-ZÇĞİÖŞÜ]{1,4}\.[A-ZÇĞİÖŞÜ0-9]{1,3}\.\d{1,2}(?:\.\d{1,2})?\./g) || []).length >= 2
+}
+
+/**
+ * Kitapçık HTML'i. Varsayılan: MEB kaynak/kazanım metni basılmaz (yalnız soru için gereken dosya metni basılır).
+ * `withObjectives: true` ("kazanımlı döküman"): kaynak metin de basılır ve her sorunun altına kazanım kodu eklenir.
+ */
+export function questionPrintHtml(questions: PrintableQuestion[], printOptions: { withObjectives?: boolean } = {}): string {
+  return questions.map((rawQuestion, index) => {
+    const hideSource = !printOptions.withObjectives && (rawQuestion.passageKind === 'meb' || looksLikeObjectiveList(rawQuestion.passage))
+    const question = hideSource ? { ...rawQuestion, passage: undefined } : rawQuestion
     const options = (!question.type || question.type === 'multiple_choice') ? (question.opts || []).map((option, i) => `<li>${String.fromCharCode(65 + i)}) ${printableMath(option)}</li>`).join('') : ''
     const pairs = question.pairs?.map(pair => `<li>${printableMath(pair.left)} → ..............</li>`).join('') || ''
     const pairChoices = question.pairs?.length ? `<p>Eşleştirme seçenekleri:</p><ul>${[...question.pairs].reverse().map(pair => `<li>${printableMath(pair.right)}</li>`).join('')}</ul>` : ''
     const items = question.items?.map(item => `<li>${printableMath(item)}</li>`).join('') || ''
     const statements = question.statements?.map(statement => `<li>${printableMath(statement.text)} ☐ Doğru ☐ Yanlış</li>`).join('') || ''
     const table = question.tableData ? `<table><thead><tr>${question.tableData.headers.map(header => `<th>${printableMath(header)}</th>`).join('')}</tr></thead><tbody>${question.tableData.rows.map(row => `<tr>${row.cells.map((cell, i) => `<td>${row.blanks?.includes(i) ? '........................' : printableMath(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : ''
-    return `<section class="print-question">${question.passage ? `<div class="print-passage">${printableMath(question.passage)}</div>` : ''}<h2>${index + 1}. ${printableMath(question.q || question.question || '')}</h2>${printableFigure(question.svg)}${options ? `<ul>${options}</ul>` : question.type === 'true_false' ? '<p>☐ Doğru ☐ Yanlış</p>' : ''}${pairs || items || statements ? `<ul>${pairs}${items}${statements}</ul>` : ''}${pairChoices}${table}${['fill_blank', 'short_answer'].includes(question.type || '') ? '<p>................................................................................................</p>' : ''}</section>`
+    const objectiveLine = printOptions.withObjectives && question.learningObjectiveCode ? `<p class="print-objective"><small>Kazanım: ${escapePrintText(String(question.learningObjectiveCode))}</small></p>` : ''
+    return `<section class="print-question">${question.passage ? `<div class="print-passage">${printableMath(question.passage)}</div>` : ''}<h2>${index + 1}. ${printableMath(question.q || question.question || '')}</h2>${printableFigure(question.svg)}${options ? `<ul>${options}</ul>` : question.type === 'true_false' ? '<p>☐ Doğru ☐ Yanlış</p>' : ''}${pairs || items || statements ? `<ul>${pairs}${items}${statements}</ul>` : ''}${pairChoices}${table}${['fill_blank', 'short_answer'].includes(question.type || '') ? '<p>................................................................................................</p>' : ''}${objectiveLine}</section>`
   }).join('')
 }
 

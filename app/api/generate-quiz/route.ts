@@ -2869,7 +2869,7 @@ export async function POST(req: NextRequest) {
       const passageWords = extractMeaningfulWords(sourcePassage)
       questions = questions.map((q) =>
         questionReferencesPassage(q, sourcePassage, passageWords)
-          ? { ...q, passage: sourcePassage }
+          ? { ...q, passage: sourcePassage, passageKind: fileContent && fileContent.trim() ? 'file' : 'meb' }
           : q
       )
     }
