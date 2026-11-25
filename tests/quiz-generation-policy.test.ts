@@ -25,4 +25,7 @@ test('kanonik kazanım yoksa yalnız öğretmen kaynaklı/dosya/üniversite test
   assert.equal(mayGenerateWithoutCanonicalObjectives({ ...base, teacherAssignmentForStudent: true }), true)
   assert.equal(mayGenerateWithoutCanonicalObjectives({ ...base, hasFileContent: true }), true)
   assert.equal(mayGenerateWithoutCanonicalObjectives({ ...base, isUniversityLevel: true }), true)
+  // Öğrencinin serbest konusu: ders+sınıf katalogda tanınıyorsa sürer, tanınmıyorsa engelli kalır.
+  assert.equal(mayGenerateWithoutCanonicalObjectives({ ...base, subjectGradeInCatalog: true }), true)
+  assert.equal(mayGenerateWithoutCanonicalObjectives({ ...base, subjectGradeInCatalog: false }), false)
 })

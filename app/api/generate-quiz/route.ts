@@ -39,7 +39,7 @@ import { resolveDiagnosticQuestionStrategy } from '@/lib/diagnostic-question-str
 import { parsePrioritySubjects, seedScoreForSubject } from '@/lib/onboarding-priorities'
 import { turkishLanguagePrompt } from '@/lib/turkish-question-rules'
 import { applicableScopes, hasLocation } from '@/lib/location/curriculum-scope'
-import { applyCanonicalObjectiveMappings, learningObjectivePrompt, loadCanonicalObjectiveCandidates } from '@/lib/learning-objective-mapping'
+import { applyCanonicalObjectiveMappings, learningObjectivePrompt, loadCanonicalObjectiveCandidates, subjectGradeHasVerifiedObjectives } from '@/lib/learning-objective-mapping'
 import { runMistralShadowComparison, MistralAdapter, isProviderConfigured } from '@/lib/ai-gateway'
 import { balanceAnswerPositions, getQuestionBankSet, hasRealVisualAsset, promoteQuestionsToBank, questionBankKey } from '@/lib/question-bank'
 import { decideQuizProvider, getQuizProviderPolicy, QUIZ_PROVIDER_POLICY_VERSION } from '@/lib/quiz-provider-policy'
@@ -1850,7 +1850,10 @@ export async function POST(req: NextRequest) {
         }
       }
       // İzinliyse no_candidates ile devam edilir: sorular kazanım hesabına girmez, öğretmenin seçtiği konuda üretilir.
-      if (!mayGenerateWithoutCanonicalObjectives({ isUniversityLevel, hasFileContent: Boolean(fileContent), teacherPrint, teacherAssignmentForStudent })) return NextResponse.json({ error: 'quality_policy_failed', reason: 'canonical_objectives_unavailable', message: 'Bu sınıf, ders ve konu için doğrulanmış aktif kazanım bulunamadığından test oluşturulamadı.' }, { status: 503 })
+      const subjectGradeInCatalog = !isUniversityLevel && !fileContent && !teacherPrint && !teacherAssignmentForStudent
+        ? await subjectGradeHasVerifiedObjectives(supabase, { subject, grade }).catch(() => false)
+        : false
+      if (!mayGenerateWithoutCanonicalObjectives({ isUniversityLevel, hasFileContent: Boolean(fileContent), teacherPrint, teacherAssignmentForStudent, subjectGradeInCatalog })) return NextResponse.json({ error: 'quality_policy_failed', reason: 'canonical_objectives_unavailable', message: 'Bu sınıf, ders ve konu için doğrulanmış aktif kazanım bulunamadığından test oluşturulamadı.' }, { status: 503 })
     }
     const objectiveInstruction = learningObjectivePrompt(objectiveCandidates) + turkishLanguagePrompt(subject, objectiveCandidates, topic)
 
