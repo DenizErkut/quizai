@@ -224,15 +224,19 @@ export function hasVisualQuota(questions: Array<Record<string, unknown>>, minimu
  * "noktalı virgül ve virgül" gibi dil bilgisi konularının kazanımı yoktur) test üretimi yalnızca şu durumlarda sürer:
  * üniversite düzeyi, kullanıcı dosyası, ÖĞRETMEN kaynaklı test (öğretmenin yazdırma/ödev üretimi) ya da öğrencinin sınıfına
  * atanmış öğretmen ödevi. Bu durumda sorular `no_candidates` olarak işaretlenir ve kazanım/yetkinlik hesabına girmez.
- * Öğrencinin kendi başına başlattığı serbest konu testi eskisi gibi engellenir.
+ * Öğrencinin kendi serbest konu testi de, ders ve sınıfı katalogda tanınıyorsa sürer (ör. Türkçe 7'de "noktalı virgül");
+ * tanınmayan ders/sınıf için eskisi gibi engellenir.
  */
 export function mayGenerateWithoutCanonicalObjectives(input: {
   isUniversityLevel: boolean
   hasFileContent: boolean
   teacherPrint: boolean
   teacherAssignmentForStudent: boolean
+  /** Ders+sınıf kazanım kataloğunda tanınıyor (konu düzeyinde eşleşme olmasa da gerçek bir okul dersi/sınıfı). */
+  subjectGradeInCatalog?: boolean
 }): boolean {
   return input.isUniversityLevel || input.hasFileContent || input.teacherPrint || input.teacherAssignmentForStudent
+    || input.subjectGradeInCatalog === true
 }
 
 export function hasCanonicalObjectiveCoverage(
