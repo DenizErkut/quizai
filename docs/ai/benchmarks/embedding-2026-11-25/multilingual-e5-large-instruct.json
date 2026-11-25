@@ -1,0 +1,84 @@
+[
+ {
+  "model": "multilingual-e5-large-instruct",
+  "id": "intfloat/multilingual-e5-large-instruct",
+  "n": 385,
+  "top1": 0.5273,
+  "top3": 0.8156,
+  "top5": 0.9013,
+  "mrr": 0.6876,
+  "random_top1": 0.0235,
+  "load_s": 2.2,
+  "enc_objectives_s": 74.9,
+  "q_latency_ms_cpu": 149.5,
+  "auroc_match_vs_nomatch": 0.5138,
+  "neg_n": 71,
+  "per_group": {
+   "matematik|ortaokul 6 sinif": {
+    "n": 161,
+    "top1": 0.429,
+    "top3": 0.795
+   },
+   "fizik|lise 9 sinif": {
+    "n": 52,
+    "top1": 0.385,
+    "top3": 0.75
+   },
+   "fen bilimleri|ortaokul 6 sinif": {
+    "n": 48,
+    "top1": 0.792,
+    "top3": 0.938
+   },
+   "fen bilimleri|ortaokul 7 sinif": {
+    "n": 36,
+    "top1": 0.722,
+    "top3": 0.889
+   },
+   "fen bilimleri|ortaokul 5 sinif": {
+    "n": 28,
+    "top1": 0.786,
+    "top3": 0.929
+   },
+   "matematik|ortaokul 5 sinif": {
+    "n": 24,
+    "top1": 0.375,
+    "top3": 0.542
+   },
+   "kimya|lise 9 sinif": {
+    "n": 10,
+    "top1": 0.4,
+    "top3": 0.8
+   },
+   "matematik|lise 9 sinif": {
+    "n": 7,
+    "top1": 0.571,
+    "top3": 0.857
+   },
+   "sosyal bilgiler|ortaokul 6 sinif": {
+    "n": 7,
+    "top1": 0.571,
+    "top3": 1.0
+   },
+   "biyoloji|lise 9 sinif": {
+    "n": 7,
+    "top1": 0.429,
+    "top3": 0.857
+   },
+   "matematik|ortaokul 7 sinif": {
+    "n": 3,
+    "top1": 0.667,
+    "top3": 0.667
+   },
+   "sosyal bilgiler|ortaokul 7 sinif": {
+    "n": 1,
+    "top1": 1.0,
+    "top3": 1.0
+   },
+   "sosyal bilgiler|ortaokul 5 sinif": {
+    "n": 1,
+    "top1": 1.0,
+    "top3": 1.0
+   }
+  }
+ }
+]
