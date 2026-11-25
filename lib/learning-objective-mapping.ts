@@ -41,6 +41,28 @@ function gradeKey(value: unknown): string {
     .replace(/(\d+)\s*\.\s*sınıf/g, '$1. sınıf')
 }
 
+function foldKey(value: unknown): string {
+  return dimensionKey(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ı/g, 'i')
+}
+
+/**
+ * Ders ve sınıf kataloğumuzda tanınıyor mu (en az bir doğrulanmış aktif kazanımı var mı)? Konu düzeyinde eşleşme olmasa bile
+ * ("noktalı virgül" gibi dil bilgisi konuları) bu, konunun gerçek bir okul dersi/sınıfı içinde olduğunu gösterir.
+ */
+export async function subjectGradeHasVerifiedObjectives(
+  supabase: SupabaseClient,
+  context: { subject?: string | null; grade?: string | null },
+): Promise<boolean> {
+  if (!context.subject || !context.grade) return false
+  const gradeNumber = /\d{1,2}/.exec(String(context.grade))?.[0]
+  if (!gradeNumber) return false
+  const { data, error } = await supabase.from('learning_objective_catalog').select('subject')
+    .eq('verification_status', 'verified').eq('is_active', true).ilike('grade', `${gradeNumber}.%`).limit(2000)
+  if (error || !data) return false
+  const wanted = foldKey(context.subject)
+  return data.some(row => foldKey((row as { subject?: unknown }).subject) === wanted)
+}
+
 /** Loads only already-published objectives. No AI/free-text inference occurs. */
 export async function loadCanonicalObjectiveCandidates(
   supabase: SupabaseClient,
