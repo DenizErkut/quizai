@@ -46,7 +46,7 @@ import { decideQuizProvider, getQuizProviderPolicy, QUIZ_PROVIDER_POLICY_VERSION
 import { attachQuestionRigorMetadata, summarizeQuestionSetRigor } from '@/lib/question-rigor'
 import { verifyVisualWithMistral } from '@/lib/mistral-quality'
 import { verifyVisualWithGemini } from '@/lib/gemini-visual-quality'
-import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, minimumNormalTestCount, minimumVerifiedQuestionCount, missingRoleBatches, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, roleBatchMaxTokens, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
+import { buildAdaptiveDifficultyQuota, buildQuestionGenerationPlan, filterQuestionsByRequestedType, formatDifficultyQuota, hasCanonicalObjectiveCoverage, hasDifficultyQuota, hasStrictQuestionReview, hasVisualQuota, mayGenerateWithoutCanonicalObjectives, minimumNormalTestCount, minimumVerifiedQuestionCount, missingRoleBatches, normalizeDifficultyLevel, normalizeRequestedQuestionType, requiredVisualCount, roleBatchMaxTokens, visualAttemptCount, type QuestionGenerationBatch } from '@/lib/quiz-generation-policy'
 import { phantomVisualIssue, salvageLeakedSvg } from '@/lib/phantom-visual'
 import { fitSvgText } from '@/lib/svg-text-fit'
 import { filterRowsByUserScope } from '@/lib/location/resource-scope'
@@ -1839,8 +1839,18 @@ export async function POST(req: NextRequest) {
       const allowed = new Set(applicableScopes(activeVersions || [], profile).map((version: { id: string }) => version.id))
       objectiveCandidates = allObjectiveCandidates.filter(candidate => allowed.has(candidate.curriculumVersionId))
     }
-    if (!isUniversityLevel && !fileContent && objectiveCandidates.length === 0) {
-      return NextResponse.json({ error: 'quality_policy_failed', reason: 'canonical_objectives_unavailable', message: 'Bu sınıf, ders ve konu için doğrulanmış aktif kazanım bulunamadığından test oluşturulamadı.' }, { status: 503 })
+    if (objectiveCandidates.length === 0) {
+      // Öğretmen testi (yazdırma/ödev üretimi ya da sınıfına atanmış ödev) konuya uyan kanonik kazanım olmasa da sürer.
+      let teacherAssignmentForStudent = false
+      if (!isUniversityLevel && !fileContent && !teacherPrint && poolAssignmentId) {
+        const { data: asg } = await supabase.from('assignments').select('classroom_id').eq('id', poolAssignmentId).maybeSingle()
+        if (asg?.classroom_id) {
+          const { data: member } = await supabase.from('classroom_students').select('student_id').eq('classroom_id', asg.classroom_id).eq('student_id', user.id).maybeSingle()
+          teacherAssignmentForStudent = Boolean(member)
+        }
+      }
+      // İzinliyse no_candidates ile devam edilir: sorular kazanım hesabına girmez, öğretmenin seçtiği konuda üretilir.
+      if (!mayGenerateWithoutCanonicalObjectives({ isUniversityLevel, hasFileContent: Boolean(fileContent), teacherPrint, teacherAssignmentForStudent })) return NextResponse.json({ error: 'quality_policy_failed', reason: 'canonical_objectives_unavailable', message: 'Bu sınıf, ders ve konu için doğrulanmış aktif kazanım bulunamadığından test oluşturulamadı.' }, { status: 503 })
     }
     const objectiveInstruction = learningObjectivePrompt(objectiveCandidates) + turkishLanguagePrompt(subject, objectiveCandidates, topic)
 

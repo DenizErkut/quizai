@@ -15,3 +15,14 @@ test('the failures seen in production (9/10, 8/10, 4/5) are all deliverable now'
   for (const [delivered, requested] of [[9, 10], [8, 10], [4, 5]]) assert.ok(delivered >= minimumNormalTestCount(requested))
   assert.ok(!(3 >= minimumNormalTestCount(5)))
 })
+
+import { mayGenerateWithoutCanonicalObjectives } from '../lib/quiz-generation-policy'
+
+test('kanonik kazanım yoksa yalnız öğretmen kaynaklı/dosya/üniversite testleri sürer', () => {
+  const base = { isUniversityLevel: false, hasFileContent: false, teacherPrint: false, teacherAssignmentForStudent: false }
+  assert.equal(mayGenerateWithoutCanonicalObjectives(base), false)
+  assert.equal(mayGenerateWithoutCanonicalObjectives({ ...base, teacherPrint: true }), true)
+  assert.equal(mayGenerateWithoutCanonicalObjectives({ ...base, teacherAssignmentForStudent: true }), true)
+  assert.equal(mayGenerateWithoutCanonicalObjectives({ ...base, hasFileContent: true }), true)
+  assert.equal(mayGenerateWithoutCanonicalObjectives({ ...base, isUniversityLevel: true }), true)
+})

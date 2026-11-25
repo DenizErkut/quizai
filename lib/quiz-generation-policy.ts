@@ -219,6 +219,22 @@ export function hasVisualQuota(questions: Array<Record<string, unknown>>, minimu
   return questions.filter(hasValidatedQuestionVisual).length >= minimum
 }
 
+/**
+ * Konuya uyan kanonik kazanım bulunamadığında (ör. Türkçe 7'de katalog yalnız "Dinleme/Konuşma/Okuma/Yazma" becerileridir;
+ * "noktalı virgül ve virgül" gibi dil bilgisi konularının kazanımı yoktur) test üretimi yalnızca şu durumlarda sürer:
+ * üniversite düzeyi, kullanıcı dosyası, ÖĞRETMEN kaynaklı test (öğretmenin yazdırma/ödev üretimi) ya da öğrencinin sınıfına
+ * atanmış öğretmen ödevi. Bu durumda sorular `no_candidates` olarak işaretlenir ve kazanım/yetkinlik hesabına girmez.
+ * Öğrencinin kendi başına başlattığı serbest konu testi eskisi gibi engellenir.
+ */
+export function mayGenerateWithoutCanonicalObjectives(input: {
+  isUniversityLevel: boolean
+  hasFileContent: boolean
+  teacherPrint: boolean
+  teacherAssignmentForStudent: boolean
+}): boolean {
+  return input.isUniversityLevel || input.hasFileContent || input.teacherPrint || input.teacherAssignmentForStudent
+}
+
 export function hasCanonicalObjectiveCoverage(
   questions: Array<Record<string, unknown>>,
   candidates: Array<{ id: string }>,
