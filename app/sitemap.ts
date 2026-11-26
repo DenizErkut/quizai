@@ -1,30 +1,36 @@
 // app/sitemap.ts
-// Next.js App Router convention — /sitemap.xml'i otomatik üretir.
-// Sadece GERÇEKTEN herkese açık (giriş gerektirmeyen) sayfalar listelenir —
-// /dashboard, /quiz, /admin gibi kimlik doğrulama arkasındaki sayfalar
-// bilerek dışarıda bırakıldı (bkz. app/robots.ts disallow listesi, aynı
-// mantıkla eşleşiyor).
+// Herkese açık (giriş gerektirmeyen) sayfalar + MEB müfredat içerik merkezi sayfaları.
+// lastModified: statik sayfalar için gerçek içerik tarihi (her istekte "şimdi" yazmak arama motorlarına güvenilmez sinyal verir);
+// müfredat sayfaları için veri tarihi bilinmediğinden belirtilmez.
 import type { MetadataRoute } from 'next'
+import { loadHubIndex } from '@/lib/curriculum-hub'
+import { MIN_INDEXABLE_OBJECTIVES } from '@/lib/curriculum-slug'
 
-export default function sitemap(): MetadataRoute.Sitemap {
+const STATIC_LASTMOD = new Date('2026-11-25T00:00:00Z')
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = 'https://pratium.com'
-  const now = new Date()
-
-  return [
-    { url: base, lastModified: now, changeFrequency: 'weekly', priority: 1 },
-    { url: `${base}/for-students`, lastModified: now, changeFrequency: 'monthly', priority: 0.9 },
-    { url: `${base}/for-parents`, lastModified: now, changeFrequency: 'monthly', priority: 0.9 },
-    { url: `${base}/for-teachers`, lastModified: now, changeFrequency: 'monthly', priority: 0.9 },
-    { url: `${base}/methodology`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
-    { url: `${base}/faq`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
-    { url: `${base}/hakkimizda`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${base}/pricing`, lastModified: now, changeFrequency: 'monthly', priority: 0.9 },
-    { url: `${base}/ozel-kocluk`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
-    { url: `${base}/privacy`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${base}/cookie-policy`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${base}/kaynaklar`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${base}/terms`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${base}/mesafeli-satis`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${base}/teslimat-iade`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
+  const pages: MetadataRoute.Sitemap = [
+    { url: base, lastModified: STATIC_LASTMOD, changeFrequency: 'weekly', priority: 1 },
+    { url: `${base}/for-students`, lastModified: STATIC_LASTMOD, changeFrequency: 'monthly', priority: 0.9 },
+    { url: `${base}/for-parents`, lastModified: STATIC_LASTMOD, changeFrequency: 'monthly', priority: 0.9 },
+    { url: `${base}/for-teachers`, lastModified: STATIC_LASTMOD, changeFrequency: 'monthly', priority: 0.9 },
+    { url: `${base}/mufredat`, lastModified: STATIC_LASTMOD, changeFrequency: 'weekly', priority: 0.9 },
+    { url: `${base}/methodology`, lastModified: STATIC_LASTMOD, changeFrequency: 'monthly', priority: 0.8 },
+    { url: `${base}/faq`, lastModified: STATIC_LASTMOD, changeFrequency: 'monthly', priority: 0.8 },
+    { url: `${base}/hakkimizda`, lastModified: STATIC_LASTMOD, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${base}/pricing`, lastModified: STATIC_LASTMOD, changeFrequency: 'monthly', priority: 0.9 },
+    { url: `${base}/ozel-kocluk`, lastModified: STATIC_LASTMOD, changeFrequency: 'monthly', priority: 0.8 },
+    { url: `${base}/privacy`, lastModified: STATIC_LASTMOD, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${base}/cookie-policy`, lastModified: STATIC_LASTMOD, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${base}/kaynaklar`, lastModified: STATIC_LASTMOD, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${base}/terms`, lastModified: STATIC_LASTMOD, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${base}/mesafeli-satis`, lastModified: STATIC_LASTMOD, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${base}/teslimat-iade`, lastModified: STATIC_LASTMOD, changeFrequency: 'yearly', priority: 0.3 },
   ]
+  try {
+    const hub = (await loadHubIndex()).filter(pair => pair.count >= MIN_INDEXABLE_OBJECTIVES)
+    for (const pair of hub) pages.push({ url: `${base}/mufredat/${pair.gradeSlug}/${pair.subjectSlug}`, changeFrequency: 'monthly', priority: 0.7 })
+  } catch { /* veritabanı erişilemezse yalnız statik sayfalar listelenir */ }
+  return pages
 }
