@@ -37,6 +37,7 @@ export default async function CurriculumPage({ params }: Params) {
   const faqs: Array<[string, string]> = [
     [`${page.grade} ${page.subject} dersinde kaç kazanım var?`, `Pratium kataloğunda ${page.grade} ${page.subject} dersi için ${page.count} doğrulanmış kazanım listelenir; bunlar ${page.units.length} ünite veya öğrenme alanında gruplanır: ${unitNames.slice(0, 8).join(', ')}.`],
     ['Kazanım kodları ne anlama gelir?', 'Kazanım kodu, MEB öğretim programındaki bir öğrenme çıktısını tanımlayan kısaltmadır; ders, sınıf ve sıra numarasını içerir. Bir sorunun hangi kazanımı ölçtüğünü açıkça belirtmek için kullanılır.'],
+    ...page.units.slice(0, 3).map((unit): [string, string] => [`${page.grade} ${page.subject} "${unit.unit}" ünitesinde hangi kazanımlar var?`, `${unit.unit} ünitesinde ${unit.objectives.length} kazanım bulunur. Örneğin: ${unit.objectives.slice(0, 3).map(o => `${o.code} (${o.title.replace(/[.;]+$/, '')})`).join('; ')}.`]),
     ['Pratium bu kazanımlar için soru hazırlar mı?', 'Evet. Pratium, sınıfına ve konuna göre sorular üretir; soruları ilgili kazanımla eşleştirmeyi ve seviyene göre zorluğu ayarlamayı hedefler. Konu düzeyinde eşleşen kazanım yoksa sorular kazanım hesabına girmez.'],
   ]
   const jsonLd = {
@@ -69,12 +70,29 @@ export default async function CurriculumPage({ params }: Params) {
         </div>
         {page.units.map(unit => (
           <section key={unit.unit} className="card" style={{ marginBottom: '1rem' }}>
-            <h2 className="serif" style={{ fontSize: '18px', marginBottom: '0.6rem' }}>{unit.unit}</h2>
+            <h2 className="serif" style={{ fontSize: '18px', marginBottom: '0.4rem' }}>{unit.unit}</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6, margin: '0 0 0.6rem' }}>Bu ünitede {unit.objectives.length} kazanım var; öğrenci şunları yapabilmeyi hedefler: {unit.objectives.slice(0, 3).map(o => o.title.replace(/[.;]+$/, '').toLowerCase()).join('; ')}{unit.objectives.length > 3 ? ' ve diğerleri' : ''}.</p>
             <ul style={{ margin: 0, paddingLeft: '1.1rem', lineHeight: 1.8, fontSize: '14px' }}>
               {unit.objectives.map(objective => <li key={objective.code}><strong>{objective.code}</strong> — {objective.title}</li>)}
             </ul>
           </section>
         ))}
+        {page.samples.length > 0 && (
+          <section style={{ marginTop: '1.5rem' }}>
+            <h2 className="serif" style={{ fontSize: '20px', marginBottom: '0.75rem' }}>Örnek sorular</h2>
+            {page.samples.map(sample => (
+              <article key={sample.code} className="card" style={{ marginBottom: '0.9rem' }}>
+                <p style={{ fontSize: '12px', color: 'var(--text3)', margin: '0 0 4px' }}>Kazanım: {sample.code}</p>
+                <p style={{ fontSize: '15px', lineHeight: 1.6, margin: '0 0 0.5rem', whiteSpace: 'pre-line' }}>{sample.question}</p>
+                <ol type="A" style={{ margin: 0, paddingLeft: '1.3rem', fontSize: '14px', lineHeight: 1.7 }}>{sample.options.map((option, index) => <li key={index}>{option}</li>)}</ol>
+                <details style={{ marginTop: '0.5rem', fontSize: '14px' }}>
+                  <summary style={{ cursor: 'pointer' }}>Doğru cevabı göster</summary>
+                  <p style={{ margin: '0.4rem 0 0' }}><strong>{String.fromCharCode(65 + sample.answerIndex)}) {sample.options[sample.answerIndex]}</strong>{sample.explanation ? ` — ${sample.explanation}` : ''}</p>
+                </details>
+              </article>
+            ))}
+          </section>
+        )}
         <h2 className="serif" style={{ fontSize: '20px', margin: '1.5rem 0 0.75rem' }}>Sık sorulan sorular</h2>
         {faqs.map(([q, a]) => <div key={q} style={{ marginBottom: '0.9rem' }}><h3 style={{ fontSize: '15px', marginBottom: '4px' }}>{q}</h3><p style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: 1.7 }}>{a}</p></div>)}
         {(sameGrade.length > 0 || sameSubject.length > 0) && (

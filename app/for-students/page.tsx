@@ -73,7 +73,7 @@ export default function ForStudentsPage() {
         </div>
 
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <a href="https://pratium.com/register" className="btn btn-primary"><Tr text="Ücretsiz Başla →" /></a>
+          <a href="https://pratium.com/register" className="btn btn-primary"><Tr text="Hemen başla →" /></a>
         </div>
 
         <div style={{ textAlign: 'center', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>

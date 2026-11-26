@@ -66,7 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         '@id': 'https://pratium.com/#organization',
         name: 'Pratium',
         url: 'https://pratium.com',
-        logo: 'https://pratium.com/pratium-logo.png',
+        logo: 'https://pratium.com/logo-512.png',
         description: 'Türkiye K-12 (ilkokul-lise) seviyesinde, MEB müfredatına uygun, yapay zeka destekli sınav hazırlık ve öğrenci gelişim takip platformu.',
         areaServed: { '@type': 'Country', name: 'Türkiye' },
         sameAs: ['https://instagram.com/pratiumai'],
@@ -88,9 +88,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         offers: {
           '@type': 'AggregateOffer',
           priceCurrency: 'TRY',
-          lowPrice: '0',
+          lowPrice: '299',
           highPrice: '19990',
-          offerCount: '3',
+          offerCount: '6',
         },
         audience: {
           '@type': 'EducationalAudience',

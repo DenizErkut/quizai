@@ -4,7 +4,8 @@ import { gradeNumberFromSlug, gradeSlug, slugify } from '@/lib/curriculum-slug'
 
 export interface HubObjective { code: string; title: string; unit: string; topic: string | null }
 export interface HubPair { grade: string; gradeSlug: string; gradeNumber: number; subject: string; subjectSlug: string; count: number }
-export interface HubPage extends HubPair { units: Array<{ unit: string; objectives: HubObjective[] }>; updatedAt: string | null }
+export interface HubSample { code: string; question: string; options: string[]; answerIndex: number; explanation: string }
+export interface HubPage extends HubPair { units: Array<{ unit: string; objectives: HubObjective[] }>; updatedAt: string | null; samples: HubSample[] }
 
 type Row = { objective_code: string; title: string; subject: string; grade: string; unit: string | null; topic: string | null; updated_at: string | null }
 
@@ -40,6 +41,36 @@ function pairsFrom(rows: Row[]): HubPair[] {
   return [...map.values()].sort((a, b) => a.gradeNumber - b.gradeNumber || a.subject.localeCompare(b.subject, 'tr'))
 }
 
+// Örnek sorular: yalnızca onaylı, görselsiz, kitapçık kaynaklı olmayan ve kazanım kodu bu sayfaya ait sorular (telif/kalite güvenliği).
+async function loadSamples(codes: string[]): Promise<HubSample[]> {
+  if (!codes.length) return []
+  try {
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+    const { data } = await db.from('question_bank')
+      .select('q:question->>q,opts:question->opts,ans:question->>ans,exp:question->>exp,code:question->>learningObjectiveCode,status:question->>objectiveMappingStatus')
+      .eq('review_status', 'approved')
+      .in('question->>objectiveMappingStatus', ['human_approved', 'ai_approved'])
+      .in('question->>learningObjectiveCode', codes.slice(0, 200))
+      .is('question->>bookletResourceId', null)
+      .or('question->>hasVisual.is.null,question->>hasVisual.neq.true')
+      .limit(60)
+    const rows = (data || []) as unknown as Array<{ q: string | null; opts: unknown; ans: string | null; exp: string | null; code: string | null; status: string | null }>
+    const seen = new Set<string>()
+    const picked: HubSample[] = []
+    for (const row of rows.sort((a, b) => Number(b.status === 'human_approved') - Number(a.status === 'human_approved'))) {
+      const options = Array.isArray(row.opts) ? row.opts.filter((o): o is string => typeof o === 'string') : []
+      const answerIndex = Number(row.ans)
+      if (!row.q || !row.code || options.length < 3 || !Number.isInteger(answerIndex) || !options[answerIndex]) continue
+      if (row.q.length > 280 || row.q.includes('<') || options.some(o => o.includes('<'))) continue
+      if (seen.has(row.code)) continue // farklı kazanımlardan çeşitlilik
+      seen.add(row.code)
+      picked.push({ code: row.code, question: row.q, options, answerIndex, explanation: (row.exp || '').slice(0, 300) })
+      if (picked.length >= 3) break
+    }
+    return picked
+  } catch { return [] }
+}
+
 export async function loadHubIndex(): Promise<HubPair[]> {
   return pairsFrom(await loadRows())
 }
@@ -58,5 +89,6 @@ export async function loadHubPage(gradeSlugValue: string, subjectSlugValue: stri
     units.set(unit, list)
   }
   const updatedAt = selected.map(row => row.updated_at).filter((value): value is string => Boolean(value)).sort().pop() || null
-  return { page: { ...pair, units: [...units.entries()].map(([unit, objectives]) => ({ unit, objectives })), updatedAt }, all }
+  const samples = await loadSamples(selected.map(row => row.objective_code))
+  return { page: { ...pair, units: [...units.entries()].map(([unit, objectives]) => ({ unit, objectives })), updatedAt, samples }, all }
 }
