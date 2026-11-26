@@ -36,7 +36,7 @@ test('every locale dictionary covers the same keys and keeps placeholders', () =
 
 test('literal t() keys in translated pages exist in the dictionaries', async () => {
   const { readFileSync } = await import('node:fs')
-  const files = ['components/Navbar.tsx', 'app/home/page.tsx', 'app/page.tsx', 'app/(auth)/login/page.tsx']
+  const files = ['components/Navbar.tsx', 'app/home/page.tsx', 'components/LandingPage.tsx', 'app/(auth)/login/page.tsx']
   const missing: string[] = []
   for (const file of files) {
     const source = readFileSync(file, 'utf8')

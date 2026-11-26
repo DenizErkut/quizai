@@ -30,7 +30,7 @@ export default function LandingPage() {
   useEffect(()=>{
     let active = true
     ;(createClient()).auth.getUser()
-      .then(({data:{user}}:any)=>{ if (active && user) router.replace('/quiz') })
+      .then(({data:{user}})=>{ if (active && user) router.replace('/quiz') })
       .catch(()=>{ /* oturum denetimi başarısızsa ziyaretçi sayfada kalır */ })
     return () => { active = false }
   },[router])
