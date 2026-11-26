@@ -4,6 +4,7 @@ import Tr from '@/components/Tr'
 import SiteFooter from '@/components/SiteFooter'
 
 export const metadata = {
+  alternates: { canonical: '/for-teachers' },
   title: 'Öğretmenler İçin | Pratium',
   description: 'Sınıfınızın hangi öğrencisinin desteğe ihtiyacı olduğunu risk gruplamasıyla görün, ödev atayın, not içe aktarın ve yapay zeka destekli sınıf analizleri alın.',
 }

@@ -13,6 +13,8 @@ const sections = [
   ['9. Haklarınız ve iletişim', 'KVKK’nın 11’inci maddesindeki haklarınıza ilişkin taleplerinizi info@pratium.com.tr adresine iletebilirsiniz. Ayrıntılı veri işleme açıklamaları için Gizlilik Politikası ve KVKK Aydınlatma Metni’ni inceleyebilirsiniz.'],
 ]
 
+export const metadata = { title: 'Çerez Politikası | Pratium', description: 'Pratium çerez politikası: kullanılan çerez türleri, amaçları ve tercihlerini nasıl yönetebileceğin.', alternates: { canonical: '/cookie-policy' } }
+
 export default function CookiePolicyPage() {
   return <main className="legal-page"><div className="legal-shell"><Link href="/" className="legal-logo"><img src="/pratium-logo-new.svg" alt="Pratium" /></Link><span className="warm-badge">Yasal bilgilendirme</span><h1>Çerez Politikası</h1><p className="legal-date">Son güncelleme: 1 Eylül 2026</p><div className="legal-intro">Bu metin, kullandığımız çerez ve benzeri teknolojileri; bunların amaçlarını ve tercihlerinizi nasıl yönetebileceğinizi açıklar.</div>{sections.map(([title,text])=><section className="card" key={title}><h2>{title}</h2><p>{text}</p></section>)}<div className="legal-links"><Link href="/privacy">Gizlilik Politikası ve KVKK Aydınlatma Metni</Link><Link href="/kvkk/aydinlatma">KVKK Aydınlatma Metni</Link></div></div><SiteFooter /></main>
 }

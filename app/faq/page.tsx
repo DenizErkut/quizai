@@ -3,6 +3,7 @@ import Tr from '@/components/Tr'
 import SiteFooter from '@/components/SiteFooter'
 
 export const metadata = {
+  alternates: { canonical: '/faq' },
   title: 'Sık Sorulan Sorular | Pratium',
   description: 'Pratium hakkında en çok sorulan sorular — fiyatlandırma, veri güvenliği, hangi sınıflar için uygun olduğu ve daha fazlası.',
 }

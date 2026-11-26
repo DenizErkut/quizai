@@ -3,6 +3,7 @@ import Tr from '@/components/Tr'
 import SiteFooter from '@/components/SiteFooter'
 
 export const metadata = {
+  alternates: { canonical: '/methodology' },
   title: 'Metodolojimiz | Pratium',
   description: 'Pratium\'un yapay zeka soru üretimi, 3 katmanlı doğrulama, adaptif zorluk ayarı ve Sokratik öğretim yaklaşımı nasıl çalışır — teknik ve pedagojik yaklaşımımız.',
 }

@@ -3,6 +3,7 @@ import Tr from '@/components/Tr'
 import SiteFooter from '@/components/SiteFooter'
 
 export const metadata = {
+  alternates: { canonical: '/for-parents' },
   title: 'Veliler İçin | Pratium',
   description: 'Çocuğunuzun akademik gelişimini haftalık otomatik özetlerle ve bir konu risk oluşturduğunda anlık bildirimlerle takip edin. KVKK uyumlu, kimlik verisi ayrı saklanır.',
 }

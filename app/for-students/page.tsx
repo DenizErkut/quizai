@@ -3,6 +3,7 @@ import Tr from '@/components/Tr'
 import SiteFooter from '@/components/SiteFooter'
 
 export const metadata = {
+  alternates: { canonical: '/for-students' },
   title: 'Öğrenciler İçin | Pratium',
   description: 'Pratium, MEB müfredatına uygun, seviyene göre kendiliğinden zorlaşan/kolaylaşan yapay zeka destekli sorularla çalışmanı sağlar. İlkokuldan üniversiteye, sınırsız kişiselleştirilmiş test.',
 }

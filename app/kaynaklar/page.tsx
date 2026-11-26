@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import SiteFooter from '@/components/SiteFooter'
 
-export const metadata = { title: 'Kaynaklar ve Atıflar | Pratium' }
+export const metadata = { title: 'Kaynaklar ve Atıflar | Pratium', description: 'Pratium\'un kullandığı müfredat ve içerik kaynakları (MEB, ACARA, DfE) ve lisans atıfları.', alternates: { canonical: '/kaynaklar' } }
 
 const sections: [string, string][] = [
   ['Avustralya Müfredatı (ACARA)', '© Australian Curriculum, Assessment and Reporting Authority (ACARA) 2010 to present, unless otherwise indicated. This material was downloaded from the Australian Curriculum website (www.australiancurriculum.edu.au) (accessed 23 October 2026) and was modified (first letter capitalised, formatting symbols simplified, assigned to Pratium grade levels). The material is licensed under CC BY 4.0 Attribution 4.0 International Deed (https://creativecommons.org/licenses/by/4.0/). ACARA does not endorse any product that uses the Australian Curriculum.'],
