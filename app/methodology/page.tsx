@@ -1,8 +1,10 @@
 import Link from 'next/link'
 import Tr from '@/components/Tr'
 import SiteFooter from '@/components/SiteFooter'
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd'
 
 export const metadata = {
+  alternates: { canonical: '/methodology' },
   title: 'Metodolojimiz | Pratium',
   description: 'Pratium\'un yapay zeka soru üretimi, 3 katmanlı doğrulama, adaptif zorluk ayarı ve Sokratik öğretim yaklaşımı nasıl çalışır — teknik ve pedagojik yaklaşımımız.',
 }
@@ -38,6 +40,7 @@ const sections = [
 export default function MethodologyPage() {
   return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', padding: '2rem 1.5rem' }}>
+      <BreadcrumbJsonLd name="Metodolojimiz" path="/methodology" />
       <div style={{ maxWidth: '760px', margin: '0 auto' }}>
 
         <div style={{ marginBottom: '2rem' }}>

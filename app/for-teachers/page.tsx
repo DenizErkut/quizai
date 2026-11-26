@@ -2,8 +2,10 @@ import TeacherMembershipNotice from '@/components/teacher/TeacherMembershipNotic
 import Link from 'next/link'
 import Tr from '@/components/Tr'
 import SiteFooter from '@/components/SiteFooter'
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd'
 
 export const metadata = {
+  alternates: { canonical: '/for-teachers' },
   title: 'Öğretmenler İçin | Pratium',
   description: 'Sınıfınızın hangi öğrencisinin desteğe ihtiyacı olduğunu risk gruplamasıyla görün, ödev atayın, not içe aktarın ve yapay zeka destekli sınıf analizleri alın.',
 }
@@ -39,6 +41,7 @@ const features = [
 export default function ForTeachersPage() {
   return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', padding: '2rem 1.5rem' }}>
+      <BreadcrumbJsonLd name="Öğretmenler İçin" path="/for-teachers" />
       <div style={{ maxWidth: '760px', margin: '0 auto' }}>
 
         <div style={{ marginBottom: '2rem' }}>

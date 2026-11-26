@@ -36,9 +36,9 @@ export const metadata: Metadata = {
     siteName: 'Pratium',
     images: [
       {
-        url: 'https://pratium.com/pratium-logo.png',
-        width: 1254,
-        height: 1254,
+        url: 'https://pratium.com/og-pratium.png',
+        width: 1200,
+        height: 630,
         alt: 'Pratium — AI Destekli Eğitim Platformu',
       }
     ],
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Pratium — Öğren. Test Et. Geliş.',
     description: 'AI destekli soru üretimi, gerçek zamanlı analiz. İlkokuldan üniversiteye 6 dilde eğitim platformu.',
-    images: ['https://pratium.com/pratium-logo.png'],
+    images: ['https://pratium.com/og-pratium.png'],
   },
 }
 

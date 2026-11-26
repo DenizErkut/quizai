@@ -1,8 +1,10 @@
 import Link from 'next/link'
 import Tr from '@/components/Tr'
 import SiteFooter from '@/components/SiteFooter'
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd'
 
 export const metadata = {
+  alternates: { canonical: '/for-parents' },
   title: 'Veliler İçin | Pratium',
   description: 'Çocuğunuzun akademik gelişimini haftalık otomatik özetlerle ve bir konu risk oluşturduğunda anlık bildirimlerle takip edin. KVKK uyumlu, kimlik verisi ayrı saklanır.',
 }
@@ -33,6 +35,7 @@ const features = [
 export default function ForParentsPage() {
   return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', padding: '2rem 1.5rem' }}>
+      <BreadcrumbJsonLd name="Veliler İçin" path="/for-parents" />
       <div style={{ maxWidth: '760px', margin: '0 auto' }}>
 
         <div style={{ marginBottom: '2rem' }}>
