@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Tr from '@/components/Tr'
 import SiteFooter from '@/components/SiteFooter'
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd'
 
 export const metadata = {
   alternates: { canonical: '/faq' },
@@ -56,6 +57,7 @@ const faqJsonLd = {
 export default function FaqPage() {
   return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', padding: '2rem 1.5rem' }}>
+      <BreadcrumbJsonLd name="Sık Sorulan Sorular" path="/faq" />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}

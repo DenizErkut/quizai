@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Tr from '@/components/Tr'
 import SiteFooter from '@/components/SiteFooter'
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd'
 
 export const metadata = {
   alternates: { canonical: '/for-students' },
@@ -42,6 +43,7 @@ const otherModes = [
 export default function ForStudentsPage() {
   return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', padding: '2rem 1.5rem' }}>
+      <BreadcrumbJsonLd name="Öğrenciler İçin" path="/for-students" />
       <div style={{ maxWidth: '760px', margin: '0 auto' }}>
 
         <div style={{ marginBottom: '2rem' }}>

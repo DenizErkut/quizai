@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import SiteFooter from '@/components/SiteFooter'
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd'
 
 export const metadata = { title: 'Kaynaklar ve Atıflar | Pratium', description: 'Pratium\'un kullandığı müfredat ve içerik kaynakları (MEB, ACARA, DfE) ve lisans atıfları.', alternates: { canonical: '/kaynaklar' } }
 
@@ -10,5 +11,6 @@ const sections: [string, string][] = [
 ]
 
 export default function SourcesPage() {
-  return <main className="legal-page"><div className="legal-shell"><Link href="/" className="legal-logo"><img src="/pratium-logo-new.svg" alt="Pratium" /></Link><span className="warm-badge">Kaynaklar</span><h1>Kaynaklar ve Atıflar</h1><div className="legal-intro">Pratium’da kullanılan müfredat kazanımlarının kaynakları ve lisans atıfları aşağıdadır.</div>{sections.map(([title, text]) => <section className="card" key={title}><h2>{title}</h2><p>{text}</p></section>)}<div className="legal-links"><Link href="/methodology">Metodoloji</Link></div></div><SiteFooter /></main>
+  return <main className="legal-page">
+      <BreadcrumbJsonLd name="Kaynaklar ve Atıflar" path="/kaynaklar" /><div className="legal-shell"><Link href="/" className="legal-logo"><img src="/pratium-logo-new.svg" alt="Pratium" /></Link><span className="warm-badge">Kaynaklar</span><h1>Kaynaklar ve Atıflar</h1><div className="legal-intro">Pratium’da kullanılan müfredat kazanımlarının kaynakları ve lisans atıfları aşağıdadır.</div>{sections.map(([title, text]) => <section className="card" key={title}><h2>{title}</h2><p>{text}</p></section>)}<div className="legal-links"><Link href="/methodology">Metodoloji</Link></div></div><SiteFooter /></main>
 }

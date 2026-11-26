@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd'
 
 export const metadata: Metadata = {
   title: 'Hakkımızda | Pratium',
@@ -7,5 +8,5 @@ export const metadata: Metadata = {
 }
 
 export default function Layout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return children
+  return <><BreadcrumbJsonLd name="Hakkımızda" path="/hakkimizda" />{children}</>
 }
